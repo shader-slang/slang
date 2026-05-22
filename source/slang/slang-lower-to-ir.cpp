@@ -3753,22 +3753,25 @@ static Type* _findReplacementThisParamType(IRGenContext* context, DeclRef<Decl> 
     return nullptr;
 }
 
-// Structural test: returns true for a `LookupDeclRef` whose lookup source
-// resolves to a `CallableDecl`-typed `DeclRefType`. Today, the only producer
-// of this shape in the front end is `convertHigherOrderExprToLookup`, which
-// rewrites `__fwd_diff(member.method)` / `__bwd_diff(member.method)` into a
+// Structural test: returns the `LookupDeclRef` if `declRefBase` is a
+// `LookupDeclRef` whose lookup source resolves to a `CallableDecl`-typed
+// `DeclRefType`, else null. The predicate itself is structural — it does
+// not check AD-ness — but today's only producer of this shape in the
+// front end is `convertHigherOrderExprToLookup`, which rewrites
+// `__fwd_diff(member.method)` / `__bwd_diff(member.method)` into a
 // member access on the function-as-type of the underlying member method
 // (the AD 2.0 rewrite). The four lowering call sites that consult this
-// predicate therefore use it as a stand-in for "this DeclRef came out of
-// the AD 2.0 rewrite," even though the predicate is not AD-specific by
-// construction. If a future change introduces a fresh
+// helper therefore use it as a stand-in for "this DeclRef came out of
+// the AD 2.0 rewrite". If a future change introduces a fresh
 // `LookupDeclRef`-on-`CallableDecl` shape from a non-AD producer, every
-// call site below must be re-validated — keep this comment in sync. See
-// shader-slang/slang#11004.
-static bool isAdLookupOnCallable(DeclRefBase* declRefBase)
+// call site below must be re-validated — keep this comment in sync.
+// See shader-slang/slang#11004.
+static LookupDeclRef* asLookupOnCallable(DeclRefBase* declRefBase)
 {
     auto lookup = as<LookupDeclRef>(declRefBase);
-    return lookup && isDeclRefTypeOf<CallableDecl>(lookup->getLookupSource());
+    if (lookup && isDeclRefTypeOf<CallableDecl>(lookup->getLookupSource()))
+        return lookup;
+    return nullptr;
 }
 
 /// Get the type of the `this` parameter introduced by `parentDeclRef`, or null.
@@ -3800,7 +3803,7 @@ Type* getThisParamTypeForCallable(IRGenContext* context, DeclRef<Decl> callableD
     {
         auto lookupSource = lookup->getLookupSource();
         // Hack for AD 2.0..
-        if (isAdLookupOnCallable(callableDeclRef.declRefBase))
+        if (asLookupOnCallable(callableDeclRef.declRefBase))
         {
             return getThisParamTypeForCallable(
                 context,
@@ -4357,11 +4360,10 @@ void _lowerInfoFromFuncType(
             getActualParamPassingModeForImplicitThisParam(declRef.getDecl(), thisType);
 
         // Hack for how this-types work for looked up function for AD 2.0..
-        if (isAdLookupOnCallable(declRef.declRefBase))
+        if (auto lookup = asLookupOnCallable(declRef.declRefBase))
         {
-            auto lookupSource = as<LookupDeclRef>(declRef.declRefBase)->getLookupSource();
             innerThisParamDirection = getActualParamPassingModeForImplicitThisParam(
-                as<DeclRefType>(lookupSource)->getDeclRef().getDecl(),
+                as<DeclRefType>(lookup->getLookupSource())->getDeclRef().getDecl(),
                 thisType);
         }
 
@@ -4826,7 +4828,7 @@ struct ExprLoweringContext
             // Plain `obj.someStaticMember()` reaches this branch with
             // the same `SharedTypeExpr` wrapper but must not synthesize
             // a `this` arg.
-            if (isAdLookupOnCallable(outInfo->funcDeclRef.declRefBase))
+            if (asLookupOnCallable(outInfo->funcDeclRef.declRefBase))
             {
                 // `convertHigherOrderExprToLookup` (slang-check-expr.cpp)
                 // routes the AD 2.0 rewrite through
@@ -4834,16 +4836,17 @@ struct ExprLoweringContext
                 // receiver in a `SharedTypeExpr` in its `This`-breadcrumb
                 // branch and forwards it to `ConstructDeclRefExpr` as the
                 // already-built base expression
-                // (`SharedTypeExpr::base.exp = <receiver>`). If this
-                // invariant ever changes upstream (a new producer of
-                // `LookupDeclRef`-on-`CallableDecl` that doesn't go via
-                // `SharedTypeExpr`) the silent fallback would drop the
-                // receiver and reproduce #11004's miscompile shape;
-                // assert here so the failure surfaces at this point
-                // instead.
+                // (`SharedTypeExpr::base.exp = <receiver>`). Use
+                // `SLANG_RELEASE_ASSERT` so the invariant holds in every
+                // build configuration — `SLANG_ASSERT` elides under
+                // `SLANG_ASSERT=release-assert-only` per the CLAUDE.md
+                // assertion-mode table, which would silently drop the
+                // receiver and reproduce #11004's miscompile shape if a
+                // future synthesis path produced a non-`SharedTypeExpr`
+                // baseExpression on this branch.
                 auto sharedTypeBase =
                     as<SharedTypeExpr>(staticMemberFuncExpr->baseExpression);
-                SLANG_ASSERT(sharedTypeBase && sharedTypeBase->base.exp);
+                SLANG_RELEASE_ASSERT(sharedTypeBase && sharedTypeBase->base.exp);
                 outInfo->baseExpr = sharedTypeBase->base.exp;
             }
             return true;
@@ -5327,14 +5330,14 @@ struct ExprLoweringContext
                 // mis-routing per-arg passing modes for unrelated
                 // shapes that happen to satisfy `paramCount ==
                 // argCount + 1`.
+                Count argCount = expr->arguments.getCount();
                 bool funcTypeAlreadyHasImplicitThis = false;
                 if (baseExpr)
                 {
                     if (auto thisType = getThisParamTypeForCallable(context, funcDeclRef))
                     {
-                        if (isAdLookupOnCallable(funcDeclRef.declRefBase) &&
-                            resolvedFuncType->getParamCount() ==
-                                static_cast<Count>(expr->arguments.getCount()) + 1)
+                        if (asLookupOnCallable(funcDeclRef.declRefBase) &&
+                            resolvedFuncType->getParamCount() == argCount + 1)
                         {
                             funcTypeAlreadyHasImplicitThis = true;
                         }
@@ -5359,10 +5362,6 @@ struct ExprLoweringContext
 
                 if (funcTypeAlreadyHasImplicitThis)
                 {
-                    Count argCount = expr->arguments.getCount();
-                    SLANG_ASSERT(
-                        resolvedFuncType->getParamCount() ==
-                        static_cast<Count>(argCount) + 1);
                     for (Index i = 0; i < argCount; ++i)
                     {
                         auto paramInfo = resolvedFuncType->getParamInfo(i + 1);

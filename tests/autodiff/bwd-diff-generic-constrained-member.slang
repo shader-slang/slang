@@ -18,7 +18,7 @@
 //     gradDiffThis<ScalarCurve>(s, 1.0) =  6.0
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4)
 
 interface ICurve : IDifferentiable
 {
@@ -27,6 +27,13 @@ interface ICurve : IDifferentiable
 
     [Differentiable]
     float eval2(float t, float u);
+
+    // `inout` parameter exercises the per-arg `getParamInfo(i + 1)`
+    // loop on an `inout DifferentialPair<T>` shape, not just the
+    // by-value `DifferentialPair<T>` shape the by-value variants
+    // produce.
+    [Differentiable]
+    void accumulate(inout float acc, float t);
 }
 
 struct Helix : ICurve, IDifferentiable
@@ -44,6 +51,13 @@ struct Helix : ICurve, IDifferentiable
     {
         return 3.0 * t * t + 5.0 * u * u;
     }
+
+    [Differentiable]
+    [NoDiffThis]
+    void accumulate(inout float acc, float t)
+    {
+        acc = acc + 7.0 * t * t;
+    }
 }
 
 struct ScalarCurve : ICurve, IDifferentiable
@@ -60,6 +74,12 @@ struct ScalarCurve : ICurve, IDifferentiable
     float eval2(float t, float u)
     {
         return k * (t + u);
+    }
+
+    [Differentiable]
+    void accumulate(inout float acc, float t)
+    {
+        acc = acc + k * t * t;
     }
 }
 
@@ -102,6 +122,23 @@ float gradMulti2DiffThis<C : ICurve>(C curve, float t, float u, float dResult)
     return pt.d;
 }
 
+// `inout DifferentialPair<T>` parameter shape: per-arg
+// `getParamInfo(i + 1)` loop must route this slot's mode correctly
+// for the bwd lookup through the AD 2.0 lookup-on-callable rewrite.
+// `accumulate(inout acc, t)` adds `7*t*t` (Helix) or `k*t*t`
+// (ScalarCurve). The bwd-mode signature wraps both `acc` and `t` as
+// `inout DifferentialPair<float>`. With `dResult = 1.0` flowing
+// backward through `acc`, the gradient w.r.t. `t` is the `acc`-mode
+// derivative `2 * <coeff> * t`.
+[Differentiable]
+float gradAccumulate<C : ICurve>(C curve, float t, float dAcc)
+{
+    var pAcc = diffPair(0.0, dAcc);
+    var pT = diffPair(t, 0.0);
+    __bwd_diff(curve.accumulate)(pAcc, pT);
+    return pT.d;
+}
+
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -137,4 +174,14 @@ void computeMain()
     // Multi-arg + differentiable-`this`: ∂(k*(t+u))/∂t = k = 3.0
     // CHECK: 3.0
     outputBuffer[6] = gradMulti2DiffThis<ScalarCurve>(s, 1.0, 2.0, 1.0);
+
+    // `inout DifferentialPair<T>` shape: ∂(7*t*t)/∂t with dAcc=1
+    // gives 2*7*t = 14*t. At t=2: 28.0.
+    // CHECK: 28.0
+    outputBuffer[7] = gradAccumulate<Helix>(h, 2.0, 1.0);
+
+    // ScalarCurve.accumulate adds k*t*t: ∂/∂t with dAcc=1 is 2*k*t.
+    // At t=2, k=3: 12.0.
+    // CHECK: 12.0
+    outputBuffer[8] = gradAccumulate<ScalarCurve>(s, 2.0, 1.0);
 }
