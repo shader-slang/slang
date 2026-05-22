@@ -3753,11 +3753,17 @@ static Type* _findReplacementThisParamType(IRGenContext* context, DeclRef<Decl> 
     return nullptr;
 }
 
-// AD 2.0 lookup-on-callable shape: a `LookupDeclRef` whose lookup source is a
-// `CallableDecl`-typed type, produced by `convertHigherOrderExprToLookup` when
-// `__fwd_diff(member.method)` / `__bwd_diff(member.method)` is rewritten into
-// `member.method.fwd_diff` / `.bwd_diff`. Used by several lowering paths to
-// recognise the substituted shape and recover the underlying callable. See
+// Structural test: returns true for a `LookupDeclRef` whose lookup source
+// resolves to a `CallableDecl`-typed `DeclRefType`. Today, the only producer
+// of this shape in the front end is `convertHigherOrderExprToLookup`, which
+// rewrites `__fwd_diff(member.method)` / `__bwd_diff(member.method)` into a
+// member access on the function-as-type of the underlying member method
+// (the AD 2.0 rewrite). The four lowering call sites that consult this
+// predicate therefore use it as a stand-in for "this DeclRef came out of
+// the AD 2.0 rewrite," even though the predicate is not AD-specific by
+// construction. If a future change introduces a fresh
+// `LookupDeclRef`-on-`CallableDecl` shape from a non-AD producer, every
+// call site below must be re-validated — keep this comment in sync. See
 // shader-slang/slang#11004.
 static bool isAdLookupOnCallable(DeclRefBase* declRefBase)
 {
