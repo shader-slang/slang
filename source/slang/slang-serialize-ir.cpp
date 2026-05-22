@@ -627,6 +627,16 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         SLANG_RELEASE_ASSERT(totalChildren == numInsts - 1);
     }
 
+    // Hard per-instruction cap on operand count. Even with the cumulative
+    // invariant below, a blob with very few insts can concentrate the entire
+    // operandIndices budget into a single inst (e.g. numInsts==2 with
+    // operandCount[0] ~= operandIndicesCount), causing _allocateInst to
+    // request gigabytes of arena memory for a single inst's IRUse table
+    // (sizeof(IRUse) == 16 bytes). 65536 is far above any realistic Slang IR
+    // inst — even very-wide struct constructors / generic instantiations stay
+    // in the low thousands — while bounding the per-inst allocation to ~1 MB.
+    constexpr Int64 kMaxOperandsPerInst = 65536;
+
     // Validate cumulative operand consumption before any allocation. Each inst
     // contributes 1 + operandCount operand-index slots (one for typeUse, plus
     // one per operand), and a well-formed flat module sums to exactly
@@ -638,8 +648,9 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         Int64 expectedOperandIndices = 0;
         for (Int64 i = 0; i < numInsts; ++i)
         {
-            const Int64 contribution = 1 + (Int64)flat.instAllocInfo[i].operandCount;
-            SLANG_RELEASE_ASSERT(contribution >= 1);
+            const Int64 operandCount = (Int64)flat.instAllocInfo[i].operandCount;
+            SLANG_RELEASE_ASSERT(operandCount >= 0 && operandCount <= kMaxOperandsPerInst);
+            const Int64 contribution = 1 + operandCount;
             SLANG_RELEASE_ASSERT(contribution <= operandIndicesCount - expectedOperandIndices);
             expectedOperandIndices += contribution;
         }
