@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry compute_main
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry compute_main
 
 // RWStructuredBuffer<int*> wrapped in a struct (RWValueRef), which is
 // then a field of a ParameterBlock struct alongside a bare pointer field.
@@ -30,6 +31,8 @@ ParameterBlock<CallData> call_data;
 // CHECK: };
 
 // CHECK-LABEL: compute_main
+
+// METALLIB: compute_main
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

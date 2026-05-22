@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Triple pointer: ensures the fix handles arbitrary nesting depth.
 // Metal rejects pointer-to-pointer types in buffer pointee types (regardless
@@ -23,6 +24,8 @@ ParameterBlock<DeepPointer> params;
 // the full pointer chain.
 // CHECK-LABEL: computeMain
 // CHECK: int device*
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

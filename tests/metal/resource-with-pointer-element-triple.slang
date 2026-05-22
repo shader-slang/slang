@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Triple pointer variant: RWStructuredBuffer<int**> inside a ParameterBlock.
 // The element type `int**` is a pointer-to-pointer, which Metal rejects in
@@ -24,6 +25,8 @@ ParameterBlock<IndirectStore> params;
 // The kernel body should cast ulong back to a typed pointer.
 // CHECK-LABEL: computeMain
 // CHECK: int device*
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

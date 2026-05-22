@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Metal rejects pointer-to-pointer types in buffer pointee types,
 // regardless of address space qualifiers or nesting depth. The type
@@ -27,6 +28,8 @@ ParameterBlock<CopyParams> params;
 
 // The kernel body accesses pointers directly (no ulong cast needed).
 // CHECK-LABEL: computeMain
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

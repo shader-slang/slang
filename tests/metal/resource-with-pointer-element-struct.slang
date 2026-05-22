@@ -3,7 +3,8 @@
 
 // Struct element type containing pointers inside a resource inside a ParameterBlock.
 // RWStructuredBuffer<PtrWrapper> where PtrWrapper has an int* field.
-// This exercises the recursive struct-walking path in element type lowering.
+// Since PtrWrapper contains only single-level pointers, no lowering is needed —
+// Metal accepts `device int*` inside structs in buffer-bound contexts.
 //
 // See: https://github.com/shader-slang/slang/issues/10841
 
@@ -19,20 +20,17 @@ struct Store
 
 ParameterBlock<Store> params;
 
-// The struct element type should have its pointer lowered to ulong.
+// The struct element type keeps its pointer as a typed device pointer (no lowering).
 // CHECK-LABEL: struct PtrWrapper
-// CHECK: ulong p
+// CHECK: int device* p
 // CHECK: };
 
-// The argument-buffer struct should reference the lowered element type
-// without any pointer-to-pointer.
+// The argument-buffer struct should not contain pointer-to-pointer.
 // CHECK-LABEL: struct Store
 // CHECK-NOT: device{{.*}}device
 // CHECK: };
 
-// The kernel body should cast ulong back to a typed pointer.
 // CHECK-LABEL: computeMain
-// CHECK: int device*
 
 // METALLIB: computeMain
 

@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // RWStructuredBuffer<int*> inside a struct inside a ParameterBlock produces
 // a pointer-to-pointer in the argument buffer struct, which Metal rejects
@@ -27,6 +28,8 @@ ParameterBlock<ValueStore> params;
 // The kernel body should cast ulong back to a typed pointer.
 // CHECK-LABEL: computeMain
 // CHECK: (int device*)
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(32, 1, 1)]

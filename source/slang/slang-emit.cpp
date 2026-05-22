@@ -94,6 +94,7 @@
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-metal-legalize.h"
+#include "slang-ir-metal-lower-buffer-pointers.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
@@ -2213,9 +2214,6 @@ Result linkAndOptimizeIR(
     else if (isKhronosTarget(targetRequest))
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::KhronosTarget;
-    else if (isMetalTarget(targetRequest))
-        bufferElementTypeLoweringOptions.loweringPolicyKind =
-            BufferElementTypeLoweringPolicyKind::Metal;
     else
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::Default;
@@ -2364,6 +2362,15 @@ Result linkAndOptimizeIR(
 
     // Run a final round of simplifications to clean up unused things after phi-elimination.
     SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
+
+    // Metal rejects pointer-to-pointer types in buffer-bound structs.
+    // Lower affected pointer fields to UIntPtr very late so that all
+    // intermediate passes (address-space specialization, inlining,
+    // simplification) see real pointer types.
+    if (isMetalTarget(targetRequest))
+    {
+        SLANG_PASS(lowerMetalBufferPointerTypes);
+    }
 
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should

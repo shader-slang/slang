@@ -410,29 +410,6 @@ void maybeAddPhysicalTypeDecoration(IRBuilder& builder, IRInst* type, TypeLoweri
         builder.addPhysicalTypeDecoration(type);
 }
 
-static bool metalContainsMultiLevelPointerImpl(IRType* type, HashSet<IRType*>& visited)
-{
-    if (auto ptrType = as<IRPtrType>(type))
-        return as<IRPtrType>(ptrType->getValueType()) != nullptr;
-    if (auto structType = as<IRStructType>(type))
-    {
-        if (!visited.add(type))
-            return false;
-        for (auto field : structType->getFields())
-            if (metalContainsMultiLevelPointerImpl(field->getFieldType(), visited))
-                return true;
-    }
-    if (auto arrayType = as<IRArrayType>(type))
-        return metalContainsMultiLevelPointerImpl(arrayType->getElementType(), visited);
-    return false;
-}
-
-static bool metalContainsMultiLevelPointer(IRType* type)
-{
-    HashSet<IRType*> visited;
-    return metalContainsMultiLevelPointerImpl(type, visited);
-}
-
 struct LoweredElementTypeContext
 {
     static const IRIntegerValue kMaxArraySizeToUnroll = 32;
@@ -893,59 +870,6 @@ struct LoweredElementTypeContext
 
             return info;
         }
-
-        // Metal ParameterBlock: for resource types whose element contains multi-level
-        // pointers, lower those elements before the existing DescriptorHandle wrapping.
-        // E.g. RWStructuredBuffer<int**> has its element rewritten to ulong so the
-        // wrapped result is DescriptorHandle(RWStructuredBuffer<ulong>) instead of
-        // DescriptorHandle(RWStructuredBuffer<int**>). Single-level pointer elements
-        // (e.g. RWStructuredBuffer<int*>) are left to the late pass
-        // (MetalBufferElementTypeLoweringPolicy) since the buffer is in StorageBuffer
-        // address space.
-        if (config.layoutRuleName == IRTypeLayoutRuleName::MetalParameterBlock &&
-            isResourceType(type))
-        {
-            IRType* elemType = nullptr;
-            if (auto builtinGeneric = as<IRBuiltinGenericType>(type))
-                elemType = builtinGeneric->getElementType();
-
-            // Only enter resource-element lowering when the element type actually
-            // contains multi-level pointers. getLoweredTypeInfo always creates a
-            // distinct storage type for structs in non-Natural layouts, even when
-            // no fields change; using it as a guard would cause every
-            // RWStructuredBuffer<SomeStruct> to get a spurious _default variant,
-            // breaking Metal's cross-type struct assignment.
-            if (elemType && metalContainsMultiLevelPointer(elemType))
-            {
-                auto loweredElemInfo = getLoweredTypeInfo(elemType, config);
-                if (loweredElemInfo.loweredType != loweredElemInfo.originalType)
-                {
-                    ShortList<IRInst*> typeOperands;
-                    for (UInt i = 0; i < type->getOperandCount(); i++)
-                        typeOperands.add(type->getOperand(i));
-                    typeOperands[0] = loweredElemInfo.loweredType;
-                    auto resourceTypeForDescriptor = builder.getType(
-                        type->getOp(),
-                        (UInt)typeOperands.getCount(),
-                        typeOperands.getArrayView().getBuffer());
-
-                    auto leafInfo = leafTypeLoweringPolicy->lowerLeafLogicalType(
-                        resourceTypeForDescriptor,
-                        config);
-                    // Override originalType to the logical (user-facing) resource type
-                    // (e.g. RWStructuredBuffer<int*>), not the rebuilt type with lowered
-                    // elements (RWStructuredBuffer<ulong>). This is safe because:
-                    //  - ConversionMethod::apply takes an explicit resultType from the
-                    //    caller, not from this field.
-                    //  - Struct unpack uses field->getFieldType() as the cast result type.
-                    //  - CastDescriptorHandleToResource is a no-op in the Metal emitter.
-                    //  - Cache lookups need the logical type as the key for consistency.
-                    leafInfo.originalType = type;
-                    return leafInfo;
-                }
-            }
-        }
-
         return leafTypeLoweringPolicy->lowerLeafLogicalType(type, config);
     }
 
@@ -974,21 +898,6 @@ struct LoweredElementTypeContext
         }
         if (loweredTypeInfo.tryGetValue(type, info))
             return info;
-
-        // Pre-populate cache with identity mapping as a sentinel to break cycles
-        // from buffer-indirected recursive types (e.g. struct A { RWStructuredBuffer<B> }
-        // + struct B { A a; }). Re-entrant calls hit this sentinel and return "no change".
-        //
-        // Note: if mutual recursion with non-trivial lowering were reachable, the
-        // identity sentinel could leak stale (un-lowered) types into dependent structs.
-        // This is safe in practice because the front-end rejects recursive structured
-        // buffer element types (validateStructuredBufferElementType calls
-        // containsRecursiveType, which unwraps resource types to detect cycles).
-        // See tests/diagnostics/structuredbuffer-resource-struct-recursive*.slang.
-        info.originalType = type;
-        info.loweredType = type;
-        loweredTypeInfo.set(type, info);
-
         info = getLoweredTypeInfoImpl(type, config);
         IRSizeAndAlignment sizeAlignment;
         getSizeAndAlignment(
@@ -1736,16 +1645,6 @@ struct LoweredElementTypeContext
         return clonedFunc;
     }
 
-    bool needsBufferElementLowering(IRType* elementType)
-    {
-        if (as<IRStructType>(elementType) || as<IRMatrixType>(elementType) ||
-            as<IRArrayType>(elementType) || as<IRBoolType>(elementType))
-            return true;
-        if (isMetalTarget(target->getTargetReq()) && as<IRPtrType>(elementType))
-            return true;
-        return false;
-    }
-
     void processModule(IRModule* module)
     {
         IRBuilder builder(module);
@@ -1799,7 +1698,8 @@ struct LoweredElementTypeContext
 
             if (as<IRTextureBufferType>(globalInst))
                 continue;
-            if (!needsBufferElementLowering(elementType))
+            if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) &&
+                !as<IRArrayType>(elementType) && !as<IRBoolType>(elementType))
                 continue;
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
         }
@@ -2913,18 +2813,6 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
     }
 };
 
-static LoweredElementTypeInfo makeMetalPointerAsUInt64Info(IRType* type)
-{
-    IRBuilder builder(type);
-    builder.setInsertBefore(type);
-    LoweredElementTypeInfo info = {};
-    info.originalType = type;
-    info.loweredType = builder.getUInt64Type();
-    info.convertLoweredToOriginal = kIROp_CastIntToPtr;
-    info.convertOriginalToLowered = kIROp_CastPtrToInt;
-    return info;
-}
-
 struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
 {
     MetalParameterBlockElementTypeLoweringPolicy(
@@ -2943,67 +2831,17 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
     {
-        if (config.layoutRuleName == IRTypeLayoutRuleName::MetalParameterBlock)
+        if (config.layoutRuleName == IRTypeLayoutRuleName::MetalParameterBlock &&
+            isResourceType(type))
         {
-            if (isResourceType(type))
-            {
-                IRBuilder builder(type);
-                builder.setInsertBefore(type);
-                LoweredElementTypeInfo info = {};
-                info.originalType = type;
-                info.loweredType = builder.getType(kIROp_DescriptorHandleType, type);
-                info.convertLoweredToOriginal = kIROp_CastDescriptorHandleToResource;
-                info.convertOriginalToLowered = kIROp_CastResourceToDescriptorHandle;
-                return info;
-            }
-            // Only lower multi-level pointers (e.g. int**, int***) to ulong.
-            // Single-level pointers (e.g. int*) are valid as `device int*` in Metal
-            // argument buffer structs and are preserved as typed pointers, matching
-            // the behavior in MetalBufferElementTypeLoweringPolicy for constant buffers.
-            // See also: MetalBufferElementTypeLoweringPolicy::lowerLeafLogicalType.
-            if (auto ptrType = as<IRPtrType>(type))
-            {
-                if (as<IRPtrType>(ptrType->getValueType()))
-                    return makeMetalPointerAsUInt64Info(type);
-            }
-        }
-        return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
-    }
-};
-
-// Late-pass policy for Metal buffer element types (StorageBuffer, ConstantBuffer).
-// See also: MetalParameterBlockElementTypeLoweringPolicy::lowerLeafLogicalType,
-// which handles the early-pass equivalent for ParameterBlock (argument buffer) structs.
-struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
-{
-    MetalBufferElementTypeLoweringPolicy(
-        TargetProgram* inTarget,
-        BufferElementTypeLoweringOptions inOptions)
-        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
-    {
-    }
-
-    LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
-    {
-        if (auto ptrType = as<IRPtrType>(type))
-        {
-            bool needsLowering = false;
-
-            // Pointers as data inside storage buffers (e.g. RWStructuredBuffer<int*>)
-            // always need lowering since the buffer itself is already a device pointer.
-            if (config.addressSpace == AddressSpace::StorageBuffer)
-                needsLowering = true;
-
-            // Multi-level pointers (e.g. int**) in any buffer context need lowering
-            // because Metal rejects pointer-to-pointer types in buffer pointee types
-            // (regardless of address space qualifiers).
-            // Single-level pointers (e.g. int*) in constant buffers are runtime-set
-            // device handles and must stay as typed pointers.
-            if (as<IRPtrType>(ptrType->getValueType()))
-                needsLowering = true;
-
-            if (needsLowering)
-                return makeMetalPointerAsUInt64Info(type);
+            IRBuilder builder(type);
+            builder.setInsertBefore(type);
+            LoweredElementTypeInfo info = {};
+            info.originalType = type;
+            info.loweredType = builder.getType(kIROp_DescriptorHandleType, type);
+            info.convertLoweredToOriginal = kIROp_CastDescriptorHandleToResource;
+            info.convertOriginalToLowered = kIROp_CastResourceToDescriptorHandle;
+            return info;
         }
         return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
     }
@@ -3052,8 +2890,6 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
         return new DefaultBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::KhronosTarget:
         return new KhronosTargetBufferElementTypeLoweringPolicy(target, options);
-    case BufferElementTypeLoweringPolicyKind::Metal:
-        return new MetalBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::MetalParameterBlock:
         return new MetalParameterBlockElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::WGSL:

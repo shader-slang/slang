@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Double pointer field in a ParameterBlock struct.
 // Metal rejects pointer-to-pointer types in buffer pointee types (regardless
@@ -22,6 +23,8 @@ ParameterBlock<PointerArray> params;
 // The kernel body should cast ulong back to the appropriate pointer type.
 // CHECK-LABEL: computeMain
 // CHECK: int device*
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(32, 1, 1)]
