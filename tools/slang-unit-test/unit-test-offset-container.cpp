@@ -106,6 +106,17 @@ SLANG_UNIT_TEST(offsetContainer)
         SLANG_CHECK(arr.getCount() == 0);
     }
 
+#if SIZE_MAX > 0xFFFFFFFFu
+    // On 64-bit hosts, exercise newArray's own count cap (size > 0xFFFFFFFFu) directly
+    // rather than relying on allocate()'s byte-cap as a backstop. The uint8_t element
+    // type makes sizeof(T) * size inert, isolating the count-cap branch.
+    {
+        OffsetContainer container;
+        auto arr = container.newArray<uint8_t>(size_t(0x100000000ull));
+        SLANG_CHECK(arr.getCount() == 0);
+    }
+#endif
+
     // allocateAndZero must propagate allocate()'s nullptr instead of memset'ing through it.
     {
         OffsetContainer container;
