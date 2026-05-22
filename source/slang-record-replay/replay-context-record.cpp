@@ -22,6 +22,7 @@ namespace SlangRecord
 using Slang::File;
 using Slang::Path;
 
+static constexpr uint32_t kMaxReplayStringLength = 64 * 1024 * 1024;
 
 void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
 {
@@ -243,10 +244,19 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
         {
             uint32_t length;
             recordRaw(RecordFlag::None, &length, sizeof(length));
-            char* buf = m_arena.allocateArray<char>(length + 1);
+            if (length > kMaxReplayStringLength)
+                throw Slang::Exception("Replay string length exceeds maximum");
+
+            size_t stringSize = size_t(length);
+            size_t streamPosition = m_stream.getPosition();
+            size_t streamSize = m_stream.getSize();
+            if (streamPosition > streamSize || stringSize > streamSize - streamPosition)
+                throw Slang::Exception("Replay string length exceeds remaining stream data");
+
+            char* buf = m_arena.allocateArray<char>(stringSize + 1);
             if (length > 0)
-                recordRaw(RecordFlag::None, buf, length);
-            buf[length] = '\0';
+                recordRaw(RecordFlag::None, buf, stringSize);
+            buf[stringSize] = '\0';
             if (hasFlag(flags, RecordFlag::Output))
             {
                 if (strcmp(str, buf) != 0)

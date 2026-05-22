@@ -155,6 +155,35 @@ SLANG_UNIT_TEST(replayContextString)
     SLANG_CHECK(testString("Unicode test: こんにちは"));
 }
 
+SLANG_UNIT_TEST(replayContextRejectsOversizedStringLength)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    uint8_t typeId = uint8_t(TypeId::String);
+    uint32_t length = 0xFFFFFFFFu;
+    ctx().getStream().write(&typeId, sizeof(typeId));
+    ctx().getStream().write(&length, sizeof(length));
+
+    ctx().switchToPlayback();
+
+    bool caughtException = false;
+    try
+    {
+        const char* readStr = nullptr;
+        ctx().record(RecordFlag::None, readStr);
+    }
+    catch (const Slang::Exception&)
+    {
+        caughtException = true;
+    }
+
+    SLANG_CHECK(caughtException);
+}
+
 // =============================================================================
 // Slang Enums
 // =============================================================================
