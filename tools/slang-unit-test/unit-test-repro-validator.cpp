@@ -359,6 +359,45 @@ SLANG_UNIT_TEST(reproStateValidator)
         }
     }
 
+    // 19b. Short-form upper boundary: 251-byte string (firstByte == kSizeBase
+    // uses the short branch with stringSize = firstByte). Locks in the
+    // `firstByte <= kSizeBase` predicate against a future `<` regression.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto searchPathArray = container.newArray<Offset32Ptr<OffsetString>>(1);
+
+        char longBuf251[252];
+        memset(longBuf251, 'c', 251);
+        longBuf251[251] = '\0';
+        auto strPtr = container.newString(UnownedStringSlice(longBuf251, 251));
+        container[requestPtr]->searchPaths = searchPathArray;
+        container[searchPathArray[0]] = strPtr;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(isReproStateValid(buf));
+    }
+
+    // 19c. validatePathInfoMap: PathAndPathInfo with non-null path and null
+    // pathInfo is allowed by the `if (pathInfo && ...)` short-circuit. Locks
+    // that contract in so tightening it to require non-null pathInfo would
+    // break this test.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto pathAndPathInfoArray = container.newArray<ReproUtil::PathAndPathInfo>(1);
+        auto pathStr = container.newString("foo");
+
+        container[requestPtr]->pathInfoMap = pathAndPathInfoArray;
+        container[pathAndPathInfoArray[0]].path = pathStr;
+        // pathInfo is left null (zero-init) — must be accepted.
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(isReproStateValid(buf));
+    }
+
     // 20. ReproUtil::getRequest size-guard boundary: N-1 / N / N+1, where
     // N = kStartOffset + sizeof(RequestState). Locks in the unconditional
     // minimum-size check getRequest applies before casting the payload.

@@ -374,7 +374,11 @@ err("library-does-not-exist", 97, "library '~path' does not exist")
 
 err("cannot-access-as-blob", 98, "cannot access as a blob")
 
-err("invalid-repro-state", 99, "repro file contains malformed offsets or sizes and cannot be loaded")
+err(
+    "invalid-repro-state",
+    99,
+    "repro file contains malformed offsets, missing required fields, or out-of-range indices and cannot be loaded"
+)
 
 err("failed-to-load-downstream-compiler", 100, "failed to load downstream compiler '~compiler'")
 

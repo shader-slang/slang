@@ -235,6 +235,12 @@ SLANG_UNIT_TEST(offsetContainer)
 
         Offset32Ptr<uint8_t> pastEndPtr(uint32_t(sizeof(data)));
         SLANG_CHECK(base.asRaw(pastEndPtr) == nullptr);
+
+        // offset > m_dataSize: exercises the first disjunct of the bounds
+        // check in _getRaw, which guards `m_dataSize - offset` from
+        // underflow. `pastEndPtr` above only hits the second disjunct.
+        Offset32Ptr<uint8_t> wayPastEndPtr(uint32_t(sizeof(data) + 1));
+        SLANG_CHECK(base.asRaw(wayPastEndPtr) == nullptr);
     }
 
     // _getRaw early-return on null m_data: a default-constructed MemoryOffsetBase
