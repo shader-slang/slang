@@ -12,8 +12,13 @@
 
 #include <miniz.h>
 
+#include <limits>
+
 namespace Slang
 {
+
+static const mz_uint64 kMaxZipFileUncompressedSize =
+    mz_uint64(SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE);
 
 class ZipFileSystemImpl : public ComBaseObject,
                           public ISlangMutableFileSystem,
@@ -485,6 +490,12 @@ SlangResult ZipFileSystemImpl::loadFile(char const* path, ISlangBlob** outBlob)
     if (!mz_zip_reader_file_stat(&m_archive, index, &fileStat) || fileStat.m_is_directory)
     {
         return SLANG_E_NOT_FOUND;
+    }
+
+    if (fileStat.m_uncomp_size > kMaxZipFileUncompressedSize ||
+        fileStat.m_uncomp_size > mz_uint64(std::numeric_limits<size_t>::max() - 1))
+    {
+        return SLANG_E_OUT_OF_MEMORY;
     }
 
     ScopedAllocation alloc;

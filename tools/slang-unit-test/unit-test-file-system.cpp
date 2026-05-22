@@ -388,6 +388,100 @@ static SlangResult _createFileSystem(
     return outFileSystem ? SLANG_OK : SLANG_FAIL;
 }
 
+#if SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE < 0xffffffffull
+static uint32_t _readUInt32LE(const uint8_t* data)
+{
+    return uint32_t(data[0]) | (uint32_t(data[1]) << 8) | (uint32_t(data[2]) << 16) |
+           (uint32_t(data[3]) << 24);
+}
+
+static void _writeUInt32LE(uint8_t* data, uint32_t value)
+{
+    data[0] = uint8_t(value);
+    data[1] = uint8_t(value >> 8);
+    data[2] = uint8_t(value >> 16);
+    data[3] = uint8_t(value >> 24);
+}
+
+static SlangResult _setZipEntryUncompressedSize(List<uint8_t>& archiveData, uint32_t size)
+{
+    static const uint32_t kLocalFileHeaderSignature = 0x04034b50;
+    static const uint32_t kCentralDirectoryHeaderSignature = 0x02014b50;
+
+    bool foundLocalHeader = false;
+    bool foundCentralDirectoryHeader = false;
+
+    uint8_t* data = archiveData.getBuffer();
+    const Index count = archiveData.getCount();
+    if (count < 4)
+    {
+        return SLANG_FAIL;
+    }
+
+    for (Index i = 0; i <= count - 4; ++i)
+    {
+        const uint32_t signature = _readUInt32LE(data + i);
+        if (signature == kLocalFileHeaderSignature && i + 26 <= count)
+        {
+            _writeUInt32LE(data + i + 22, size);
+            foundLocalHeader = true;
+        }
+        else if (signature == kCentralDirectoryHeaderSignature && i + 28 <= count)
+        {
+            _writeUInt32LE(data + i + 24, size);
+            foundCentralDirectoryHeader = true;
+        }
+    }
+
+    return foundLocalHeader && foundCentralDirectoryHeader ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _testZipRejectsOversizedUncompressedEntry()
+{
+    ComPtr<ISlangMutableFileSystem> fileSystem;
+    SLANG_RETURN_ON_FAIL(ZipFileSystem::create(fileSystem));
+
+    const char contents[] = "small";
+    SLANG_RETURN_ON_FAIL(fileSystem->saveFile("bomb.txt", contents, sizeof(contents) - 1));
+
+    IArchiveFileSystem* archiveFileSystem = as<IArchiveFileSystem>(fileSystem);
+    if (!archiveFileSystem)
+    {
+        return SLANG_FAIL;
+    }
+
+    ComPtr<ISlangBlob> archiveBlob;
+    SLANG_RETURN_ON_FAIL(archiveFileSystem->storeArchive(false, archiveBlob.writeRef()));
+
+    List<uint8_t> archiveData;
+    archiveData.setCount(Index(archiveBlob->getBufferSize()));
+    ::memcpy(
+        archiveData.getBuffer(),
+        archiveBlob->getBufferPointer(),
+        archiveBlob->getBufferSize());
+
+    const uint32_t oversizedUncompressedSize =
+        uint32_t(SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE + 1);
+    SLANG_RETURN_ON_FAIL(_setZipEntryUncompressedSize(archiveData, oversizedUncompressedSize));
+
+    ComPtr<ISlangFileSystemExt> loadedFileSystem;
+    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(
+        archiveData.getBuffer(),
+        size_t(archiveData.getCount()),
+        loadedFileSystem));
+
+    SlangPathType pathType;
+    SLANG_RETURN_ON_FAIL(loadedFileSystem->getPathType("bomb.txt", &pathType));
+    SLANG_CHECK(pathType == SLANG_PATH_TYPE_FILE);
+
+    ComPtr<ISlangBlob> blob;
+    SLANG_CHECK(
+        loadedFileSystem->loadFile("bomb.txt", blob.writeRef()) == SLANG_E_OUT_OF_MEMORY);
+
+    return SLANG_OK;
+}
+#endif
+
 static SlangResult _testImplicitDirectory(FileSystemType type)
 {
     ComPtr<ISlangMutableFileSystem> fileSystem;
@@ -574,4 +668,11 @@ SLANG_UNIT_TEST(fileSystem)
             SLANG_CHECK(SLANG_SUCCEEDED(_testImplicitDirectory(type)));
         }
     }
+}
+
+SLANG_UNIT_TEST(zipRejectsOversizedUncompressedEntry)
+{
+#if SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE < 0xffffffffull
+    SLANG_CHECK(SLANG_SUCCEEDED(_testZipRejectsOversizedUncompressedEntry()));
+#endif
 }
