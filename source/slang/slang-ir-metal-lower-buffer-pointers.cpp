@@ -72,6 +72,7 @@ struct MetalBufferPointerLoweringContext
 
     struct FieldLoweringInfo
     {
+        IRStructField* field;
         IRStructKey* key;
         IRType* originalPtrType;
     };
@@ -100,7 +101,10 @@ struct MetalBufferPointerLoweringContext
             {
                 auto user = use->getUser();
                 if (as<IRConstantBufferType>(user) || as<IRParameterBlockType>(user))
+                {
                     usedInConstantBuffer = true;
+                    break;
+                }
             }
 
             if (!usedInConstantBuffer)
@@ -112,6 +116,7 @@ struct MetalBufferPointerLoweringContext
                 if (isMultiLevelPointer(field->getFieldType()))
                 {
                     FieldLoweringInfo info;
+                    info.field = field;
                     info.key = field->getKey();
                     info.originalPtrType = field->getFieldType();
                     fieldsToLower.add(info);
@@ -128,68 +133,40 @@ struct MetalBufferPointerLoweringContext
     void rewriteStructFields(Dictionary<IRStructType*, List<FieldLoweringInfo>>& structsToLower)
     {
         auto uintPtrType = getUIntPtrType();
-        for (auto& [structType, fields] : structsToLower)
+        for (auto& [_, fields] : structsToLower)
         {
             for (auto& fieldInfo : fields)
-            {
-                for (auto field : structType->getFields())
-                {
-                    if (field->getKey() == fieldInfo.key)
-                    {
-                        field->setFieldType(uintPtrType);
-                        break;
-                    }
-                }
-            }
+                fieldInfo.field->setFieldType(uintPtrType);
         }
     }
 
     void insertCastsForStructFields(
         Dictionary<IRStructType*, List<FieldLoweringInfo>>& structsToLower)
     {
-        HashSet<IRStructKey*> loweredKeys;
-        Dictionary<IRStructKey*, IRType*> keyToOrigType;
+        auto uintPtrType = getUIntPtrType();
+
         for (auto& [_, fields] : structsToLower)
         {
             for (auto& fieldInfo : fields)
             {
-                loweredKeys.add(fieldInfo.key);
-                keyToOrigType[fieldInfo.key] = fieldInfo.originalPtrType;
-            }
-        }
-
-        auto uintPtrType = getUIntPtrType();
-
-        List<IRInst*> fieldAddressInsts;
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            auto func = as<IRFunc>(globalInst);
-            if (!func)
-                continue;
-            for (auto block : func->getBlocks())
-            {
-                for (auto inst : block->getOrdinaryInsts())
+                List<IRInst*> fieldAddressInsts;
+                for (auto use = fieldInfo.key->firstUse; use; use = use->nextUse)
                 {
-                    if (inst->getOp() != kIROp_FieldAddress)
-                        continue;
-                    auto key = as<IRStructKey>(cast<IRFieldAddress>(inst)->getField());
-                    if (key && loweredKeys.contains(key))
-                        fieldAddressInsts.add(inst);
+                    auto user = use->getUser();
+                    if (user->getOp() == kIROp_FieldAddress)
+                        fieldAddressInsts.add(user);
+                }
+
+                for (auto inst : fieldAddressInsts)
+                {
+                    auto fieldAddr = cast<IRFieldAddress>(inst);
+                    auto ptrToField = as<IRPtrTypeBase>(fieldAddr->getFullType());
+                    if (ptrToField)
+                        fieldAddr->setFullType(builder.getPtrType(uintPtrType, ptrToField));
+
+                    insertCastsForPointerUses(fieldAddr, fieldInfo.originalPtrType, uintPtrType);
                 }
             }
-        }
-
-        for (auto inst : fieldAddressInsts)
-        {
-            auto fieldAddr = cast<IRFieldAddress>(inst);
-            auto key = cast<IRStructKey>(fieldAddr->getField());
-            auto originalPtrType = keyToOrigType[key];
-
-            auto ptrToField = as<IRPtrTypeBase>(fieldAddr->getFullType());
-            if (ptrToField)
-                fieldAddr->setFullType(builder.getPtrType(uintPtrType, ptrToField));
-
-            insertCastsForPointerUses(fieldAddr, originalPtrType, uintPtrType);
         }
     }
 
@@ -199,56 +176,35 @@ struct MetalBufferPointerLoweringContext
     {
         auto uintPtrType = getUIntPtrType();
 
-        // Find RWStructuredBuffer types whose element type is a pointer.
-        // Rewrite their element type operand and insert casts at access sites.
-        List<IRHLSLStructuredBufferTypeBase*> buffersToLower;
-        Dictionary<IRHLSLStructuredBufferTypeBase*, IRType*> bufToOrigElemType;
-
         for (auto globalInst : module->getGlobalInsts())
         {
             auto bufType = as<IRHLSLStructuredBufferTypeBase>(globalInst);
             if (!bufType)
                 continue;
             auto elemType = bufType->getElementType();
-            if (as<IRPtrType>(elemType))
-            {
-                buffersToLower.add(bufType);
-                bufToOrigElemType[bufType] = elemType;
-            }
-        }
+            if (!as<IRPtrType>(elemType))
+                continue;
 
-        for (auto bufType : buffersToLower)
-        {
-            auto origElemType = bufToOrigElemType[bufType];
-            // Rewrite element type operand from PtrType to UIntPtrType.
+            auto origElemType = elemType;
             bufType->setOperand(0, uintPtrType);
 
-            // Find all rwstructuredBufferGetElementPtr instructions that
-            // return Ptr(origElemType) and rewrite them.
+            // Walk the use chain of the buffer type to find global variables
+            // typed as this buffer, then walk their uses to find element-access
+            // instructions.
             List<IRInst*> elemPtrInsts;
-            for (auto globalInst : module->getGlobalInsts())
+            for (auto use = bufType->firstUse; use; use = use->nextUse)
             {
-                auto func = as<IRFunc>(globalInst);
-                if (!func)
-                    continue;
-                for (auto block : func->getBlocks())
+                auto bufVar = use->getUser();
+                for (auto varUse = bufVar->firstUse; varUse; varUse = varUse->nextUse)
                 {
-                    for (auto inst : block->getOrdinaryInsts())
-                    {
-                        if (inst->getOp() != kIROp_RWStructuredBufferGetElementPtr)
-                            continue;
-                        // Check if this accesses the lowered buffer type.
-                        auto bufOperand = inst->getOperand(0);
-                        auto bufOperandType = bufOperand->getDataType();
-                        if (bufOperandType == bufType)
-                            elemPtrInsts.add(inst);
-                    }
+                    auto varUser = varUse->getUser();
+                    if (varUser->getOp() == kIROp_RWStructuredBufferGetElementPtr)
+                        elemPtrInsts.add(varUser);
                 }
             }
 
             for (auto inst : elemPtrInsts)
             {
-                // Result type changes from Ptr(origElemType) to Ptr(UIntPtrType).
                 auto ptrType = as<IRPtrTypeBase>(inst->getFullType());
                 if (ptrType)
                     inst->setFullType(builder.getPtrType(uintPtrType, ptrType));
