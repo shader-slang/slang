@@ -1,17 +1,14 @@
-// Companion regression test for shader-slang/slang#11004:
-// `__bwd_diff(obj.method)` shares the same AD 2.0 lookup path that
-// `__fwd_diff(obj.method)` exercises (the same surfacing of
-// `SharedTypeExpr::base.exp` and the same `funcTypeAlreadyHasImplicitThis`
-// branch in `visitInvokeExprImpl`), so we mirror the forward-mode
-// coverage to keep the reverse-mode half from regressing silently.
+// Companion to `fwd-diff-generic-constrained-member.slang` for
+// shader-slang/slang#11004: `__bwd_diff` applied to a non-static member
+// method on a generic-constrained interface-typed receiver must thread
+// the receiver as the implicit `this` argument and back-propagate the
+// gradient correctly.
 //
-// For `Helix.eval(t) = 2*t*t`, the reverse-mode signature is
-// `eval_bwd(inout DifferentialPair<float> t_pair, float dResult)`,
-// and `t_pair.d = 4*t * dResult` after the call:
-//   pair = DifferentialPair(2.0, 0); __bwd_diff(curve.eval)(pair, 1.0)
-//     → pair.d = 4*2*1 = 8.0
-//   pair = DifferentialPair(3.0, 0); __bwd_diff(curve.eval)(pair, 1.0)
-//     → pair.d = 4*3*1 = 12.0
+// `Helix.eval(t) = 2*t*t  ⇒  ∂eval/∂t = 4*t`, so for
+// `__bwd_diff(curve.eval)(pair, dResult)` with `pair = (t, 0)`:
+//   pair.d after call = 4*t * dResult
+//   t = 2.0, dResult = 1.0  →  pair.d =  8.0
+//   t = 3.0, dResult = 1.0  →  pair.d = 12.0
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
@@ -32,8 +29,6 @@ struct Helix : ICurve, IDifferentiable
     }
 }
 
-// Generic-constrained method dispatch — the same shape #11004 fixed
-// for the forward-mode case, mirrored for the reverse-mode lookup.
 [Differentiable]
 float gradGeneric<C : ICurve>(C curve, float t, float dResult)
 {
