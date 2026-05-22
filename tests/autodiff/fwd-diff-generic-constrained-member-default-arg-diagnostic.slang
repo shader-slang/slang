@@ -41,6 +41,10 @@ struct Foo : IFoo, IDifferentiable
 [Differentiable]
 float test<F : IFoo>(F foo, float t)
 {
-    // CHECK: error 39999: not enough arguments to call (got 1, expected 2)
+    // Match on the unique message text rather than `error 39999` —
+    // 39999 is the placeholder code shared by ~30 unrelated front-end
+    // diagnostics, so a future renumbering would silently break this
+    // gate's contract.
+    // CHECK: not enough arguments to call (got 1, expected 2)
     return __fwd_diff(foo.bar)(diffPair(t, 1.0)).d;
 }
