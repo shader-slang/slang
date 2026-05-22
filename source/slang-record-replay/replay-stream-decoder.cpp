@@ -483,7 +483,14 @@ String ReplayStreamDecoder::decodeValueFromBytes(const void* data, size_t size)
 {
     ReplayStream stream(data, size);
     StringBuilder output;
-    decodeValueFromStream(stream, output, 0);
+    try
+    {
+        decodeValueFromStream(stream, output, 0);
+    }
+    catch (const Slang::Exception& e)
+    {
+        output << "ERROR: " << e.Message.getBuffer();
+    }
     return output.produceString();
 }
 

@@ -144,6 +144,26 @@ SLANG_UNIT_TEST(replayStreamDecoderRejectsInvalidArrayCountType)
     SLANG_CHECK(containsString(decoded, "Array element count has invalid type"));
 }
 
+SLANG_UNIT_TEST(replayStreamDecoderRejectsHugeArrayCountOnSkipPath)
+{
+    // The decode-path cap test puts the oversized Array[1000001] at top level,
+    // which is decode (not skip). Mirror the depth-on-skip-path pattern: outer
+    // Array[101] forces element 101 through skipValueInStream, where the
+    // nested oversized array trips `count > kMaxReplayDecodeArrayElementCount`.
+    // A regression that splits readReplayDecodeArrayElementCount and weakens
+    // the cap on only the skip path would otherwise sneak by.
+    ReplayStream stream;
+    writeArrayHeader(stream, 101);
+    for (int i = 0; i < 100; ++i)
+        writeReplayTypeId(stream, TypeId::Null);
+    writeArrayHeader(stream, 1000001);
+
+    ReplayStream reader = stream.createReader();
+    String decoded = ReplayStreamDecoder::decode(reader);
+
+    SLANG_CHECK(containsString(decoded, "Array element count exceeds decoder limit"));
+}
+
 SLANG_UNIT_TEST(replayStreamDecoderDecodesValidArray)
 {
     // Happy path: a valid Array of three UInt32 elements must decode cleanly,
