@@ -92,12 +92,12 @@ cross-target behavior.
 
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| WebGPU runtime tests. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
-| LLVM-native binary emission. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
-| Slang round-trip (`-target slang`). | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
-| VM byte-code target (`-target hostvm`). | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
-| Any test that needs runtime device enumeration. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
-| Torch glue / `slang-python` bindings. | (unclassified) | [#slang-python](../../../docs/llm-generated/cross-cutting/targets.md#slang-python) | Not reachable via any allowed test directive. |
+| WebGPU runtime tests. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| LLVM-native binary emission. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| Slang round-trip (`-target slang`). | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| VM byte-code target (`-target hostvm`). | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| Any test that needs runtime device enumeration. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| Torch glue / `slang-python` bindings. | (unclassified) | [#slang-python](../../../docs/llm-generated/cross-cutting/targets.md#slang-python) | Reason and explanation to be refined by the next regeneration. |
 
 ## Framework feedback for \_common.md
 

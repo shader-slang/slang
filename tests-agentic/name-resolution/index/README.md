@@ -48,10 +48,10 @@ composition observable.
 
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| Arity / convertibility filtering, conversion-cost ranking, partial generic application, ambiguous-call diagnostics -- see `tests-agentic/name-resolution/overload-resolution/`. | out-of-bundle | (unspecified) | Not reachable via any allowed test directive. |
-| `LookupMask` filter, transparent-member injection, breadcrumb construction details, inheritance walk for member lookup, ambiguity / member-not-found diagnostics, container-level overload accumulation, override-wins-over-default -- see `tests-agentic/name-resolution/lookup/`. | out-of-bundle | [#lookupmask](../../../docs/llm-generated/name-resolution/index.md#lookupmask) | Not reachable via any allowed test directive. |
-| `public` / `internal` / `private` semantics, accessor visibility, default-visibility rules -- see `tests-agentic/name-resolution/visibility/`. | out-of-bundle | [#public](../../../docs/llm-generated/name-resolution/index.md#public) | Not reachable via any allowed test directive. |
-| `Scope` shape, sibling-chain construction, file-scope and namespace boundaries, generic-parameter scope -- see `tests-agentic/name-resolution/scopes/`. | out-of-bundle | [#scope](../../../docs/llm-generated/name-resolution/index.md#scope) | Not reachable via any allowed test directive. |
+| Arity / convertibility filtering, conversion-cost ranking, partial generic application, ambiguous-call diagnostics -- see `tests-agentic/name-resolution/overload-resolution/`. | out-of-bundle | (unspecified) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
+| `LookupMask` filter, transparent-member injection, breadcrumb construction details, inheritance walk for member lookup, ambiguity / member-not-found diagnostics, container-level overload accumulation, override-wins-over-default -- see `tests-agentic/name-resolution/lookup/`. | out-of-bundle | [#lookupmask](../../../docs/llm-generated/name-resolution/index.md#lookupmask) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
+| `public` / `internal` / `private` semantics, accessor visibility, default-visibility rules -- see `tests-agentic/name-resolution/visibility/`. | out-of-bundle | [#public](../../../docs/llm-generated/name-resolution/index.md#public) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
+| `Scope` shape, sibling-chain construction, file-scope and namespace boundaries, generic-parameter scope -- see `tests-agentic/name-resolution/scopes/`. | out-of-bundle | [#scope](../../../docs/llm-generated/name-resolution/index.md#scope) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
 
 ## Sibling-bundle overlap
 
