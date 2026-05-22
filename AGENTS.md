@@ -80,8 +80,9 @@ reachable without `../`:
 #include "../compiler-core/slang-source-loc.h"
 ```
 
-New files should use direct paths; existing files need not be converted unless being substantially
-rewritten.
+New files should use direct paths. Existing files need not be converted purely for style, but may
+be opportunistically updated when the file is already being substantially modified for other
+reasons (e.g., a security fix or feature addition touching many lines).
 
 ## Coding Style & Naming Conventions
 

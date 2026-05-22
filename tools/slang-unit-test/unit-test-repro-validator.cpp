@@ -317,4 +317,45 @@ SLANG_UNIT_TEST(reproStateValidator)
         containerToBuffer(container, buf);
         SLANG_CHECK(!isReproStateValid(buf));
     }
+
+    // 19. Long string (252+ chars) using multi-byte size encoding — passes.
+    // Strings > kSizeBase (251) bytes use a multi-byte length header. This exercises the
+    // sizeByteCount ∈ {1,2} success paths in validateString that the short-string tests skip.
+    {
+        // 252-byte string: first byte = kSizeBase+1 (252), 1 size byte = 252
+        {
+            OffsetContainer container;
+            auto requestPtr = container.newObject<ReproUtil::RequestState>();
+            auto searchPathArray = container.newArray<Offset32Ptr<OffsetString>>(1);
+
+            char longBuf252[253];
+            memset(longBuf252, 'a', 252);
+            longBuf252[252] = '\0';
+            auto strPtr = container.newString(UnownedStringSlice(longBuf252, 252));
+            container[requestPtr]->searchPaths = searchPathArray;
+            container[searchPathArray[0]] = strPtr;
+
+            List<uint8_t> buf;
+            containerToBuffer(container, buf);
+            SLANG_CHECK(isReproStateValid(buf));
+        }
+
+        // 260-byte string: first byte = kSizeBase+2 (253), 2 size bytes = 260
+        {
+            OffsetContainer container;
+            auto requestPtr = container.newObject<ReproUtil::RequestState>();
+            auto searchPathArray = container.newArray<Offset32Ptr<OffsetString>>(1);
+
+            char longBuf260[261];
+            memset(longBuf260, 'b', 260);
+            longBuf260[260] = '\0';
+            auto strPtr = container.newString(UnownedStringSlice(longBuf260, 260));
+            container[requestPtr]->searchPaths = searchPathArray;
+            container[searchPathArray[0]] = strPtr;
+
+            List<uint8_t> buf;
+            containerToBuffer(container, buf);
+            SLANG_CHECK(isReproStateValid(buf));
+        }
+    }
 }
