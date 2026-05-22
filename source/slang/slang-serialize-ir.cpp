@@ -567,6 +567,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 #if DIRECT_FROM_FOSSIL
     const auto numInsts = flat.instAllocInfo.getElementCount();
     const auto operandIndicesCount = flat.operandIndices.getElementCount();
+    SLANG_RELEASE_ASSERT(flat.childCounts.getElementCount() == numInsts);
 #else
     const auto numInsts = flat.instAllocInfo.getCount();
     const auto operandIndicesCount = flat.operandIndices.getCount();
@@ -612,6 +613,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // About 5% of instructions in the core module are strings!
         case kIROp_StringLit:
         case kIROp_BlobLit:
+            SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
             minSizeInBytes = offsetof(IRConstant, value) +
                              offsetof(IRConstant::StringValue, chars) +
                              flat.stringLengths[stringLengthIndex++];
@@ -652,22 +654,27 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             break;
         case kIROp_BoolLit:
         case kIROp_IntLit:
+            SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
             cast<IRConstant>(inst)->value.intVal =
                 bitCast<IRIntegerValue>(flat.literals[litIndex++]);
             break;
         case kIROp_FloatLit:
+            SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
             cast<IRConstant>(inst)->value.floatVal = bitCast<double>(flat.literals[litIndex++]);
             break;
         case kIROp_PtrLit:
+            SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
             // Keep the compiler happy on 32 bit builds
             cast<IRConstant>(inst)->value.ptrVal = (void*)(uintptr_t(flat.literals[litIndex++]));
             break;
         case kIROp_StringLit:
         case kIROp_BlobLit:
+            SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
             const auto c = cast<IRConstant>(inst);
             const auto len = flat.stringLengths[stringLengthIndex++];
             char* const dstChars = c->value.stringVal.chars;
             c->value.stringVal.numChars = uint32_t(len);
+            SLANG_RELEASE_ASSERT(stringDataIndex + len <= flat.stringChars.getCount());
             memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
             stringDataIndex += len;
             break;
