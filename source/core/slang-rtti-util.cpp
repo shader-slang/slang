@@ -77,10 +77,10 @@ struct ListFuncs
 
             if (srcCount > dstList.getCount())
             {
+                // Allocate new memory
                 void* newBuffer = _mallocArray(srcCount, elementType->m_size);
                 SLANG_RELEASE_ASSERT(newBuffer);
 
-                // Allocate new memory
                 const Index dstCapacity = dstList.getCapacity();
                 void* oldBuffer = dstList.detachBuffer();
 
@@ -469,6 +469,11 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
 
     const auto typeFuncs = typeMap->getFuncsForType(elementType);
     SLANG_ASSERT(typeFuncs.isValid());
+
+    if (count < 0)
+    {
+        return SLANG_E_INVALID_ARG;
+    }
 
     void* newBuffer = _mallocArray(count, elementType->m_size);
     if (!newBuffer && count != 0)
