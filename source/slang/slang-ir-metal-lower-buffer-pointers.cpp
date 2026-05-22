@@ -195,6 +195,7 @@ struct MetalBufferPointerLoweringContext
             // so we only capture accesses from pointer-element buffers (not
             // a user-declared RWStructuredBuffer<ulong> that may merge after).
             List<IRInst*> elemPtrInsts;
+            List<IRInst*> elemLoadInsts;
             for (auto use = bufType->firstUse; use; use = use->nextUse)
             {
                 auto bufVar = use->getUser();
@@ -203,6 +204,10 @@ struct MetalBufferPointerLoweringContext
                     auto varUser = varUse->getUser();
                     if (varUser->getOp() == kIROp_RWStructuredBufferGetElementPtr)
                         elemPtrInsts.add(varUser);
+                    else if (
+                        varUser->getOp() == kIROp_StructuredBufferLoad ||
+                        varUser->getOp() == kIROp_RWStructuredBufferLoad)
+                        elemLoadInsts.add(varUser);
                 }
             }
 
@@ -216,6 +221,15 @@ struct MetalBufferPointerLoweringContext
                     inst->setFullType(builder.getPtrType(uintPtrType, ptrType));
 
                 insertCastsForPointerUses(inst, origElemType, uintPtrType);
+            }
+
+            for (auto inst : elemLoadInsts)
+            {
+                inst->setFullType(uintPtrType);
+                builder.setInsertAfter(inst);
+                auto castInst = builder.emitCastIntToPtr(origElemType, inst);
+                inst->replaceUsesWith(castInst);
+                castInst->setOperand(0, inst);
             }
         }
     }
