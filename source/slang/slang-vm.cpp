@@ -217,10 +217,13 @@ SlangResult ByteCodeInterpreter::validateFunctionForExecution(
             return SLANG_FAIL;
         }
 
-        auto inst = reinterpret_cast<VMInstHeader*>(cursor);
-        auto operandBytes = uint64_t(inst->operandCount) * sizeof(VMOperand);
+        // Copy the header into an aligned local so we don't rely on the raw
+        // bytecode blob meeting alignof(VMInstHeader).
+        VMInstHeader instHeader;
+        memcpy(&instHeader, cursor, sizeof(VMInstHeader));
+        auto operandBytes = uint64_t(instHeader.operandCount) * sizeof(VMOperand);
         auto instSize = uint64_t(sizeof(VMInstHeader)) + operandBytes;
-        if (operandBytes / sizeof(VMOperand) != inst->operandCount || instSize > remainingSize)
+        if (operandBytes / sizeof(VMOperand) != instHeader.operandCount || instSize > remainingSize)
         {
             reportError("VM instruction operand list exceeds function code size.");
             return SLANG_FAIL;
@@ -228,11 +231,13 @@ SlangResult ByteCodeInterpreter::validateFunctionForExecution(
 
         auto instOffset = (uint32_t)(cursor - func.functionCode);
         exeFunc.m_instOffsets.add(instOffset);
-        exeFunc.m_opcodes.add(inst->opcode);
+        exeFunc.m_opcodes.add(instHeader.opcode);
 
-        for (uint32_t operandIdx = 0; operandIdx < inst->operandCount; operandIdx++)
+        uint8_t* operandBase = cursor + sizeof(VMInstHeader);
+        for (uint32_t operandIdx = 0; operandIdx < instHeader.operandCount; operandIdx++)
         {
-            auto& operand = inst->getOperand(operandIdx);
+            VMOperand operand;
+            memcpy(&operand, operandBase + operandIdx * sizeof(VMOperand), sizeof(VMOperand));
             switch (operand.sectionId)
             {
             case kSlangByteCodeSectionWorkingSet:
@@ -289,10 +294,14 @@ SlangResult ByteCodeInterpreter::validateFunctionForExecution(
 
     for (auto instOffset : exeFunc.m_instOffsets)
     {
-        auto inst = reinterpret_cast<VMInstHeader*>(func.functionCode + instOffset);
-        for (uint32_t operandIdx = 0; operandIdx < inst->operandCount; operandIdx++)
+        uint8_t* instPtr = func.functionCode + instOffset;
+        VMInstHeader instHeader;
+        memcpy(&instHeader, instPtr, sizeof(VMInstHeader));
+        uint8_t* operandBase = instPtr + sizeof(VMInstHeader);
+        for (uint32_t operandIdx = 0; operandIdx < instHeader.operandCount; operandIdx++)
         {
-            auto& operand = inst->getOperand(operandIdx);
+            VMOperand operand;
+            memcpy(&operand, operandBase + operandIdx * sizeof(VMOperand), sizeof(VMOperand));
             if (operand.sectionId == kSlangByteCodeSectionInsts &&
                 !isValidInstOffset(exeFunc, operand.offset))
             {
@@ -860,8 +869,11 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ByteCodeInterpreter::loadModule(IBlob* mo
     m_currentWorkingSetSizeInBytes = 0;
     m_executionFailed = false;
     m_code.addRange((uint8_t*)(moduleBlob->getBufferPointer()), moduleBlob->getBufferSize());
-    SLANG_RETURN_ON_FAIL(
-        initVMModule(m_code.getBuffer(), (uint32_t)moduleBlob->getBufferSize(), &m_moduleView));
+    SLANG_RETURN_ON_FAIL(initVMModule(
+        m_code.getBuffer(),
+        (uint32_t)moduleBlob->getBufferSize(),
+        &m_moduleView,
+        &m_errorBuilder));
     SLANG_RETURN_ON_FAIL(prepareModuleForExecution());
     return SLANG_OK;
 }

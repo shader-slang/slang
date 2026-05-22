@@ -42,80 +42,104 @@ static bool isRangeInBounds(uint64_t offset, uint64_t size, uint64_t limit)
     return offset <= limit && size <= limit - offset;
 }
 
-SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleView)
+static SlangResult reportBytecodeError(StringBuilder* errorSink, const char* msg)
+{
+    if (errorSink)
+    {
+        errorSink->append("VM bytecode load failed: ");
+        errorSink->append(msg);
+        errorSink->append("\n");
+    }
+    return SLANG_FAIL;
+}
+
+SlangResult initVMModule(
+    uint8_t* code,
+    uint32_t codeSize,
+    VMModuleView* moduleView,
+    StringBuilder* errorSink)
 {
     MemoryStreamBase stream(FileAccess::Read, code, codeSize);
+
+    // Reset the view so an early-return on a malformed blob leaves no stale
+    // section pointers, sizes, or function metadata behind.
     moduleView->code = code;
     moduleView->codeSize = codeSize;
+    moduleView->functionCount = 0;
+    moduleView->functionOffsets = nullptr;
+    moduleView->constants = nullptr;
+    moduleView->constantBlobSize = 0;
+    moduleView->stringCount = 0;
+    moduleView->stringOffsets = nullptr;
+    moduleView->kernelBlob = nullptr;
+    moduleView->kernelBlobSize = 0;
     moduleView->functionViews.clear();
 
     // Check the FourCC
-    SLANG_RETURN_ON_FAIL(consumeFourCC(stream, kSlangByteCodeFourCC));
+    if (SLANG_FAILED(consumeFourCC(stream, kSlangByteCodeFourCC)))
+        return reportBytecodeError(errorSink, "missing or invalid module magic (FourCC).");
 
     // Check the version
     uint32_t version;
     size_t bytesRead = 0;
-    SLANG_RETURN_ON_FAIL(stream.read(&version, sizeof(version), bytesRead));
+    if (SLANG_FAILED(stream.read(&version, sizeof(version), bytesRead)))
+        return reportBytecodeError(errorSink, "truncated module header (version field).");
     if (version > kSlangByteCodeVersion)
-    {
-        return SLANG_FAIL; // Unsupported version
-    }
+        return reportBytecodeError(errorSink, "unsupported bytecode version.");
 
     // Read the function section
-    SLANG_RETURN_ON_FAIL(consumeFourCC(stream, kSlangByteCodeFunctionsFourCC));
+    if (SLANG_FAILED(consumeFourCC(stream, kSlangByteCodeFunctionsFourCC)))
+        return reportBytecodeError(errorSink, "missing or invalid function section FourCC.");
     uint32_t functionSectionSize = 0;
-    SLANG_RETURN_ON_FAIL(readUInt32(stream, functionSectionSize));
-    auto funcDataStart = (uint32_t)stream.getPosition();
+    if (SLANG_FAILED(readUInt32(stream, functionSectionSize)))
+        return reportBytecodeError(errorSink, "truncated function section size.");
+    auto funcDataStart = stream.getPosition();
     if (functionSectionSize < sizeof(uint32_t)) // At least the function count
-    {
-        return SLANG_FAIL; // Invalid section size
-    }
+        return reportBytecodeError(
+            errorSink,
+            "function section size too small for function count.");
     if (!isRangeInBounds(funcDataStart, functionSectionSize, codeSize))
-    {
-        return SLANG_FAIL; // Invalid section size
-    }
+        return reportBytecodeError(errorSink, "function section overruns the bytecode blob.");
 
-    SLANG_RETURN_ON_FAIL(readUInt32(stream, moduleView->functionCount));
+    if (SLANG_FAILED(readUInt32(stream, moduleView->functionCount)))
+        return reportBytecodeError(errorSink, "truncated function count.");
     if (moduleView->functionCount > (functionSectionSize - sizeof(uint32_t)) / sizeof(uint32_t))
-    {
-        return SLANG_FAIL; // Invalid function offset table size
-    }
+        return reportBytecodeError(
+            errorSink,
+            "function offset table exceeds function section size.");
     moduleView->functionOffsets = reinterpret_cast<uint32_t*>(code + stream.getPosition());
 
     SLANG_RETURN_ON_FAIL(stream.seek(SeekOrigin::Start, funcDataStart + functionSectionSize));
 
     // Read the kernel blob section
-    SLANG_RETURN_ON_FAIL(consumeFourCC(stream, kSlangByteCodeKernelBlobFourCC));
-    SLANG_RETURN_ON_FAIL(readUInt32(stream, moduleView->kernelBlobSize));
+    if (SLANG_FAILED(consumeFourCC(stream, kSlangByteCodeKernelBlobFourCC)))
+        return reportBytecodeError(errorSink, "missing or invalid kernel blob section FourCC.");
+    if (SLANG_FAILED(readUInt32(stream, moduleView->kernelBlobSize)))
+        return reportBytecodeError(errorSink, "truncated kernel blob size.");
     if (moduleView->kernelBlobSize > codeSize - stream.getPosition())
-    {
-        return SLANG_FAIL; // Invalid kernel blob size
-    }
+        return reportBytecodeError(errorSink, "kernel blob overruns the bytecode blob.");
     moduleView->kernelBlob = code + stream.getPosition();
     SLANG_RETURN_ON_FAIL(stream.seek(SeekOrigin::Current, moduleView->kernelBlobSize));
 
     // Read the constants section
-    SLANG_RETURN_ON_FAIL(consumeFourCC(stream, kSlangByteCodeConstantsFourCC));
-    SLANG_RETURN_ON_FAIL(readUInt32(stream, moduleView->constantBlobSize));
-    SLANG_RETURN_ON_FAIL(readUInt32(stream, moduleView->stringCount));
+    if (SLANG_FAILED(consumeFourCC(stream, kSlangByteCodeConstantsFourCC)))
+        return reportBytecodeError(errorSink, "missing or invalid constants section FourCC.");
+    if (SLANG_FAILED(readUInt32(stream, moduleView->constantBlobSize)))
+        return reportBytecodeError(errorSink, "truncated constant blob size.");
+    if (SLANG_FAILED(readUInt32(stream, moduleView->stringCount)))
+        return reportBytecodeError(errorSink, "truncated string count.");
     if (moduleView->stringCount > (codeSize - stream.getPosition()) / sizeof(uint32_t))
-    {
-        return SLANG_FAIL; // Invalid string offset table size
-    }
+        return reportBytecodeError(errorSink, "string offset table overruns the bytecode blob.");
     moduleView->stringOffsets = reinterpret_cast<uint32_t*>(code + stream.getPosition());
     stream.seek(SeekOrigin::Current, moduleView->stringCount * sizeof(uint32_t));
     if (moduleView->constantBlobSize > codeSize - stream.getPosition())
-    {
-        return SLANG_FAIL; // Invalid constant blob size
-    }
+        return reportBytecodeError(errorSink, "constant blob overruns the bytecode blob.");
     moduleView->constants = code + stream.getPosition();
 
     for (uint32_t i = 0; i < moduleView->stringCount; i++)
     {
         if (moduleView->stringOffsets[i] >= moduleView->constantBlobSize)
-        {
-            return SLANG_FAIL; // Invalid string literal offset
-        }
+            return reportBytecodeError(errorSink, "string literal offset is out of bounds.");
         const uint8_t* stringBegin = moduleView->constants + moduleView->stringOffsets[i];
         const uint8_t* constantsEnd = moduleView->constants + moduleView->constantBlobSize;
         bool foundTerminator = false;
@@ -128,9 +152,7 @@ SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleV
             }
         }
         if (!foundTerminator)
-        {
-            return SLANG_FAIL; // Unterminated string literal
-        }
+            return reportBytecodeError(errorSink, "string literal is not null-terminated.");
     }
 
     auto functionSectionEnd = funcDataStart + functionSectionSize;
@@ -142,7 +164,9 @@ SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleV
         if (functionOffset < functionDataStart ||
             !isRangeInBounds(functionOffset, sizeof(VMFuncHeader), functionSectionEnd))
         {
-            return SLANG_FAIL; // Invalid function offset
+            return reportBytecodeError(
+                errorSink,
+                "function offset points outside the function section.");
         }
         auto functionStart = code + moduleView->functionOffsets[i];
         auto header = (VMFuncHeader*)(functionStart);
@@ -154,11 +178,15 @@ SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleV
                 functionSectionEnd) ||
             !isRangeInBounds(codeOffset, header->codeSize, functionSectionEnd))
         {
-            return SLANG_FAIL; // Invalid function body size
+            return reportBytecodeError(
+                errorSink,
+                "function body or parameter table overruns the function section.");
         }
         if (header->name.offset >= moduleView->stringCount)
         {
-            return SLANG_FAIL; // Invalid function name
+            return reportBytecodeError(
+                errorSink,
+                "function name references an invalid string literal.");
         }
         VMFunctionView functionView;
         functionView.moduleView = moduleView;

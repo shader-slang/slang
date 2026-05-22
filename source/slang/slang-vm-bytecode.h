@@ -249,7 +249,11 @@ struct VMModuleView
     }
 };
 
-SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleView);
+SlangResult initVMModule(
+    uint8_t* code,
+    uint32_t codeSize,
+    VMModuleView* moduleView,
+    StringBuilder* errorSink = nullptr);
 
 StringBuilder& operator<<(StringBuilder& sb, VMOp op);
 StringBuilder& operator<<(StringBuilder& sb, VMModuleView& module);

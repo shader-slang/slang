@@ -571,7 +571,7 @@ static void jumpIfHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 static void getWorkingSetPtrHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 {
     auto ctx = convert(inCtx);
-    if (inst->opcodeExtension > ctx->m_currentWorkingSetSizeInBytes)
+    if (inst->opcodeExtension >= ctx->m_currentWorkingSetSizeInBytes)
     {
         ctx->failExecution("VM working-set pointer offset is out of bounds.");
         return;
