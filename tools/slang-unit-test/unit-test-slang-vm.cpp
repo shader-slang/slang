@@ -21,7 +21,19 @@ static void appendUInt32(List<uint8_t>& data, uint32_t value)
     data.add(uint8_t((value >> 24) & 0xFF));
 }
 
-static ComPtr<slang::IBlob> createVMByteCodeWithStringCount(uint32_t stringCount)
+// Build a minimal valid-looking VM bytecode for the rejection-path tests. Fields can be set
+// independently of the actual trailing bytes so the test can advertise an over-large count or
+// inject misalignment between sections.
+struct VMByteCodeOptions
+{
+    uint32_t functionCount = 0;
+    uint32_t functionSectionSize = sizeof(uint32_t);
+    uint32_t kernelBlobBytes = 0;
+    uint32_t constantBlobSize = 0;
+    uint32_t stringCount = 0;
+};
+
+static ComPtr<slang::IBlob> createVMByteCode(const VMByteCodeOptions& options)
 {
     List<uint8_t> data;
 
@@ -29,22 +41,60 @@ static ComPtr<slang::IBlob> createVMByteCodeWithStringCount(uint32_t stringCount
     appendUInt32(data, 100);
 
     appendUInt32(data, SLANG_FOUR_CC('S', 'V', 'F', 'N'));
-    appendUInt32(data, sizeof(uint32_t));
-    appendUInt32(data, 0);
+    appendUInt32(data, options.functionSectionSize);
+    appendUInt32(data, options.functionCount);
 
     appendUInt32(data, SLANG_FOUR_CC('S', 'V', 'K', 'N'));
-    appendUInt32(data, 0);
+    appendUInt32(data, options.kernelBlobBytes);
+    for (uint32_t i = 0; i < options.kernelBlobBytes; i++)
+    {
+        data.add(0);
+    }
 
     appendUInt32(data, SLANG_FOUR_CC('S', 'V', 'C', 'S'));
-    appendUInt32(data, sizeof(uint32_t));
-    appendUInt32(data, stringCount);
+    appendUInt32(data, options.constantBlobSize);
+    appendUInt32(data, options.stringCount);
 
     return ListBlob::moveCreate(data);
 }
 
+static ComPtr<slang::IBlob> createVMByteCodeWithStringCount(uint32_t stringCount)
+{
+    VMByteCodeOptions opts;
+    opts.stringCount = stringCount;
+    return createVMByteCode(opts);
+}
+
 SLANG_UNIT_TEST(slangVMRejectsOversizedStringOffsetArray)
 {
+    // stringCount * 4 reaches past the end of the buffer, exercising the
+    // checkByteRangeAvailable rejection path on stringOffsetsSize.
     ComPtr<slang::IBlob> code = createVMByteCodeWithStringCount(0x40000001);
+    ComPtr<slang::IBlob> disasmBlob;
+    SLANG_CHECK(SLANG_FAILED(slang_disassembleByteCode(code, disasmBlob.writeRef())));
+}
+
+SLANG_UNIT_TEST(slangVMRejectsMisalignedStringOffsetArray)
+{
+    // A 1-byte kernel blob makes the byte position before stringOffsets non-multiple of 4,
+    // exercising the alignment-guard rejection path that prevents an unaligned uint32_t* cast.
+    VMByteCodeOptions opts;
+    opts.kernelBlobBytes = 1;
+    opts.stringCount = 0;
+    ComPtr<slang::IBlob> code = createVMByteCode(opts);
+    ComPtr<slang::IBlob> disasmBlob;
+    SLANG_CHECK(SLANG_FAILED(slang_disassembleByteCode(code, disasmBlob.writeRef())));
+}
+
+SLANG_UNIT_TEST(slangVMRejectsOversizedFunctionCount)
+{
+    // functionSectionSize advertises only enough room for the function count, but functionCount
+    // claims billions of function offsets. The functionOffsets-array bounds check must reject
+    // this rather than letting the disassembler walk the resulting bogus pointer.
+    VMByteCodeOptions opts;
+    opts.functionSectionSize = sizeof(uint32_t);
+    opts.functionCount = 0x40000001;
+    ComPtr<slang::IBlob> code = createVMByteCode(opts);
     ComPtr<slang::IBlob> disasmBlob;
     SLANG_CHECK(SLANG_FAILED(slang_disassembleByteCode(code, disasmBlob.writeRef())));
 }
