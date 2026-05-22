@@ -58,11 +58,8 @@ private:
         return size <= m_dataSize - offset;
     }
 
-    bool isArrayRangeInBounds(
-        uint32_t offset,
-        size_t elementSize,
-        size_t count,
-        size_t alignment) const
+    bool isArrayRangeInBounds(uint32_t offset, size_t elementSize, size_t count, size_t alignment)
+        const
     {
         if (count == 0)
         {
@@ -234,6 +231,12 @@ private:
 
     bool validateFileState(const FileState& file) const
     {
+        // extractFiles() dereferences uniqueName when contents is present.
+        if (!file.contents.isNull() && file.uniqueName.isNull())
+        {
+            return false;
+        }
+
         return validateString(file.uniqueIdentity) && validateString(file.contents) &&
                validateString(file.canonicalPath) && validateString(file.foundPath) &&
                validateString(file.uniqueName);
@@ -283,7 +286,19 @@ private:
 
     bool validateSourceFileState(const SourceFileState& sourceFile) const
     {
-        return validateString(sourceFile.foundPath) && validateFilePtr(sourceFile.file, true);
+        const FileState* file = nullptr;
+        if (!tryGetRequiredObject(sourceFile.file, file))
+        {
+            return false;
+        }
+
+        // load() materializes SourceFile from blob; require serialized contents.
+        if (file->contents.isNull())
+        {
+            return false;
+        }
+
+        return validateString(sourceFile.foundPath) && validateFileState(*file);
     }
 
     bool validateSourceFilePtr(Offset32Ptr<SourceFileState> sourceFilePtr) const
@@ -293,8 +308,7 @@ private:
                validateSourceFileState(*sourceFile);
     }
 
-    bool validateSourceFilePtrArray(
-        const Offset32Array<Offset32Ptr<SourceFileState>>& array) const
+    bool validateSourceFilePtrArray(const Offset32Array<Offset32Ptr<SourceFileState>>& array) const
     {
         const Offset32Ptr<SourceFileState>* sourceFiles = nullptr;
         if (!tryGetArrayData(array, sourceFiles))
@@ -313,9 +327,8 @@ private:
         return true;
     }
 
-    bool validateOutputStateArray(
-        const Offset32Array<OutputState>& array,
-        uint32_t entryPointCount) const
+    bool validateOutputStateArray(const Offset32Array<OutputState>& array, uint32_t entryPointCount)
+        const
     {
         const OutputState* outputStates = nullptr;
         if (!tryGetArrayData(array, outputStates))
@@ -392,8 +405,7 @@ private:
         return true;
     }
 
-    bool validateTranslationUnitArray(
-        const Offset32Array<TranslationUnitRequestState>& array) const
+    bool validateTranslationUnitArray(const Offset32Array<TranslationUnitRequestState>& array) const
     {
         const TranslationUnitRequestState* translationUnits = nullptr;
         if (!tryGetArrayData(array, translationUnits))
