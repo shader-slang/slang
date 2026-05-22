@@ -633,7 +633,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     Int64 instIndex = 0;
     stringLengthIndex = 0;
     Int64 stringDataIndex = 0;
-    auto readInstRef = [&]() -> IRInst*
+    auto readInstRef = [&operandIndex, &flat, operandIndicesCount, numInsts, insts]() -> IRInst*
     {
         SLANG_RELEASE_ASSERT(operandIndex < operandIndicesCount);
         const auto index = flat.operandIndices[operandIndex++];
