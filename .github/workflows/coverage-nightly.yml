@@ -27,7 +27,6 @@ jobs:
       runs-on: '["ubuntu-22.04"]'
       container: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
       build-llvm: true
-      deploy-pages: false
       server-count: 1
     secrets: inherit
 
@@ -40,7 +39,6 @@ jobs:
       config: relwithdebinfo
       runs-on: '["macos-latest"]'
       build-llvm: true
-      deploy-pages: false
       server-count: 1
     secrets: inherit
 
@@ -53,7 +51,6 @@ jobs:
       config: relwithdebinfo
       runs-on: '["windows-latest"]'
       build-llvm: true
-      deploy-pages: false
       server-count: 1
     secrets: inherit
 
@@ -124,12 +121,11 @@ jobs:
           echo "Organized coverage data:"
           ls -R coverage-reports/
 
-      - name: Render with slang-coverage-html (new renderer)
-        # Produces a merged cross-OS report and per-OS reports rendered with
-        # the new in-tree renderer (tools/coverage-html/slang-coverage-html.py).
-        # Runs alongside the existing per-OS HTML reports so output can be
-        # compared. Persists the merged LCOV + auth-summary so a future diff
-        # job can compare two runs without re-merging from scratch.
+      - name: Render with slang-coverage-html
+        # Produces a merged cross-OS report and per-OS reports rendered
+        # with the in-tree renderer (tools/coverage-html/slang-coverage-html.py).
+        # Persists the merged LCOV + auth-summary so a future diff job
+        # can compare two runs without re-merging from scratch.
         run: |
           set -euo pipefail
 
@@ -175,7 +171,7 @@ jobs:
           [ -f "$ART/coverage-macos-aarch64/coverage-report-slangc.txt" ] && AUTH_SLANGC+=( --auth-summary "$ART/coverage-macos-aarch64/coverage-report-slangc.txt" )
 
           if [ ${#INPUTS[@]} -eq 0 ]; then
-            echo "::warning::No per-OS LCOV artifacts found; skipping new-renderer reports."
+            echo "::warning::No per-OS LCOV artifacts found; skipping rendered reports."
             exit 0
           fi
 
@@ -224,7 +220,7 @@ jobs:
             --title "Slang merged slangc coverage (Linux + macOS + Windows)" \
             --output-dir coverage-reports/merged/slangc/html
 
-          # ----- Per-OS reports (new renderer, side-by-side with existing) -----
+          # ----- Per-OS reports -----
           # Path-normalize each per-OS LCOV via the merger in single-input
           # mode so --source-root resolves source files cleanly.
           render_per_os() {
@@ -245,14 +241,14 @@ jobs:
             [ -f "$report" ] && auth=( --auth-summary "$report" )
             python3 "$RENDERER" "$dest/full/coverage.lcov" "${auth[@]}" \
               --source-root . \
-              --title "Slang $os coverage (new renderer)" \
+              --title "Slang $os coverage" \
               --output-dir "$dest/full/html"
 
             auth=()
             [ -f "$report_slangc" ] && auth=( --auth-summary "$report_slangc" )
             python3 "$SLANG_RENDER" "$dest/full/coverage.lcov" "${auth[@]}" \
               --source-root . \
-              --title "Slang $os slangc coverage (new renderer)" \
+              --title "Slang $os slangc coverage" \
               --output-dir "$dest/slangc/html"
           }
           shopt -s nullglob
@@ -292,9 +288,8 @@ jobs:
           cat coverage-reports/combined-summary.json
 
       - name: Upload Merged Coverage Reports
-        # Lets feature-branch dispatches inspect the merged + new-renderer
-        # output without writing to slang-coverage-reports. Always uploads
-        # so we can compare the new and existing renderers across runs.
+        # Lets feature-branch dispatches inspect the rendered output
+        # without writing to slang-coverage-reports. Always uploads.
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports-merged
@@ -327,49 +322,26 @@ jobs:
           mkdir -p "${REPORT_DIR}"/{linux,macos,windows}
           mkdir -p reports/latest/{linux,macos,windows}
 
-          # Copy Linux coverage
-          cp -r ../coverage-reports/linux/coverage-html/* "${REPORT_DIR}/linux/"
-          cp ../coverage-reports/linux/coverage-summary.json "${REPORT_DIR}/linux/"
-          if [ -d "../coverage-reports/linux/coverage-html-slangc" ]; then
-            mkdir -p "${REPORT_DIR}/linux/slangc"
-            cp -r ../coverage-reports/linux/coverage-html-slangc/* "${REPORT_DIR}/linux/slangc/"
-          fi
-
-          # Copy macOS coverage
-          cp -r ../coverage-reports/macos/coverage-html/* "${REPORT_DIR}/macos/"
-          cp ../coverage-reports/macos/coverage-summary.json "${REPORT_DIR}/macos/"
-          if [ -d "../coverage-reports/macos/coverage-html-slangc" ]; then
-            mkdir -p "${REPORT_DIR}/macos/slangc"
-            cp -r ../coverage-reports/macos/coverage-html-slangc/* "${REPORT_DIR}/macos/slangc/"
-          fi
-
-          # Copy Windows coverage. No coverage-html-slangc/ on Windows -- the
-          # full HTML report is the only browseable view; slangc totals come
-          # from coverage-slangc.lcov which we stash next to the summary.
-          if [ -d "../coverage-reports/windows/coverage-html" ]; then
-            cp -r ../coverage-reports/windows/coverage-html/* "${REPORT_DIR}/windows/"
-            cp ../coverage-reports/windows/coverage-summary.json "${REPORT_DIR}/windows/"
-            if [ -f "../coverage-reports/windows/coverage-slangc.lcov" ]; then
-              cp ../coverage-reports/windows/coverage-slangc.lcov "${REPORT_DIR}/windows/"
+          # Per-OS reports come from the in-tree renderer
+          # (tools/coverage-html/). The full/ render is the primary
+          # per-OS landing page; slangc/ is the compiler-only filtered
+          # view. Same shape for all three platforms.
+          for os in linux macos windows; do
+            src_root="../coverage-reports/$os"
+            if [ -d "$src_root/new-html/full/html" ]; then
+              cp -r "$src_root/new-html/full/html"/* "${REPORT_DIR}/$os/"
             fi
-          fi
+            if [ -d "$src_root/new-html/slangc/html" ]; then
+              mkdir -p "${REPORT_DIR}/$os/slangc"
+              cp -r "$src_root/new-html/slangc/html"/* "${REPORT_DIR}/$os/slangc/"
+            fi
+            if [ -f "$src_root/coverage-summary.json" ]; then
+              cp "$src_root/coverage-summary.json" "${REPORT_DIR}/$os/"
+            fi
+          done
 
           # Copy combined summary
           cp ../coverage-reports/combined-summary.json "${REPORT_DIR}/"
-
-          # Copy new-renderer reports (rendered alongside the existing
-          # llvm-cov / ReportGenerator HTML so the two outputs can be
-          # compared visually). Best-effort: skip silently when missing.
-          for os in linux macos windows; do
-            for view in full slangc; do
-              src="../coverage-reports/$os/new-html/$view/html"
-              dest="${REPORT_DIR}/$os/new/$view"
-              if [ -d "$src" ]; then
-                mkdir -p "$dest"
-                cp -r "$src"/* "$dest/"
-              fi
-            done
-          done
 
           # Merged cross-OS report (single canonical view that rolls up all
           # three platforms). The merged LCOV + auth-summary are persisted
@@ -388,41 +360,24 @@ jobs:
             cp ../coverage-reports/merged/slangc/coverage-report.txt "${REPORT_DIR}/merged/slangc/" 2>/dev/null || true
           fi
 
-          # Update latest
+          # Update latest. Same per-OS structure as the history archive
+          # above, sourcing from the in-tree renderer.
           rm -rf reports/latest/{linux,macos,windows}/*
           rm -rf reports/latest/merged
-          cp -r ../coverage-reports/linux/coverage-html/* reports/latest/linux/
-          cp ../coverage-reports/linux/coverage-summary.json reports/latest/linux/
-          if [ -d "../coverage-reports/linux/coverage-html-slangc" ]; then
-            mkdir -p reports/latest/linux/slangc
-            cp -r ../coverage-reports/linux/coverage-html-slangc/* reports/latest/linux/slangc/
-          fi
-          cp -r ../coverage-reports/macos/coverage-html/* reports/latest/macos/
-          cp ../coverage-reports/macos/coverage-summary.json reports/latest/macos/
-          if [ -d "../coverage-reports/macos/coverage-html-slangc" ]; then
-            mkdir -p reports/latest/macos/slangc
-            cp -r ../coverage-reports/macos/coverage-html-slangc/* reports/latest/macos/slangc/
-          fi
-          if [ -d "../coverage-reports/windows/coverage-html" ]; then
-            cp -r ../coverage-reports/windows/coverage-html/* reports/latest/windows/
-            cp ../coverage-reports/windows/coverage-summary.json reports/latest/windows/
-            if [ -f "../coverage-reports/windows/coverage-slangc.lcov" ]; then
-              cp ../coverage-reports/windows/coverage-slangc.lcov reports/latest/windows/
-            fi
-          fi
-          cp ../coverage-reports/combined-summary.json reports/latest/
-
-          # Mirror the new-renderer reports into reports/latest/.
           for os in linux macos windows; do
-            for view in full slangc; do
-              src="../coverage-reports/$os/new-html/$view/html"
-              dest="reports/latest/$os/new/$view"
-              if [ -d "$src" ]; then
-                mkdir -p "$dest"
-                cp -r "$src"/* "$dest/"
-              fi
-            done
+            src_root="../coverage-reports/$os"
+            if [ -d "$src_root/new-html/full/html" ]; then
+              cp -r "$src_root/new-html/full/html"/* "reports/latest/$os/"
+            fi
+            if [ -d "$src_root/new-html/slangc/html" ]; then
+              mkdir -p "reports/latest/$os/slangc"
+              cp -r "$src_root/new-html/slangc/html"/* "reports/latest/$os/slangc/"
+            fi
+            if [ -f "$src_root/coverage-summary.json" ]; then
+              cp "$src_root/coverage-summary.json" "reports/latest/$os/"
+            fi
           done
+          cp ../coverage-reports/combined-summary.json reports/latest/
           if [ -d ../coverage-reports/merged/full/html ]; then
             mkdir -p reports/latest/merged/full
             cp -r ../coverage-reports/merged/full/html/* reports/latest/merged/full/
