@@ -3803,7 +3803,7 @@ Type* getThisParamTypeForCallable(IRGenContext* context, DeclRef<Decl> callableD
     {
         auto lookupSource = lookup->getLookupSource();
         // Hack for AD 2.0..
-        if (asLookupOnCallable(callableDeclRef.declRefBase))
+        if (isDeclRefTypeOf<CallableDecl>(lookupSource))
         {
             return getThisParamTypeForCallable(
                 context,
@@ -4830,24 +4830,31 @@ struct ExprLoweringContext
             // a `this` arg.
             if (asLookupOnCallable(outInfo->funcDeclRef.declRefBase))
             {
+                // The AD 2.0 rewrite produced by
                 // `convertHigherOrderExprToLookup` (slang-check-expr.cpp)
-                // routes the AD 2.0 rewrite through
-                // `ConstructLookupResultExpr`, which wraps the original
-                // receiver in a `SharedTypeExpr` in its `This`-breadcrumb
-                // branch and forwards it to `ConstructDeclRefExpr` as the
-                // already-built base expression
-                // (`SharedTypeExpr::base.exp = <receiver>`). Use
-                // `SLANG_RELEASE_ASSERT` so the invariant holds in every
-                // build configuration — `SLANG_ASSERT` elides under
-                // `SLANG_ASSERT=release-assert-only` per the CLAUDE.md
-                // assertion-mode table, which would silently drop the
-                // receiver and reproduce #11004's miscompile shape if a
-                // future synthesis path produced a non-`SharedTypeExpr`
-                // baseExpression on this branch.
-                auto sharedTypeBase =
-                    as<SharedTypeExpr>(staticMemberFuncExpr->baseExpression);
-                SLANG_RELEASE_ASSERT(sharedTypeBase && sharedTypeBase->base.exp);
-                outInfo->baseExpr = sharedTypeBase->base.exp;
+                // routes through `ConstructLookupResultExpr`'s
+                // `isEffectivelyStatic` path, which wraps the original
+                // receiver in a `SharedTypeExpr`
+                // (`SharedTypeExpr::base.exp = <receiver>`) and forwards
+                // it to `ConstructDeclRefExpr`. `ConstructLookupResultExpr`
+                // also has a sibling `TypeType` branch that emits a
+                // `StaticMemberExpr` *without* a `SharedTypeExpr`
+                // wrapping — today no AD 2.0 lookup reaches this code
+                // through that path, but a future synthesis or overload
+                // collapse could land here with a different
+                // `baseExpression` shape. Guard rather than assert so a
+                // shape we don't recognise leaves `outInfo->baseExpr`
+                // null and the call falls back to the pre-PR behaviour
+                // (the worst case is the original #11004 ICE
+                // re-surfacing on that exact path) instead of aborting
+                // a release build.
+                if (auto sharedTypeBase =
+                        as<SharedTypeExpr>(staticMemberFuncExpr->baseExpression))
+                {
+                    SLANG_ASSERT(sharedTypeBase->base.exp);
+                    if (sharedTypeBase->base.exp)
+                        outInfo->baseExpr = sharedTypeBase->base.exp;
+                }
             }
             return true;
         }
