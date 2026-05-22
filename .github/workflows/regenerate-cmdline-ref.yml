@@ -176,7 +176,7 @@ jobs:
             }}
 
       - name: Add reaction
-        if: needs.generate_cmdline_ref.result == 'success'
+        if: needs.generate_cmdline_ref.result == 'success' && steps.create-pr.conclusion == 'success'
         uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
