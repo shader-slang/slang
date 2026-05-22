@@ -19,12 +19,12 @@ include(FetchContent)
 if(NOT DEFINED SLANG_DXC_BINARY_URL)
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         set(SLANG_DXC_BINARY_URL
-            "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/dxc_2026_02_20.zip"
+            "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.10.2605.2/dxc_preview_2026_04_22.zip"
         )
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
             set(SLANG_DXC_BINARY_URL
-                "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/linux_dxc_2026_02_20.x86_64.tar.gz"
+                "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.10.2605.2/linux_dxc_preview_2026_04_22.x86_64.tar.gz"
             )
         endif()
     endif()
