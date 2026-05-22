@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for name-resolution/overload-resolution
 
 ## Intent
-
 Tests verify the overload-resolution behaviors documented in
 [`docs/llm-generated/name-resolution/overload-resolution.md`](../../../docs/llm-generated/name-resolution/overload-resolution.md):
 the `TryCheckOverloadCandidate` probe-phase filter pipeline (arity,
@@ -34,8 +33,8 @@ Multi-backend rule: overload resolution runs at semantic-check
 before any backend lowering. Per `_common.md`, INTERPRET is the
 primary single-directive form. No multi-backend coverage is needed.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | An exact-type match (cost 0) beats a scalar-to-vector promotion (kConversionCost_ScalarToVector additive); the int3 overload is not chosen when the call passes an int. | functional | [#conversion-costs](../../../docs/llm-generated/name-resolution/overload-resolution.md#conversion-costs) | [`scalar-to-vector-promotion-cost-loses.slang`](scalar-to-vector-promotion-cost-loses.slang) |
@@ -63,8 +62,24 @@ primary single-directive form. No multi-backend coverage is needed.
 | Scope-distance step of the comparator (step 7) picks the closer-scope candidate when other ranking signals tie; a same-named function in the enclosing namespace at the use site beats a sibling-namespace one of equal cost. | functional | [#tie-breaking-comparator](../../../docs/llm-generated/name-resolution/overload-resolution.md#tie-breaking-comparator) | [`overload-prefers-closer-scope.slang`](overload-prefers-closer-scope.slang) |
 | The comparator's compareOverloadCandidateSpecificity step prefers a non-generic candidate over a generic one when both are Applicable with the same conversion cost. | functional | [#tie-breaking-comparator](../../../docs/llm-generated/name-resolution/overload-resolution.md#tie-breaking-comparator) | [`overload-prefers-non-generic-over-generic.slang`](overload-prefers-non-generic-over-generic.slang) |
 
-## Sibling-bundle overlap
 
+## Untested claims
+NA
+
+
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#tie-breaking-comparator](../../../docs/llm-generated/name-resolution/overload-resolution.md#tie-breaking-comparator) | ambiguous-claim | The doc's `## Tie-breaking comparator` section claims step 5 `compareOverloadCandidateSpecificity` prefers "fewer default parameters > more". The actual resolver does not break ties on this dimension for the simple case of `pick(int)` vs `pick(int, int = 99)` called with one int: both candidates are considered equally good and the resolver emits ambiguous-call. | Either the comparator does not run this preference for default parameters in `Func` flavor, or the documented claim is too broad. `ambiguous-call-with-default-param-overload.slang` records the observed behavior; a precise claim would name the conditions under which the default-count preference actually fires (e.g. only for variadic vs non-variadic, or only for explicit generic applications). |
+| [#tie-breaking-comparator](../../../docs/llm-generated/name-resolution/overload-resolution.md#tie-breaking-comparator) | undocumented-behavior | The doc's `## Tie-breaking comparator` lists step 4 "Implicit conversion preference" — "If exactly one candidate is marked `ImplicitConversionModifier`, that one wins." The `__implicit_conversion` attribute is a core-module-only modifier; user code cannot decorate an overload with it from a `.slang` source. No user-observable test anchors to this claim, so it is recorded here as a doc gap (a claim that maps to a user-writable surface would unblock a test). |  |
+| [#tie-breaking-comparator](../../../docs/llm-generated/name-resolution/overload-resolution.md#tie-breaking-comparator) | undocumented-behavior | The doc's `## Tie-breaking comparator` step 6 names `getExportRank` and says `export` decls are preferred over `extern` decls. `export` and `extern` are module-system primitives that require multi-file compilation; `slang-test` runs each `.slang` file standalone (no `-r` resolution), so this preference is not observable from a single test file. A claim that names a single-file surface where `getExportRank` is observable would unblock a test. |  |
+| [#operator-overloading](../../../docs/llm-generated/name-resolution/overload-resolution.md#operator-overloading) | undocumented-behavior | The doc's `## Operator overloading` section names `ResolvedOperatorOverload` / `TypeCheckingCache::resolvedOperatorOverloadCache` and the invalidation by `cacheVersion`. The cache is a performance optimization "correctness does not depend on it", so there is no user-observable consequence: the same expression resolves to the same overload whether the cache hits or misses. No test anchors to the cache itself. |  |
+| [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/overload-resolution.md#edge-cases-and-failure-modes) | undocumented-behavior | The doc's `## Edge cases and failure modes` section says an unresolved `PartiallyAppliedGenericExpr` reaching the lowerer is an "internal compiler error" (a correctness invariant on the resolver). The user-visible diagnostic is generic-argument- inference-failed at the resolver, which we cover; the lowerer's internal-error surface is not anchored. |  |
+| [#probe-phase-trycheckoverloadcandidate](../../../docs/llm-generated/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | undocumented-behavior | The doc's `## Probe phase: TryCheckOverloadCandidate` step 7 (`TryCheckOverloadCandidateClassNewMatchUp`) is documented as finalize-only; its user-visible surface is the choice between `Class()` and `Class.new()` AST forms. There is no documented diagnostic that fires when this step rejects, and the surface is identical at the call site, so no test anchors here directly. |  |
+| [#probe-phase-trycheckoverloadcandidate](../../../docs/llm-generated/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | undocumented-behavior | The doc's `## Probe phase: TryCheckOverloadCandidate` step 2 (`TryCheckOverloadCandidateFixity`) names catching "calling an infix operator in prefix position". Slang's surface does not let user code write a free `prefix` / `postfix` / `infix` marker on a function, so the fixity-failure path is not reachable from a `.slang` source. A claim that names a user-writable surface for fixity (or a confirmation that fixity is implicit) would unblock a test. |  |
+
+
+## Sibling-bundle overlap
 `tests-agentic/name-resolution/lookup/` covers how the **candidate set**
 is built (lookup walks, container accumulation, inheritance, transparent
 members). This bundle covers **how the resolver narrows that set to a
@@ -77,20 +92,3 @@ here:
   candidate; this bundle picks among the inherited members).
 - transparent-member resolution (lookup owns the breadcrumb
   construction).
-
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#tie-breaking-comparator](../../../docs/llm-generated/name-resolution/overload-resolution.md#tie-breaking-comparator) | ambiguous-claim | The doc's `## Tie-breaking comparator` section claims step 5 `compareOverloadCandidateSpecificity` prefers "fewer default parameters > more". The actual resolver does not break ties on this dimension for the simple case of `pick(int)` vs `pick(int, int = 99)` called with one int: both candidates are considered equally good and the resolver emits ambiguous-call. | Either the comparator does not run this preference for default parameters in `Func` flavor, or the documented claim is too broad. `ambiguous-call-with-default-param-overload.slang` records the observed behavior; a precise claim would name the conditions under which the default-count preference actually fires (e.g. only for variadic vs non-variadic, or only for explicit generic applications). |
-| [#tie-breaking-comparator](../../../docs/llm-generated/name-resolution/overload-resolution.md#tie-breaking-comparator) | undocumented-behavior | The doc's `## Tie-breaking comparator` lists step 4 "Implicit conversion preference" — "If exactly one candidate is marked `ImplicitConversionModifier`, that one wins." The `__implicit_conversion` attribute is a core-module-only modifier; user code cannot decorate an overload with it from a `.slang` source. No user-observable test anchors to this claim, so it is recorded here as a doc gap (a claim that maps to a user-writable surface would unblock a test). |  |
-| [#tie-breaking-comparator](../../../docs/llm-generated/name-resolution/overload-resolution.md#tie-breaking-comparator) | undocumented-behavior | The doc's `## Tie-breaking comparator` step 6 names `getExportRank` and says `export` decls are preferred over `extern` decls. `export` and `extern` are module-system primitives that require multi-file compilation; `slang-test` runs each `.slang` file standalone (no `-r` resolution), so this preference is not observable from a single test file. A claim that names a single-file surface where `getExportRank` is observable would unblock a test. |  |
-| [#operator-overloading](../../../docs/llm-generated/name-resolution/overload-resolution.md#operator-overloading) | undocumented-behavior | The doc's `## Operator overloading` section names `ResolvedOperatorOverload` / `TypeCheckingCache::resolvedOperatorOverloadCache` and the invalidation by `cacheVersion`. The cache is a performance optimization "correctness does not depend on it", so there is no user-observable consequence: the same expression resolves to the same overload whether the cache hits or misses. No test anchors to the cache itself. |  |
-| [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/overload-resolution.md#edge-cases-and-failure-modes) | undocumented-behavior | The doc's `## Edge cases and failure modes` section says an unresolved `PartiallyAppliedGenericExpr` reaching the lowerer is an "internal compiler error" (a correctness invariant on the resolver). The user-visible diagnostic is generic-argument- inference-failed at the resolver, which we cover; the lowerer's internal-error surface is not anchored. |  |
-| [#probe-phase-trycheckoverloadcandidate](../../../docs/llm-generated/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | undocumented-behavior | The doc's `## Probe phase: TryCheckOverloadCandidate` step 7 (`TryCheckOverloadCandidateClassNewMatchUp`) is documented as finalize-only; its user-visible surface is the choice between `Class()` and `Class.new()` AST forms. There is no documented diagnostic that fires when this step rejects, and the surface is identical at the call site, so no test anchors here directly. |  |
-| [#probe-phase-trycheckoverloadcandidate](../../../docs/llm-generated/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | undocumented-behavior | The doc's `## Probe phase: TryCheckOverloadCandidate` step 2 (`TryCheckOverloadCandidateFixity`) names catching "calling an infix operator in prefix position". Slang's surface does not let user code write a free `prefix` / `postfix` / `infix` marker on a function, so the fixity-failure path is not reachable from a `.slang` source. A claim that names a user-writable surface for fixity (or a confirmation that fixity is implicit) would unblock a test. |  |
-
-## Untested claims
-
-(none)
-

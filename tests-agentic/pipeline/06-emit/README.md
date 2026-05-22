@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for pipeline/06-emit
 
 ## Intent
-
 Tests verify the code-emission stage described in
 [`docs/llm-generated/pipeline/06-emit.md`](../../../docs/llm-generated/pipeline/06-emit.md):
 that the emit dispatcher (`emitEntryPointsSourceFromIR`) routes a
@@ -49,8 +48,8 @@ CLikeSourceEmitter), one cross-target vector-type-spelling test
 (SourceWriter), and one preludes-include test (across HLSL / CUDA /
 C++ for positive coverage and GLSL / WGSL for negative coverage).
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A Slang cbuffer is emitted in its target-shaped form on each text backend: HLSL `cbuffer`, GLSL `layout(std140) uniform`, Metal `constant *`, WGSL `var<uniform>`, SPIR-V Uniform/Block-decorated struct. | functional | [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | [`cbuffer-shape-per-target.slang`](cbuffer-shape-per-target.slang) |
@@ -96,24 +95,8 @@ C++ for positive coverage and GLSL / WGSL for negative coverage).
 | The Torch backend emits the PyTorch C++ glue for a `[TorchEntryPoint]` function — including a `SLANG_PRELUDE_EXPORT` declaration and a `pybind11`-style `m.def(...)` binding — and references the slang-torch-prelude.h header. | expansion | [#torch](../../../docs/llm-generated/pipeline/06-emit.md#torch) | [`torch-entry-point-cpp-binding.slang`](torch-entry-point-cpp-binding.slang) |
 | The WGSL backend emits WGSL source with @binding(N) @group(N) for resources and @compute / @workgroup_size for the compute entry point. | functional | [#wgsl](../../../docs/llm-generated/pipeline/06-emit.md#wgsl) | [`wgsl-binding-and-workgroup.slang`](wgsl-binding-and-workgroup.slang) |
 
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#line-893](../../../docs/llm-generated/pipeline/06-emit.md#line-893) | undocumented-behavior | The doc lists `slang-emit.cpp` line numbers ("line 893", "line 2418 at `source_commit`") for `linkAndOptimizeIR` and `emitEntryPointsSourceFromIR`. These are navigation aids, not user-facing claims; no test anchors them. |  |
-| [#ifdef](../../../docs/llm-generated/pipeline/06-emit.md#ifdef) | undocumented-behavior | The doc's preludes table groups HLSL with the prelude-having targets, but the HLSL emit only includes `nvHLSLExtns.h` conditionally (`#ifdef SLANG_HLSL_ENABLE_NVAPI`). | A one-line note in the doc that HLSL's prelude inclusion is conditional (unlike CUDA / C++) would clarify what a test should check; the test in this bundle pins the `SLANG_HLSL_ENABLE_NVAPI` macro rather than an unconditional `#include`. |
-| [#operator-precedence-and-parenthesization](../../../docs/llm-generated/pipeline/06-emit.md#operator-precedence-and-parenthesization) | undocumented-behavior | The doc's `## Operator precedence and parenthesization` section says the helper inserts "minimal" parentheses but does not give any example of an expression that requires parens vs. one that does not. Two tests in this bundle cover the two cases; an example pair in the doc would let an agent test these more precisely. |  |
-| [#line](../../../docs/llm-generated/pipeline/06-emit.md#line) | undocumented-behavior | The doc's `## Source-writer abstraction` section mentions `LineDirectiveMode` configures the directive style (C / GLSL / none) but does not state which mode is the default per target. The test in this bundle pins only the existence of `#line` directives on HLSL/GLSL/Metal/CUDA/C++; SPIR-V and WGSL do not emit `#line` directives by default but the doc does not say so explicitly. |  |
-| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | undocumented-behavior | The doc's `## Backends` table for Metal says "Emits Metal Shading Language" but does not state that Metal assigns `buffer(N)` indices positionally from the entry-point parameter list (i.e. Metal does not honour `register(uN)` or `vk::binding(N)` for buffer index). | A one-line clarification in the doc would let the test pin Metal's `buffer(N)` to a specific index; the test in this bundle accepts any integer. |
-| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | undocumented-behavior | The doc's `## Backends` table lists CUDA as emitting CUDA source, but does not state that CUDA uses a `GlobalParams` struct + `SLANG_globalParams` shim to surface module-scope `uniform` declarations. The test in this bundle confirms the `SLANG_globalParams`/`__constant__ GlobalParams_0` shape, which the doc does not currently describe. |  |
-| [#preludes](../../../docs/llm-generated/pipeline/06-emit.md#preludes) | undocumented-behavior | The doc's `## Preludes` table column for "C++ host" points at `slang-cpp-host-prelude.h`, but the doc does not state when this prelude is selected vs. `slang-cpp-prelude.h`. We test only the shader-side prelude (`slang-cpp-prelude.h`) because that is the one chosen by `-target cpp` for a compute entry point. |  |
-
-## Untested coverable claims
-
-(none)
 
 ## Untested claims
-
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | **LLVM / native via `slang-llvm`** (`#backends` > LLVM). | (unclassified) | [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | Requires the LLVM JIT. |
@@ -124,3 +107,15 @@ C++ for positive coverage and GLSL / WGSL for negative coverage).
 | **`SourceMap` companion** (`#source-writer-abstraction`). Source-map metadata is an API surface, not a text-emit shape. | (unclassified) | [#source-writer-abstraction](../../../docs/llm-generated/pipeline/06-emit.md#source-writer-abstraction) | Reason and explanation to be refined by the next regeneration. |
 | **`IArtifact` object layout** (`#inputs-and-outputs`). Internal C++ structure. The user-visible consequence ("a successful compile produces text") is implied by every other test passing. | needs-unit-test | [#inputs-and-outputs](../../../docs/llm-generated/pipeline/06-emit.md#inputs-and-outputs) | No slangc CLI surface reaches this. A C++ unit test in `tools/slang-unit-test/` could exercise the relevant compiler internals directly. |
 | **"Adding a new backend" workflow** (`#adding-a-new-backend`). A developer guide, not a user-observable behavior. | process-doc | [#adding-a-new-backend](../../../docs/llm-generated/pipeline/06-emit.md#adding-a-new-backend) | Contributor walkthrough / process documentation, not a compiler behavior. |
+
+
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#line-893](../../../docs/llm-generated/pipeline/06-emit.md#line-893) | undocumented-behavior | The doc lists `slang-emit.cpp` line numbers ("line 893", "line 2418 at `source_commit`") for `linkAndOptimizeIR` and `emitEntryPointsSourceFromIR`. These are navigation aids, not user-facing claims; no test anchors them. |  |
+| [#ifdef](../../../docs/llm-generated/pipeline/06-emit.md#ifdef) | undocumented-behavior | The doc's preludes table groups HLSL with the prelude-having targets, but the HLSL emit only includes `nvHLSLExtns.h` conditionally (`#ifdef SLANG_HLSL_ENABLE_NVAPI`). | A one-line note in the doc that HLSL's prelude inclusion is conditional (unlike CUDA / C++) would clarify what a test should check; the test in this bundle pins the `SLANG_HLSL_ENABLE_NVAPI` macro rather than an unconditional `#include`. |
+| [#operator-precedence-and-parenthesization](../../../docs/llm-generated/pipeline/06-emit.md#operator-precedence-and-parenthesization) | undocumented-behavior | The doc's `## Operator precedence and parenthesization` section says the helper inserts "minimal" parentheses but does not give any example of an expression that requires parens vs. one that does not. Two tests in this bundle cover the two cases; an example pair in the doc would let an agent test these more precisely. |  |
+| [#line](../../../docs/llm-generated/pipeline/06-emit.md#line) | undocumented-behavior | The doc's `## Source-writer abstraction` section mentions `LineDirectiveMode` configures the directive style (C / GLSL / none) but does not state which mode is the default per target. The test in this bundle pins only the existence of `#line` directives on HLSL/GLSL/Metal/CUDA/C++; SPIR-V and WGSL do not emit `#line` directives by default but the doc does not say so explicitly. |  |
+| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | undocumented-behavior | The doc's `## Backends` table for Metal says "Emits Metal Shading Language" but does not state that Metal assigns `buffer(N)` indices positionally from the entry-point parameter list (i.e. Metal does not honour `register(uN)` or `vk::binding(N)` for buffer index). | A one-line clarification in the doc would let the test pin Metal's `buffer(N)` to a specific index; the test in this bundle accepts any integer. |
+| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | undocumented-behavior | The doc's `## Backends` table lists CUDA as emitting CUDA source, but does not state that CUDA uses a `GlobalParams` struct + `SLANG_globalParams` shim to surface module-scope `uniform` declarations. The test in this bundle confirms the `SLANG_globalParams`/`__constant__ GlobalParams_0` shape, which the doc does not currently describe. |  |
+| [#preludes](../../../docs/llm-generated/pipeline/06-emit.md#preludes) | undocumented-behavior | The doc's `## Preludes` table column for "C++ host" points at `slang-cpp-host-prelude.h`, but the doc does not state when this prelude is selected vs. `slang-cpp-prelude.h`. We test only the shader-side prelude (`slang-cpp-prelude.h`) because that is the one chosen by `-target cpp` for a compute entry point. |  |

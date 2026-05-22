@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for ir-reference/index
 
 ## Intent
-
 Tests verify the **cross-cutting orientation claims** made by
 [`docs/llm-generated/ir-reference/index.md`](../../../docs/llm-generated/ir-reference/index.md):
 the ten-family taxonomy assigning every concrete opcode to a
@@ -33,8 +32,8 @@ index doc itself asserts, observed by `-dump-ir` against a
 text target with `-o /dev/null` (per `_common.md`'s rules for
 IR-dump observation).
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | Per the family taxonomy row for the Decoration family, decorations are metadata attached to instructions; an entry-point function shows a decoration token co-located with its host func opcode in the IR dump. | functional | [#family-taxonomy](../../../docs/llm-generated/ir-reference/index.md#family-taxonomy) | [`decoration-attaches-to-host-inst.slang`](decoration-attaches-to-host-inst.slang) |
@@ -44,8 +43,8 @@ IR-dump observation).
 | The index doc names visitInfixExpr as dispatching to arithmetic opcodes like Add, Sub, Mul; mixed-operator code emits each opcode. | functional | [#how-ast-nodes-lower-to-ir](../../../docs/llm-generated/ir-reference/index.md#how-ast-nodes-lower-to-ir) | [`ast-mapping-infix-dispatches-to-arith.slang`](ast-mapping-infix-dispatches-to-arith.slang) |
 | The index doc names visitVarDecl as the AST-to-IR mapping that emits a Var opcode; a struct-typed local should produce a var instruction in the IR. | functional | [#how-ast-nodes-lower-to-ir](../../../docs/llm-generated/ir-reference/index.md#how-ast-nodes-lower-to-ir) | [`ast-mapping-var-decl-emits-var.slang`](ast-mapping-var-decl-emits-var.slang) |
 
-## Untested claims
 
+## Untested claims
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | Per-opcode value catalog (memory ops, aggregate constructors, constexpr arithmetic, bit-cast and conversion) -- see `tests-agentic/ir-reference/values/`. | out-of-bundle | (unspecified) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
@@ -60,8 +59,16 @@ IR-dump observation).
 | `specialize`, existential pack/unpack, RTTI, type-flow dispatchers -- see `tests-agentic/ir-reference/generics-and-existentials/`. | out-of-bundle | [#specialize](../../../docs/llm-generated/ir-reference/index.md#specialize) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
 | IR schema, op-flag bits, hoistable/global deduplication, module versioning, and the workflow for adding a new opcode -- see `cross-cutting/ir-instructions` (the index doc names it as the canonical conventions doc, but it is itself a cross-cutting topic anchor, not an index-level claim). | process-doc | (unspecified) | Contributor walkthrough / process documentation, not a compiler behavior. |
 
-## Sibling-bundle overlap
 
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#how-ast-nodes-lower-to-ir](../../../docs/llm-generated/ir-reference/index.md#how-ast-nodes-lower-to-ir) | undocumented-behavior | The `#how-ast-nodes-lower-to-ir` section names exactly two example mappings (`visitVarDecl -> Var`, `visitInfixExpr -> Add/Sub/Mul`). Tests in this bundle pin both; a third, distinct family of mappings (e.g. an entry- point declaration -> `func` with `[entryPoint(...)]` decoration) is *implied* but not enumerated. The doc could add one or two more concrete examples to strengthen the cross-family AST-to-IR mapping claim without growing the table. |  |
+| [#specialize](../../../docs/llm-generated/ir-reference/index.md#specialize) | undocumented-behavior | The index doc states "Many opcodes have no direct AST source: they are produced by IR passes ... and may even be retired before code emission." but does not provide a user-observable example of a synthesized opcode that survives into a final text dump. We attempted a `specialize`-from-pass observation in test design but dropped it: by the time `-dump-ir` emits the final IR, target legalization has typically removed `specialize` instructions. A natural-surface example that reliably leaves a synthesized opcode in the final dump would make this claim testable at the index level (it is currently only testable inside `pipeline/05-ir-passes`). |  |
+| [#cross-cutting-topics](../../../docs/llm-generated/ir-reference/index.md#cross-cutting-topics) | undocumented-behavior | The `#cross-cutting-topics` and `#pages` sections are pure pointer tables; they are explicitly out of scope per the per-section prompt. No gap, just noted for future readers. |  |
+
+
+## Sibling-bundle overlap
 The following peer-bundle behaviors are intentionally not
 re-tested here to avoid duplication:
 
@@ -89,11 +96,3 @@ re-tested here to avoid duplication:
   `family-taxonomy-if-stmt-is-control-flow.slang` exercises
   only the family-assignment claim, not the per-terminator
   catalog.
-
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#how-ast-nodes-lower-to-ir](../../../docs/llm-generated/ir-reference/index.md#how-ast-nodes-lower-to-ir) | undocumented-behavior | The `#how-ast-nodes-lower-to-ir` section names exactly two example mappings (`visitVarDecl -> Var`, `visitInfixExpr -> Add/Sub/Mul`). Tests in this bundle pin both; a third, distinct family of mappings (e.g. an entry- point declaration -> `func` with `[entryPoint(...)]` decoration) is *implied* but not enumerated. The doc could add one or two more concrete examples to strengthen the cross-family AST-to-IR mapping claim without growing the table. |  |
-| [#specialize](../../../docs/llm-generated/ir-reference/index.md#specialize) | undocumented-behavior | The index doc states "Many opcodes have no direct AST source: they are produced by IR passes ... and may even be retired before code emission." but does not provide a user-observable example of a synthesized opcode that survives into a final text dump. We attempted a `specialize`-from-pass observation in test design but dropped it: by the time `-dump-ir` emits the final IR, target legalization has typically removed `specialize` instructions. A natural-surface example that reliably leaves a synthesized opcode in the final dump would make this claim testable at the index level (it is currently only testable inside `pipeline/05-ir-passes`). |  |
-| [#cross-cutting-topics](../../../docs/llm-generated/ir-reference/index.md#cross-cutting-topics) | undocumented-behavior | The `#cross-cutting-topics` and `#pages` sections are pure pointer tables; they are explicitly out of scope per the per-section prompt. No gap, just noted for future readers. |  |

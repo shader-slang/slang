@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for pipeline/overview
 
 ## Intent
-
 Tests verify the end-to-end pipeline behaviors described in
 [`docs/llm-generated/pipeline/overview.md`](../../../docs/llm-generated/pipeline/overview.md):
 that a single source successfully traverses the full
@@ -41,8 +40,8 @@ struct, one if/else control flow), and one multi-target test for the
 entry-point-flows-to-target-marker claim. Multi-backend coverage is
 the point of this bundle.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | Decls in the AST (here a struct) lower into IR types and re-emerge in the emitted target text after IR passes. | functional | [#ast-ir-lowering](../../../docs/llm-generated/pipeline/overview.md#ast-ir-lowering) | [`ast-to-ir-lowers-struct.slang`](ast-to-ir-lowers-struct.slang) |
@@ -53,8 +52,15 @@ the point of this bundle.
 | A non-trivial source successfully traverses the full pipeline to produce HLSL text with the entry-point body intact. | functional | [#end-to-end-flow](../../../docs/llm-generated/pipeline/overview.md#end-to-end-flow) | [`end-to-end-flow-hlsl.slang`](end-to-end-flow-hlsl.slang) |
 | The IR pass list is target-sensitive; the same source emits target-shaped output (not just textually identical) for each backend. | functional | [#ir-passes](../../../docs/llm-generated/pipeline/overview.md#ir-passes) | [`pipeline-is-target-sensitive.slang`](pipeline-is-target-sensitive.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+| Claim | Reason | Anchor | Why untested |
+| --- | --- | --- | --- |
+| Targets that require a host compiler or runtime not available in the agentic runner: Torch glue (`-target torch`), LLVM IR / native via `slang-llvm`, DXIL, MSL binary, SPIRV binary (requires `spirv-val` ecosystem). Text-emit forms are tested instead. | out-of-bundle | [#slang-llvm](../../../docs/llm-generated/pipeline/overview.md#slang-llvm) | The pipeline-overview doc is a navigation hub; per-target downstream paths belong to the `target-pipelines/*` bundles. |
+| Determinism of the compiler (compile twice → identical text). `slang-test` would need a custom diff harness for this, and the doc does not currently make a determinism claim; recorded as doc-gap-adjacent and skipped here. | (unclassified) | [#slang-test](../../../docs/llm-generated/pipeline/overview.md#slang-test) | Reason and explanation to be refined by the next regeneration. |
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#end-to-end-flow](../../../docs/llm-generated/pipeline/overview.md#end-to-end-flow) | undocumented-behavior | The `## End-to-end flow` section says explicitly that the ordering in the diagram "is conceptual — actual control flow weaves checking and parsing together (see [02-parse-ast.md] for the two-stage parser)". That two-stage parsing claim is testable (e.g. generic-vs-comparison disambiguation depends on type info introduced by the checker mid-parse) but is fundamentally a parser-stage claim. Deferred to `pipeline/02-parse-ast`. |  |
@@ -66,10 +72,3 @@ the point of this bundle.
 | [#cross-cutting-concerns](../../../docs/llm-generated/pipeline/overview.md#cross-cutting-concerns) | undocumented-behavior | The `## Cross-cutting concerns` section enumerates five cross-cutting topics. Each has its own bundle: diagnostics → `cross-cutting/diagnostics`, IR instructions → `cross-cutting/ir-instructions`, targets and capabilities → `cross-cutting/targets`, core module / preludes → `cross-cutting/core-module`, serialization → `cross-cutting/serialization`. Not duplicated here. |  |
 | [#line-893-at-sourcecommit](../../../docs/llm-generated/pipeline/overview.md#line-893-at-sourcecommit) | undocumented-behavior | The doc lists `slang-emit.cpp` line numbers ("line 893 at source_commit", "line 2418 at source_commit") for `linkAndOptimizeIR` and `emitEntryPointsSourceFromIR`. These are navigation aids, not user-facing claims; no test anchors them. The fact that linkAndOptimizeIR runs is observed indirectly by successful end-to-end compile of a shader that requires linking (function calls, struct usage) — covered by the existing tests. |  |
 | [#emit](../../../docs/llm-generated/pipeline/overview.md#emit) | undocumented-behavior | The `## Emit` subsection lists Torch glue, LLVM IR / native via `slang-llvm`, and VM bytecode as targets in addition to the text emit backends. Torch and LLVM/native require host compilers we cannot assume in the no-GPU runner; VM bytecode is exercised via `INTERPRET` in lower-level bundles. Recorded as out-of-scope here. |  |
-
-## Untested claims
-
-| Claim | Reason | Anchor | Why untested |
-| --- | --- | --- | --- |
-| Targets that require a host compiler or runtime not available in the agentic runner: Torch glue (`-target torch`), LLVM IR / native via `slang-llvm`, DXIL, MSL binary, SPIRV binary (requires `spirv-val` ecosystem). Text-emit forms are tested instead. | out-of-bundle | [#slang-llvm](../../../docs/llm-generated/pipeline/overview.md#slang-llvm) | The pipeline-overview doc is a navigation hub; per-target downstream paths belong to the `target-pipelines/*` bundles. |
-| Determinism of the compiler (compile twice → identical text). `slang-test` would need a custom diff harness for this, and the doc does not currently make a determinism claim; recorded as doc-gap-adjacent and skipped here. | (unclassified) | [#slang-test](../../../docs/llm-generated/pipeline/overview.md#slang-test) | Reason and explanation to be refined by the next regeneration. |

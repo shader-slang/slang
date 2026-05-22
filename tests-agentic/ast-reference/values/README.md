@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for ast-reference/values
 
 ## Intent
-
 Tests verify the **user-observable** consequences of the non-Type
 `Val` subclasses enumerated in
 [`docs/llm-generated/ast-reference/values.md`](../../../docs/llm-generated/ast-reference/values.md):
@@ -51,8 +50,8 @@ that this bundle exercises are:
 (`unormmodifierval-resource-format.slang`) is used because the
 `unorm` modifier's observable surface is in the emitted text.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | Two GenericAppDeclRefs of the same decl with different generic arguments are distinct types; assigning one to the other is rejected by the type checker. | negative | [#declref-family](../../../docs/llm-generated/ast-reference/values.md#declref-family) | [`genericappdeclref-different-args-distinct.slang`](genericappdeclref-different-args-distinct.slang) |
@@ -67,20 +66,8 @@ that this bundle exercises are:
 | A DeclaredSubtypeWitness represents the proof carried by an InheritanceDecl that T conforms to interface I; the witness is what permits dispatching I's methods on a T value through a generic constraint. | functional | [#witness-and-witness-table-evidence](../../../docs/llm-generated/ast-reference/values.md#witness-and-witness-table-evidence) | [`declaredsubtypewitness-interface-dispatch.slang`](declaredsubtypewitness-interface-dispatch.slang) |
 | A TransitiveSubtypeWitness composes two existing witnesses A:B and B:C to obtain A:C; a concrete type that implements a derived interface satisfies a generic constraint on the base interface. | functional | [#witness-and-witness-table-evidence](../../../docs/llm-generated/ast-reference/values.md#witness-and-witness-table-evidence) | [`transitivesubtypewitness-chain.slang`](transitivesubtypewitness-chain.slang) |
 
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#an-integer-value-resolved-through-a-witness-table-lookup](../../../docs/llm-generated/ast-reference/values.md#an-integer-value-resolved-through-a-witness-table-lookup) | undocumented-behavior | The doc names `WitnessLookupIntVal` as "an integer value resolved through a witness-table lookup", but the surface spelling that produces this Val is not given. | Without a surface form (e.g. an interface with a `static const int` requirement that another generic reads), it is not anchorable. |
-| [#a-compile-time-call-to-an-integer-returning-function](../../../docs/llm-generated/ast-reference/values.md#a-compile-time-call-to-an-integer-returning-function) | undocumented-behavior | The doc names `FuncCallIntVal` as "a compile-time call to an integer-returning function" but does not name the spelling. Slang has `__intrinsic` / `[__BuiltinFunc]` helpers, but no portable user-spellable form is documented. A doc-level pointer to a minimal example (e.g. a `constexpr`-like function call in array bounds) would let an agent anchor a test. |  |
-| [#an-integer-cast-to-a-different-integer-type](../../../docs/llm-generated/ast-reference/values.md#an-integer-cast-to-a-different-integer-type) | undocumented-behavior | `TypeCastIntVal` is "an integer cast to a different integer type" but the surface that produces this Val (vs. just an inline cast in IR) is not named. A spelling pointer would help. |  |
-| [#out-of-scope](../../../docs/llm-generated/ast-reference/values.md#out-of-scope) | undocumented-behavior | The `Polynomial helpers` section (`PolynomialIntValFactor`, `PolynomialIntValTerm`) is purely internal: they "are not `IntVal`s themselves: they appear as operands of a `PolynomialIntVal`". Their observable surface is identical to `PolynomialIntVal`'s; no user-spellable distinction exists. The doc could state this explicitly under `## Untested claims`. |  |
-| [#how-the-declaration-was-reached](../../../docs/llm-generated/ast-reference/values.md#how-the-declaration-was-reached) | undocumented-behavior | The doc lists `MemberDeclRef`, `LookupDeclRef`, and `DirectDeclRef` in the `DeclRefBase` family but their user-observable surface is the same as a plain identifier lookup. No claim distinguishes them at the surface level (the distinction is internal: "how the declaration was reached"). A doc-level note saying "these three variants are observationally indistinguishable through `slangc`; only `GenericAppDeclRef` produces a distinct surface (generic args)" would clarify boundary ownership. |  |
-| [#intval](../../../docs/llm-generated/ast-reference/values.md#intval) | undocumented-behavior | The doc lists all the pack-related `IntVal` and `SubtypeWitness` variants (`FirstIntVal`, `LastIntVal`, `EachIntVal`, `EachSubtypeWitness`, etc.). The user-observable surface for these belongs to the variadic-generic / pack feature bundle. The doc could note that explicitly. |  |
-| [#differentiateval](../../../docs/llm-generated/ast-reference/values.md#differentiateval) | undocumented-behavior | The doc lists the `DifferentiateVal` family (`ForwardDifferentiateVal`, `BackwardDifferentiateVal`, ...) alongside autodiff machinery. Their observable surface belongs to the autodiff feature bundle. A doc pointer to that bundle would clarify ownership. |  |
 
 ## Untested claims
-
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | **The `## Family hierarchy` mermaid diagram itself.** | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
@@ -103,3 +90,15 @@ that this bundle exercises are:
 | **`WitnessLookupIntVal`** — same as `FuncCallIntVal`; no surface spelling documented. Recorded as a doc gap. | (unclassified) | [#witnesslookupintval](../../../docs/llm-generated/ast-reference/values.md#witnesslookupintval) | Reason and explanation to be refined by the next regeneration. |
 | **The C++ parent class** of any concrete `Val` (e.g. that `SizeOfIntVal` extends `SizeOfLikeIntVal`, that `UNormModifierVal` extends `ResourceFormatModifierVal`). | internal-source-fact | [#val](../../../docs/llm-generated/ast-reference/values.md#val) | Only the user-observable role of each leaf is testable. |
 | **`TypeCoercionWitness`** family (`BuiltinTypeCoercionWitness`, `DeclRefTypeCoercionWitness`) — these underlie implicit-cast insertion. The mechanics of implicit casting are owned by the `pipeline/03-semantic-check` bundle; the witness identities have no distinct surface observation. | out-of-bundle | [#typecoercionwitness](../../../docs/llm-generated/ast-reference/values.md#typecoercionwitness) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
+
+
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#an-integer-value-resolved-through-a-witness-table-lookup](../../../docs/llm-generated/ast-reference/values.md#an-integer-value-resolved-through-a-witness-table-lookup) | undocumented-behavior | The doc names `WitnessLookupIntVal` as "an integer value resolved through a witness-table lookup", but the surface spelling that produces this Val is not given. | Without a surface form (e.g. an interface with a `static const int` requirement that another generic reads), it is not anchorable. |
+| [#a-compile-time-call-to-an-integer-returning-function](../../../docs/llm-generated/ast-reference/values.md#a-compile-time-call-to-an-integer-returning-function) | undocumented-behavior | The doc names `FuncCallIntVal` as "a compile-time call to an integer-returning function" but does not name the spelling. Slang has `__intrinsic` / `[__BuiltinFunc]` helpers, but no portable user-spellable form is documented. A doc-level pointer to a minimal example (e.g. a `constexpr`-like function call in array bounds) would let an agent anchor a test. |  |
+| [#an-integer-cast-to-a-different-integer-type](../../../docs/llm-generated/ast-reference/values.md#an-integer-cast-to-a-different-integer-type) | undocumented-behavior | `TypeCastIntVal` is "an integer cast to a different integer type" but the surface that produces this Val (vs. just an inline cast in IR) is not named. A spelling pointer would help. |  |
+| [#out-of-scope](../../../docs/llm-generated/ast-reference/values.md#out-of-scope) | undocumented-behavior | The `Polynomial helpers` section (`PolynomialIntValFactor`, `PolynomialIntValTerm`) is purely internal: they "are not `IntVal`s themselves: they appear as operands of a `PolynomialIntVal`". Their observable surface is identical to `PolynomialIntVal`'s; no user-spellable distinction exists. The doc could state this explicitly under `## Untested claims`. |  |
+| [#how-the-declaration-was-reached](../../../docs/llm-generated/ast-reference/values.md#how-the-declaration-was-reached) | undocumented-behavior | The doc lists `MemberDeclRef`, `LookupDeclRef`, and `DirectDeclRef` in the `DeclRefBase` family but their user-observable surface is the same as a plain identifier lookup. No claim distinguishes them at the surface level (the distinction is internal: "how the declaration was reached"). A doc-level note saying "these three variants are observationally indistinguishable through `slangc`; only `GenericAppDeclRef` produces a distinct surface (generic args)" would clarify boundary ownership. |  |
+| [#intval](../../../docs/llm-generated/ast-reference/values.md#intval) | undocumented-behavior | The doc lists all the pack-related `IntVal` and `SubtypeWitness` variants (`FirstIntVal`, `LastIntVal`, `EachIntVal`, `EachSubtypeWitness`, etc.). The user-observable surface for these belongs to the variadic-generic / pack feature bundle. The doc could note that explicitly. |  |
+| [#differentiateval](../../../docs/llm-generated/ast-reference/values.md#differentiateval) | undocumented-behavior | The doc lists the `DifferentiateVal` family (`ForwardDifferentiateVal`, `BackwardDifferentiateVal`, ...) alongside autodiff machinery. Their observable surface belongs to the autodiff feature bundle. A doc pointer to that bundle would clarify ownership. |  |

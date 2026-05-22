@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for ir-reference/resources-and-atomics
 
 ## Intent
-
 Tests verify the per-opcode catalog of the IR resource/atomic family
 described in
 [`docs/llm-generated/ir-reference/resources-and-atomics.md`](../../../docs/llm-generated/ir-reference/resources-and-atomics.md):
@@ -35,8 +34,8 @@ target text, and uses FileCheck patterns anchored at `func %main`
 matchers (for opcodes that live inside the pulled-in library
 function bodies of byte-address-buffer accessors).
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | `AppendStructuredBuffer::Append(v)` lowers to `StructuredBufferAppend(%buf, %v)`; `ConsumeStructuredBuffer::Consume()` lowers to `StructuredBufferConsume(%buf)`. | functional | [#append-and-consume-buffers](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#append-and-consume-buffers) | [`append-consume-buffer.slang`](append-consume-buffer.slang) |
@@ -139,8 +138,23 @@ function bodies of byte-address-buffer accessors).
 | `rwtex[xyz] = val` assignment on an `RWTexture3D<T>` surfaces in `main` as a `call specialize(..., TextureShape3DType, ...)(%rwtex, %xyz, %val)` — the 3D witness of the doc's `imageStore` opcode in its pre-inline `call` shape. | expansion | [#texture-and-image](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#texture-and-image) | [`rwtexture3d-store-ir.slang`](rwtexture3d-store-ir.slang) |
 | `rwtex[xyz]` rvalue on an `RWTexture3D<T>` surfaces in `main` as a `call specialize(..., TextureShape3DType, ...)(%rwtex, %xyz)` — the 3D + RW witness of the doc's `imageSubscript` opcode in its `call`-form pre-inline shape. | expansion | [#texture-and-image](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#texture-and-image) | [`rwtexture3d-load-ir.slang`](rwtexture3d-load-ir.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+| Claim | Reason | Anchor | Why untested |
+| --- | --- | --- | --- |
+| `atomicSub` — `Atomic<T>` does not expose a `.sub(v)` surface; see doc gaps. | (unclassified) | [#atomicsub](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#atomicsub) | Reason and explanation to be refined by the next regeneration. |
+| Resource queries and modifier helpers (`getNaturalStride`, `castDynamicResource`, `getEquivalentStructuredBuffer`, `getStructuredBufferPtr`, `getUntypedBufferPtr`, `getRegisterIndex`, `getRegisterSpace`). | (unclassified) | [#getnaturalstride](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#getnaturalstride) | Reason and explanation to be refined by the next regeneration. |
+| Workgroup / stage introspection (`GetWorkGroupSize`, `GetCurrentStage`) — materialized in the layout / emit pipeline. | (unclassified) | [#getworkgroupsize](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#getworkgroupsize) | Reason and explanation to be refined by the next regeneration. |
+| Barriers (`GroupMemoryBarrierWithGroupSync`, `ControlBarrier`, `BeginFragmentShaderInterlock`, `EndFragmentShaderInterlock`) — surface as `call` at LOWER-TO-IR. | (unclassified) | [#groupmemorybarrierwithgroupsync](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#groupmemorybarrierwithgroupsync) | Reason and explanation to be refined by the next regeneration. |
+| Texture and image opcodes (`imageSubscript`, `imageLoad`, `imageStore`, `SubpassLoad`, `MetalCastToDepthTexture`, `IsTextureAccess`, `IsTextureScalarAccess`, `IsTextureArrayAccess`, `ExtractTextureFromTextureAccess`, `ExtractCoordFromTextureAccess`, `ExtractArrayCoordFromTextureAccess`). | (unclassified) | [#imagesubscript](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#imagesubscript) | Reason and explanation to be refined by the next regeneration. |
+| `MetalAtomicCast`, `IncrementCoverageCounter` — synthesized. | (unclassified) | [#metalatomiccast](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#metalatomiccast) | Reason and explanation to be refined by the next regeneration. |
+| The doc's `rwstructuredBufferStore` opcode — actually produced via `rwstructuredBufferGetElementPtr` + `store` lowering. | (unclassified) | [#rwstructuredbufferstore](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#rwstructuredbufferstore) | Reason and explanation to be refined by the next regeneration. |
+| Sampling and combined-sampler opcodes (`sample`, `sampleGrad`, `makeCombinedTextureSampler`, `MakeCombinedTextureSamplerFromHandle`, `CombinedTextureSamplerGetTexture`, `CombinedTextureSamplerGetSampler`). | (unclassified) | [#sample](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#sample) | Reason and explanation to be refined by the next regeneration. |
+| `StructuredBufferGetDimensions` — appears only inside the helper function body, not on `main`. | (unclassified) | [#structuredbuffergetdimensions](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#structuredbuffergetdimensions) | Reason and explanation to be refined by the next regeneration. |
+| Wave intrinsics (`waveGetActiveMask`, `waveMaskBallot`, `waveMaskMatch`) — surface as `call` at LOWER-TO-IR. | (unclassified) | [#wavegetactivemask](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#wavegetactivemask) | Reason and explanation to be refined by the next regeneration. |
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#atomic-operations](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#atomic-operations) | undocumented-behavior | The `atomic-operations` table lists `atomicSub` as a distinct opcode, but `Atomic<T>` does not expose a `sub(v)` method on its natural surface — `a.add(-v)` lowers to `atomicAdd(%p, -%v)`, not `atomicSub`. | The doc should either name the AST surface that produces `atomicSub` (perhaps an IR pass that folds `add(-v)` into `sub`) or note that `atomicSub` is synthesized. |
@@ -162,22 +176,3 @@ function bodies of byte-address-buffer accessors).
 | [#sampling-and-combined-samplers](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#sampling-and-combined-samplers) | undocumented-behavior | The doc's `sampling-and-combined-samplers` table lists `sample` and `sampleGrad` but does not enumerate `Gather`, `SampleCmp`, `SampleCmpLevelZero`, `SampleBias`, or `SampleLevel`. All five are documented surfaces on `Texture*` in the core module and all of them lower through the same `call specialize(%helper, ..., TextureShape*Type, ...)` pre-inline shape in `main`. | The doc should either name additional opcodes that correspond to them or note that they share the `sample` / `sampleGrad` opcodes after inlining. |
 | [#texture-resident](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#texture-resident) | undocumented-behavior | Texture `Load`/`Sample`/`Gather`/`SampleCmp` calls all pass the texture shape, array flag, MS flag, and access flag as specialization arguments to the helper at LOWER-TO-IR, but the isMS slot in the `call specialize(...)` arg list for a `Texture2DMS<T>::Load` is `0`, not `1` — the multi-sample-ness is encoded in the texture's `global_param` type, not re-supplied at the call site. | The doc should state which capability slots are "texture-resident" (only on the type) vs "call-resident" (also passed to the helper specialization). |
 | [#samplercomparisonstate](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#samplercomparisonstate) | undocumented-behavior | The doc lists `SamplerComparisonState` only implicitly as a variant of `SamplerState`; no row enumerates its distinct IR resource type. The `samplercomparisonstate-globalparam.slang` test pins it as a distinct top-level `global_param` carrier alongside `SamplerState`. |  |
-
-## Untested coverable claims
-
-(none)
-
-## Untested claims
-
-| Claim | Reason | Anchor | Why untested |
-| --- | --- | --- | --- |
-| `atomicSub` — `Atomic<T>` does not expose a `.sub(v)` surface; see doc gaps. | (unclassified) | [#atomicsub](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#atomicsub) | Reason and explanation to be refined by the next regeneration. |
-| Resource queries and modifier helpers (`getNaturalStride`, `castDynamicResource`, `getEquivalentStructuredBuffer`, `getStructuredBufferPtr`, `getUntypedBufferPtr`, `getRegisterIndex`, `getRegisterSpace`). | (unclassified) | [#getnaturalstride](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#getnaturalstride) | Reason and explanation to be refined by the next regeneration. |
-| Workgroup / stage introspection (`GetWorkGroupSize`, `GetCurrentStage`) — materialized in the layout / emit pipeline. | (unclassified) | [#getworkgroupsize](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#getworkgroupsize) | Reason and explanation to be refined by the next regeneration. |
-| Barriers (`GroupMemoryBarrierWithGroupSync`, `ControlBarrier`, `BeginFragmentShaderInterlock`, `EndFragmentShaderInterlock`) — surface as `call` at LOWER-TO-IR. | (unclassified) | [#groupmemorybarrierwithgroupsync](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#groupmemorybarrierwithgroupsync) | Reason and explanation to be refined by the next regeneration. |
-| Texture and image opcodes (`imageSubscript`, `imageLoad`, `imageStore`, `SubpassLoad`, `MetalCastToDepthTexture`, `IsTextureAccess`, `IsTextureScalarAccess`, `IsTextureArrayAccess`, `ExtractTextureFromTextureAccess`, `ExtractCoordFromTextureAccess`, `ExtractArrayCoordFromTextureAccess`). | (unclassified) | [#imagesubscript](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#imagesubscript) | Reason and explanation to be refined by the next regeneration. |
-| `MetalAtomicCast`, `IncrementCoverageCounter` — synthesized. | (unclassified) | [#metalatomiccast](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#metalatomiccast) | Reason and explanation to be refined by the next regeneration. |
-| The doc's `rwstructuredBufferStore` opcode — actually produced via `rwstructuredBufferGetElementPtr` + `store` lowering. | (unclassified) | [#rwstructuredbufferstore](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#rwstructuredbufferstore) | Reason and explanation to be refined by the next regeneration. |
-| Sampling and combined-sampler opcodes (`sample`, `sampleGrad`, `makeCombinedTextureSampler`, `MakeCombinedTextureSamplerFromHandle`, `CombinedTextureSamplerGetTexture`, `CombinedTextureSamplerGetSampler`). | (unclassified) | [#sample](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#sample) | Reason and explanation to be refined by the next regeneration. |
-| `StructuredBufferGetDimensions` — appears only inside the helper function body, not on `main`. | (unclassified) | [#structuredbuffergetdimensions](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#structuredbuffergetdimensions) | Reason and explanation to be refined by the next regeneration. |
-| Wave intrinsics (`waveGetActiveMask`, `waveMaskBallot`, `waveMaskMatch`) — surface as `call` at LOWER-TO-IR. | (unclassified) | [#wavegetactivemask](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#wavegetactivemask) | Reason and explanation to be refined by the next regeneration. |

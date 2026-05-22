@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for pipeline/04b-pre-link-passes
 
 ## Intent
-
 Tests verify the pre-link IR-pass sequence described in
 [`docs/llm-generated/pipeline/04b-pre-link-passes.md`](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md):
 the ordered Phase A / B / C / D passes that run inside
@@ -36,8 +35,8 @@ documents. Several internal-only knobs (`[__unsafeForceInlineEarly]`
 user attribute, debug-info insertion, obfuscation) are recorded
 under `## Untested claims` rather than tested.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | Phase B's lowerDefer (B3) emits the defer body at scope exit so downstream passes see straight-line code; no defer opcode survives. | functional | [#lowerdefer](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#lowerdefer) | [`phase-b-lower-defer-inlines-body-at-scope-exit.slang`](phase-b-lower-defer-inlines-body-at-scope-exit.slang) |
@@ -57,17 +56,8 @@ under `## Untested claims` rather than tested.
 | Phase D's stripFrontEndOnlyInstructions (D10) removes IRHighLevelDeclDecoration before the LOWER-TO-IR dump. | functional | [#stripfrontendonlyinstructions](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#stripfrontendonlyinstructions) | [`phase-d-strip-front-end-only-removes-high-level-decl.slang`](phase-d-strip-front-end-only-removes-high-level-decl.slang) |
 | Phase B's synthesizeBitFieldAccessors (B4) synthesises get/set bodies for bit-field accessors so the early-inlining loop can inline them. | functional | [#synthesizebitfieldaccessors](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#synthesizebitfieldaccessors) | [`phase-b-synthesize-bit-field-accessors-creates-backing.slang`](phase-b-synthesize-bit-field-accessors-creates-backing.slang) |
 
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| (unspecified) | undocumented-behavior | The doc states that Phase D's per-function eliminateDeadCode (C5) and the final eliminateDeadCode (D12) both run with `keepExportsAlive = true` and `keepLayoutsAlive = true`, but does not name a user-observable consequence of those flags being set rather than unset. The mangled-name-export test (C-16) anchors on the observed result (export decorations survive); a doc sentence calling that out explicitly would be useful. |  |
-| [#lowerexpandtype](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#lowerexpandtype) | undocumented-behavior | The doc names B5 `lowerExpandType` and explains the IR shape change (pattern nested inside `IRExpand`), but does not provide a Slang surface that produces an `IRExpandType` cleanly enough for the pre-link dump to show the rewrite. The variadic-generics surface this depends on is documented only by reference. A doc gap: name a minimal user-code example that produces `IRExpandType` so the pass's effect is testable. |  |
-| [#checkautodiffusages](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#checkautodiffusages) | undocumented-behavior | The doc lists D6 `checkAutoDiffUsages`, D8 `addDecorationsForGenericsSpecializedWithExistentials`, and D9 `checkForMeshOutputReads`, but the diagnostic text and severity each pass emits is not stated. | Without verbatim diagnostic text the `DIAGNOSTIC_TEST` anchors are brittle; doc should list at least the error code. |
-| [#insertdebugvaluestore](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#insertdebugvaluestore) | undocumented-behavior | The doc names B6 `insertDebugValueStore` gated on `debugInfoLevel >= Standard`, but does not give the surface-observable inst (`DebugValue`) that distinguishes the `-g` vs no-`-g` IR. A claim sentence pointing at the expected post-pass opcode would unblock a focused test. |  |
 
 ## Untested claims
-
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | `[__unsafeForceInlineEarly]` user-code surface — the attribute is internal-only and must not appear in user code; the loop's fixed-point convergence is tested indirectly via C-12. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
@@ -77,3 +67,12 @@ under `## Untested claims` rather than tested.
 | `prelinkIR`'s pull-in of the `externalSymbolsToPrelink` set populated by upstream lowering — the set itself is not user-visible. | (unclassified) | [#prelinkir](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#prelinkir) | Reason and explanation to be refined by the next regeneration. |
 | `validateIRModuleIfEnabled` (A10, D14) — no-op unless the IR-validation compiler option is set; not exercised by the agentic bundle. | (unclassified) | [#validateirmoduleifenabled](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#validateirmoduleifenabled) | Reason and explanation to be refined by the next regeneration. |
 | The exact ordering of A1…A10, B1…B6, C1…C7, D1…D15 — the `### LOWER-TO-IR:` dump shows only the post-Phase-D state, not intermediate stages, so per-pass ordering is not observable from this bundle. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |
+
+
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| (unspecified) | undocumented-behavior | The doc states that Phase D's per-function eliminateDeadCode (C5) and the final eliminateDeadCode (D12) both run with `keepExportsAlive = true` and `keepLayoutsAlive = true`, but does not name a user-observable consequence of those flags being set rather than unset. The mangled-name-export test (C-16) anchors on the observed result (export decorations survive); a doc sentence calling that out explicitly would be useful. |  |
+| [#lowerexpandtype](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#lowerexpandtype) | undocumented-behavior | The doc names B5 `lowerExpandType` and explains the IR shape change (pattern nested inside `IRExpand`), but does not provide a Slang surface that produces an `IRExpandType` cleanly enough for the pre-link dump to show the rewrite. The variadic-generics surface this depends on is documented only by reference. A doc gap: name a minimal user-code example that produces `IRExpandType` so the pass's effect is testable. |  |
+| [#checkautodiffusages](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#checkautodiffusages) | undocumented-behavior | The doc lists D6 `checkAutoDiffUsages`, D8 `addDecorationsForGenericsSpecializedWithExistentials`, and D9 `checkForMeshOutputReads`, but the diagnostic text and severity each pass emits is not stated. | Without verbatim diagnostic text the `DIAGNOSTIC_TEST` anchors are brittle; doc should list at least the error code. |
+| [#insertdebugvaluestore](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#insertdebugvaluestore) | undocumented-behavior | The doc names B6 `insertDebugValueStore` gated on `debugInfoLevel >= Standard`, but does not give the surface-observable inst (`DebugValue`) that distinguishes the `-g` vs no-`-g` IR. A claim sentence pointing at the expected post-pass opcode would unblock a focused test. |  |

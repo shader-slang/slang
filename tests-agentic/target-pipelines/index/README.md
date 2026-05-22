@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for target-pipelines/index
 
 ## Intent
-
 Tests verify the **cross-cutting / multi-target dispatcher claims**
 made by
 [`docs/llm-generated/target-pipelines/index.md`](../../../docs/llm-generated/target-pipelines/index.md):
@@ -37,8 +36,8 @@ multiple `//TEST` directives in a single file with per-target
 `CHECK_<TARGET>` prefixes so a single source file actually exercises
 the dispatcher.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | Phi-elimination is gated per-target (register-allocation only for SPIR-V; default options for HLSL, Metal, WGSL, CUDA); a source with merging control flow still emits successfully on every backend. | functional | [#cross-target-comparison](../../../docs/llm-generated/target-pipelines/index.md#cross-target-comparison) | [`phi-elim-cross-target-success.slang`](phi-elim-cross-target-success.slang) |
@@ -47,8 +46,8 @@ the dispatcher.
 | The shared four-phase shape (link / specialize / target-legalize / emit) of linkAndOptimizeIR runs end-to-end for every text-emit target named by the index doc. | functional | [#shared-shape](../../../docs/llm-generated/target-pipelines/index.md#shared-shape) | [`four-phase-shape-end-to-end.slang`](four-phase-shape-end-to-end.slang) |
 | A single Slang source dispatches through the multi-target orchestrator to each of the five text-emit backends named by the index doc (spirv, hlsl, metal, wgsl, cuda). | functional | [#target-pipelines](../../../docs/llm-generated/target-pipelines/index.md#target-pipelines) | [`multi-target-dispatcher.slang`](multi-target-dispatcher.slang) |
 
-## Untested claims
 
+## Untested claims
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | Unordered topical catalog of every IR pass — see the `pipeline/05-ir-passes` bundle. | out-of-bundle | (unspecified) | The index doc routes per-pass enumeration to the pipeline bundle. |
@@ -59,8 +58,16 @@ the dispatcher.
 | WGSL-specific lowering (`legalizeIRForWGSL`, `specializeAddressSpaceForWGSL`), Tint downstream for `WGSLSPIRV*` variants. | out-of-bundle | [#legalizeirforwgsl](../../../docs/llm-generated/target-pipelines/index.md#legalizeirforwgsl) | The index doc routes these to `tests-agentic/target-pipelines/wgsl/`. |
 | Per-target options, capability sets, target predicates (`isSPIRV`, `isMetalTarget`, `isWGPUTarget`, `isCUDATarget`, `isD3DTarget`, `isKhronosTarget`). | out-of-bundle | [#isspirv](../../../docs/llm-generated/target-pipelines/index.md#isspirv) | The index doc routes these to the `cross-cutting/targets` bundle. |
 
-## Sibling-bundle overlap
 
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#shared-shape](../../../docs/llm-generated/target-pipelines/index.md#shared-shape) | undocumented-behavior | The index doc's `#shared-shape` section enumerates the four phases (A link/entry-prep, B specialize/type-legalize, C target-legalize/lowering/phi-elim, D emit) but does not state any **user-observable** property that distinguishes the phases from each other at the source level. A reader cannot, from the index alone, write a test that pins "this observation comes from Phase B specifically". The four-phase shape test in this bundle therefore observes end-to-end success only; per-phase observations are routed to the peer bundles. The doc could add a sentence per phase naming one user-visible artefact of that phase's work. |  |
+| [#loops](../../../docs/llm-generated/target-pipelines/index.md#loops) | undocumented-behavior | The cross-target comparison table's "Loops" column tells the reader which targets re-run inner legalization loops, but the index doc does not describe a **user-observable** consequence of looping vs not looping (a source that requires looped legalization is target-specific by definition and so belongs to the SPIR-V bundle). A future revision could add a sentence about what happens to a SPIR-V-only construct compiled to a non-looping target -- the answer would scope a future cross-cutting test. |  |
+| [#pages](../../../docs/llm-generated/target-pipelines/index.md#pages) | undocumented-behavior | The `#pages` and `#see-also` sections are pure pointer tables; they are explicitly excluded from citation per the per-section prompt. No gap, just noted for future readers. |  |
+
+
+## Sibling-bundle overlap
 The following peer-bundle behaviors are intentionally not
 re-tested here to avoid duplication:
 
@@ -86,11 +93,3 @@ re-tested here to avoid duplication:
   bundle's `same-source-distinct-emitters.slang` combines them
   in a single file to assert the cross-target divergence claim
   from the comparison table, not the individual spellings.
-
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#shared-shape](../../../docs/llm-generated/target-pipelines/index.md#shared-shape) | undocumented-behavior | The index doc's `#shared-shape` section enumerates the four phases (A link/entry-prep, B specialize/type-legalize, C target-legalize/lowering/phi-elim, D emit) but does not state any **user-observable** property that distinguishes the phases from each other at the source level. A reader cannot, from the index alone, write a test that pins "this observation comes from Phase B specifically". The four-phase shape test in this bundle therefore observes end-to-end success only; per-phase observations are routed to the peer bundles. The doc could add a sentence per phase naming one user-visible artefact of that phase's work. |  |
-| [#loops](../../../docs/llm-generated/target-pipelines/index.md#loops) | undocumented-behavior | The cross-target comparison table's "Loops" column tells the reader which targets re-run inner legalization loops, but the index doc does not describe a **user-observable** consequence of looping vs not looping (a source that requires looped legalization is target-specific by definition and so belongs to the SPIR-V bundle). A future revision could add a sentence about what happens to a SPIR-V-only construct compiled to a non-looping target -- the answer would scope a future cross-cutting test. |  |
-| [#pages](../../../docs/llm-generated/target-pipelines/index.md#pages) | undocumented-behavior | The `#pages` and `#see-also` sections are pure pointer tables; they are explicitly excluded from citation per the per-section prompt. No gap, just noted for future readers. |  |

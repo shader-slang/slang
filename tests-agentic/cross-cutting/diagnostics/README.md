@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for cross-cutting/diagnostics
 
 ## Intent
-
 Tests verify the diagnostic-system surface described in
 [`docs/llm-generated/cross-cutting/diagnostics.md`](../../../docs/llm-generated/cross-cutting/diagnostics.md):
 the severity names rendered to users, the integer ids attached to
@@ -32,8 +31,8 @@ Diagnostics fire pre-codegen and are target-independent for every
 claim in this bundle, so a single directive per file is sufficient;
 no multi-backend matrix is needed.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A legacy diagnostic with `span` and `note` helpers renders a primary span on the offending site and a companion note on the previously-defined site. | negative | [#anatomy-of-a-legacy-diagnostic](../../../docs/llm-generated/cross-cutting/diagnostics.md#anatomy-of-a-legacy-diagnostic) | [`note-multi-span-rendering.slang`](note-multi-span-rendering.slang) |
@@ -87,8 +86,12 @@ no multi-backend matrix is needed.
 | The sink uses SourceManager to decode SourceLoc into file:line:column and renders a caret aligned to the offending token's column. | negative | [#source-locations-and-message-rendering](../../../docs/llm-generated/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`caret-points-at-offending-token.slang`](caret-points-at-offending-token.slang) |
 | The sink uses SourceManager to decode source locations and renders carets that span the full offending token, not just the start. | negative | [#source-locations-and-message-rendering](../../../docs/llm-generated/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`source-span-multi-character.slang`](source-span-multi-character.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+NA
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#how-to-trigger](../../../docs/llm-generated/cross-cutting/diagnostics.md#how-to-trigger) | undocumented-behavior | The doc enumerates `Severity::Fatal` and `Severity::Internal` and states their rendered names (`fatal error`, `internal error`) but does not describe any user-reachable program that reliably triggers either severity. Both are typically driven by environment conditions (missing include file for fatal, ICE for internal) that are non-trivial to script as a regression. Suggest the doc either link to a representative example or add a short "how to trigger" note next to each severity. |  |
@@ -99,8 +102,3 @@ no multi-backend matrix is needed.
 | [#can-suppress-downgrade-or-upgrade-diagnostics-by-id](../../../docs/llm-generated/cross-cutting/diagnostics.md#can-suppress-downgrade-or-upgrade-diagnostics-by-id) | undocumented-behavior | The doc mentions that the Severity filter "can suppress, downgrade, or upgrade diagnostics by id" but does not name the user-facing surfaces for `upgrade` and `downgrade` (the `-warnings-as-errors <id>` and `-warnings-disable <id>` command line flags). The boundary test `warnings-as-errors-promotes-warning.slang` exercises the `-warnings-as-errors` surface; the doc could call out both command-line flags explicitly. |  |
 | [#pragma](../../../docs/llm-generated/cross-cutting/diagnostics.md#pragma) | undocumented-behavior | The doc describes the `#pragma warning` overrides but does not enumerate the legal specifier set (`push`, `pop`, `disable`, `error`, `default`, `suppress`). The `pragma-warning-unknown- specifier-warns.slang` boundary test pins one rejected specifier; the doc could list the accepted set explicitly to pair with the rejection diagnostic. |  |
 | [#rendered-with-their-expansion-stack](../../../docs/llm-generated/cross-cutting/diagnostics.md#rendered-with-their-expansion-stack) | undocumented-behavior | The doc claims macro-expanded locations are "rendered with their expansion stack" but does not describe what an end-of-file-during-conditional diagnostic chain looks like (primary + companion `see 'if' directive` note). The boundary test `error-code-end-of-file-in-conditional.slang` exercises this chain; the doc could add a small example of the multi- record rendering. |  |
-
-## Untested claims
-
-(none)
-

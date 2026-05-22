@@ -136,7 +136,12 @@ _ALLOWED_GAP_KINDS = (
     "drift-from-source",  # observed behavior contradicts the doc
 )
 
-_ALLOWED_COVERABLE_BACKENDS = (
+_ALLOWED_OOS_REASONS = (
+    # Test-harness alternatives — testable, just not via slang-test //TEST
+    "needs-unit-test",  # observable in C++ but not via slangc CLI
+    "needs-multi-file-test",  # cross-module / multi-translation-unit setup
+    "needs-cli-test",  # CLI invocation / env / exit code / flag mapping
+    # Runner-capability alternatives — testable with a different runner
     "gpu-dxr",
     "gpu-mesh-shader",
     "gpu-dxc-dxil",
@@ -150,13 +155,8 @@ _ALLOWED_COVERABLE_BACKENDS = (
     "gpu-cooperative",
     "gpu-vulkan-extension",
     "gpu-cross-api-flag",
-    "gpu-other",  # general GPU-runtime-required without specific tag
-)
-
-_ALLOWED_OOS_REASONS = (
-    "needs-unit-test",  # replaces api-only; observable in C++ but not via slangc CLI
-    "needs-multi-file-test",  # cross-module / multi-translation-unit setup
-    "needs-cli-test",  # CLI invocation / env / exit code / flag mapping
+    "gpu-other",
+    # Truly terminal — no harness or runner upgrade unblocks
     "link-stage-only",
     "out-of-bundle",
     "deprecated",
@@ -681,18 +681,10 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
     for tf in test_files:
         for issue in _lint_test_file(spec, tf):
             issues.append(issue)
-    # Untested-coverable + Out-of-scope tables: optional sections,
-    # but if present must be tables with the controlled vocabulary.
-    for heading, allowed, col_name in (
-        (
-            "## Untested coverable claims",
-            _ALLOWED_COVERABLE_BACKENDS,
-            "Backend",
-        ),
-        ("## Untested claims", _ALLOWED_OOS_REASONS, "Reason"),
-    ):
-        if heading not in text:
-            continue
+    # Untested-claims table: optional section, but if present must be a
+    # table with the controlled Reason vocabulary.
+    heading = "## Untested claims"
+    if heading in text:
         rows = _parse_tagged_table(text, heading)
         if not rows and not _section_explicitly_empty(text, heading):
             issues.append(
@@ -700,17 +692,17 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                     f"{spec.dir}/README.md",
                     "error",
                     f"{heading} section present but no table rows parsed"
-                    f" (expected | Anchor | {col_name} | ... | ... | columns)",
+                    f" (expected | Claim | Reason | Anchor | Why untested | columns)",
                 )
             )
         for row in rows:
             tag = row[1]
-            if tag not in allowed:
+            if tag not in _ALLOWED_OOS_REASONS:
                 issues.append(
                     LintIssue(
                         f"{spec.dir}/README.md",
                         "error",
-                        f"{heading} {col_name}={tag!r} not in {list(allowed)}",
+                        f"{heading} Reason={tag!r} not in {list(_ALLOWED_OOS_REASONS)}",
                     )
                 )
 
@@ -791,7 +783,10 @@ def _parse_tagged_table(text: str, heading: str) -> list[tuple[str, str, str, st
 
 
 def _section_explicitly_empty(text: str, heading: str) -> bool:
-    """True if `heading` exists and its body starts with `(none)`."""
+    """True if `heading` exists and its body is an explicit empty marker.
+
+    Recognised markers: `NA`, `(none)`, or `(none) — <prose>`.
+    """
     in_section = False
     for raw in text.splitlines():
         s = raw.strip()
@@ -803,18 +798,16 @@ def _section_explicitly_empty(text: str, heading: str) -> bool:
                 continue
             if s.startswith("## "):
                 return False
-            if s.startswith("(none)"):
+            if s == "NA" or s.startswith("(none)"):
                 return True
             return False
     return False
 
 
 def _gap_section_explicitly_empty(text: str) -> bool:
-    """True if the gap section starts with an explicit '(none)' marker.
+    """True if the gap section is explicitly marked empty.
 
-    The (none) can stand alone or be followed by a short explanatory
-    sentence on the same line (e.g., "(none) — this bundle has no
-    section-specific gaps; see peer bundle Y").
+    Recognised markers: `NA`, `(none)`, or `(none) — <prose>`.
     """
     in_section = False
     for raw in text.splitlines():
@@ -827,7 +820,7 @@ def _gap_section_explicitly_empty(text: str) -> bool:
                 continue
             if line.startswith("## "):
                 return False
-            if line.startswith("(none)"):
+            if line == "NA" or line.startswith("(none)"):
                 return True
             # Any other content -> not explicitly empty.
             return False

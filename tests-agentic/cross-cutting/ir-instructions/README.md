@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for cross-cutting/ir-instructions
 
 ## Intent
-
 Tests verify the observable shape of the Slang IR described in
 [`docs/llm-generated/cross-cutting/ir-instructions.md`](../../../docs/llm-generated/cross-cutting/ir-instructions.md):
 that representative opcodes from each documented family
@@ -43,8 +42,8 @@ FIDDLE-generated `IROp` enum — are recorded under
 `## Untested claims` because they are not observable
 through any directive that `slang-test` runs on a CPU.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A `discard` statement in a pixel shader lowers to the `discard` IR terminator that the doc lists alongside `return_val` and `unreachable`. | boundary | [#control-flow-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#control-flow-instructions) | [`control-flow-discard-ir.slang`](control-flow-discard-ir.slang) |
@@ -173,8 +172,22 @@ through any directive that `slang-test` runs on a CPU.
 | `>` on two `uint64_t` operands lowers to the documented `cmpGT` opcode with a `Bool` result — 64-bit unsigned probe of the comparison family on its already-tested `cmpGT` member. | expansion | [#value-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#value-instructions) | [`comparison-cmpgt-uint64.slang`](comparison-cmpgt-uint64.slang) |
 | `float3(a, b, 1.0)` with `a : float`, `b : int` lowers to an explicit `castIntToFloat(%b)` followed by the documented `makeVector` aggregate-constructor opcode — pins mixed-precision vector composition. | expansion | [#value-instructions](../../../docs/llm-generated/cross-cutting/ir-instructions.md#value-instructions) | [`makevec-float-from-int-and-float.slang`](makevec-float-from-int-and-float.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+| Claim | Reason | Anchor | Why untested |
+| --- | --- | --- | --- |
+| The contiguous opcode-range allocation that lets `as<IRBasicType>()` be a single integer comparison — entirely internal to FIDDLE-generated `slang-ir-insts-enum.h.fiddle`. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| The module-version bump required when an opcode is inserted in the middle of an existing family range — a serialization invariant for `.slang-module` files. The user-facing consequences belong to `cross-cutting/serialization`. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| The C++ wrapper-struct identity for each opcode (e.g. that `add` is an `IRAdd*` in C++) — internal API. | (unclassified) | [#add](../../../docs/llm-generated/cross-cutting/ir-instructions.md#add) | Reason and explanation to be refined by the next regeneration. |
+| Whether `Hoistable` instructions actually float to the outermost scope where their operands are available — observable only by inspecting the IR-dump position of an instruction relative to its defining scope, and the dump's textual order does not directly encode the scope tree. | (unclassified) | [#hoistable](../../../docs/llm-generated/cross-cutting/ir-instructions.md#hoistable) | Reason and explanation to be refined by the next regeneration. |
+| The flag-bit layout (`kIROpFlag_Parent`, `kIROpFlag_UseOther`, `kIROpFlag_Hoistable`, `kIROpFlag_Global`) — internal to the `IROpFlags` enum in `slang-ir.h`. Not surfaced in `-dump-ir` output. | (unclassified) | [#kiropflagparent](../../../docs/llm-generated/cross-cutting/ir-instructions.md#kiropflagparent) | Reason and explanation to be refined by the next regeneration. |
+| The opcode-bit packing (`kIROpMeta::kIROpMeta_OtherShift = 10`, high bits store auxiliary info for `UseOther` ops) — internal to `IRInst::m_op` layout. | (unclassified) | [#useother](../../../docs/llm-generated/cross-cutting/ir-instructions.md#useother) | Reason and explanation to be refined by the next regeneration. |
+| The `IRBuilder` emitter helper for each opcode — internal C++ API. | needs-unit-test | [#irbuilder](../../../docs/llm-generated/cross-cutting/ir-instructions.md#irbuilder) | No slangc CLI surface reaches this. A C++ unit test in `tools/slang-unit-test/` could exercise the relevant compiler internals directly. |
+| The IR builder's deduplication / hoisting decision for hoistable opcodes — the IR dump shows the post-hoist result, not the decision path. Two textually identical `vector(Int, 3)` types appearing once in the dump is observable; the *reason* (dedup) is not. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |
+| The FIDDLE workflow for adding a new opcode — a developer guide ("Adding a new opcode" section in the source doc) rather than a user-observable behaviour. | process-doc | [#adding-a-new-opcode](../../../docs/llm-generated/cross-cutting/ir-instructions.md#adding-a-new-opcode) | Contributor walkthrough / process documentation, not a compiler behavior. |
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#representative-not-exhaustive](../../../docs/llm-generated/cross-cutting/ir-instructions.md#representative-not-exhaustive) | undocumented-behavior | The doc's per-family tables are explicitly "representative, not exhaustive". Behaviors that the doc names but does not list a specific opcode for — e.g. the full set of comparison opcodes (`cmpEQ`/`cmpNE`/`cmpLE`/`cmpGE`), the full set of conversion ops (`floatCast`/`bitCast`/`uintCast`), the `matrix` type, the `Texture` type — are deferred to the family-specific bundles (`ir-reference/values`, `ir-reference/types`) where they belong. |  |
@@ -192,17 +205,3 @@ through any directive that `slang-test` runs on a CPU.
 | [#cmpeqcmpltcmpgt](../../../docs/llm-generated/cross-cutting/ir-instructions.md#cmpeqcmpltcmpgt) | undocumented-behavior | The doc names the comparison family `cmpEQ/cmpLT/cmpGT/...` but does not state the promotion rule for mixed-precision operands. Empirically the front end emits an `intCast` on the narrower operand before the `cmp*` opcode. Calling this out — and naming the source-level rule that selects the unified width — would let an agent pin the conversion + comparison combination directly to a documented claim. |  |
 | [#rwstructuredbufferstore](../../../docs/llm-generated/cross-cutting/ir-instructions.md#rwstructuredbufferstore) | undocumented-behavior | The doc lists `rwstructuredBufferStore` and `structuredBufferLoad` but the read-back companion `rwstructuredBufferLoad` (emitted for `RWStructuredBuffer<T>.Load(idx)`) is not named. | A one-line entry in the resource family row would surface this opcode. |
 | [#swizzle](../../../docs/llm-generated/cross-cutting/ir-instructions.md#swizzle) | undocumented-behavior | The doc's `swizzle` entry does not state the result-type rule. Empirically the result type is `Vec(elemTy, indexCount)` when the index list has length > 1 and the bare scalar `elemTy` when the index list has length 1. | Naming this in the memory-instructions row would let agents pin the length-1 vs length-N boundary. |
-
-## Untested claims
-
-| Claim | Reason | Anchor | Why untested |
-| --- | --- | --- | --- |
-| The contiguous opcode-range allocation that lets `as<IRBasicType>()` be a single integer comparison — entirely internal to FIDDLE-generated `slang-ir-insts-enum.h.fiddle`. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
-| The module-version bump required when an opcode is inserted in the middle of an existing family range — a serialization invariant for `.slang-module` files. The user-facing consequences belong to `cross-cutting/serialization`. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
-| The C++ wrapper-struct identity for each opcode (e.g. that `add` is an `IRAdd*` in C++) — internal API. | (unclassified) | [#add](../../../docs/llm-generated/cross-cutting/ir-instructions.md#add) | Reason and explanation to be refined by the next regeneration. |
-| Whether `Hoistable` instructions actually float to the outermost scope where their operands are available — observable only by inspecting the IR-dump position of an instruction relative to its defining scope, and the dump's textual order does not directly encode the scope tree. | (unclassified) | [#hoistable](../../../docs/llm-generated/cross-cutting/ir-instructions.md#hoistable) | Reason and explanation to be refined by the next regeneration. |
-| The flag-bit layout (`kIROpFlag_Parent`, `kIROpFlag_UseOther`, `kIROpFlag_Hoistable`, `kIROpFlag_Global`) — internal to the `IROpFlags` enum in `slang-ir.h`. Not surfaced in `-dump-ir` output. | (unclassified) | [#kiropflagparent](../../../docs/llm-generated/cross-cutting/ir-instructions.md#kiropflagparent) | Reason and explanation to be refined by the next regeneration. |
-| The opcode-bit packing (`kIROpMeta::kIROpMeta_OtherShift = 10`, high bits store auxiliary info for `UseOther` ops) — internal to `IRInst::m_op` layout. | (unclassified) | [#useother](../../../docs/llm-generated/cross-cutting/ir-instructions.md#useother) | Reason and explanation to be refined by the next regeneration. |
-| The `IRBuilder` emitter helper for each opcode — internal C++ API. | needs-unit-test | [#irbuilder](../../../docs/llm-generated/cross-cutting/ir-instructions.md#irbuilder) | No slangc CLI surface reaches this. A C++ unit test in `tools/slang-unit-test/` could exercise the relevant compiler internals directly. |
-| The IR builder's deduplication / hoisting decision for hoistable opcodes — the IR dump shows the post-hoist result, not the decision path. Two textually identical `vector(Int, 3)` types appearing once in the dump is observable; the *reason* (dedup) is not. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |
-| The FIDDLE workflow for adding a new opcode — a developer guide ("Adding a new opcode" section in the source doc) rather than a user-observable behaviour. | process-doc | [#adding-a-new-opcode](../../../docs/llm-generated/cross-cutting/ir-instructions.md#adding-a-new-opcode) | Contributor walkthrough / process documentation, not a compiler behavior. |

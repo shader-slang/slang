@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for pipeline/03-semantic-check
 
 ## Intent
-
 Tests verify the semantic-checking behaviors described in
 [`docs/llm-generated/pipeline/03-semantic-check.md`](../../../docs/llm-generated/pipeline/03-semantic-check.md):
 turning a raw AST into a fully resolved, type-checked AST. The doc
@@ -44,8 +43,8 @@ each test uses a single directive. Positive observations use
 checked code at runtime); diagnostic claims use
 `//DIAGNOSTIC_TEST:SIMPLE`.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | Block-local shadowing hides a local from lookup until its DeclStmt is reached; using `x` before its declaration produces an undefined-identifier diagnostic. | negative | [#block-local-shadowing](../../../docs/llm-generated/pipeline/03-semantic-check.md#block-local-shadowing) | [`forward-reference-in-block-rejected.slang`](forward-reference-in-block-rejected.slang) |
@@ -126,8 +125,12 @@ checked code at runtime); diagnostic claims use
 | The checker synthesizes nested initializer-list construction so a struct containing another struct can be initialized by a brace-enclosed list of brace-enclosed lists. | boundary | [#synthesizing-implicit-code](../../../docs/llm-generated/pipeline/03-semantic-check.md#synthesizing-implicit-code) | [`synthesized-positional-constructor-nested.slang`](synthesized-positional-constructor-nested.slang) |
 | Function bodies are left as UnparsedStmt by the parser and checked on demand; a well-formed body parses and runs. | functional | [#two-pass-interaction-with-the-parser](../../../docs/llm-generated/pipeline/03-semantic-check.md#two-pass-interaction-with-the-parser) | [`function-body-checked-after-parser-handoff.slang`](function-body-checked-after-parser-handoff.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+NA
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#synthesizing-implicit-code](../../../docs/llm-generated/pipeline/03-semantic-check.md#synthesizing-implicit-code) | undocumented-behavior | The `## Synthesizing implicit code` section names "generated comparison / construction methods" as a category but does not enumerate which comparison operators are auto-synthesized (`==`, `!=`, `<`, `>`, `<=`, `>=`) nor which structural rules trigger them. The bundle tests the construction half (initializer- list constructor) but not comparison-method synthesis; a doc enumeration would let the bundle grow exhaustively in that area. |  |
@@ -136,8 +139,3 @@ checked code at runtime); diagnostic claims use
 | [#failure-modes](../../../docs/llm-generated/pipeline/03-semantic-check.md#failure-modes) | undocumented-behavior | The `## Failure modes` section says overload resolution "returns a synthetic `errorExpr` rather than aborting". The user-visible consequence is "compilation continues past the offending site" — the `recovery-after-error-does-not-cascade` test exercises the general claim, but the doc has no observable surface that specifically distinguishes "synthetic errorExpr" from any other error-recovery placeholder. |  |
 | [#semanticsvisitor](../../../docs/llm-generated/pipeline/03-semantic-check.md#semanticsvisitor) | undocumented-behavior | The `## SemanticsVisitor` and `## Files and responsibilities` sections describe the architectural split (which `.cpp` file handles which concern). Most of those claims are not directly observable from outside the compiler — the bundle anchors negative tests to the file table by treating each row's "concern" as a testable surface claim (e.g. "statement checking validates control-flow rules"). A stronger anchoring would be to add a per-concern subsection enumerating exactly which user-visible behaviors live in each file. |  |
 | [#name-resolution](../../../docs/llm-generated/pipeline/03-semantic-check.md#name-resolution) | undocumented-behavior | The doc points readers to [`../name-resolution/`](../../../docs/llm-generated/name-resolution/) for the lookup algorithm but does not restate any specific consequences in this file. The bundle therefore anchors a handful of tests directly to `lookup.md` and `overload-resolution.md` (which the per-section prompt explicitly permits). If the source doc were extended with one-line summaries of each user-visible lookup behavior, those tests could re-anchor here. |  |
-
-## Untested claims
-
-(none)
-

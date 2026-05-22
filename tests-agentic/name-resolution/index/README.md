@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for name-resolution/index
 
 ## Intent
-
 Tests verify the **cross-cutting orientation claims** made by
 [`docs/llm-generated/name-resolution/index.md`](../../../docs/llm-generated/name-resolution/index.md):
 the subtree's product (a resolved `DeclRef`), the documented
@@ -33,8 +32,8 @@ Strategy: one positive test per cross-cutting composition that the
 index doc itself asserts, using the lightest runner that makes the
 composition observable.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | In the documented phase order, the visibility filter precedes overload resolution, so a more-specific but inaccessible overload does not win over a less-specific but visible one. | functional | [#flow-diagram](../../../docs/llm-generated/name-resolution/index.md#flow-diagram) | [`visibility-filters-before-overload.slang`](visibility-filters-before-overload.slang) |
@@ -44,8 +43,8 @@ composition observable.
 | The product of name resolution is a DeclRef whose specialization is observable; resolving a generic function call binds the type argument observably to the resolved DeclRef. | functional | [#name-resolution](../../../docs/llm-generated/name-resolution/index.md#name-resolution) | [`declref-product-of-resolution.slang`](declref-product-of-resolution.slang) |
 | The resolved DeclRef flows downstream into AST-to-IR lowering, where the breadcrumb chain becomes a concrete field access in emitted target code. | functional | [#where-this-fits-in-the-pipeline](../../../docs/llm-generated/name-resolution/index.md#where-this-fits-in-the-pipeline) | [`breadcrumb-flows-into-emitted-hlsl.slang`](breadcrumb-flows-into-emitted-hlsl.slang) |
 
-## Untested claims
 
+## Untested claims
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | Arity / convertibility filtering, conversion-cost ranking, partial generic application, ambiguous-call diagnostics -- see `tests-agentic/name-resolution/overload-resolution/`. | out-of-bundle | (unspecified) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
@@ -53,8 +52,16 @@ composition observable.
 | `public` / `internal` / `private` semantics, accessor visibility, default-visibility rules -- see `tests-agentic/name-resolution/visibility/`. | out-of-bundle | [#public](../../../docs/llm-generated/name-resolution/index.md#public) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
 | `Scope` shape, sibling-chain construction, file-scope and namespace boundaries, generic-parameter scope -- see `tests-agentic/name-resolution/scopes/`. | out-of-bundle | [#scope](../../../docs/llm-generated/name-resolution/index.md#scope) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
 
-## Sibling-bundle overlap
 
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#the-visibility-diagnostic-still-fires](../../../docs/llm-generated/name-resolution/index.md#the-visibility-diagnostic-still-fires) | undocumented-behavior | The index doc names `TryCheckOverloadCandidateVisibility` as the reason phases interleave (visibility is re-checked inside overload resolution), but does not give a user-observable consequence distinct from "the visibility diagnostic still fires". A direct test of this would have nothing to observe beyond what `visibility/` and `overload-resolution/` already cover; the index doc could either drop the parenthetical or add a sentence describing what a developer sees differently. |  |
+| [#pages](../../../docs/llm-generated/name-resolution/index.md#pages) | undocumented-behavior | The `#pages` and `#related-glossary-terms` sections are pure pointer tables; they are explicitly out of scope per the per-section prompt. No gap, just noted for future readers. |  |
+| [#flow-diagram](../../../docs/llm-generated/name-resolution/index.md#flow-diagram) | undocumented-behavior | The mermaid `#flow-diagram` shows `breadcrumbs` as part of the final output but the body text does not state where the breadcrumb chain is first attached. The index doc could clarify whether breadcrumbs are produced inside lookup, during the visibility/overload phases, or assembled at the very end -- the answer would scope a future "where-do-breadcrumbs-come-from" test. |  |
+
+
+## Sibling-bundle overlap
 The following peer-bundle behaviors are intentionally not
 re-tested here to avoid duplication:
 
@@ -73,11 +80,3 @@ re-tested here to avoid duplication:
   The index bundle's `visibility-filters-before-overload.slang`
   exercises the composition of phase ordering, not the ranking
   itself.
-
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#the-visibility-diagnostic-still-fires](../../../docs/llm-generated/name-resolution/index.md#the-visibility-diagnostic-still-fires) | undocumented-behavior | The index doc names `TryCheckOverloadCandidateVisibility` as the reason phases interleave (visibility is re-checked inside overload resolution), but does not give a user-observable consequence distinct from "the visibility diagnostic still fires". A direct test of this would have nothing to observe beyond what `visibility/` and `overload-resolution/` already cover; the index doc could either drop the parenthetical or add a sentence describing what a developer sees differently. |  |
-| [#pages](../../../docs/llm-generated/name-resolution/index.md#pages) | undocumented-behavior | The `#pages` and `#related-glossary-terms` sections are pure pointer tables; they are explicitly out of scope per the per-section prompt. No gap, just noted for future readers. |  |
-| [#flow-diagram](../../../docs/llm-generated/name-resolution/index.md#flow-diagram) | undocumented-behavior | The mermaid `#flow-diagram` shows `breadcrumbs` as part of the final output but the body text does not state where the breadcrumb chain is first attached. The index doc could clarify whether breadcrumbs are produced inside lookup, during the visibility/overload phases, or assembled at the very end -- the answer would scope a future "where-do-breadcrumbs-come-from" test. |  |

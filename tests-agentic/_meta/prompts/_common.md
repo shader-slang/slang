@@ -62,6 +62,18 @@ Compute `watched_paths_digest` and `source_doc_digest` with
 
 ## README.md body structure
 
+Every bundle README has exactly these four sections, in this order:
+
+1. `## Intent`
+2. `## Functional coverage`
+3. `## Untested claims`
+4. `## Doc gaps observed`
+
+If a section has nothing to record, write `NA` as its body. Do not
+omit the heading. Bundle-specific sections (e.g. `## Sibling-bundle
+overlap`, `## Catalog coverage`, `## Codes dropped`) may appear after
+the four canonical sections but never between them.
+
 ```markdown
 # Tests for <bundle-key>
 
@@ -73,39 +85,25 @@ strategy (e.g. "one positive + one negative per claim in sections
 
 ## Functional coverage
 
-| Claim                                                                          | Intent     | Anchor                                                          | Tests                                                                  |
-| ------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Claim                                                                          | Intent     | Anchor                                                                        | Tests                                                                    |
+| ------------------------------------------------------------------------------ | ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | The more specialized generic wins when both candidates are equally accessible. | functional | [#overload-resolution](../../docs/llm-generated/<doc>.md#overload-resolution) | [`overload-prefer-specialized.slang`](overload-prefer-specialized.slang) |
-| ...                                                                            | ...        | ...                                                             | ...                                                                    |
-
-## Doc gaps observed
-
-| Anchor                                                    | Kind            | Gap                                                                                   | Suggested addition                                          |
-| --------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| [#basic-scalar-types](../../docs/llm-generated/<doc>.md#basic-scalar-types) | missing-surface | The doc lists `IntPtr` and `UIntPtr` as opcodes but does not name a Slang surface construct that produces them. | A "user-level surface" column per row, or a note that these are host-side only. |
-| ...                                                       | ...             | ...                                                                                   | ...                                                         |
-
-If there are no gaps, omit the section. Do not write a placeholder row.
-
-## Untested coverable claims
-
-| Anchor                                                    | Backend            | Claim                                                                                | Why untested                                                 |
-| --------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| [#dxr-ray-tracing](../../docs/llm-generated/<doc>.md#dxr-ray-tracing) | gpu-dxr            | The `closesthit` entry point lowers to a DXR `[shader("closesthit")]` HLSL function. | Agent runtime has no GPU; CI nightly has D3D12 + DXR support. |
-| ...                                                       | ...                | ...                                                                                  | ...                                                          |
-
-If every documented claim already has a test in the Coverage table,
-omit this section.
+| ...                                                                            | ...        | ...                                                                           | ...                                                                      |
 
 ## Untested claims
 
-| Claim                                                                                                                                       | Reason            | Anchor                                                    | Why untested                                                                                            |
-| ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| The doc describes the `serialize(serializer, value)` template pattern that compiler internals use to thread values through serialization.   | needs-unit-test   | [#serialize-pattern](../../docs/llm-generated/<doc>.md#serialize-pattern) | A C++ idiom invoked from compiler-internal code; no slangc CLI surface reaches it. A C++ unit test against the serializer types could verify it. |
-| ...                                                                                                                                         | ...               | ...                                                       | ...                                                                                                     |
+| Claim                                                                                                                                     | Reason          | Anchor                                                                    | Why untested                                                                                                                                     |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The doc describes the `serialize(serializer, value)` template pattern that compiler internals use to thread values through serialization. | needs-unit-test | [#serialize-pattern](../../docs/llm-generated/<doc>.md#serialize-pattern) | A C++ idiom invoked from compiler-internal code; no slangc CLI surface reaches it. A C++ unit test against the serializer types could verify it. |
+| The `closesthit` entry point lowers to a DXR `[shader("closesthit")]` HLSL function.                                                      | gpu-dxr         | [#dxr-ray-tracing](../../docs/llm-generated/<doc>.md#dxr-ray-tracing)     | Agent runtime has no GPU; CI nightly has D3D12 + DXR support.                                                                                    |
+| ...                                                                                                                                       | ...             | ...                                                                       | ...                                                                                                                                              |
 
-If every documented claim is either tested or coverable, omit this
-section.
+## Doc gaps observed
+
+| Anchor                                                                      | Kind            | Gap                                                                                                             | Suggested addition                                                              |
+| --------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [#basic-scalar-types](../../docs/llm-generated/<doc>.md#basic-scalar-types) | missing-surface | The doc lists `IntPtr` and `UIntPtr` as opcodes but does not name a Slang surface construct that produces them. | A "user-level surface" column per row, or a note that these are host-side only. |
+| ...                                                                         | ...             | ...                                                                                                             | ...                                                                             |
 ```
 
 **Functional-coverage table rules:**
@@ -170,52 +168,17 @@ Rows from multiple bundles that report the same anchor + kind are
 merged by the aggregator (`regenerate.py doc-gaps`), so independent
 co-reports are fine — they are useful evidence.
 
-**Untested-coverable table rules:**
-
-The `## Untested coverable claims` section is the **next-wave
-priority list**. Each row is a documented claim the bundle does
-**not** have a test for because the agent runtime (Claude Code,
-Codex, etc.) cannot validate it locally — but CI (nightly,
-GPU-equipped) or a developer's command line can. An expansion wave
-that does have access to the relevant runner is expected to walk
-this table and write tests for it.
-
-- **Anchor**: markdown link to the doc section, same shape as the
-  other tables.
-- **Backend**: controlled vocabulary naming the runner / capability
-  needed:
-
-  | Backend                | Meaning                                                              |
-  | ---------------------- | -------------------------------------------------------------------- |
-  | `gpu-dxr`              | D3D12 + DXR ray-tracing entry points (`closesthit`/`anyhit`/`miss`/`raygen`/`intersection`/`callable`). |
-  | `gpu-mesh-shader`      | Mesh / amplification entry points.                                   |
-  | `gpu-dxc-dxil`         | DXC binary; `-target dxil` / DXBytecode output.                      |
-  | `gpu-fxc-dxbc`         | fxc binary; DXBytecode legacy output.                                |
-  | `gpu-cuda`             | nvrtc / PTX / OptiX runtime.                                         |
-  | `gpu-metal-toolchain`  | Apple `metal` compiler / `.metallib` toolchain.                      |
-  | `gpu-wgsl-tint`        | Tint downstream invocation (`-target wgsl-spirv`).                   |
-  | `gpu-spirv-tools`      | spirv-link / spirv-val / spirv-opt downstream chain.                 |
-  | `gpu-non-compute`      | Vertex / fragment / hull / domain / geometry / tessellation stages.  |
-  | `gpu-bindless`         | Bindless / `NonUniformResourceIndex` capability.                     |
-  | `gpu-cooperative`      | Cooperative matrix / cooperative vector capability.                  |
-  | `gpu-vulkan-extension` | A Vulkan extension or capability set not enabled in the bundle.      |
-  | `gpu-cross-api-flag`   | Vulkan-cross-API option flags (`VulkanInvertY`, `VulkanUseDxPositionW`, etc.). |
-- **Claim**: one to three sentences describing what the test would
-  verify, written in the voice of a future test agent — concrete
-  enough that the agent can write the test from this row alone.
-- **Why untested**: one sentence naming the runner constraint
-  (typically "Agent runtime has no GPU; CI / local machine does.").
-
 **Untested-claims table rules:**
 
 The `## Untested claims` section is the **bucket of doc claims that
-cannot be tested by `slang-test` directly**. Each row names a claim
-and the kind of test harness that *would* verify it (C++ unit test,
-multi-file test, CLI test, etc.) — or, when no harness exists, why
-the claim is unobservable through any test directive. The doc-regen
+do not yet have a test in this bundle**. Each row names a claim and
+why no test exists — either the kind of test harness that *would*
+verify it (C++ unit test, multi-file test, CLI test), the runner /
+capability that *would* unblock it (GPU runtime, DXC, etc.), or, for
+truly terminal cases, why no upgrade unblocks it. The doc-regen
 workflow does **not** consume this table; it exists to make the
 suite's coverage boundary visible to readers, and to surface
-candidates for unit-test / CLI-test campaigns.
+candidates for follow-up campaigns.
 
 Columns: `Claim | Reason | Anchor | Why untested`. The Claim is the
 primary content; Anchor is a supporting pointer.
@@ -224,25 +187,56 @@ primary content; Anchor is a supporting pointer.
   Lead with the claim because that's the substance — readers and
   downstream tooling want to know *what* before *why*.
 - **Reason**: controlled vocabulary naming what is needed (when
-  testable elsewhere) or why the claim is unreachable:
+  testable elsewhere) or why the claim is unreachable. Three families:
 
-  | Reason                    | Meaning                                                                                                                                                                              |
-  | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-  | `needs-unit-test`         | The claim is about C++ behavior (an `ISession` method, a `serialize(...)` template pattern, an internal helper) that has no slangc CLI surface but could be tested by a C++ unit test (in `tools/slang-unit-test/`). |
-  | `needs-multi-file-test`   | The claim is observable only across 2+ `.slang` files (cross-module `import`, `__include` / `__implementing`, `-embed-downstream-ir` artefacts, `.slang-module` linking). The single-file `//TEST` directive cannot stage the input. |
-  | `needs-cli-test`          | The claim is about how `slangc` is invoked rather than what it compiles (help output, exit codes, env-var-gated paths like `SLANG_RUN_SPIRV_VALIDATION`, flag-mapping tables, argument-parsing edge cases). A wrapper script invoking `slangc` directly is what would verify it. |
-  | `link-stage-only`         | The claim is about a `(synthesized)` opcode / pass-output that does not exist at this bundle's `pipeline_stage`. Test belongs in the bundle whose pipeline stage matches.            |
-  | `out-of-bundle`           | The claim is about behavior already covered in a sibling bundle. (Name the sibling in the Why cell.)                                                                                  |
-  | `deprecated`              | The CLI flag or feature is deprecated and will not be tested.                                                                                                                         |
-  | `process-doc`             | The claim is about a contributor walkthrough / process documentation, not a compiler behavior.                                                                                        |
-  | `internal-source-fact`    | The claim is an implementation fact (C++ class hierarchy, field names, parser-callback names) with no user-observable consequence.                                                    |
-  | `compile-time-toggle`     | The claim is about a preprocessor define or build-time flag baked into the binary. Not observable at run-time.                                                                        |
-  | `requires-external-tool`  | The claim could be verified but requires a non-Slang tool (`unzip`, hex dumper, etc.) the runner does not include.                                                                    |
-  | `implementation-detail`   | The claim is about internal compiler choice (pass ordering count, hoistability decisions) with no test-directive that reveals it.                                                     |
+  Test-harness alternatives — testable, just not via slang-test `//TEST`:
+
+  | Reason                  | Meaning                                                                                                                                                                                                                |
+  | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `needs-unit-test`       | The claim is about C++ behavior (an `ISession` method, a `serialize(...)` template pattern, an internal helper) that has no slangc CLI surface but could be tested by a C++ unit test (in `tools/slang-unit-test/`).   |
+  | `needs-multi-file-test` | The claim is observable only across 2+ `.slang` files (cross-module `import`, `__include` / `__implementing`, `-embed-downstream-ir` artefacts, `.slang-module` linking).                                              |
+  | `needs-cli-test`        | The claim is about how `slangc` is invoked (help output, exit codes, env-var-gated paths like `SLANG_RUN_SPIRV_VALIDATION`, flag-mapping tables). A wrapper script invoking `slangc` directly is what would verify it. |
+
+  Runner-capability alternatives — testable with a different runner /
+  toolchain. CI nightly typically lifts these; the agent runtime
+  cannot validate them locally.
+
+  | Reason                 | Meaning                                                                                                                |
+  | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+  | `gpu-dxr`              | D3D12 + DXR ray-tracing entry points (`closesthit` / `anyhit` / `miss` / `raygen` / `intersection` / `callable`).      |
+  | `gpu-mesh-shader`      | Mesh / amplification entry points.                                                                                     |
+  | `gpu-dxc-dxil`         | DXC binary; `-target dxil` / DXBytecode output.                                                                        |
+  | `gpu-fxc-dxbc`         | fxc binary; DXBytecode legacy output.                                                                                  |
+  | `gpu-cuda`             | nvrtc / PTX / OptiX runtime.                                                                                           |
+  | `gpu-metal-toolchain`  | Apple `metal` compiler / `.metallib` toolchain.                                                                        |
+  | `gpu-wgsl-tint`        | Tint downstream invocation (`-target wgsl-spirv`).                                                                     |
+  | `gpu-spirv-tools`      | spirv-link / spirv-val / spirv-opt downstream chain.                                                                   |
+  | `gpu-non-compute`      | Vertex / fragment / hull / domain / geometry / tessellation stages.                                                    |
+  | `gpu-bindless`         | Bindless / `NonUniformResourceIndex` capability.                                                                       |
+  | `gpu-cooperative`      | Cooperative matrix / cooperative vector capability.                                                                    |
+  | `gpu-vulkan-extension` | A Vulkan extension or capability set not enabled in the bundle.                                                        |
+  | `gpu-cross-api-flag`   | Vulkan-cross-API option flags (`VulkanInvertY`, `VulkanUseDxPositionW`, etc.).                                         |
+  | `gpu-other`            | General GPU-runtime requirement without a specific tag above.                                                          |
+
+  Terminal — no harness or runner upgrade unblocks:
+
+  | Reason                   | Meaning                                                                                                                            |
+  | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+  | `link-stage-only`        | The claim is about a `(synthesized)` opcode / pass-output that does not exist at this bundle's `pipeline_stage`.                   |
+  | `out-of-bundle`          | The claim is about behavior already covered in a sibling bundle. (Name the sibling in the Why cell.)                               |
+  | `deprecated`             | The CLI flag or feature is deprecated and will not be tested.                                                                      |
+  | `process-doc`            | The claim is about a contributor walkthrough / process documentation, not a compiler behavior.                                     |
+  | `internal-source-fact`   | The claim is an implementation fact (C++ class hierarchy, field names, parser-callback names) with no user-observable consequence. |
+  | `compile-time-toggle`    | The claim is about a preprocessor define or build-time flag baked into the binary. Not observable at run-time.                     |
+  | `requires-external-tool` | The claim could be verified but requires a non-Slang tool (`unzip`, hex dumper, etc.) the runner does not include.                 |
+  | `implementation-detail`  | The claim is about internal compiler choice (pass ordering count, hoistability decisions) with no test-directive that reveals it.  |
 - **Anchor**: markdown link to the doc section that makes the claim.
 - **Why untested**: one to two sentences elaborating the Reason —
-  what specifically blocks the test, and (for `needs-*` rows) what
-  shape of test would verify it.
+  what specifically blocks the test, and (for `needs-*` / `gpu-*`
+  rows) what shape of test would verify it.
+
+If the table is empty (no untested claims at all), write `NA` as the
+section body.
 
 ## Per-test `//META` block
 
@@ -311,9 +305,9 @@ C++ template pattern with no CLI surface), record it in the
 `## Untested claims` table with the appropriate `Reason` tag. If the
 claim is observable but the test would only be validatable in CI
 (needs a GPU runner / DXC / nvrtc / etc.), still write the test —
-CI validates it. Record nothing extra; the `gpu-*` Backend tags in
-the `## Untested coverable claims` table are only used when no test
-has been written yet.
+CI validates it. The `gpu-*` Reason tags in `## Untested claims` are
+used only when no test has been written for the claim yet; once a
+test exists, the claim moves to `## Functional coverage`.
 
 ### Exercise as many backends as the claim allows
 

@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for target-pipelines/cuda
 
 ## Intent
-
 Tests verify the CUDA target pipeline described in
 [`docs/llm-generated/target-pipelines/cuda.md`](../../../docs/llm-generated/target-pipelines/cuda.md):
 the ordered IR-pass sequence run by `linkAndOptimizeIR` and
@@ -51,8 +50,8 @@ Phase A/B/C/D tables that can be observed in
 `slangc -target cuda` text. Default directive is
 `//TEST:SIMPLE(filecheck=CHECK):-target cuda -entry main -stage compute`.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | collectOptiXEntryPointUniformParams replaces collectEntryPointUniformParams for raygeneration entry points so a CUDA raygeneration shader emits as an extern "C" __global__ void __raygen__<name> kernel through the OptiX SBT pathway. | expansion | [#collectoptixentrypointuniformparams](../../../docs/llm-generated/target-pipelines/cuda.md#collectoptixentrypointuniformparams) | [`collect-optix-entry-point-uniforms-raygen.slang`](collect-optix-entry-point-uniforms-raygen.slang) |
@@ -117,8 +116,19 @@ Phase A/B/C/D tables that can be observed in
 | transformParamsToConstRef converts struct value parameters into pointer-form parameters on CUDA for pass-by-reference. | functional | [#undoparametercopy-and-transformparamstoconstref](../../../docs/llm-generated/target-pipelines/cuda.md#undoparametercopy-and-transformparamstoconstref) | [`transform-params-to-constref.slang`](transform-params-to-constref.slang) |
 | undoParameterCopy rewrites explicit inout copy-in copy-out wrappers as pass-by-pointer on CUDA emit. | functional | [#undoparametercopy-and-transformparamstoconstref](../../../docs/llm-generated/target-pipelines/cuda.md#undoparametercopy-and-transformparamstoconstref) | [`inout-via-pointer.slang`](inout-via-pointer.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+| Claim | Reason | Anchor | Why untested |
+| --- | --- | --- | --- |
+| **`PyTorchCppBinding`** adjacent target arm (`#adjacent-targets`). Out of scope: shares some Phase B passes but emits via `TorchCppSourceEmitter`, not `CUDASourceEmitter`. | (unclassified) | [#adjacent-targets](../../../docs/llm-generated/target-pipelines/cuda.md#adjacent-targets) | Reason and explanation to be refined by the next regeneration. |
+| **`autodiff` / `higherOrderFunc` / `derivativePyBindWrapper` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `generateDerivativeWrappers`, `finalizeAutoDiffPass`, etc.). Covered by other bundles; the doc anchors them to Phase B but the emit-stage observable is a downstream language feature. | (unclassified) | [#autodiff](../../../docs/llm-generated/target-pipelines/cuda.md#autodiff) | Reason and explanation to be refined by the next regeneration. |
+| **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). Coverage instrumentation is a debugging flag, not user-observable through text emit. | (unclassified) | [#coveragetracing](../../../docs/llm-generated/target-pipelines/cuda.md#coveragetracing) | Reason and explanation to be refined by the next regeneration. |
+| **`dynamicResourceHeap`**, **`meshOutput`**, **`bindingQuery`** Phase C gates. Each requires a feature surface that is not on the compute-test envelope. | (unclassified) | [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/cuda.md#dynamicresourceheap) | Reason and explanation to be refined by the next regeneration. |
+| **`validateAndRemoveAssumeAddress` with `validate=false`**. The doc states CUDA passes `validate=false` (line 960) but the consequence (no validation diagnostic on a malformed address-of) requires a deliberately-malformed input that is out of scope here. | (unclassified) | [#validateandremoveassumeaddress](../../../docs/llm-generated/target-pipelines/cuda.md#validateandremoveassumeaddress) | Reason and explanation to be refined by the next regeneration. |
+| **Pass-ordering claims** (Phase A passes 1-18, Phase B passes 1-62, Phase C passes 1-32). The doc enumerates the ordered list; pass _existence_ is observable through emit side effects, but pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#prelude-symbol-emit-shape](../../../docs/llm-generated/target-pipelines/cuda.md#prelude-symbol-emit-shape) | undocumented-behavior | The doc does not pin the specific CUDA-prelude macros and helper symbols (`SLANG_INFINITY`, `__half(...)`, `make_float2`, `tex2DLod`, `FixedArray<T, N>`) that the emitter relies on for numeric and texture boundaries. The boundary tests anchor each through its parent claim section, but a single doc table listing "prelude-symbol → emit-shape" would let boundary tests reference the symbols directly. |  |
@@ -137,18 +147,3 @@ Phase A/B/C/D tables that can be observed in
 | [#downstream-nvrtc](../../../docs/llm-generated/target-pipelines/cuda.md#downstream-nvrtc) | undocumented-behavior | The doc's `## Downstream nvrtc` says PTX is produced via nvrtc but does not name the canonical PTX-text markers (`.version`, `.target`, `.visible .entry`) that a test can fingerprint the output against. Tests for the PTX downstream end up matching prelude-format strings that are nvrtc/PTX-ISA artifacts rather than Slang-documented invariants. | Add a "PTX text fingerprint" sentence to `## Downstream nvrtc` listing the canonical PTX header directives (`.version`, `.target`, `.address_size`) and the `.visible .entry <name>` pattern that wraps each CUDA `__global__` kernel as the test-stable surface. |
 | [#processlaterequirecapabilityinsts](../../../docs/llm-generated/target-pipelines/cuda.md#processlaterequirecapabilityinsts) | undocumented-behavior | The doc's Phase C table lists `processLateRequireCapabilityInsts` and `cleanUpVoidType` but does not name observable CUDA-emit markers for them. No test. |  |
 | [#phase-d](../../../docs/llm-generated/target-pipelines/cuda.md#phase-d) | undocumented-behavior | The doc's `## Phase D` table lists `simplifyForEmit` but the effect is observable only as an absence of redundant variables in the emitted text — there is no doc-anchored positive marker. No test. |  |
-
-## Untested coverable claims
-
-(none)
-
-## Untested claims
-
-| Claim | Reason | Anchor | Why untested |
-| --- | --- | --- | --- |
-| **`PyTorchCppBinding`** adjacent target arm (`#adjacent-targets`). Out of scope: shares some Phase B passes but emits via `TorchCppSourceEmitter`, not `CUDASourceEmitter`. | (unclassified) | [#adjacent-targets](../../../docs/llm-generated/target-pipelines/cuda.md#adjacent-targets) | Reason and explanation to be refined by the next regeneration. |
-| **`autodiff` / `higherOrderFunc` / `derivativePyBindWrapper` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `generateDerivativeWrappers`, `finalizeAutoDiffPass`, etc.). Covered by other bundles; the doc anchors them to Phase B but the emit-stage observable is a downstream language feature. | (unclassified) | [#autodiff](../../../docs/llm-generated/target-pipelines/cuda.md#autodiff) | Reason and explanation to be refined by the next regeneration. |
-| **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). Coverage instrumentation is a debugging flag, not user-observable through text emit. | (unclassified) | [#coveragetracing](../../../docs/llm-generated/target-pipelines/cuda.md#coveragetracing) | Reason and explanation to be refined by the next regeneration. |
-| **`dynamicResourceHeap`**, **`meshOutput`**, **`bindingQuery`** Phase C gates. Each requires a feature surface that is not on the compute-test envelope. | (unclassified) | [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/cuda.md#dynamicresourceheap) | Reason and explanation to be refined by the next regeneration. |
-| **`validateAndRemoveAssumeAddress` with `validate=false`**. The doc states CUDA passes `validate=false` (line 960) but the consequence (no validation diagnostic on a malformed address-of) requires a deliberately-malformed input that is out of scope here. | (unclassified) | [#validateandremoveassumeaddress](../../../docs/llm-generated/target-pipelines/cuda.md#validateandremoveassumeaddress) | Reason and explanation to be refined by the next regeneration. |
-| **Pass-ordering claims** (Phase A passes 1-18, Phase B passes 1-62, Phase C passes 1-32). The doc enumerates the ordered list; pass _existence_ is observable through emit side effects, but pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |

@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for pipeline/02-parse-ast
 
 ## Intent
-
 Tests verify the parser-stage behaviors described in
 [`docs/llm-generated/pipeline/02-parse-ast.md`](../../../docs/llm-generated/pipeline/02-parse-ast.md):
 two-stage parsing (decl-stage vs body-stage), syntax-as-declaration
@@ -34,8 +33,8 @@ cost. Failure-mode and error-recovery claims use
 test pins the diagnostic the doc names without overcommitting to
 neighbouring messages the doc does not promise.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | On an unexpected token the parser emits a diagnostic, then uses skip-to-synchronization-point heuristics to resume, so a second later error in the same file is also reported. | negative | [#error-recovery](../../../docs/llm-generated/pipeline/02-parse-ast.md#error-recovery) | [`error-recovery-continues-after-syntax-error.slang`](error-recovery-continues-after-syntax-error.slang) |
@@ -59,8 +58,12 @@ neighbouring messages the doc does not promise.
 | Function bodies are captured at decl-stage as UnparsedStmt and re-parsed in body-parse mode, so a body that references a generic call (which depends on body-stage `<` disambiguation) still parses and runs. | functional | [#two-stage-parsing](../../../docs/llm-generated/pipeline/02-parse-ast.md#two-stage-parsing) | [`function-body-deferred-to-check-stage.slang`](function-body-deferred-to-check-stage.slang) |
 | The Type production includes the array form `T '[' Expr? ']'` (grammar.md handing off from the parse-AST doc's `## AST data model` Type family note); `int arr[3]` parses into an array-typed VarDecl. | functional | [#types](../../../docs/llm-generated/pipeline/02-parse-ast.md#types) | [`type-array-spelling.slang`](type-array-spelling.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+NA
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#generics-ambiguity](../../../docs/llm-generated/pipeline/02-parse-ast.md#generics-ambiguity) | ambiguous-claim | The `## Generics ambiguity` section describes the disambiguation strategy in narrative form ("try a generic-application parse and roll back if it does not commit cleanly") but does not enumerate the **set of follower tokens** that decides commit-vs-rollback. Grammar.md's `### \`<\` disambiguation` lists them explicitly (`::`, `.`, `(`, `)`, `[`, `]`, `:`, `,`, `?`, `;`, `==`, `!=`, `>`, `>>`). The parse-AST doc should either copy that table or unambiguously hand off to it; right now a reader could not write a rollback test from the parse-AST doc alone. |  |
@@ -70,8 +73,3 @@ neighbouring messages the doc does not promise.
 | [#error-recovery](../../../docs/llm-generated/pipeline/02-parse-ast.md#error-recovery) | undocumented-behavior | `## Error recovery` says the parser uses "simple skip-to-synchronization-point heuristics (looking for `;`, `}`, or the next declaration keyword)" but does not promise that any specific input produces any specific number of diagnostics. The bundle's error-recovery test relies on the observable fact that two adjacent function bodies each report their own error; if the recovery heuristic changes to merge or suppress one of them the test will need to be updated even though the doc claim hasn't changed. Recorded as fragility; a tighter doc commitment would help. |  |
 | [#ast-data-model](../../../docs/llm-generated/pipeline/02-parse-ast.md#ast-data-model) | undocumented-behavior | `## AST data model` describes `ASTBuilder` ownership and hash- consing of types, but neither has a slangc/slangi-observable surface (hash-consing identity is hidden by the IR / emit pipelines). Recorded as architecture-only, not testable here. |  |
 | [#function-and-method-bodies-are-still-unparsed-at-this-stage](../../../docs/llm-generated/pipeline/02-parse-ast.md#function-and-method-bodies-are-still-unparsed-at-this-stage) | undocumented-behavior | The pure-decl-stage observable that the doc calls out — "Function and method bodies are still unparsed at this stage" — is hard to pin without IR-dump inspection that the agentic suite explicitly excludes (and the doc does not promise any user-visible diagnostic for it). The bundle's `function-body-deferred-to-check-stage.slang` and `body-forward-references-outer-decl.slang` cover the consequence; the cleanest direct test would need a doc-promised observable for "this body has not been parsed yet". |  |
-
-## Untested claims
-
-(none)
-

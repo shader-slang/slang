@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for syntax-reference/keywords-and-builtins
 
 ## Intent
-
 Tests verify the parser-surface behaviors described in
 [`docs/llm-generated/syntax-reference/keywords-and-builtins.md`](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md):
 which identifiers acquire special meaning as statement, decl,
@@ -25,8 +24,8 @@ makes the claim observable. Most tests are observed through
 through text-emit `FileCheck`s on the relevant backends; one negative
 test confirms that `let` immutability is enforced by the checker.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | `hitAttributeEXT` is a complex modifier in the raytracing family; an HLSL-style intersection shader that calls `ReportHit` with a user-defined hit-attribute struct lowers to GLSL with a `hitAttributeEXT`-decorated variable and pulls in the `GL_EXT_ray_tracing` extension. | expansion | [#complex-modifiers-take-arguments](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#complex-modifiers-take-arguments) | [`modifier-raytracing-hitattributeext.slang`](modifier-raytracing-hitattributeext.slang) |
@@ -86,8 +85,12 @@ test confirms that `let` immutability is enforced by the checker.
 | `switch`, `case`, and `default` form the multi-way dispatch statement; the parser recognizes all three as statement keywords. | functional | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords) | [`statement-switch-case.slang`](statement-switch-case.slang) |
 | `while` and `do` are statement keywords parsing the head-tested and tail-tested loop forms respectively. | functional | [#statement-keywords](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#statement-keywords) | [`statement-while-do.slang`](statement-while-do.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+NA
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#complex-modifiers-take-arguments](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#complex-modifiers-take-arguments) | undocumented-behavior | The `#complex-modifiers-take-arguments` table lists `layout`, `volatile`, `coherent`, `restrict`, etc. as taking arguments, but does not give a complete syntactic shape (what the argument list looks like, which contexts accept the modifier). No test in this bundle anchors there because the user-facing syntax is not described precisely enough to derive a verifiable claim. Filing as a doc gap would help. |  |
@@ -98,11 +101,3 @@ test confirms that `let` immutability is enforced by the checker.
 | [#countofarr](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#countofarr) | undocumented-behavior | `countof(arr)` on a plain fixed-size local array under `slangi` returned `4` (the size of `int` in bytes) rather than the array element count, regardless of the declared size. The variadic-pack form (`countof(D)` for `let each D : int`) returns the documented element count, so the `boundary-countof-variadic-pack.slang` probe uses the pack form. Worth a note in the doc that the array form is only constant-folded in some contexts, or that the canonical `countof` shape is the pack form. |  |
 | [#let](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#let) | undocumented-behavior | The keyword-vs-identifier rules are not spelled out: `let`, `var`, and even `int` can be reused as identifier names in declarator position (e.g. `int let = 5;` is accepted), but `int` cannot appear at the head of an expression-typed declaration (`int x = int + 1;` is rejected with `E30060`). | A short paragraph on which contexts re-classify an identifier as a value vs a type would let us write more precise boundary tests. |
 | [#reserved](../../../docs/llm-generated/syntax-reference/keywords-and-builtins.md#reserved) | undocumented-behavior | `SV_`-prefixed and `gl_`-prefixed names are documented as "reserved", but in practice a user-named local `int SV_userVar` inside a function compiles and produces the printed value. The prefix policy is therefore advisory rather than enforced; a note to that effect in the doc would justify removing speculative user-prefix boundary tests. |  |
-
-## Untested coverable claims
-
-(none)
-
-## Untested claims
-
-(none)

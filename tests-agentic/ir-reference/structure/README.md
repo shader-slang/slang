@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for ir-reference/structure
 
 ## Intent
-
 Tests verify the per-opcode catalog of the IR structural / hierarchy
 family described in
 [`docs/llm-generated/ir-reference/structure.md`](../../../docs/llm-generated/ir-reference/structure.md):
@@ -39,8 +38,8 @@ observes a parent / child relationship, a top-level declaration's
 linkage, or a structural cross-link (interface-side and
 witness-side sharing a key, generic body yielding a func).
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A user-named helper function lowers to func %helper with the signature on its Func(...) result type and parameters as Param children of the entry block. | functional | [#func](../../../docs/llm-generated/ir-reference/structure.md#func) | [`func-helper-signature.slang`](func-helper-signature.slang) |
@@ -66,8 +65,8 @@ witness-side sharing a key, generic body yielding a func).
 | Each row of a witness_table is a witness_table_entry pairing a requirementKey with the concrete satisfying function value. | functional | [#witnesstableentry-vs-interfacereqentry](../../../docs/llm-generated/ir-reference/structure.md#witnesstableentry-vs-interfacereqentry) | [`witness-table-entry-pairs.slang`](witness-table-entry-pairs.slang) |
 | Two distinct struct conformances to the same interface produce two distinct witness_tables both keyed by the same requirementKey. | functional | [#witnesstableentry-vs-interfacereqentry](../../../docs/llm-generated/ir-reference/structure.md#witnesstableentry-vs-interfacereqentry) | [`two-impls-share-requirement-key.slang`](two-impls-share-requirement-key.slang) |
 
-## Untested claims
 
+## Untested claims
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | **`global_generic_param`** — a `GenericTypeParamDecl` at module level (not nested under a `generic` parent) is non-trivial to produce from natural Slang surface code. | (unclassified) | [#globalgenericparam](../../../docs/llm-generated/ir-reference/structure.md#globalgenericparam) | Reason and explanation to be refined by the next regeneration. |
@@ -78,8 +77,8 @@ witness-side sharing a key, generic body yielding a func).
 | **`indexedFieldKey`** — `(synthesized)`; the doc lists no AST origin and the natural surface (tuple-like field access) does not produce it portably at LOWER-TO-IR. | link-stage-only | [#indexedfieldkey](../../../docs/llm-generated/ir-reference/structure.md#indexedfieldkey) | Synthesized at a later IR pass than this bundle's `pipeline_stage` observes; the test belongs in the bundle whose pipeline stage matches. |
 | **`TypeEqualityWitness`** — `(synthesized)`; no AST origin. | link-stage-only | [#typeequalitywitness](../../../docs/llm-generated/ir-reference/structure.md#typeequalitywitness) | Synthesized at a later IR pass than this bundle's `pipeline_stage` observes; the test belongs in the bundle whose pipeline stage matches. |
 
-## Doc gaps observed
 
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#generic](../../../docs/llm-generated/ir-reference/structure.md#generic) | undocumented-behavior | The doc's `### generic` notable-opcode discussion states "Each `generic` has a single block, and that block ends with a `yield` (not a `return_val`) whose operand is the result of the type- level computation." The actual LOWER-TO-IR dump shows `return_val(%func)` rather than a `yield`-spelled terminator — the `yield` opcode is the underlying instruction but the dump prints it as `return_val` at this stage. A clarifying note on the dump-vs-internal spelling would prevent test-author confusion. (See `generic-body-yields-func.slang`.) |  |

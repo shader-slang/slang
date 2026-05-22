@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for syntax-reference/tokens
 
 ## Intent
-
 Tests verify the lexer-surface behaviors described in
 [`docs/llm-generated/syntax-reference/tokens.md`](../../../docs/llm-generated/syntax-reference/tokens.md):
 how the source character stream becomes a token stream, including
@@ -25,8 +24,8 @@ This is the **pilot bundle** for Phase B1. It exercises the full
 agentic-test contract end-to-end on a tightly-scoped doc before the
 rest of the suite is bootstrapped.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A double-quoted `StringLiteral` is recognized by the lexer and its text content survives end-to-end through to emitted code. | functional | [#content-tokens](../../../docs/llm-generated/syntax-reference/tokens.md#content-tokens) | [`string-literal-basic.slang`](string-literal-basic.slang) |
@@ -64,8 +63,24 @@ rest of the suite is bootstrapped.
 | A `LineComment` (`// ...`) ends at the end of its physical line; code on the following line is not part of the comment. | functional | [#trivia-whitespace-and-comments](../../../docs/llm-generated/syntax-reference/tokens.md#trivia-whitespace-and-comments) | [`line-comment-ends-at-newline.slang`](line-comment-ends-at-newline.slang) |
 | Boundary - an empty block comment (`/**/`) is a valid BlockComment token and is removed from the token stream. | boundary | [#trivia-whitespace-and-comments](../../../docs/llm-generated/syntax-reference/tokens.md#trivia-whitespace-and-comments) | [`block-comment-empty.slang`](block-comment-empty.slang) |
 
-## Boundary / negative / stress probes (expansion pass)
 
+## Untested claims
+NA
+
+
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#lambda-requirement-binding](../../../docs/llm-generated/syntax-reference/tokens.md#lambda-requirement-binding) | undocumented-behavior | The doc describes `RightArrow` (`->`), `DoubleRightArrow` (`=>`), `Ellipsis` (`...`), and `Scope` (`::`) as punctuation tokens but does not state user-facing claims about their semantic role beyond one-line notes like "lambda / requirement-binding". Tests for these would need to anchor to `syntax-reference/grammar.md` or `ast-reference/expressions.md`, neither of which has been generated yet. Deferred to Phase C cross-link, or to expansion once those bundles exist. |  |
+| [#token-flags](../../../docs/llm-generated/syntax-reference/tokens.md#token-flags) | undocumented-behavior | The doc lists `TokenFlags::AtStartOfLine`, `AfterWhitespace`, and `ScrubbingNeeded` (under `#token-flags`) but these are internal lexer state with no surface observable consequence accessible via `slangc`. Recorded as undocumented-by-design rather than a doc gap. |  |
+| [#and](../../../docs/llm-generated/syntax-reference/tokens.md#and) | undocumented-behavior | Numeric literal suffixes beyond `u` and `f` (`l`, `ul`, `h`, `lf`, ...) are mentioned but not exhaustively enumerated. Expansion pass candidate once a definitive list is added to the doc. |  |
+| [#0x](../../../docs/llm-generated/syntax-reference/tokens.md#0x) | undocumented-behavior | Integer-literal bases (decimal / hex `0x` / octal `0` / binary `0b`) are exercised by the lexer but the doc does not enumerate the accepted prefixes. Boundary tests for each base now exist; the doc would benefit from a one-line note that all four bases are accepted. |  |
+| [#content-tokens](../../../docs/llm-generated/syntax-reference/tokens.md#content-tokens) | undocumented-behavior | Floating-point literal forms (trailing dot `1.`, leading dot `.5`, decimal exponent `1e3`, hexadecimal float `0x1.0p4`) are accepted by the lexer but only the generic "FloatingPointLiteral" row in `#content-tokens` is documented. | A short grammar note in `#content-tokens` listing the four accepted shapes would close this gap. |
+| [#special-case-lexing-rules](../../../docs/llm-generated/syntax-reference/tokens.md#special-case-lexing-rules) | missing-example | The interaction of `\<newline>` continuation with line comments (the comment swallows the next physical line because continuations are folded before comment recognition) is implied by the "consumed and folded out" wording in `#special-case-lexing-rules` but not stated explicitly. | A worked example in the doc would prevent a confusing-looking but correct behavior from surprising readers. |
+| [#diagnostics](../../../docs/llm-generated/syntax-reference/tokens.md#diagnostics) | undocumented-behavior | Documented diagnostics (`integer literal is too large to be represented in any integer type`, `invalid suffix on integer literal`, `illegal character literal`) have no explicit error codes / messages listed in `tokens.md`. The negative tests in this pass copy the diagnostic text verbatim from the compiler; promoting them to a "Diagnostics" subsection in the doc would let future authors anchor by claim ID rather than by free text. |  |
+
+
+## Boundary / negative / stress probes (expansion pass)
 This pass appends 25 additional tests that probe documented claims at
 their edges. The intents map as follows:
 
@@ -80,20 +95,3 @@ their edges. The intents map as follows:
 Every appended file uses the same `doc_ref` (and `doc_section_digest`)
 as the smoke test for the claim it probes; the boundaries are
 additional anchors of those same claims, not new ones.
-
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#lambda-requirement-binding](../../../docs/llm-generated/syntax-reference/tokens.md#lambda-requirement-binding) | undocumented-behavior | The doc describes `RightArrow` (`->`), `DoubleRightArrow` (`=>`), `Ellipsis` (`...`), and `Scope` (`::`) as punctuation tokens but does not state user-facing claims about their semantic role beyond one-line notes like "lambda / requirement-binding". Tests for these would need to anchor to `syntax-reference/grammar.md` or `ast-reference/expressions.md`, neither of which has been generated yet. Deferred to Phase C cross-link, or to expansion once those bundles exist. |  |
-| [#token-flags](../../../docs/llm-generated/syntax-reference/tokens.md#token-flags) | undocumented-behavior | The doc lists `TokenFlags::AtStartOfLine`, `AfterWhitespace`, and `ScrubbingNeeded` (under `#token-flags`) but these are internal lexer state with no surface observable consequence accessible via `slangc`. Recorded as undocumented-by-design rather than a doc gap. |  |
-| [#and](../../../docs/llm-generated/syntax-reference/tokens.md#and) | undocumented-behavior | Numeric literal suffixes beyond `u` and `f` (`l`, `ul`, `h`, `lf`, ...) are mentioned but not exhaustively enumerated. Expansion pass candidate once a definitive list is added to the doc. |  |
-| [#0x](../../../docs/llm-generated/syntax-reference/tokens.md#0x) | undocumented-behavior | Integer-literal bases (decimal / hex `0x` / octal `0` / binary `0b`) are exercised by the lexer but the doc does not enumerate the accepted prefixes. Boundary tests for each base now exist; the doc would benefit from a one-line note that all four bases are accepted. |  |
-| [#content-tokens](../../../docs/llm-generated/syntax-reference/tokens.md#content-tokens) | undocumented-behavior | Floating-point literal forms (trailing dot `1.`, leading dot `.5`, decimal exponent `1e3`, hexadecimal float `0x1.0p4`) are accepted by the lexer but only the generic "FloatingPointLiteral" row in `#content-tokens` is documented. | A short grammar note in `#content-tokens` listing the four accepted shapes would close this gap. |
-| [#special-case-lexing-rules](../../../docs/llm-generated/syntax-reference/tokens.md#special-case-lexing-rules) | missing-example | The interaction of `\<newline>` continuation with line comments (the comment swallows the next physical line because continuations are folded before comment recognition) is implied by the "consumed and folded out" wording in `#special-case-lexing-rules` but not stated explicitly. | A worked example in the doc would prevent a confusing-looking but correct behavior from surprising readers. |
-| [#diagnostics](../../../docs/llm-generated/syntax-reference/tokens.md#diagnostics) | undocumented-behavior | Documented diagnostics (`integer literal is too large to be represented in any integer type`, `invalid suffix on integer literal`, `illegal character literal`) have no explicit error codes / messages listed in `tokens.md`. The negative tests in this pass copy the diagnostic text verbatim from the compiler; promoting them to a "Diagnostics" subsection in the doc would let future authors anchor by claim ID rather than by free text. |  |
-
-## Untested claims
-
-(none)
-

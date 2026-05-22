@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for cross-cutting/core-module
 
 ## Intent
-
 Tests verify the core-module / GLSL-module / standard-module / prelude
 claims in
 [`docs/llm-generated/cross-cutting/core-module.md`](../../../docs/llm-generated/cross-cutting/core-module.md):
@@ -39,8 +38,8 @@ Multi-target where the claim is target-dependent (intrinsic /
 resource / vector lowering); single-target where the claim is
 module-identity (typedef resolves, `Optional<T>` compiles).
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | Boundary: HLSL meta-module Texture2D.Sample accepts the (0,0) corner UV and lowers per target. | boundary | [#core-module](../../../docs/llm-generated/cross-cutting/core-module.md#core-module) | [`texture-sample-uv-corner.slang`](texture-sample-uv-corner.slang) |
@@ -121,8 +120,20 @@ module-identity (typedef resolves, `Optional<T>` compiles).
 | The core module exposes `Optional<T>`; user code can declare and use `Optional<int>` without an explicit import. | functional | [#what-the-core-module-provides](../../../docs/llm-generated/cross-cutting/core-module.md#what-the-core-module-provides) | [`core-optional-type-usable.slang`](core-optional-type-usable.slang) |
 | The core module's `float64_t` typedef resolves and lowers to a 64-bit float spelling on HLSL (`double`) and CUDA (`double`). | functional | [#what-the-core-module-provides](../../../docs/llm-generated/cross-cutting/core-module.md#what-the-core-module-provides) | [`core-typedef-float64-resolves.slang`](core-typedef-float64-resolves.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+| Claim | Reason | Anchor | Why untested |
+| --- | --- | --- | --- |
+| DXIL / metallib / WGSL→SPIRV downstream paths and Torch / LLVM / Slang round-trip targets. | out-of-bundle | (unspecified) | The core-module doc routes these to the relevant `target-pipelines/*` bundles. |
+| The byte-for-byte embedded module artefact (a build product). | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| The `slang-standard-module-config.h.in` template machinery (internal build infrastructure). | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| The full intrinsic list (the doc explicitly disclaims enumerating it). | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| **Atomic-op intrinsics** (e.g. `InterlockedAdd`, `atomicAdd`, `OpAtomicIAdd`) — target-specific spellings, and prior agentic attempts have wasted iterations on them; skipped entirely. | (unclassified) | [#interlockedadd](../../../docs/llm-generated/cross-cutting/core-module.md#interlockedadd) | Reason and explanation to be refined by the next regeneration. |
+| The `SLANG_EMBED_CORE_MODULE` ON vs. OFF build option — affects how the compiler ships the module, not what user code sees. | (unclassified) | [#slangembedcoremodule](../../../docs/llm-generated/cross-cutting/core-module.md#slangembedcoremodule) | Reason and explanation to be refined by the next regeneration. |
+| The "Adding a new built-in" developer workflow (not a user- observable behaviour). | process-doc | [#adding-a-new-built-in](../../../docs/llm-generated/cross-cutting/core-module.md#adding-a-new-built-in) | Contributor walkthrough / process documentation, not a compiler behavior. |
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#core-module](../../../docs/llm-generated/cross-cutting/core-module.md#core-module) | undocumented-behavior | `#core-module` lists `__intrinsic_op` and `__target_intrinsic` as the modifier vocabulary mapping core-module declarations onto IR and per-target spellings, but the per-target spelling table for any specific intrinsic (e.g. `dot`, `length`, `mul`) is not enumerated in `cross-cutting/core-module.md` itself — tests had to discover SPIR-V spellings (`OpDot`, `Length`, `OpVectorTimesMatrix`) by inspection. |  |
@@ -138,15 +149,3 @@ module-identity (typedef resolves, `Optional<T>` compiles).
 | [#core-module](../../../docs/llm-generated/cross-cutting/core-module.md#core-module) | undocumented-behavior | `#core-module` lists `Texture2D` and `RWTexture2D` as the representative HLSL-named resource types but does not enumerate the full set of texture variants the HLSL meta-module surfaces (`Texture1D`, `Texture3D`, `TextureCube`, `Texture2DArray`, `TextureCubeArray`, `Texture2DMS`, `RWTexture1D`, `RWTexture3D`, `SamplerComparisonState`). Texture-variant expansion tests had to discover the per-target lowering (1D / 3D / Cube image dimensionality, multisampled image marker, Dref opcodes for shadow samplers) from emit inspection rather than from a doc table. |  |
 | [#core-module](../../../docs/llm-generated/cross-cutting/core-module.md#core-module) | undocumented-behavior | `#core-module` does not enumerate which sampling operations (`Sample`, `SampleLevel`, `SampleGrad`, `Load`, `GatherRed`, `SampleCmp`, `SampleCmpLevelZero`) are available on which texture variant, nor the per-variant coordinate shapes (e.g. `Texture3D.Load` takes `int4`, `Texture1D.Load` takes `int2`, `Texture2DMS.Load` takes `(int2, sampleIdx)`). These signatures were determined empirically from compiler errors. |  |
 | [#core-module](../../../docs/llm-generated/cross-cutting/core-module.md#core-module) | undocumented-behavior | `#core-module` does not name which texel-format generics (`float4` / `int4` / `uint4` / `unorm` / `snorm`) are valid on each texture variant, nor describe the per-target sampler-type flavouring (e.g. GLSL `utexture3D` for `uint4` content, `image1D` vs `uimage1D` for the RW variants). Format-variant tests probe only `float4` and `uint4` and leave the `unorm`/`snorm` admission status as a doc gap. |  |
-
-## Untested claims
-
-| Claim | Reason | Anchor | Why untested |
-| --- | --- | --- | --- |
-| DXIL / metallib / WGSL→SPIRV downstream paths and Torch / LLVM / Slang round-trip targets. | out-of-bundle | (unspecified) | The core-module doc routes these to the relevant `target-pipelines/*` bundles. |
-| The byte-for-byte embedded module artefact (a build product). | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
-| The `slang-standard-module-config.h.in` template machinery (internal build infrastructure). | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
-| The full intrinsic list (the doc explicitly disclaims enumerating it). | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
-| **Atomic-op intrinsics** (e.g. `InterlockedAdd`, `atomicAdd`, `OpAtomicIAdd`) — target-specific spellings, and prior agentic attempts have wasted iterations on them; skipped entirely. | (unclassified) | [#interlockedadd](../../../docs/llm-generated/cross-cutting/core-module.md#interlockedadd) | Reason and explanation to be refined by the next regeneration. |
-| The `SLANG_EMBED_CORE_MODULE` ON vs. OFF build option — affects how the compiler ships the module, not what user code sees. | (unclassified) | [#slangembedcoremodule](../../../docs/llm-generated/cross-cutting/core-module.md#slangembedcoremodule) | Reason and explanation to be refined by the next regeneration. |
-| The "Adding a new built-in" developer workflow (not a user- observable behaviour). | process-doc | [#adding-a-new-built-in](../../../docs/llm-generated/cross-cutting/core-module.md#adding-a-new-built-in) | Contributor walkthrough / process documentation, not a compiler behavior. |

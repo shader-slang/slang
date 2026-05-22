@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for ir-reference/metadata
 
 ## Intent
-
 Tests verify the per-opcode catalog of the IR *metadata* families
 described in
 [`docs/llm-generated/ir-reference/metadata.md`](../../../docs/llm-generated/ir-reference/metadata.md):
@@ -64,8 +63,8 @@ This bundle is adjacent to:
 - [`cross-cutting/ir-instructions`](../../cross-cutting/ir-instructions/)
   — the category-level view that samples each IR family once.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A structFieldLayout Attr opcode is emitted for each field inside a structTypeLayout; operands are the field key and a varLayout. | functional | [#attr-family](../../../docs/llm-generated/ir-reference/metadata.md#attr-family) | [`struct-field-layout-attr.slang`](struct-field-layout-attr.slang) |
@@ -93,23 +92,19 @@ This bundle is adjacent to:
 | Multiple varLayout opcodes coexist in one module: one for each uniform global, plus the EntryPointLayout's owned varLayouts. | functional | [#varlayout-and-entrypointlayout](../../../docs/llm-generated/ir-reference/metadata.md#varlayout-and-entrypointlayout) | [`varlayout-uniform-and-entry-point.slang`](varlayout-uniform-and-entry-point.slang) |
 | The layout pass synthesizes an EntryPointLayout opcode for each entry point; it owns a varLayout for the parameter group and a stage attribute. | functional | [#varlayout-and-entrypointlayout](../../../docs/llm-generated/ir-reference/metadata.md#varlayout-and-entrypointlayout) | [`entry-point-layout.slang`](entry-point-layout.slang) |
 
-## Untested coverable claims
-
-| Anchor | Backend | Claim | Why untested |
-| --- | --- | --- | --- |
-| [#snorm](../../../docs/llm-generated/ir-reference/metadata.md#snorm) | gpu-bindless | **Attr family — remaining niche attrs**: `snorm` (mirror of `unorm`; same AST origin mechanism, one test is sufficient), `Aligned` (synthesized; no stable AST surface observed), `MemoryScope` (synthesized on atomic/barrier operations after later passes), `caseLayout` (existential / enum-style layout; requires existential surface), `tupleFieldLayout` (tuple-layout-specific), `FuncThrowType` (synthesized — observed not to surface on `throws` functions in the dump points sampled by this bundle), `userSemantic` (the surface `: TEXCOORD0` lowers to `semantic("TEXCOORD0", ...)` decoration rather than to a separate `userSemantic` Attr opcode at the observation points sampled here). | Agent runtime has no GPU; CI / local machine does. |
-| [#streamoutputtypelayout](../../../docs/llm-generated/ir-reference/metadata.md#streamoutputtypelayout) | gpu-non-compute | **Layout family — remaining niche layout kinds**: `existentialTypeLayout` (requires existential-typed values visible to layout), `tupleTypeLayout` (tuples are lowered before layout in normal Slang surface), `ptrTypeLayout` (requires explicit pointer-typed laid-out variables). Each is observable in principle with the right surface but requires pipeline-specific scaffolding distinct from the per-opcode reference goal. | Agent runtime has no GPU; CI / local machine does. |
 
 ## Untested claims
-
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | **Debug-info family — niche debug opcodes**: `DebugInlinedAt`, `DebugInlinedVariable` (require an actual inlined call to be observable; would need a `[ForceInline]` helper plus a non-trivial scope), `DebugScope`, `DebugNoScope` (typically pinned to compound statements rather than top-level insts and harder to anchor in a small test), `DebugBuildIdentifier` (synthesized at SPIR-V emission with build-tooling-specific contents and pollutes the test with non-deterministic strings), `EmbeddedDownstreamIR` (requires a precompiled-library workflow, which is out of scope). | (unclassified) | [#debuginlinedat](../../../docs/llm-generated/ir-reference/metadata.md#debuginlinedat) | Reason and explanation to be refined by the next regeneration. |
 | **Debug info on inlined call sites**: `DebugInlinedAt` and `DebugInlinedVariable` require the inliner to actually inline a call under `-g`, which depends on inlining decisions and the order of passes — fragile per-test. | (unclassified) | [#debuginlinedat](../../../docs/llm-generated/ir-reference/metadata.md#debuginlinedat) | Reason and explanation to be refined by the next regeneration. |
 | **SPIRVAsmOperand opcode catalog**: the inline-asm operand opcodes (`SPIRVAsmOperandLiteral`, `SPIRVAsmOperandInst`, `SPIRVAsmOperandEnum`, `SPIRVAsmOperandBuiltinVar`, `SPIRVAsmOperandGLSL450Set`, `SPIRVAsmOperandDebugPrintfSet`, `SPIRVAsmOperandId`, `SPIRVAsmOperandResult`, `SPIRVAsmOperandConvertTexel`, `SPIRVAsmOperandRayPayloadFromLocation`, `SPIRVAsmOperandRayAttributeFromLocation`, `SPIRVAsmOperandRayCallableFromLocation`, `__truncate`, `__entryPoint`, `__sampledType`, `__imageType`, `__sampledImageType`) are typed operands of a `SPIRVAsmInst`. The dump prints them inline as the arguments of `SPIRVAsmInst(...)` (e.g. `result`, `param`), not as separately-named opcodes; observing each per-opcode spelling requires an inline-asm fragment exercising that operand kind and a parser of the printed operand syntax that is not stable across compiler versions. One representative `SPIRVAsm` / `SPIRVAsmInst` block is sampled instead. | (unclassified) | [#spirvasmoperandliteral](../../../docs/llm-generated/ir-reference/metadata.md#spirvasmoperandliteral) | Reason and explanation to be refined by the next regeneration. |
 
-## Doc gaps observed
+| **Attr family — remaining niche attrs**: `snorm` (mirror of `unorm`; same AST origin mechanism, one test is sufficient), `Aligned` (synthesized; no stable AST surface observed), `MemoryScope` (synthesized on atomic/barrier operations after later passes), `caseLayout` (existential / enum-style layout; requires existential surface), `tupleFieldLayout` (tuple-layout-specific), `FuncThrowType` (synthesized — observed not to surface on `throws` functions in the dump points sampled by this bundle), `userSemantic` (the surface `: TEXCOORD0` lowers to `semantic("TEXCOORD0", ...)` decoration rather than to a separate `userSemantic` Attr opcode at the observation points sampled here). | gpu-bindless | [#snorm](../../../docs/llm-generated/ir-reference/metadata.md#snorm) | Agent runtime has no GPU; CI / local machine does. |
+| **Layout family — remaining niche layout kinds**: `existentialTypeLayout` (requires existential-typed values visible to layout), `tupleTypeLayout` (tuples are lowered before layout in normal Slang surface), `ptrTypeLayout` (requires explicit pointer-typed laid-out variables). Each is observable in principle with the right surface but requires pipeline-specific scaffolding distinct from the per-opcode reference goal. | gpu-non-compute | [#streamoutputtypelayout](../../../docs/llm-generated/ir-reference/metadata.md#streamoutputtypelayout) | Agent runtime has no GPU; CI / local machine does. |
 
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | (unspecified) | undocumented-behavior | The Layout-family table lists every opcode's `AST origin` as `(synthesized)`, which is true at the LOWER-TO-IR boundary but is a one-shot loss of information: the layout opcodes *do* have a stable user-side AST surface that triggers them (e.g. `cbuffer X { ... }` → `parameterGroupTypeLayout`, `float arr[4]` field → `arrayTypeLayout`, `float4x4 m` field → `matrixTypeLayout`, `RWStructuredBuffer<T>` global → `structuredBufferTypeLayout`). Documenting the surface→layout-opcode mapping would make this table testable without exploration. |  |

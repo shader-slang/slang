@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for target-pipelines/spirv
 
 ## Intent
-
 Tests verify the SPIR-V direct-emit target pipeline described in
 [`docs/llm-generated/target-pipelines/spirv.md`](../../../docs/llm-generated/target-pipelines/spirv.md):
 the ordered IR-pass + emit sequence executed when
@@ -65,8 +64,8 @@ not part of this bundle. spirv-link / spirv-val / spirv-opt
 are downstream tools that don't change the emitted assembly
 text and are out of scope.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | spirv-val runs when -validate-spirv is passed (or SLANG_RUN_SPIRV_VALIDATION is set) — on a valid module the emit is unchanged and still carries the canonical OpCapability Shader / OpMemoryModel Logical GLSL450 prelude. | expansion | [#downstream-spirv-link-spirv-val-spirv-opt-chain](../../../docs/llm-generated/target-pipelines/spirv.md#downstream-spirv-link-spirv-val-spirv-opt-chain) | [`spirv-validation-flag-emit.slang`](spirv-validation-flag-emit.slang) |
@@ -202,8 +201,27 @@ text and are out of scope.
 | Compiling with -profile spirv_1_6 takes the shouldEmitDiscardAsDemote=true branch — discard lowers to OpDemoteToHelperInvocation (not a terminator), and the OpKill fix-up pass is skipped. | boundary | [#spir-v-specific-runtime-predicates](../../../docs/llm-generated/target-pipelines/spirv.md#spir-v-specific-runtime-predicates) | [`discard-spirv-16-demote.slang`](discard-spirv-16-demote.slang) |
 | Under SPIR-V 1.5 (the Slang default) discard lowers to OpKill — the documented "shouldEmitDiscardAsDemote returns false" branch where removeUnreachableCodeAfterDiscardForOpKill is active. | boundary | [#spir-v-specific-runtime-predicates](../../../docs/llm-generated/target-pipelines/spirv.md#spir-v-specific-runtime-predicates) | [`discard-fragment-opkill.slang`](discard-fragment-opkill.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+| Claim | Reason | Anchor | Why untested |
+| --- | --- | --- | --- |
+| **`autodiff` / `higherOrderFunc` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `finalizeAutoDiffPass`). | (unclassified) | [#autodiff](../../../docs/llm-generated/target-pipelines/spirv.md#autodiff) | Reason and explanation to be refined by the next regeneration. |
+| **Forward-declared-pointer fixup loop** (Phase D step 12). | (unclassified) | [#checkforrecursivetypes](../../../docs/llm-generated/target-pipelines/spirv.md#checkforrecursivetypes) | Only fires on recursive struct-pointer graphs. `checkForRecursiveTypes` errors out before Phase D for user-declared recursive structs. |
+| **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). | (unclassified) | [#coveragetracing](../../../docs/llm-generated/target-pipelines/spirv.md#coveragetracing) | Reason and explanation to be refined by the next regeneration. |
+| **`dynamicResourceHeap`** — SM 6.6 dynamic resource heap. | (unclassified) | [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/spirv.md#dynamicresourceheap) | Reason and explanation to be refined by the next regeneration. |
+| **`introduceExplicitGlobalContext`** — gated on `EnableExperimentalPasses`. | (unclassified) | [#introduceexplicitglobalcontext](../../../docs/llm-generated/target-pipelines/spirv.md#introduceexplicitglobalcontext) | Reason and explanation to be refined by the next regeneration. |
+| **`legalizeUniformBufferLoad`** — anchored to an IR-level canonicalization without a documented text-emit marker. | (unclassified) | [#legalizeuniformbufferload](../../../docs/llm-generated/target-pipelines/spirv.md#legalizeuniformbufferload) | Reason and explanation to be refined by the next regeneration. |
+| **`removeUnreachableCodeAfterDiscardForOpKill`** — requires `discard` and SPIR-V `< 1.6`; Slang defaults to `>= 1.5` and gates the pass on `!shouldEmitDiscardAsDemote()`. | (unclassified) | [#removeunreachablecodeafterdiscardforopkill](../../../docs/llm-generated/target-pipelines/spirv.md#removeunreachablecodeafterdiscardforopkill) | Reason and explanation to be refined by the next regeneration. |
+| **`simplifyIRForSpirvLegalization` outer/inner loop bounds** (`kMaxIterations = 8`, `kMaxFuncIterations = 16`). The loops terminate by fixed-point in practice; no documented user-source pattern hits the bound. | (unclassified) | [#simplifyirforspirvlegalization](../../../docs/llm-generated/target-pipelines/spirv.md#simplifyirforspirvlegalization) | Reason and explanation to be refined by the next regeneration. |
+| **`unexportNonEmbeddableIR`** — gated on `EmbedDownstreamIR`. | (unclassified) | [#unexportnonembeddableir](../../../docs/llm-generated/target-pipelines/spirv.md#unexportnonembeddableir) | Reason and explanation to be refined by the next regeneration. |
+| **Cross-target probes.** The bundle is single-target by design — SPIR-V observations only. "X fires on SPIR-V but Y doesn't" claims are documented in the `## Conditional gates` section of the doc but not exercised as multi-target CHECK tests in this bundle. | (unclassified) | [#x-fires-on-spir-v-but-y-doesnt](../../../docs/llm-generated/target-pipelines/spirv.md#x-fires-on-spir-v-but-y-doesnt) | Reason and explanation to be refined by the next regeneration. |
+| **Pass-ordering claims** (Phase A passes 1-19, Phase B passes 1-65, Phase C passes 1-41, Phase D steps 1-20). Pass _existence_ is observable via emit; pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |
+
+| **spirv-link**. | gpu-spirv-tools | [#downstream-spirv-link-spirv-val-spirv-opt-chain](../../../docs/llm-generated/target-pipelines/spirv.md#downstream-spirv-link-spirv-val-spirv-opt-chain) | Only invoked when `spirvFiles.getCount() > 1`, i.e. when there is an `IREmbeddedDownstreamIR` of `CodeGenTarget::SPIRV` to merge with the freshly emitted module. A single `//TEST:SIMPLE` directive cannot set up `-embed-downstream-ir` plus a pre-built `.slang-module` artifact; the multi-file `COMPILE` + `SIMPLE` chain is not in the `//TEST:SIMPLE`-only validation contract this bundle uses. |
+| **spirv-opt**. Invoked via the generic downstream path; options-dependent whether it changes anything. The inline `optimizeSPIRV` call site is `#if 0`'d out (doc-only). | gpu-spirv-tools | [#downstream-spirv-link-spirv-val-spirv-opt-chain](../../../docs/llm-generated/target-pipelines/spirv.md#downstream-spirv-link-spirv-val-spirv-opt-chain) | The downstream-compile invocation does not change the emitted spirv-asm text deterministically; FileCheck cannot pin an observable artifact. CI can observe whether spirv-opt fails on the emitted SPIR-V (a process-level signal), but that is outside the `-target spirv-asm` text the bundle checks. |
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools](../../../docs/llm-generated/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools) | undocumented-behavior | The doc enumerates the Phase D word-emission steps (`emitDebug`, `emitParams`, `emitEPs`, `emitFront`, `emitPhys`) but does not name the canonical SPIR-V text prelude markers (`; SPIR-V`, `; Version: 1.X`, `OpCapability Shader`, `OpMemoryModel Logical GLSL450`, `SPV_KHR_storage_buffer_storage_class`, `OpSource Slang 1`). | A one-line statement of these prelude facts would let a test anchor them precisely; the bundle anchors them to the general `#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools` section. |
@@ -228,26 +246,3 @@ text and are out of scope.
 | [#glslstd450](../../../docs/llm-generated/target-pipelines/spirv.md#glslstd450) | undocumented-behavior | The doc mentions `GLSL.std.450` only obliquely (the via-GLSL legacy path). The SPIR-V direct-emit path also relies on `OpExtInstImport "GLSL.std.450"` for transcendentals; this belongs in the doc's "common to all SPIR-V emit" list. |  |
 | [#spec-constants-emit-as-opspecconstant](../../../docs/llm-generated/target-pipelines/spirv.md#spec-constants-emit-as-opspecconstant) | undocumented-behavior | The doc does not name `OpSpecConstant` or the `[SpecializationConstant]` -> `SpecId` mapping. Specialization constants are core to Vulkan but the doc treats them as out of scope; a one-line "spec-constants emit as OpSpecConstant" note would let the bundle anchor that claim. |  |
 | [#oploopmerge](../../../docs/llm-generated/target-pipelines/spirv.md#oploopmerge) | undocumented-behavior | The doc names `OpLoopMerge` for structured control flow but does not state that `[unroll]` adds the `Unroll` annotation (and `[loop]` adds `DontUnroll`). Pinned by emit-experiment. |  |
-
-## Untested coverable claims
-
-| Anchor | Backend | Claim | Why untested |
-| --- | --- | --- | --- |
-| [#downstream-spirv-link-spirv-val-spirv-opt-chain](../../../docs/llm-generated/target-pipelines/spirv.md#downstream-spirv-link-spirv-val-spirv-opt-chain) | gpu-spirv-tools | **spirv-link**. | Only invoked when `spirvFiles.getCount() > 1`, i.e. when there is an `IREmbeddedDownstreamIR` of `CodeGenTarget::SPIRV` to merge with the freshly emitted module. A single `//TEST:SIMPLE` directive cannot set up `-embed-downstream-ir` plus a pre-built `.slang-module` artifact; the multi-file `COMPILE` + `SIMPLE` chain is not in the `//TEST:SIMPLE`-only validation contract this bundle uses. |
-| [#downstream-spirv-link-spirv-val-spirv-opt-chain](../../../docs/llm-generated/target-pipelines/spirv.md#downstream-spirv-link-spirv-val-spirv-opt-chain) | gpu-spirv-tools | **spirv-opt**. Invoked via the generic downstream path; options-dependent whether it changes anything. The inline `optimizeSPIRV` call site is `#if 0`'d out (doc-only). | The downstream-compile invocation does not change the emitted spirv-asm text deterministically; FileCheck cannot pin an observable artifact. CI can observe whether spirv-opt fails on the emitted SPIR-V (a process-level signal), but that is outside the `-target spirv-asm` text the bundle checks. |
-
-## Untested claims
-
-| Claim | Reason | Anchor | Why untested |
-| --- | --- | --- | --- |
-| **`autodiff` / `higherOrderFunc` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `finalizeAutoDiffPass`). | (unclassified) | [#autodiff](../../../docs/llm-generated/target-pipelines/spirv.md#autodiff) | Reason and explanation to be refined by the next regeneration. |
-| **Forward-declared-pointer fixup loop** (Phase D step 12). | (unclassified) | [#checkforrecursivetypes](../../../docs/llm-generated/target-pipelines/spirv.md#checkforrecursivetypes) | Only fires on recursive struct-pointer graphs. `checkForRecursiveTypes` errors out before Phase D for user-declared recursive structs. |
-| **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). | (unclassified) | [#coveragetracing](../../../docs/llm-generated/target-pipelines/spirv.md#coveragetracing) | Reason and explanation to be refined by the next regeneration. |
-| **`dynamicResourceHeap`** — SM 6.6 dynamic resource heap. | (unclassified) | [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/spirv.md#dynamicresourceheap) | Reason and explanation to be refined by the next regeneration. |
-| **`introduceExplicitGlobalContext`** — gated on `EnableExperimentalPasses`. | (unclassified) | [#introduceexplicitglobalcontext](../../../docs/llm-generated/target-pipelines/spirv.md#introduceexplicitglobalcontext) | Reason and explanation to be refined by the next regeneration. |
-| **`legalizeUniformBufferLoad`** — anchored to an IR-level canonicalization without a documented text-emit marker. | (unclassified) | [#legalizeuniformbufferload](../../../docs/llm-generated/target-pipelines/spirv.md#legalizeuniformbufferload) | Reason and explanation to be refined by the next regeneration. |
-| **`removeUnreachableCodeAfterDiscardForOpKill`** — requires `discard` and SPIR-V `< 1.6`; Slang defaults to `>= 1.5` and gates the pass on `!shouldEmitDiscardAsDemote()`. | (unclassified) | [#removeunreachablecodeafterdiscardforopkill](../../../docs/llm-generated/target-pipelines/spirv.md#removeunreachablecodeafterdiscardforopkill) | Reason and explanation to be refined by the next regeneration. |
-| **`simplifyIRForSpirvLegalization` outer/inner loop bounds** (`kMaxIterations = 8`, `kMaxFuncIterations = 16`). The loops terminate by fixed-point in practice; no documented user-source pattern hits the bound. | (unclassified) | [#simplifyirforspirvlegalization](../../../docs/llm-generated/target-pipelines/spirv.md#simplifyirforspirvlegalization) | Reason and explanation to be refined by the next regeneration. |
-| **`unexportNonEmbeddableIR`** — gated on `EmbedDownstreamIR`. | (unclassified) | [#unexportnonembeddableir](../../../docs/llm-generated/target-pipelines/spirv.md#unexportnonembeddableir) | Reason and explanation to be refined by the next regeneration. |
-| **Cross-target probes.** The bundle is single-target by design — SPIR-V observations only. "X fires on SPIR-V but Y doesn't" claims are documented in the `## Conditional gates` section of the doc but not exercised as multi-target CHECK tests in this bundle. | (unclassified) | [#x-fires-on-spir-v-but-y-doesnt](../../../docs/llm-generated/target-pipelines/spirv.md#x-fires-on-spir-v-but-y-doesnt) | Reason and explanation to be refined by the next regeneration. |
-| **Pass-ordering claims** (Phase A passes 1-19, Phase B passes 1-65, Phase C passes 1-41, Phase D steps 1-20). Pass _existence_ is observable via emit; pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |

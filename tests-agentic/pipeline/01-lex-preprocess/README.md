@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for pipeline/01-lex-preprocess
 
 ## Intent
-
 Tests verify the lex-and-preprocess pipeline behaviors described in
 [`docs/llm-generated/pipeline/01-lex-preprocess.md`](../../../docs/llm-generated/pipeline/01-lex-preprocess.md):
 the lexer's special-case handling (backslash continuation,
@@ -32,8 +31,8 @@ directive, unbalanced `#if`). Pure lex-surface claims that
 comment shapes, raw strings) are intentionally NOT duplicated
 here.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A `#if` directive with no matching `#endif` is reported as a preprocessor diagnostic. | negative | [#failure-modes](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#failure-modes) | [`unbalanced-if-diagnostic.slang`](unbalanced-if-diagnostic.slang) |
@@ -80,8 +79,12 @@ here.
 | `__FILE__` is a constructed token synthesized fresh at the use site; it expands to a string literal naming the current source file. | functional | [#source-location-preservation](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#source-location-preservation) | [`file-macro-is-constructed-token.slang`](file-macro-is-constructed-token.slang) |
 | `__LINE__` is a constructed token synthesized fresh at each use; it expands to the line number of the use site. | functional | [#source-location-preservation](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#source-location-preservation) | [`line-macro-is-constructed-token.slang`](line-macro-is-constructed-token.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+NA
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#source-location-preservation](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#source-location-preservation) | undocumented-behavior | The `## Source-location preservation` section distinguishes three categories of expansion-time tokens — raw body, argument, and constructed — but does not give a directly observable, no-GPU way to verify the **raw-body** vs **argument** distinction (e.g. that an argument token's spelling location remains the call-site rather than the macro body). The distinction is observed through diagnostics whose exact wording is not promised by the doc. Tests deferred until either the diagnostics doc commits to a specific message or the source doc adds an observable claim. |  |
@@ -96,8 +99,8 @@ here.
 | [#a-macro-that-references-its-own-name-in-its-body](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#a-macro-that-references-its-own-name-in-its-body) | undocumented-behavior | Recursive macro expansion ("a macro that references its own name in its body") is not explicitly addressed in the doc. The doc describes "fresh environment that maps parameter names to pseudo-macros" but does not commit to a recursion-detection rule. Boundary test deferred until the doc commits a claim. |  |
 | [#x](../../../docs/llm-generated/pipeline/01-lex-preprocess.md#x) | undocumented-behavior | The doc's `## Source-location preservation` lists `__LINE__`, `__FILE__`, `#x`, `x##y` as "constructed tokens" but does not discuss the `#line` directive's interaction with `__LINE__` (verified by `line-macro-after-line-directive.slang`). Suggestion: add a sentence noting that `#line N` shifts the logical counter used by constructed `__LINE__` tokens. |  |
 
-## Boundary / stress coverage added in expansion
 
+## Boundary / stress coverage added in expansion
 The expansion pass added boundary, stress, and negative probes
 against the axes called out in `_common.md` (Pressure the
 compiler):
@@ -133,8 +136,3 @@ Skipped boundary axes:
 - **Line continuation in `#include` path** — Slang does not
   document line-continuation behavior inside an include path
   specifically; no observable claim to anchor to.
-
-## Untested claims
-
-(none)
-

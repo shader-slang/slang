@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for ast-reference/base
 
 ## Intent
-
 Tests verify the abstract AST root classes described in
 [`docs/llm-generated/ast-reference/base.md`](../../../docs/llm-generated/ast-reference/base.md):
 `NodeBase`, `SyntaxNodeBase`, `SyntaxNode`, `Modifier`,
@@ -38,8 +37,8 @@ recorded under `## Untested claims` because they are
 internal to the compiler and unobservable through any test directive
 that does not link against the C++ AST headers.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | Every Decl carries a name and a parent ContainerDecl; the same simple name can live in two different parents and be disambiguated via member-access. | functional | [#decl-declbase](../../../docs/llm-generated/ast-reference/base.md#decl-declbase) | [`decl-name-and-parent.slang`](decl-name-and-parent.slang) |
@@ -55,16 +54,8 @@ that does not link against the C++ AST headers.
 | Every type the front end works with is a Type-as-Val; an ill-formed type expression at a declaration site cannot resolve to any Type and is diagnosed. | negative | [#type-val](../../../docs/llm-generated/ast-reference/base.md#type-val) | [`type-malformed-diagnoses.slang`](type-malformed-diagnoses.slang) |
 | Vals (including Types) are deduplicated by the ASTBuilder; two textually identical type expressions denote the same Val, so an overload set keyed on the type resolves identically at each use. | functional | [#val-nodebase](../../../docs/llm-generated/ast-reference/base.md#val-nodebase) | [`val-type-dedup-same-overload.slang`](val-type-dedup-same-overload.slang) |
 
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#decl-declbase](../../../docs/llm-generated/ast-reference/base.md#decl-declbase) | undocumented-behavior | The doc lists `Decl::inferredCapabilityRequirements` as a field filled in during checking but does not state a user-facing claim about when a capability mismatch is diagnosed; the doc points inward to a private field rather than outward to an observable behavior. The pipeline pages already cover the capability gate; a one-line cross-link from `#decl-declbase` to `pipeline/03-semantic-check.md` (or to a future capabilities doc) would let an agent anchor a capability-check test here. |  |
-| [#declcheckstate](../../../docs/llm-generated/ast-reference/base.md#declcheckstate) | undocumented-behavior | The doc mentions `Decl::checkState` (which checking phases have completed) without stating any externally-observable consequence of `checkState`. The phased-check sequencing is described in `pipeline/03-semantic-check.md`; the cross-reference is implicit. |  |
-| (unspecified) | undocumented-behavior | The doc lists `Modifier::keywordName: Name*` but does not name a user-facing consequence of the keyword name beyond appearing in diagnostics. The diagnostic-text dependency is implicit and worth a one-line note. |  |
 
 ## Untested claims
-
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | `NodeBase::_astBuilder` back-pointer — private field; not observable. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
@@ -76,3 +67,11 @@ that does not link against the C++ AST headers.
 | `Type::m_astBuilderForReflection` — reflection-only field; not reachable through `slangc` text output we can FileCheck without GPU-bound runtime APIs. | (unclassified) | [#slangc](../../../docs/llm-generated/ast-reference/base.md#slangc) | Reason and explanation to be refined by the next regeneration. |
 | `as<T>()` / `dynamicCast<T>()` dispatch on AST nodes — internal C++ API. | needs-unit-test | (unspecified) | No slangc CLI surface reaches this. A C++ unit test in `tools/slang-unit-test/` could exercise the relevant compiler internals directly. |
 | `SyntaxClass<T>` reflection handle — internal C++ type. | needs-unit-test | (unspecified) | No slangc CLI surface reaches this. A C++ unit test in `tools/slang-unit-test/` could exercise the relevant compiler internals directly. |
+
+
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#decl-declbase](../../../docs/llm-generated/ast-reference/base.md#decl-declbase) | undocumented-behavior | The doc lists `Decl::inferredCapabilityRequirements` as a field filled in during checking but does not state a user-facing claim about when a capability mismatch is diagnosed; the doc points inward to a private field rather than outward to an observable behavior. The pipeline pages already cover the capability gate; a one-line cross-link from `#decl-declbase` to `pipeline/03-semantic-check.md` (or to a future capabilities doc) would let an agent anchor a capability-check test here. |  |
+| [#declcheckstate](../../../docs/llm-generated/ast-reference/base.md#declcheckstate) | undocumented-behavior | The doc mentions `Decl::checkState` (which checking phases have completed) without stating any externally-observable consequence of `checkState`. The phased-check sequencing is described in `pipeline/03-semantic-check.md`; the cross-reference is implicit. |  |
+| (unspecified) | undocumented-behavior | The doc lists `Modifier::keywordName: Name*` but does not name a user-facing consequence of the keyword name beyond appearing in diagnostics. The diagnostic-text dependency is implicit and worth a one-line note. |  |

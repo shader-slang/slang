@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for target-pipelines/hlsl
 
 ## Intent
-
 Tests verify the HLSL target pipeline described in
 [`docs/llm-generated/target-pipelines/hlsl.md`](../../../docs/llm-generated/target-pipelines/hlsl.md):
 the ordered IR-pass sequence run by `linkAndOptimizeIR` and
@@ -47,8 +46,8 @@ One file (`non-khronos-hlsl-vs-glsl-buffer.slang`) carries a
 second `-target glsl` directive because the claim is
 specifically about HLSL being non-Khronos.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | collectCooperativeMetadata runs when target capabilities imply cooperative_matrix or cooperative_vector; a CoopVec compute kernel under -profile cs_6_9 emits HLSL that retains the cooperative-vector spelling and the byte-address buffer storage backing it. | expansion | [#collectcooperativemetadata](../../../docs/llm-generated/target-pipelines/hlsl.md#collectcooperativemetadata) | [`collect-cooperative-metadata-coopvec.slang`](collect-cooperative-metadata-coopvec.slang) |
@@ -195,8 +194,18 @@ specifically about HLSL being non-Khronos.
 | wrapStructuredBuffersOfMatrices does NOT wrap a non-matrix element type; a StructuredBuffer<int> stays as RWStructuredBuffer<int>. | functional | [#wrapstructuredbuffersofmatrices](../../../docs/llm-generated/target-pipelines/hlsl.md#wrapstructuredbuffersofmatrices) | [`structured-buffer-of-int-no-wrap.slang`](structured-buffer-of-int-no-wrap.slang) |
 | wrapStructuredBuffersOfMatrices wraps a matrix-typed StructuredBuffer element in a single-field struct so pack_matrix applies. | functional | [#wrapstructuredbuffersofmatrices](../../../docs/llm-generated/target-pipelines/hlsl.md#wrapstructuredbuffersofmatrices) | [`wrap-structured-buffer-of-matrix.slang`](wrap-structured-buffer-of-matrix.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+| Claim | Reason | Anchor | Why untested |
+| --- | --- | --- | --- |
+| **`autodiff` / `higherOrderFunc` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `finalizeAutoDiffPass`, etc.). The doc anchors them to Phase B but the emit-stage observable is a downstream language feature; covered by other bundles. | (unclassified) | [#autodiff](../../../docs/llm-generated/target-pipelines/hlsl.md#autodiff) | Reason and explanation to be refined by the next regeneration. |
+| **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). Coverage instrumentation is a debugging flag, not user-observable through text emit. | (unclassified) | [#coveragetracing](../../../docs/llm-generated/target-pipelines/hlsl.md#coveragetracing) | Reason and explanation to be refined by the next regeneration. |
+| **`dynamicResourceHeap`**. | (unclassified) | [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/hlsl.md#dynamicresourceheap) | Requires the SM 6.6 dynamic resource heap setup. |
+| **`legalizeUniformBufferLoad`** (`#legalizeuniformbufferload`). The doc anchors it as an IR-level canonicalization without naming an emit marker. | (unclassified) | [#legalizeuniformbufferload](../../../docs/llm-generated/target-pipelines/hlsl.md#legalizeuniformbufferload) | Reason and explanation to be refined by the next regeneration. |
+| **Pass-ordering claims** (Phase A passes 1-20, Phase B passes 1-63, Phase C passes 1-31). The doc enumerates the ordered list; pass _existence_ is observable through emit side effects, but pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#pragma](../../../docs/llm-generated/target-pipelines/hlsl.md#pragma) | undocumented-behavior | The doc's Phase D table mentions the `HLSLSourceEmitter` and the emit step but does not name `#pragma pack_matrix(column_major)` as the canonical HLSL prelude marker, or describe the `#ifdef SLANG_HLSL_ENABLE_NVAPI` guarded `nvHLSLExtns.h` include. | A one-line statement of these two emit-prelude facts would let a test anchor them precisely; this bundle anchors them to the general `#phase-d-hlsl-emit-and-downstream-tools` section. |
@@ -210,17 +219,3 @@ specifically about HLSL being non-Khronos.
 | [#source](../../../docs/llm-generated/target-pipelines/hlsl.md#source) | undocumented-behavior | The doc's `## Source` table cites line numbers (`linkAndOptimizeIR` at line ~893, `emitEntryPointsSourceFromIR` at line ~2418, the `HLSLSourceEmitter` constructor at line ~2507). These are navigation aids and not user-observable; no test. |  |
 | [#hlsl-has-no-iterative-passes-in-linkandoptimizeir](../../../docs/llm-generated/target-pipelines/hlsl.md#hlsl-has-no-iterative-passes-in-linkandoptimizeir) | undocumented-behavior | The doc states "HLSL has no iterative passes in `linkAndOptimizeIR`" but the consequence ("no extra simplification loop in the pass log") is not observable through `slangc -target hlsl` text. No test. |  |
 | [#phase-d-hlsl-emit-and-downstream-tools](../../../docs/llm-generated/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools) | undocumented-behavior | The doc's Phase D table mentions `HLSLSourceEmitter` walks the IR and writes HLSL text, but does not enumerate which texture variants survive (`Texture1D`, `Texture2DArray`, `TextureCubeArray`, `Texture2DMS<T,N>`, `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `SamplerComparisonState`) nor the canonical method spellings (`Sample`, `SampleLevel`, `SampleGrad`, `Load`, `GatherRed`/`GatherGreen`/`GatherBlue`/`GatherAlpha`, `SampleCmp`, `SampleCmpLevelZero`). | A one-line statement that each Slang texture/sampler variant emits as the same HLSL native type name with the matching `register(t\|u\|s)` class would let tests anchor more precisely than the general `#phase-d-hlsl-emit-and-downstream-tools` section. |
-
-## Untested coverable claims
-
-(none)
-
-## Untested claims
-
-| Claim | Reason | Anchor | Why untested |
-| --- | --- | --- | --- |
-| **`autodiff` / `higherOrderFunc` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `finalizeAutoDiffPass`, etc.). The doc anchors them to Phase B but the emit-stage observable is a downstream language feature; covered by other bundles. | (unclassified) | [#autodiff](../../../docs/llm-generated/target-pipelines/hlsl.md#autodiff) | Reason and explanation to be refined by the next regeneration. |
-| **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). Coverage instrumentation is a debugging flag, not user-observable through text emit. | (unclassified) | [#coveragetracing](../../../docs/llm-generated/target-pipelines/hlsl.md#coveragetracing) | Reason and explanation to be refined by the next regeneration. |
-| **`dynamicResourceHeap`**. | (unclassified) | [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/hlsl.md#dynamicresourceheap) | Requires the SM 6.6 dynamic resource heap setup. |
-| **`legalizeUniformBufferLoad`** (`#legalizeuniformbufferload`). The doc anchors it as an IR-level canonicalization without naming an emit marker. | (unclassified) | [#legalizeuniformbufferload](../../../docs/llm-generated/target-pipelines/hlsl.md#legalizeuniformbufferload) | Reason and explanation to be refined by the next regeneration. |
-| **Pass-ordering claims** (Phase A passes 1-20, Phase B passes 1-63, Phase C passes 1-31). The doc enumerates the ordered list; pass _existence_ is observable through emit side effects, but pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |

@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for architecture/module-map
 
 ## Intent
-
 Tests verify the slangc-observable consequences of the subsystems
 enumerated in
 [`docs/llm-generated/architecture/module-map.md`](../../../docs/llm-generated/architecture/module-map.md).
@@ -40,8 +39,8 @@ module also backs the GLSL frontend reached via `-allow-glsl`; (e)
 the `prelude/` directory ships per-target prelude headers that are
 literally `#include`d in the emitted text for CUDA and C++ targets.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | The "Code emission" table lists an emit dispatcher and per-target backends for HLSL, GLSL, SPIR-V, Metal, WGSL, CPP, and CUDA; the same source compiles to each. | functional | [#code-emission](../../../docs/llm-generated/architecture/module-map.md#code-emission) | [`emit-dispatcher-multi-target.slang`](emit-dispatcher-multi-target.slang) |
@@ -51,19 +50,8 @@ literally `#include`d in the emitted text for CUDA and C++ targets.
 | The GLSL module (glsl.meta.slang) is embedded into libslang; `import glsl;` resolves with no extra search path. | functional | [#sourceslang-glsl-module-embedded-glsl-module](../../../docs/llm-generated/architecture/module-map.md#sourceslang-glsl-module-embedded-glsl-module) | [`glsl-module-import.slang`](glsl-module-import.slang) |
 | The GLSL module also backs the GLSL frontend; with `-allow-glsl`, slangc accepts GLSL source syntax and round-trips it to GLSL emit. | functional | [#sourceslang-glsl-module-embedded-glsl-module](../../../docs/llm-generated/architecture/module-map.md#sourceslang-glsl-module-embedded-glsl-module) | [`allow-glsl-frontend.slang`](allow-glsl-frontend.slang) |
 
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#code-emission](../../../docs/llm-generated/architecture/module-map.md#code-emission) | undocumented-behavior | The `## Code emission` table names a "Dispatcher" row (`slang-emit.cpp` "Selects backend per `TargetRequest`") and per-target rows, but does not state the **CLI spelling** of the selector (`-target hlsl\|glsl\|spirv\|spirv-asm\|metal\|wgsl\|cuda\|cpp`). The mapping from logical backend to the `-target` spelling has to be discovered from `slangc -help`; a one-line addition to each row would let future bundles anchor backend-specific tests by anchor. |  |
-| [#other-source-subdirectories](../../../docs/llm-generated/architecture/module-map.md#other-source-subdirectories) | undocumented-behavior | The `## Other source/ subdirectories` table lists `slang-llvm`, `slang-glslang`, `slang-dispatcher`, `slang-rt`, `slang-record-replay`, `slang-wasm`, and `slangc`, each with a one-line role. None of these roles are reachable from the agentic runner except `slangc` (trivially: any test runs it). The doc could note which roles are CLI-observable so future bundles can decide whether to skip the row entirely. |  |
-| [#prelude](../../../docs/llm-generated/architecture/module-map.md#prelude) | undocumented-behavior | The `## prelude/` table lists `slang-llvm.h` as the "`slang-llvm` integration" prelude, but the LLVM/JIT integration is a downstream-compiler concern, not a textual emit. There is no obvious slangc CLI consequence of that prelude's existence (no `-target llvm-prelude` exists). The doc could mark prelude rows that are inlineable from CLI text-emit vs those that are linked only when the runtime embeds them. |  |
-| [#sourcestandard-modules-standard-libraries-row-lists-a](../../../docs/llm-generated/architecture/module-map.md#sourcestandard-modules-standard-libraries-row-lists-a) | undocumented-behavior | The doc's "## source/standard-modules/ — standard libraries" row lists a `neural/` module. Loading it requires `-experimental-feature` and the doc does not commit to a CLI shape; no test is anchored here. If standard modules become a shipped, default-on feature, an `import neural;` test would belong here. |  |
-| [#ir-passes](../../../docs/llm-generated/architecture/module-map.md#ir-passes) | undocumented-behavior | The "IR passes" section explicitly defers per-pass enumeration to `pipeline/05-ir-passes.md` but lists six category groupings (cleanup, specialization, differentiation, layout, validation, target-specific lowering) with example file prefixes. None of these have a slangc CLI observable that isn't already covered by general emit tests. Recorded as a no-op gap: the doc is appropriately silent here, but a reader may expect tests anchored on this section to exist and find none. |  |
-| [#cross-cutting](../../../docs/llm-generated/architecture/module-map.md#cross-cutting) | undocumented-behavior | The "Cross-cutting" subsection points to dedicated docs for diagnostics, capabilities, profiles, and serialization. Each has its own bundle (or should); the module-map doc's role is pure navigation, so no module-map-anchored tests are written for those subsystems. |  |
 
 ## Untested claims
-
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | That `source/core/` contains `slang-basic.h`, `slang-array.h`, `slang-string.h`, `slang-list.h`, `slang-dictionary.h`, `slang-hash.h`, `slang-blob.h`, `slang-file-system.h`, `slang-smart-pointer.h`, `slang-allocator.h`, and the rest of the listed utility headers. File-system facts. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
@@ -92,3 +80,14 @@ literally `#include`d in the emitted text for CUDA and C++ targets.
 | That the file enumeration corresponds to the recorded `source_commit` in the doc's front matter. A reproducibility contract, not slangc behavior. | (unclassified) | [#sourcecommit](../../../docs/llm-generated/architecture/module-map.md#sourcecommit) | Reason and explanation to be refined by the next regeneration. |
 | The AST file inventory: `slang-ast-forward-declarations.h`, `slang-ast-base.{h,cpp}`, `slang-ast-all.h`, `slang-ast-decl.{h,cpp}`, `slang-ast-decl-ref.cpp`, `slang-ast-expr.h`, `slang-ast-stmt.h`, `slang-ast-type.{h,cpp}`, `slang-ast-modifier.{h,cpp}`, `slang-ast-val.{h,cpp}`, `slang-ast-builder.{h,cpp}`, `slang-ast-dispatch.h`, `slang-ast-iterator.h`, `slang-ast-dump.{h,cpp}`, `slang-ast-print.{h,cpp}`, `slang-ast-synthesis.{h,cpp}`, `slang-ast-natural-layout.{h,cpp}`, `slang-ast-support-types.{h,cpp}`, `slang-ast-boilerplate.cpp`. A C++ class hierarchy is not CLI-visible. | needs-unit-test | (unspecified) | No slangc CLI surface reaches this. A C++ unit test in `tools/slang-unit-test/` could exercise the relevant compiler internals directly. |
 | That `IRBuilder`, `IRInst`, `IRModule`, `Token`, `TokenKind`, `SourceManager`, `Linkage`, `Session`, `Module`, `IComponentType` exist as C++ classes / types in the cited files. C++ identity is invisible to the CLI; the relevant user-surface behaviors live in their respective subsystem bundles. | needs-unit-test | [#irbuilder](../../../docs/llm-generated/architecture/module-map.md#irbuilder) | No slangc CLI surface reaches this. A C++ unit test in `tools/slang-unit-test/` could exercise the relevant compiler internals directly. |
+
+
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#code-emission](../../../docs/llm-generated/architecture/module-map.md#code-emission) | undocumented-behavior | The `## Code emission` table names a "Dispatcher" row (`slang-emit.cpp` "Selects backend per `TargetRequest`") and per-target rows, but does not state the **CLI spelling** of the selector (`-target hlsl\|glsl\|spirv\|spirv-asm\|metal\|wgsl\|cuda\|cpp`). The mapping from logical backend to the `-target` spelling has to be discovered from `slangc -help`; a one-line addition to each row would let future bundles anchor backend-specific tests by anchor. |  |
+| [#other-source-subdirectories](../../../docs/llm-generated/architecture/module-map.md#other-source-subdirectories) | undocumented-behavior | The `## Other source/ subdirectories` table lists `slang-llvm`, `slang-glslang`, `slang-dispatcher`, `slang-rt`, `slang-record-replay`, `slang-wasm`, and `slangc`, each with a one-line role. None of these roles are reachable from the agentic runner except `slangc` (trivially: any test runs it). The doc could note which roles are CLI-observable so future bundles can decide whether to skip the row entirely. |  |
+| [#prelude](../../../docs/llm-generated/architecture/module-map.md#prelude) | undocumented-behavior | The `## prelude/` table lists `slang-llvm.h` as the "`slang-llvm` integration" prelude, but the LLVM/JIT integration is a downstream-compiler concern, not a textual emit. There is no obvious slangc CLI consequence of that prelude's existence (no `-target llvm-prelude` exists). The doc could mark prelude rows that are inlineable from CLI text-emit vs those that are linked only when the runtime embeds them. |  |
+| [#sourcestandard-modules-standard-libraries-row-lists-a](../../../docs/llm-generated/architecture/module-map.md#sourcestandard-modules-standard-libraries-row-lists-a) | undocumented-behavior | The doc's "## source/standard-modules/ — standard libraries" row lists a `neural/` module. Loading it requires `-experimental-feature` and the doc does not commit to a CLI shape; no test is anchored here. If standard modules become a shipped, default-on feature, an `import neural;` test would belong here. |  |
+| [#ir-passes](../../../docs/llm-generated/architecture/module-map.md#ir-passes) | undocumented-behavior | The "IR passes" section explicitly defers per-pass enumeration to `pipeline/05-ir-passes.md` but lists six category groupings (cleanup, specialization, differentiation, layout, validation, target-specific lowering) with example file prefixes. None of these have a slangc CLI observable that isn't already covered by general emit tests. Recorded as a no-op gap: the doc is appropriately silent here, but a reader may expect tests anchored on this section to exist and find none. |  |
+| [#cross-cutting](../../../docs/llm-generated/architecture/module-map.md#cross-cutting) | undocumented-behavior | The "Cross-cutting" subsection points to dedicated docs for diagnostics, capabilities, profiles, and serialization. Each has its own bundle (or should); the module-map doc's role is pure navigation, so no module-map-anchored tests are written for those subsystems. |  |

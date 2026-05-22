@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for cross-cutting/targets
 
 ## Intent
-
 Tests verify the target-abstraction claims in
 [`docs/llm-generated/cross-cutting/targets.md`](../../../docs/llm-generated/cross-cutting/targets.md):
 the relationship between `TargetRequest`, `Profile`, and capability
@@ -29,8 +28,8 @@ cross-target behavior.
 > framework lesson, captured below under `## Framework feedback for
 > _common.md`.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A `[require(hlsl, glsl)]` conjunction populates the `target` keyhole with two different atoms; the doc says such conjunctions are incompatible and the compiler rejects with `E36111: disallowed capability`. | negative | [#capability-system](../../../docs/llm-generated/cross-cutting/targets.md#capability-system) | [`capability-conflict-two-target-atoms-rejected.slang`](capability-conflict-two-target-atoms-rejected.slang) |
@@ -70,8 +69,19 @@ cross-target behavior.
 | A stage atom (`compute`) populates the `stage` keyhole; a target atom (`hlsl`, `glsl`, `spirv`, ...) populates the `target` keyhole. Because they populate different keyholes a `compute` entry point is compatible with every text-emit target. | functional | [#vocabulary](../../../docs/llm-generated/cross-cutting/targets.md#vocabulary) | [`capability-conjunction-stage-and-target.slang`](capability-conjunction-stage-and-target.slang) |
 | The stage / target keyhole independence claim extends to `cuda`: a `compute` entry point conjoined with the `cuda` target atom is a valid combination (different keyholes), mirroring the C-01 smoke probe at a single specific target. | boundary | [#vocabulary](../../../docs/llm-generated/cross-cutting/targets.md#vocabulary) | [`capability-stage-and-target-conjunction-cuda.slang`](capability-stage-and-target-conjunction-cuda.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+| Claim | Reason | Anchor | Why untested |
+| --- | --- | --- | --- |
+| WebGPU runtime tests. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| LLVM-native binary emission. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| Slang round-trip (`-target slang`). | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| VM byte-code target (`-target hostvm`). | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| Any test that needs runtime device enumeration. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
+| Torch glue / `slang-python` bindings. | (unclassified) | [#slang-python](../../../docs/llm-generated/cross-cutting/targets.md#slang-python) | Reason and explanation to be refined by the next regeneration. |
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#targets](../../../docs/llm-generated/cross-cutting/targets.md#targets) | undocumented-behavior | `## Targets` enumerates DXIL/MSL-binary/WebGPU-binary as binary output formats but does not state which combinations of `-target` + `-profile` produce them via slangc CLI vs. via the runtime API. |  |
@@ -84,23 +94,8 @@ cross-target behavior.
 | [#capability-system](../../../docs/llm-generated/cross-cutting/targets.md#capability-system) | undocumented-behavior | The `-restrictive-capability-check` flag is exercised by tests but not named in `## Capability system`; only the "Computing the join" bullet under Runtime representation hints at its role. |  |
 | (unspecified) | undocumented-behavior | Per-target stage rejection (e.g. fragment-on-cuda) is not robust: one observed shape produced a SIGSEGV rather than a clean diagnostic. | The doc should state which stage × target pairs are rejected at check time vs. accepted vs. unsupported. |
 
-## Untested coverable claims
-
-(none)
-
-## Untested claims
-
-| Claim | Reason | Anchor | Why untested |
-| --- | --- | --- | --- |
-| WebGPU runtime tests. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
-| LLVM-native binary emission. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
-| Slang round-trip (`-target slang`). | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
-| VM byte-code target (`-target hostvm`). | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
-| Any test that needs runtime device enumeration. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
-| Torch glue / `slang-python` bindings. | (unclassified) | [#slang-python](../../../docs/llm-generated/cross-cutting/targets.md#slang-python) | Reason and explanation to be refined by the next regeneration. |
 
 ## Framework feedback for \_common.md
-
 A diagnostic test whose CHECK text mismatches the actual compiler
 message by a single token (e.g. `entry point` vs. `entrypoint`) can
 cause the runner to drop into an iterative "find the right CHECK"

@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for name-resolution/visibility
 
 ## Intent
-
 Tests verify the visibility-enforcement behaviors described in
 [`docs/llm-generated/name-resolution/visibility.md`](../../../docs/llm-generated/name-resolution/visibility.md):
 which decl/scope pairs are accepted by
@@ -39,8 +38,8 @@ decl invisible from a different module) cannot be expressed in a
 single file with the agentic runner and is captured under
 "Out of scope (single-file runner)" below.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A `public` field of a less-visible (internal) struct type inside a `public` aggregate is rejected with `use-of-less-visible-type`. | negative | [#container-level-cap](../../../docs/llm-generated/name-resolution/visibility.md#container-level-cap) | [`public-field-of-less-visible-type-rejected.slang`](public-field-of-less-visible-type-rejected.slang) |
@@ -60,18 +59,18 @@ single file with the agentic runner and is captured under
 | A private member declared in one `extension S` is reachable from another `extension S` because both extensions resolve to the same target type. | functional | [#where-visibility-is-filtered](../../../docs/llm-generated/name-resolution/visibility.md#where-visibility-is-filtered) | [`private-callable-from-sibling-extension.slang`](private-callable-from-sibling-extension.slang) |
 | `isDeclVisibleFromScope` treats an extension on the same type as inside the aggregate; a private member is reachable from that extension. | functional | [#where-visibility-is-filtered](../../../docs/llm-generated/name-resolution/visibility.md#where-visibility-is-filtered) | [`private-callable-from-extension-on-same-type.slang`](private-callable-from-extension-on-same-type.slang) |
 
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#per-keyword-semantics](../../../docs/llm-generated/name-resolution/visibility.md#per-keyword-semantics) | undocumented-behavior | The "Per-keyword semantics" section claims `private` is visible "inside the declaring container — that is, the same aggregate type (`struct`, `class`, `interface`, ...) **or the same namespace**." In practice the compiler rejects a `private` decl declared directly inside a `namespace` block with `invalid-use-of-private-visibility` (because `isGlobalDecl(decl)` returns true for namespace-scope decls in `slang-check-modifier.cpp` around line 1971). | The doc should clarify that `private` works for aggregate-type members only, or describe the namespace-scope path that triggers the diagnostic. |
-| [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/visibility.md#edge-cases-and-failure-modes) | undocumented-behavior | The "Edge cases and failure modes" section lists `invalid-use-of-private-visibility` as firing for "a top-level decl … marked `private`," but the same diagnostic also fires for interface requirements (see `private-interface-requirement-rejected.slang`). A second bullet enumerating the interface-requirement case would make the failure-mode list complete. |  |
-| [#defaults-by-language-version](../../../docs/llm-generated/name-resolution/visibility.md#defaults-by-language-version) | undocumented-behavior | "Defaults by language version" describes the legacy-language default of `public` for unannotated decls, but does not surface a single-file way to observe that default. Today the default is only observable across `import` boundaries between modules of different language versions, which the single-file agentic runner cannot express. |  |
 
 ## Untested claims
-
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | Language-server-mode "return unfiltered result" behaviour from `filterLookupResultByVisibilityAndDiagnose`. The agentic runner exercises `slangc` / `slangi`, not the LSP code path. | (unclassified) | [#filterlookupresultbyvisibilityanddiagnose](../../../docs/llm-generated/name-resolution/visibility.md#filterlookupresultbyvisibilityanddiagnose) | Reason and explanation to be refined by the next regeneration. |
 | Cross-module `import`-time visibility: confirming that an `internal` decl in module A is invisible from a separate module B's importing scope (the `getModuleDecl(decl) == getModuleDecl(scope)` branch of `isDeclVisibleFromScope`). This requires two separately-compiled translation units that the single-file agentic tests cannot host. Coverage exists in `tests/diagnostics/extension-visibility*.slang`. | (unclassified) | [#import](../../../docs/llm-generated/name-resolution/visibility.md#import) | Reason and explanation to be refined by the next regeneration. |
 | Legacy-language-default (`SLANG_LANGUAGE_VERSION_LEGACY`) `public` behaviour. Observing the default's effect requires a modern-language consumer importing a legacy module; same multi-file limitation. | (unclassified) | [#slanglanguageversionlegacy](../../../docs/llm-generated/name-resolution/visibility.md#slanglanguageversionlegacy) | Reason and explanation to be refined by the next regeneration. |
+
+
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#per-keyword-semantics](../../../docs/llm-generated/name-resolution/visibility.md#per-keyword-semantics) | undocumented-behavior | The "Per-keyword semantics" section claims `private` is visible "inside the declaring container — that is, the same aggregate type (`struct`, `class`, `interface`, ...) **or the same namespace**." In practice the compiler rejects a `private` decl declared directly inside a `namespace` block with `invalid-use-of-private-visibility` (because `isGlobalDecl(decl)` returns true for namespace-scope decls in `slang-check-modifier.cpp` around line 1971). | The doc should clarify that `private` works for aggregate-type members only, or describe the namespace-scope path that triggers the diagnostic. |
+| [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/visibility.md#edge-cases-and-failure-modes) | undocumented-behavior | The "Edge cases and failure modes" section lists `invalid-use-of-private-visibility` as firing for "a top-level decl … marked `private`," but the same diagnostic also fires for interface requirements (see `private-interface-requirement-rejected.slang`). A second bullet enumerating the interface-requirement case would make the failure-mode list complete. |  |
+| [#defaults-by-language-version](../../../docs/llm-generated/name-resolution/visibility.md#defaults-by-language-version) | undocumented-behavior | "Defaults by language version" describes the legacy-language default of `public` for unannotated decls, but does not surface a single-file way to observe that default. Today the default is only observable across `import` boundaries between modules of different language versions, which the single-file agentic runner cannot express. |  |

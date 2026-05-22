@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for ir-reference/differentiation
 
 ## Intent
-
 Tests verify the per-opcode catalog of the IR differentiation family
 described in
 [`docs/llm-generated/ir-reference/differentiation.md`](../../../docs/llm-generated/ir-reference/differentiation.md):
@@ -43,8 +42,8 @@ autodiff system. The internal autodiff-pass opcodes
 `checkpointObj`, `loopExitValue`, `PrimalParamRef`, etc.) are not
 user-observable at LOWER-TO-IR and are recorded as out of scope.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | detach(x) inside a differentiable function lowers to detachDerivative(%x). | functional | [#detachderivative](../../../docs/llm-generated/ir-reference/differentiation.md#detachderivative) | [`detach-derivative.slang`](detach-derivative.slang) |
@@ -64,8 +63,8 @@ user-observable at LOWER-TO-IR and are recorded as out of scope.
 | A single entry point that constructs a DifferentialPair then reads both .p and .d exercises MakeDiffPair, GetPrimal, and GetDifferential in one IR dump. | functional | [#opcodes](../../../docs/llm-generated/ir-reference/differentiation.md#opcodes) | [`make-diff-pair-and-projections.slang`](make-diff-pair-and-projections.slang) |
 | The no_diff parameter marker is implemented by a unique module-scope let %k : Void = no_diff value that all Attributed(T, %k) wrappers reference. | functional | [#opcodes](../../../docs/llm-generated/ir-reference/differentiation.md#opcodes) | [`no-diff-module-scope-marker.slang`](no-diff-module-scope-marker.slang) |
 
-## Untested claims
 
+## Untested claims
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | **`checkpointObj`**, **`loopExitValue`**, **`ReportCheckpointStore`** — checkpointing markers inserted by the reverse-mode pass; no natural surface form at LOWER-TO-IR. | (unclassified) | [#checkpointobj](../../../docs/llm-generated/ir-reference/differentiation.md#checkpointobj) | Reason and explanation to be refined by the next regeneration. |
@@ -79,8 +78,8 @@ user-observable at LOWER-TO-IR and are recorded as out of scope.
 | **`GetDifferentialPtr`**, **`GetPrimalRef`** — `(synthesized)` pointer-projection counterparts; no natural user surface. | link-stage-only | [#getdifferentialptr](../../../docs/llm-generated/ir-reference/differentiation.md#getdifferentialptr) | Synthesized at a later IR pass than this bundle's `pipeline_stage` observes; the test belongs in the bundle whose pipeline stage matches. |
 | **`MakeDiffRefPair`** — `(synthesized)`; pointer-typed primal/ differential pair used inside autodiff-pass plumbing. | link-stage-only | [#makediffrefpair](../../../docs/llm-generated/ir-reference/differentiation.md#makediffrefpair) | Synthesized at a later IR pass than this bundle's `pipeline_stage` observes; the test belongs in the bundle whose pipeline stage matches. |
 
-## Doc gaps observed
 
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#backwarddifferentiate](../../../docs/llm-generated/ir-reference/differentiation.md#backwarddifferentiate) | drift-from-source | The `### BackwardDifferentiate` notable-opcode discussion names `__bwd_diff` as the AST origin of `BackwardDifferentiate`, but the actual LOWER-TO-IR opcode emitted by `slang-lower-to-ir.cpp` for `__bwd_diff(f)` is `LegacyBackwardDifferentiate(%apply_bwd, %remat, %ctx_t)` — the legacy-bridge form. The modern `BackwardDifferentiate` opcode is not produced at LOWER-TO-IR at all; it is synthesized later by the unzip pass when converting the legacy form to the modern primal-/propagate-/remat-triple. | A one-line note clarifying that `BackwardDifferentiate` is an unzip-pass opcode (and that `LegacyBackwardDifferentiate` is the LOWER-TO-IR spelling) would prevent test-author confusion. (See `legacy-backward-differentiate.slang` and `bwd-diff-alias.slang`.) |

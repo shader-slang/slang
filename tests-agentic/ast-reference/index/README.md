@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for ast-reference/index
 
 ## Intent
-
 Tests verify the **cross-cutting orientation claims** made by
 [`docs/llm-generated/ast-reference/index.md`](../../../docs/llm-generated/ast-reference/index.md):
 the family taxonomy is real (the abstract roots partition the
@@ -34,8 +33,8 @@ Strategy: one observation per cross-cutting claim that the index
 doc itself asserts, using the lightest runner that makes the
 observation visible.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | The index doc names the syntax-as-declaration model (via SyntaxDecl and AttributeDecl) as the mapping from keywords and attributes to AST node classes; an attribute that has no declared mapping is diagnosed. | negative | [#cross-cutting-topics](../../../docs/llm-generated/ast-reference/index.md#cross-cutting-topics) | [`syntax-as-declaration-unknown-attribute-rejected.slang`](syntax-as-declaration-unknown-attribute-rejected.slang) |
@@ -44,8 +43,8 @@ observation visible.
 | A working program composes concrete leaves from every AST root family the index taxonomy names (Decl, Expr, Stmt, Type, Modifier, Val), demonstrating that the family partition spans the surface language. | functional | [#family-taxonomy](../../../docs/llm-generated/ast-reference/index.md#family-taxonomy) | [`multi-family-composition-program.slang`](multi-family-composition-program.slang) |
 | The AST family taxonomy is real: a Stmt root and an Expr root are distinct, so a bare break statement outside a loop or switch is diagnosed by the checker (a Stmt-shape constraint, not an Expr-shape one). | negative | [#family-taxonomy](../../../docs/llm-generated/ast-reference/index.md#family-taxonomy) | [`family-taxonomy-stmt-vs-expr-rejected.slang`](family-taxonomy-stmt-vs-expr-rejected.slang) |
 
-## Untested claims
 
+## Untested claims
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | Concrete `Decl` leaves (`StructDecl`, `FuncDecl`, `InterfaceDecl`, `GenericDecl`, ...) -- see `tests-agentic/ast-reference/declarations/`. | out-of-bundle | [#decl](../../../docs/llm-generated/ast-reference/index.md#decl) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
@@ -57,8 +56,16 @@ observation visible.
 | Concrete `Type` leaves (`VectorType`, `MatrixType`, buffer types, `OptionalType`, ...) -- see `tests-agentic/ast-reference/types/`. | out-of-bundle | [#type](../../../docs/llm-generated/ast-reference/index.md#type) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
 | `Val` non-Type leaves (`DeclRefBase`, `IntVal`, `Witness`, ...) -- see `tests-agentic/ast-reference/values/`. | out-of-bundle | [#val](../../../docs/llm-generated/ast-reference/index.md#val) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
 
-## Sibling-bundle overlap
 
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#shape-parent-class-fields-grammar-source-rather-than-behavior](../../../docs/llm-generated/ast-reference/index.md#shape-parent-class-fields-grammar-source-rather-than-behavior) | undocumented-behavior | The index doc says the family pages describe "shape (parent class, fields, grammar source) rather than behavior", but this is a doc-organization claim and is not directly testable through any `slangc` directive without instrumenting the C++ AST. No test was authored for it; a future revision of the index could either drop the meta-claim or restate it as a user-observable consequence (e.g. "every documented field appears in a grammar production we can point at"). |  |
+| [#how-to-navigate](../../../docs/llm-generated/ast-reference/index.md#how-to-navigate) | undocumented-behavior | The index doc's `#how-to-navigate` section is purely doc-navigation guidance (which page to read first, what each page's table looks like) with no slangc-observable consequence. The bundle therefore did not cite that anchor. |  |
+| [#pages](../../../docs/llm-generated/ast-reference/index.md#pages) | undocumented-behavior | The `#pages` table and the `#family-taxonomy` mermaid claim approximate concrete-class counts ("~60", "~90", ...). The numeric approximations are guaranteed only "rounded to the nearest five at the source_commit"; no agent can sensibly anchor a test to a "~60" approximation. Treating the counts as testable would require the doc to commit to a stable exact number or to a programmatic invariant. |  |
+
+
+## Sibling-bundle overlap
 The following peer-bundle behaviors are intentionally not
 re-tested here to avoid duplication:
 
@@ -80,11 +87,3 @@ re-tested here to avoid duplication:
   cites only the index doc's mapping-claim
   (SyntaxDecl/AttributeDecl) and the consequence that an
   unmapped name has no class to bind to.
-
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#shape-parent-class-fields-grammar-source-rather-than-behavior](../../../docs/llm-generated/ast-reference/index.md#shape-parent-class-fields-grammar-source-rather-than-behavior) | undocumented-behavior | The index doc says the family pages describe "shape (parent class, fields, grammar source) rather than behavior", but this is a doc-organization claim and is not directly testable through any `slangc` directive without instrumenting the C++ AST. No test was authored for it; a future revision of the index could either drop the meta-claim or restate it as a user-observable consequence (e.g. "every documented field appears in a grammar production we can point at"). |  |
-| [#how-to-navigate](../../../docs/llm-generated/ast-reference/index.md#how-to-navigate) | undocumented-behavior | The index doc's `#how-to-navigate` section is purely doc-navigation guidance (which page to read first, what each page's table looks like) with no slangc-observable consequence. The bundle therefore did not cite that anchor. |  |
-| [#pages](../../../docs/llm-generated/ast-reference/index.md#pages) | undocumented-behavior | The `#pages` table and the `#family-taxonomy` mermaid claim approximate concrete-class counts ("~60", "~90", ...). The numeric approximations are guaranteed only "rounded to the nearest five at the source_commit"; no agent can sensibly anchor a test to a "~60" approximation. Treating the counts as testable would require the doc to commit to a stable exact number or to a programmatic invariant. |  |

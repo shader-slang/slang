@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for syntax-reference/grammar
 
 ## Intent
-
 Tests verify the surface-grammar productions described in
 [`docs/llm-generated/syntax-reference/grammar.md`](../../../docs/llm-generated/syntax-reference/grammar.md):
 declaration / expression / statement / type / generic / modifier
@@ -29,8 +28,8 @@ from `pipeline/02-parse-ast` (which is parser-stage internal
 behavior). The angle here is **production-shape**: which strings the
 grammar names, and in what shape they parse.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | `Attribute` parses as `'[' AttributeName ('(' ArgList? ')')? ']'` and attaches to the following decl. | functional | [#attributes-and-decorations](../../../docs/llm-generated/syntax-reference/grammar.md#attributes-and-decorations) | [`attribute-bracket-form.slang`](attribute-bracket-form.slang) |
@@ -71,8 +70,12 @@ grammar names, and in what shape they parse.
 | `VarDecl` accepts the C-style form `Type VarDeclarator (',' VarDeclarator)* ';'` with an `Initializer`. | functional | [#variable-binding-declarations](../../../docs/llm-generated/syntax-reference/grammar.md#variable-binding-declarations) | [`decl-var-cstyle-with-init.slang`](decl-var-cstyle-with-init.slang) |
 | `VarDeclarator` accepts an `ArraySuffix` of the form `'[' Expr ']'`. | functional | [#variable-binding-declarations](../../../docs/llm-generated/syntax-reference/grammar.md#variable-binding-declarations) | [`decl-var-array-suffix.slang`](decl-var-array-suffix.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+NA
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#generic-followers](../../../docs/llm-generated/syntax-reference/grammar.md#generic-followers) | undocumented-behavior | The `### `<` disambiguation` section lists the "generic-followers" punctuation set (`::`, `.`, `(`, `)`, `[`, `]`, `:`, `,`, `?`, `;`, `==`, `!=`, `>`, `>>`) but does not give a positive example for each follower individually. A claim-per-follower expansion would need either an enumerative example or a follower-specific sub-anchor in the doc. |  |
@@ -81,8 +84,3 @@ grammar names, and in what shape they parse.
 | [#try](../../../docs/llm-generated/syntax-reference/grammar.md#try) | undocumented-behavior | The doc mentions `try` is an expression keyword but states there is no `try { } catch { }` statement, only `do ... catch`. We cover `DoCatchStmt` only indirectly via the statement list; a dedicated positive test would require exception machinery beyond pure-parse observation, which `_common.md` warns is fragile under INTERPRET. |  |
 | [#expressions](../../../docs/llm-generated/syntax-reference/grammar.md#expressions) | undocumented-behavior | The `## Expressions` section lists `AtomExpr ::= ... \| '(' Expr (',' Expr)+ ')' -- tuple` but in practice this surface is parsed as comma-operator expressions, not a tuple literal. The actual user-facing tuple construction uses `makeTuple(...)` or an explicit `Tuple<...>` type. | The doc should either narrow the production (e.g. "only after a tuple-typed binding context") or remove the standalone tuple-atom form. |
 | [#types](../../../docs/llm-generated/syntax-reference/grammar.md#types) | undocumented-behavior | The `## Types` section lists pointer (`Type '*'`), optional (`Type '?'`), reference (`Type '&'`), and function-type spellings with the caveat "where supported", but does not say which Slang contexts permit each. Anchoring a positive test for those forms would require the doc to enumerate the supported positions. |  |
-
-## Untested claims
-
-(none)
-

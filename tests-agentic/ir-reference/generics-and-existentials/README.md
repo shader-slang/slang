@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for ir-reference/generics-and-existentials
 
 ## Intent
-
 Tests verify the per-opcode catalog of the IR generics-and-existentials
 family described in
 [`docs/llm-generated/ir-reference/generics-and-existentials.md`](../../../docs/llm-generated/ir-reference/generics-and-existentials.md):
@@ -42,8 +41,8 @@ structural bundle observes those same opcodes as parents and
 children; this bundle observes them as IR values with operand
 shapes.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | Dispatching through an interface-typed value produces extractExistentialType(%i) whose result type is Type. | functional | [#existential-destructuring](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#existential-destructuring) | [`extract-existential-type.slang`](extract-existential-type.slang) |
@@ -86,8 +85,8 @@ shapes.
 | A struct conforming to a 3-method interface emits three witness_table_entry rows — one per requirement, in declaration order. | boundary | [#witnesstable-and-witnesstableentry](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#witnesstable-and-witnesstableentry) | [`witness-table-three-method-rows.slang`](witness-table-three-method-rows.slang) |
 | Each row inside a witness_table body is witness_table_entry(requirementKey, satisfyingVal) — first operand is the key, second is the satisfying value. | functional | [#witnesstable-and-witnesstableentry](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#witnesstable-and-witnesstableentry) | [`witness-table-entry-operands.slang`](witness-table-entry-operands.slang) |
 
-## Untested claims
 
+## Untested claims
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | **`bind_global_generic_param`** — `(synthesized)` at link time. | link-stage-only | [#bindglobalgenericparam](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#bindglobalgenericparam) | Synthesized at a later IR pass than this bundle's `pipeline_stage` observes; the test belongs in the bundle whose pipeline stage matches. |
@@ -104,8 +103,8 @@ shapes.
 | All `### Type-flow specialization` opcodes (`TypeSet`, `FuncSet`, `WitnessTableSet`, `GenericSet`, `UnboundedTypeElement`, `MakeTaggedUnion`, `GetTagFromTaggedUnion`, `GetDispatcher`, `SpecializeExistentialsInFunc`, `WeakUse`, etc.) — `(synthesized)` by the type-flow pass, post-specialization. | link-stage-only | [#typeset](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#typeset) | Synthesized at a later IR pass than this bundle's `pipeline_stage` observes; the test belongs in the bundle whose pipeline stage matches. |
 | **`wrapExistential`** — `(synthesized)` by the `BindExistentialsType` lowering pass. | link-stage-only | [#wrapexistential](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#wrapexistential) | Synthesized at a later IR pass than this bundle's `pipeline_stage` observes; the test belongs in the bundle whose pipeline stage matches. |
 
-## Doc gaps observed
 
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#makeexistential](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#makeexistential) | missing-example | The `### makeExistential` notable-opcode discussion says the opcode "packs a value of some concrete type `C` and a witness that `C` conforms to the target interface `I` into a single existential value of type `I`", but does not call out the dump shape `let %i : %I = makeExistential(%value, %witness)` — the result type appearing in the `let` is the target interface type, not a constructed `Existential<I>` wrapper. | A worked example would prevent test-authors from expecting a wrapper-typed result. |

@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for ir-reference/decorations
 
 ## Intent
-
 Tests verify the per-opcode catalog of the IR `Decoration` family
 described in
 [`docs/llm-generated/ir-reference/decorations.md`](../../../docs/llm-generated/ir-reference/decorations.md):
@@ -47,8 +46,8 @@ attached to structural parents — `nameHint` on a `func`, `export`
 on a struct-field key) is: **the decoration family in its own
 right**, sampling its breadth across categories.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A WaveSize attribute on a compute entry point lowers to a waveSize decoration carrying the requested lane count. | functional | [#entry-point-and-stage](../../../docs/llm-generated/ir-reference/decorations.md#entry-point-and-stage) | [`wave-size-decoration.slang`](wave-size-decoration.slang) |
@@ -116,14 +115,8 @@ right**, sampling its breadth across categories.
 | The synthesized struct initializer carries a constructor decoration; the dump prints constructor(true) with a Bool literal operand. | functional | [#other](../../../docs/llm-generated/ir-reference/decorations.md#other) | [`constructor-decoration.slang`](constructor-decoration.slang) |
 | Calling a core-module built-in pulls in its [targetIntrinsic(capSet, "spelling")] decoration in the IR dump's core-module section. | functional | [#targetintrinsic-targetintrinsicdecoration](../../../docs/llm-generated/ir-reference/decorations.md#targetintrinsic-targetintrinsicdecoration) | [`target-intrinsic-decoration.slang`](target-intrinsic-decoration.slang) |
 
-## Untested coverable claims
-
-| Anchor | Backend | Claim | Why untested |
-| --- | --- | --- | --- |
-| [#mesh-shader-geometry-shader-and-per-vertex](../../../docs/llm-generated/ir-reference/decorations.md#mesh-shader-geometry-shader-and-per-vertex) | gpu-non-compute | **Mesh / geometry / hull / domain shader decorations not yet sampled** — `pointPrimitiveType`, `linePrimitiveType`, `lineAdjPrimitiveType`, `triangleAdjPrimitiveType`, `vertices`, `indices`, `primitives`, `HLSLMeshPayloadDecoration`, `PositionOutput`, `PositionInput`, `PerVertex`, `stageReadAccess`, `stageWriteAccess`, `patchConstantFunc`, `maxTessFactor`, `outputControlPoints`, `outputTopology`, `partitioning`, `domain`, `maxVertexCount`, `instance`, `GeometryInputPrimitiveTypeDecoration`, `MeshOutputDecoration`, `StageAccessDecoration`. `trianglePrimitiveType` and `streamOutputTypeDecoration` are now sampled via a geometry-shader test pair. The remaining decorations each require their own pipeline-specific entry-point scaffolding (mesh / hull / domain). | Agent runtime has no GPU; CI / local machine does. |
 
 ## Untested claims
-
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | **Debug / reflection decorations** — `DebugLocation`, `DebugFunction`, `CounterBuffer`. Require `-g` or `[counter]` plumbing distinct from a per-opcode reference angle. | (unclassified) | [#debuglocation](../../../docs/llm-generated/ir-reference/decorations.md#debuglocation) | Reason and explanation to be refined by the next regeneration. |
@@ -139,8 +132,10 @@ right**, sampling its breadth across categories.
 | **All `(synthesized)` decorations** — every row whose `AST origin` column reads `(synthesized)` lacks a stable AST-side anchor and is out of scope for this representative bundle. This includes `BinaryInterfaceType`, `PhysicalType`, `AlignedAddressDecoration`, `SizeAndAlignment`, `Offset`, `optimizableTypeDecoration`, `NonDynamicUniformReturnDecoration`, `bindExistentialSlots`, `DispatchFuncDecoration`, `SpecializationDepthDecoration`, `SequentialIDDecoration`, `RTTI_typeSize`, `AnyValueSize`, `transitory`, `InParamProxyVar`, `TempCallArgImmutableVar`, `TempCallArgVar`, `GlobalVariableShadowingGlobalParameterDecoration`, `DisableCopyEliminationDecoration`, `DynamicUniform`, `availableInDownstreamIR`, `downstreamModuleExport`, `downstreamModuleImport`, `PyBindExportFuncInfo`, `ignoreSideEffectsDecoration`, `loopCounterDecoration`, `loopCounterUpdateDecoration`. | link-stage-only | [#binaryinterfacetype](../../../docs/llm-generated/ir-reference/decorations.md#binaryinterfacetype) | Synthesized at a later IR pass than this bundle's `pipeline_stage` observes; the test belongs in the bundle whose pipeline stage matches. |
 | **Specialization / conformance / existentials decorations** — `SpecializeDecoration`, `DynamicDispatchWitnessDecoration`, `StaticRequirementDecoration`, `TypeConstraintDecoration`, `ResultWitness`, `SpecializationConstantDecoration`. These are largely synthesized by the specialization pass. | link-stage-only | [#specializedecoration](../../../docs/llm-generated/ir-reference/decorations.md#specializedecoration) | Synthesized at a later IR pass than this bundle's `pipeline_stage` observes; the test belongs in the bundle whose pipeline stage matches. |
 
-## Doc gaps observed
+| **Mesh / geometry / hull / domain shader decorations not yet sampled** — `pointPrimitiveType`, `linePrimitiveType`, `lineAdjPrimitiveType`, `triangleAdjPrimitiveType`, `vertices`, `indices`, `primitives`, `HLSLMeshPayloadDecoration`, `PositionOutput`, `PositionInput`, `PerVertex`, `stageReadAccess`, `stageWriteAccess`, `patchConstantFunc`, `maxTessFactor`, `outputControlPoints`, `outputTopology`, `partitioning`, `domain`, `maxVertexCount`, `instance`, `GeometryInputPrimitiveTypeDecoration`, `MeshOutputDecoration`, `StageAccessDecoration`. `trianglePrimitiveType` and `streamOutputTypeDecoration` are now sampled via a geometry-shader test pair. The remaining decorations each require their own pipeline-specific entry-point scaffolding (mesh / hull / domain). | gpu-non-compute | [#mesh-shader-geometry-shader-and-per-vertex](../../../docs/llm-generated/ir-reference/decorations.md#mesh-shader-geometry-shader-and-per-vertex) | Agent runtime has no GPU; CI / local machine does. |
 
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#entrypoint-entrypointdecoration](../../../docs/llm-generated/ir-reference/decorations.md#entrypoint-entrypointdecoration) | undocumented-behavior | The doc's `### entryPoint / EntryPointDecoration` notable-opcodes section states "Its three operands are the profile (an IRIntLit tag), the user-visible name, and an optional module name", but does not specify the source of the module-name operand. In the observed dump it is the source-file stem (e.g. `"two-entry- points-coexist"` for `two-entry-points-coexist.slang`), which means a test that pins the literal module-name string is filename-fragile. A clarifying note that the module-name operand is derived from the file name (or compilation-unit name) would help test authors avoid this pitfall. |  |

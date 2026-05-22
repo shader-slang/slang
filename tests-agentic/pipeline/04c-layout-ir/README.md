@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for pipeline/04c-layout-ir
 
 ## Intent
-
 Tests verify the per-target layout IR module construction described
 in
 [`docs/llm-generated/pipeline/04c-layout-ir.md`](../../../docs/llm-generated/pipeline/04c-layout-ir.md):
@@ -41,8 +40,8 @@ mangled-name linkage), the executable-IR-is-layout-free claim, and
 the per-target observability of layout. Several gates (capability
 filter, obfuscation, lazy cache) are recorded under `## Untested claims`.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | After the per-global-parameter loop, _lowerTypeLayoutCommon builds an IRStructTypeLayout for the global scope; with no cbuffer wrapping, the merged IR shows a top-level structTypeLayout(...) for the global struct (no parameterGroupTypeLayout). | functional | [#global-scope-type-layout](../../../docs/llm-generated/pipeline/04c-layout-ir.md#global-scope-type-layout) | [`global-scope-struct-type-layout-built.slang`](global-scope-struct-type-layout-built.slang) |
@@ -59,18 +58,8 @@ filter, obfuscation, lazy cache) are recorded under `## Untested claims`.
 | The pre-link executable IR (### LOWER-TO-IR:) carries no [layout(...)] decorations; layout lives in a sibling module built by createIRModuleForLayout. | functional | [#what-this-module-is-not](../../../docs/llm-generated/pipeline/04c-layout-ir.md#what-this-module-is-not) | [`lower-to-ir-block-has-no-layout-decorations.slang`](lower-to-ir-block-has-no-layout-decorations.slang) |
 | Layout is target-specific; the same global parameter produces a [layout(...)] / varLayout / offset structure on both SPIR-V and HLSL targets (this test asserts presence on HLSL to complement the default SPIR-V test). | functional | [#why-this-module-exists](../../../docs/llm-generated/pipeline/04c-layout-ir.md#why-this-module-exists) | [`layout-is-per-target-spirv-vs-hlsl.slang`](layout-is-per-target-spirv-vs-hlsl.slang) |
 
-## Doc gaps observed
-
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#irrequirecapabilityatomdecoration](../../../docs/llm-generated/pipeline/04c-layout-ir.md#irrequirecapabilityatomdecoration) | undocumented-behavior | The doc states the capability-atom filter at lines 15462-15463 emits `IRRequireCapabilityAtomDecoration`s only for SPIR-V and Metal layout-module entry points, but does not name a textual surface (e.g. a `requireCapabilityAtom(...)` instruction or `[requireCapabilityAtom(...)]` decoration name) by which a reader could observe the decoration in `-dump-ir` output. | Without that, comparing the post-link IR across SPIR-V vs HLSL targets is brittle (capability machinery is heavily rewritten by post-link passes). A doc sentence naming the IR opcode would unblock a focused test. |
-| [#per-entry-point-steps](../../../docs/llm-generated/pipeline/04c-layout-ir.md#per-entry-point-steps) | undocumented-behavior | The doc's "Per-entry-point steps" table row 6 mentions forwarding capability atoms in the range `[_spirv_1_0, latestSpirvAtom]` or `[metallib_2_3, latestMetalAtom]`, but the precise atom values and their string mangling in `-dump-ir` output is not given. Treat as a doc gap pending an example. |  |
-| [#optional-obfuscation-pass](../../../docs/llm-generated/pipeline/04c-layout-ir.md#optional-obfuscation-pass) | undocumented-behavior | The doc's "Optional obfuscation pass" describes the strip + DCE block but does not provide a user-observable consequence under `-obfuscate-code`. The doc could name the `IRNameHintDecoration` removal as the observable so a focused test could compare with/without `-obfuscate-code` flags. |  |
-| [#cache-and-reuse](../../../docs/llm-generated/pipeline/04c-layout-ir.md#cache-and-reuse) | undocumented-behavior | The doc's "Cache and reuse" section describes lazy construction (`getOrCreateIRModuleForLayout`) and the `m_irModuleForLayout` cache field, but cache hit/miss is not user-observable through `slangc` (the only signal is correctness across multiple compilations). No actionable doc gap, but worth noting that cache semantics are inherently untestable from this bundle. |  |
-| [#caveats-and-gotchas](../../../docs/llm-generated/pipeline/04c-layout-ir.md#caveats-and-gotchas) | undocumented-behavior | The doc's "Caveats and gotchas" lists `materialize` failure as `SLANG_UNEXPECTED("unhandled value flavor")` and the `SLANG_ASSERT(m_layout)` precondition; neither is reachable from user Slang source, so they cannot be tested. The doc could clarify that these are internal contract checks, not user-visible diagnostics. |  |
 
 ## Untested claims
-
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | **Optional obfuscation pass**: gated on `-obfuscate-code`, observable only via obfuscated source-map machinery outside this bundle's scope. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
@@ -81,3 +70,13 @@ filter, obfuscation, lazy cache) are recorded under `## Untested claims`.
 | **Lazy construction / cache reuse** of `m_irModuleForLayout`: no user-visible signal through `slangc`. | (unclassified) | [#mirmoduleforlayout](../../../docs/llm-generated/pipeline/04c-layout-ir.md#mirmoduleforlayout) | Reason and explanation to be refined by the next regeneration. |
 | **Per-`TargetProgram` independence** (two layout modules in memory for two targets in one session): the cross-target shape difference is covered indirectly by `layout-is-per-target-spirv-vs-hlsl.slang` running on a separate invocation; in-process multi-target independence is not exposed through `slangc`. | (unclassified) | [#targetprogram](../../../docs/llm-generated/pipeline/04c-layout-ir.md#targetprogram) | Reason and explanation to be refined by the next regeneration. |
 | **`IRRequireCapabilityAtomDecoration` filter** for SPIR-V / Metal only: see doc gaps above; the post-link pipeline rewrites capability metadata heavily, so no clean surface signal exists in `-dump-ir` to distinguish layout-module-attached from executable-module-attached capability atoms. | link-stage-only | [#irrequirecapabilityatomdecoration](../../../docs/llm-generated/pipeline/04c-layout-ir.md#irrequirecapabilityatomdecoration) | Synthesized at a later IR pass than this bundle's `pipeline_stage` observes; the test belongs in the bundle whose pipeline stage matches. |
+
+
+## Doc gaps observed
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#irrequirecapabilityatomdecoration](../../../docs/llm-generated/pipeline/04c-layout-ir.md#irrequirecapabilityatomdecoration) | undocumented-behavior | The doc states the capability-atom filter at lines 15462-15463 emits `IRRequireCapabilityAtomDecoration`s only for SPIR-V and Metal layout-module entry points, but does not name a textual surface (e.g. a `requireCapabilityAtom(...)` instruction or `[requireCapabilityAtom(...)]` decoration name) by which a reader could observe the decoration in `-dump-ir` output. | Without that, comparing the post-link IR across SPIR-V vs HLSL targets is brittle (capability machinery is heavily rewritten by post-link passes). A doc sentence naming the IR opcode would unblock a focused test. |
+| [#per-entry-point-steps](../../../docs/llm-generated/pipeline/04c-layout-ir.md#per-entry-point-steps) | undocumented-behavior | The doc's "Per-entry-point steps" table row 6 mentions forwarding capability atoms in the range `[_spirv_1_0, latestSpirvAtom]` or `[metallib_2_3, latestMetalAtom]`, but the precise atom values and their string mangling in `-dump-ir` output is not given. Treat as a doc gap pending an example. |  |
+| [#optional-obfuscation-pass](../../../docs/llm-generated/pipeline/04c-layout-ir.md#optional-obfuscation-pass) | undocumented-behavior | The doc's "Optional obfuscation pass" describes the strip + DCE block but does not provide a user-observable consequence under `-obfuscate-code`. The doc could name the `IRNameHintDecoration` removal as the observable so a focused test could compare with/without `-obfuscate-code` flags. |  |
+| [#cache-and-reuse](../../../docs/llm-generated/pipeline/04c-layout-ir.md#cache-and-reuse) | undocumented-behavior | The doc's "Cache and reuse" section describes lazy construction (`getOrCreateIRModuleForLayout`) and the `m_irModuleForLayout` cache field, but cache hit/miss is not user-observable through `slangc` (the only signal is correctness across multiple compilations). No actionable doc gap, but worth noting that cache semantics are inherently untestable from this bundle. |  |
+| [#caveats-and-gotchas](../../../docs/llm-generated/pipeline/04c-layout-ir.md#caveats-and-gotchas) | undocumented-behavior | The doc's "Caveats and gotchas" lists `materialize` failure as `SLANG_UNEXPECTED("unhandled value flavor")` and the `SLANG_ASSERT(m_layout)` precondition; neither is reachable from user Slang source, so they cannot be tested. The doc could clarify that these are internal contract checks, not user-visible diagnostics. |  |

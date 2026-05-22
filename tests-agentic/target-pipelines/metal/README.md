@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for target-pipelines/metal
 
 ## Intent
-
 Tests verify the Metal target pipeline described in
 [`docs/llm-generated/target-pipelines/metal.md`](../../../docs/llm-generated/target-pipelines/metal.md):
 the ordered IR-pass + emit sequence executed when
@@ -83,8 +82,8 @@ filtered-out-pass contrast. `MetalLib` / `MetalLibAssembly`
 require the Apple `metal` command-line tool and are out of
 scope on the no-GPU runner.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | Bare `-target metal` stops at Metal text; the Apple `metal` downstream compiler is invoked only for MetalLib/MetalLibAssembly, so the emitted output is plain MSL source (no .metallib bytes). | negative | [#downstream-apple-metal-compiler](../../../docs/llm-generated/target-pipelines/metal.md#downstream-apple-metal-compiler) | [`downstream-stops-at-text-no-metallib.slang`](downstream-stops-at-text-no-metallib.slang) |
@@ -161,8 +160,16 @@ scope on the no-GPU runner.
 | MetalLibAssembly is omitted from the `wrapCBufferElementsForMetal` case list at line 1731-1735 (only `Metal` and `MetalLib` fire the pass): for `-target metallib-asm`, the same float4x4 cbuffer skips the `_MatrixStorage_`/`SLANG_ParameterGroup_` wrapping that `-target metal` produces. | expansion | [#wrapcbufferelementsformetal](../../../docs/llm-generated/target-pipelines/metal.md#wrapcbufferelementsformetal) | [`metallib-asm-skips-cbuffer-wrap.slang`](metallib-asm-skips-cbuffer-wrap.slang) |
 | wrapCBufferElementsForMetal wraps a float4x4 cbuffer element in a _MatrixStorage_..._natural_<N> struct so the emitted MSL is valid. | functional | [#wrapcbufferelementsformetal](../../../docs/llm-generated/target-pipelines/metal.md#wrapcbufferelementsformetal) | [`cbuffer-matrix-storage-wrap.slang`](cbuffer-matrix-storage-wrap.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+| Claim | Reason | Anchor | Why untested |
+| --- | --- | --- | --- |
+| **`AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>` lowering on Metal.** Rejected by `checkEntryPointDecorations` on the compute stage; cannot be observed in compute-only emit. (Recorded as a doc gap.) | (unclassified) | [#checkentrypointdecorations](../../../docs/llm-generated/target-pipelines/metal.md#checkentrypointdecorations) | Reason and explanation to be refined by the next regeneration. |
+| **Pass ordering within Phase A/B/C.** Pass _existence_ is observable through its effect on emitted text; pass _ordering_ is an IR-level claim that requires `-dump-ir` cross-pass annotations the doc does not anchor to a specific marker. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |
+| **Iterative-pass observation.** Metal has **no** iterative passes in `linkAndOptimizeIR`, so the absence of `simplifyIR` iteration cannot be directly tested through `slangc` text emit. | implementation-detail | [#linkandoptimizeir](../../../docs/llm-generated/target-pipelines/metal.md#linkandoptimizeir) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#target-pipelinesmetalmd](../../../docs/llm-generated/target-pipelines/metal.md#target-pipelinesmetalmd) | undocumented-behavior | `target-pipelines/metal.md` claims `lowerAppendConsumeStructuredBuffers` fires for Metal (`target != HLSL`), but in practice `checkEntryPointDecorations` rejects `AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>` on the Metal compute stage with diagnostic `E36107` ("uses features that are not available in 'compute' stage for 'metal' compilation target"). The pass cannot be observed in emitted text on a compute entry point. | The doc should either name the stage(s) where the pass output is observable or note the compute-stage rejection. |
@@ -172,15 +179,3 @@ scope on the no-GPU runner.
 | [#legalizebyteaddressbufferops](../../../docs/llm-generated/target-pipelines/metal.md#legalizebyteaddressbufferops) | undocumented-behavior | The doc names the Metal-arm `legalizeByteAddressBufferOps` options but does not show the **emitted form** (`as_type<uint>(buf[(off)>>2])`); a one-line example would let tests assert against a concrete pattern. |  |
 | [#phase-d-](../../../docs/llm-generated/target-pipelines/metal.md#phase-d-) | undocumented-behavior | The doc mentions `[[texture(N)]]` slot positionally but does not enumerate the **per-Slang-texture-variant → Metal `texture*<T, access::...>`** mapping (`Texture1D` → `texture1d`, `Texture3D` → `texture3d`, `TextureCube` → `texturecube`, `Texture2DArray` → `texture2d_array`, and `RWTexture3D` → `texture3d<..., access::read_write>`). A small table under `#phase-d-...` (or a Texture-types subsection) would let texture-variant tests anchor more precisely. The `#legalizeimagesubscript` paragraph only mentions `RWTexture2D`; it should generalize to RWTexture1D / RWTexture3D / RWTexture2DArray. |  |
 | [#gradientcube](../../../docs/llm-generated/target-pipelines/metal.md#gradientcube) | undocumented-behavior | The doc does not describe the **`gradientcube(...)` / `gradient2d(...)` / `gradient3d(...)` selector wrappers** that the Metal emitter inserts around explicit-gradient SampleGrad arguments. Anchoring this would let SampleGrad-shape tests pin the gradient selector. |  |
-
-## Untested coverable claims
-
-(none)
-
-## Untested claims
-
-| Claim | Reason | Anchor | Why untested |
-| --- | --- | --- | --- |
-| **`AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>` lowering on Metal.** Rejected by `checkEntryPointDecorations` on the compute stage; cannot be observed in compute-only emit. (Recorded as a doc gap.) | (unclassified) | [#checkentrypointdecorations](../../../docs/llm-generated/target-pipelines/metal.md#checkentrypointdecorations) | Reason and explanation to be refined by the next regeneration. |
-| **Pass ordering within Phase A/B/C.** Pass _existence_ is observable through its effect on emitted text; pass _ordering_ is an IR-level claim that requires `-dump-ir` cross-pass annotations the doc does not anchor to a specific marker. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |
-| **Iterative-pass observation.** Metal has **no** iterative passes in `linkAndOptimizeIR`, so the absence of `simplifyIR` iteration cannot be directly tested through `slangc` text emit. | implementation-detail | [#linkandoptimizeir](../../../docs/llm-generated/target-pipelines/metal.md#linkandoptimizeir) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |

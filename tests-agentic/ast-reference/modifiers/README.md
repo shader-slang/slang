@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for ast-reference/modifiers
 
 ## Intent
-
 Tests verify the user-observable roles of concrete `Modifier` and
 `Attribute` subclasses described in
 [`docs/llm-generated/ast-reference/modifiers.md`](../../../docs/llm-generated/ast-reference/modifiers.md):
@@ -42,8 +41,8 @@ value; `DIAGNOSTIC_TEST` directives for misuse claims (`const`
 assignment, `private` access from outside, non-mutating `this`
 assignment, `inout` of a literal).
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A function-scope `static` variable retains its value across calls to the function. | functional | [#compatibility-and-hlsl-storage-class-modifiers](../../../docs/llm-generated/ast-reference/modifiers.md#compatibility-and-hlsl-storage-class-modifiers) | [`static-local-persists-across-calls.slang`](static-local-persists-across-calls.slang) |
@@ -76,12 +75,8 @@ assignment, `inout` of a literal).
 | A `private` member is not accessible from outside its enclosing type. | negative | [#visibility-modifiers](../../../docs/llm-generated/ast-reference/modifiers.md#visibility-modifiers) | [`private-rejects-outside-access.slang`](private-rejects-outside-access.slang) |
 | A `public` member is accessible from outside its enclosing type and a `public` function from anywhere. | functional | [#visibility-modifiers](../../../docs/llm-generated/ast-reference/modifiers.md#visibility-modifiers) | [`public-allows-cross-module-access.slang`](public-allows-cross-module-access.slang) |
 
-## Untested coverable claims
-
-(none)
 
 ## Untested claims
-
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | Python / FFI attributes (`[TorchEntryPoint]`, `[PyExport]`, `[DllImport]`, `[AutoPyBindCuda]`) ship through a host Python / PyTorch / C ABI runtime that the agent runtime does not include, and that the `slang-test` harness does not invoke. | requires-external-tool | [#cuda-python-ffi-attributes](../../../docs/llm-generated/ast-reference/modifiers.md#cuda-python-ffi-attributes) | Verifying these attributes' behavior requires running a Python / PyTorch / loader runtime against the emitted artifact; no `slang-test` directive surfaces that. |
@@ -96,8 +91,8 @@ assignment, `inout` of a literal).
 | The mermaid "Family hierarchy" graph as a graph — the topology is structural metadata about the class hierarchy, not user behavior. | internal-source-fact | [#family-hierarchy](../../../docs/llm-generated/ast-reference/modifiers.md#family-hierarchy) | Implementation detail (C++ class hierarchy, field names, parser-callback names) with no user-observable consequence. |
 | Private/key field names and types (e.g. the `irOp: uint32_t` field on `IntrinsicOpModifier`, the bitmask on `MemoryQualifierSetModifier`, the version `Token` on `GLSLVersionDirective`). | internal-source-fact | [#intrinsicopmodifier](../../../docs/llm-generated/ast-reference/modifiers.md#intrinsicopmodifier) | Implementation detail (C++ class hierarchy, field names, parser-callback names) with no user-observable consequence. |
 
-## Doc gaps observed
 
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#hlslnointerpolationmodifier](../../../docs/llm-generated/ast-reference/modifiers.md#hlslnointerpolationmodifier) | undocumented-behavior | The doc enumerates `HLSLNoInterpolationModifier`, `HLSLNoPerspectiveModifier`, `HLSLLinearModifier`, `HLSLSampleModifier`, `HLSLCentroidModifier`, `PerVertexModifier` but does not specify which combinations are mutually exclusive. A reader cannot tell from the doc whether `nointerpolation sample` on the same field is valid or diagnosed. |  |

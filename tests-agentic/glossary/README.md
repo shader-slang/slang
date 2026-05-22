@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for glossary
 
 ## Intent
-
 Tests verify the **compiler-internals vocabulary** defined in
 [`docs/llm-generated/glossary.md`](../../docs/llm-generated/glossary.md).
 The glossary is a lookup aid: most of its entries describe internal
@@ -28,8 +27,8 @@ every entry, so every test's `doc_ref` and `doc_section_digest`
 reference that one anchor; the `purpose` line names the specific
 term being verified.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | DiagnosticSink: the compiler emits diagnostics through a sink; a use of an undeclared identifier produces an "undefined identifier" error, observable as text on the compile output. | negative | [#terms](../../docs/llm-generated/glossary.md#terms) | [`diagnostic-undeclared-identifier.slang`](diagnostic-undeclared-identifier.slang) |
@@ -47,17 +46,17 @@ term being verified.
 | target: switching `-target` switches the emitted code-generation format; `-target glsl` yields GLSL with a `#version` directive and a `main()` function. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`target-glsl-emits-glsl.slang`](target-glsl-emits-glsl.slang) |
 | type inference: an omitted type on a `var` initialized from an int literal is inferred to `int`; overload resolution then picks the int overload. | functional | [#terms](../../docs/llm-generated/glossary.md#terms) | [`type-inference-var-from-int.slang`](type-inference-var-from-int.slang) |
 
-## Doc gaps observed
-
-(none) — the glossary is a lookup aid that points at peer documents
-for the contract surface; in-bundle gaps would be better reported
-against those peer documents.
 
 ## Untested claims
-
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | **Serialization back-ends, not user-visible by default:** `fossil format`, `RIFF container`. | (unclassified) | (unspecified) | Reason and explanation to be refined by the next regeneration. |
 | **Internal C++ types / helpers with no slangc surface:** `abstract syntax tree`, `ASTBuilder`, `IRBuilder`, `IRInst`, `IROp`, `IRFunc`, `IRModule`, `IRDecoration`, `decoration`, `parent instruction`, `hoistable instruction`, `terminator instruction`, `block parameter`, `single static assignment (SSA)`, `control-flow graph`, `dominator`, `dataflow analysis`, `decl-ref`, `lookup breadcrumb`, `lookup mask`, `lookup options`, `lookup result`, `linkage`, `session`, `scope`, `source-loc`, `FIDDLE`, `intermediate representation` (the concept; specific IR text is target-specific and unstable for FileCheck). | needs-unit-test | [#astbuilder](../../docs/llm-generated/glossary.md#astbuilder) | No slangc CLI surface reaches this. A C++ unit test in `tools/slang-unit-test/` could exercise the relevant compiler internals directly. |
 | **IR / type-system vocabulary owned by other bundles:** `existential type`, `witness table`, `differential pair`, `capability atom`, `profile`, `layout IR module`, `mandatory optimization pass`, `target legalization driver`, `target intrinsic`, `core module`, `prelude`, `module` (the `IModule` C++ object; `import` semantics belong to the language-reference module bundle), `translation unit` (the multi-file flag belongs to architecture/overview), `syntax-decl`, `partial generic application`, `transparent member`, `two-stage parsing`, `recursive descent` (the technique; the parsing behavior is covered by `parser-recursive-descent-parses-if.slang`), `dead-code elimination` (the IR pass is real but no contract-stable text artifact ties to it through `-dump-ir`), `conversion cost` (the numeric scoring is internal; the observable consequence — implicit-conversion rejection — is owned by `name-resolution/overload-resolution`). | out-of-bundle | [#profile](../../docs/llm-generated/glossary.md#profile) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
 | **Already covered by the user-facing visibility bundle:** `visibility`. | out-of-bundle | [#visibility](../../docs/llm-generated/glossary.md#visibility) | Covered by a sibling bundle; see the appropriate `tests-agentic/<sibling>/` directory. |
+
+
+## Doc gaps observed
+(none) — the glossary is a lookup aid that points at peer documents
+for the contract surface; in-bundle gaps would be better reported
+against those peer documents.

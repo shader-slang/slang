@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for name-resolution/scopes
 
 ## Intent
-
 Tests verify the lexical-scoping behaviors described in
 [`docs/llm-generated/name-resolution/scopes.md`](../../../docs/llm-generated/name-resolution/scopes.md):
 which AST nodes introduce a fresh `Scope`, what is reachable from
@@ -34,8 +33,8 @@ check, before any backend lowering).
 Multi-backend rule: every claim in this doc is target-independent, so
 each test uses a single directive.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A sibling of the outer decl that mentions a generic type parameter cannot reach it; its scope chain does not pass through the GenericDecl. | negative | [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/scopes.md#edge-cases-and-failure-modes) | [`generic-param-not-visible-in-sibling-decl.slang`](generic-param-not-visible-in-sibling-decl.slang) |
@@ -64,8 +63,12 @@ each test uses a single directive.
 | Re-opening the same namespace name reuses the existing NamespaceDecl and links siblings; members from both declarations are reachable via the same qualified name. | functional | [#sibling-scopes](../../../docs/llm-generated/name-resolution/scopes.md#sibling-scopes) | [`namespace-reopened-merges-members.slang`](namespace-reopened-merges-members.slang) |
 | When a module is imported, the checker adds its scope as a sibling so names from it are reachable without explicit qualification; the core module's builtins (e.g. `sin`) are reachable through this mechanism. | functional | [#sibling-scopes](../../../docs/llm-generated/name-resolution/scopes.md#sibling-scopes) | [`builtin-from-implicit-core-module.slang`](builtin-from-implicit-core-module.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+NA
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#sibling-scopes](../../../docs/llm-generated/name-resolution/scopes.md#sibling-scopes) | ambiguous-claim | The `## Sibling scopes` section enumerates three concrete uses of the sibling chain (multi-file modules, imports, re-opened namespaces) but does not promise a user-visible diagnostic for the "two siblings define the same name" ambiguity case. The closely related ambiguous-reference diagnostic is anchored from `name-resolution/lookup.md` in the pipeline/03-semantic-check bundle; if scopes.md were extended with a one-line note about the ambiguity surface, the test could be re-anchored here. |  |
@@ -74,8 +77,3 @@ each test uses a single directive.
 | [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/scopes.md#edge-cases-and-failure-modes) | undocumented-behavior | The `## Edge cases and failure modes` section mentions `UnparsedStmt` capturing `currentScope` and `outerScope` at parse time, but its observable consequence (which decls a deferred-body function sees once it is finally parsed) overlaps with pipeline/03-semantic-check's `function-body-checked-after-parser-handoff` test. No additional scopes-specific surface is documented; if the doc enumerated a scope-visibility consequence distinct from the parse-handoff one, a separate test could anchor here. |  |
 | [#concepts](../../../docs/llm-generated/name-resolution/scopes.md#concepts) | undocumented-behavior | The `## Concepts` section gives a precise description of `Scope`'s three fields and the `containerDecl` ownership convention. None of those properties are observable through `slang-test`; they show up only in IR/AST dumps or in internal asserts. Tests for those would have to fish through `-dump-ir` (which lowers past scopes already) and are not anchorable here. |  |
 | [#concepts](../../../docs/llm-generated/name-resolution/scopes.md#concepts) | undocumented-behavior | The `## Concepts` section lists `LambdaDecl (parameter scope)` and `parseIfLetStatement (synthetic)` in the scope-bearing table. Lambdas have a complete surface in `tests/language-feature/lambda/` but no scope-specific claim is restated in scopes.md beyond "a dedicated ScopeDecl for the parameter list". A test for "lambda parameter is not visible outside the lambda body" would anchor to an implicit consequence rather than an explicit one; deferred until the doc enumerates that boundary. |  |
-
-## Untested claims
-
-(none)
-

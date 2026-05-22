@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for ir-reference/control-flow
 
 ## Intent
-
 Tests verify the per-opcode catalog of the IR control-flow family
 described in
 [`docs/llm-generated/ir-reference/control-flow.md`](../../../docs/llm-generated/ir-reference/control-flow.md):
@@ -38,8 +37,8 @@ to a single block. Switch case labels in one test use
 values appear as inline literal operands regardless of declaration
 form.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | A block parameter encodes Slang IR's replacement for an SSA phi node — the receiving block declares the param, predecessors supply the matching argument on their unconditionalBranch. | functional | [#block-and-param](../../../docs/llm-generated/ir-reference/control-flow.md#block-and-param) | [`block-param-from-switch-merge.slang`](block-param-from-switch-merge.slang) |
@@ -80,8 +79,8 @@ form.
 | Boundary: a `break;` inside a switch nested in a loop targets the switch's breakLabel — it leaves the switch, not the enclosing loop. Both a switch terminator and a loop terminator coexist with distinct break labels. | boundary | [#terminators-unconditional-branches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-unconditional-branches) | [`break-from-switch-inside-loop.slang`](break-from-switch-inside-loop.slang) |
 | unconditionalBranch carries argument operands beyond the target block; these become the values bound to the target's block params, the Slang-IR SSA phi handoff. | functional | [#terminators-unconditional-branches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-unconditional-branches) | [`unconditional-branch-with-args.slang`](unconditional-branch-with-args.slang) |
 
-## Untested claims
 
+## Untested claims
 | Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
 | **`defer`** — `DeferStmt` lowers to `defer`, but the natural surface form is non-trivial to write portably. | (unclassified) | [#defer](../../../docs/llm-generated/ir-reference/control-flow.md#defer) | Reason and explanation to be refined by the next regeneration. |
@@ -93,8 +92,8 @@ form.
 | **`missingReturn`** — synthesized by lowering when a non-`void` function falls off the end; the natural surface is rejected as a diagnostic before IR is dumped. | link-stage-only | [#missingreturn](../../../docs/llm-generated/ir-reference/control-flow.md#missingreturn) | Synthesized at a later IR pass than this bundle's `pipeline_stage` observes; the test belongs in the bundle whose pipeline stage matches. |
 | **`targetSwitch`** — synthesized by the multi-target lowering pass; not produced from surface code on the LOWER-TO-IR stage. | link-stage-only | [#targetswitch](../../../docs/llm-generated/ir-reference/control-flow.md#targetswitch) | Synthesized at a later IR pass than this bundle's `pipeline_stage` observes; the test belongs in the bundle whose pipeline stage matches. |
 
-## Doc gaps observed
 
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#conditionalbranch](../../../docs/llm-generated/ir-reference/control-flow.md#conditionalbranch) | undocumented-behavior | The doc lists `conditionalBranch` with no AST origin and notes that it is the lower-level form, but does not state explicitly that the front-end *never* emits it directly from surface code. | A note pinning the producer (some later IR-pass / legalization step) would make the cross-bundle boundary with `cross-cutting/ir-instructions` clearer. |

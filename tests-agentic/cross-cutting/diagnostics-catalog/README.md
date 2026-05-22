@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for cross-cutting/diagnostics-catalog
 
 ## Intent
-
 This bundle is the systematic negative-test sweep called for by the
 agentic-tests plan §15.3: one `DIAGNOSTIC_TEST` file per diagnostic
 code that the Slang compiler can emit, anchored to the structured
@@ -30,15 +29,8 @@ because almost every reproduction also fires a follow-up parser or
 checker diagnostic; `non-exhaustive` lets us pin just the target
 catalog code.
 
-## Catalog coverage
-
-| Bucket | Codes in bucket | Tests added | Codes dropped |
-| ------ | --------------- | ----------- | ------------- |
-| 0      | 123             | 39          | 84            |
-| 3      | 123             | 105         | 18            |
 
 ## Functional coverage
-
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | Drop note for E30098 (non-static-member-function-not-allowed-as-diff-operand); see README.md | negative | source/slang/slang-diagnostics.lua | [`30098-non-static-member-function-not-allowed-as-diff-operand.slang`](30098-non-static-member-function-not-allowed-as-diff-operand.slang) |
@@ -365,8 +357,23 @@ catalog code.
 | Fires diagnostic W40010 (float-literal-too-small) - floating-point literal too small | negative | source/slang/slang-diagnostics.lua | [`40010-float-literal-too-small.slang`](40010-float-literal-too-small.slang) |
 | Placeholder file - code 30025 is not in bucket 1 (asserts a benign program does not spuriously emit E30025) | negative | source/slang/slang-diagnostics.lua | [`30025-not-applicable.slang`](30025-not-applicable.slang) |
 
-## Codes dropped (could not reach from minimum input)
 
+## Untested claims
+NA
+
+
+## Doc gaps observed
+NA
+
+
+## Catalog coverage
+| Bucket | Codes in bucket | Tests added | Codes dropped |
+| ------ | --------------- | ----------- | ------------- |
+| 0      | 123             | 39          | 84            |
+| 3      | 123             | 105         | 18            |
+
+
+## Codes dropped (could not reach from minimum input)
 | Code | Name | Reason |
 | ---- | ---- | ------ |
 | E2 | cannot-find-file | Driver-only diagnostic (file-system search across include paths); not emitted from .slang content. |
@@ -471,4 +478,3 @@ catalog code.
 | E39025 | conflicting-vulkan-inferred-binding-for-parameter | Requires two parameters whose Vulkan binding inference happens to overlap; minimum repro not found in 2 attempts. |
 | E39031 | class-type-not-supported | Triggering this with `class X { int a; } X x;` segfaults the compiler in this build; do not lock in buggy behavior. |
 | E39998 | generic-evaluation-recursion-limit-exceeded | Requires generic evaluation depth above `kMaxTypeNestingDepth`; needs synthesized deep generic chain beyond minimum repro. |
-

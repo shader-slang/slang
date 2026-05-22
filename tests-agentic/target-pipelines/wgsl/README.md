@@ -12,7 +12,6 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for target-pipelines/wgsl
 
 ## Intent
-
 This bundle exercises the **WGSL target pipeline** documented at
 `docs/llm-generated/target-pipelines/wgsl.md`. The doc enumerates
 four phases (Link / Specialization / WGSL legalization / Emit +
@@ -22,8 +21,8 @@ compute stage and FileCheck on the WGSL emit text. All tests run
 with `-target wgsl -entry main -stage compute` against the
 `slangc` text emitter; no Tint, no runtime, no GPU.
 
-## Functional coverage
 
+## Functional coverage
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
 | The wgsl-spirv target hands the emitted WGSL text to Tint which produces a SPIR-V module whose OpEntryPoint names main | functional | [#downstream-tint](../../../docs/llm-generated/target-pipelines/wgsl.md#downstream-tint) | [`tint-downstream-spirv-emit.slang`](tint-downstream-spirv-emit.slang) |
@@ -89,8 +88,19 @@ with `-target wgsl -entry main -stage compute` against the
 | Module-scope static variables become var<private> with the initializer fired inside main | functional | [#specializeaddressspaceforwgsl](../../../docs/llm-generated/target-pipelines/wgsl.md#specializeaddressspaceforwgsl) | [`static-module-global-becomes-private.slang`](static-module-global-becomes-private.slang) |
 | groupshared declarations are tagged var<workgroup> by specializeAddressSpaceForWGSL | functional | [#specializeaddressspaceforwgsl](../../../docs/llm-generated/target-pipelines/wgsl.md#specializeaddressspaceforwgsl) | [`groupshared-becomes-workgroup-address-space.slang`](groupshared-becomes-workgroup-address-space.slang) |
 
-## Doc gaps observed
 
+## Untested claims
+| Claim | Reason | Anchor | Why untested |
+| --- | --- | --- | --- |
+| **`AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>`.** The Slang front-end rejects these in a WGSL compute entry point with `E36107`, so the `lowerAppendConsumeStructuredBuffers` pass that runs for WGSL is not reachable from a `.slang` source. | (unclassified) | [#e36107](../../../docs/llm-generated/target-pipelines/wgsl.md#e36107) | Reason and explanation to be refined by the next regeneration. |
+| **HLSL-style `InterlockedAdd` / `InterlockedExchange`.** Slang rejects these for WGSL; use `Atomic<T>` instead (covered by `atomic-add-buffer.slang`). | (unclassified) | [#interlockedadd](../../../docs/llm-generated/target-pipelines/wgsl.md#interlockedadd) | Reason and explanation to be refined by the next regeneration. |
+| **`legalizeEntryPointsForGLSL`, `legalizeImageSubscript`, `legalizeConstantBufferLoadForGLSL`.** GLSL/SPIR-V only. | (unclassified) | [#legalizeentrypointsforglsl](../../../docs/llm-generated/target-pipelines/wgsl.md#legalizeentrypointsforglsl) | Reason and explanation to be refined by the next regeneration. |
+| **WGSL has no iterative passes (zero loops in `linkAndOptimizeIR`).** A textual claim about the absence of a while loop; not directly observable in emitted text. | (unclassified) | [#linkandoptimizeir](../../../docs/llm-generated/target-pipelines/wgsl.md#linkandoptimizeir) | Reason and explanation to be refined by the next regeneration. |
+| **Pass-ordering inside Phase A/B/C.** Pass existence is observable from emitted text; intra-phase ordering needs `-dump-ir` anchors that the doc does not pin. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |
+| **DXR / mesh / ray-tracing / graphics-stage entry points.** WGSL has no DXR or ray-tracing surface; ray-tracing entry points are covered in the HLSL and SPIR-V target-pipeline bundles instead. | out-of-bundle | (unspecified) | WGSL fundamentally lacks the ray-tracing surface; covered by the `hlsl` / `spirv` sibling bundles. |
+
+
+## Doc gaps observed
 | Anchor | Kind | Gap | Suggested addition |
 | --- | --- | --- | --- |
 | [#phase-d-](../../../docs/llm-generated/target-pipelines/wgsl.md#phase-d-) | undocumented-behavior | The doc names the `i32(N)` / `u32(N)` / `<value>f` literal spellings only obliquely (in passing inside the address-space discussion). | A short subsection under "Phase D" that pins down the literal-emit shapes (and the `vec<rank><elem>` rule for WGSL vector types) would let tests anchor directly to that subsection instead of to the broad `#phase-d-...` anchor. |
@@ -101,18 +111,3 @@ with `-target wgsl -entry main -stage compute` against the
 | [#texture2dfloat4](../../../docs/llm-generated/target-pipelines/wgsl.md#texture2dfloat4) | undocumented-behavior | The doc names the Phase-D `Texture2D<float4>` emit shape (`texture_2d<f32>`) but does not enumerate the **per-Slang- texture-variant → WGSL `texture_*<f32>` mapping** for `Texture1D` (`texture_1d`), `Texture3D` (`texture_3d`), `TextureCube` (`texture_cube`), `Texture2DArray` (`texture_2d_array`), or `RWTexture2D` (`texture_storage_2d<format, access>`). A Phase-D subsection with the table would let texture-variant tests anchor each mapping precisely. |  |
 | [#sample](../../../docs/llm-generated/target-pipelines/wgsl.md#sample) | undocumented-behavior | The doc does not describe how Slang lowers the various texture-access intrinsics (`Sample`, `SampleLevel`, `SampleGrad`, `Load`) to their WGSL counterparts (`textureSample`, `textureSampleLevel`, `textureSampleGrad`, `textureLoad`). A subsection would let sample-shape tests anchor concretely. |  |
 | [#rwtexture2dfloat4](../../../docs/llm-generated/target-pipelines/wgsl.md#rwtexture2dfloat4) | undocumented-behavior | The doc does not document how WGSL's storage-texture format is inferred from the Slang element type (`RWTexture2D<float4>` → `rgba32float`). The `RWTexture2D.Load` / `.Store` test anchors broadly to Phase D; pinning the inferred-format rule would let it anchor precisely. |  |
-
-## Untested coverable claims
-
-(none)
-
-## Untested claims
-
-| Claim | Reason | Anchor | Why untested |
-| --- | --- | --- | --- |
-| **`AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>`.** The Slang front-end rejects these in a WGSL compute entry point with `E36107`, so the `lowerAppendConsumeStructuredBuffers` pass that runs for WGSL is not reachable from a `.slang` source. | (unclassified) | [#e36107](../../../docs/llm-generated/target-pipelines/wgsl.md#e36107) | Reason and explanation to be refined by the next regeneration. |
-| **HLSL-style `InterlockedAdd` / `InterlockedExchange`.** Slang rejects these for WGSL; use `Atomic<T>` instead (covered by `atomic-add-buffer.slang`). | (unclassified) | [#interlockedadd](../../../docs/llm-generated/target-pipelines/wgsl.md#interlockedadd) | Reason and explanation to be refined by the next regeneration. |
-| **`legalizeEntryPointsForGLSL`, `legalizeImageSubscript`, `legalizeConstantBufferLoadForGLSL`.** GLSL/SPIR-V only. | (unclassified) | [#legalizeentrypointsforglsl](../../../docs/llm-generated/target-pipelines/wgsl.md#legalizeentrypointsforglsl) | Reason and explanation to be refined by the next regeneration. |
-| **WGSL has no iterative passes (zero loops in `linkAndOptimizeIR`).** A textual claim about the absence of a while loop; not directly observable in emitted text. | (unclassified) | [#linkandoptimizeir](../../../docs/llm-generated/target-pipelines/wgsl.md#linkandoptimizeir) | Reason and explanation to be refined by the next regeneration. |
-| **Pass-ordering inside Phase A/B/C.** Pass existence is observable from emitted text; intra-phase ordering needs `-dump-ir` anchors that the doc does not pin. | implementation-detail | (unspecified) | Internal compiler choice (pass ordering, hoistability decisions, deduplication) with no test-directive that reveals it. |
-| **DXR / mesh / ray-tracing / graphics-stage entry points.** WGSL has no DXR or ray-tracing surface; ray-tracing entry points are covered in the HLSL and SPIR-V target-pipeline bundles instead. | out-of-bundle | (unspecified) | WGSL fundamentally lacks the ray-tracing surface; covered by the `hlsl` / `spirv` sibling bundles. |
