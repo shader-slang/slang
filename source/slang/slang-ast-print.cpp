@@ -1022,7 +1022,7 @@ void ASTPrinter::addExpr(Expr* expr)
 
         sb << "<";
         bool first = true;
-        for (auto arg : partiallyAppliedGenericExpr->knownGenericArgs)
+        for (auto arg : partiallyAppliedGenericExpr->providedOrdinaryArgs)
         {
             if (!first)
                 sb << ", ";

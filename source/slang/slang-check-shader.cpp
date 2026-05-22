@@ -2965,17 +2965,18 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         if (auto partiallyAppliedExpr = as<PartiallyAppliedGenericExpr>(checkedExpr))
         {
             // If checked generic is partially applied generic, we try to force conversion into
-            // a fully defined declref by calling `trySolveConstraintSystem`.
-            SemanticsVisitor::ConstraintSystem system;
-            system.genericDecl = genericDeclRef.getDecl();
+            // a fully defined declref by calling `trySolveGenericArguments`.
+            SemanticsVisitor::GenericInferenceContext inferenceContext;
+            inferenceContext.genericDecl = genericDeclRef.getDecl();
             ConversionCost outCost;
-            specializedFuncDeclRef = visitor
-                                         .trySolveConstraintSystem(
-                                             _Move(system),
-                                             genericDeclRef,
-                                             partiallyAppliedExpr->knownGenericArgs.getArrayView(),
-                                             outCost)
-                                         .as<FuncDecl>();
+            specializedFuncDeclRef =
+                visitor
+                    .trySolveGenericArguments(
+                        _Move(inferenceContext),
+                        genericDeclRef,
+                        partiallyAppliedExpr->providedOrdinaryArgs.getArrayView(),
+                        outCost)
+                    .as<FuncDecl>();
         }
         else if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
         {

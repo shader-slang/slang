@@ -912,8 +912,8 @@ class PackBranchTypeExpr : public Expr
     FIDDLE() TypeExp nonEmptyType;
 };
 
-/// An expression that applies a generic to arguments for some,
-/// but not all, of its explicit parameters.
+/// An expression that applies a generic after only some of its ordinary
+/// arguments have been provided.
 ///
 FIDDLE()
 class PartiallyAppliedGenericExpr : public Expr
@@ -926,8 +926,8 @@ public:
     /// The generic being applied
     DeclRef<GenericDecl> baseGenericDeclRef;
 
-    /// A substitution that includes the generic arguments known so far
-    List<Val*> knownGenericArgs;
+    /// Ordinary arguments already provided by the partial generic application.
+    List<Val*> providedOrdinaryArgs;
 };
 
 
