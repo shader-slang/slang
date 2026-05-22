@@ -56,3 +56,52 @@ SLANG_UNIT_TEST(replayStreamDecoderBoundsSkippedArrayDepth)
 
     SLANG_CHECK(containsString(decoded, "Maximum replay decode nesting depth exceeded"));
 }
+
+SLANG_UNIT_TEST(replayStreamDecoderBoundsDecodedArrayDepth)
+{
+    // Nest arrays deeper than kMaxReplayDecodeNestingDepth with count=1 at every
+    // level so traversal stays on the decode path (i < kMaxDisplayedArrayElementCount)
+    // and exercises checkReplayDecodeNestingDepth inside decodeValueFromStream,
+    // complementing the skip-path coverage above.
+    ReplayStream stream;
+    for (int i = 0; i < 70; ++i)
+        writeArrayHeader(stream, 1);
+    writeReplayTypeId(stream, TypeId::Null);
+
+    ReplayStream reader = stream.createReader();
+    String decoded = ReplayStreamDecoder::decode(reader);
+
+    SLANG_CHECK(containsString(decoded, "Maximum replay decode nesting depth exceeded"));
+}
+
+SLANG_UNIT_TEST(replayStreamDecoderRejectsArrayLargerThanStream)
+{
+    // Count fits under the 1M element cap but exceeds the bytes remaining in the
+    // stream, so validateReplayDecodeArrayElementCount must reach the
+    // count > remainingBytes guard. This is the realistic attack: the cap alone
+    // would still let a small-but-too-large count slip through.
+    ReplayStream stream;
+    writeArrayHeader(stream, 500);
+    writeReplayTypeId(stream, TypeId::Null);
+
+    ReplayStream reader = stream.createReader();
+    String decoded = ReplayStreamDecoder::decode(reader);
+
+    SLANG_CHECK(containsString(decoded, "exceeds remaining stream bytes"));
+}
+
+SLANG_UNIT_TEST(replayStreamDecoderRejectsInvalidArrayCountType)
+{
+    // The pre-PR code blindly skipped the count's TypeId byte. The new
+    // readReplayDecodeArrayElementCount rejects anything other than UInt64;
+    // pin that behavior so a future refactor cannot silently weaken it.
+    ReplayStream stream;
+    writeReplayTypeId(stream, TypeId::Array);
+    writeReplayTypeId(stream, TypeId::UInt32);
+    writeUInt64Payload(stream, 0);
+
+    ReplayStream reader = stream.createReader();
+    String decoded = ReplayStreamDecoder::decode(reader);
+
+    SLANG_CHECK(containsString(decoded, "Array element count has invalid type"));
+}
