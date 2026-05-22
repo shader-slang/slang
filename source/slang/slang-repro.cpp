@@ -1286,6 +1286,7 @@ struct LoadContext
         auto readResult = reader.read(outBuffer.getBuffer(), remainingSize);
         if (SLANG_FAILED(readResult))
         {
+            outBuffer.clear();
             sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
             return readResult;
         }
