@@ -18,6 +18,17 @@ static void _checkEncodeDecode(uint32_t size)
     SLANG_CHECK(chars - (const char*)encode == encodeSize);
 }
 
+static void _checkAllocateOverflowDoesNotWrap(size_t dataSize, size_t size, size_t alignment)
+{
+    OffsetContainer container;
+    container.m_dataSize = dataSize;
+
+    void* data = container.allocate(size, alignment);
+
+    SLANG_CHECK(data == nullptr);
+    SLANG_CHECK(container.getDataCount() == dataSize);
+}
+
 namespace
 { // anonymous
 
@@ -38,6 +49,9 @@ SLANG_UNIT_TEST(offsetContainer)
     {
         _checkEncodeDecode(uint32_t(i));
     }
+
+    _checkAllocateOverflowDoesNotWrap(SIZE_MAX - 7, 16, 1);
+    _checkAllocateOverflowDoesNotWrap(SIZE_MAX - 3, 1, 8);
 
     {
         OffsetContainer container;

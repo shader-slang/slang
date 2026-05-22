@@ -129,12 +129,27 @@ void OffsetContainer::fixAlignment(size_t alignment)
 
 void* OffsetContainer::allocate(size_t size, size_t alignment)
 {
-    size_t offset = (m_dataSize + alignment - 1) & ~(alignment - 1);
-
-    if (offset + size > m_capacity)
+    if (alignment == 0)
     {
-        const size_t minSize = offset + size;
+        return nullptr;
+    }
 
+    const size_t alignmentMask = alignment - 1;
+    if (m_dataSize > SIZE_MAX - alignmentMask)
+    {
+        return nullptr;
+    }
+
+    size_t offset = (m_dataSize + alignmentMask) & ~alignmentMask;
+    if (size > SIZE_MAX - offset)
+    {
+        return nullptr;
+    }
+
+    const size_t minSize = offset + size;
+
+    if (minSize > m_capacity)
+    {
         size_t calcSize = m_capacity;
         if (calcSize < 2048)
         {
@@ -150,19 +165,28 @@ void* OffsetContainer::allocate(size_t size, size_t alignment)
         size_t newSize = (calcSize < minSize) ? minSize : calcSize;
 
         // Reallocate space
-        m_data = (uint8_t*)::realloc(m_data, newSize);
+        uint8_t* newData = (uint8_t*)::realloc(m_data, newSize);
+        if (!newData)
+        {
+            return nullptr;
+        }
+        m_data = newData;
         m_capacity = newSize;
     }
 
-    SLANG_ASSERT(offset + size <= m_capacity);
+    SLANG_ASSERT(minSize <= m_capacity);
 
-    m_dataSize = offset + size;
+    m_dataSize = minSize;
     return m_data + offset;
 }
 
 void* OffsetContainer::allocateAndZero(size_t size, size_t alignment)
 {
     void* data = allocate(size, alignment);
+    if (!data)
+    {
+        return nullptr;
+    }
     memset(data, 0, size);
     return data;
 }
