@@ -71,7 +71,7 @@ jobs:
           ./build/${{ env.cmake_config }}/bin/slangc -help-style markdown -h > docs/command-line-slangc-reference.md 2>&1
 
       - name: Upload generated reference
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
         with:
           name: command-line-reference
           path: pr-branch/docs/command-line-slangc-reference.md
@@ -100,7 +100,7 @@ jobs:
       - name: Download generated reference
         id: download-doc
         if: needs.generate_cmdline_ref.result == 'success'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@81eafdc926c95ab3a46553696557fe28c599a41a # v4
         with:
           name: command-line-reference
           path: generated-docs
@@ -170,12 +170,13 @@ jobs:
             ${{
               needs.generate_cmdline_ref.result != 'success'
               && format('❌ Command line reference generation failed. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
-              || (failure()
+              || (steps.create-pr.conclusion != 'success'
                   && format('❌ Failed to create regenerate command line reference pull request. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
                   || format('🌈 Regenerated command line reference, please merge the changes from [this PR]({0})', steps.create-pr.outputs.pull-request-url))
             }}
 
       - name: Add reaction
+        if: needs.generate_cmdline_ref.result == 'success'
         uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
