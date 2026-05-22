@@ -3760,7 +3760,7 @@ static Type* _findReplacementThisParamType(IRGenContext* context, DeclRef<Decl> 
 // front end is `convertHigherOrderExprToLookup`, which rewrites
 // `__fwd_diff(member.method)` / `__bwd_diff(member.method)` into a
 // member access on the function-as-type of the underlying member method
-// (the AD 2.0 rewrite). The four lowering call sites that consult this
+// (the AD 2.0 rewrite). The lowering call sites that consult this
 // helper therefore use it as a stand-in for "this DeclRef came out of
 // the AD 2.0 rewrite". If a future change introduces a fresh
 // `LookupDeclRef`-on-`CallableDecl` shape from a non-AD producer, every
