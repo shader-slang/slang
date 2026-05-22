@@ -546,6 +546,20 @@ static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRe
     return t;
 }
 
+// Deserialize a flat module representation produced by serializeAsFlatModule.
+//
+// The bounds-checking guards in this function use SLANG_RELEASE_ASSERT, which
+// aborts the host process on failure. This is deliberate: the routine is part
+// of the IR (de)serializer's internal trust boundary and is expected to be
+// reached only from well-formed blobs (either fresh writer output or
+// previously validated cached artifacts). The asserts are defense-in-depth
+// against an internal-encoder bug or accidental corruption rather than a
+// general-purpose untrusted-input parser. Callers that must accept genuinely
+// untrusted .slang-module blobs (e.g. a long-running host loading
+// third-party-distributed modules) should validate the blob through a layered
+// boundary before reaching this routine, or a follow-up refactor should
+// thread Result back out of this function so failure surfaces as SLANG_FAIL
+// rather than process abort.
 static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serializer, IRModule* module)
 {
     IRSerialReadContext& readContext = *serializer.getContext();
