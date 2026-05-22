@@ -15,7 +15,10 @@ using namespace Slang;
 
 static void appendUInt32(List<uint8_t>& data, uint32_t value)
 {
-    data.addRange(reinterpret_cast<const uint8_t*>(&value), sizeof(value));
+    data.add(uint8_t((value >> 0) & 0xFF));
+    data.add(uint8_t((value >> 8) & 0xFF));
+    data.add(uint8_t((value >> 16) & 0xFF));
+    data.add(uint8_t((value >> 24) & 0xFF));
 }
 
 static ComPtr<slang::IBlob> createVMByteCodeWithStringCount(uint32_t stringCount)
