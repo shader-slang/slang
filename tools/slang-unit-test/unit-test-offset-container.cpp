@@ -252,6 +252,26 @@ SLANG_UNIT_TEST(offsetContainer)
         SLANG_CHECK(emptyBase.asRaw(ptr) == nullptr);
     }
 
+    // _getRaw overflow safety: with m_dataSize close to UINT32_MAX and an
+    // offset near UINT32_MAX, the disjunctive check
+    // `offset > m_dataSize || size > m_dataSize - offset`
+    // must reject. A future "simplification" to `offset + size > m_dataSize`
+    // computed in uint32_t would wrap silently and yield a false negative.
+    //
+    // We never dereference the spoofed range — _getRaw returns nullptr before
+    // touching m_data — so a 1-byte stack buffer is safe to spoof.
+    {
+        uint8_t dummy = 0;
+        MemoryOffsetBase base;
+        // Spoof a very large dataSize without actually allocating it.
+        base.set(&dummy, size_t(0xFFFFFFFDu));
+
+        // offset (0xFFFFFFFCu) > m_dataSize? false.
+        // size (4) > m_dataSize - offset (1)? true → reject.
+        Offset32Ptr<uint32_t> hugeOffsetPtr(0xFFFFFFFCu);
+        SLANG_CHECK(base.asRaw(hugeOffsetPtr) == nullptr);
+    }
+
     // Offset32Array::operator[] positive coverage at 0 and count-1.
     // The bounds check is a SLANG_RELEASE_ASSERT; this test would trip the
     // assert if the check were ever inverted (e.g. `<=` instead of `<`).

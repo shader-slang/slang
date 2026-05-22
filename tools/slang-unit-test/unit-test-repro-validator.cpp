@@ -491,6 +491,55 @@ SLANG_UNIT_TEST(reproStateValidator)
         SLANG_CHECK(!isReproStateValid(buf));
     }
 
+    // 19i. validateStringPtrArray with requireElements = false: an entry point
+    // whose specializationArgStrings is a 1-element array with a null element
+    // must be accepted. Pins the only `requireElements = false` call site so a
+    // future "harmonisation" to `true` would fail this test.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto tuArray = container.newArray<ReproUtil::TranslationUnitRequestState>(1);
+        auto epArray = container.newArray<ReproUtil::EntryPointState>(1);
+        auto specArgArray = container.newArray<Offset32Ptr<OffsetString>>(1);
+
+        container[requestPtr]->translationUnits = tuArray;
+        container[requestPtr]->entryPoints = epArray;
+        // translationUnitIndex == 0 is valid (translationUnitCount == 1).
+        container[epArray[0]].translationUnitIndex = 0;
+        container[epArray[0]].specializationArgStrings = specArgArray;
+        // specArgArray[0] is null by zero-init — must be accepted.
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(isReproStateValid(buf));
+    }
+
+    // 19j. Alignment check: an Offset32Array<T> whose m_data.m_offset is not
+    // aligned to alignof(T) must be rejected. Pins the
+    // `if (alignment > 1 && (offset % alignment) != 0)` branch in
+    // isRangeInBounds against accidental removal.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto filesArray = container.newArray<Offset32Ptr<ReproUtil::FileState>>(1);
+        container[requestPtr]->files = filesArray;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+
+        // RequestState.files is an Offset32Array { m_data: Offset32Ptr (4
+        // bytes), m_count: uint32_t (4 bytes) }. m_data.m_offset is the first
+        // 4 bytes of the array struct, located at
+        // kStartOffset + offsetof(RequestState, files).
+        const size_t filesMDataOffset = kStartOffset + offsetof(ReproUtil::RequestState, files);
+        uint32_t* mDataSlot = reinterpret_cast<uint32_t*>(buf.getBuffer() + filesMDataOffset);
+        uint32_t originalOffset = *mDataSlot;
+        SLANG_CHECK((originalOffset % 4) == 0);
+        // +1 makes the array start misaligned for any T with alignment > 1.
+        *mDataSlot = originalOffset + 1;
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
     // 20. ReproUtil::getRequest size-guard boundary: N-1 / N / N+1, where
     // N = kStartOffset + sizeof(RequestState). Locks in the unconditional
     // minimum-size check getRequest applies before casting the payload.
