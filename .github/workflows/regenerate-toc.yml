@@ -2,25 +2,31 @@ name: Regenerate TOC
 on:
   repository_dispatch:
     types: [regenerate-toc-command]
+permissions:
+  contents: read
 jobs:
   regenerate-toc:
+    if: >-
+      github.repository == 'shader-slang/slang' &&
+      github.event.client_payload.github.payload.repository.full_name == 'shader-slang/slang' &&
+      github.event.client_payload.pull_request.base.repo.full_name == 'shader-slang/slang'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.SLANGBOT_PAT }}
           repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
           ref: ${{ github.event.client_payload.pull_request.head.ref }}
           path: pr-branch
+          persist-credentials: false
 
       - name: Checkout target branch
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.SLANGBOT_PAT }}
-          repository: ${{ github.event.client_payload.pull_request.base.repo.full_name }}
+          repository: shader-slang/slang
           ref: ${{ github.event.client_payload.pull_request.base.ref }}
           path: target-branch
+          persist-credentials: false
 
       - name: Install Mono
         run: |
@@ -61,12 +67,16 @@ jobs:
           push-to-fork: ${{ steps.git-info.outputs.bot_name }}/slang
           delete-branch: true
 
+      - name: Remove signing key
+        if: always()
+        run: rm -f "${{ runner.temp }}/signing_key"
+
       - name: Comment on PR
         uses: peter-evans/create-or-update-comment@v4
         if: always()
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
-          repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
+          repository: shader-slang/slang
           issue-number: ${{ github.event.client_payload.pull_request.number }}
           body: |
             ${{ 
@@ -81,7 +91,7 @@ jobs:
         uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
-          repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
+          repository: shader-slang/slang
           comment-id: ${{ github.event.client_payload.github.payload.comment.id }}
           reactions-edit-mode: replace
           reactions: hooray

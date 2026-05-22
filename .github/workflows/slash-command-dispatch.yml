@@ -2,6 +2,10 @@ name: Slash Command Dispatch
 on:
   issue_comment:
     types: [created]
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
 jobs:
   slashCommandDispatch:
     if: github.repository == 'shader-slang/slang'
@@ -23,12 +27,12 @@ jobs:
               },
               {
                 "command": "regenerate-toc",
-                "permission": "none",
+                "permission": "write",
                 "issue_type": "pull-request"
               },
               {
                 "command": "regenerate-cmdline-ref",
-                "permission": "none",
+                "permission": "write",
                 "issue_type": "pull-request"
               }
             ]
