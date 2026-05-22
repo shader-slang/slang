@@ -352,7 +352,7 @@ public:
     T& asRaw(const Offset32Ref<T>& ref)
     {
         uint8_t* raw = _getRaw(ref.m_offset, sizeof(T));
-        SLANG_ASSERT(raw);
+        SLANG_RELEASE_ASSERT(raw);
         return *(T*)raw;
     }
 
@@ -368,7 +368,7 @@ public:
     T& operator[](const Offset32Ref<T>& ref)
     {
         uint8_t* raw = _getRaw(ref.m_offset, sizeof(T));
-        SLANG_ASSERT(raw);
+        SLANG_RELEASE_ASSERT(raw);
         return *(T*)raw;
     }
 
