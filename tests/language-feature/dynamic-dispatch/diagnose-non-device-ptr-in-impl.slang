@@ -6,11 +6,9 @@
 // after AnyValue round-tripping.
 //
 // Plain pointers (int*) default to device address space and are allowed
-// in interface implementations on targets that support pointer-in-AnyValue
-// (CPU, CUDA). On SPIRV, pointer fields in AnyValue produce type mismatches
-// and are rejected with error 41014.
+// in interface implementations.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "ImplGroupsharedPtr:IFoo=0" -conformance "ImplRefField:IFoo=1" -conformance "GoodImpl:IFoo=2"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "ImplGroupsharedPtr:IFoo=0" -conformance "ImplRefField:IFoo=1" -conformance "GoodImpl:IFoo=2" -conformance "GoodImplDevicePtr:IFoo=3"
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "ImplGroupsharedPtr:IFoo=0" -conformance "ImplRefField:IFoo=1" -conformance "GoodImpl:IFoo=2" -conformance "GoodImplDevicePtr:IFoo=3"
 
 interface IFoo

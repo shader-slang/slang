@@ -9,7 +9,8 @@ Pipeline:
        `RWStructuredBuffer<uint> __slang_coverage`. Counter slots are
        assigned one-per-op in traversal order.
     2. Read the `.coverage-mapping.json` sidecar describing each
-       counter's `(file, line)`, or query the same data through
+       source coverage entry's counter/source mapping, or query the
+       same data through
        `ICoverageTracingMetadata`.
     3. Dispatch the shader, bound to the coverage buffer at the
        reflected binding reported by the metadata / sidecar.
@@ -61,6 +62,89 @@ def load_counters_text(src, count):
     return values[:count]
 
 
+def get_manifest_version(manifest):
+    version = manifest.get("version", 1)
+    if version not in (1, 2):
+        sys.exit(f"error: unsupported manifest version {version}")
+    return version
+
+
+def parse_manifest_int(value, field_name):
+    if isinstance(value, bool):
+        sys.exit(f"error: manifest {field_name} must be an integer")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if text and text.lstrip("-").isdigit():
+            return int(text)
+    sys.exit(f"error: manifest {field_name} must be an integer")
+
+
+def get_manifest_counter_count(manifest):
+    version = get_manifest_version(manifest)
+    try:
+        if version == 1:
+            total = parse_manifest_int(manifest["counters"], "counter count")
+        else:
+            total = parse_manifest_int(manifest["counter_count"], "counter count")
+    except (KeyError, TypeError, ValueError):
+        sys.exit("error: manifest is missing a valid counter count")
+    if total < 0:
+        sys.exit(f"error: manifest counter count must be non-negative, got {total}")
+    return total
+
+
+def iter_line_entries(manifest, skipped_by_kind=None):
+    version = get_manifest_version(manifest)
+    try:
+        entries = manifest["entries"]
+    except KeyError:
+        sys.exit("error: manifest is missing 'entries'")
+    if not isinstance(entries, list):
+        sys.exit("error: manifest entries must be an array")
+    for entry in entries:
+        if version == 1:
+            try:
+                yield (
+                    parse_manifest_int(entry["index"], "v1 entry index"),
+                    entry.get("file"),
+                    parse_manifest_int(entry["line"], "v1 entry line"),
+                )
+            except (AttributeError, KeyError, TypeError, ValueError):
+                sys.exit("error: invalid v1 entry in manifest")
+            continue
+        if version == 2:
+            try:
+                # Non-line kinds and counterless line entries are not
+                # representable in LCOV's line-oriented model and are
+                # intentionally skipped here. Record the skip category
+                # so `main` can surface a stderr summary for
+                # debuggability — future producers emitting branch /
+                # function / region entries should otherwise see empty
+                # LCOV with no diagnostic.
+                kind = entry.get("kind", "line")
+                if kind != "line":
+                    if skipped_by_kind is not None:
+                        skipped_by_kind[kind] = skipped_by_kind.get(kind, 0) + 1
+                    continue
+                counter = entry.get("counter")
+                if counter is None:
+                    if skipped_by_kind is not None:
+                        skipped_by_kind["line-counterless"] = (
+                            skipped_by_kind.get("line-counterless", 0) + 1
+                        )
+                    continue
+                yield (
+                    parse_manifest_int(counter, "v2 entry counter"),
+                    entry.get("file"),
+                    parse_manifest_int(entry["line"], "v2 entry line"),
+                )
+            except (AttributeError, KeyError, TypeError, ValueError):
+                sys.exit("error: invalid v2 line entry in manifest")
+            continue
+
+
 def main():
     p = argparse.ArgumentParser(
         description="Convert Slang coverage buffer + manifest to LCOV .info."
@@ -90,13 +174,7 @@ def main():
     with open(args.manifest) as f:
         manifest = json.load(f)
 
-    version = manifest.get("version", 1)
-    if version != 1:
-        sys.exit(f"error: unsupported manifest version {version}")
-
-    total = int(manifest["counters"])
-    if total < 0:
-        sys.exit(f"error: manifest 'counters' must be non-negative, got {total}")
+    total = get_manifest_counter_count(manifest)
     if args.counters:
         counters = load_counters_binary(args.counters, total)
     else:
@@ -111,12 +189,10 @@ def main():
     # but filter them out when exporting LCOV.
     hits_by_line = collections.defaultdict(lambda: collections.defaultdict(int))
     skipped_entries = 0
-    for entry in manifest["entries"]:
-        idx = entry["index"]
+    skipped_by_kind = {}
+    for idx, source, line in iter_line_entries(manifest, skipped_by_kind):
         if idx < 0 or idx >= len(counters):
-            sys.exit(f"error: entry index {idx} out of range [0, {len(counters)})")
-        source = entry.get("file")
-        line = int(entry["line"])
+            sys.exit(f"error: counter index {idx} out of range [0, {len(counters)})")
         if not source or line <= 0:
             skipped_entries += 1
             continue
@@ -135,6 +211,16 @@ def main():
         print(
             f"note: skipped {skipped_entries} coverage entr"
             f"{'y' if skipped_entries == 1 else 'ies'} without attributable source location",
+            file=sys.stderr,
+        )
+    for kind in sorted(skipped_by_kind):
+        count = skipped_by_kind[kind]
+        if kind == "line-counterless":
+            label = "line entries without a runtime counter"
+        else:
+            label = f"entries of kind {kind!r}"
+        print(
+            f"note: skipped {count} {label} not representable in LCOV",
             file=sys.stderr,
         )
 

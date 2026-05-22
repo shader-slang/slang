@@ -67,7 +67,7 @@ The coverage-specific public object is:
 Its intended use is:
 
 - coverage reporting
-- slot-to-source attribution
+- source-entry attribution
 - coverage manifest serialization through `slang_writeCoverageManifestJson`
 
 The coverage query methods are:
@@ -75,17 +75,26 @@ The coverage query methods are:
 - `getCounterCount()`
 - `getEntryInfo(index, ...)`
 - `getBufferInfo(...)`
+- `getEntryCount()`
 
 These answer:
 
-- how many counters exist
-- what each counter slot means
+- how many runtime counters exist
+- what each source coverage entry means
 - the legacy coverage-specific descriptor binding view
+- how many source coverage entries exist
 
-Line counters are source-location based. If generic specialization,
-inlining, or other IR cloning creates multiple executable copies of
-the same source line, all those copies contribute to that source
-line's counter rather than receiving per-specialization counters.
+Line counters are source-location based, but the current producer emits
+one source entry per inserted counter op. If generic specialization,
+inlining, or other IR cloning creates multiple executable copies that
+map to the same source line, those entries keep distinct counter slots;
+LCOV export aggregates them by `(file, line)` at report-generation
+time. For the current line-coverage mode, `getEntryCount()` equals
+`getCounterCount()`, `CoverageEntryInfo::kind` is `Line`, and
+`CoverageEntryInfo::counterIndex` selects the runtime counter slot.
+Future branch, function, and source-region coverage can add entries
+that carry function names, branch arm identity, or source ranges without
+changing the binding contract.
 
 Hosts use `ICoverageTracingMetadata` when they need to interpret the
 counter values they read back, or emit LCOV or manifest output.
@@ -263,7 +272,8 @@ For direct hosts, the intended usage is:
    - `ISyntheticResourceMetadata`
 4. query `ICoverageTracingMetadata` for:
    - counter count
-   - slot-to-source attribution
+   - source entry count
+   - source-entry attribution
 5. query `ISyntheticResourceMetadata` for the hidden binding contract:
    - `getResourceCount()`
    - `getResourceInfo(...)`
