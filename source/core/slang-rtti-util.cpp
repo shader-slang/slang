@@ -86,12 +86,7 @@ struct ListFuncs
 
                 // Initialize it all first
                 typeFuncs.ctorArray(typeMap, elementType, newBuffer, srcCount);
-                typeFuncs.copyArray(
-                    typeMap,
-                    elementType,
-                    newBuffer,
-                    srcList.getBuffer(),
-                    srcCount);
+                typeFuncs.copyArray(typeMap, elementType, newBuffer, srcList.getBuffer(), srcCount);
 
                 // Attach the new buffer
                 dstList.attachBuffer((Byte*)newBuffer, srcCount, srcCount);
