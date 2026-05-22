@@ -396,8 +396,9 @@ the size of the runtime counter buffer. Region entries may later use
 direct counters, shared counters, derived counter expressions, or
 counterless metadata entries represented through tail-extended fields
 or a derived metadata interface. `CoverageCounterMode` currently
-defines only `Count`; additional counter interpretations should be
-appended when a concrete mode is implemented. LCOV remains a
+defines only `Count`; additional counter interpretations such as
+binary hit/not-hit and warp/group-aggregated modes should be appended
+when a concrete mode is implemented. LCOV remains a
 compatibility export (`DA:`, `FN/FNDA:`, `BRDA:`), not the only
 internal coverage model.
 
