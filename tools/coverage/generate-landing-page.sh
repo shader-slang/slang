@@ -84,9 +84,13 @@ if [[ -f "$COMBINED_SUMMARY" ]]; then
   # Check which platforms are available
   LINUX_SUMMARY="${REPORTS_DIR}/latest/linux/coverage-summary.json"
   MACOS_SUMMARY="${REPORTS_DIR}/latest/macos/coverage-summary.json"
+  WINDOWS_SUMMARY="${REPORTS_DIR}/latest/windows/coverage-summary.json"
+  MERGED_SUMMARY="${REPORTS_DIR}/latest/merged/coverage-summary.json"
 
   HAS_LINUX=false
   HAS_MACOS=false
+  HAS_WINDOWS=false
+  HAS_MERGED=false
 
   if [[ -f "$LINUX_SUMMARY" ]]; then
     HAS_LINUX=true
@@ -148,8 +152,58 @@ if [[ -f "$COMBINED_SUMMARY" ]]; then
     MACOS_SLANGC_BRANCHES_FOUND=$(get_json_number "slangc_branches_found" "$MACOS_SUMMARY")
   fi
 
-  # Use Linux coverage for the main badge (most comprehensive usually)
-  if [[ "$HAS_LINUX" == "true" ]]; then
+  # Windows summary schema is leaner (OpenCppCoverage produces line metrics
+  # only; no region / function / branch). slangc_* is similarly line-only.
+  if [[ -f "$WINDOWS_SUMMARY" ]]; then
+    HAS_WINDOWS=true
+    WINDOWS_LINE_COV=$(get_json_value "line_coverage" "$WINDOWS_SUMMARY")
+    WINDOWS_LINES_HIT=$(get_json_number "lines_hit" "$WINDOWS_SUMMARY")
+    WINDOWS_LINES_FOUND=$(get_json_number "lines_found" "$WINDOWS_SUMMARY")
+
+    WINDOWS_SLANGC_LINE_COV=$(get_json_value "slangc_line_coverage" "$WINDOWS_SUMMARY")
+    WINDOWS_SLANGC_LINES_HIT=$(get_json_number "slangc_lines_hit" "$WINDOWS_SUMMARY")
+    WINDOWS_SLANGC_LINES_FOUND=$(get_json_number "slangc_lines_found" "$WINDOWS_SUMMARY")
+  fi
+
+  # Merged summary is synthesized by coverage-nightly.yml from the cross-OS
+  # auth-summary text files. Same field shape as the per-OS Linux/macOS
+  # summaries, except regions are empty (the merger doesn't compute regions
+  # across platforms).
+  if [[ -f "$MERGED_SUMMARY" ]]; then
+    HAS_MERGED=true
+    MERGED_LINE_COV=$(get_json_value "line_coverage" "$MERGED_SUMMARY")
+    MERGED_LINES_HIT=$(get_json_number "lines_hit" "$MERGED_SUMMARY")
+    MERGED_LINES_FOUND=$(get_json_number "lines_found" "$MERGED_SUMMARY")
+    MERGED_REGION_COV=$(get_json_value "region_coverage" "$MERGED_SUMMARY")
+    MERGED_REGIONS_HIT=$(get_json_number "regions_hit" "$MERGED_SUMMARY")
+    MERGED_REGIONS_FOUND=$(get_json_number "regions_found" "$MERGED_SUMMARY")
+    MERGED_FUNCTION_COV=$(get_json_value "function_coverage" "$MERGED_SUMMARY")
+    MERGED_FUNCTIONS_HIT=$(get_json_number "functions_hit" "$MERGED_SUMMARY")
+    MERGED_FUNCTIONS_FOUND=$(get_json_number "functions_found" "$MERGED_SUMMARY")
+    MERGED_BRANCH_COV=$(get_json_value "branch_coverage" "$MERGED_SUMMARY")
+    MERGED_BRANCHES_HIT=$(get_json_number "branches_hit" "$MERGED_SUMMARY")
+    MERGED_BRANCHES_FOUND=$(get_json_number "branches_found" "$MERGED_SUMMARY")
+
+    MERGED_SLANGC_LINE_COV=$(get_json_value "slangc_line_coverage" "$MERGED_SUMMARY")
+    MERGED_SLANGC_LINES_HIT=$(get_json_number "slangc_lines_hit" "$MERGED_SUMMARY")
+    MERGED_SLANGC_LINES_FOUND=$(get_json_number "slangc_lines_found" "$MERGED_SUMMARY")
+    MERGED_SLANGC_REGION_COV=$(get_json_value "slangc_region_coverage" "$MERGED_SUMMARY")
+    MERGED_SLANGC_REGIONS_HIT=$(get_json_number "slangc_regions_hit" "$MERGED_SUMMARY")
+    MERGED_SLANGC_REGIONS_FOUND=$(get_json_number "slangc_regions_found" "$MERGED_SUMMARY")
+    MERGED_SLANGC_FUNCTION_COV=$(get_json_value "slangc_function_coverage" "$MERGED_SUMMARY")
+    MERGED_SLANGC_FUNCTIONS_HIT=$(get_json_number "slangc_functions_hit" "$MERGED_SUMMARY")
+    MERGED_SLANGC_FUNCTIONS_FOUND=$(get_json_number "slangc_functions_found" "$MERGED_SUMMARY")
+    MERGED_SLANGC_BRANCH_COV=$(get_json_value "slangc_branch_coverage" "$MERGED_SUMMARY")
+    MERGED_SLANGC_BRANCHES_HIT=$(get_json_number "slangc_branches_hit" "$MERGED_SUMMARY")
+    MERGED_SLANGC_BRANCHES_FOUND=$(get_json_number "slangc_branches_found" "$MERGED_SUMMARY")
+  fi
+
+  # Headline badge uses the merged cross-OS number when available
+  # (most comprehensive view), falling back to per-OS otherwise.
+  if [[ "$HAS_MERGED" == "true" ]]; then
+    LINE_COV="$MERGED_LINE_COV"
+    LINE_COLOR=$(get_badge_color "$LINE_COV")
+  elif [[ "$HAS_LINUX" == "true" ]]; then
     LINE_COV="$LINUX_LINE_COV"
     LINE_COLOR=$(get_badge_color "$LINE_COV")
   elif [[ "$HAS_MACOS" == "true" ]]; then
@@ -437,6 +491,26 @@ if [[ "$HAS_DATA" == "true" ]]; then
                 <tbody>
 EOF
 
+    if [[ "$HAS_MERGED" == "true" ]]; then
+      merged_line_class=$(get_badge_color "$MERGED_LINE_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+      merged_function_class=$(get_badge_color "$MERGED_FUNCTION_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+      merged_branch_class=$(get_badge_color "$MERGED_BRANCH_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+
+      # Regions column is intentionally n/a: the cross-OS merger
+      # doesn't produce a region count (each OS reports regions
+      # differently and they can't be combined sensibly).
+      cat >>"${OUTPUT_FILE}" <<EOF
+                    <tr style="border-bottom: 1px solid #ddd; background: #f8f9fa;">
+                        <td style="padding: 15px;"><strong>🧩 Merged (cross-OS)</strong></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${merged_line_class}">${MERGED_LINE_COV}%</span><br><small>${MERGED_LINES_HIT}/${MERGED_LINES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
+                        <td style="padding: 15px; text-align: center;"><span class="${merged_function_class}">${MERGED_FUNCTION_COV}%</span><br><small>${MERGED_FUNCTIONS_HIT}/${MERGED_FUNCTIONS_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${merged_branch_class}">${MERGED_BRANCH_COV}%</span><br><small>${MERGED_BRANCHES_HIT}/${MERGED_BRANCHES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><a href="${LINK_PREFIX}latest/merged/full/index.html" style="color: #667eea;">View</a></td>
+                    </tr>
+EOF
+    fi
+
     if [[ "$HAS_LINUX" == "true" ]]; then
       # Get color classes for each metric
       linux_line_class=$(get_badge_color "$LINUX_LINE_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
@@ -487,6 +561,23 @@ EOF
 EOF
     fi
 
+    if [[ "$HAS_WINDOWS" == "true" ]]; then
+      # OpenCppCoverage only produces line metrics on Windows, so
+      # region / function / branch columns are n/a here.
+      windows_line_class=$(get_badge_color "$WINDOWS_LINE_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+
+      cat >>"${OUTPUT_FILE}" <<EOF
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 15px;"><strong>🪟 Windows (x86_64)</strong></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${windows_line_class}">${WINDOWS_LINE_COV}%</span><br><small>${WINDOWS_LINES_HIT}/${WINDOWS_LINES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
+                        <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
+                        <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
+                        <td style="padding: 15px; text-align: center;"><a href="${LINK_PREFIX}latest/windows/index.html" style="color: #667eea;">View</a></td>
+                    </tr>
+EOF
+    fi
+
     cat >>"${OUTPUT_FILE}" <<EOF
                 </tbody>
             </table>
@@ -498,6 +589,12 @@ EOF
       HAS_SLANGC=true
     fi
     if [[ "$HAS_MACOS" == "true" && -n "$MACOS_SLANGC_LINE_COV" ]]; then
+      HAS_SLANGC=true
+    fi
+    if [[ "$HAS_WINDOWS" == "true" && -n "$WINDOWS_SLANGC_LINE_COV" ]]; then
+      HAS_SLANGC=true
+    fi
+    if [[ "$HAS_MERGED" == "true" && -n "$MERGED_SLANGC_LINE_COV" ]]; then
       HAS_SLANGC=true
     fi
 
@@ -522,6 +619,23 @@ EOF
                 </thead>
                 <tbody>
 EOF
+
+      if [[ "$HAS_MERGED" == "true" && -n "$MERGED_SLANGC_LINE_COV" ]]; then
+        merged_sl_line_class=$(get_badge_color "$MERGED_SLANGC_LINE_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+        merged_sl_function_class=$(get_badge_color "$MERGED_SLANGC_FUNCTION_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+        merged_sl_branch_class=$(get_badge_color "$MERGED_SLANGC_BRANCH_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+
+        cat >>"${OUTPUT_FILE}" <<EOF
+                    <tr style="border-bottom: 1px solid #ddd; background: #f8f9fa;">
+                        <td style="padding: 15px;"><strong>🧩 Merged (cross-OS)</strong></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${merged_sl_line_class}">${MERGED_SLANGC_LINE_COV}%</span><br><small>${MERGED_SLANGC_LINES_HIT}/${MERGED_SLANGC_LINES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
+                        <td style="padding: 15px; text-align: center;"><span class="${merged_sl_function_class}">${MERGED_SLANGC_FUNCTION_COV}%</span><br><small>${MERGED_SLANGC_FUNCTIONS_HIT}/${MERGED_SLANGC_FUNCTIONS_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${merged_sl_branch_class}">${MERGED_SLANGC_BRANCH_COV}%</span><br><small>${MERGED_SLANGC_BRANCHES_HIT}/${MERGED_SLANGC_BRANCHES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><a href="${LINK_PREFIX}latest/merged/slangc/index.html" style="color: #667eea;">View</a></td>
+                    </tr>
+EOF
+      fi
 
       if [[ "$HAS_LINUX" == "true" && -n "$LINUX_SLANGC_LINE_COV" ]]; then
         linux_sl_line_class=$(get_badge_color "$LINUX_SLANGC_LINE_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
@@ -555,6 +669,21 @@ EOF
                         <td style="padding: 15px; text-align: center;"><span class="${macos_sl_function_class}">${MACOS_SLANGC_FUNCTION_COV}</span><br><small>${MACOS_SLANGC_FUNCTIONS_HIT}/${MACOS_SLANGC_FUNCTIONS_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center;"><span class="${macos_sl_branch_class}">${MACOS_SLANGC_BRANCH_COV}</span><br><small>${MACOS_SLANGC_BRANCHES_HIT}/${MACOS_SLANGC_BRANCHES_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center;"><a href="${LINK_PREFIX}latest/macos/slangc/index.html" style="color: #667eea;">View</a></td>
+                    </tr>
+EOF
+      fi
+
+      if [[ "$HAS_WINDOWS" == "true" && -n "$WINDOWS_SLANGC_LINE_COV" ]]; then
+        windows_sl_line_class=$(get_badge_color "$WINDOWS_SLANGC_LINE_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+
+        cat >>"${OUTPUT_FILE}" <<EOF
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 15px;"><strong>🪟 Windows (x86_64)</strong></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${windows_sl_line_class}">${WINDOWS_SLANGC_LINE_COV}%</span><br><small>${WINDOWS_SLANGC_LINES_HIT}/${WINDOWS_SLANGC_LINES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
+                        <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
+                        <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
+                        <td style="padding: 15px; text-align: center;"><a href="${LINK_PREFIX}latest/windows/slangc/index.html" style="color: #667eea;">View</a></td>
                     </tr>
 EOF
       fi

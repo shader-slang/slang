@@ -257,7 +257,79 @@ jobs:
           render_per_os windows windows-x86_64
           shopt -u nullglob
 
-          echo "New-renderer outputs:"
+          # Synthesize a single merged coverage-summary.json that the
+          # landing-page generator can read alongside the per-OS ones.
+          # Data comes from the auth-summary text files just written by
+          # the merger; both full and slangc are folded into one JSON
+          # to mirror the per-OS schema.
+          REPORT_DATE=$(date -u +"%Y-%m-%d")
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          MERGED_FULL_TXT=coverage-reports/merged/full/coverage-report.txt
+          MERGED_SLANGC_TXT=coverage-reports/merged/slangc/coverage-report.txt
+          if [ -f "$MERGED_FULL_TXT" ]; then
+            python3 - "$MERGED_FULL_TXT" "$MERGED_SLANGC_TXT" "$REPORT_DATE" "$COMMIT_SHORT" <<'PY' > coverage-reports/merged/coverage-summary.json
+          import json, os, sys
+
+          full_txt, slangc_txt, date, commit = sys.argv[1:5]
+
+          def parse_total(path):
+              if not path or not os.path.isfile(path):
+                  return None
+              with open(path) as f:
+                  for line in f:
+                      if not line.startswith("TOTAL"):
+                          continue
+                      # Columns: TOTAL <regions> <missed_r> <r_cov>
+                      #          <functions> <missed_f> <f_cov>
+                      #          <lines> <missed_l> <l_cov>
+                      #          <branches> <missed_b> <b_cov>
+                      p = line.split()
+                      if len(p) < 13:
+                          return None
+                      def n(s):
+                          try: return int(s)
+                          except ValueError: return 0
+                      def pct(s):
+                          return s.rstrip("%") if s.endswith("%") else ""
+                      r_tot, r_miss = n(p[1]), n(p[2])
+                      f_tot, f_miss = n(p[4]), n(p[5])
+                      l_tot, l_miss = n(p[7]), n(p[8])
+                      b_tot, b_miss = n(p[10]), n(p[11])
+                      return {
+                          "region_coverage": pct(p[3]),
+                          "regions_hit": r_tot - r_miss,
+                          "regions_found": r_tot,
+                          "function_coverage": pct(p[6]),
+                          "functions_hit": f_tot - f_miss,
+                          "functions_found": f_tot,
+                          "line_coverage": pct(p[9]),
+                          "lines_hit": l_tot - l_miss,
+                          "lines_found": l_tot,
+                          "branch_coverage": pct(p[12]),
+                          "branches_hit": b_tot - b_miss,
+                          "branches_found": b_tot,
+                      }
+              return None
+
+          out = {
+              "date": date,
+              "commit": commit,
+              "platform": "merged",
+              "platform_detail": "linux+macos+windows",
+          }
+          full = parse_total(full_txt)
+          if full:
+              out.update(full)
+          slangc = parse_total(slangc_txt)
+          if slangc:
+              out.update({"slangc_" + k: v for k, v in slangc.items()})
+          out["_version"] = 2
+          json.dump(out, sys.stdout, indent=2)
+          PY
+            echo "Wrote coverage-reports/merged/coverage-summary.json"
+          fi
+
+          echo "Renderer outputs:"
           find coverage-reports -maxdepth 6 -name index.html -printf '  %p\n' | sort
 
       - name: Combine Platform Summaries
