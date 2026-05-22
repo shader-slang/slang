@@ -279,6 +279,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             slang-llvm
             copy-dxcompiler
             copy-dxil
+            stage-dxc-headers
             copy-webgpu_dawn
             copy-slang-tint
         FOLDER test
