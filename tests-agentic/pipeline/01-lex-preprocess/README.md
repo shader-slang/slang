@@ -32,7 +32,7 @@ directive, unbalanced `#if`). Pure lex-surface claims that
 comment shapes, raw strings) are intentionally NOT duplicated
 here.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -134,7 +134,7 @@ Skipped boundary axes:
   document line-continuation behavior inside an include path
   specifically; no observable claim to anchor to.
 
-## Out of scope
+## Untested claims
 
 (none)
 

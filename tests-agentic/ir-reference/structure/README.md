@@ -39,7 +39,7 @@ observes a parent / child relationship, a top-level declaration's
 linkage, or a structural cross-link (interface-side and
 witness-side sharing a key, generic body yielding a func).
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -66,17 +66,17 @@ witness-side sharing a key, generic body yielding a func).
 | Each row of a witness_table is a witness_table_entry pairing a requirementKey with the concrete satisfying function value. | functional | [#witnesstableentry-vs-interfacereqentry](../../../docs/llm-generated/ir-reference/structure.md#witnesstableentry-vs-interfacereqentry) | [`witness-table-entry-pairs.slang`](witness-table-entry-pairs.slang) |
 | Two distinct struct conformances to the same interface produce two distinct witness_tables both keyed by the same requirementKey. | functional | [#witnesstableentry-vs-interfacereqentry](../../../docs/llm-generated/ir-reference/structure.md#witnesstableentry-vs-interfacereqentry) | [`two-impls-share-requirement-key.slang`](two-impls-share-requirement-key.slang) |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#globalgenericparam](../../../docs/llm-generated/ir-reference/structure.md#globalgenericparam) | (unclassified) | **`global_generic_param`** — a `GenericTypeParamDecl` at module level (not nested under a `generic` parent) is non-trivial to produce from natural Slang surface code. | Not reachable via any allowed test directive. |
-| [#symbolalias](../../../docs/llm-generated/ir-reference/structure.md#symbolalias) | (unclassified) | **`SymbolAlias`** — per the doc, `(synthesized as part of linking)`; not observable at LOWER-TO-IR. The doc itself notes "No `SymbolAlias` should survive past linking". | Not reachable via any allowed test directive. |
-| [#thistypewitness](../../../docs/llm-generated/ir-reference/structure.md#thistypewitness) | (unclassified) | **`thisTypeWitness`** — `(synthesized inside InterfaceDecl lowering)`; not portably observable in a stable dump form. | Not reachable via any allowed test directive. |
-| [#module](../../../docs/llm-generated/ir-reference/structure.md#module) | implementation-detail | **`module` / `ModuleInst`** — observable only as the implicit preamble that wraps every IR dump. There is no anchor inside an IR dump that uniquely identifies the module instruction in a FileCheck-able way without coupling to dump preamble formatting. | Not reachable via any allowed test directive. |
-| [#globalhashedstringliterals](../../../docs/llm-generated/ir-reference/structure.md#globalhashedstringliterals) | link-stage-only | **`global_hashed_string_literals`** — `(synthesized)` container; no natural surface anchor. | Not reachable via any allowed test directive. |
-| [#indexedfieldkey](../../../docs/llm-generated/ir-reference/structure.md#indexedfieldkey) | link-stage-only | **`indexedFieldKey`** — `(synthesized)`; the doc lists no AST origin and the natural surface (tuple-like field access) does not produce it portably at LOWER-TO-IR. | Not reachable via any allowed test directive. |
-| [#typeequalitywitness](../../../docs/llm-generated/ir-reference/structure.md#typeequalitywitness) | link-stage-only | **`TypeEqualityWitness`** — `(synthesized)`; no AST origin. | Not reachable via any allowed test directive. |
+| **`global_generic_param`** — a `GenericTypeParamDecl` at module level (not nested under a `generic` parent) is non-trivial to produce from natural Slang surface code. | (unclassified) | [#globalgenericparam](../../../docs/llm-generated/ir-reference/structure.md#globalgenericparam) | Not reachable via any allowed test directive. |
+| **`SymbolAlias`** — per the doc, `(synthesized as part of linking)`; not observable at LOWER-TO-IR. The doc itself notes "No `SymbolAlias` should survive past linking". | (unclassified) | [#symbolalias](../../../docs/llm-generated/ir-reference/structure.md#symbolalias) | Not reachable via any allowed test directive. |
+| **`thisTypeWitness`** — `(synthesized inside InterfaceDecl lowering)`; not portably observable in a stable dump form. | (unclassified) | [#thistypewitness](../../../docs/llm-generated/ir-reference/structure.md#thistypewitness) | Not reachable via any allowed test directive. |
+| **`module` / `ModuleInst`** — observable only as the implicit preamble that wraps every IR dump. There is no anchor inside an IR dump that uniquely identifies the module instruction in a FileCheck-able way without coupling to dump preamble formatting. | implementation-detail | [#module](../../../docs/llm-generated/ir-reference/structure.md#module) | Not reachable via any allowed test directive. |
+| **`global_hashed_string_literals`** — `(synthesized)` container; no natural surface anchor. | link-stage-only | [#globalhashedstringliterals](../../../docs/llm-generated/ir-reference/structure.md#globalhashedstringliterals) | Not reachable via any allowed test directive. |
+| **`indexedFieldKey`** — `(synthesized)`; the doc lists no AST origin and the natural surface (tuple-like field access) does not produce it portably at LOWER-TO-IR. | link-stage-only | [#indexedfieldkey](../../../docs/llm-generated/ir-reference/structure.md#indexedfieldkey) | Not reachable via any allowed test directive. |
+| **`TypeEqualityWitness`** — `(synthesized)`; no AST origin. | link-stage-only | [#typeequalitywitness](../../../docs/llm-generated/ir-reference/structure.md#typeequalitywitness) | Not reachable via any allowed test directive. |
 
 ## Doc gaps observed
 

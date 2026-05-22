@@ -49,7 +49,7 @@ CLikeSourceEmitter), one cross-target vector-type-spelling test
 (SourceWriter), and one preludes-include test (across HLSL / CUDA /
 C++ for positive coverage and GLSL / WGSL for negative coverage).
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -112,15 +112,15 @@ C++ for positive coverage and GLSL / WGSL for negative coverage).
 
 (none)
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | (unclassified) | **LLVM / native via `slang-llvm`** (`#backends` > LLVM). | Requires the LLVM JIT. |
-| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | (unclassified) | **VM bytecode** (`#backends` > VM). Exercised by `INTERPRET`-style tests in lower-level bundles; this bundle's focus is per-target text emit. | Not reachable via any allowed test directive. |
-| [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | (unclassified) | **Slang round-trip** (`#backends` > Slang round-trip). `-target slang` is a debugging output covered by syntax-reference bundles. | Not reachable via any allowed test directive. |
-| [#dependency-file-output](../../../docs/llm-generated/pipeline/06-emit.md#dependency-file-output) | (unclassified) | **Dependency-file output `.d`** (`#dependency-file-output`). The `-depfile` flag emits a side artefact; this bundle stays on per-target text emission as described in the rest of the doc. | Not reachable via any allowed test directive. |
-| [#linedirectivemode](../../../docs/llm-generated/pipeline/06-emit.md#linedirectivemode) | (unclassified) | **Alternative `LineDirectiveMode` values** beyond the default. The mode is a command-line surface (`-line-directive-mode`), not an emit-stage invariant. | Not reachable via any allowed test directive. |
-| [#source-writer-abstraction](../../../docs/llm-generated/pipeline/06-emit.md#source-writer-abstraction) | (unclassified) | **`SourceMap` companion** (`#source-writer-abstraction`). Source-map metadata is an API surface, not a text-emit shape. | Not reachable via any allowed test directive. |
-| [#inputs-and-outputs](../../../docs/llm-generated/pipeline/06-emit.md#inputs-and-outputs) | api-only | **`IArtifact` object layout** (`#inputs-and-outputs`). Internal C++ structure. The user-visible consequence ("a successful compile produces text") is implied by every other test passing. | Not reachable via any allowed test directive. |
-| [#adding-a-new-backend](../../../docs/llm-generated/pipeline/06-emit.md#adding-a-new-backend) | process-doc | **"Adding a new backend" workflow** (`#adding-a-new-backend`). A developer guide, not a user-observable behavior. | Not reachable via any allowed test directive. |
+| **LLVM / native via `slang-llvm`** (`#backends` > LLVM). | (unclassified) | [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | Requires the LLVM JIT. |
+| **VM bytecode** (`#backends` > VM). Exercised by `INTERPRET`-style tests in lower-level bundles; this bundle's focus is per-target text emit. | (unclassified) | [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | Not reachable via any allowed test directive. |
+| **Slang round-trip** (`#backends` > Slang round-trip). `-target slang` is a debugging output covered by syntax-reference bundles. | (unclassified) | [#backends](../../../docs/llm-generated/pipeline/06-emit.md#backends) | Not reachable via any allowed test directive. |
+| **Dependency-file output `.d`** (`#dependency-file-output`). The `-depfile` flag emits a side artefact; this bundle stays on per-target text emission as described in the rest of the doc. | (unclassified) | [#dependency-file-output](../../../docs/llm-generated/pipeline/06-emit.md#dependency-file-output) | Not reachable via any allowed test directive. |
+| **Alternative `LineDirectiveMode` values** beyond the default. The mode is a command-line surface (`-line-directive-mode`), not an emit-stage invariant. | (unclassified) | [#linedirectivemode](../../../docs/llm-generated/pipeline/06-emit.md#linedirectivemode) | Not reachable via any allowed test directive. |
+| **`SourceMap` companion** (`#source-writer-abstraction`). Source-map metadata is an API surface, not a text-emit shape. | (unclassified) | [#source-writer-abstraction](../../../docs/llm-generated/pipeline/06-emit.md#source-writer-abstraction) | Not reachable via any allowed test directive. |
+| **`IArtifact` object layout** (`#inputs-and-outputs`). Internal C++ structure. The user-visible consequence ("a successful compile produces text") is implied by every other test passing. | needs-unit-test | [#inputs-and-outputs](../../../docs/llm-generated/pipeline/06-emit.md#inputs-and-outputs) | Not reachable via any allowed test directive. |
+| **"Adding a new backend" workflow** (`#adding-a-new-backend`). A developer guide, not a user-observable behavior. | process-doc | [#adding-a-new-backend](../../../docs/llm-generated/pipeline/06-emit.md#adding-a-new-backend) | Not reachable via any allowed test directive. |

@@ -34,11 +34,11 @@ small.
 The bulk of the doc's structural claims — `NodeBase`'s
 `astNodeType` discriminator, the `ASTBuilder` back-pointer, the
 private `Val::m_operands` array, the support-type catalog — are
-recorded under `## Out of scope (no-GPU runner)` because they are
+recorded under `## Untested claims` because they are
 internal to the compiler and unobservable through any test directive
 that does not link against the C++ AST headers.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -63,16 +63,16 @@ that does not link against the C++ AST headers.
 | [#declcheckstate](../../../docs/llm-generated/ast-reference/base.md#declcheckstate) | undocumented-behavior | The doc mentions `Decl::checkState` (which checking phases have completed) without stating any externally-observable consequence of `checkState`. The phased-check sequencing is described in `pipeline/03-semantic-check.md`; the cross-reference is implicit. |  |
 | (unspecified) | undocumented-behavior | The doc lists `Modifier::keywordName: Name*` but does not name a user-facing consequence of the keyword name beyond appearing in diagnostics. The diagnostic-text dependency is implicit and worth a one-line note. |  |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| (unspecified) | (unclassified) | `NodeBase::_astBuilder` back-pointer — private field; not observable. | Not reachable via any allowed test directive. |
-| (unspecified) | (unclassified) | `Val::m_operands` generic operand list — internal layout. | Not reachable via any allowed test directive. |
-| [#astbuilder](../../../docs/llm-generated/ast-reference/base.md#astbuilder) | (unclassified) | `NodeBase::astNodeType` discriminator tag — set internally by `ASTBuilder`; no test directive surfaces it. | Not reachable via any allowed test directive. |
-| [#astnodetype](../../../docs/llm-generated/ast-reference/base.md#astnodetype) | (unclassified) | The FIDDLE-generated `ASTNodeType` enum and its stable-tag guarantee — a build-system invariant, not a `slangc` behavior. | Not reachable via any allowed test directive. |
-| [#modifiers](../../../docs/llm-generated/ast-reference/base.md#modifiers) | (unclassified) | The catalog of support types (`DeclRef<T>`, `Modifiers`, `QualType`, `SubstitutionSet`, `LookupResult`, `LookupResultItem`, `TypeExp`, `WitnessTable`): these are non-node helper types described in `slang-ast-support-types.h`. Their effects bleed through into other observables (a `QualType` is what an `Expr::type` field carries; a `WitnessTable` participates in interface dispatch), but the support types themselves are not surface-visible. The family-page bundles (`ast-reference/values`, `ast-reference/types`, …) are the better home for any tests that do exist; this base bundle deliberately defers. | Not reachable via any allowed test directive. |
-| [#scope](../../../docs/llm-generated/ast-reference/base.md#scope) | (unclassified) | `Scope` as a `NodeBase` — runtime name-lookup data structure, not a parsed AST node. | Not reachable via any allowed test directive. |
-| [#slangc](../../../docs/llm-generated/ast-reference/base.md#slangc) | (unclassified) | `Type::m_astBuilderForReflection` — reflection-only field; not reachable through `slangc` text output we can FileCheck without GPU-bound runtime APIs. | Not reachable via any allowed test directive. |
-| (unspecified) | api-only | `as<T>()` / `dynamicCast<T>()` dispatch on AST nodes — internal C++ API. | Not reachable via any allowed test directive. |
-| (unspecified) | api-only | `SyntaxClass<T>` reflection handle — internal C++ type. | Not reachable via any allowed test directive. |
+| `NodeBase::_astBuilder` back-pointer — private field; not observable. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| `Val::m_operands` generic operand list — internal layout. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| `NodeBase::astNodeType` discriminator tag — set internally by `ASTBuilder`; no test directive surfaces it. | (unclassified) | [#astbuilder](../../../docs/llm-generated/ast-reference/base.md#astbuilder) | Not reachable via any allowed test directive. |
+| The FIDDLE-generated `ASTNodeType` enum and its stable-tag guarantee — a build-system invariant, not a `slangc` behavior. | (unclassified) | [#astnodetype](../../../docs/llm-generated/ast-reference/base.md#astnodetype) | Not reachable via any allowed test directive. |
+| The catalog of support types (`DeclRef<T>`, `Modifiers`, `QualType`, `SubstitutionSet`, `LookupResult`, `LookupResultItem`, `TypeExp`, `WitnessTable`): these are non-node helper types described in `slang-ast-support-types.h`. Their effects bleed through into other observables (a `QualType` is what an `Expr::type` field carries; a `WitnessTable` participates in interface dispatch), but the support types themselves are not surface-visible. The family-page bundles (`ast-reference/values`, `ast-reference/types`, …) are the better home for any tests that do exist; this base bundle deliberately defers. | (unclassified) | [#modifiers](../../../docs/llm-generated/ast-reference/base.md#modifiers) | Not reachable via any allowed test directive. |
+| `Scope` as a `NodeBase` — runtime name-lookup data structure, not a parsed AST node. | (unclassified) | [#scope](../../../docs/llm-generated/ast-reference/base.md#scope) | Not reachable via any allowed test directive. |
+| `Type::m_astBuilderForReflection` — reflection-only field; not reachable through `slangc` text output we can FileCheck without GPU-bound runtime APIs. | (unclassified) | [#slangc](../../../docs/llm-generated/ast-reference/base.md#slangc) | Not reachable via any allowed test directive. |
+| `as<T>()` / `dynamicCast<T>()` dispatch on AST nodes — internal C++ API. | needs-unit-test | (unspecified) | Not reachable via any allowed test directive. |
+| `SyntaxClass<T>` reflection handle — internal C++ type. | needs-unit-test | (unspecified) | Not reachable via any allowed test directive. |

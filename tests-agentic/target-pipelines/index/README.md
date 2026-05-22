@@ -28,7 +28,7 @@ counterparts.
 The bundle is intentionally small (5 tests). The index doc is a
 navigation hub; the per-target legalization details belong to the
 five peer bundles under `tests-agentic/target-pipelines/`, and we
-route them there via `## Out of scope` rather than duplicating.
+route them there via `## Untested claims` rather than duplicating.
 
 Strategy: one observation per cross-cutting claim, using the
 lightest set of `//TEST:SIMPLE(-target ...)` directives that make
@@ -37,7 +37,7 @@ multiple `//TEST` directives in a single file with per-target
 `CHECK_<TARGET>` prefixes so a single source file actually exercises
 the dispatcher.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -47,17 +47,17 @@ the dispatcher.
 | The shared four-phase shape (link / specialize / target-legalize / emit) of linkAndOptimizeIR runs end-to-end for every text-emit target named by the index doc. | functional | [#shared-shape](../../../docs/llm-generated/target-pipelines/index.md#shared-shape) | [`four-phase-shape-end-to-end.slang`](four-phase-shape-end-to-end.slang) |
 | A single Slang source dispatches through the multi-target orchestrator to each of the five text-emit backends named by the index doc (spirv, hlsl, metal, wgsl, cuda). | functional | [#target-pipelines](../../../docs/llm-generated/target-pipelines/index.md#target-pipelines) | [`multi-target-dispatcher.slang`](multi-target-dispatcher.slang) |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| (unspecified) | out-of-bundle | Unordered topical catalog of every IR pass — see the `pipeline/05-ir-passes` bundle. | The index doc routes per-pass enumeration to the pipeline bundle. |
-| [#synthesizeactivemask](../../../docs/llm-generated/target-pipelines/index.md#synthesizeactivemask) | out-of-bundle | CUDA per-pass arms (`synthesizeActiveMask`, `legalizeEntryPointVaryingParamsForCUDA`, `lowerImmutableBufferLoadForCUDA`), nvrtc downstream, `__ldg` factoring, the CPU/Metal/CUDA shared `undoParameterCopy` / `transformParamsToConstRef` arms, adjacent PyTorch / OptiX / host-CPP targets. | The index doc routes these to `tests-agentic/target-pipelines/cuda/`. |
-| [#wrapstructuredbuffersofmatrices](../../../docs/llm-generated/target-pipelines/index.md#wrapstructuredbuffersofmatrices) | out-of-bundle | HLSL per-pass arms (`wrapStructuredBuffersOfMatrices`, `legalizeNonStructParameterToStructForHLSL`, `legalizeNonVectorCompositeSelect`, `legalizeEmptyRayPayloadsForHLSL`, `legalizeUniformBufferLoad`, `applyVariableScopeCorrection`), DXC and fxc downstream, per-register class assignments. | The index doc routes these to `tests-agentic/target-pipelines/hlsl/`. |
-| [#legalizeirformetal](../../../docs/llm-generated/target-pipelines/index.md#legalizeirformetal) | out-of-bundle | Metal-specific lowering (`legalizeIRForMetal`, `specializeAddressSpaceForMetal`), Metal `[[buffer(N)]]` positional binding, Apple `metal` compiler downstream. | The index doc routes these to `tests-agentic/target-pipelines/metal/`. |
-| [#legalizeirforspirv](../../../docs/llm-generated/target-pipelines/index.md#legalizeirforspirv) | out-of-bundle | SPIR-V direct-emit specifics, `legalizeIRForSPIRV`, `simplifyIRForSpirvLegalization` outer/inner loops, the forward-declared-pointer fixup, the spirv-link / spirv-val / spirv-opt downstream chain. | The index doc routes these to `tests-agentic/target-pipelines/spirv/`. |
-| [#legalizeirforwgsl](../../../docs/llm-generated/target-pipelines/index.md#legalizeirforwgsl) | out-of-bundle | WGSL-specific lowering (`legalizeIRForWGSL`, `specializeAddressSpaceForWGSL`), Tint downstream for `WGSLSPIRV*` variants. | The index doc routes these to `tests-agentic/target-pipelines/wgsl/`. |
-| [#isspirv](../../../docs/llm-generated/target-pipelines/index.md#isspirv) | out-of-bundle | Per-target options, capability sets, target predicates (`isSPIRV`, `isMetalTarget`, `isWGPUTarget`, `isCUDATarget`, `isD3DTarget`, `isKhronosTarget`). | The index doc routes these to the `cross-cutting/targets` bundle. |
+| Unordered topical catalog of every IR pass — see the `pipeline/05-ir-passes` bundle. | out-of-bundle | (unspecified) | The index doc routes per-pass enumeration to the pipeline bundle. |
+| CUDA per-pass arms (`synthesizeActiveMask`, `legalizeEntryPointVaryingParamsForCUDA`, `lowerImmutableBufferLoadForCUDA`), nvrtc downstream, `__ldg` factoring, the CPU/Metal/CUDA shared `undoParameterCopy` / `transformParamsToConstRef` arms, adjacent PyTorch / OptiX / host-CPP targets. | out-of-bundle | [#synthesizeactivemask](../../../docs/llm-generated/target-pipelines/index.md#synthesizeactivemask) | The index doc routes these to `tests-agentic/target-pipelines/cuda/`. |
+| HLSL per-pass arms (`wrapStructuredBuffersOfMatrices`, `legalizeNonStructParameterToStructForHLSL`, `legalizeNonVectorCompositeSelect`, `legalizeEmptyRayPayloadsForHLSL`, `legalizeUniformBufferLoad`, `applyVariableScopeCorrection`), DXC and fxc downstream, per-register class assignments. | out-of-bundle | [#wrapstructuredbuffersofmatrices](../../../docs/llm-generated/target-pipelines/index.md#wrapstructuredbuffersofmatrices) | The index doc routes these to `tests-agentic/target-pipelines/hlsl/`. |
+| Metal-specific lowering (`legalizeIRForMetal`, `specializeAddressSpaceForMetal`), Metal `[[buffer(N)]]` positional binding, Apple `metal` compiler downstream. | out-of-bundle | [#legalizeirformetal](../../../docs/llm-generated/target-pipelines/index.md#legalizeirformetal) | The index doc routes these to `tests-agentic/target-pipelines/metal/`. |
+| SPIR-V direct-emit specifics, `legalizeIRForSPIRV`, `simplifyIRForSpirvLegalization` outer/inner loops, the forward-declared-pointer fixup, the spirv-link / spirv-val / spirv-opt downstream chain. | out-of-bundle | [#legalizeirforspirv](../../../docs/llm-generated/target-pipelines/index.md#legalizeirforspirv) | The index doc routes these to `tests-agentic/target-pipelines/spirv/`. |
+| WGSL-specific lowering (`legalizeIRForWGSL`, `specializeAddressSpaceForWGSL`), Tint downstream for `WGSLSPIRV*` variants. | out-of-bundle | [#legalizeirforwgsl](../../../docs/llm-generated/target-pipelines/index.md#legalizeirforwgsl) | The index doc routes these to `tests-agentic/target-pipelines/wgsl/`. |
+| Per-target options, capability sets, target predicates (`isSPIRV`, `isMetalTarget`, `isWGPUTarget`, `isCUDATarget`, `isD3DTarget`, `isKhronosTarget`). | out-of-bundle | [#isspirv](../../../docs/llm-generated/target-pipelines/index.md#isspirv) | The index doc routes these to the `cross-cutting/targets` bundle. |
 
 ## Sibling-bundle overlap
 

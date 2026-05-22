@@ -26,14 +26,14 @@ field accesses in emitted code.
 The bundle is intentionally small (6 tests). The index doc is
 mostly a set of pointers to peer pages; the per-phase details
 belong to the four peer bundles under `tests-agentic/name-resolution/`,
-and we route them there via `## Out of scope` rather than
+and we route them there via `## Untested claims` rather than
 duplicating.
 
 Strategy: one positive test per cross-cutting composition that the
 index doc itself asserts, using the lightest runner that makes the
 composition observable.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -44,14 +44,14 @@ composition observable.
 | The product of name resolution is a DeclRef whose specialization is observable; resolving a generic function call binds the type argument observably to the resolved DeclRef. | functional | [#name-resolution](../../../docs/llm-generated/name-resolution/index.md#name-resolution) | [`declref-product-of-resolution.slang`](declref-product-of-resolution.slang) |
 | The resolved DeclRef flows downstream into AST-to-IR lowering, where the breadcrumb chain becomes a concrete field access in emitted target code. | functional | [#where-this-fits-in-the-pipeline](../../../docs/llm-generated/name-resolution/index.md#where-this-fits-in-the-pipeline) | [`breadcrumb-flows-into-emitted-hlsl.slang`](breadcrumb-flows-into-emitted-hlsl.slang) |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| (unspecified) | out-of-bundle | Arity / convertibility filtering, conversion-cost ranking, partial generic application, ambiguous-call diagnostics -- see `tests-agentic/name-resolution/overload-resolution/`. | Not reachable via any allowed test directive. |
-| [#lookupmask](../../../docs/llm-generated/name-resolution/index.md#lookupmask) | out-of-bundle | `LookupMask` filter, transparent-member injection, breadcrumb construction details, inheritance walk for member lookup, ambiguity / member-not-found diagnostics, container-level overload accumulation, override-wins-over-default -- see `tests-agentic/name-resolution/lookup/`. | Not reachable via any allowed test directive. |
-| [#public](../../../docs/llm-generated/name-resolution/index.md#public) | out-of-bundle | `public` / `internal` / `private` semantics, accessor visibility, default-visibility rules -- see `tests-agentic/name-resolution/visibility/`. | Not reachable via any allowed test directive. |
-| [#scope](../../../docs/llm-generated/name-resolution/index.md#scope) | out-of-bundle | `Scope` shape, sibling-chain construction, file-scope and namespace boundaries, generic-parameter scope -- see `tests-agentic/name-resolution/scopes/`. | Not reachable via any allowed test directive. |
+| Arity / convertibility filtering, conversion-cost ranking, partial generic application, ambiguous-call diagnostics -- see `tests-agentic/name-resolution/overload-resolution/`. | out-of-bundle | (unspecified) | Not reachable via any allowed test directive. |
+| `LookupMask` filter, transparent-member injection, breadcrumb construction details, inheritance walk for member lookup, ambiguity / member-not-found diagnostics, container-level overload accumulation, override-wins-over-default -- see `tests-agentic/name-resolution/lookup/`. | out-of-bundle | [#lookupmask](../../../docs/llm-generated/name-resolution/index.md#lookupmask) | Not reachable via any allowed test directive. |
+| `public` / `internal` / `private` semantics, accessor visibility, default-visibility rules -- see `tests-agentic/name-resolution/visibility/`. | out-of-bundle | [#public](../../../docs/llm-generated/name-resolution/index.md#public) | Not reachable via any allowed test directive. |
+| `Scope` shape, sibling-chain construction, file-scope and namespace boundaries, generic-parameter scope -- see `tests-agentic/name-resolution/scopes/`. | out-of-bundle | [#scope](../../../docs/llm-generated/name-resolution/index.md#scope) | Not reachable via any allowed test directive. |
 
 ## Sibling-bundle overlap
 

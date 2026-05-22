@@ -42,7 +42,7 @@ structural bundle observes those same opcodes as parents and
 children; this bundle observes them as IR values with operand
 shapes.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -86,23 +86,23 @@ shapes.
 | A struct conforming to a 3-method interface emits three witness_table_entry rows — one per requirement, in declaration order. | boundary | [#witnesstable-and-witnesstableentry](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#witnesstable-and-witnesstableentry) | [`witness-table-three-method-rows.slang`](witness-table-three-method-rows.slang) |
 | Each row inside a witness_table body is witness_table_entry(requirementKey, satisfyingVal) — first operand is the key, second is the satisfying value. | functional | [#witnesstable-and-witnesstableentry](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#witnesstable-and-witnesstableentry) | [`witness-table-entry-operands.slang`](witness-table-entry-operands.slang) |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#bindglobalgenericparam](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#bindglobalgenericparam) | link-stage-only | **`bind_global_generic_param`** — `(synthesized)` at link time. | Not reachable via any allowed test directive. |
-| [#createexistentialobject](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#createexistentialobject) | link-stage-only | **`createExistentialObject`** — `(synthesized)` lower-level form used after specialization. | Not reachable via any allowed test directive. |
-| [#extracttaggeduniontag](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#extracttaggeduniontag) | link-stage-only | **`extractTaggedUnionTag` / `extractTaggedUnionPayload`** — `(synthesized)` by the type-flow specialization pass. | Not reachable via any allowed test directive. |
-| [#getdynamicresourceheap](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#getdynamicresourceheap) | link-stage-only | **`GetDynamicResourceHeap`** — `(synthesized)`. | Not reachable via any allowed test directive. |
-| [#getvaluefromboundinterface](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#getvaluefromboundinterface) | link-stage-only | **`getValueFromBoundInterface`** — `(synthesized)`. | Not reachable via any allowed test directive. |
-| [#globalvalueref](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#globalvalueref) | link-stage-only | **`globalValueRef`** — `(synthesized)` to carry references across an IR-pass boundary. | Not reachable via any allowed test directive. |
-| [#isnullexistential](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#isnullexistential) | link-stage-only | **`isNullExistential`** — `(synthesized)`; no portable Slang-surface anchor. | Not reachable via any allowed test directive. |
-| [#makeexistentialwithrtti](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#makeexistentialwithrtti) | link-stage-only | **`makeExistentialWithRTTI`** — `(synthesized)` after specialization; `makeExistential` is what the natural cast surface produces. | Not reachable via any allowed test directive. |
-| [#packanyvalue](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#packanyvalue) | link-stage-only | **`packAnyValue` / `unpackAnyValue`** — `(synthesized)` by the existential-elimination pass. | Not reachable via any allowed test directive. |
-| [#rttiobject](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#rttiobject) | link-stage-only | **`rtti_object` / `GetSequentialID`** — `(synthesized)` by the RTTI-object pass; not observable at LOWER-TO-IR. | Not reachable via any allowed test directive. |
-| [#thistypewitness](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#thistypewitness) | link-stage-only | **`thisTypeWitness`** / **`TypeEqualityWitness`** — `(synthesized)` inside `InterfaceDecl` lowering. | Not reachable via any allowed test directive. |
-| [#typeset](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#typeset) | link-stage-only | All `### Type-flow specialization` opcodes (`TypeSet`, `FuncSet`, `WitnessTableSet`, `GenericSet`, `UnboundedTypeElement`, `MakeTaggedUnion`, `GetTagFromTaggedUnion`, `GetDispatcher`, `SpecializeExistentialsInFunc`, `WeakUse`, etc.) — `(synthesized)` by the type-flow pass, post-specialization. | Not reachable via any allowed test directive. |
-| [#wrapexistential](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#wrapexistential) | link-stage-only | **`wrapExistential`** — `(synthesized)` by the `BindExistentialsType` lowering pass. | Not reachable via any allowed test directive. |
+| **`bind_global_generic_param`** — `(synthesized)` at link time. | link-stage-only | [#bindglobalgenericparam](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#bindglobalgenericparam) | Not reachable via any allowed test directive. |
+| **`createExistentialObject`** — `(synthesized)` lower-level form used after specialization. | link-stage-only | [#createexistentialobject](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#createexistentialobject) | Not reachable via any allowed test directive. |
+| **`extractTaggedUnionTag` / `extractTaggedUnionPayload`** — `(synthesized)` by the type-flow specialization pass. | link-stage-only | [#extracttaggeduniontag](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#extracttaggeduniontag) | Not reachable via any allowed test directive. |
+| **`GetDynamicResourceHeap`** — `(synthesized)`. | link-stage-only | [#getdynamicresourceheap](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#getdynamicresourceheap) | Not reachable via any allowed test directive. |
+| **`getValueFromBoundInterface`** — `(synthesized)`. | link-stage-only | [#getvaluefromboundinterface](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#getvaluefromboundinterface) | Not reachable via any allowed test directive. |
+| **`globalValueRef`** — `(synthesized)` to carry references across an IR-pass boundary. | link-stage-only | [#globalvalueref](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#globalvalueref) | Not reachable via any allowed test directive. |
+| **`isNullExistential`** — `(synthesized)`; no portable Slang-surface anchor. | link-stage-only | [#isnullexistential](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#isnullexistential) | Not reachable via any allowed test directive. |
+| **`makeExistentialWithRTTI`** — `(synthesized)` after specialization; `makeExistential` is what the natural cast surface produces. | link-stage-only | [#makeexistentialwithrtti](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#makeexistentialwithrtti) | Not reachable via any allowed test directive. |
+| **`packAnyValue` / `unpackAnyValue`** — `(synthesized)` by the existential-elimination pass. | link-stage-only | [#packanyvalue](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#packanyvalue) | Not reachable via any allowed test directive. |
+| **`rtti_object` / `GetSequentialID`** — `(synthesized)` by the RTTI-object pass; not observable at LOWER-TO-IR. | link-stage-only | [#rttiobject](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#rttiobject) | Not reachable via any allowed test directive. |
+| **`thisTypeWitness`** / **`TypeEqualityWitness`** — `(synthesized)` inside `InterfaceDecl` lowering. | link-stage-only | [#thistypewitness](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#thistypewitness) | Not reachable via any allowed test directive. |
+| All `### Type-flow specialization` opcodes (`TypeSet`, `FuncSet`, `WitnessTableSet`, `GenericSet`, `UnboundedTypeElement`, `MakeTaggedUnion`, `GetTagFromTaggedUnion`, `GetDispatcher`, `SpecializeExistentialsInFunc`, `WeakUse`, etc.) — `(synthesized)` by the type-flow pass, post-specialization. | link-stage-only | [#typeset](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#typeset) | Not reachable via any allowed test directive. |
+| **`wrapExistential`** — `(synthesized)` by the `BindExistentialsType` lowering pass. | link-stage-only | [#wrapexistential](../../../docs/llm-generated/ir-reference/generics-and-existentials.md#wrapexistential) | Not reachable via any allowed test directive. |
 
 ## Doc gaps observed
 

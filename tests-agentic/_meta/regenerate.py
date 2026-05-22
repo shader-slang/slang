@@ -154,7 +154,9 @@ _ALLOWED_COVERABLE_BACKENDS = (
 )
 
 _ALLOWED_OOS_REASONS = (
-    "api-only",
+    "needs-unit-test",  # replaces api-only; observable in C++ but not via slangc CLI
+    "needs-multi-file-test",  # cross-module / multi-translation-unit setup
+    "needs-cli-test",  # CLI invocation / env / exit code / flag mapping
     "link-stage-only",
     "out-of-bundle",
     "deprecated",
@@ -687,7 +689,7 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
             _ALLOWED_COVERABLE_BACKENDS,
             "Backend",
         ),
-        ("## Out of scope", _ALLOWED_OOS_REASONS, "Reason"),
+        ("## Untested claims", _ALLOWED_OOS_REASONS, "Reason"),
     ):
         if heading not in text:
             continue
@@ -778,8 +780,8 @@ def _parse_tagged_table(text: str, heading: str) -> list[tuple[str, str, str, st
         if not cells or all(set(c) <= set("- ") for c in cells):
             i += 1
             continue
-        # Header detection: first cell == "Anchor"
-        if cells[0].lower() == "anchor":
+        # Header detection: any of the known column header tokens
+        if cells[0].lower() in ("anchor", "claim"):
             i += 1
             continue
         if len(cells) >= 4:

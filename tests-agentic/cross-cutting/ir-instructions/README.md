@@ -40,10 +40,10 @@ Implementation-internal claims — opcode-flag bits
 deduplication decision, the contiguous opcode-range layout that
 underlies `as<IRBasicType>()`, the module-version-bump workflow, the
 FIDDLE-generated `IROp` enum — are recorded under
-`## Out of scope (no-GPU runner)` because they are not observable
+`## Untested claims` because they are not observable
 through any directive that `slang-test` runs on a CPU.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -193,16 +193,16 @@ through any directive that `slang-test` runs on a CPU.
 | [#rwstructuredbufferstore](../../../docs/llm-generated/cross-cutting/ir-instructions.md#rwstructuredbufferstore) | undocumented-behavior | The doc lists `rwstructuredBufferStore` and `structuredBufferLoad` but the read-back companion `rwstructuredBufferLoad` (emitted for `RWStructuredBuffer<T>.Load(idx)`) is not named. | A one-line entry in the resource family row would surface this opcode. |
 | [#swizzle](../../../docs/llm-generated/cross-cutting/ir-instructions.md#swizzle) | undocumented-behavior | The doc's `swizzle` entry does not state the result-type rule. Empirically the result type is `Vec(elemTy, indexCount)` when the index list has length > 1 and the bare scalar `elemTy` when the index list has length 1. | Naming this in the memory-instructions row would let agents pin the length-1 vs length-N boundary. |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| (unspecified) | (unclassified) | The contiguous opcode-range allocation that lets `as<IRBasicType>()` be a single integer comparison — entirely internal to FIDDLE-generated `slang-ir-insts-enum.h.fiddle`. | Not reachable via any allowed test directive. |
-| (unspecified) | (unclassified) | The module-version bump required when an opcode is inserted in the middle of an existing family range — a serialization invariant for `.slang-module` files. The user-facing consequences belong to `cross-cutting/serialization`. | Not reachable via any allowed test directive. |
-| [#add](../../../docs/llm-generated/cross-cutting/ir-instructions.md#add) | (unclassified) | The C++ wrapper-struct identity for each opcode (e.g. that `add` is an `IRAdd*` in C++) — internal API. | Not reachable via any allowed test directive. |
-| [#hoistable](../../../docs/llm-generated/cross-cutting/ir-instructions.md#hoistable) | (unclassified) | Whether `Hoistable` instructions actually float to the outermost scope where their operands are available — observable only by inspecting the IR-dump position of an instruction relative to its defining scope, and the dump's textual order does not directly encode the scope tree. | Not reachable via any allowed test directive. |
-| [#kiropflagparent](../../../docs/llm-generated/cross-cutting/ir-instructions.md#kiropflagparent) | (unclassified) | The flag-bit layout (`kIROpFlag_Parent`, `kIROpFlag_UseOther`, `kIROpFlag_Hoistable`, `kIROpFlag_Global`) — internal to the `IROpFlags` enum in `slang-ir.h`. Not surfaced in `-dump-ir` output. | Not reachable via any allowed test directive. |
-| [#useother](../../../docs/llm-generated/cross-cutting/ir-instructions.md#useother) | (unclassified) | The opcode-bit packing (`kIROpMeta::kIROpMeta_OtherShift = 10`, high bits store auxiliary info for `UseOther` ops) — internal to `IRInst::m_op` layout. | Not reachable via any allowed test directive. |
-| [#irbuilder](../../../docs/llm-generated/cross-cutting/ir-instructions.md#irbuilder) | api-only | The `IRBuilder` emitter helper for each opcode — internal C++ API. | Not reachable via any allowed test directive. |
-| (unspecified) | implementation-detail | The IR builder's deduplication / hoisting decision for hoistable opcodes — the IR dump shows the post-hoist result, not the decision path. Two textually identical `vector(Int, 3)` types appearing once in the dump is observable; the *reason* (dedup) is not. | Not reachable via any allowed test directive. |
-| [#adding-a-new-opcode](../../../docs/llm-generated/cross-cutting/ir-instructions.md#adding-a-new-opcode) | process-doc | The FIDDLE workflow for adding a new opcode — a developer guide ("Adding a new opcode" section in the source doc) rather than a user-observable behaviour. | Not reachable via any allowed test directive. |
+| The contiguous opcode-range allocation that lets `as<IRBasicType>()` be a single integer comparison — entirely internal to FIDDLE-generated `slang-ir-insts-enum.h.fiddle`. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| The module-version bump required when an opcode is inserted in the middle of an existing family range — a serialization invariant for `.slang-module` files. The user-facing consequences belong to `cross-cutting/serialization`. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| The C++ wrapper-struct identity for each opcode (e.g. that `add` is an `IRAdd*` in C++) — internal API. | (unclassified) | [#add](../../../docs/llm-generated/cross-cutting/ir-instructions.md#add) | Not reachable via any allowed test directive. |
+| Whether `Hoistable` instructions actually float to the outermost scope where their operands are available — observable only by inspecting the IR-dump position of an instruction relative to its defining scope, and the dump's textual order does not directly encode the scope tree. | (unclassified) | [#hoistable](../../../docs/llm-generated/cross-cutting/ir-instructions.md#hoistable) | Not reachable via any allowed test directive. |
+| The flag-bit layout (`kIROpFlag_Parent`, `kIROpFlag_UseOther`, `kIROpFlag_Hoistable`, `kIROpFlag_Global`) — internal to the `IROpFlags` enum in `slang-ir.h`. Not surfaced in `-dump-ir` output. | (unclassified) | [#kiropflagparent](../../../docs/llm-generated/cross-cutting/ir-instructions.md#kiropflagparent) | Not reachable via any allowed test directive. |
+| The opcode-bit packing (`kIROpMeta::kIROpMeta_OtherShift = 10`, high bits store auxiliary info for `UseOther` ops) — internal to `IRInst::m_op` layout. | (unclassified) | [#useother](../../../docs/llm-generated/cross-cutting/ir-instructions.md#useother) | Not reachable via any allowed test directive. |
+| The `IRBuilder` emitter helper for each opcode — internal C++ API. | needs-unit-test | [#irbuilder](../../../docs/llm-generated/cross-cutting/ir-instructions.md#irbuilder) | Not reachable via any allowed test directive. |
+| The IR builder's deduplication / hoisting decision for hoistable opcodes — the IR dump shows the post-hoist result, not the decision path. Two textually identical `vector(Int, 3)` types appearing once in the dump is observable; the *reason* (dedup) is not. | implementation-detail | (unspecified) | Not reachable via any allowed test directive. |
+| The FIDDLE workflow for adding a new opcode — a developer guide ("Adding a new opcode" section in the source doc) rather than a user-observable behaviour. | process-doc | [#adding-a-new-opcode](../../../docs/llm-generated/cross-cutting/ir-instructions.md#adding-a-new-opcode) | Not reachable via any allowed test directive. |

@@ -39,9 +39,9 @@ plain-struct and parameter-group paths), the per-entry-point loop
 (layout decoration, EntryPointLayout shape, stage/semantic operands,
 mangled-name linkage), the executable-IR-is-layout-free claim, and
 the per-target observability of layout. Several gates (capability
-filter, obfuscation, lazy cache) are recorded under `## Out of scope`.
+filter, obfuscation, lazy cache) are recorded under `## Untested claims`.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -69,15 +69,15 @@ filter, obfuscation, lazy cache) are recorded under `## Out of scope`.
 | [#cache-and-reuse](../../../docs/llm-generated/pipeline/04c-layout-ir.md#cache-and-reuse) | undocumented-behavior | The doc's "Cache and reuse" section describes lazy construction (`getOrCreateIRModuleForLayout`) and the `m_irModuleForLayout` cache field, but cache hit/miss is not user-observable through `slangc` (the only signal is correctness across multiple compilations). No actionable doc gap, but worth noting that cache semantics are inherently untestable from this bundle. |  |
 | [#caveats-and-gotchas](../../../docs/llm-generated/pipeline/04c-layout-ir.md#caveats-and-gotchas) | undocumented-behavior | The doc's "Caveats and gotchas" lists `materialize` failure as `SLANG_UNEXPECTED("unhandled value flavor")` and the `SLANG_ASSERT(m_layout)` precondition; neither is reachable from user Slang source, so they cannot be tested. The doc could clarify that these are internal contract checks, not user-visible diagnostics. |  |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| (unspecified) | (unclassified) | **Optional obfuscation pass**: gated on `-obfuscate-code`, observable only via obfuscated source-map machinery outside this bundle's scope. | Not reachable via any allowed test directive. |
-| (unspecified) | (unclassified) | **`SLANG_ASSERT(m_layout)` precondition**: a hard assertion for callers that bypass the lazy accessor; not user-reachable. | Not reachable via any allowed test directive. |
-| [#buildmanglednametoglobalinstmap](../../../docs/llm-generated/pipeline/04c-layout-ir.md#buildmanglednametoglobalinstmap) | (unclassified) | **`buildMangledNameToGlobalInstMap`** call at the end of `createIRModuleForLayout`: no user-observable consequence (mirrors the same out-of-scope finding in 04b). | Not reachable via any allowed test directive. |
-| [#constructssa](../../../docs/llm-generated/pipeline/04c-layout-ir.md#constructssa) | (unclassified) | **No mandatory optimization passes run on the layout module**: the doc's "What this module is not" point that `constructSSA` / SCCP / CFG-simplify / DCE / early-inlining do not run on the layout side. The layout module's per-function bodies are stubs, so there is no positive textual signal; the negative signal (no SSA cleanup observable on a side that has no code) is unfalsifiable. | Not reachable via any allowed test directive. |
-| [#materialize](../../../docs/llm-generated/pipeline/04c-layout-ir.md#materialize) | (unclassified) | **`materialize` failure** (`SLANG_UNEXPECTED("unhandled value flavor")`): a hard crash for corrupted per-module IR caches; not user-reachable from Slang source. | Not reachable via any allowed test directive. |
-| [#mirmoduleforlayout](../../../docs/llm-generated/pipeline/04c-layout-ir.md#mirmoduleforlayout) | (unclassified) | **Lazy construction / cache reuse** of `m_irModuleForLayout`: no user-visible signal through `slangc`. | Not reachable via any allowed test directive. |
-| [#targetprogram](../../../docs/llm-generated/pipeline/04c-layout-ir.md#targetprogram) | (unclassified) | **Per-`TargetProgram` independence** (two layout modules in memory for two targets in one session): the cross-target shape difference is covered indirectly by `layout-is-per-target-spirv-vs-hlsl.slang` running on a separate invocation; in-process multi-target independence is not exposed through `slangc`. | Not reachable via any allowed test directive. |
-| [#irrequirecapabilityatomdecoration](../../../docs/llm-generated/pipeline/04c-layout-ir.md#irrequirecapabilityatomdecoration) | link-stage-only | **`IRRequireCapabilityAtomDecoration` filter** for SPIR-V / Metal only: see doc gaps above; the post-link pipeline rewrites capability metadata heavily, so no clean surface signal exists in `-dump-ir` to distinguish layout-module-attached from executable-module-attached capability atoms. | Not reachable via any allowed test directive. |
+| **Optional obfuscation pass**: gated on `-obfuscate-code`, observable only via obfuscated source-map machinery outside this bundle's scope. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| **`SLANG_ASSERT(m_layout)` precondition**: a hard assertion for callers that bypass the lazy accessor; not user-reachable. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| **`buildMangledNameToGlobalInstMap`** call at the end of `createIRModuleForLayout`: no user-observable consequence (mirrors the same out-of-scope finding in 04b). | (unclassified) | [#buildmanglednametoglobalinstmap](../../../docs/llm-generated/pipeline/04c-layout-ir.md#buildmanglednametoglobalinstmap) | Not reachable via any allowed test directive. |
+| **No mandatory optimization passes run on the layout module**: the doc's "What this module is not" point that `constructSSA` / SCCP / CFG-simplify / DCE / early-inlining do not run on the layout side. The layout module's per-function bodies are stubs, so there is no positive textual signal; the negative signal (no SSA cleanup observable on a side that has no code) is unfalsifiable. | (unclassified) | [#constructssa](../../../docs/llm-generated/pipeline/04c-layout-ir.md#constructssa) | Not reachable via any allowed test directive. |
+| **`materialize` failure** (`SLANG_UNEXPECTED("unhandled value flavor")`): a hard crash for corrupted per-module IR caches; not user-reachable from Slang source. | (unclassified) | [#materialize](../../../docs/llm-generated/pipeline/04c-layout-ir.md#materialize) | Not reachable via any allowed test directive. |
+| **Lazy construction / cache reuse** of `m_irModuleForLayout`: no user-visible signal through `slangc`. | (unclassified) | [#mirmoduleforlayout](../../../docs/llm-generated/pipeline/04c-layout-ir.md#mirmoduleforlayout) | Not reachable via any allowed test directive. |
+| **Per-`TargetProgram` independence** (two layout modules in memory for two targets in one session): the cross-target shape difference is covered indirectly by `layout-is-per-target-spirv-vs-hlsl.slang` running on a separate invocation; in-process multi-target independence is not exposed through `slangc`. | (unclassified) | [#targetprogram](../../../docs/llm-generated/pipeline/04c-layout-ir.md#targetprogram) | Not reachable via any allowed test directive. |
+| **`IRRequireCapabilityAtomDecoration` filter** for SPIR-V / Metal only: see doc gaps above; the post-link pipeline rewrites capability metadata heavily, so no clean surface signal exists in `-dump-ir` to distinguish layout-module-attached from executable-module-attached capability atoms. | link-stage-only | [#irrequirecapabilityatomdecoration](../../../docs/llm-generated/pipeline/04c-layout-ir.md#irrequirecapabilityatomdecoration) | Not reachable via any allowed test directive. |

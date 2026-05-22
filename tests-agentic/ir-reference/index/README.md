@@ -26,14 +26,14 @@ The bundle is intentionally small (6 tests). The index doc is
 mostly a set of pointers to per-family pages; the per-opcode
 catalog observations belong to the ten peer bundles under
 `tests-agentic/ir-reference/`, and we route them there via
-`## Out of scope` rather than duplicating.
+`## Untested claims` rather than duplicating.
 
 Strategy: one positive test per cross-cutting claim that the
 index doc itself asserts, observed by `-dump-ir` against a
 text target with `-o /dev/null` (per `_common.md`'s rules for
 IR-dump observation).
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -44,21 +44,21 @@ IR-dump observation).
 | The index doc names visitInfixExpr as dispatching to arithmetic opcodes like Add, Sub, Mul; mixed-operator code emits each opcode. | functional | [#how-ast-nodes-lower-to-ir](../../../docs/llm-generated/ir-reference/index.md#how-ast-nodes-lower-to-ir) | [`ast-mapping-infix-dispatches-to-arith.slang`](ast-mapping-infix-dispatches-to-arith.slang) |
 | The index doc names visitVarDecl as the AST-to-IR mapping that emits a Var opcode; a struct-typed local should produce a var instruction in the IR. | functional | [#how-ast-nodes-lower-to-ir](../../../docs/llm-generated/ir-reference/index.md#how-ast-nodes-lower-to-ir) | [`ast-mapping-var-decl-emits-var.slang`](ast-mapping-var-decl-emits-var.slang) |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| (unspecified) | out-of-bundle | Per-opcode value catalog (memory ops, aggregate constructors, constexpr arithmetic, bit-cast and conversion) -- see `tests-agentic/ir-reference/values/`. | Not reachable via any allowed test directive. |
-| (unspecified) | out-of-bundle | Image/buffer/sampler/atomic/raytracing/wave opcodes -- see `tests-agentic/ir-reference/resources-and-atomics/`. | Not reachable via any allowed test directive. |
-| (unspecified) | out-of-bundle | Autodiff opcodes (differential pairs, forward/backward differentiate) -- see `tests-agentic/ir-reference/differentiation/`. | Not reachable via any allowed test directive. |
-| (unspecified) | out-of-bundle | Individual decoration semantics (the ~180 decoration opcodes catalog) -- see `tests-agentic/ir-reference/decorations/`. The index bundle anchors only the **fact** that decorations attach to instructions; it does not catalog individual decoration semantics. | Not reachable via any allowed test directive. |
-| [#block](../../../docs/llm-generated/ir-reference/index.md#block) | out-of-bundle | `block`, `param` (block-parameter role), branches, terminators, `Require*` markers -- see `tests-agentic/ir-reference/control-flow/`. | Not reachable via any allowed test directive. |
-| [#inttype](../../../docs/llm-generated/ir-reference/index.md#inttype) | out-of-bundle | Per-opcode type catalog (`IntType`, `StructuredBufferType`, vector/matrix types, ...) -- see `tests-agentic/ir-reference/types/`. | Not reachable via any allowed test directive. |
-| [#layout](../../../docs/llm-generated/ir-reference/index.md#layout) | out-of-bundle | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` -- see `tests-agentic/ir-reference/metadata/`. | Not reachable via any allowed test directive. |
-| [#module](../../../docs/llm-generated/ir-reference/index.md#module) | out-of-bundle | Structural opcodes (`module`, `func`, `generic`, `global_var`, `global_param`, `struct`, `interface`, `witness_table`, `key`, `field`, `lookupWitness`) catalog -- see `tests-agentic/ir-reference/structure/`. | Not reachable via any allowed test directive. |
-| [#nop](../../../docs/llm-generated/ir-reference/index.md#nop) | out-of-bundle | `nop`, `Unrecognized`, type queries, size/alignment, storage casts, liveness markers, descriptor heaps, kernel launch -- see `tests-agentic/ir-reference/misc/`. | Not reachable via any allowed test directive. |
-| [#specialize](../../../docs/llm-generated/ir-reference/index.md#specialize) | out-of-bundle | `specialize`, existential pack/unpack, RTTI, type-flow dispatchers -- see `tests-agentic/ir-reference/generics-and-existentials/`. | Not reachable via any allowed test directive. |
-| (unspecified) | process-doc | IR schema, op-flag bits, hoistable/global deduplication, module versioning, and the workflow for adding a new opcode -- see `cross-cutting/ir-instructions` (the index doc names it as the canonical conventions doc, but it is itself a cross-cutting topic anchor, not an index-level claim). | Not reachable via any allowed test directive. |
+| Per-opcode value catalog (memory ops, aggregate constructors, constexpr arithmetic, bit-cast and conversion) -- see `tests-agentic/ir-reference/values/`. | out-of-bundle | (unspecified) | Not reachable via any allowed test directive. |
+| Image/buffer/sampler/atomic/raytracing/wave opcodes -- see `tests-agentic/ir-reference/resources-and-atomics/`. | out-of-bundle | (unspecified) | Not reachable via any allowed test directive. |
+| Autodiff opcodes (differential pairs, forward/backward differentiate) -- see `tests-agentic/ir-reference/differentiation/`. | out-of-bundle | (unspecified) | Not reachable via any allowed test directive. |
+| Individual decoration semantics (the ~180 decoration opcodes catalog) -- see `tests-agentic/ir-reference/decorations/`. The index bundle anchors only the **fact** that decorations attach to instructions; it does not catalog individual decoration semantics. | out-of-bundle | (unspecified) | Not reachable via any allowed test directive. |
+| `block`, `param` (block-parameter role), branches, terminators, `Require*` markers -- see `tests-agentic/ir-reference/control-flow/`. | out-of-bundle | [#block](../../../docs/llm-generated/ir-reference/index.md#block) | Not reachable via any allowed test directive. |
+| Per-opcode type catalog (`IntType`, `StructuredBufferType`, vector/matrix types, ...) -- see `tests-agentic/ir-reference/types/`. | out-of-bundle | [#inttype](../../../docs/llm-generated/ir-reference/index.md#inttype) | Not reachable via any allowed test directive. |
+| `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` -- see `tests-agentic/ir-reference/metadata/`. | out-of-bundle | [#layout](../../../docs/llm-generated/ir-reference/index.md#layout) | Not reachable via any allowed test directive. |
+| Structural opcodes (`module`, `func`, `generic`, `global_var`, `global_param`, `struct`, `interface`, `witness_table`, `key`, `field`, `lookupWitness`) catalog -- see `tests-agentic/ir-reference/structure/`. | out-of-bundle | [#module](../../../docs/llm-generated/ir-reference/index.md#module) | Not reachable via any allowed test directive. |
+| `nop`, `Unrecognized`, type queries, size/alignment, storage casts, liveness markers, descriptor heaps, kernel launch -- see `tests-agentic/ir-reference/misc/`. | out-of-bundle | [#nop](../../../docs/llm-generated/ir-reference/index.md#nop) | Not reachable via any allowed test directive. |
+| `specialize`, existential pack/unpack, RTTI, type-flow dispatchers -- see `tests-agentic/ir-reference/generics-and-existentials/`. | out-of-bundle | [#specialize](../../../docs/llm-generated/ir-reference/index.md#specialize) | Not reachable via any allowed test directive. |
+| IR schema, op-flag bits, hoistable/global deduplication, module versioning, and the workflow for adding a new opcode -- see `cross-cutting/ir-instructions` (the index doc names it as the canonical conventions doc, but it is itself a cross-cutting topic anchor, not an index-level claim). | process-doc | (unspecified) | Not reachable via any allowed test directive. |
 
 ## Sibling-bundle overlap
 

@@ -25,7 +25,7 @@ makes the claim observable. Most tests are observed through
 through text-emit `FileCheck`s on the relevant backends; one negative
 test confirms that `let` immutability is enforced by the checker.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -103,6 +103,6 @@ test confirms that `let` immutability is enforced by the checker.
 
 (none)
 
-## Out of scope
+## Untested claims
 
 (none)

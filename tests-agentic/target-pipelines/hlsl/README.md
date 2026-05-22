@@ -47,7 +47,7 @@ One file (`non-khronos-hlsl-vs-glsl-buffer.slang`) carries a
 second `-target glsl` directive because the claim is
 specifically about HLSL being non-Khronos.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -215,12 +215,12 @@ specifically about HLSL being non-Khronos.
 
 (none)
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#autodiff](../../../docs/llm-generated/target-pipelines/hlsl.md#autodiff) | (unclassified) | **`autodiff` / `higherOrderFunc` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `finalizeAutoDiffPass`, etc.). The doc anchors them to Phase B but the emit-stage observable is a downstream language feature; covered by other bundles. | Not reachable via any allowed test directive. |
-| [#coveragetracing](../../../docs/llm-generated/target-pipelines/hlsl.md#coveragetracing) | (unclassified) | **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). Coverage instrumentation is a debugging flag, not user-observable through text emit. | Not reachable via any allowed test directive. |
-| [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/hlsl.md#dynamicresourceheap) | (unclassified) | **`dynamicResourceHeap`**. | Requires the SM 6.6 dynamic resource heap setup. |
-| [#legalizeuniformbufferload](../../../docs/llm-generated/target-pipelines/hlsl.md#legalizeuniformbufferload) | (unclassified) | **`legalizeUniformBufferLoad`** (`#legalizeuniformbufferload`). The doc anchors it as an IR-level canonicalization without naming an emit marker. | Not reachable via any allowed test directive. |
-| (unspecified) | implementation-detail | **Pass-ordering claims** (Phase A passes 1-20, Phase B passes 1-63, Phase C passes 1-31). The doc enumerates the ordered list; pass _existence_ is observable through emit side effects, but pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | Not reachable via any allowed test directive. |
+| **`autodiff` / `higherOrderFunc` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `finalizeAutoDiffPass`, etc.). The doc anchors them to Phase B but the emit-stage observable is a downstream language feature; covered by other bundles. | (unclassified) | [#autodiff](../../../docs/llm-generated/target-pipelines/hlsl.md#autodiff) | Not reachable via any allowed test directive. |
+| **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). Coverage instrumentation is a debugging flag, not user-observable through text emit. | (unclassified) | [#coveragetracing](../../../docs/llm-generated/target-pipelines/hlsl.md#coveragetracing) | Not reachable via any allowed test directive. |
+| **`dynamicResourceHeap`**. | (unclassified) | [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/hlsl.md#dynamicresourceheap) | Requires the SM 6.6 dynamic resource heap setup. |
+| **`legalizeUniformBufferLoad`** (`#legalizeuniformbufferload`). The doc anchors it as an IR-level canonicalization without naming an emit marker. | (unclassified) | [#legalizeuniformbufferload](../../../docs/llm-generated/target-pipelines/hlsl.md#legalizeuniformbufferload) | Not reachable via any allowed test directive. |
+| **Pass-ordering claims** (Phase A passes 1-20, Phase B passes 1-63, Phase C passes 1-31). The doc enumerates the ordered list; pass _existence_ is observable through emit side effects, but pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | implementation-detail | (unspecified) | Not reachable via any allowed test directive. |

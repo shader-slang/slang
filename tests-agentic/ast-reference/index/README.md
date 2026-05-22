@@ -28,13 +28,13 @@ The bundle is intentionally small (5 tests). The index doc is
 mostly a navigation page that points to per-family pages; the
 per-node and per-family details belong to the seven peer
 bundles under `tests-agentic/ast-reference/`, and we route them
-there via `## Out of scope` rather than duplicating.
+there via `## Untested claims` rather than duplicating.
 
 Strategy: one observation per cross-cutting claim that the index
 doc itself asserts, using the lightest runner that makes the
 observation visible.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -44,18 +44,18 @@ observation visible.
 | A working program composes concrete leaves from every AST root family the index taxonomy names (Decl, Expr, Stmt, Type, Modifier, Val), demonstrating that the family partition spans the surface language. | functional | [#family-taxonomy](../../../docs/llm-generated/ast-reference/index.md#family-taxonomy) | [`multi-family-composition-program.slang`](multi-family-composition-program.slang) |
 | The AST family taxonomy is real: a Stmt root and an Expr root are distinct, so a bare break statement outside a loop or switch is diagnosed by the checker (a Stmt-shape constraint, not an Expr-shape one). | negative | [#family-taxonomy](../../../docs/llm-generated/ast-reference/index.md#family-taxonomy) | [`family-taxonomy-stmt-vs-expr-rejected.slang`](family-taxonomy-stmt-vs-expr-rejected.slang) |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#decl](../../../docs/llm-generated/ast-reference/index.md#decl) | out-of-bundle | Concrete `Decl` leaves (`StructDecl`, `FuncDecl`, `InterfaceDecl`, `GenericDecl`, ...) -- see `tests-agentic/ast-reference/declarations/`. | Not reachable via any allowed test directive. |
-| [#expr](../../../docs/llm-generated/ast-reference/index.md#expr) | out-of-bundle | Concrete `Expr` leaves (binary, unary, `InvokeExpr`, `MemberExpr`, conversion exprs, ...) -- see `tests-agentic/ast-reference/expressions/`. | Not reachable via any allowed test directive. |
-| [#modifier](../../../docs/llm-generated/ast-reference/index.md#modifier) | out-of-bundle | Concrete `Modifier` / attribute leaves (per-attribute semantics) -- see `tests-agentic/ast-reference/modifiers/`. | Not reachable via any allowed test directive. |
-| [#nodebase](../../../docs/llm-generated/ast-reference/index.md#nodebase) | out-of-bundle | Abstract roots (`NodeBase`, `SyntaxNode`, `Val`, `Type`, `Decl`, `Expr`, `Stmt`, `Modifier`) and their per-root observable consequences -- see `tests-agentic/ast-reference/base/`. | Not reachable via any allowed test directive. |
-| [#sourceloc](../../../docs/llm-generated/ast-reference/index.md#sourceloc) | out-of-bundle | `SourceLoc`-bearing diagnostic placement at a specific node level -- see `tests-agentic/ast-reference/base/` (claim `syntaxnodebase-source-loc-in-diagnostic.slang`); the index bundle does not re-test this because every family page inherits the same `SourceLoc` shape, and the cross-cutting observation reduces to the base claim. | Not reachable via any allowed test directive. |
-| [#stmt](../../../docs/llm-generated/ast-reference/index.md#stmt) | out-of-bundle | Concrete `Stmt` leaves (`BlockStmt`, `IfStmt`, loops, `ReturnStmt`, ...) -- see `tests-agentic/ast-reference/statements/`. | Not reachable via any allowed test directive. |
-| [#type](../../../docs/llm-generated/ast-reference/index.md#type) | out-of-bundle | Concrete `Type` leaves (`VectorType`, `MatrixType`, buffer types, `OptionalType`, ...) -- see `tests-agentic/ast-reference/types/`. | Not reachable via any allowed test directive. |
-| [#val](../../../docs/llm-generated/ast-reference/index.md#val) | out-of-bundle | `Val` non-Type leaves (`DeclRefBase`, `IntVal`, `Witness`, ...) -- see `tests-agentic/ast-reference/values/`. | Not reachable via any allowed test directive. |
+| Concrete `Decl` leaves (`StructDecl`, `FuncDecl`, `InterfaceDecl`, `GenericDecl`, ...) -- see `tests-agentic/ast-reference/declarations/`. | out-of-bundle | [#decl](../../../docs/llm-generated/ast-reference/index.md#decl) | Not reachable via any allowed test directive. |
+| Concrete `Expr` leaves (binary, unary, `InvokeExpr`, `MemberExpr`, conversion exprs, ...) -- see `tests-agentic/ast-reference/expressions/`. | out-of-bundle | [#expr](../../../docs/llm-generated/ast-reference/index.md#expr) | Not reachable via any allowed test directive. |
+| Concrete `Modifier` / attribute leaves (per-attribute semantics) -- see `tests-agentic/ast-reference/modifiers/`. | out-of-bundle | [#modifier](../../../docs/llm-generated/ast-reference/index.md#modifier) | Not reachable via any allowed test directive. |
+| Abstract roots (`NodeBase`, `SyntaxNode`, `Val`, `Type`, `Decl`, `Expr`, `Stmt`, `Modifier`) and their per-root observable consequences -- see `tests-agentic/ast-reference/base/`. | out-of-bundle | [#nodebase](../../../docs/llm-generated/ast-reference/index.md#nodebase) | Not reachable via any allowed test directive. |
+| `SourceLoc`-bearing diagnostic placement at a specific node level -- see `tests-agentic/ast-reference/base/` (claim `syntaxnodebase-source-loc-in-diagnostic.slang`); the index bundle does not re-test this because every family page inherits the same `SourceLoc` shape, and the cross-cutting observation reduces to the base claim. | out-of-bundle | [#sourceloc](../../../docs/llm-generated/ast-reference/index.md#sourceloc) | Not reachable via any allowed test directive. |
+| Concrete `Stmt` leaves (`BlockStmt`, `IfStmt`, loops, `ReturnStmt`, ...) -- see `tests-agentic/ast-reference/statements/`. | out-of-bundle | [#stmt](../../../docs/llm-generated/ast-reference/index.md#stmt) | Not reachable via any allowed test directive. |
+| Concrete `Type` leaves (`VectorType`, `MatrixType`, buffer types, `OptionalType`, ...) -- see `tests-agentic/ast-reference/types/`. | out-of-bundle | [#type](../../../docs/llm-generated/ast-reference/index.md#type) | Not reachable via any allowed test directive. |
+| `Val` non-Type leaves (`DeclRefBase`, `IntVal`, `Witness`, ...) -- see `tests-agentic/ast-reference/values/`. | out-of-bundle | [#val](../../../docs/llm-generated/ast-reference/index.md#val) | Not reachable via any allowed test directive. |
 
 ## Sibling-bundle overlap
 

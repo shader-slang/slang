@@ -39,7 +39,7 @@ Multi-target where the claim is target-dependent (intrinsic /
 resource / vector lowering); single-target where the claim is
 module-identity (typedef resolves, `Optional<T>` compiles).
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -139,14 +139,14 @@ module-identity (typedef resolves, `Optional<T>` compiles).
 | [#core-module](../../../docs/llm-generated/cross-cutting/core-module.md#core-module) | undocumented-behavior | `#core-module` does not enumerate which sampling operations (`Sample`, `SampleLevel`, `SampleGrad`, `Load`, `GatherRed`, `SampleCmp`, `SampleCmpLevelZero`) are available on which texture variant, nor the per-variant coordinate shapes (e.g. `Texture3D.Load` takes `int4`, `Texture1D.Load` takes `int2`, `Texture2DMS.Load` takes `(int2, sampleIdx)`). These signatures were determined empirically from compiler errors. |  |
 | [#core-module](../../../docs/llm-generated/cross-cutting/core-module.md#core-module) | undocumented-behavior | `#core-module` does not name which texel-format generics (`float4` / `int4` / `uint4` / `unorm` / `snorm`) are valid on each texture variant, nor describe the per-target sampler-type flavouring (e.g. GLSL `utexture3D` for `uint4` content, `image1D` vs `uimage1D` for the RW variants). Format-variant tests probe only `float4` and `uint4` and leave the `unorm`/`snorm` admission status as a doc gap. |  |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| (unspecified) | out-of-bundle | DXIL / metallib / WGSL→SPIRV downstream paths and Torch / LLVM / Slang round-trip targets. | The core-module doc routes these to the relevant `target-pipelines/*` bundles. |
-| (unspecified) | (unclassified) | The byte-for-byte embedded module artefact (a build product). | Not reachable via any allowed test directive. |
-| (unspecified) | (unclassified) | The `slang-standard-module-config.h.in` template machinery (internal build infrastructure). | Not reachable via any allowed test directive. |
-| (unspecified) | (unclassified) | The full intrinsic list (the doc explicitly disclaims enumerating it). | Not reachable via any allowed test directive. |
-| [#interlockedadd](../../../docs/llm-generated/cross-cutting/core-module.md#interlockedadd) | (unclassified) | **Atomic-op intrinsics** (e.g. `InterlockedAdd`, `atomicAdd`, `OpAtomicIAdd`) — target-specific spellings, and prior agentic attempts have wasted iterations on them; skipped entirely. | Not reachable via any allowed test directive. |
-| [#slangembedcoremodule](../../../docs/llm-generated/cross-cutting/core-module.md#slangembedcoremodule) | (unclassified) | The `SLANG_EMBED_CORE_MODULE` ON vs. OFF build option — affects how the compiler ships the module, not what user code sees. | Not reachable via any allowed test directive. |
-| [#adding-a-new-built-in](../../../docs/llm-generated/cross-cutting/core-module.md#adding-a-new-built-in) | process-doc | The "Adding a new built-in" developer workflow (not a user- observable behaviour). | Not reachable via any allowed test directive. |
+| DXIL / metallib / WGSL→SPIRV downstream paths and Torch / LLVM / Slang round-trip targets. | out-of-bundle | (unspecified) | The core-module doc routes these to the relevant `target-pipelines/*` bundles. |
+| The byte-for-byte embedded module artefact (a build product). | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| The `slang-standard-module-config.h.in` template machinery (internal build infrastructure). | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| The full intrinsic list (the doc explicitly disclaims enumerating it). | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| **Atomic-op intrinsics** (e.g. `InterlockedAdd`, `atomicAdd`, `OpAtomicIAdd`) — target-specific spellings, and prior agentic attempts have wasted iterations on them; skipped entirely. | (unclassified) | [#interlockedadd](../../../docs/llm-generated/cross-cutting/core-module.md#interlockedadd) | Not reachable via any allowed test directive. |
+| The `SLANG_EMBED_CORE_MODULE` ON vs. OFF build option — affects how the compiler ships the module, not what user code sees. | (unclassified) | [#slangembedcoremodule](../../../docs/llm-generated/cross-cutting/core-module.md#slangembedcoremodule) | Not reachable via any allowed test directive. |
+| The "Adding a new built-in" developer workflow (not a user- observable behaviour). | process-doc | [#adding-a-new-built-in](../../../docs/llm-generated/cross-cutting/core-module.md#adding-a-new-built-in) | Not reachable via any allowed test directive. |

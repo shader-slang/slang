@@ -83,7 +83,7 @@ filtered-out-pass contrast. `MetalLib` / `MetalLibAssembly`
 require the Apple `metal` command-line tool and are out of
 scope on the no-GPU runner.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -177,10 +177,10 @@ scope on the no-GPU runner.
 
 (none)
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#checkentrypointdecorations](../../../docs/llm-generated/target-pipelines/metal.md#checkentrypointdecorations) | (unclassified) | **`AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>` lowering on Metal.** Rejected by `checkEntryPointDecorations` on the compute stage; cannot be observed in compute-only emit. (Recorded as a doc gap.) | Not reachable via any allowed test directive. |
-| (unspecified) | implementation-detail | **Pass ordering within Phase A/B/C.** Pass _existence_ is observable through its effect on emitted text; pass _ordering_ is an IR-level claim that requires `-dump-ir` cross-pass annotations the doc does not anchor to a specific marker. | Not reachable via any allowed test directive. |
-| [#linkandoptimizeir](../../../docs/llm-generated/target-pipelines/metal.md#linkandoptimizeir) | implementation-detail | **Iterative-pass observation.** Metal has **no** iterative passes in `linkAndOptimizeIR`, so the absence of `simplifyIR` iteration cannot be directly tested through `slangc` text emit. | Not reachable via any allowed test directive. |
+| **`AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>` lowering on Metal.** Rejected by `checkEntryPointDecorations` on the compute stage; cannot be observed in compute-only emit. (Recorded as a doc gap.) | (unclassified) | [#checkentrypointdecorations](../../../docs/llm-generated/target-pipelines/metal.md#checkentrypointdecorations) | Not reachable via any allowed test directive. |
+| **Pass ordering within Phase A/B/C.** Pass _existence_ is observable through its effect on emitted text; pass _ordering_ is an IR-level claim that requires `-dump-ir` cross-pass annotations the doc does not anchor to a specific marker. | implementation-detail | (unspecified) | Not reachable via any allowed test directive. |
+| **Iterative-pass observation.** Metal has **no** iterative passes in `linkAndOptimizeIR`, so the absence of `simplifyIR` iteration cannot be directly tested through `slangc` text emit. | implementation-detail | [#linkandoptimizeir](../../../docs/llm-generated/target-pipelines/metal.md#linkandoptimizeir) | Not reachable via any allowed test directive. |

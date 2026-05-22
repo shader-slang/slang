@@ -30,7 +30,7 @@ chunk layout, the deprecated repro round-trip, and the
 because they have no slangc-CLI observable. The bundle is therefore
 small by design (9 tests).
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -59,15 +59,15 @@ small by design (9 tests).
 
 (none)
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#fossil-backend](../../../docs/llm-generated/cross-cutting/serialization.md#fossil-backend) | (unclassified) | The Fossil backend's memory-mappable property (`#fossil-backend`). | an internal performance claim with no observable. |
-| [#versioning-and-backwards-compatibility](../../../docs/llm-generated/cross-cutting/serialization.md#versioning-and-backwards-compatibility) | (unclassified) | `Unrecognized`-opcode deserializer behaviour (`#versioning-and-backwards-compatibility`). | would require constructing a module whose opcode set exceeds the current compiler's, which the CLI cannot do. |
-| [#the-serialize-pattern](../../../docs/llm-generated/cross-cutting/serialization.md#the-serialize-pattern) | api-only | The `serialize(serializer, value)` template pattern (`#the-serialize-pattern`). | a C++ idiom, no CLI surface. |
-| [#fossil-backend](../../../docs/llm-generated/cross-cutting/serialization.md#fossil-backend) | compile-time-toggle | The `SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS` toggle (`#fossil-backend`). | baked into the binary at compile time. |
-| [#round-trip-and-repro-files](../../../docs/llm-generated/cross-cutting/serialization.md#round-trip-and-repro-files) | deprecated | `-dump-repro` / `-load-repro` round-trip (`#round-trip-and-repro-files`). | deprecated per CLAUDE.md. |
-| [#adding-a-new-serialized-field](../../../docs/llm-generated/cross-cutting/serialization.md#adding-a-new-serialized-field) | process-doc | The "Adding a new serialized field" developer walkthrough (`#adding-a-new-serialized-field`). | process documentation. |
-| [#riff-container-format](../../../docs/llm-generated/cross-cutting/serialization.md#riff-container-format) | requires-external-tool | Raw RIFF chunk-code inspection (`#riff-container-format`). | would require parsing bytes; the doc defers chunk codes to source files. |
-| [#source-location-serialization](../../../docs/llm-generated/cross-cutting/serialization.md#source-location-serialization) | requires-external-tool | `-line-directive-mode source-map` zip emission (`#source-location-serialization`) — the FileCheck runner cannot see inside a zip archive without an external `unzip` step. The default `#line` mode covers the same user-facing round-trip claim. | Not reachable via any allowed test directive. |
+| The Fossil backend's memory-mappable property (`#fossil-backend`). | (unclassified) | [#fossil-backend](../../../docs/llm-generated/cross-cutting/serialization.md#fossil-backend) | an internal performance claim with no observable. |
+| `Unrecognized`-opcode deserializer behaviour (`#versioning-and-backwards-compatibility`). | (unclassified) | [#versioning-and-backwards-compatibility](../../../docs/llm-generated/cross-cutting/serialization.md#versioning-and-backwards-compatibility) | would require constructing a module whose opcode set exceeds the current compiler's, which the CLI cannot do. |
+| The `serialize(serializer, value)` template pattern (`#the-serialize-pattern`). | needs-unit-test | [#the-serialize-pattern](../../../docs/llm-generated/cross-cutting/serialization.md#the-serialize-pattern) | a C++ idiom, no CLI surface. |
+| The `SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS` toggle (`#fossil-backend`). | compile-time-toggle | [#fossil-backend](../../../docs/llm-generated/cross-cutting/serialization.md#fossil-backend) | baked into the binary at compile time. |
+| `-dump-repro` / `-load-repro` round-trip (`#round-trip-and-repro-files`). | deprecated | [#round-trip-and-repro-files](../../../docs/llm-generated/cross-cutting/serialization.md#round-trip-and-repro-files) | deprecated per CLAUDE.md. |
+| The "Adding a new serialized field" developer walkthrough (`#adding-a-new-serialized-field`). | process-doc | [#adding-a-new-serialized-field](../../../docs/llm-generated/cross-cutting/serialization.md#adding-a-new-serialized-field) | process documentation. |
+| Raw RIFF chunk-code inspection (`#riff-container-format`). | requires-external-tool | [#riff-container-format](../../../docs/llm-generated/cross-cutting/serialization.md#riff-container-format) | would require parsing bytes; the doc defers chunk codes to source files. |
+| `-line-directive-mode source-map` zip emission (`#source-location-serialization`) — the FileCheck runner cannot see inside a zip archive without an external `unzip` step. The default `#line` mode covers the same user-facing round-trip claim. | requires-external-tool | [#source-location-serialization](../../../docs/llm-generated/cross-cutting/serialization.md#source-location-serialization) | Not reachable via any allowed test directive. |

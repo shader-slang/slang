@@ -51,7 +51,7 @@ Phase A/B/C/D tables that can be observed in
 `slangc -target cuda` text. Default directive is
 `//TEST:SIMPLE(filecheck=CHECK):-target cuda -entry main -stage compute`.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -142,13 +142,13 @@ Phase A/B/C/D tables that can be observed in
 
 (none)
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#adjacent-targets](../../../docs/llm-generated/target-pipelines/cuda.md#adjacent-targets) | (unclassified) | **`PyTorchCppBinding`** adjacent target arm (`#adjacent-targets`). Out of scope: shares some Phase B passes but emits via `TorchCppSourceEmitter`, not `CUDASourceEmitter`. | Not reachable via any allowed test directive. |
-| [#autodiff](../../../docs/llm-generated/target-pipelines/cuda.md#autodiff) | (unclassified) | **`autodiff` / `higherOrderFunc` / `derivativePyBindWrapper` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `generateDerivativeWrappers`, `finalizeAutoDiffPass`, etc.). Covered by other bundles; the doc anchors them to Phase B but the emit-stage observable is a downstream language feature. | Not reachable via any allowed test directive. |
-| [#coveragetracing](../../../docs/llm-generated/target-pipelines/cuda.md#coveragetracing) | (unclassified) | **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). Coverage instrumentation is a debugging flag, not user-observable through text emit. | Not reachable via any allowed test directive. |
-| [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/cuda.md#dynamicresourceheap) | (unclassified) | **`dynamicResourceHeap`**, **`meshOutput`**, **`bindingQuery`** Phase C gates. Each requires a feature surface that is not on the compute-test envelope. | Not reachable via any allowed test directive. |
-| [#validateandremoveassumeaddress](../../../docs/llm-generated/target-pipelines/cuda.md#validateandremoveassumeaddress) | (unclassified) | **`validateAndRemoveAssumeAddress` with `validate=false`**. The doc states CUDA passes `validate=false` (line 960) but the consequence (no validation diagnostic on a malformed address-of) requires a deliberately-malformed input that is out of scope here. | Not reachable via any allowed test directive. |
-| (unspecified) | implementation-detail | **Pass-ordering claims** (Phase A passes 1-18, Phase B passes 1-62, Phase C passes 1-32). The doc enumerates the ordered list; pass _existence_ is observable through emit side effects, but pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | Not reachable via any allowed test directive. |
+| **`PyTorchCppBinding`** adjacent target arm (`#adjacent-targets`). Out of scope: shares some Phase B passes but emits via `TorchCppSourceEmitter`, not `CUDASourceEmitter`. | (unclassified) | [#adjacent-targets](../../../docs/llm-generated/target-pipelines/cuda.md#adjacent-targets) | Not reachable via any allowed test directive. |
+| **`autodiff` / `higherOrderFunc` / `derivativePyBindWrapper` passes** (`checkAutodiffPatterns`, `specializeHigherOrderParameters`, `generateDerivativeWrappers`, `finalizeAutoDiffPass`, etc.). Covered by other bundles; the doc anchors them to Phase B but the emit-stage observable is a downstream language feature. | (unclassified) | [#autodiff](../../../docs/llm-generated/target-pipelines/cuda.md#autodiff) | Not reachable via any allowed test directive. |
+| **`coverageTracing`-gated passes** (`instrumentCoverage`, `finalizeCoverageInstrumentationMetadata`). Coverage instrumentation is a debugging flag, not user-observable through text emit. | (unclassified) | [#coveragetracing](../../../docs/llm-generated/target-pipelines/cuda.md#coveragetracing) | Not reachable via any allowed test directive. |
+| **`dynamicResourceHeap`**, **`meshOutput`**, **`bindingQuery`** Phase C gates. Each requires a feature surface that is not on the compute-test envelope. | (unclassified) | [#dynamicresourceheap](../../../docs/llm-generated/target-pipelines/cuda.md#dynamicresourceheap) | Not reachable via any allowed test directive. |
+| **`validateAndRemoveAssumeAddress` with `validate=false`**. The doc states CUDA passes `validate=false` (line 960) but the consequence (no validation diagnostic on a malformed address-of) requires a deliberately-malformed input that is out of scope here. | (unclassified) | [#validateandremoveassumeaddress](../../../docs/llm-generated/target-pipelines/cuda.md#validateandremoveassumeaddress) | Not reachable via any allowed test directive. |
+| **Pass-ordering claims** (Phase A passes 1-18, Phase B passes 1-62, Phase C passes 1-32). The doc enumerates the ordered list; pass _existence_ is observable through emit side effects, but pass _ordering_ would require `-dump-ir` cross-pass comparison without doc-anchored ordering markers. Covered by `pipeline/05-ir-passes`. | implementation-detail | (unspecified) | Not reachable via any allowed test directive. |

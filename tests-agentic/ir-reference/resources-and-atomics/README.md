@@ -35,7 +35,7 @@ target text, and uses FileCheck patterns anchored at `func %main`
 matchers (for opcodes that live inside the pulled-in library
 function bodies of byte-address-buffer accessors).
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -167,17 +167,17 @@ function bodies of byte-address-buffer accessors).
 
 (none)
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#atomicsub](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#atomicsub) | (unclassified) | `atomicSub` — `Atomic<T>` does not expose a `.sub(v)` surface; see doc gaps. | Not reachable via any allowed test directive. |
-| [#getnaturalstride](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#getnaturalstride) | (unclassified) | Resource queries and modifier helpers (`getNaturalStride`, `castDynamicResource`, `getEquivalentStructuredBuffer`, `getStructuredBufferPtr`, `getUntypedBufferPtr`, `getRegisterIndex`, `getRegisterSpace`). | Not reachable via any allowed test directive. |
-| [#getworkgroupsize](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#getworkgroupsize) | (unclassified) | Workgroup / stage introspection (`GetWorkGroupSize`, `GetCurrentStage`) — materialized in the layout / emit pipeline. | Not reachable via any allowed test directive. |
-| [#groupmemorybarrierwithgroupsync](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#groupmemorybarrierwithgroupsync) | (unclassified) | Barriers (`GroupMemoryBarrierWithGroupSync`, `ControlBarrier`, `BeginFragmentShaderInterlock`, `EndFragmentShaderInterlock`) — surface as `call` at LOWER-TO-IR. | Not reachable via any allowed test directive. |
-| [#imagesubscript](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#imagesubscript) | (unclassified) | Texture and image opcodes (`imageSubscript`, `imageLoad`, `imageStore`, `SubpassLoad`, `MetalCastToDepthTexture`, `IsTextureAccess`, `IsTextureScalarAccess`, `IsTextureArrayAccess`, `ExtractTextureFromTextureAccess`, `ExtractCoordFromTextureAccess`, `ExtractArrayCoordFromTextureAccess`). | Not reachable via any allowed test directive. |
-| [#metalatomiccast](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#metalatomiccast) | (unclassified) | `MetalAtomicCast`, `IncrementCoverageCounter` — synthesized. | Not reachable via any allowed test directive. |
-| [#rwstructuredbufferstore](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#rwstructuredbufferstore) | (unclassified) | The doc's `rwstructuredBufferStore` opcode — actually produced via `rwstructuredBufferGetElementPtr` + `store` lowering. | Not reachable via any allowed test directive. |
-| [#sample](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#sample) | (unclassified) | Sampling and combined-sampler opcodes (`sample`, `sampleGrad`, `makeCombinedTextureSampler`, `MakeCombinedTextureSamplerFromHandle`, `CombinedTextureSamplerGetTexture`, `CombinedTextureSamplerGetSampler`). | Not reachable via any allowed test directive. |
-| [#structuredbuffergetdimensions](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#structuredbuffergetdimensions) | (unclassified) | `StructuredBufferGetDimensions` — appears only inside the helper function body, not on `main`. | Not reachable via any allowed test directive. |
-| [#wavegetactivemask](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#wavegetactivemask) | (unclassified) | Wave intrinsics (`waveGetActiveMask`, `waveMaskBallot`, `waveMaskMatch`) — surface as `call` at LOWER-TO-IR. | Not reachable via any allowed test directive. |
+| `atomicSub` — `Atomic<T>` does not expose a `.sub(v)` surface; see doc gaps. | (unclassified) | [#atomicsub](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#atomicsub) | Not reachable via any allowed test directive. |
+| Resource queries and modifier helpers (`getNaturalStride`, `castDynamicResource`, `getEquivalentStructuredBuffer`, `getStructuredBufferPtr`, `getUntypedBufferPtr`, `getRegisterIndex`, `getRegisterSpace`). | (unclassified) | [#getnaturalstride](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#getnaturalstride) | Not reachable via any allowed test directive. |
+| Workgroup / stage introspection (`GetWorkGroupSize`, `GetCurrentStage`) — materialized in the layout / emit pipeline. | (unclassified) | [#getworkgroupsize](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#getworkgroupsize) | Not reachable via any allowed test directive. |
+| Barriers (`GroupMemoryBarrierWithGroupSync`, `ControlBarrier`, `BeginFragmentShaderInterlock`, `EndFragmentShaderInterlock`) — surface as `call` at LOWER-TO-IR. | (unclassified) | [#groupmemorybarrierwithgroupsync](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#groupmemorybarrierwithgroupsync) | Not reachable via any allowed test directive. |
+| Texture and image opcodes (`imageSubscript`, `imageLoad`, `imageStore`, `SubpassLoad`, `MetalCastToDepthTexture`, `IsTextureAccess`, `IsTextureScalarAccess`, `IsTextureArrayAccess`, `ExtractTextureFromTextureAccess`, `ExtractCoordFromTextureAccess`, `ExtractArrayCoordFromTextureAccess`). | (unclassified) | [#imagesubscript](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#imagesubscript) | Not reachable via any allowed test directive. |
+| `MetalAtomicCast`, `IncrementCoverageCounter` — synthesized. | (unclassified) | [#metalatomiccast](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#metalatomiccast) | Not reachable via any allowed test directive. |
+| The doc's `rwstructuredBufferStore` opcode — actually produced via `rwstructuredBufferGetElementPtr` + `store` lowering. | (unclassified) | [#rwstructuredbufferstore](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#rwstructuredbufferstore) | Not reachable via any allowed test directive. |
+| Sampling and combined-sampler opcodes (`sample`, `sampleGrad`, `makeCombinedTextureSampler`, `MakeCombinedTextureSamplerFromHandle`, `CombinedTextureSamplerGetTexture`, `CombinedTextureSamplerGetSampler`). | (unclassified) | [#sample](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#sample) | Not reachable via any allowed test directive. |
+| `StructuredBufferGetDimensions` — appears only inside the helper function body, not on `main`. | (unclassified) | [#structuredbuffergetdimensions](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#structuredbuffergetdimensions) | Not reachable via any allowed test directive. |
+| Wave intrinsics (`waveGetActiveMask`, `waveMaskBallot`, `waveMaskMatch`) — surface as `call` at LOWER-TO-IR. | (unclassified) | [#wavegetactivemask](../../../docs/llm-generated/ir-reference/resources-and-atomics.md#wavegetactivemask) | Not reachable via any allowed test directive. |

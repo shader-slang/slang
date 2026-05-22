@@ -37,7 +37,7 @@ catalog code.
 | 0      | 123             | 39          | 84            |
 | 3      | 123             | 105         | 18            |
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |

@@ -34,7 +34,7 @@ check, before any backend lowering).
 Multi-backend rule: every claim in this doc is target-independent, so
 each test uses a single directive.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -75,7 +75,7 @@ each test uses a single directive.
 | [#concepts](../../../docs/llm-generated/name-resolution/scopes.md#concepts) | undocumented-behavior | The `## Concepts` section gives a precise description of `Scope`'s three fields and the `containerDecl` ownership convention. None of those properties are observable through `slang-test`; they show up only in IR/AST dumps or in internal asserts. Tests for those would have to fish through `-dump-ir` (which lowers past scopes already) and are not anchorable here. |  |
 | [#concepts](../../../docs/llm-generated/name-resolution/scopes.md#concepts) | undocumented-behavior | The `## Concepts` section lists `LambdaDecl (parameter scope)` and `parseIfLetStatement (synthetic)` in the scope-bearing table. Lambdas have a complete surface in `tests/language-feature/lambda/` but no scope-specific claim is restated in scopes.md beyond "a dedicated ScopeDecl for the parameter list". A test for "lambda parameter is not visible outside the lambda body" would anchor to an implicit consequence rather than an explicit one; deferred until the doc enumerates that boundary. |  |
 
-## Out of scope
+## Untested claims
 
 (none)
 

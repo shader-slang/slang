@@ -29,7 +29,7 @@ cross-target behavior.
 > framework lesson, captured below under `## Framework feedback for
 > _common.md`.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -88,16 +88,16 @@ cross-target behavior.
 
 (none)
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| (unspecified) | (unclassified) | WebGPU runtime tests. | Not reachable via any allowed test directive. |
-| (unspecified) | (unclassified) | LLVM-native binary emission. | Not reachable via any allowed test directive. |
-| (unspecified) | (unclassified) | Slang round-trip (`-target slang`). | Not reachable via any allowed test directive. |
-| (unspecified) | (unclassified) | VM byte-code target (`-target hostvm`). | Not reachable via any allowed test directive. |
-| (unspecified) | (unclassified) | Any test that needs runtime device enumeration. | Not reachable via any allowed test directive. |
-| [#slang-python](../../../docs/llm-generated/cross-cutting/targets.md#slang-python) | (unclassified) | Torch glue / `slang-python` bindings. | Not reachable via any allowed test directive. |
+| WebGPU runtime tests. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| LLVM-native binary emission. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| Slang round-trip (`-target slang`). | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| VM byte-code target (`-target hostvm`). | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| Any test that needs runtime device enumeration. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| Torch glue / `slang-python` bindings. | (unclassified) | [#slang-python](../../../docs/llm-generated/cross-cutting/targets.md#slang-python) | Not reachable via any allowed test directive. |
 
 ## Framework feedback for \_common.md
 

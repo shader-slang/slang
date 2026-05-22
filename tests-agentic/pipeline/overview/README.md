@@ -41,7 +41,7 @@ struct, one if/else control flow), and one multi-target test for the
 entry-point-flows-to-target-marker claim. Multi-backend coverage is
 the point of this bundle.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -67,9 +67,9 @@ the point of this bundle.
 | [#line-893-at-sourcecommit](../../../docs/llm-generated/pipeline/overview.md#line-893-at-sourcecommit) | undocumented-behavior | The doc lists `slang-emit.cpp` line numbers ("line 893 at source_commit", "line 2418 at source_commit") for `linkAndOptimizeIR` and `emitEntryPointsSourceFromIR`. These are navigation aids, not user-facing claims; no test anchors them. The fact that linkAndOptimizeIR runs is observed indirectly by successful end-to-end compile of a shader that requires linking (function calls, struct usage) — covered by the existing tests. |  |
 | [#emit](../../../docs/llm-generated/pipeline/overview.md#emit) | undocumented-behavior | The `## Emit` subsection lists Torch glue, LLVM IR / native via `slang-llvm`, and VM bytecode as targets in addition to the text emit backends. Torch and LLVM/native require host compilers we cannot assume in the no-GPU runner; VM bytecode is exercised via `INTERPRET` in lower-level bundles. Recorded as out-of-scope here. |  |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#slang-llvm](../../../docs/llm-generated/pipeline/overview.md#slang-llvm) | out-of-bundle | Targets that require a host compiler or runtime not available in the agentic runner: Torch glue (`-target torch`), LLVM IR / native via `slang-llvm`, DXIL, MSL binary, SPIRV binary (requires `spirv-val` ecosystem). Text-emit forms are tested instead. | The pipeline-overview doc is a navigation hub; per-target downstream paths belong to the `target-pipelines/*` bundles. |
-| [#slang-test](../../../docs/llm-generated/pipeline/overview.md#slang-test) | (unclassified) | Determinism of the compiler (compile twice → identical text). `slang-test` would need a custom diff harness for this, and the doc does not currently make a determinism claim; recorded as doc-gap-adjacent and skipped here. | Not reachable via any allowed test directive. |
+| Targets that require a host compiler or runtime not available in the agentic runner: Torch glue (`-target torch`), LLVM IR / native via `slang-llvm`, DXIL, MSL binary, SPIRV binary (requires `spirv-val` ecosystem). Text-emit forms are tested instead. | out-of-bundle | [#slang-llvm](../../../docs/llm-generated/pipeline/overview.md#slang-llvm) | The pipeline-overview doc is a navigation hub; per-target downstream paths belong to the `target-pipelines/*` bundles. |
+| Determinism of the compiler (compile twice → identical text). `slang-test` would need a custom diff harness for this, and the doc does not currently make a determinism claim; recorded as doc-gap-adjacent and skipped here. | (unclassified) | [#slang-test](../../../docs/llm-generated/pipeline/overview.md#slang-test) | Not reachable via any allowed test directive. |

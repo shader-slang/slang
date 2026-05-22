@@ -34,9 +34,9 @@ and missing-return in D5).
 The bundle covers all four phases at the granularity the doc
 documents. Several internal-only knobs (`[__unsafeForceInlineEarly]`
 user attribute, debug-info insertion, obfuscation) are recorded
-under `## Out of scope` rather than tested.
+under `## Untested claims` rather than tested.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -66,14 +66,14 @@ under `## Out of scope` rather than tested.
 | [#checkautodiffusages](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#checkautodiffusages) | undocumented-behavior | The doc lists D6 `checkAutoDiffUsages`, D8 `addDecorationsForGenericsSpecializedWithExistentials`, and D9 `checkForMeshOutputReads`, but the diagnostic text and severity each pass emits is not stated. | Without verbatim diagnostic text the `DIAGNOSTIC_TEST` anchors are brittle; doc should list at least the error code. |
 | [#insertdebugvaluestore](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#insertdebugvaluestore) | undocumented-behavior | The doc names B6 `insertDebugValueStore` gated on `debugInfoLevel >= Standard`, but does not give the surface-observable inst (`DebugValue`) that distinguishes the `-g` vs no-`-g` IR. A claim sentence pointing at the expected post-pass opcode would unblock a focused test. |  |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| (unspecified) | (unclassified) | `[__unsafeForceInlineEarly]` user-code surface — the attribute is internal-only and must not appear in user code; the loop's fixed-point convergence is tested indirectly via C-12. | Not reachable via any allowed test directive. |
-| [#checkforoperatorshiftoverflow](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#checkforoperatorshiftoverflow) | (unclassified) | `checkForOperatorShiftOverflow` (D7) — does not reliably diagnose `1 << 40` in the default option set; treat as out-of-scope until a clean surface trigger is documented. | Not reachable via any allowed test directive. |
-| [#insertdebugvaluestore](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#insertdebugvaluestore) | (unclassified) | `insertDebugValueStore` (B6) — requires `-g` and couples observation to SPIR-V debug instructions outside the pre-link scope. | Not reachable via any allowed test directive. |
-| [#obfuscatemodulelocs](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#obfuscatemodulelocs) | (unclassified) | `obfuscateModuleLocs` (D13) — requires both `-obfuscate-code` and `-source-map`; runner does not exercise the surface. | Not reachable via any allowed test directive. |
-| [#prelinkir](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#prelinkir) | (unclassified) | `prelinkIR`'s pull-in of the `externalSymbolsToPrelink` set populated by upstream lowering — the set itself is not user-visible. | Not reachable via any allowed test directive. |
-| [#validateirmoduleifenabled](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#validateirmoduleifenabled) | (unclassified) | `validateIRModuleIfEnabled` (A10, D14) — no-op unless the IR-validation compiler option is set; not exercised by the agentic bundle. | Not reachable via any allowed test directive. |
-| (unspecified) | implementation-detail | The exact ordering of A1…A10, B1…B6, C1…C7, D1…D15 — the `### LOWER-TO-IR:` dump shows only the post-Phase-D state, not intermediate stages, so per-pass ordering is not observable from this bundle. | Not reachable via any allowed test directive. |
+| `[__unsafeForceInlineEarly]` user-code surface — the attribute is internal-only and must not appear in user code; the loop's fixed-point convergence is tested indirectly via C-12. | (unclassified) | (unspecified) | Not reachable via any allowed test directive. |
+| `checkForOperatorShiftOverflow` (D7) — does not reliably diagnose `1 << 40` in the default option set; treat as out-of-scope until a clean surface trigger is documented. | (unclassified) | [#checkforoperatorshiftoverflow](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#checkforoperatorshiftoverflow) | Not reachable via any allowed test directive. |
+| `insertDebugValueStore` (B6) — requires `-g` and couples observation to SPIR-V debug instructions outside the pre-link scope. | (unclassified) | [#insertdebugvaluestore](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#insertdebugvaluestore) | Not reachable via any allowed test directive. |
+| `obfuscateModuleLocs` (D13) — requires both `-obfuscate-code` and `-source-map`; runner does not exercise the surface. | (unclassified) | [#obfuscatemodulelocs](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#obfuscatemodulelocs) | Not reachable via any allowed test directive. |
+| `prelinkIR`'s pull-in of the `externalSymbolsToPrelink` set populated by upstream lowering — the set itself is not user-visible. | (unclassified) | [#prelinkir](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#prelinkir) | Not reachable via any allowed test directive. |
+| `validateIRModuleIfEnabled` (A10, D14) — no-op unless the IR-validation compiler option is set; not exercised by the agentic bundle. | (unclassified) | [#validateirmoduleifenabled](../../../docs/llm-generated/pipeline/04b-pre-link-passes.md#validateirmoduleifenabled) | Not reachable via any allowed test directive. |
+| The exact ordering of A1…A10, B1…B6, C1…C7, D1…D15 — the `### LOWER-TO-IR:` dump shows only the post-Phase-D state, not intermediate stages, so per-pass ordering is not observable from this bundle. | implementation-detail | (unspecified) | Not reachable via any allowed test directive. |

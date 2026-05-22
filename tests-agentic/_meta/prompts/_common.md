@@ -71,7 +71,7 @@ One short paragraph: which doc this bundle exercises, and the coverage
 strategy (e.g. "one positive + one negative per claim in sections
 3.1–3.5").
 
-## Coverage
+## Functional coverage
 
 | Claim                                                                          | Intent     | Anchor                                                          | Tests                                                                  |
 | ------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -97,18 +97,18 @@ If there are no gaps, omit the section. Do not write a placeholder row.
 If every documented claim already has a test in the Coverage table,
 omit this section.
 
-## Out of scope
+## Untested claims
 
-| Anchor                                                    | Reason          | Claim                                                                                                                                       | Why it's terminal                                                                                            |
-| --------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| [#serialize-pattern](../../docs/llm-generated/<doc>.md#serialize-pattern) | api-only        | The doc describes the `serialize(serializer, value)` template pattern that compiler internals use to thread values through serialization.   | No `slangc` CLI surface reaches this template; it is a C++ idiom invoked from the compiler's own source.     |
-| ...                                                       | ...             | ...                                                                                                                                         | ...                                                                                                          |
+| Claim                                                                                                                                       | Reason            | Anchor                                                    | Why untested                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| The doc describes the `serialize(serializer, value)` template pattern that compiler internals use to thread values through serialization.   | needs-unit-test   | [#serialize-pattern](../../docs/llm-generated/<doc>.md#serialize-pattern) | A C++ idiom invoked from compiler-internal code; no slangc CLI surface reaches it. A C++ unit test against the serializer types could verify it. |
+| ...                                                                                                                                         | ...               | ...                                                       | ...                                                                                                     |
 
 If every documented claim is either tested or coverable, omit this
 section.
 ```
 
-**Coverage table rules:**
+**Functional-coverage table rules:**
 
 - One row per documented claim. The **Claim** cell paraphrases what the
   test verifies in one plain-English sentence; it must match the test's
@@ -130,7 +130,7 @@ section.
   same doc section cluster.
 
 The lint pass verifies that every `.slang` file in the bundle directory
-appears in the Coverage table's Tests column.
+appears in the Functional coverage table's Tests column.
 
 **Doc-gap table rules:**
 
@@ -206,32 +206,43 @@ this table and write tests for it.
 - **Why untested**: one sentence naming the runner constraint
   (typically "Agent runtime has no GPU; CI / local machine does.").
 
-**Out-of-scope table rules:**
+**Untested-claims table rules:**
 
-The `## Out of scope` section is the **permanent exception log**.
-Each row is a doc claim that cannot be tested by `slang-test` even
-with full runner access — it is terminal. The doc-regen workflow
-does **not** consume this table; it exists to make the suite's
-coverage boundary visible to readers.
+The `## Untested claims` section is the **bucket of doc claims that
+cannot be tested by `slang-test` directly**. Each row names a claim
+and the kind of test harness that *would* verify it (C++ unit test,
+multi-file test, CLI test, etc.) — or, when no harness exists, why
+the claim is unobservable through any test directive. The doc-regen
+workflow does **not** consume this table; it exists to make the
+suite's coverage boundary visible to readers, and to surface
+candidates for unit-test / CLI-test campaigns.
 
-- **Anchor**: markdown link to the doc section.
-- **Reason**: controlled vocabulary naming why the claim is
-  terminal:
+Columns: `Claim | Reason | Anchor | Why untested`. The Claim is the
+primary content; Anchor is a supporting pointer.
 
-  | Reason                    | Meaning                                                                                                   |
-  | ------------------------- | --------------------------------------------------------------------------------------------------------- |
-  | `api-only`                | The claim is about behavior of a C++ API (`ISession`, `serialize(...)`, template patterns) with no `slangc` CLI surface. |
-  | `link-stage-only`         | The claim is about a `(synthesized)` opcode / pass-output that does not exist at this bundle's `pipeline_stage`. Test belongs in the bundle whose pipeline stage matches. |
-  | `out-of-bundle`           | The claim is about behavior already covered in a sibling bundle. (Name the sibling in the Why cell.)     |
-  | `deprecated`              | The CLI flag or feature is deprecated and will not be tested.                                            |
-  | `process-doc`             | The claim is about a contributor walkthrough / process documentation, not a compiler behavior.            |
-  | `internal-source-fact`    | The claim is an implementation fact (C++ class hierarchy, field names, parser-callback names) with no user-observable consequence. |
-  | `compile-time-toggle`     | The claim is about a preprocessor define or build-time flag baked into the binary. Not observable at run-time. |
-  | `requires-external-tool`  | The claim could be verified but requires a non-Slang tool (`unzip`, hex dumper, etc.) the runner does not include. |
-  | `implementation-detail`   | The claim is about internal compiler choice (pass ordering count, hoistability decisions) with no test-directive that reveals it. |
 - **Claim**: one to three sentences naming what the doc states.
-- **Why it's terminal**: one sentence explaining why no runner
-  upgrade will make this testable.
+  Lead with the claim because that's the substance — readers and
+  downstream tooling want to know *what* before *why*.
+- **Reason**: controlled vocabulary naming what is needed (when
+  testable elsewhere) or why the claim is unreachable:
+
+  | Reason                    | Meaning                                                                                                                                                                              |
+  | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | `needs-unit-test`         | The claim is about C++ behavior (an `ISession` method, a `serialize(...)` template pattern, an internal helper) that has no slangc CLI surface but could be tested by a C++ unit test (in `tools/slang-unit-test/`). |
+  | `needs-multi-file-test`   | The claim is observable only across 2+ `.slang` files (cross-module `import`, `__include` / `__implementing`, `-embed-downstream-ir` artefacts, `.slang-module` linking). The single-file `//TEST` directive cannot stage the input. |
+  | `needs-cli-test`          | The claim is about how `slangc` is invoked rather than what it compiles (help output, exit codes, env-var-gated paths like `SLANG_RUN_SPIRV_VALIDATION`, flag-mapping tables, argument-parsing edge cases). A wrapper script invoking `slangc` directly is what would verify it. |
+  | `link-stage-only`         | The claim is about a `(synthesized)` opcode / pass-output that does not exist at this bundle's `pipeline_stage`. Test belongs in the bundle whose pipeline stage matches.            |
+  | `out-of-bundle`           | The claim is about behavior already covered in a sibling bundle. (Name the sibling in the Why cell.)                                                                                  |
+  | `deprecated`              | The CLI flag or feature is deprecated and will not be tested.                                                                                                                         |
+  | `process-doc`             | The claim is about a contributor walkthrough / process documentation, not a compiler behavior.                                                                                        |
+  | `internal-source-fact`    | The claim is an implementation fact (C++ class hierarchy, field names, parser-callback names) with no user-observable consequence.                                                    |
+  | `compile-time-toggle`     | The claim is about a preprocessor define or build-time flag baked into the binary. Not observable at run-time.                                                                        |
+  | `requires-external-tool`  | The claim could be verified but requires a non-Slang tool (`unzip`, hex dumper, etc.) the runner does not include.                                                                    |
+  | `implementation-detail`   | The claim is about internal compiler choice (pass ordering count, hoistability decisions) with no test-directive that reveals it.                                                     |
+- **Anchor**: markdown link to the doc section that makes the claim.
+- **Why untested**: one to two sentences elaborating the Reason —
+  what specifically blocks the test, and (for `needs-*` rows) what
+  shape of test would verify it.
 
 ## Per-test `//META` block
 
@@ -297,7 +308,7 @@ nothing.
 If a claim is genuinely unobservable through any `slang-test`
 directive even with full runner access (e.g., the claim is about a
 C++ template pattern with no CLI surface), record it in the
-`## Out of scope` table with the appropriate `Reason` tag. If the
+`## Untested claims` table with the appropriate `Reason` tag. If the
 claim is observable but the test would only be validatable in CI
 (needs a GPU runner / DXC / nvrtc / etc.), still write the test —
 CI validates it. Record nothing extra; the `gpu-*` Backend tags in
@@ -385,7 +396,7 @@ bundle MUST include boundary tests for them:
 #### Encouraged axes
 
 These are not lint-enforced, but skip them only with a
-`## Out of scope` rationale:
+`## Untested claims` rationale:
 
 - **Vector / matrix**: 1-element / smallest documented dim, max
   documented dim, mixed-type construction, swizzle of length 1

@@ -48,7 +48,7 @@ Cross-cutting decoration / opcode catalog coverage (`entryPoint`,
 this bundle anchors on the AST-side of the mapping ("which AST node
 lowers to which IR construct").
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -193,15 +193,15 @@ lowers to which IR construct").
 | [#parameterblockt-vardecl---irglobalparam-of-type-parameterblockt](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#parameterblockt-vardecl---irglobalparam-of-type-parameterblockt) | undocumented-behavior | **`ParameterBlock<T>` lowering is not mentioned by name.** The doc says global VarDecls become `IRGlobalVar`, but `ParameterBlock(%T)` is a distinct IR type, not a plain global. A row "ParameterBlock<T> VarDecl -> IRGlobalParam of type `ParameterBlock(%T)`" would close this gap. |  |
 | [#typecastexpr---family-of-cast-pure-value-insts](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#typecastexpr---family-of-cast-pure-value-insts) | undocumented-behavior | **Cast lowering is illustrated by name but not by family.** The doc table mentions `BinaryExpr -> IRAdd/IRMul/IREq, ...`. Explicit type-cast lowering follows a parallel family — `floatCast`, `intCast`, `castFloatToInt`, `castIntToFloat` — with one opcode per source/dest type family. A row "TypeCastExpr -> family of cast pure-value insts" would tie these to the doc directly; the bundle currently anchors them under the more general "Mapping AST constructs to IR" header. |  |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#generateirforspecializedcomponenttype](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#generateirforspecializedcomponenttype) | (unclassified) | `generateIRForSpecializedComponentType` and `generateIRForTypeConformance` — component-type API entry points invoked through the `Session`, not through the command line. A C++ unit test would exercise them. | Not reachable via any allowed test directive. |
-| [#irbuilder](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#irbuilder) | (unclassified) | `IRBuilder` hash-consing decisions — the dump shows the post- dedup result, not the decision path. | Not reachable via any allowed test directive. |
-| [#kiropflaghoistable](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#kiropflaghoistable) | (unclassified) | `kIROpFlag_Hoistable` / `kIROpFlag_Global` flag bits — internal to `IRInst`, not in the dump. | Not reachable via any allowed test directive. |
-| [#linkandoptimizeir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#linkandoptimizeir) | (unclassified) | Order of pass invocation inside `linkAndOptimizeIR` — belongs to `pipeline/05-ir-passes`. | Not reachable via any allowed test directive. |
-| [#lowering-errors-flow-through-diagnosticsink](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#lowering-errors-flow-through-diagnosticsink) | (unclassified) | "Lowering errors flow through DiagnosticSink" — true, but the doc does not name a specific construct that produces a lowering-only diagnostic, so no `.slang` test can probe it here. Diagnostic claims belong to `pipeline/03-semantic-check`. | Not reachable via any allowed test directive. |
-| [#module](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#module) | (unclassified) | Side artefacts on the surrounding `Module` (entry-point list, type-conformance bookkeeping, layout-intent markers) — these are C++ container contents, not observable through slangc CLI. | Not reachable via any allowed test directive. |
-| [#irop](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#irop) | compile-time-toggle | The `slang-ir-insts-enum.h` FIDDLE-generated `IROp` enum — a build-time artefact. | Not reachable via any allowed test directive. |
-| (unspecified) | internal-source-fact | Internal lowering visitor structure (which C++ visitor method handles which AST node) — implementation detail of `slang-lower-to-ir.cpp`, not surface-visible. | Not reachable via any allowed test directive. |
+| `generateIRForSpecializedComponentType` and `generateIRForTypeConformance` — component-type API entry points invoked through the `Session`, not through the command line. A C++ unit test would exercise them. | (unclassified) | [#generateirforspecializedcomponenttype](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#generateirforspecializedcomponenttype) | Not reachable via any allowed test directive. |
+| `IRBuilder` hash-consing decisions — the dump shows the post- dedup result, not the decision path. | (unclassified) | [#irbuilder](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#irbuilder) | Not reachable via any allowed test directive. |
+| `kIROpFlag_Hoistable` / `kIROpFlag_Global` flag bits — internal to `IRInst`, not in the dump. | (unclassified) | [#kiropflaghoistable](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#kiropflaghoistable) | Not reachable via any allowed test directive. |
+| Order of pass invocation inside `linkAndOptimizeIR` — belongs to `pipeline/05-ir-passes`. | (unclassified) | [#linkandoptimizeir](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#linkandoptimizeir) | Not reachable via any allowed test directive. |
+| "Lowering errors flow through DiagnosticSink" — true, but the doc does not name a specific construct that produces a lowering-only diagnostic, so no `.slang` test can probe it here. Diagnostic claims belong to `pipeline/03-semantic-check`. | (unclassified) | [#lowering-errors-flow-through-diagnosticsink](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#lowering-errors-flow-through-diagnosticsink) | Not reachable via any allowed test directive. |
+| Side artefacts on the surrounding `Module` (entry-point list, type-conformance bookkeeping, layout-intent markers) — these are C++ container contents, not observable through slangc CLI. | (unclassified) | [#module](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#module) | Not reachable via any allowed test directive. |
+| The `slang-ir-insts-enum.h` FIDDLE-generated `IROp` enum — a build-time artefact. | compile-time-toggle | [#irop](../../../docs/llm-generated/pipeline/04-ast-to-ir.md#irop) | Not reachable via any allowed test directive. |
+| Internal lowering visitor structure (which C++ visitor method handles which AST node) — implementation detail of `slang-lower-to-ir.cpp`, not surface-visible. | internal-source-fact | (unspecified) | Not reachable via any allowed test directive. |

@@ -40,7 +40,7 @@ single-directive form. Only the transparent / deref tests use a
 text-emit target, and only because the surface (`cbuffer` /
 `ConstantBuffer<T>`) is not interpretable.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -101,7 +101,7 @@ not duplicated here:
 | [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/lookup.md#edge-cases-and-failure-modes) | undocumented-behavior | The `## Edge cases and failure modes` section names `ExtensionExternVarModifier` and `ExternModifier` in extensions as filtered at the start of `DeclPassesLookupMask`. Both modifiers are core-module-only; user code cannot apply them to an extension to produce the rejection. A claim that some user-writable form maps to those modifiers would unblock a negative test. |  |
 | [#edge-cases-and-failure-modes](../../../docs/llm-generated/name-resolution/lookup.md#edge-cases-and-failure-modes) | undocumented-behavior | The `## Edge cases and failure modes` section says `AndType` reaching the type dispatch is an internal-error (`SLANG_UNEXPECTED`). That is a compiler-developer claim ("constraint-flattening must run before lookup"), not a user- observable claim, so no test anchors here. |  |
 
-## Out of scope
+## Untested claims
 
 (none)
 

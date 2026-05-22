@@ -22,7 +22,7 @@ compute stage and FileCheck on the WGSL emit text. All tests run
 with `-target wgsl -entry main -stage compute` against the
 `slangc` text emitter; no Tint, no runtime, no GPU.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -106,13 +106,13 @@ with `-target wgsl -entry main -stage compute` against the
 
 (none)
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#e36107](../../../docs/llm-generated/target-pipelines/wgsl.md#e36107) | (unclassified) | **`AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>`.** The Slang front-end rejects these in a WGSL compute entry point with `E36107`, so the `lowerAppendConsumeStructuredBuffers` pass that runs for WGSL is not reachable from a `.slang` source. | Not reachable via any allowed test directive. |
-| [#interlockedadd](../../../docs/llm-generated/target-pipelines/wgsl.md#interlockedadd) | (unclassified) | **HLSL-style `InterlockedAdd` / `InterlockedExchange`.** Slang rejects these for WGSL; use `Atomic<T>` instead (covered by `atomic-add-buffer.slang`). | Not reachable via any allowed test directive. |
-| [#legalizeentrypointsforglsl](../../../docs/llm-generated/target-pipelines/wgsl.md#legalizeentrypointsforglsl) | (unclassified) | **`legalizeEntryPointsForGLSL`, `legalizeImageSubscript`, `legalizeConstantBufferLoadForGLSL`.** GLSL/SPIR-V only. | Not reachable via any allowed test directive. |
-| [#linkandoptimizeir](../../../docs/llm-generated/target-pipelines/wgsl.md#linkandoptimizeir) | (unclassified) | **WGSL has no iterative passes (zero loops in `linkAndOptimizeIR`).** A textual claim about the absence of a while loop; not directly observable in emitted text. | Not reachable via any allowed test directive. |
-| (unspecified) | implementation-detail | **Pass-ordering inside Phase A/B/C.** Pass existence is observable from emitted text; intra-phase ordering needs `-dump-ir` anchors that the doc does not pin. | Not reachable via any allowed test directive. |
-| (unspecified) | out-of-bundle | **DXR / mesh / ray-tracing / graphics-stage entry points.** WGSL has no DXR or ray-tracing surface; ray-tracing entry points are covered in the HLSL and SPIR-V target-pipeline bundles instead. | WGSL fundamentally lacks the ray-tracing surface; covered by the `hlsl` / `spirv` sibling bundles. |
+| **`AppendStructuredBuffer<T>` / `ConsumeStructuredBuffer<T>`.** The Slang front-end rejects these in a WGSL compute entry point with `E36107`, so the `lowerAppendConsumeStructuredBuffers` pass that runs for WGSL is not reachable from a `.slang` source. | (unclassified) | [#e36107](../../../docs/llm-generated/target-pipelines/wgsl.md#e36107) | Not reachable via any allowed test directive. |
+| **HLSL-style `InterlockedAdd` / `InterlockedExchange`.** Slang rejects these for WGSL; use `Atomic<T>` instead (covered by `atomic-add-buffer.slang`). | (unclassified) | [#interlockedadd](../../../docs/llm-generated/target-pipelines/wgsl.md#interlockedadd) | Not reachable via any allowed test directive. |
+| **`legalizeEntryPointsForGLSL`, `legalizeImageSubscript`, `legalizeConstantBufferLoadForGLSL`.** GLSL/SPIR-V only. | (unclassified) | [#legalizeentrypointsforglsl](../../../docs/llm-generated/target-pipelines/wgsl.md#legalizeentrypointsforglsl) | Not reachable via any allowed test directive. |
+| **WGSL has no iterative passes (zero loops in `linkAndOptimizeIR`).** A textual claim about the absence of a while loop; not directly observable in emitted text. | (unclassified) | [#linkandoptimizeir](../../../docs/llm-generated/target-pipelines/wgsl.md#linkandoptimizeir) | Not reachable via any allowed test directive. |
+| **Pass-ordering inside Phase A/B/C.** Pass existence is observable from emitted text; intra-phase ordering needs `-dump-ir` anchors that the doc does not pin. | implementation-detail | (unspecified) | Not reachable via any allowed test directive. |
+| **DXR / mesh / ray-tracing / graphics-stage entry points.** WGSL has no DXR or ray-tracing surface; ray-tracing entry points are covered in the HLSL and SPIR-V target-pipeline bundles instead. | out-of-bundle | (unspecified) | WGSL fundamentally lacks the ray-tracing surface; covered by the `hlsl` / `spirv` sibling bundles. |

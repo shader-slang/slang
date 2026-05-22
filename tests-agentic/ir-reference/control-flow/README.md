@@ -38,7 +38,7 @@ to a single block. Switch case labels in one test use
 values appear as inline literal operands regardless of declaration
 form.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -80,18 +80,18 @@ form.
 | Boundary: a `break;` inside a switch nested in a loop targets the switch's breakLabel — it leaves the switch, not the enclosing loop. Both a switch terminator and a loop terminator coexist with distinct break labels. | boundary | [#terminators-unconditional-branches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-unconditional-branches) | [`break-from-switch-inside-loop.slang`](break-from-switch-inside-loop.slang) |
 | unconditionalBranch carries argument operands beyond the target block; these become the values bound to the target's block params, the Slang-IR SSA phi handoff. | functional | [#terminators-unconditional-branches](../../../docs/llm-generated/ir-reference/control-flow.md#terminators-unconditional-branches) | [`unconditional-branch-with-args.slang`](unconditional-branch-with-args.slang) |
 
-## Out of scope
+## Untested claims
 
-| Anchor | Reason | Claim | Why it's terminal |
+| Claim | Reason | Anchor | Why untested |
 | --- | --- | --- | --- |
-| [#defer](../../../docs/llm-generated/ir-reference/control-flow.md#defer) | (unclassified) | **`defer`** — `DeferStmt` lowers to `defer`, but the natural surface form is non-trivial to write portably. | Not reachable via any allowed test directive. |
-| [#trycall](../../../docs/llm-generated/ir-reference/control-flow.md#trycall) | (unclassified) | **`tryCall` / `throw`** — error-flow opcodes. The natural `try` / `throw` surface is unstable in current Slang dumps; exercise via `cross-cutting/ir-instructions` if at all. | Not reachable via any allowed test directive. |
-| [#yield](../../../docs/llm-generated/ir-reference/control-flow.md#yield) | (unclassified) | **`yield`** — terminates the body of a `generic` value; observable only inside generic-instantiation IR, not via natural surface code. | Not reachable via any allowed test directive. |
-| [#gpuforeach](../../../docs/llm-generated/ir-reference/control-flow.md#gpuforeach) | api-only | **`gpuForeach`** — emitted by host-shader lowering only. | Not reachable via any allowed test directive. |
-| [#conditionalbranch](../../../docs/llm-generated/ir-reference/control-flow.md#conditionalbranch) | link-stage-only | **`conditionalBranch`** — listed in the doc as `(synthesized)` with no AST origin. The front-end emits structured `ifElse` for every surface conditional; no portable Slang surface produces `conditionalBranch` at the LOWER-TO-IR stage. | Not reachable via any allowed test directive. |
-| [#genericasm](../../../docs/llm-generated/ir-reference/control-flow.md#genericasm) | link-stage-only | **`GenericAsm`** / **`RequirePrelude`** / **`RequireTargetExtension`** / **`RequireComputeDerivative`** / **`StaticAssert`** / **`Printf`** / **`RequireMaximallyReconverges`** / **`RequireQuadDerivatives`** — all `(synthesized)` or backend hints per the doc; no portable surface anchors them at LOWER-TO-IR. | Not reachable via any allowed test directive. |
-| [#missingreturn](../../../docs/llm-generated/ir-reference/control-flow.md#missingreturn) | link-stage-only | **`missingReturn`** — synthesized by lowering when a non-`void` function falls off the end; the natural surface is rejected as a diagnostic before IR is dumped. | Not reachable via any allowed test directive. |
-| [#targetswitch](../../../docs/llm-generated/ir-reference/control-flow.md#targetswitch) | link-stage-only | **`targetSwitch`** — synthesized by the multi-target lowering pass; not produced from surface code on the LOWER-TO-IR stage. | Not reachable via any allowed test directive. |
+| **`defer`** — `DeferStmt` lowers to `defer`, but the natural surface form is non-trivial to write portably. | (unclassified) | [#defer](../../../docs/llm-generated/ir-reference/control-flow.md#defer) | Not reachable via any allowed test directive. |
+| **`tryCall` / `throw`** — error-flow opcodes. The natural `try` / `throw` surface is unstable in current Slang dumps; exercise via `cross-cutting/ir-instructions` if at all. | (unclassified) | [#trycall](../../../docs/llm-generated/ir-reference/control-flow.md#trycall) | Not reachable via any allowed test directive. |
+| **`yield`** — terminates the body of a `generic` value; observable only inside generic-instantiation IR, not via natural surface code. | (unclassified) | [#yield](../../../docs/llm-generated/ir-reference/control-flow.md#yield) | Not reachable via any allowed test directive. |
+| **`gpuForeach`** — emitted by host-shader lowering only. | needs-unit-test | [#gpuforeach](../../../docs/llm-generated/ir-reference/control-flow.md#gpuforeach) | Not reachable via any allowed test directive. |
+| **`conditionalBranch`** — listed in the doc as `(synthesized)` with no AST origin. The front-end emits structured `ifElse` for every surface conditional; no portable Slang surface produces `conditionalBranch` at the LOWER-TO-IR stage. | link-stage-only | [#conditionalbranch](../../../docs/llm-generated/ir-reference/control-flow.md#conditionalbranch) | Not reachable via any allowed test directive. |
+| **`GenericAsm`** / **`RequirePrelude`** / **`RequireTargetExtension`** / **`RequireComputeDerivative`** / **`StaticAssert`** / **`Printf`** / **`RequireMaximallyReconverges`** / **`RequireQuadDerivatives`** — all `(synthesized)` or backend hints per the doc; no portable surface anchors them at LOWER-TO-IR. | link-stage-only | [#genericasm](../../../docs/llm-generated/ir-reference/control-flow.md#genericasm) | Not reachable via any allowed test directive. |
+| **`missingReturn`** — synthesized by lowering when a non-`void` function falls off the end; the natural surface is rejected as a diagnostic before IR is dumped. | link-stage-only | [#missingreturn](../../../docs/llm-generated/ir-reference/control-flow.md#missingreturn) | Not reachable via any allowed test directive. |
+| **`targetSwitch`** — synthesized by the multi-target lowering pass; not produced from surface code on the LOWER-TO-IR stage. | link-stage-only | [#targetswitch](../../../docs/llm-generated/ir-reference/control-flow.md#targetswitch) | Not reachable via any allowed test directive. |
 
 ## Doc gaps observed
 

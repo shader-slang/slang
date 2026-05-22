@@ -44,7 +44,7 @@ each test uses a single directive. Positive observations use
 checked code at runtime); diagnostic claims use
 `//DIAGNOSTIC_TEST:SIMPLE`.
 
-## Coverage
+## Functional coverage
 
 | Claim | Intent | Anchor | Tests |
 | --- | --- | --- | --- |
@@ -137,7 +137,7 @@ checked code at runtime); diagnostic claims use
 | [#semanticsvisitor](../../../docs/llm-generated/pipeline/03-semantic-check.md#semanticsvisitor) | undocumented-behavior | The `## SemanticsVisitor` and `## Files and responsibilities` sections describe the architectural split (which `.cpp` file handles which concern). Most of those claims are not directly observable from outside the compiler — the bundle anchors negative tests to the file table by treating each row's "concern" as a testable surface claim (e.g. "statement checking validates control-flow rules"). A stronger anchoring would be to add a per-concern subsection enumerating exactly which user-visible behaviors live in each file. |  |
 | [#name-resolution](../../../docs/llm-generated/pipeline/03-semantic-check.md#name-resolution) | undocumented-behavior | The doc points readers to [`../name-resolution/`](../../../docs/llm-generated/name-resolution/) for the lookup algorithm but does not restate any specific consequences in this file. The bundle therefore anchors a handful of tests directly to `lookup.md` and `overload-resolution.md` (which the per-section prompt explicitly permits). If the source doc were extended with one-line summaries of each user-visible lookup behavior, those tests could re-anchor here. |  |
 
-## Out of scope
+## Untested claims
 
 (none)
 
