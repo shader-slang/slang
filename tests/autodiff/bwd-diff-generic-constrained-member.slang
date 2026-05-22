@@ -18,7 +18,7 @@
 //     gradDiffThis<ScalarCurve>(s, 1.0) =  6.0
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0], stride=4)
 
 interface ICurve : IDifferentiable
 {
@@ -90,6 +90,18 @@ float gradDiffThis<C : ICurve>(C curve, float t, float dResult)
     return pair.d;
 }
 
+// Multi-arg + differentiable-`this` intersection: same idea as the fwd
+// peer's `tangent2DiffThis`, mirrored to exercise the bwd lookup
+// through both axes simultaneously.
+[Differentiable]
+float gradMulti2DiffThis<C : ICurve>(C curve, float t, float u, float dResult)
+{
+    var pt = diffPair(t, 0.0);
+    var pu = diffPair(u, 0.0);
+    __bwd_diff(curve.eval2)(pt, pu, dResult);
+    return pt.d;
+}
+
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -121,4 +133,8 @@ void computeMain()
     // ∂(k*t*t)/∂t at t=1, k=3, dResult=1 = 2*3*1 = 6.0
     // CHECK: 6.0
     outputBuffer[5] = gradDiffThis<ScalarCurve>(s, 1.0, 1.0);
+
+    // Multi-arg + differentiable-`this`: ∂(k*(t+u))/∂t = k = 3.0
+    // CHECK: 3.0
+    outputBuffer[6] = gradMulti2DiffThis<ScalarCurve>(s, 1.0, 2.0, 1.0);
 }

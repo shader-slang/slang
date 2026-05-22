@@ -13,9 +13,15 @@
 // because `Helix` has no fields, so a wrong-receiver miscompile that
 // silently dropped the implicit `this` would still emit valid SPIRV
 // indistinguishable from a correct emit. With `ScalarCurve.k` flowing
-// into the derivative, the lowered SPIRV must reference the constant
-// initialiser; if the receiver were dropped the field constant would
-// be elided. The CHECK lines anchor on those constants.
+// into the derivative, the lowered SPIRV must reference `k`'s
+// initialiser.
+//
+// Anchor literals are deliberately non-trivial (3.14159, 2.71828) to
+// prevent constant-folding from collapsing a `3.0` into a different
+// precomputed value, or another stray `3.0` (default initialiser,
+// layout constant) from satisfying the CHECK incidentally. If the
+// receiver were dropped, `k` would not be live and `OpConstant %float
+// 3.14159` would be elided.
 //
 // Pre-fix failure mode (verified against prebuilt slangc 2026.9.1):
 //   error[E99997]: ... assert failure: slang-ir-constexpr.cpp(504):
@@ -46,17 +52,13 @@ float tangent<C : ICurve>(C curve, float t)
     return pair.d;
 }
 
-// CHECK: OpEntryPoint Fragment
-// Receiver-threading check: `s.k = 3.0` flows through the
-// differentiated call into the lowered derivative. Lockdown anchors
-// on the `k`-derived constant so a regression that silently dropped
-// the implicit `this` argument — or routed it to the wrong slot —
-// would elide the constant and fail this CHECK.
-// CHECK: OpConstant %float 3
+// CHECK-DAG: OpEntryPoint Fragment
+// CHECK-DAG: OpConstant %float 3.14159
+// CHECK-DAG: OpConstant %float 2.71828
 [shader("fragment")]
 float4 fs(float4 pos : SV_Position) : SV_Target
 {
     ScalarCurve s;
-    s.k = 3.0;
-    return float4(tangent(s, pos.x * 0.01), 0, 0, 1);
+    s.k = 3.14159;
+    return float4(tangent(s, pos.x * 2.71828), 0, 0, 1);
 }

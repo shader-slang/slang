@@ -16,9 +16,19 @@
 // participates in the derivative): with `k = 3.0`,
 //   tangentDiffThis<ScalarCurve>(s, 2.0) = 12.0
 //   tangentDiffThis<ScalarCurve>(s, 1.0) =  6.0
+//
+// Multi-arg + differentiable-`this` intersection: `ScalarCurve.eval2(t,
+// u) = k*(t+u)`, directional derivative along `(1, 1)` is `2*k`. With
+// `k = 3.0`,
+//   tangent2DiffThis<ScalarCurve>(s, 1.0, 1.0) = 6.0
+//   tangent2DiffThis<ScalarCurve>(s, 2.0, 5.0) = 6.0  (constant: 2k)
+// This combines the per-arg `getParamInfo(i + 1)` loop (trip count > 1)
+// with a differentiable-`this` slot — a wrong i+1 shift only when the
+// implicit-`this` slot consumes a real diff-witness (rather than the
+// `no_diff`-wrapped marker) is caught here.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0], stride=4)
 
 interface ICurve : IDifferentiable
 {
@@ -91,6 +101,15 @@ float tangentDiffThis<C : ICurve>(C curve, float t)
     return pair.d;
 }
 
+// Combines the multi-arg per-arg loop (trip count > 1) with a
+// differentiable-`this` slot.
+[Differentiable]
+float tangent2DiffThis<C : ICurve>(C curve, float t, float u)
+{
+    let pair = __fwd_diff(curve.eval2)(diffPair(t, 1.0), diffPair(u, 1.0));
+    return pair.d;
+}
+
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -118,4 +137,12 @@ void computeMain()
 
     // CHECK: 6.0
     outputBuffer[5] = tangentDiffThis<ScalarCurve>(s, 1.0);
+
+    // Multi-arg + differentiable-`this`: directional derivative of
+    // k*(t+u) along (1, 1) at any (t, u) with k=3 is 2k = 6.
+    // CHECK: 6.0
+    outputBuffer[6] = tangent2DiffThis<ScalarCurve>(s, 1.0, 1.0);
+
+    // CHECK: 6.0
+    outputBuffer[7] = tangent2DiffThis<ScalarCurve>(s, 2.0, 5.0);
 }
