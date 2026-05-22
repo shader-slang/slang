@@ -124,6 +124,15 @@ SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleV
     SLANG_RETURN_ON_FAIL(checkByteRangeAvailable(stream, codeSize, stringOffsetsSize));
     moduleView->stringOffsets = reinterpret_cast<uint32_t*>(code + stream.getPosition());
     SLANG_RETURN_ON_FAIL(stream.seek(SeekOrigin::Current, Int64(stringOffsetsSize)));
+
+    // constantBlobSize was read as the total section size. Subtract the bytes already consumed
+    // (stringCount field + stringOffsets array) so it reflects only the constants blob.
+    size_t consumedFromSection = sizeof(uint32_t) + stringOffsetsSize;
+    if (size_t(moduleView->constantBlobSize) < consumedFromSection)
+    {
+        return SLANG_FAIL;
+    }
+    moduleView->constantBlobSize -= (uint32_t)consumedFromSection;
     SLANG_RETURN_ON_FAIL(checkByteRangeAvailable(stream, codeSize, moduleView->constantBlobSize));
     moduleView->constants = code + stream.getPosition();
 
