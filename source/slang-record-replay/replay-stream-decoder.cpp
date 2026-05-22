@@ -10,6 +10,50 @@ namespace SlangRecord
 using Slang::String;
 using Slang::StringBuilder;
 
+namespace
+{
+
+static const int kMaxReplayDecodeNestingDepth = 64;
+static const uint64_t kMaxReplayDecodeArrayElementCount = 1000000;
+static const uint64_t kMaxDisplayedArrayElementCount = 100;
+
+void checkReplayDecodeNestingDepth(int recursionDepth)
+{
+    if (recursionDepth > kMaxReplayDecodeNestingDepth)
+        throw Slang::Exception("Maximum replay decode nesting depth exceeded");
+}
+
+void validateReplayDecodeArrayElementCount(ReplayStream& stream, uint64_t count)
+{
+    if (count > kMaxReplayDecodeArrayElementCount)
+        throw Slang::Exception("Array element count exceeds decoder limit");
+
+    size_t position = stream.getPosition();
+    size_t size = stream.getSize();
+    uint64_t remainingBytes = position < size ? uint64_t(size - position) : 0;
+
+    // Each serialized array element has at least a one-byte TypeId. Reject impossible counts
+    // before recursively walking the array.
+    if (count > remainingBytes)
+        throw Slang::Exception("Array element count exceeds remaining stream bytes");
+}
+
+uint64_t readReplayDecodeArrayElementCount(ReplayStream& stream)
+{
+    uint8_t countTypeValue;
+    stream.read(&countTypeValue, sizeof(countTypeValue));
+    TypeId countType = static_cast<TypeId>(countTypeValue);
+    if (countType != TypeId::UInt64)
+        throw Slang::Exception("Array element count has invalid type");
+
+    uint64_t count;
+    stream.read(&count, sizeof(count));
+    validateReplayDecodeArrayElementCount(stream, count);
+    return count;
+}
+
+} // namespace
+
 // =============================================================================
 // Public Static API - Full Stream Decoding
 // =============================================================================
@@ -143,6 +187,17 @@ void ReplayStreamDecoder::decodeValueFromStream(
     StringBuilder& output,
     int indentLevel)
 {
+    decodeValueFromStream(stream, output, indentLevel, 0);
+}
+
+void ReplayStreamDecoder::decodeValueFromStream(
+    ReplayStream& stream,
+    StringBuilder& output,
+    int indentLevel,
+    int recursionDepth)
+{
+    checkReplayDecodeNestingDepth(recursionDepth);
+
     TypeId type = readTypeId(stream);
 
     switch (type)
@@ -370,26 +425,26 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::Array:
         {
-            uint64_t count;
-            stream.skip(1); // the type of the count (1B, should be TypeId::UInt64)
-            stream.read(&count, sizeof(count));
+            uint64_t count = readReplayDecodeArrayElementCount(stream);
 
             output << "Array[" << count << "]:";
-            for (uint64_t i = 0; i < count && i < 100; i++)
+            uint64_t displayedCount =
+                count < kMaxDisplayedArrayElementCount ? count : kMaxDisplayedArrayElementCount;
+            for (uint64_t i = 0; i < displayedCount; i++)
             {
                 output << "\n";
                 indent(output, indentLevel + 1);
                 output << "[" << i << "] ";
-                decodeValueFromStream(stream, output, indentLevel + 1);
+                decodeValueFromStream(stream, output, indentLevel + 1, recursionDepth + 1);
             }
-            if (count > 100)
+            if (count > kMaxDisplayedArrayElementCount)
             {
                 output << "\n";
                 indent(output, indentLevel + 1);
-                output << "... (" << (count - 100) << " more elements)";
+                output << "... (" << (count - kMaxDisplayedArrayElementCount) << " more elements)";
                 // Skip remaining elements
-                for (uint64_t i = 100; i < count; ++i)
-                    skipValueInStream(stream);
+                for (uint64_t i = kMaxDisplayedArrayElementCount; i < count; ++i)
+                    skipValueInStream(stream, recursionDepth + 1);
             }
         }
         break;
@@ -479,6 +534,13 @@ void ReplayStreamDecoder::decodeByteRange(
 
 void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)
 {
+    skipValueInStream(stream, 0);
+}
+
+void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream, int recursionDepth)
+{
+    checkReplayDecodeNestingDepth(recursionDepth);
+
     TypeId type = readTypeId(stream);
 
     switch (type)
@@ -548,11 +610,9 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)
 
     case TypeId::Array:
         {
-            uint64_t count;
-            stream.skip(1); // the type of the count (1B, should be TypeId::UInt64)
-            stream.read(&count, sizeof(count));
+            uint64_t count = readReplayDecodeArrayElementCount(stream);
             for (uint64_t i = 0; i < count; i++)
-                skipValueInStream(stream);
+                skipValueInStream(stream, recursionDepth + 1);
         }
         break;
 
