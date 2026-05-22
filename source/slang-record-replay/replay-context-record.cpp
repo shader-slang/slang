@@ -34,14 +34,13 @@ static bool isValidSHA1DigestString(const char* str)
     if (!str)
         return false;
 
-    size_t length = 0;
-    for (; str[length]; ++length)
+    for (size_t i = 0; i < kSHA1DigestStringLength; ++i)
     {
-        if (!isSHA1DigestChar(str[length]))
+        if (!str[i] || !isSHA1DigestChar(str[i]))
             return false;
     }
 
-    return length == kSHA1DigestStringLength;
+    return str[kSHA1DigestStringLength] == '\0';
 }
 
 void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
