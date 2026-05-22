@@ -5327,14 +5327,50 @@ struct ExprLoweringContext
                 // receiver in `funcTypeInfo.type`), and we must skip the
                 // implicit `this` slot when iterating the user-written
                 // direct arguments. See shader-slang/slang#11004.
+                //
+                // The gate is intentionally narrow: matching the AD 2.0
+                // lookup shape on `funcDeclRef` (a `LookupDeclRef` whose
+                // lookup source is a `CallableDecl`-typed type — same
+                // predicate `getThisParamTypeForCallable` and
+                // `tryResolveDeclRefForCall` use to surface the
+                // receiver). A purely structural
+                // `paramCount == argCount + 1` test would also match,
+                // for example, a callable with one trailing default-
+                // valued parameter the user omitted, and would silently
+                // mis-route per-arg passing modes by one slot instead
+                // of asserting in `addDirectCallArgs`.
                 bool funcTypeAlreadyHasImplicitThis = false;
                 if (baseExpr)
                 {
                     if (auto thisType = getThisParamTypeForCallable(context, funcDeclRef))
                     {
-                        funcTypeAlreadyHasImplicitThis =
+                        // Reuse the same AD 2.0 lookup-shape predicate
+                        // as the receiver-surfacing block in
+                        // `tryResolveDeclRefForCall`: only treat the
+                        // resolved `FuncType` as already encoding the
+                        // implicit `this` when `funcDeclRef` is a
+                        // `LookupDeclRef` whose lookup source is the
+                        // underlying callable's function-as-type. A
+                        // purely structural `paramCount == argCount + 1`
+                        // test would also match unrelated shapes (e.g.
+                        // a callable with one trailing default-valued
+                        // parameter the user omitted) and would
+                        // silently mis-route per-arg passing modes by
+                        // one parameter slot instead of asserting in
+                        // `addDirectCallArgs`.
+                        bool isAdLookupShape = false;
+                        if (auto lookup = as<LookupDeclRef>(funcDeclRef.declRefBase))
+                        {
+                            if (isDeclRefTypeOf<CallableDecl>(lookup->getLookupSource()))
+                                isAdLookupShape = true;
+                        }
+
+                        if (isAdLookupShape &&
                             resolvedFuncType->getParamCount() ==
-                                static_cast<Count>(expr->arguments.getCount()) + 1;
+                                static_cast<Count>(expr->arguments.getCount()) + 1)
+                        {
+                            funcTypeAlreadyHasImplicitThis = true;
+                        }
 
                         if (!funcTypeAlreadyHasImplicitThis)
                         {
@@ -5358,8 +5394,15 @@ struct ExprLoweringContext
                 {
                     // Iterate over the user-written direct arguments
                     // only, advancing past the implicit `this` parameter
-                    // that already exists in `resolvedFuncType`.
+                    // that already exists in `resolvedFuncType`. The
+                    // assertion lets a future regression that violates
+                    // the AD 2.0 lookup-shape invariants fail loudly
+                    // instead of mis-routing per-arg passing modes by
+                    // one slot. (See shader-slang/slang#11004 review.)
                     Count argCount = expr->arguments.getCount();
+                    SLANG_ASSERT(
+                        resolvedFuncType->getParamCount() ==
+                        static_cast<Count>(argCount) + 1);
                     for (Index i = 0; i < argCount; ++i)
                     {
                         auto paramInfo = resolvedFuncType->getParamInfo(i + 1);
