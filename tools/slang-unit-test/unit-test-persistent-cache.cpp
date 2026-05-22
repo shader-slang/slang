@@ -373,6 +373,19 @@ struct CorruptionTest : public PersistentCacheTest
         SLANG_CHECK(cache->readEntry(entries[0].key, data.writeRef()) == SLANG_E_NOT_FOUND);
         SLANG_CHECK(cache->readEntry(entries[0].key, data.writeRef()) == SLANG_E_NOT_FOUND);
 
+        // Confirm cache fully recovers after tamper eviction.
+        writeEntry(entries[0]);
+        SLANG_CHECK(readEntry(entries[0]) == true);
+        // Confirm the persisted index reflects the recovery (re-open cache from same directory).
+        {
+            PersistentCache::Desc desc2;
+            desc2.directory = cacheDirectory.getBuffer();
+            RefPtr<PersistentCache> cache2 = new PersistentCache(desc2);
+            ComPtr<ISlangBlob> readData;
+            SLANG_CHECK(cache2->readEntry(entries[0].key, readData.writeRef()) == SLANG_OK);
+            SLANG_CHECK(isBlobEqual(readData, entries[0].data));
+        }
+
         // Test behavior when the index file is removed before reading.
         writeEntry(entries[0]);
         SLANG_CHECK(readEntry(entries[0]) == true);
@@ -403,7 +416,7 @@ struct CorruptionTest : public PersistentCacheTest
                     FileShare::ReadWrite);
                 fs.write("x", 1);
             },
-            SLANG_E_INTERNAL_FAIL);
+            SLANG_E_NOT_FOUND);
 
         testIndexCorruption(
             [this]()
@@ -418,7 +431,7 @@ struct CorruptionTest : public PersistentCacheTest
                 uint32_t version = 0xffffffff;
                 fs.write(&version, sizeof(version));
             },
-            SLANG_E_INTERNAL_FAIL);
+            SLANG_E_NOT_FOUND);
 
         testIndexCorruption(
             [this]()
@@ -433,7 +446,7 @@ struct CorruptionTest : public PersistentCacheTest
                 uint32_t count = 0x7fffffff;
                 fs.write(&count, sizeof(count));
             },
-            SLANG_E_INTERNAL_FAIL);
+            SLANG_E_NOT_FOUND);
 
         testIndexCorruption(
             [this]()
@@ -448,7 +461,7 @@ struct CorruptionTest : public PersistentCacheTest
                 uint32_t count = 0;
                 fs.write(&count, sizeof(count));
             },
-            SLANG_E_INTERNAL_FAIL);
+            SLANG_E_NOT_FOUND);
 
         testIndexCorruption(
             [this]()
@@ -462,7 +475,20 @@ struct CorruptionTest : public PersistentCacheTest
                 fs.seek(SeekOrigin::End, 0);
                 fs.write("x", 1);
             },
-            SLANG_E_INTERNAL_FAIL);
+            SLANG_E_NOT_FOUND);
+
+        // Test in-place update when writing a duplicate key: entryCount must stay at 1, not grow
+        // to 2, and a subsequent read must return the updated data with a refreshed hash.
+        // entries[0] is in the cache at this point (left by the last testIndexCorruption call).
+        SLANG_CHECK(cache->getStats().entryCount == 1);
+        {
+            Entry updatedEntry0{entries[0].key, createRandomBlob(2048)};
+            writeEntry(updatedEntry0);
+            SLANG_CHECK(cache->getStats().entryCount == 1);
+            ComPtr<ISlangBlob> readData;
+            SLANG_CHECK(cache->readEntry(updatedEntry0.key, readData.writeRef()) == SLANG_OK);
+            SLANG_CHECK(isBlobEqual(readData, updatedEntry0.data));
+        }
     }
 };
 

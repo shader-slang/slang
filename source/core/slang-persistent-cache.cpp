@@ -95,8 +95,14 @@ SlangResult PersistentCache::readEntry(const Key& key, ISlangBlob** outData)
     }
 
     // Read the cache index.
+    // Any index read failure (wrong version, corrupted header, etc.) is treated as a
+    // cache miss so that version upgrades and disk corruption degrade gracefully rather
+    // than propagating a hard error to the caller.
     CacheIndex cacheIndex;
-    SLANG_RETURN_ON_FAIL(readIndex(m_indexFileName, cacheIndex));
+    if (SLANG_FAILED(readIndex(m_indexFileName, cacheIndex)))
+    {
+        return SLANG_E_NOT_FOUND;
+    }
 
     // Increase the age of all entries in the cache.
     for (auto& entry : cacheIndex)
