@@ -4829,19 +4829,22 @@ struct ExprLoweringContext
             if (isAdLookupOnCallable(outInfo->funcDeclRef.declRefBase))
             {
                 // `convertHigherOrderExprToLookup` (slang-check-expr.cpp)
-                // routes the AD 2.0 rewrite through `ConstructDeclRefExpr`,
-                // which wraps the original receiver in a `SharedTypeExpr`
+                // routes the AD 2.0 rewrite through
+                // `ConstructLookupResultExpr`, which wraps the original
+                // receiver in a `SharedTypeExpr` in its `This`-breadcrumb
+                // branch and forwards it to `ConstructDeclRefExpr` as the
+                // already-built base expression
                 // (`SharedTypeExpr::base.exp = <receiver>`). If this
-                // invariant ever changes upstream (e.g. a new producer of
+                // invariant ever changes upstream (a new producer of
                 // `LookupDeclRef`-on-`CallableDecl` that doesn't go via
-                // `SharedTypeExpr`) the silent fallback below would drop
-                // the receiver and reproduce #11004's miscompile shape;
-                // assert the shape so the failure surfaces here instead.
+                // `SharedTypeExpr`) the silent fallback would drop the
+                // receiver and reproduce #11004's miscompile shape;
+                // assert here so the failure surfaces at this point
+                // instead.
                 auto sharedTypeBase =
                     as<SharedTypeExpr>(staticMemberFuncExpr->baseExpression);
                 SLANG_ASSERT(sharedTypeBase && sharedTypeBase->base.exp);
-                if (sharedTypeBase && sharedTypeBase->base.exp)
-                    outInfo->baseExpr = sharedTypeBase->base.exp;
+                outInfo->baseExpr = sharedTypeBase->base.exp;
             }
             return true;
         }
