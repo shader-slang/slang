@@ -582,6 +582,23 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     SLANG_RELEASE_ASSERT(sourceLocs.getCount() == numInsts);
     SLANG_RELEASE_ASSERT(numInsts >= 1);
 
+    // Validate per-element childCounts before any allocation or recursion:
+    // every count must be in [0, numInsts), and the total number of children
+    // across all insts must equal numInsts - 1 (every non-root inst is exactly
+    // one child of some other inst). This catches blobs that would otherwise
+    // either skip insts (under-consumption) or attempt recursion bounds far
+    // exceeding the actual inst count.
+    {
+        Int64 totalChildren = 0;
+        for (Int64 i = 0; i < numInsts; ++i)
+        {
+            const Int64 c = (Int64)flat.childCounts[i];
+            SLANG_RELEASE_ASSERT(c >= 0 && c < numInsts);
+            totalChildren += c;
+        }
+        SLANG_RELEASE_ASSERT(totalChildren == numInsts - 1);
+    }
+
     instsList.setCount(numInsts + 1);
     // nullptr instructions are represented as `-1`. We can save ourselves a
     // branch by just making that index valid.
@@ -620,12 +637,14 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // About 5% of instructions in the core module are strings!
         case kIROp_StringLit:
         case kIROp_BlobLit:
-            SLANG_RELEASE_ASSERT(stringLengthIndex < stringLengthsCount);
-            const Int64 strLen = flat.stringLengths[stringLengthIndex++];
-            SLANG_RELEASE_ASSERT(strLen >= 0 && strLen <= (Int64)UINT32_MAX);
-            minSizeInBytes = offsetof(IRConstant, value) +
-                             offsetof(IRConstant::StringValue, chars) + (size_t)strLen;
-            break;
+            {
+                SLANG_RELEASE_ASSERT(stringLengthIndex < stringLengthsCount);
+                const Int64 strLen = flat.stringLengths[stringLengthIndex++];
+                SLANG_RELEASE_ASSERT(strLen >= 0 && strLen <= (Int64)UINT32_MAX);
+                minSizeInBytes = offsetof(IRConstant, value) +
+                                 offsetof(IRConstant::StringValue, chars) + (size_t)strLen;
+                break;
+            }
         }
         SLANG_RELEASE_ASSERT((Int64)a.operandCount <= operandIndicesCount);
         insts[instIndex] = module->_allocateInst(op, a.operandCount, minSizeInBytes);
@@ -643,8 +662,14 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         SLANG_RELEASE_ASSERT(index >= -1 && index < (Int64)numInsts);
         return insts[index];
     };
-    const auto go = [&](auto& go, IRInst* parent) -> IRInst*
+    // Cap recursion depth to defend against deeply-nested malicious blobs that
+    // would otherwise stack-overflow the host (e.g. a chain where each inst has
+    // exactly one child of its own). The limit is far above what any realistic
+    // IR module exhibits.
+    constexpr Int64 kMaxRecursionDepth = 4096;
+    const auto go = [&](auto& go, IRInst* parent, Int64 depth) -> IRInst*
     {
+        SLANG_RELEASE_ASSERT(depth < kMaxRecursionDepth);
         SLANG_RELEASE_ASSERT(instIndex < numInsts);
         const auto thisInstIndex = instIndex++;
         IRInst* inst = insts[thisInstIndex];
@@ -678,17 +703,19 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             break;
         case kIROp_StringLit:
         case kIROp_BlobLit:
-            SLANG_RELEASE_ASSERT(stringLengthIndex < stringLengthsCount);
-            const auto c = cast<IRConstant>(inst);
-            const auto len = flat.stringLengths[stringLengthIndex++];
-            SLANG_RELEASE_ASSERT(len >= 0 && len <= (Int64)UINT32_MAX);
-            char* const dstChars = c->value.stringVal.chars;
-            c->value.stringVal.numChars = uint32_t(len);
-            SLANG_RELEASE_ASSERT(len <= (Int64)stringCharsCount - stringDataIndex);
-            if (len > 0)
-                memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
-            stringDataIndex += len;
-            break;
+            {
+                SLANG_RELEASE_ASSERT(stringLengthIndex < stringLengthsCount);
+                const auto c = cast<IRConstant>(inst);
+                const auto len = flat.stringLengths[stringLengthIndex++];
+                SLANG_RELEASE_ASSERT(len >= 0 && len <= (Int64)UINT32_MAX);
+                char* const dstChars = c->value.stringVal.chars;
+                c->value.stringVal.numChars = uint32_t(len);
+                SLANG_RELEASE_ASSERT(len <= (Int64)stringCharsCount - stringDataIndex);
+                if (len > 0)
+                    memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
+                stringDataIndex += len;
+                break;
+            }
         }
 
         // Read in children, and fix up pointers
@@ -698,7 +725,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         IRInst* last = nullptr;
         for (Int64 i = 0; i < flat.childCounts[thisInstIndex]; ++i)
         {
-            auto c = go(go, inst);
+            auto c = go(go, inst, depth + 1);
             if (i == 0)
                 first = c;
             last = c;
@@ -714,7 +741,18 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 
         return inst;
     };
-    const auto moduleInst = go(go, nullptr);
+    const auto moduleInst = go(go, nullptr, 0);
+
+    // Post-conditions: a well-formed flat module is exactly consumed by the
+    // traversal. A truncated blob (e.g. childCounts that terminate the
+    // recursion early) would leave allocated insts unparented and unconnected,
+    // and is rejected here.
+    SLANG_RELEASE_ASSERT(instIndex == numInsts);
+    SLANG_RELEASE_ASSERT(operandIndex == operandIndicesCount);
+    SLANG_RELEASE_ASSERT(litIndex == literalsCount);
+    SLANG_RELEASE_ASSERT(stringLengthIndex == stringLengthsCount);
+    SLANG_RELEASE_ASSERT(stringDataIndex == (Int64)stringCharsCount);
+
     return cast<IRModuleInst>(moduleInst);
 }
 
