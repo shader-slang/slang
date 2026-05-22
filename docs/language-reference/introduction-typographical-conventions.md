@@ -8,7 +8,7 @@ The Slang grammar in this document is presented using a variation of the
 
 **Terminal symbol**
 > **`'terminal'`** --- terminal symbol spelled exactly as is within quotes<br>
-> **\<regex\>** --- terminal symbol expressed by a regular expression
+> **`<regex>`** --- terminal symbol expressed by a regular expression
 
 [Terminal symbols](https://en.wikipedia.org/wiki/Terminal_and_nonterminal_symbols#Terminal_symbols) are those
 that can appear in the language. In the Slang language reference manual, two forms are used: literal strings that

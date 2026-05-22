@@ -3,6 +3,13 @@ Literal Expressions
 
 All literal expressions are [r-values](expressions-value-categories.md).
 
+## Boolean Literal Expressions
+
+> *`BooleanLiteral`* = (**`'true'`** \| **`'false'`**)
+
+Boolean literals represent [Boolean](types-fundamental.md#boolean) values `true` and `false`.
+
+
 ## Integer Literal Expressions
 
 > *`IntegerLiteral`* = (<br>
@@ -12,21 +19,25 @@ All literal expressions are [r-values](expressions-value-categories.md).
 > &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`OctIntegerLiteralBody`* )<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`IntegerSuffix`*?
 >
-> *`DecIntegerLiteralBody`* = (<br>
+> *`DecIntegerLiteralBody`* = <br>
 > &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**`'0'`** \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`'1'`**-**`'9'`**] [**`'0'`**-**`'9'`**]* )<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`DecDigitNonZero`* *`DecDigit`*\*<br>
+>
+> *`DecDigit`* = **`<[0-9]>`**
+>
+> *`DecDigitNonZero`* = **`<[1-9]>`**
 >
 > *`HexIntegerLiteralBody`* = (**`'0x'`**\|**`'0X'`**) *`HexDigit`*+
 >
-> *`HexDigit`* = [**`'0'`**-**`'9'`**] \| [**`'A'`**-**`'F'`**] \| [**`'a'`**-**`'f'`**]
+> *`HexDigit`* = **`<[0-9A-Fa-f]>`**
 >
 > *`BinIntegerLiteralBody`* = (**`'0b'`**\|**`'0B'`**) *`BinDigit`*+
 >
-> *`BinDigit`* = [**`'0'`**-**`'1'`**]
+> *`BinDigit`* = **`'0'`** \| **`'1'`**
 >
 > *`OctIntegerLiteralBody`* = **`'0'`** *`OctDigit`*+
 >
-> *`OctDigit`* = [**`'0'`**-**`'7'`**]
+> *`OctDigit`* = **`<[0-7]>`**
 >
 > *`IntegerSuffix`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;( *`IntegerSuffixUnsigned`* *`IntegerSuffixWidth`*? ) \|<br>
@@ -36,10 +47,10 @@ All literal expressions are [r-values](expressions-value-categories.md).
 >
 > *`IntegerSuffixWidth`* = **`'l'`** \| **`'L'`** \| **`'ll'`** \| **`'LL'`** \| **`'z'`** \| **`'Z'`**
 
-An integer literal represents an integer value. It consists of two parts:
+An integer literal represents an [integer](types-fundamental.md#integer) value. It consists of two parts:
 
 - the body, which consists of an optional prefix and digits.
-- the suffix, which determines the type of the literal in conjunction with the value.
+- an optional suffix, which determines the type of the literal in conjunction with the value.
 
 The body uses one of the following forms:
 
@@ -158,19 +169,84 @@ Suffix                 | Base        | Value range                              
 > minimum integer values preceded by unary minus.
 
 
-## Floating-Point Literal Expressions (todo)
+## Floating-Point Literal Expressions
 
-A floating-point literal expression consists of a single floating-point literal token:
+> *`FloatLiteral`* = (<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`DecFloatLiteralBody`* \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`HexFloatLiteralBody`* \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`FloatLiteralInfinity`* )<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`FloatSuffix`*?
+>
+> *`DecFloatLiteralBody`* = <br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DecFloatLiteralBodyForm1`* \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DecFloatLiteralBodyForm2`* \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DecFloatLiteralBodyForm3`*
+>
+> *`DecFloatLiteralBodyForm1`* = *`DecDigit`*+ *`DecExponent`*
+>
+> *`DecFloatLiteralBodyForm2`* = *`DecDigit`*+ **`'.'`** *`DecExponent`*?
+>
+> *`DecFloatLiteralBodyForm3`* = *`DecDigit`*\* **`'.'`** *`DecDigit`*+ *`DecExponent`*?
+>
+> *`DecExponent`* = (**`'e'`** \| **`'E'`**) (**`'+'`** \| **`'-'`**)? *`DecDigit`*+
+>
+>
+> *`HexFloatLiteralBody`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'0x'`**\|**`'0X'`**) (<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`HexFloatLiteralBodyForm1`* \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`HexFloatLiteralBodyForm2`* \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`HexFloatLiteralBodyForm3`* )
+>
+> *`HexFloatLiteralBodyForm1`* = *`HexDigit`*+ *`HexExponent`*
+>
+> *`HexFloatLiteralBodyForm2`* = *`HexDigit`*+ **`'.'`** *`HexExponent`*
+>
+> *`HexFloatLiteralBodyForm3`* = *`HexDigit`*\* **`'.'`** *`HexDigit`*+ *`HexExponent`*
+>
+> *`HexExponent`* = (**`'p'`** \| **`'P'`**) (**`'+'`** \| **`'-'`**)? *`DecDigit`*+
+>
+> *`FloatLiteralInfinity`* = **`'#INF'`**
+>
+> *`FloatSuffix`* = *`FloatSuffixF16`* \| *`FloatSuffixF32`* \| *`FloatSuffixF64`*
+>
+> *`FloatSuffixF16`* = **`'h'`** \| **`'H'`** \| **`'hf'`** \| **`'HF'`** \| **`'fh'`** \| **`'FH'`**
+>
+> *`FloatSuffixF32`* = **`'f'`** \| **`'F'`**
+>
+> *`FloatSuffixF64`* = **`'l'`** \| **`'L'`** \| **`'lf'`** \| **`'LF'`** \| **`'fl'`** \| **`'FL'`**
+
+A floating-point literal represents a [floating-point](types-fundamental.md#floating) value. The numeric form
+consist of three parts:
+
+- the body, which can be either decimal or hexadecimal.
+- an exponent, which is optional in decimal form when the body contains a decimal separator.
+- an optional suffix, which determines the type of the literal. If omitted, the type is `float`.
+
+The decimal body has two variants:
+
+1. Decimal digits and exponent. (*`DecFloatLiteralBodyForm1`*)
+2. Decimal digits separated by a decimal separator, and an optional exponent. (*`DecFloatLiteralBodyForm2`*
+   and *`DecFloatLiteralBodyForm3`*)
+
+The decimal digits and the optional separator form the decimal significand. The value is significand \* *10^x*
+where *x* is the number with the optional sign in *`DecExponent`* or 0 if *`DecExponent`* is not specified.
+
+The hexadecimal body form has one or more hexadecimal digits, optional radix separator, and a mandatory
+hexadecimal exponent. (*`HexFloatLiteralBodyForm1`*, *`HexFloatLiteralBodyForm2`*, *`HexFloatLiteralBodyForm3`*)
+
+The hexadecimal digits and the optional separator form the hexadecimal significand. The value is *significand* \* *2^y*
+where *y* is the number with the optional sign in *`HexExponent`*. Note that the number 
+
+The non-numeric form `#INF` represents the positive infinity. (*`FloatLiteralInfinity`)
+
+
+**Examples:**
 
 ```hlsl
-1.23
+TODO
 ```
 
-A unsuffixed floating-point literal expression always has type `float`.
-
-## Boolean Literal Expressions (todo)
-
-Boolean literal expressions use the keywords `true` and `false`.
+> 📝 **Remark 1:** A floating-point literal expression without a suffix has type `float`.
 
 ## String Literal Expressions (todo)
 
