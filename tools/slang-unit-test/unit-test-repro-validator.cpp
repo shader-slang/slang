@@ -292,4 +292,29 @@ SLANG_UNIT_TEST(reproStateValidator)
 
         SLANG_CHECK(!isReproStateValid(buf));
     }
+
+    // 18. FileState with both contents and uniqueName null (pathInfoMap crash path) — fails.
+    // extractFiles() dereferences uniqueName unconditionally at slang-repro.cpp:1708 when
+    // pathInfo->file is non-null, regardless of whether contents is set.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+
+        // Build a pathInfoMap entry whose pathInfo->file references a FileState
+        // with both contents and uniqueName null.
+        auto pathAndPathInfoArray = container.newArray<ReproUtil::PathAndPathInfo>(1);
+        auto pathStr = container.newString("shader.slang");
+        auto pathInfoPtr = container.newObject<ReproUtil::PathInfoState>();
+        auto filePtr = container.newObject<ReproUtil::FileState>();
+        // filePtr->contents and filePtr->uniqueName are both null (zero-init).
+
+        container[requestPtr]->pathInfoMap = pathAndPathInfoArray;
+        container[pathAndPathInfoArray[0]].path = pathStr;
+        container[pathAndPathInfoArray[0]].pathInfo = pathInfoPtr;
+        container[pathInfoPtr]->file = filePtr;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
 }
