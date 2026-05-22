@@ -27,6 +27,8 @@ public:
     List<uint64_t> m_codeBuffer;
     VMFuncHeader* m_header;
     List<uint32_t> m_parameterOffsets;
+    List<uint32_t> m_instOffsets;
+    List<VMOp> m_opcodes;
 
     InstIterator begin();
     InstIterator end();
@@ -36,7 +38,9 @@ struct StackFrame
 {
     VMExecInstHeader* m_currentInst = nullptr;
     void* m_currentFuncCode = nullptr;
+    ExecutableFunction* m_currentFunction = nullptr;
     size_t m_workingSetOffset = 0;
+    uint32_t m_currentWorkingSetSizeInBytes = 0;
 };
 
 class ByteCodeInterpreter : public RefObject, public IByteCodeRunner
@@ -52,6 +56,7 @@ public:
     List<ExecutableFunction> m_functions;
     Dictionary<String, VMExtFunction> m_extInstHandlers;
     SlangResult prepareModuleForExecution();
+    SlangResult validateFunctionForExecution(VMFunctionView func, ExecutableFunction& exeFunc);
     void* m_extInstHandlerUserData = nullptr;
     List<uint8_t> m_returnRegister;
     List<uint64_t> m_workingSetBuffer;
@@ -60,16 +65,20 @@ public:
     const char** m_stringLitsPtr = nullptr;
 
     size_t m_returnValSize = 0;
+    bool m_executionFailed = false;
 
     void pushFrame(uint32_t size)
     {
         StackFrame frame;
+        frame.m_currentFunction = m_currentFunction;
+        frame.m_currentWorkingSetSizeInBytes = m_currentWorkingSetSizeInBytes;
         frame.m_workingSetOffset =
             (uint32_t)((uint64_t*)m_currentWorkingSet - m_workingSetBuffer.getBuffer());
         m_stack.add(frame);
         auto stackBufferCount = m_workingSetBuffer.getCount();
         m_workingSetBuffer.setCount(m_workingSetBuffer.getCount() + size / sizeof(uint64_t));
         m_currentWorkingSet = m_workingSetBuffer.getBuffer() + stackBufferCount;
+        m_currentWorkingSetSizeInBytes = size;
     }
     void popFrame()
     {
@@ -79,13 +88,17 @@ public:
         m_workingSetBuffer.setCount(lastWorkingSetBufferCount);
         m_currentInst = stackFrame.m_currentInst->getNextInst();
         m_currentFuncCode = stackFrame.m_currentFuncCode;
+        m_currentFunction = stackFrame.m_currentFunction;
+        m_currentWorkingSetSizeInBytes = stackFrame.m_currentWorkingSetSizeInBytes;
         m_currentWorkingSet = m_workingSetBuffer.getBuffer() + stackFrame.m_workingSetOffset;
         m_stack.removeLast();
     }
 
     VMExecInstHeader* m_currentInst = nullptr;
     void* m_currentFuncCode = nullptr;
+    ExecutableFunction* m_currentFunction = nullptr;
     void* m_currentWorkingSet = nullptr;
+    uint32_t m_currentWorkingSetSizeInBytes = 0;
 
     VMPrintFunc m_printCallback = nullptr;
     void* m_printCallbackUserData = nullptr;
@@ -96,6 +109,29 @@ public:
         m_errorBuilder.append(StringUtil::makeStringWithFormat(format, args...));
         m_errorBuilder.append("\n");
     }
+
+    template<typename... Args>
+    bool failExecution(const char* format, Args... args)
+    {
+        reportError(format, args...);
+        m_executionFailed = true;
+        m_currentInst = nullptr;
+        return false;
+    }
+
+    bool validateCurrentInstruction(VMExecInstHeader* inst);
+    bool validateOperandAccess(
+        const VMExecOperand& operand,
+        size_t size,
+        bool isWrite,
+        size_t additionalOffset = 0);
+    bool validatePointerAccess(const void* ptr, size_t size, bool isWrite);
+    bool validatePointerOffset(
+        const void* basePtr,
+        int64_t elementOffset,
+        uint32_t stride,
+        size_t accessSize,
+        void** outPtr);
 
     static void defaultPrintCallback(const char* message, void* userData);
     ByteCodeInterpreter();

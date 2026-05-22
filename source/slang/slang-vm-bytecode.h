@@ -4,6 +4,7 @@
 #include "core/slang-basic.h"
 #include "core/slang-riff.h"
 #include "slang-com-ptr.h"
+#include "slang.h"
 
 namespace Slang
 {
@@ -218,6 +219,7 @@ struct VMFunctionView
 struct VMModuleView
 {
     uint8_t* code;
+    uint32_t codeSize;
     uint32_t functionCount;
     uint32_t* functionOffsets;
     uint8_t* constants;
