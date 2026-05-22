@@ -179,6 +179,14 @@ jobs:
             exit 0
           fi
 
+          # Restrict reports to files under source/. Top-level, build/,
+          # external/, include/ and tools/ files are not what readers of
+          # the Slang coverage report are looking for; the slangc-only
+          # path already filters them via slang_filters.py, and we apply
+          # the same restriction to the full-library view here for
+          # consistency.
+          INCLUDE_SOURCE=( --filter-include-regex '^source/' )
+
           # ----- Merged full-library report -----
           mkdir -p coverage-reports/merged/full
           MERGED_FULL_LCOV=coverage-reports/merged/full/coverage.lcov
@@ -186,7 +194,7 @@ jobs:
           AUTH_OUT_FULL=()
           [ ${#AUTH_FULL[@]} -gt 0 ] && AUTH_OUT_FULL=( --auth-summary-out "$MERGED_FULL_REPORT" )
 
-          python3 "$MERGER" "${INPUTS[@]}" "${STRIP[@]}" \
+          python3 "$MERGER" "${INPUTS[@]}" "${STRIP[@]}" "${INCLUDE_SOURCE[@]}" \
             "${AUTH_FULL[@]}" "${AUTH_OUT_FULL[@]}" \
             -o "$MERGED_FULL_LCOV"
 
@@ -205,7 +213,7 @@ jobs:
           AUTH_OUT_SLANGC=()
           [ ${#AUTH_SLANGC[@]} -gt 0 ] && AUTH_OUT_SLANGC=( --auth-summary-out "$MERGED_SLANGC_REPORT" )
 
-          python3 "$SLANG_MERGE" "${INPUTS[@]}" \
+          python3 "$SLANG_MERGE" "${INPUTS[@]}" "${INCLUDE_SOURCE[@]}" \
             "${AUTH_SLANGC[@]}" "${AUTH_OUT_SLANGC[@]}" \
             -o "$MERGED_SLANGC_LCOV"
 
@@ -230,7 +238,8 @@ jobs:
 
             mkdir -p "$dest/full" "$dest/slangc"
 
-            python3 "$MERGER" "$gz" "${STRIP[@]}" -o "$dest/full/coverage.lcov"
+            python3 "$MERGER" "$gz" "${STRIP[@]}" "${INCLUDE_SOURCE[@]}" \
+              -o "$dest/full/coverage.lcov"
 
             local auth=()
             [ -f "$report" ] && auth=( --auth-summary "$report" )
