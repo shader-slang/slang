@@ -23,7 +23,13 @@
 #define USE_RIFF 0
 // If we are serializing using Fossil, DIRECT_FROM_FOSSIL will make it so that
 // we unflatten directly from the fossilized representation rather than
-// deserializing everything first. It is the fastest option
+// deserializing everything first. It is the fastest option.
+//
+// NOTE: USE_RIFF and DIRECT_FROM_FOSSIL are currently hard-coded to 0 with no
+// CMake option or CI matrix entry flipping them. Code under
+// `#if USE_RIFF` / `#if DIRECT_FROM_FOSSIL` is therefore unbuilt in CI: it
+// must be kept in sync with the `#else` arm by inspection until a build
+// configuration exercises it.
 #define DIRECT_FROM_FOSSIL 0
 
 FIDDLE()
@@ -548,18 +554,19 @@ static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRe
 
 // Deserialize a flat module representation produced by serializeAsFlatModule.
 //
-// The bounds-checking guards in this function use SLANG_RELEASE_ASSERT, which
-// aborts the host process on failure. This is deliberate: the routine is part
-// of the IR (de)serializer's internal trust boundary and is expected to be
-// reached only from well-formed blobs (either fresh writer output or
-// previously validated cached artifacts). The asserts are defense-in-depth
-// against an internal-encoder bug or accidental corruption rather than a
-// general-purpose untrusted-input parser. Callers that must accept genuinely
-// untrusted .slang-module blobs (e.g. a long-running host loading
-// third-party-distributed modules) should validate the blob through a layered
-// boundary before reaching this routine, or a follow-up refactor should
-// thread Result back out of this function so failure surfaces as SLANG_FAIL
-// rather than process abort.
+// This routine is reached from the public `Linkage::loadModuleFromIRBlob`
+// entry point (see source/slang/slang-session.cpp) and may be invoked on
+// caller-supplied .slang-module blobs whose authorship is not under the
+// host's control. The bounds-checking guards therefore double as a defense
+// against malformed or adversarial inputs.
+//
+// The guards use SLANG_RELEASE_ASSERT, which (in builds with
+// SLANG_HAS_EXCEPTIONS — the default) raises an InternalError; the outer
+// `Linkage::loadModuleFromBlob` catches `Exception` and converts it into a
+// nullptr return plus diagnostics, so a malformed blob normally fails the
+// module load rather than terminating the host. In non-exceptions builds the
+// asserts hit SLANG_BREAKPOINT. A follow-up refactor should thread Result out
+// of this function so failures need not transit the exception path.
 static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serializer, IRModule* module)
 {
     IRSerialReadContext& readContext = *serializer.getContext();
