@@ -190,12 +190,10 @@ struct MetalBufferPointerLoweringContext
                 continue;
 
             auto origElemType = elemType;
-            // Safe during iteration: setOperand does not move the inst in the global list.
-            bufType->setOperand(0, uintPtrType);
 
-            // Walk the use chain of the buffer type to find global variables
-            // typed as this buffer, then walk their uses to find element-access
-            // instructions.
+            // Collect element-access instructions BEFORE mutating the type,
+            // so we only capture accesses from pointer-element buffers (not
+            // a user-declared RWStructuredBuffer<ulong> that may merge after).
             List<IRInst*> elemPtrInsts;
             for (auto use = bufType->firstUse; use; use = use->nextUse)
             {
@@ -207,6 +205,9 @@ struct MetalBufferPointerLoweringContext
                         elemPtrInsts.add(varUser);
                 }
             }
+
+            // Use replaceOperand to safely mutate the hoistable buffer type.
+            builder.replaceOperand(bufType->getOperands() + 0, uintPtrType);
 
             for (auto inst : elemPtrInsts)
             {
