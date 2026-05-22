@@ -141,6 +141,13 @@ void* OffsetContainer::allocate(size_t size, size_t alignment)
     // but prevents silent truncation when offsets are converted to uint32_t.
     const size_t kMaxDataSize = size_t(0xFFFFFFFFu);
     const size_t alignmentMask = alignment - 1;
+    // On 64-bit hosts a caller can request an alignment larger than the 32-bit offset
+    // domain (e.g., 2^33). That would make alignmentMask > kMaxDataSize and cause the
+    // subtraction in the next guard to underflow, silently bypassing the check.
+    if (alignmentMask > kMaxDataSize)
+    {
+        return nullptr;
+    }
     if (m_dataSize > kMaxDataSize - alignmentMask)
     {
         return nullptr;
@@ -202,9 +209,11 @@ Offset32Ptr<OffsetString> OffsetContainer::newString(const UnownedStringSlice& s
     size_t stringSize = slice.getLength();
 
     // OffsetString encodes the size in at most 4 bytes (kSizeBase + 4-byte little-endian),
-    // so the string itself must fit in 32 bits. Reject anything larger to avoid wrapping in
-    // the headSize + stringSize + 1 computation below.
-    if (stringSize > size_t(0xFFFFFFFFu))
+    // so the string itself must fit in 32 bits. Subtract kMaxSizeEncodeSize + 1 (the
+    // encoded header plus the trailing null terminator) to also prevent
+    // headSize + stringSize + 1 from wrapping on 32-bit hosts where
+    // size_t == uint32_t.
+    if (stringSize > size_t(0xFFFFFFFFu) - OffsetString::kMaxSizeEncodeSize - 1)
     {
         return Offset32Ptr<OffsetString>();
     }

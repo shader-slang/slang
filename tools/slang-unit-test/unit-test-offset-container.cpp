@@ -65,6 +65,13 @@ SLANG_UNIT_TEST(offsetContainer)
     _checkAllocateOverflowDoesNotWrap(0, 1, 5);
     _checkAllocateOverflowDoesNotWrap(0, 1, 6);
 
+#if SIZE_MAX > 0xFFFFFFFFu
+    // On 64-bit hosts a power-of-two alignment larger than the 32-bit offset domain must be
+    // rejected before alignmentMask = alignment - 1 underflows kMaxDataSize - alignmentMask.
+    _checkAllocateOverflowDoesNotWrap(0, 1, size_t(1) << 33);
+    _checkAllocateOverflowDoesNotWrap(8, 1, size_t(1) << 40);
+#endif
+
     {
         OffsetContainer container;
 
