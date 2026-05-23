@@ -33,15 +33,19 @@ namespace Slang
 //
 // ## Type translation consistency
 //
-// The pass rewrites struct fields in-place and updates all get_field_addr /
-// rwstructuredBufferGetElementPtr result types.  Because the IR is post-SSA
-// and post-inlining, every access site is a direct field-address + load/store
-// sequence in the entry-point function body.  No cross-function propagation
-// is needed.
+// The pass rewrites struct fields in-place and updates result types for
+// FieldAddress, StructuredBufferLoad/Store, and GetElementPtr instructions.
+// Buffer types are mutated via IRBuilder::replaceOperand to respect the
+// global deduplication map for hoistable type nodes.
+//
+// Struct collection recursively walks nested struct fields — Metal's
+// pointer-to-pointer restriction is transitive through nested types.
 //
 // ## Instruction coverage
 //
-// Only load and store instructions on rewritten field addresses need casts.
+// For struct fields: load and store on rewritten field addresses get casts.
+// For storage buffer elements: all structured buffer access opcodes are
+// handled (Load, LoadStatus, Store, GetElementPtr, Consume, Append).
 //
 // ## Relationship to the early ParameterBlock pass
 //
@@ -93,25 +97,37 @@ struct MetalBufferPointerLoweringContext
     {
         Dictionary<IRStructType*, List<FieldLoweringInfo>> result;
 
+        HashSet<IRStructType*> bufferBoundStructs;
         for (auto globalInst : module->getGlobalInsts())
         {
             auto structType = as<IRStructType>(globalInst);
             if (!structType)
                 continue;
-
-            bool usedInBuffer = false;
             for (auto use = structType->firstUse; use; use = use->nextUse)
             {
                 auto user = use->getUser();
                 if (as<IRConstantBufferType>(user) || as<IRParameterBlockType>(user) ||
                     as<IRHLSLStructuredBufferTypeBase>(user))
                 {
-                    usedInBuffer = true;
+                    bufferBoundStructs.add(structType);
                     break;
                 }
             }
+        }
 
-            if (!usedInBuffer)
+        // Recursively walk all structs reachable from buffer-bound structs.
+        // Metal's pointer-to-pointer restriction is transitive — a nested
+        // struct with multi-level pointers also makes the outer type invalid.
+        HashSet<IRStructType*> visited;
+        List<IRStructType*> worklist;
+        for (auto s : bufferBoundStructs)
+            worklist.add(s);
+
+        while (worklist.getCount() > 0)
+        {
+            auto structType = worklist.getLast();
+            worklist.removeLast();
+            if (!visited.add(structType))
                 continue;
 
             List<FieldLoweringInfo> fieldsToLower;
@@ -125,6 +141,8 @@ struct MetalBufferPointerLoweringContext
                     info.originalPtrType = field->getFieldType();
                     fieldsToLower.add(info);
                 }
+                if (auto nestedStruct = as<IRStructType>(field->getFieldType()))
+                    worklist.add(nestedStruct);
             }
 
             if (fieldsToLower.getCount() > 0)
@@ -218,10 +236,10 @@ struct MetalBufferPointerLoweringContext
                         break;
                     }
                 case kIROp_StructuredBufferLoad:
-                case kIROp_StructuredBufferLoadStatus:
+                case kIROp_StructuredBufferLoadStatus: // unlikely with pointer elements
                 case kIROp_RWStructuredBufferLoad:
-                case kIROp_RWStructuredBufferLoadStatus:
-                case kIROp_StructuredBufferConsume:
+                case kIROp_RWStructuredBufferLoadStatus: // unlikely with pointer elements
+                case kIROp_StructuredBufferConsume:      // unlikely with pointer elements
                     {
                         inst->setFullType(uintPtrType);
                         builder.setInsertAfter(inst);
@@ -231,7 +249,7 @@ struct MetalBufferPointerLoweringContext
                         break;
                     }
                 case kIROp_RWStructuredBufferStore:
-                case kIROp_StructuredBufferAppend:
+                case kIROp_StructuredBufferAppend: // unlikely with pointer elements
                     {
                         UInt valIdx = (inst->getOp() == kIROp_StructuredBufferAppend) ? 1 : 2;
                         auto val = inst->getOperand(valIdx);
@@ -278,6 +296,10 @@ struct MetalBufferPointerLoweringContext
                 IRInst* args[] = {val};
                 auto castInst = builder.emitIntrinsicInst(uintPtrType, kIROp_CastPtrToInt, 1, args);
                 storeInst->setOperand(1, castInst);
+            }
+            else
+            {
+                SLANG_ASSERT(!"Unexpected user of lowered pointer field address");
             }
         }
     }
