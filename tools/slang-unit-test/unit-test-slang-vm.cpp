@@ -16,12 +16,16 @@ using namespace Slang;
 struct MinimalVMByteCode
 {
     List<uint8_t> data;
+    uint32_t functionSectionSizeOffset = 0;
     uint32_t functionOffsetOffset = 0;
     uint32_t functionHeaderOffset = 0;
+    uint32_t constantBlobSizeOffset = 0;
+    uint32_t stringCountOffset = 0;
     uint32_t stringOffsetOffset = 0;
 };
 
 static const char kMinimalFunctionName[] = "main";
+static const char kAlternateFunctionName[] = "tail";
 
 template<typename T>
 static void appendValue(List<uint8_t>& data, const T& value)
@@ -34,6 +38,12 @@ static void patchUInt32(List<uint8_t>& data, uint32_t offset, uint32_t value)
     memcpy(data.getBuffer() + offset, &value, sizeof(value));
 }
 
+static VMFuncHeader* getFunctionHeaderForTest(MinimalVMByteCode& byteCode)
+{
+    return reinterpret_cast<VMFuncHeader*>(
+        byteCode.data.getBuffer() + byteCode.functionHeaderOffset);
+}
+
 static MinimalVMByteCode makeMinimalVMByteCode()
 {
     MinimalVMByteCode result;
@@ -42,7 +52,7 @@ static MinimalVMByteCode makeMinimalVMByteCode()
     appendValue(result.data, kSlangByteCodeVersion);
 
     appendValue(result.data, kSlangByteCodeFunctionsFourCC);
-    uint32_t functionSectionSizeOffset = (uint32_t)result.data.getCount();
+    result.functionSectionSizeOffset = (uint32_t)result.data.getCount();
     appendValue(result.data, uint32_t(0));
 
     appendValue(result.data, uint32_t(1));
@@ -63,14 +73,16 @@ static MinimalVMByteCode makeMinimalVMByteCode()
     appendValue(result.data, retInst);
 
     uint32_t functionSectionSize =
-        (uint32_t)result.data.getCount() - functionSectionSizeOffset - sizeof(uint32_t);
-    patchUInt32(result.data, functionSectionSizeOffset, functionSectionSize);
+        (uint32_t)result.data.getCount() - result.functionSectionSizeOffset - sizeof(uint32_t);
+    patchUInt32(result.data, result.functionSectionSizeOffset, functionSectionSize);
 
     appendValue(result.data, kSlangByteCodeKernelBlobFourCC);
     appendValue(result.data, uint32_t(0));
 
     appendValue(result.data, kSlangByteCodeConstantsFourCC);
+    result.constantBlobSizeOffset = (uint32_t)result.data.getCount();
     appendValue(result.data, uint32_t(sizeof(kMinimalFunctionName)));
+    result.stringCountOffset = (uint32_t)result.data.getCount();
     appendValue(result.data, uint32_t(1));
     result.stringOffsetOffset = (uint32_t)result.data.getCount();
     appendValue(result.data, uint32_t(0));
@@ -184,6 +196,38 @@ SLANG_UNIT_TEST(slangVMRejectMalformedByteCodeOffsets)
     auto validByteCode = makeMinimalVMByteCode();
     SLANG_CHECK(validateVMModuleForTest(validByteCode.data) == SLANG_OK);
 
+    auto validLastFunctionNameIndex = makeMinimalVMByteCode();
+    uint32_t alternateNameOffset = sizeof(kMinimalFunctionName);
+    auto stringDataOffset = validLastFunctionNameIndex.stringOffsetOffset + sizeof(uint32_t);
+    validLastFunctionNameIndex.data.insertRange(
+        stringDataOffset,
+        reinterpret_cast<const uint8_t*>(&alternateNameOffset),
+        sizeof(alternateNameOffset));
+    validLastFunctionNameIndex.data.addRange(
+        reinterpret_cast<const uint8_t*>(kAlternateFunctionName),
+        sizeof(kAlternateFunctionName));
+    patchUInt32(
+        validLastFunctionNameIndex.data,
+        validLastFunctionNameIndex.constantBlobSizeOffset,
+        uint32_t(sizeof(kMinimalFunctionName) + sizeof(kAlternateFunctionName)));
+    patchUInt32(validLastFunctionNameIndex.data, validLastFunctionNameIndex.stringCountOffset, 2);
+    getFunctionHeaderForTest(validLastFunctionNameIndex)->name.offset = 1;
+    SLANG_CHECK(validateVMModuleForTest(validLastFunctionNameIndex.data) == SLANG_OK);
+
+    auto invalidFunctionSectionSize = makeMinimalVMByteCode();
+    patchUInt32(
+        invalidFunctionSectionSize.data,
+        invalidFunctionSectionSize.functionSectionSizeOffset,
+        (uint32_t)invalidFunctionSectionSize.data.getCount());
+    SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidFunctionSectionSize.data)));
+
+    auto invalidFunctionOffsetTableSize = makeMinimalVMByteCode();
+    patchUInt32(
+        invalidFunctionOffsetTableSize.data,
+        invalidFunctionOffsetTableSize.functionSectionSizeOffset,
+        uint32_t(sizeof(uint32_t)));
+    SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidFunctionOffsetTableSize.data)));
+
     auto invalidFunctionOffset = makeMinimalVMByteCode();
     patchUInt32(
         invalidFunctionOffset.data,
@@ -191,11 +235,33 @@ SLANG_UNIT_TEST(slangVMRejectMalformedByteCodeOffsets)
         (uint32_t)invalidFunctionOffset.data.getCount() + sizeof(VMFuncHeader));
     SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidFunctionOffset.data)));
 
+    auto invalidParameterTableSize = makeMinimalVMByteCode();
+    getFunctionHeaderForTest(invalidParameterTableSize)->parameterCount =
+        (uint32_t)invalidParameterTableSize.data.getCount();
+    SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidParameterTableSize.data)));
+
+    auto invalidFunctionCodeSize = makeMinimalVMByteCode();
+    getFunctionHeaderForTest(invalidFunctionCodeSize)->codeSize =
+        (uint32_t)invalidFunctionCodeSize.data.getCount();
+    SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidFunctionCodeSize.data)));
+
     auto invalidFunctionName = makeMinimalVMByteCode();
-    auto funcHeader = reinterpret_cast<VMFuncHeader*>(
-        invalidFunctionName.data.getBuffer() + invalidFunctionName.functionHeaderOffset);
-    funcHeader->name.offset = 1;
+    getFunctionHeaderForTest(invalidFunctionName)->name.offset = 1;
     SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidFunctionName.data)));
+
+    auto invalidStringOffsetTableSize = makeMinimalVMByteCode();
+    patchUInt32(
+        invalidStringOffsetTableSize.data,
+        invalidStringOffsetTableSize.stringCountOffset,
+        (uint32_t)invalidStringOffsetTableSize.data.getCount());
+    SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidStringOffsetTableSize.data)));
+
+    auto invalidConstantBlobSize = makeMinimalVMByteCode();
+    patchUInt32(
+        invalidConstantBlobSize.data,
+        invalidConstantBlobSize.constantBlobSizeOffset,
+        (uint32_t)invalidConstantBlobSize.data.getCount());
+    SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidConstantBlobSize.data)));
 
     auto invalidStringOffset = makeMinimalVMByteCode();
     patchUInt32(
@@ -205,7 +271,7 @@ SLANG_UNIT_TEST(slangVMRejectMalformedByteCodeOffsets)
     SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidStringOffset.data)));
 
     auto unterminatedString = makeMinimalVMByteCode();
-    auto stringDataOffset = unterminatedString.stringOffsetOffset + sizeof(uint32_t);
+    stringDataOffset = unterminatedString.stringOffsetOffset + sizeof(uint32_t);
     unterminatedString.data[stringDataOffset + 4] = '!';
     SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(unterminatedString.data)));
 }
