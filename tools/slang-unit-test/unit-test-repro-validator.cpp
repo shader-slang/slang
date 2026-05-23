@@ -379,21 +379,17 @@ SLANG_UNIT_TEST(reproStateValidator)
         SLANG_CHECK(isReproStateValid(buf));
     }
 
-    // 14. Array with m_count that would overflow when multiplied by element size — fails.
-    // isArrayRangeInBounds: elementSize > size_t(-1) / count → return false.
+    // 14. Array with m_count that extends beyond the serialized buffer — fails.
+    // isArrayRangeInBounds: isRangeInBounds(offset, elementSize * count, alignment) returns false.
     {
         OffsetContainer container;
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
         auto filesArray = container.newArray<Offset32Ptr<ReproUtil::FileState>>(1);
         container[requestPtr]->files = filesArray;
+        container[requestPtr]->files.m_count = 0xFFFFFFFFu;
 
         List<uint8_t> buf;
         containerToBuffer(container, buf);
-
-        // Overwrite m_count to near-UINT32_MAX; elementSize * count would overflow size_t.
-        uint32_t* countSlot =
-            reinterpret_cast<uint32_t*>(buf.getBuffer() + filesArray.m_data.m_offset + 4);
-        *countSlot = 0xFFFFFFFFu;
 
         SLANG_CHECK(!isReproStateValid(buf));
     }
