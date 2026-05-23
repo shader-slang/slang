@@ -7,24 +7,14 @@
 #include "core/slang-offset-container.h"
 #include "core/slang-stream.h"
 #include "core/slang-string-util.h"
-#include "slang/slang-compiler-api.h"
-#include "slang/slang-end-to-end-request.h"
 #include "slang/slang-repro-validator.h"
 #include "slang/slang-repro.h"
+#include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
 static const int kInvalidReproStateDiagnosticId = 99;
-
-#if defined(__clang__)
-#define SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED \
-    __attribute__((no_sanitize("undefined"))) __attribute__((no_sanitize("vptr")))
-#elif defined(__GNUC__)
-#define SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED __attribute__((no_sanitize("undefined")))
-#else
-#define SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED
-#endif
 
 // Copy OffsetContainer bytes into a List<uint8_t> as isReproStateValid expects.
 static void containerToBuffer(OffsetContainer& container, List<uint8_t>& outBuf)
@@ -138,6 +128,47 @@ static void buildStateRiff(const List<uint8_t>& payload, List<uint8_t>& outRiff)
     stream.swapContents(outRiff);
 }
 
+static void loadReproBlobState(ISlangBlob* reproBlob, List<uint8_t>& outBuffer)
+{
+    SLANG_CHECK_ABORT(reproBlob && reproBlob->getBufferSize() != 0);
+
+    DiagnosticSink sink;
+    SlangResult loadResult = ReproUtil::loadState(
+        static_cast<const uint8_t*>(reproBlob->getBufferPointer()),
+        reproBlob->getBufferSize(),
+        &sink,
+        outBuffer);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(loadResult));
+    SLANG_CHECK_ABORT(sink.getErrorCount() == 0);
+    SLANG_CHECK_ABORT(isReproStateValid(outBuffer));
+    SLANG_CHECK_ABORT(ReproUtil::getRequest(outBuffer) != nullptr);
+}
+
+static const char* getTranslationUnitSourceFilePath(
+    MemoryOffsetBase& base,
+    ReproUtil::RequestState* requestState,
+    Index translationUnitIndex,
+    Index sourceFileIndex)
+{
+    SLANG_CHECK_ABORT(requestState);
+    SLANG_CHECK_ABORT(translationUnitIndex >= 0);
+    SLANG_CHECK_ABORT(translationUnitIndex < requestState->translationUnits.getCount());
+
+    const auto& translationUnit = base.asRaw(requestState->translationUnits[translationUnitIndex]);
+    SLANG_CHECK_ABORT(sourceFileIndex >= 0);
+    SLANG_CHECK_ABORT(sourceFileIndex < translationUnit.sourceFiles.getCount());
+
+    Offset32Ptr<ReproUtil::SourceFileState> sourceFilePtr =
+        base.asRaw(translationUnit.sourceFiles[sourceFileIndex]);
+    auto sourceFile = base.asRaw(sourceFilePtr);
+    SLANG_CHECK_ABORT(sourceFile);
+
+    auto foundPath = base.asRaw(sourceFile->foundPath);
+    SLANG_CHECK_ABORT(foundPath);
+    return foundPath->getCstr();
+}
+
 static Offset32Ptr<ReproUtil::SourceFileState> addSourceFileState(
     OffsetContainer& container,
     const char* path)
@@ -156,20 +187,6 @@ static Offset32Ptr<ReproUtil::SourceFileState> addSourceFileState(
     container[sourceFile]->file = file;
 
     return sourceFile;
-}
-
-static SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED SlangResult loadReproState(
-    OffsetBase& base,
-    ReproUtil::RequestState* requestState,
-    SlangCompileRequest* request)
-{
-    return ReproUtil::load(base, requestState, nullptr, asInternal(request));
-}
-
-static SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED const List<RefPtr<TranslationUnitRequest>>&
-getLoadedTranslationUnits(SlangCompileRequest* request)
-{
-    return asInternal(request)->getFrontEndReq()->translationUnits;
 }
 
 SLANG_UNIT_TEST(reproStateValidator)
@@ -1123,25 +1140,16 @@ SLANG_UNIT_TEST(reproStateValidatorAcceptsSavedState)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(spSaveRepro(request, reproBlob.writeRef())));
     SLANG_CHECK_ABORT(reproBlob && reproBlob->getBufferSize() != 0);
 
-    DiagnosticSink sink;
     List<uint8_t> outBuffer;
-    SlangResult loadResult = ReproUtil::loadState(
-        static_cast<const uint8_t*>(reproBlob->getBufferPointer()),
-        reproBlob->getBufferSize(),
-        &sink,
-        outBuffer);
-
-    SLANG_CHECK(SLANG_SUCCEEDED(loadResult));
-    SLANG_CHECK(sink.getErrorCount() == 0);
-    SLANG_CHECK(isReproStateValid(outBuffer));
-    auto requestState = ReproUtil::getRequest(outBuffer);
-    SLANG_CHECK_ABORT(requestState != nullptr);
+    loadReproBlobState(reproBlob, outBuffer);
 
     auto replayRequest = spCreateCompileRequest(session);
     SLANG_CHECK_ABORT(replayRequest != nullptr);
-    MemoryOffsetBase base;
-    base.set(outBuffer.getBuffer(), outBuffer.getCount());
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(loadReproState(base, requestState, replayRequest)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(spLoadRepro(
+        replayRequest,
+        nullptr,
+        reproBlob->getBufferPointer(),
+        reproBlob->getBufferSize())));
 
     spDestroyCompileRequest(replayRequest);
     spDestroyCompileRequest(request);
@@ -1250,23 +1258,44 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
     container[tu1SourceFiles[0]] = tu1SourceFileA;
     container[tu1SourceFiles[1]] = tu1SourceFileB;
 
+    List<uint8_t> payload;
+    containerToBuffer(container, payload);
+    List<uint8_t> riffData;
+    buildStateRiff(payload, riffData);
+
     auto session = spCreateSession();
     auto externalRequest = spCreateCompileRequest(session);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        spLoadRepro(externalRequest, nullptr, riffData.getBuffer(), riffData.getCount())));
+    SLANG_CHECK_ABORT(spGetTranslationUnitCount(externalRequest) == 2);
 
-    OffsetBase& base = container.asBase();
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(loadReproState(base, base.asRaw(requestPtr), externalRequest)));
+    ComPtr<ISlangBlob> savedReproBlob;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(spSaveRepro(externalRequest, savedReproBlob.writeRef())));
 
-    auto& loadedTranslationUnits = getLoadedTranslationUnits(externalRequest);
-    SLANG_CHECK_ABORT(loadedTranslationUnits.getCount() == 2);
-    const auto& loadedTu0SourceFiles = loadedTranslationUnits[0]->getSourceFiles();
-    const auto& loadedTu1SourceFiles = loadedTranslationUnits[1]->getSourceFiles();
+    List<uint8_t> loadedBuffer;
+    loadReproBlobState(savedReproBlob, loadedBuffer);
 
-    SLANG_CHECK_ABORT(loadedTu0SourceFiles.getCount() == 1);
-    SLANG_CHECK_ABORT(loadedTu1SourceFiles.getCount() == 2);
-    SLANG_CHECK(loadedTu0SourceFiles[0]->getPathInfo().foundPath == "load-tu0.slang");
-    SLANG_CHECK(loadedTu1SourceFiles[0]->getPathInfo().foundPath == "load-tu1-a.slang");
-    SLANG_CHECK(loadedTu1SourceFiles[1]->getPathInfo().foundPath == "load-tu1-b.slang");
+    MemoryOffsetBase loadedBase;
+    loadedBase.set(loadedBuffer.getBuffer(), loadedBuffer.getCount());
+    auto loadedRequestState = ReproUtil::getRequest(loadedBuffer);
+    SLANG_CHECK_ABORT(loadedRequestState->translationUnits.getCount() == 2);
+    const auto& loadedTu0 = loadedBase.asRaw(loadedRequestState->translationUnits[0]);
+    const auto& loadedTu1 = loadedBase.asRaw(loadedRequestState->translationUnits[1]);
+
+    SLANG_CHECK_ABORT(loadedTu0.sourceFiles.getCount() == 1);
+    SLANG_CHECK_ABORT(loadedTu1.sourceFiles.getCount() == 2);
+    SLANG_CHECK(
+        strcmp(
+            getTranslationUnitSourceFilePath(loadedBase, loadedRequestState, 0, 0),
+            "load-tu0.slang") == 0);
+    SLANG_CHECK(
+        strcmp(
+            getTranslationUnitSourceFilePath(loadedBase, loadedRequestState, 1, 0),
+            "load-tu1-a.slang") == 0);
+    SLANG_CHECK(
+        strcmp(
+            getTranslationUnitSourceFilePath(loadedBase, loadedRequestState, 1, 1),
+            "load-tu1-b.slang") == 0);
 
     spDestroyCompileRequest(externalRequest);
     spDestroySession(session);
