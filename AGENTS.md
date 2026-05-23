@@ -20,11 +20,15 @@ Key directories:
 ## Build, Test, and Development Commands
 
 Slang build setup is platform-specific, especially under WSL. For compiler builds, use the
-`slang-build` skill from the `shader-slang/slang-skills` repository instead of following
-hard-coded commands in this file.
+`slang-build` skill from `skills/slang-build` in the `shader-slang/slang-skills` repository
+instead of following hard-coded commands in this file.
+
+If the skill is unavailable because skills cannot be installed or network access is limited, use
+`docs/building.md` as the fallback build reference.
 
 Examples:
 - `/slang-build build debug`: build the Debug configuration.
+- `/slang-build build release`: build the Release configuration.
 - `/slang-build rebuild debug`: discard the existing build directory and rebuild Debug.
 - `/slang-build configure releasewithdebug`: configure an optimized build with symbols.
 - `/slang-build clean`: rename and remove the existing build directory.
