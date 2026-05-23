@@ -1,5 +1,6 @@
 // unit-test-slang-vm.cpp
 
+#include "core/slang-blob.h"
 #include "core/slang-memory-file-system.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -77,10 +78,11 @@ static MinimalVMByteCode makeMinimalVMByteCode()
     return result;
 }
 
-static SlangResult initVMModuleForTest(List<uint8_t>& data)
+static SlangResult validateVMModuleForTest(List<uint8_t>& data)
 {
-    VMModuleView moduleView = {};
-    return initVMModule(data.getBuffer(), (uint32_t)data.getCount(), &moduleView);
+    ComPtr<slang::IBlob> moduleBlob = RawBlob::create(data.getBuffer(), data.getCount());
+    ComPtr<slang::IBlob> disassemblyBlob;
+    return slang_disassembleByteCode(moduleBlob, disassemblyBlob.writeRef());
 }
 
 SLANG_UNIT_TEST(slangVM)
@@ -177,29 +179,29 @@ SLANG_UNIT_TEST(slangVM)
 SLANG_UNIT_TEST(slangVMRejectMalformedByteCodeOffsets)
 {
     auto validByteCode = makeMinimalVMByteCode();
-    SLANG_CHECK(initVMModuleForTest(validByteCode.data) == SLANG_OK);
+    SLANG_CHECK(validateVMModuleForTest(validByteCode.data) == SLANG_OK);
 
     auto invalidFunctionOffset = makeMinimalVMByteCode();
     patchUInt32(
         invalidFunctionOffset.data,
         invalidFunctionOffset.functionOffsetOffset,
         (uint32_t)invalidFunctionOffset.data.getCount() + sizeof(VMFuncHeader));
-    SLANG_CHECK(SLANG_FAILED(initVMModuleForTest(invalidFunctionOffset.data)));
+    SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidFunctionOffset.data)));
 
     auto invalidFunctionName = makeMinimalVMByteCode();
     auto funcHeader = reinterpret_cast<VMFuncHeader*>(
         invalidFunctionName.data.getBuffer() + invalidFunctionName.functionHeaderOffset);
     funcHeader->name.offset = 1;
-    SLANG_CHECK(SLANG_FAILED(initVMModuleForTest(invalidFunctionName.data)));
+    SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidFunctionName.data)));
 
     auto invalidStringOffset = makeMinimalVMByteCode();
     patchUInt32(invalidStringOffset.data, invalidStringOffset.stringOffsetOffset, UINT32_MAX);
-    SLANG_CHECK(SLANG_FAILED(initVMModuleForTest(invalidStringOffset.data)));
+    SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidStringOffset.data)));
 
     auto unterminatedString = makeMinimalVMByteCode();
     auto stringDataOffset = unterminatedString.stringOffsetOffset + sizeof(uint32_t);
     unterminatedString.data[stringDataOffset + 4] = '!';
-    SLANG_CHECK(SLANG_FAILED(initVMModuleForTest(unterminatedString.data)));
+    SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(unterminatedString.data)));
 }
 
 struct ExtCallState
