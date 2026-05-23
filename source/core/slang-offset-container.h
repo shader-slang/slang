@@ -279,11 +279,15 @@ public:
 
     Offset32Ref<const T> operator[](Index i) const
     {
+        // Serialized repro data can drive these offsets in release builds, so this must remain a
+        // release assert rather than a debug-only SLANG_ASSERT.
         SLANG_RELEASE_ASSERT(i >= 0 && uint32_t(i) < m_count);
         return Offset32Ref<const T>((m_data + i).m_offset);
     }
     Offset32Ref<T> operator[](Index i)
     {
+        // Serialized repro data can drive these offsets in release builds, so this must remain a
+        // release assert rather than a debug-only SLANG_ASSERT.
         SLANG_RELEASE_ASSERT(i >= 0 && uint32_t(i) < m_count);
         return Offset32Ref<T>((m_data + i).m_offset);
     }
@@ -352,6 +356,8 @@ public:
     T& asRaw(const Offset32Ref<T>& ref)
     {
         uint8_t* raw = _getRaw(ref.m_offset, sizeof(T));
+        // Offset32Ref is non-null by construction; an invalid deserialized offset must trap in
+        // release builds before forming a reference.
         SLANG_RELEASE_ASSERT(raw);
         return *(T*)raw;
     }
@@ -368,6 +374,8 @@ public:
     T& operator[](const Offset32Ref<T>& ref)
     {
         uint8_t* raw = _getRaw(ref.m_offset, sizeof(T));
+        // Offset32Ref is non-null by construction; an invalid deserialized offset must trap in
+        // release builds before forming a reference.
         SLANG_RELEASE_ASSERT(raw);
         return *(T*)raw;
     }
