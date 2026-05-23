@@ -206,7 +206,6 @@ SLANG_UNIT_TEST(replayContextRejectsStringLengthPastLimit)
     uint32_t length = kMaxReplayStringLength + 1;
     ctx().getStream().write(&typeId, sizeof(typeId));
     ctx().getStream().write(&length, sizeof(length));
-    writeRepeatedBytes(length, uint8_t('x'));
 
     ctx().switchToPlayback();
 
