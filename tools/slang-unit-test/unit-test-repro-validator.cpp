@@ -2,6 +2,7 @@
 // Tests for isReproStateValid and the ReproStateValidator graph traversal.
 
 #include "compiler-core/slang-diagnostic-sink.h"
+#include "core/slang-io.h"
 #include "core/slang-memory-file-system.h"
 #include "core/slang-offset-container.h"
 #include "core/slang-stream.h"
@@ -82,7 +83,10 @@ static void buildStateRiff(const List<uint8_t>& payload, List<uint8_t>& outRiff)
         header.m_typeHash = calcReproTypeHashForTest();
 
         cursor.addData(header);
-        cursor.addUnownedData(payload.getBuffer(), payload.getCount());
+        if (payload.getCount())
+        {
+            cursor.addUnownedData(payload.getBuffer(), payload.getCount());
+        }
     }
 
     OwnedMemoryStream stream(FileAccess::Write);
@@ -751,6 +755,57 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsInvalidPayload)
     SLANG_CHECK(outBuffer.getCount() == 0);
     SLANG_CHECK(sink.getErrorCount() == 1);
     SLANG_CHECK(sink.outputBuffer.produceString().contains("malformed offsets"));
+}
+
+SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload)
+{
+    List<uint8_t> emptyPayload;
+    List<uint8_t> riffData;
+    buildStateRiff(emptyPayload, riffData);
+
+    OwnedMemoryStream stream(FileAccess::Read);
+    stream.setContent(riffData.getBuffer(), riffData.getCount());
+
+    DiagnosticSink sink;
+    List<uint8_t> outBuffer;
+    outBuffer.add(0xff);
+
+    SlangResult result = ReproUtil::loadState(&stream, &sink, outBuffer);
+    SLANG_CHECK(SLANG_FAILED(result));
+    SLANG_CHECK(outBuffer.getCount() == 0);
+    SLANG_CHECK(sink.getErrorCount() == 1);
+    SLANG_CHECK(sink.outputBuffer.produceString().contains("malformed offsets"));
+}
+
+SLANG_UNIT_TEST(reproExtractFilesToDirectoryRejectsInvalidPayload)
+{
+    List<uint8_t> invalidPayload;
+    buildMinimalValid(invalidPayload);
+    SLANG_CHECK_ABORT(invalidPayload.getCount() > 0);
+    invalidPayload.setCount(invalidPayload.getCount() - 1);
+
+    List<uint8_t> riffData;
+    buildStateRiff(invalidPayload, riffData);
+
+    String filePath;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::generateTemporary(toSlice("slang-repro"), filePath)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllBytes(filePath, riffData.getBuffer(), riffData.getCount())));
+
+    String outputDir;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(ReproUtil::calcDirectoryPathFromFilename(filePath, outputDir)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(Path::removeNonEmpty(outputDir)));
+
+    DiagnosticSink sink;
+    SlangResult result = ReproUtil::extractFilesToDirectory(filePath, &sink);
+    SLANG_CHECK(SLANG_FAILED(result));
+    SLANG_CHECK(sink.getErrorCount() == 1);
+    SLANG_CHECK(sink.outputBuffer.produceString().contains("malformed offsets"));
+    SLANG_CHECK(!File::exists(outputDir));
+
+    SLANG_CHECK(SLANG_SUCCEEDED(File::remove(filePath)));
+    SLANG_CHECK(SLANG_SUCCEEDED(Path::removeNonEmpty(outputDir)));
 }
 
 SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
