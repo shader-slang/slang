@@ -371,17 +371,33 @@ alias cpp_glsl = cpp | glsl;
 /// [Compound]
 alias cpp_glsl_hlsl_spirv = cpp | glsl | hlsl | spirv;
 
+/// CPP, GLSL, HLSL, SPIRV, and LLVM code-gen targets
+/// [Compound]
+alias cpp_glsl_hlsl_spirv_llvm = cpp | glsl | hlsl | spirv | llvm;
+
 /// CPP, GLSL, HLSL, SPIRV and WGSL code-gen targets
 /// [Compound]
 alias cpp_glsl_hlsl_spirv_wgsl = cpp | glsl | hlsl | spirv | wgsl;
+
+/// CPP, GLSL, HLSL, SPIRV, WGSL, and LLVM code-gen targets
+/// [Compound]
+alias cpp_glsl_hlsl_spirv_wgsl_llvm = cpp | glsl | hlsl | spirv | wgsl | llvm;
 
 /// CPP, GLSL, HLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias cpp_glsl_hlsl_metal_spirv = cpp | glsl | hlsl | metal | spirv;
 
+/// CPP, GLSL, HLSL, Metal, SPIRV, and LLVM code-gen targets
+/// [Compound]
+alias cpp_glsl_hlsl_metal_spirv_llvm = cpp | glsl | hlsl | metal | spirv | llvm;
+
 /// CPP, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
 /// [Compound]
 alias cpp_glsl_hlsl_metal_spirv_wgsl = cpp | glsl | hlsl | metal | spirv | wgsl;
+
+/// CPP, GLSL, HLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
+/// [Compound]
+alias cpp_glsl_hlsl_metal_spirv_wgsl_llvm = cpp | glsl | hlsl | metal | spirv | wgsl | llvm;
 
 /// CPP, and HLSL code-gen targets
 /// [Compound]
@@ -414,6 +430,10 @@ alias cuda_glsl_hlsl_metal_spirv = cuda | glsl | hlsl | metal | spirv;
 /// CUDA, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
 /// [Compound]
 alias cuda_glsl_hlsl_metal_spirv_wgsl = cuda | glsl | hlsl | metal | spirv | wgsl;
+
+/// CUDA, GLSL, HLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
+/// [Compound]
+alias cuda_glsl_hlsl_metal_spirv_wgsl_llvm = cuda | glsl | hlsl | metal | spirv | wgsl | llvm;
 
 /// CUDA, GLSL, and SPIRV code-gen targets
 /// [Compound]
@@ -451,9 +471,17 @@ alias glsl_hlsl_spirv_wgsl = glsl | hlsl | spirv | wgsl;
 /// [Compound]
 alias glsl_hlsl_metal_spirv = glsl | hlsl | metal | spirv;
 
+/// GLSL, HLSL, Metal, SPIRV, and LLVM code-gen targets
+/// [Compound]
+alias glsl_hlsl_metal_spirv_llvm = glsl | hlsl | metal | spirv | llvm;
+
 /// GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
 /// [Compound]
 alias glsl_hlsl_metal_spirv_wgsl = glsl | hlsl | metal | spirv | wgsl;
+
+/// GLSL, HLSL, Metal, SPIRV, WGSL, and LLVM code-gen targets
+/// [Compound]
+alias glsl_hlsl_metal_spirv_wgsl_llvm = glsl | hlsl | metal | spirv | wgsl | llvm;
 
 /// GLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
@@ -474,6 +502,10 @@ alias glsl_spirv_wgsl = glsl | spirv | wgsl;
 /// HLSL, and SPIRV code-gen targets
 /// [Compound]
 alias hlsl_spirv = hlsl | spirv;
+
+/// HLSL, SPIRV and LLVM code-gen targets
+/// [Compound]
+alias hlsl_spirv_llvm = hlsl | spirv | llvm;
 
 // stages
 //
@@ -2339,7 +2371,7 @@ alias texture_sm_4_1_clamp_fragment = texture_sm_4_0_fragment | GL_ARB_sparse_te
 alias texture_sm_4_1_vertex_fragment_geometry = texture_sm_4_1;
 /// Capabilities required to use 'vertex/fragment/geometry shader only' texture gather operations
 /// [Compound]
-alias texture_gather = texture_sm_4_1_vertex_fragment_geometry | GL_ARB_texture_gather;
+alias texture_gather = texture_sm_4_1_vertex_fragment_geometry | GL_ARB_texture_gather | llvm;
 /// Capabilities required to query image (RWTexture) sample info
 /// [Compound]
 alias image_samples = texture_sm_4_1_compute_fragment | GL_ARB_shader_texture_image_samples;
@@ -2361,7 +2393,7 @@ alias texture_shadowlod = texture_sm_4_1;
 /// Capabilities required for shadow texture sampling with bias and gradients.
 /// New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 /// [Compound]
-alias texture_shadowgrad = _sm_6_8 | _GLSL_150 | spirv_1_0 | GL_EXT_texture_shadow_lod;
+alias texture_shadowgrad = _sm_6_8 | _GLSL_150 | spirv_1_0 | GL_EXT_texture_shadow_lod | llvm;
 
 /// (GLSL/SPIRV) Capabilities required to use GLSL-tier-1 float-atomic operations
 /// [Compound]
