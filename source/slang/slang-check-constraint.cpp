@@ -790,22 +790,29 @@ private:
         // The argument arrays start from the same declaration-order layout used
         // by ordinary generic substitution. Solver constraints update `m_args`
         // in place as they solve ordinary and witness arguments.
-        return initializeCurrentArgs();
+        return initializeArgs();
     }
 
     // Collect the nested generic declarations being solved.
     void collectGenericDeclChain()
     {
         // Generic applications can be nested through declarations such as
-        // `Outer<T>.Inner<U>`. We collect by walking from `Inner` to `Outer`,
-        // then reverse the list so later substitution can build `Outer` before
-        // using that substituted decl-ref as the parent for `Inner`.
+        // `Outer<T>.Inner<U>`. We first walk from `Inner` to `Outer`, then put
+        // the collected declarations in outer-to-inner order so later
+        // substitution can build `Outer` before using that substituted decl-ref
+        // as the parent for `Inner`.
         for (auto genericDecl = m_genericDeclRef.getDecl(); genericDecl;
              genericDecl = as<GenericDecl>(genericDecl->parentDecl))
         {
             m_genericDecls.add(genericDecl);
         }
-        m_genericDecls.reverse();
+
+        for (Index ii = 0, jj = m_genericDecls.getCount() - 1; ii < jj; ii++, jj--)
+        {
+            auto tmp = m_genericDecls[ii];
+            m_genericDecls[ii] = m_genericDecls[jj];
+            m_genericDecls[jj] = tmp;
+        }
     }
 
     // Add solver constraints discovered by unification.
@@ -861,23 +868,20 @@ private:
         }
     }
 
-    // Initialize the current generic-application argument arrays.
-    bool initializeCurrentArgs()
+    // Initialize the live generic-application argument arrays.
+    bool initializeArgs()
     {
         for (auto genericDecl : m_genericDecls)
         {
-            // `getDefaultSubstitutionArgs()` already knows the declaration-order
+            // `getDefaultSubstitutionArgs()` already builds the exact argument
             // layout consumed by `getGenericAppDeclRef`: ordinary arguments
-            // first, then witness arguments. Starting from that layout keeps
-            // partial substitutions structurally valid even before solving.
+            // first, then witness arguments. These default substitution args are
+            // not solver answers; they are values such as `T`, `N`, or a
+            // declared witness that keep dependent values like `T.A` well formed
+            // until a solver constraint replaces them.
             auto defaultArgs = getDefaultSubstitutionArgs(m_astBuilder, m_visitor, genericDecl);
             auto& args = m_args[genericDecl];
             args.clear();
-
-            // These default substitution args are not solver answers. They are
-            // default substitution args such as `T`, `N`, or a declared witness
-            // that allow dependent values like `T.A` to remain well formed
-            // until solver constraints replace them with solved arguments.
             for (auto arg : defaultArgs)
             {
                 if (!arg)
@@ -885,49 +889,41 @@ private:
                 args.add(arg);
             }
 
-            // Caller-provided ordinary arguments and omitted packs are known
-            // before witness solving begins, so install them now while leaving
-            // witness arguments in their default-substitution form.
-            if (!initializeOrdinaryArgs(genericDecl))
-                return false;
-        }
-        return true;
-    }
+            // Ordinary parameters may have an initial value that is more
+            // specific than the default substitution arg. A partially applied
+            // generic can provide an ordinary argument, as in `foo<int>(x)`,
+            // and an omitted pack starts as the empty pack. Witness arguments
+            // stay in their default-substitution form until witness constraints
+            // solve them.
+            for (auto member : genericDecl->getDirectMemberDecls())
+            {
+                Val* providedArg = nullptr;
+                if (tryGetProvidedOrdinaryArg(member, providedArg))
+                {
+                    if (!setCurrentArg(member, providedArg))
+                        return false;
+                    auto argState = isDefaultSubstitutionArgForParam(member, providedArg)
+                                        ? ArgState::DependentOrdinaryArg
+                                        : ArgState::CallerProvidedOrdinaryArg;
+                    setArgState(member, argState);
+                    continue;
+                }
 
-    // Initialize the ordinary arguments for one generic declaration.
-    bool initializeOrdinaryArgs(GenericDecl* genericDecl)
-    {
-        for (auto member : genericDecl->getDirectMemberDecls())
-        {
-            // A partially applied generic can provide some ordinary arguments
-            // before overload inference runs. For `foo<int>(x)`, `T` is already
-            // known as `int`, so defaults and inference must not replace it.
-            Val* providedArg = nullptr;
-            if (tryGetProvidedOrdinaryArg(member, providedArg))
-            {
-                if (!setCurrentArg(member, providedArg))
-                    return false;
-                auto argState = isDefaultSubstitutionArgForParam(member, providedArg)
-                                    ? ArgState::DependentOrdinaryArg
-                                    : ArgState::CallerProvidedOrdinaryArg;
-                setArgState(member, argState);
-                continue;
-            }
-
-            // Omitted packs use empty pack values rather than default generic
-            // arguments. A later non-empty-pack witness constraint decides
-            // whether that empty value is legal for this candidate.
-            if (as<GenericTypePackParamDecl>(member))
-            {
-                if (!setCurrentArg(member, m_astBuilder->getTypePack(ArrayView<Type*>())))
-                    return false;
-                setArgState(member, ArgState::EmptyPackArg);
-            }
-            else if (as<GenericValuePackParamDecl>(member))
-            {
-                if (!setCurrentArg(member, m_astBuilder->getIntValPack(ArrayView<IntVal*>())))
-                    return false;
-                setArgState(member, ArgState::EmptyPackArg);
+                // Omitted packs use empty pack values rather than their default
+                // substitution args. A later non-empty-pack witness constraint
+                // decides whether that empty value is legal for this candidate.
+                if (as<GenericTypePackParamDecl>(member))
+                {
+                    if (!setCurrentArg(member, m_astBuilder->getTypePack(ArrayView<Type*>())))
+                        return false;
+                    setArgState(member, ArgState::EmptyPackArg);
+                }
+                else if (as<GenericValuePackParamDecl>(member))
+                {
+                    if (!setCurrentArg(member, m_astBuilder->getIntValPack(ArrayView<IntVal*>())))
+                        return false;
+                    setArgState(member, ArgState::EmptyPackArg);
+                }
             }
         }
         return true;
@@ -2690,7 +2686,7 @@ private:
     // Nested generic declarations from outermost to innermost. A substituted
     // decl-ref for `Outer<T>.Inner<U>` consumes arguments for `Outer` before it
     // can name `Inner`, so the solver stores the declarations in that order.
-    List<GenericDecl*> m_genericDecls;
+    ShortList<GenericDecl*, 4> m_genericDecls;
 
     // Current generic-application arguments keyed by generic declaration. This
     // is the declaration-order view consumed by `getGenericAppDeclRef`: ordinary

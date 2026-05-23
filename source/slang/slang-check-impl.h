@@ -2796,7 +2796,7 @@ public:
         // Ordinary argument constraints discovered by unification or type
         // joining. The generic solver drains and clears this list whenever it
         // needs to pull newly discovered constraints into the iterative loop.
-        List<SolverConstraint> discoveredConstraints;
+        ShortList<SolverConstraint, 8> discoveredConstraints;
 
         // Additional subtype witnesses available to the current constraint solving context.
         Type* subTypeForAdditionalWitnesses = nullptr;
