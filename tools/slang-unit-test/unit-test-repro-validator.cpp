@@ -8,8 +8,8 @@
 #include "core/slang-stream.h"
 #include "core/slang-string-util.h"
 #include "slang/slang-compiler-api.h"
-#include "slang/slang-repro.h"
 #include "slang/slang-repro-validator.h"
+#include "slang/slang-repro.h"
 #include "slang/slang-rich-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
 
