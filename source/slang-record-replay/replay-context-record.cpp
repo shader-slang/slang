@@ -236,9 +236,14 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
     }
     else
     {
+        const char* expectedStr = str;
         TypeId typeId = readTypeId();
         if (typeId == TypeId::Null)
         {
+            if (hasFlag(flags, RecordFlag::Output) && expectedStr != nullptr)
+            {
+                throw DataMismatchException(m_stream.getPosition() - sizeof(uint8_t), 0);
+            }
             str = nullptr;
         }
         else if (typeId == TypeId::String)
@@ -261,7 +266,7 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
             buf[stringSize] = '\0';
             if (hasFlag(flags, RecordFlag::Output))
             {
-                if (strcmp(str, buf) != 0)
+                if (expectedStr == nullptr || strcmp(expectedStr, buf) != 0)
                 {
                     throw DataMismatchException(m_stream.getPosition() - length, length);
                 }

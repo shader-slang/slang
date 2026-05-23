@@ -168,6 +168,56 @@ SLANG_UNIT_TEST(replayContextString)
     SLANG_CHECK(testString("Unicode test: こんにちは"));
 }
 
+SLANG_UNIT_TEST(replayContextRejectsOutputStringNullnessMismatch)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    {
+        ctx().reset();
+        ctx().setMode(Mode::Record);
+        const char* recordedStr = nullptr;
+        ctx().record(RecordFlag::None, recordedStr);
+
+        ctx().switchToPlayback();
+
+        bool caughtException = false;
+        try
+        {
+            const char* expectedStr = "expected";
+            ctx().record(RecordFlag::Output, expectedStr);
+        }
+        catch (const DataMismatchException&)
+        {
+            caughtException = true;
+        }
+
+        SLANG_CHECK(caughtException);
+    }
+
+    {
+        ctx().reset();
+        ctx().setMode(Mode::Record);
+        const char* recordedStr = "actual";
+        ctx().record(RecordFlag::None, recordedStr);
+
+        ctx().switchToPlayback();
+
+        bool caughtException = false;
+        try
+        {
+            const char* expectedStr = nullptr;
+            ctx().record(RecordFlag::Output, expectedStr);
+        }
+        catch (const DataMismatchException&)
+        {
+            caughtException = true;
+        }
+
+        SLANG_CHECK(caughtException);
+    }
+}
+
 SLANG_UNIT_TEST(replayContextAcceptsMaxStringLength)
 {
     REPLAY_TEST;
