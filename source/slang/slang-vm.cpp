@@ -161,6 +161,30 @@ static Index findInstIndex(const ExecutableFunction& func, uint32_t offset)
     }
     return -1;
 }
+
+static bool validateControlFlowTarget(
+    ByteCodeInterpreter* interpreter,
+    const ExecutableFunction& exeFunc,
+    VMInstHeader instHeader,
+    uint8_t* operandBase,
+    uint32_t operandIdx)
+{
+    if (operandIdx >= instHeader.operandCount)
+    {
+        interpreter->reportError("VM branch instruction is missing a target operand.");
+        return false;
+    }
+
+    VMOperand operand;
+    memcpy(&operand, operandBase + operandIdx * sizeof(VMOperand), sizeof(VMOperand));
+    if (operand.sectionId != kSlangByteCodeSectionInsts ||
+        !isValidInstOffset(exeFunc, operand.offset))
+    {
+        interpreter->reportError("VM branch target does not point to an instruction boundary.");
+        return false;
+    }
+    return true;
+}
 } // namespace
 
 ISlangUnknown* ByteCodeInterpreter::getInterface(const Guid& guid)
@@ -228,6 +252,11 @@ SlangResult ByteCodeInterpreter::validateFunctionForExecution(
             reportError("VM instruction operand list exceeds function code size.");
             return SLANG_FAIL;
         }
+        if (instHeader.opcode == VMOp::CallExt && instHeader.operandCount < 2)
+        {
+            reportError("VM CallExt instruction requires at least 2 operands.");
+            return SLANG_FAIL;
+        }
 
         auto instOffset = (uint32_t)(cursor - func.functionCode);
         exeFunc.m_instOffsets.add(instOffset);
@@ -255,7 +284,8 @@ SlangResult ByteCodeInterpreter::validateFunctionForExecution(
                 }
                 break;
             case kSlangByteCodeSectionInsts:
-                if (operand.offset >= header->codeSize)
+                if (!isRangeInBounds(operand.offset, operand.size, header->codeSize) ||
+                    (operand.size == 0 && operand.offset >= header->codeSize))
                 {
                     reportError("VM operand points outside the instruction section.");
                     return SLANG_FAIL;
@@ -274,6 +304,11 @@ SlangResult ByteCodeInterpreter::validateFunctionForExecution(
                 if (operand.offset >= m_moduleView.stringCount)
                 {
                     reportError("VM operand references an invalid string.");
+                    return SLANG_FAIL;
+                }
+                if (operand.size != 0 && operand.size < sizeof(const char*))
+                {
+                    reportError("VM string operand is smaller than a pointer.");
                     return SLANG_FAIL;
                 }
                 break;
@@ -298,16 +333,19 @@ SlangResult ByteCodeInterpreter::validateFunctionForExecution(
         VMInstHeader instHeader;
         memcpy(&instHeader, instPtr, sizeof(VMInstHeader));
         uint8_t* operandBase = instPtr + sizeof(VMInstHeader);
-        for (uint32_t operandIdx = 0; operandIdx < instHeader.operandCount; operandIdx++)
+        switch (instHeader.opcode)
         {
-            VMOperand operand;
-            memcpy(&operand, operandBase + operandIdx * sizeof(VMOperand), sizeof(VMOperand));
-            if (operand.sectionId == kSlangByteCodeSectionInsts &&
-                !isValidInstOffset(exeFunc, operand.offset))
-            {
-                reportError("VM branch target does not point to an instruction boundary.");
+        case VMOp::Jump:
+            if (!validateControlFlowTarget(this, exeFunc, instHeader, operandBase, 0))
                 return SLANG_FAIL;
-            }
+            break;
+        case VMOp::JumpIf:
+            if (!validateControlFlowTarget(this, exeFunc, instHeader, operandBase, 1) ||
+                !validateControlFlowTarget(this, exeFunc, instHeader, operandBase, 2))
+                return SLANG_FAIL;
+            break;
+        default:
+            break;
         }
     }
 
@@ -841,7 +879,10 @@ bool ByteCodeInterpreter::validateCurrentInstruction(VMExecInstHeader* inst)
             return false;
         for (uint32_t i = 1; i < inst->operandCount; i++)
         {
-            if (!check(i, inst->getOperand(i).size, OperandAccess::Read))
+            auto sectionId = getExecOperandSectionId(this, inst->getOperand(i));
+            auto size = sectionId == kSlangByteCodeSectionStrings ? sizeof(const char*)
+                                                                  : inst->getOperand(i).size;
+            if (!check(i, size, OperandAccess::Read))
                 return false;
         }
         return true;
@@ -944,9 +985,15 @@ ByteCodeInterpreter::execute(void* argumentData, size_t argumentSize)
         reportError("No working set allocated for execution");
         return SLANG_FAIL;
     }
-    if (argumentSize > m_currentWorkingSetSizeInBytes)
+    if (!m_currentFunction)
     {
-        reportError("Argument size exceeds working set.");
+        reportError("No function selected for execution");
+        return SLANG_FAIL;
+    }
+    auto parameterSize = m_currentFunction->m_header->parameterSizeInBytes;
+    if (argumentSize > parameterSize)
+    {
+        reportError("Argument size exceeds function parameter area.");
         return SLANG_FAIL;
     }
     // Copy the arguments into the working set
