@@ -125,6 +125,7 @@ SLANG_UNIT_TEST(replayContextBool)
 // String Type
 // =============================================================================
 
+/// Write a repeated byte payload without constructing a large temporary buffer.
 static void writeRepeatedBytes(size_t count, uint8_t value)
 {
     uint8_t payload[4096];

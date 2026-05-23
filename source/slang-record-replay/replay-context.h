@@ -205,6 +205,7 @@ private:
     size_t m_offset, m_size;
 };
 
+/// Require the current playback stream position to contain a byte range.
 inline void requireReplayStreamBytes(const ReplayStream& stream, size_t offset, size_t size)
 {
     const size_t streamPosition = stream.getPosition();
@@ -213,6 +214,7 @@ inline void requireReplayStreamBytes(const ReplayStream& stream, size_t offset, 
         throw DataMismatchException(offset, size);
 }
 
+/// Validate a replayed array count before allocation and element deserialization.
 inline void validateReplayArrayCount(
     const ReplayStream& stream,
     uint64_t arrayCount,
