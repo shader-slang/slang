@@ -44,7 +44,7 @@ jobs:
 
     steps:
       - name: Configure Git safe directory
-        run: git config --global --add safe.directory '*'
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@v4
         with:

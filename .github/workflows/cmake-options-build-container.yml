@@ -49,7 +49,11 @@ jobs:
       packages: read # Required to pull container from ghcr.io
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
-      options: --user root -v /:/host_root
+      options: --user 1001:1001
+
+    env:
+      GIT_CONFIG_GLOBAL: /tmp/gitconfig
+      HOME: /tmp/github-home
 
     defaults:
       run:
@@ -61,7 +65,9 @@ jobs:
 
     steps:
       - name: Configure Git safe directory
-        run: git config --global --add safe.directory '*'
+        run: |
+          mkdir -p "$HOME"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@v4
         with:

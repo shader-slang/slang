@@ -94,8 +94,7 @@ RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.3
 COPY docker/print-env-info.sh /usr/local/bin/print-env-info
 RUN chmod +x /usr/local/bin/print-env-info
 
-# Git configuration for container workflows
-RUN git config --global --add safe.directory '*'
+# Container workflows configure Git safe.directory for the mounted workspace.
 
 # Verify installations
 RUN echo "=== Installed Tools ===" && \

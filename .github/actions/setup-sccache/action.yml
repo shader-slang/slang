@@ -31,13 +31,20 @@ runs:
         tar xz -f /tmp/sccache.tar.gz
         rm /tmp/sccache.tar.gz
 
-        # Try with sudo if available, otherwise install directly (for containers running as root)
-        if command -v sudo &> /dev/null; then
+        # Prefer a system install when available, but support non-root containers.
+        if command -v sudo &> /dev/null && sudo -n true 2>/dev/null; then
           sudo mv sccache-v0.7.4-${SCCACHE_ARCH}/sccache /usr/local/bin/
           sudo chmod +x /usr/local/bin/sccache
-        else
+        elif [ -w /usr/local/bin ]; then
           mv sccache-v0.7.4-${SCCACHE_ARCH}/sccache /usr/local/bin/
           chmod +x /usr/local/bin/sccache
+        else
+          install_dir="${RUNNER_TEMP:-/tmp}/sccache-bin"
+          mkdir -p "$install_dir"
+          mv sccache-v0.7.4-${SCCACHE_ARCH}/sccache "$install_dir/"
+          chmod +x "$install_dir/sccache"
+          echo "$install_dir" >> "$GITHUB_PATH"
+          export PATH="$install_dir:$PATH"
         fi
 
         sccache --version
