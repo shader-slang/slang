@@ -22,8 +22,6 @@ namespace SlangRecord
 using Slang::File;
 using Slang::Path;
 
-static constexpr uint32_t kMaxReplayStringLength = 64 * 1024 * 1024;
-
 void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
 {
     switch (m_mode)
@@ -244,13 +242,14 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
         {
             uint32_t length;
             recordRaw(RecordFlag::None, &length, sizeof(length));
-            SLANG_RELEASE_ASSERT(length <= kMaxReplayStringLength);
+            if (length > kMaxReplayStringLength)
+            {
+                throw DataMismatchException(m_stream.getPosition() - sizeof(length), length);
+            }
 
             size_t stringSize = size_t(length);
             size_t streamPosition = m_stream.getPosition();
-            size_t streamSize = m_stream.getSize();
-            SLANG_RELEASE_ASSERT(
-                streamPosition <= streamSize && stringSize <= streamSize - streamPosition);
+            requireReplayStreamBytes(m_stream, streamPosition, stringSize);
 
             char* buf = m_arena.allocateArray<char>(stringSize + 1);
             if (length > 0)

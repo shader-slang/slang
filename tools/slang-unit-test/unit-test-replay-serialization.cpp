@@ -125,6 +125,18 @@ SLANG_UNIT_TEST(replayContextBool)
 // String Type
 // =============================================================================
 
+static void writeRepeatedBytes(size_t count, uint8_t value)
+{
+    uint8_t payload[4096];
+    memset(payload, value, sizeof(payload));
+    while (count > 0)
+    {
+        size_t chunkSize = count < sizeof(payload) ? count : sizeof(payload);
+        ctx().getStream().write(payload, chunkSize);
+        count -= chunkSize;
+    }
+}
+
 SLANG_UNIT_TEST(replayContextString)
 {
     REPLAY_TEST;
@@ -155,6 +167,62 @@ SLANG_UNIT_TEST(replayContextString)
     SLANG_CHECK(testString("Unicode test: こんにちは"));
 }
 
+SLANG_UNIT_TEST(replayContextAcceptsMaxStringLength)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    uint8_t typeId = uint8_t(TypeId::String);
+    uint32_t length = kMaxReplayStringLength;
+    ctx().getStream().write(&typeId, sizeof(typeId));
+    ctx().getStream().write(&length, sizeof(length));
+    writeRepeatedBytes(length, uint8_t('x'));
+
+    ctx().switchToPlayback();
+
+    const char* readStr = nullptr;
+    ctx().record(RecordFlag::None, readStr);
+
+    SLANG_CHECK(readStr != nullptr);
+    SLANG_CHECK(readStr[0] == 'x');
+    SLANG_CHECK(readStr[size_t(length) - 1] == 'x');
+    SLANG_CHECK(readStr[size_t(length)] == '\0');
+    SLANG_CHECK(ctx().getStream().atEnd());
+}
+
+SLANG_UNIT_TEST(replayContextRejectsStringLengthPastLimit)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    uint8_t typeId = uint8_t(TypeId::String);
+    uint32_t length = kMaxReplayStringLength + 1;
+    ctx().getStream().write(&typeId, sizeof(typeId));
+    ctx().getStream().write(&length, sizeof(length));
+    writeRepeatedBytes(length, uint8_t('x'));
+
+    ctx().switchToPlayback();
+
+    bool caughtException = false;
+    try
+    {
+        const char* readStr = nullptr;
+        ctx().record(RecordFlag::None, readStr);
+    }
+    catch (const DataMismatchException& e)
+    {
+        caughtException = e.getOffset() == sizeof(typeId) && e.getSize() == length;
+    }
+
+    SLANG_CHECK(caughtException);
+}
+
 SLANG_UNIT_TEST(replayContextRejectsOversizedStringLength)
 {
     REPLAY_TEST;
@@ -176,9 +244,9 @@ SLANG_UNIT_TEST(replayContextRejectsOversizedStringLength)
         const char* readStr = nullptr;
         ctx().record(RecordFlag::None, readStr);
     }
-    catch (const Slang::Exception&)
+    catch (const DataMismatchException& e)
     {
-        caughtException = true;
+        caughtException = e.getOffset() == sizeof(typeId) && e.getSize() == length;
     }
 
     SLANG_CHECK(caughtException);
@@ -207,7 +275,104 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedStringPayload)
         const char* readStr = nullptr;
         ctx().record(RecordFlag::None, readStr);
     }
+    catch (const DataMismatchException& e)
+    {
+        caughtException = e.getOffset() == sizeof(typeId) + sizeof(length) && e.getSize() == length;
+    }
+
+    SLANG_CHECK(caughtException);
+}
+
+SLANG_UNIT_TEST(replayContextRejectsTruncatedStringLength)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    uint8_t typeId = uint8_t(TypeId::String);
+    uint16_t partialLength = 16;
+    ctx().getStream().write(&typeId, sizeof(typeId));
+    ctx().getStream().write(&partialLength, sizeof(partialLength));
+
+    ctx().switchToPlayback();
+
+    bool caughtException = false;
+    try
+    {
+        const char* readStr = nullptr;
+        ctx().record(RecordFlag::None, readStr);
+    }
     catch (const Slang::Exception&)
+    {
+        caughtException = true;
+    }
+
+    SLANG_CHECK(caughtException);
+}
+
+// =============================================================================
+// Array Type
+// =============================================================================
+
+SLANG_UNIT_TEST(replayContextRejectsOversizedArrayCount)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    uint8_t arrayTypeId = uint8_t(TypeId::Array);
+    uint8_t countTypeId = uint8_t(TypeId::UInt64);
+    uint64_t arrayCount = kMaxReplayArrayCount + 1;
+    ctx().getStream().write(&arrayTypeId, sizeof(arrayTypeId));
+    ctx().getStream().write(&countTypeId, sizeof(countTypeId));
+    ctx().getStream().write(&arrayCount, sizeof(arrayCount));
+
+    ctx().switchToPlayback();
+
+    bool caughtException = false;
+    try
+    {
+        int32_t* arr = nullptr;
+        uint64_t count = 0;
+        ctx().recordArray(RecordFlag::None, arr, count);
+    }
+    catch (const DataMismatchException&)
+    {
+        caughtException = true;
+    }
+
+    SLANG_CHECK(caughtException);
+}
+
+SLANG_UNIT_TEST(replayContextRejectsTruncatedArrayPayload)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    uint8_t arrayTypeId = uint8_t(TypeId::Array);
+    uint8_t countTypeId = uint8_t(TypeId::UInt64);
+    uint64_t arrayCount = 4;
+    ctx().getStream().write(&arrayTypeId, sizeof(arrayTypeId));
+    ctx().getStream().write(&countTypeId, sizeof(countTypeId));
+    ctx().getStream().write(&arrayCount, sizeof(arrayCount));
+
+    ctx().switchToPlayback();
+
+    bool caughtException = false;
+    try
+    {
+        const int32_t* arr = nullptr;
+        uint64_t count = 0;
+        ctx().recordArray(RecordFlag::None, arr, count);
+    }
+    catch (const DataMismatchException&)
     {
         caughtException = true;
     }

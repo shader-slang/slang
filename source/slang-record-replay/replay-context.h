@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <mutex>
 #include <slang-com-helper.h>
 #include <slang-com-ptr.h>
@@ -52,6 +53,12 @@ constexpr uint64_t kCustomFileSystemHandle =
 constexpr uint64_t kDefaultFileSystemHandle =
     3; ///< Default file system (when user doesn't provide one)
 constexpr uint64_t kFirstValidHandle = 0x100; ///< First handle for tracked objects
+
+/// Replay file sanity limits. They bound attacker-controlled allocation sizes
+/// before deserializers allocate replay-owned buffers.
+constexpr uint32_t kMaxReplayStringLength = 64 * 1024 * 1024;
+constexpr uint64_t kMaxReplayArrayCount = 16 * 1024 * 1024;
+constexpr size_t kMaxReplayArrayAllocationSize = 64 * 1024 * 1024;
 
 /// Fixed-size index entry for the call index stream.
 /// Each entry stores only the byte offset of a call in stream.bin.
@@ -197,6 +204,37 @@ public:
 private:
     size_t m_offset, m_size;
 };
+
+inline void requireReplayStreamBytes(const ReplayStream& stream, size_t offset, size_t size)
+{
+    const size_t streamPosition = stream.getPosition();
+    const size_t streamSize = stream.getSize();
+    if (streamPosition > streamSize || size > streamSize - streamPosition)
+        throw DataMismatchException(offset, size);
+}
+
+inline void validateReplayArrayCount(
+    const ReplayStream& stream,
+    uint64_t arrayCount,
+    uint64_t maxCountForCountType,
+    size_t elementSize,
+    size_t countOffset)
+{
+    if (arrayCount > maxCountForCountType || arrayCount > kMaxReplayArrayCount)
+        throw DataMismatchException(countOffset, sizeof(arrayCount));
+
+    if (arrayCount > uint64_t((std::numeric_limits<size_t>::max)()))
+        throw DataMismatchException(countOffset, sizeof(arrayCount));
+
+    const size_t sizeCount = static_cast<size_t>(arrayCount);
+    if (elementSize == 0 || sizeCount > kMaxReplayArrayAllocationSize / elementSize)
+        throw DataMismatchException(countOffset, sizeof(arrayCount));
+
+    const size_t streamPosition = stream.getPosition();
+    const size_t streamSize = stream.getSize();
+    if (streamPosition > streamSize || arrayCount > uint64_t(streamSize - streamPosition))
+        throw DataMismatchException(streamPosition, sizeof(arrayCount));
+}
 
 /// Unified serializer for binary I/O during record/replay.
 /// Provides a uniform API for both reading and writing serialized data.
@@ -743,12 +781,20 @@ void ReplayContext::recordArray(RecordFlag flags, T*& arr, CountT& count)
     {
         expectTypeId(TypeId::Array);
         uint64_t arrayCount;
+        size_t countOffset = m_stream.getPosition();
         record(flags, arrayCount);
+        validateReplayArrayCount(
+            m_stream,
+            arrayCount,
+            uint64_t((std::numeric_limits<CountT>::max)()),
+            sizeof(T),
+            countOffset);
         count = static_cast<CountT>(arrayCount);
         if (arrayCount > 0)
         {
-            T* buf = m_arena.allocateArray<T>(static_cast<size_t>(arrayCount));
-            for (uint64_t i = 0; i < arrayCount; ++i)
+            size_t sizeCount = static_cast<size_t>(arrayCount);
+            T* buf = m_arena.allocateArray<T>(sizeCount);
+            for (size_t i = 0; i < sizeCount; ++i)
             {
                 new (&buf[i]) T{};
                 record(flags, buf[i]);
@@ -779,12 +825,20 @@ void ReplayContext::recordArray(RecordFlag flags, const T*& arr, CountT& count)
     {
         expectTypeId(TypeId::Array);
         uint64_t arrayCount;
+        size_t countOffset = m_stream.getPosition();
         record(flags, arrayCount);
+        validateReplayArrayCount(
+            m_stream,
+            arrayCount,
+            uint64_t((std::numeric_limits<CountT>::max)()),
+            sizeof(T),
+            countOffset);
         count = static_cast<CountT>(arrayCount);
         if (arrayCount > 0)
         {
-            T* buf = m_arena.allocateArray<T>(static_cast<size_t>(arrayCount));
-            for (uint64_t i = 0; i < arrayCount; ++i)
+            size_t sizeCount = static_cast<size_t>(arrayCount);
+            T* buf = m_arena.allocateArray<T>(sizeCount);
+            for (size_t i = 0; i < sizeCount; ++i)
             {
                 new (&buf[i]) T{};
                 record(flags, buf[i]);
