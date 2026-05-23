@@ -1,6 +1,7 @@
 // slang-repro-validator.cpp
 #include "slang-repro-validator.h"
 
+#include "core/slang-dictionary.h"
 #include "slang-repro.h"
 
 namespace Slang
@@ -231,6 +232,11 @@ private:
 
     bool validateFileState(const FileState& file) const
     {
+        if (m_seenFiles.contains(&file))
+        {
+            return true;
+        }
+
         // extractFiles() dereferences uniqueName unconditionally inside its
         // pathInfoMap iteration, regardless of whether contents is set.
         if (file.uniqueName.isNull())
@@ -238,9 +244,31 @@ private:
             return false;
         }
 
-        return validateString(file.uniqueIdentity) && validateString(file.contents) &&
-               validateString(file.canonicalPath) && validateString(file.foundPath) &&
-               validateString(file.uniqueName);
+        if (!validateString(file.uniqueIdentity) || !validateString(file.contents) ||
+            !validateString(file.canonicalPath) || !validateString(file.foundPath) ||
+            !validateString(file.uniqueName))
+        {
+            return false;
+        }
+
+        if (!file.uniqueIdentity.isNull())
+        {
+            const OffsetString* uniqueIdentity = nullptr;
+            if (!tryGetObjectAt(file.uniqueIdentity.m_offset, uniqueIdentity))
+            {
+                return false;
+            }
+
+            const UnownedStringSlice uniqueIdentitySlice = uniqueIdentity->getSlice();
+            if (uniqueIdentitySlice.getLength() == 0 ||
+                !m_seenUniqueIdentities.add(uniqueIdentitySlice))
+            {
+                return false;
+            }
+        }
+
+        m_seenFiles.add(&file);
+        return true;
     }
 
     bool validateFilePtr(Offset32Ptr<FileState> filePtr, bool requireFile) const
@@ -391,6 +419,13 @@ private:
                 return false;
             }
 
+            const OffsetString* path = nullptr;
+            if (!tryGetObjectAt(paths[i].path.m_offset, path) ||
+                !m_seenPathInfoPaths.add(path->getSlice()))
+            {
+                return false;
+            }
+
             const PathInfoState* pathInfo = nullptr;
             if (!tryGetObject(paths[i].pathInfo, pathInfo))
             {
@@ -473,6 +508,9 @@ private:
 
     const uint8_t* m_data;
     size_t m_dataSize;
+    mutable HashSet<const FileState*> m_seenFiles;
+    mutable HashSet<UnownedStringSlice> m_seenPathInfoPaths;
+    mutable HashSet<UnownedStringSlice> m_seenUniqueIdentities;
 };
 
 } // namespace

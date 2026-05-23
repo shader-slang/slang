@@ -620,6 +620,66 @@ SLANG_UNIT_TEST(reproStateValidator)
         SLANG_CHECK(!isReproStateValid(buf));
     }
 
+    // 19h2. validatePathInfoMap rejects duplicate path keys. load() inserts
+    // pathInfoMap entries with Dictionary::add, so duplicate serialized keys
+    // must be rejected before replay reaches the loader.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto pathAndPathInfoArray = container.newArray<ReproUtil::PathAndPathInfo>(2);
+
+        container[requestPtr]->pathInfoMap = pathAndPathInfoArray;
+        container[pathAndPathInfoArray[0]].path = container.newString("shader.slang");
+        container[pathAndPathInfoArray[1]].path = container.newString("shader.slang");
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 19h3. Distinct FileState objects with the same non-empty uniqueIdentity
+    // are rejected because load()/loadFileSystem populate unique maps with
+    // Dictionary::add.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto filesArray = container.newArray<Offset32Ptr<ReproUtil::FileState>>(2);
+        auto file0 = container.newObject<ReproUtil::FileState>();
+        auto file1 = container.newObject<ReproUtil::FileState>();
+
+        container[requestPtr]->files = filesArray;
+        container[filesArray[0]] = file0;
+        container[filesArray[1]] = file1;
+        container[file0]->uniqueName = container.newString("file0.slang");
+        container[file0]->uniqueIdentity = container.newString("same-identity");
+        container[file1]->uniqueName = container.newString("file1.slang");
+        container[file1]->uniqueIdentity = container.newString("same-identity");
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 19h4. Reusing the same FileState object is still accepted; the loader
+    // interns FileState* to one PathInfo, so only distinct objects with duplicate
+    // identities are malformed.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto filesArray = container.newArray<Offset32Ptr<ReproUtil::FileState>>(2);
+        auto file = container.newObject<ReproUtil::FileState>();
+
+        container[requestPtr]->files = filesArray;
+        container[filesArray[0]] = file;
+        container[filesArray[1]] = file;
+        container[file]->uniqueName = container.newString("file.slang");
+        container[file]->uniqueIdentity = container.newString("same-object");
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(isReproStateValid(buf));
+    }
+
     // 19i. validateStringPtrArray with requireElements = false: an entry point
     // whose specializationArgStrings is a 1-element array with a null element
     // must be accepted. Pins the only `requireElements = false` call site so a

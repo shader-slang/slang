@@ -23,8 +23,9 @@ can be inspected and modified. */
 struct ReproUtil
 {
     // ReproUtil is an internal compiler helper declared under source/, not part of the public
-    // include/slang.h API. Selected members carry SLANG_API so dynamically loaded tools and unit
-    // tests can link against the compiler DLL without duplicating repro serialization logic.
+    // include/slang.h API. Selected loader members carry SLANG_API only as binary link points for
+    // companion modules such as slang-unit-test-tool; external consumers should use the public C
+    // APIs for repro loading and extraction.
     enum
     {
         kMajorVersion = 0,
