@@ -49,11 +49,13 @@ jobs:
       packages: read # Required to pull container from ghcr.io
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
+      # Current callers use GitHub-hosted Ubuntu, where the mounted workspace is
+      # writable by UID/GID 1001. The published image has no named non-root user.
       options: --user 1001:1001
 
     env:
+      # Store Git's global config in writable /tmp for the numeric non-root user.
       GIT_CONFIG_GLOBAL: /tmp/gitconfig
-      HOME: /tmp/github-home
 
     defaults:
       run:
@@ -65,9 +67,7 @@ jobs:
 
     steps:
       - name: Configure Git safe directory
-        run: |
-          mkdir -p "$HOME"
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@v4
         with:

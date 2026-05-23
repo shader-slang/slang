@@ -68,8 +68,6 @@ RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.3
     ln -s /opt/cmake-3.30.0-linux-x86_64/bin/ctest /usr/local/bin/ctest && \
     ln -s /opt/cmake-3.30.0-linux-x86_64/bin/cpack /usr/local/bin/cpack
 
-# Container workflows configure Git safe.directory for the mounted workspace.
-
 # Verify installations
 RUN echo "=== Installed Tools ===" && \
     echo "clang: $(clang-18 --version | head -1)" && \
