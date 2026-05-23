@@ -402,6 +402,7 @@ static void checkReplayContextIsPristine()
     SLANG_CHECK(!ctx().isActive());
     SLANG_CHECK(ctx().getStream().getSize() == 0);
     SLANG_CHECK(!ctx().hasCallIndex());
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() == 0);
     SLANG_CHECK(ctx().getNextHandle() == kFirstValidHandle);
     SLANG_CHECK(ctx().getCurrentThisHandle() == kNullHandle);
 }
@@ -470,17 +471,24 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyPlaybackState)
 {
     ctx().reset();
 
-    // Record two values, switch to playback, consume the first one. The stream
-    // is now in reading mode at a non-zero position, mimicking the state an
-    // aborted SLANG_CHECK during a read would leave behind.
+    // Record two values and a string, switch to playback, and consume the first
+    // value plus string. The stream is now in reading mode at a non-zero
+    // position, and the playback arena has a live allocation, mimicking the
+    // state an aborted SLANG_CHECK during a read would leave behind.
     ctx().setMode(Mode::Record);
     int32_t value = 42;
+    const char* text = "dirty";
     ctx().record(RecordFlag::None, value);
+    ctx().record(RecordFlag::None, text);
     ctx().record(RecordFlag::None, value);
     ctx().switchToPlayback();
     int32_t consumed = 0;
     ctx().record(RecordFlag::None, consumed);
     SLANG_CHECK(consumed == 42);
+    const char* readText = nullptr;
+    ctx().record(RecordFlag::None, readText);
+    SLANG_CHECK(readText != nullptr);
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() > 0);
     SLANG_CHECK(ctx().isPlayback());
     SLANG_CHECK(ctx().getStream().getPosition() > 0);
 

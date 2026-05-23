@@ -384,6 +384,10 @@ public:
     SLANG_API ReplayStream& getStream() { return m_stream; }
     SLANG_API const ReplayStream& getStream() const { return m_stream; }
     SLANG_API MemoryArena& getArena() { return m_arena; }
+    SLANG_API size_t testsOnlyGetReplayArenaAllocationSize() const
+    {
+        return m_replayArenaAllocationSize;
+    }
 
     /// Lock the context for thread-safe access.
     /// Returns an RAII lock guard.
