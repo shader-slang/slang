@@ -1,9 +1,9 @@
 // unit-test-repro-validator.cpp
 // Tests for isReproStateValid and the ReproStateValidator graph traversal.
 
-#include "../../source/core/slang-offset-container.h"
-#include "../../source/slang/slang-repro-validator.h"
-#include "../../source/slang/slang-repro.h"
+#include "core/slang-offset-container.h"
+#include "slang/slang-repro-validator.h"
+#include "slang/slang-repro.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
