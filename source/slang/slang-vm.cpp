@@ -734,7 +734,9 @@ bool ByteCodeInterpreter::validateCurrentInstruction(VMExecInstHeader* inst)
     switch (op)
     {
     case VMOp::Nop:
-        return validateOperandCount(this, inst, 0);
+        // Nop handlers ignore operands, and existing emitted bytecode can leave
+        // unused operands attached to nops.
+        return true;
     case VMOp::Ret:
         if (inst->opcodeExtension > m_currentFunction->m_header->returnValueSizeInBytes)
             return failExecution("VM return size exceeds the function return value size.");
