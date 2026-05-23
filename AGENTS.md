@@ -32,8 +32,11 @@ Examples:
 Do not infer WSL build commands from generic Linux instructions. Follow the platform detection,
 host-tool selection, CMake preset choice, and clean-build steps defined by the skill.
 
-After building, run tests from the repository root using the generated `slang-test` binary:
+After building, run tests from the repository root using the generated `slang-test` binary in
+the directory for the selected configuration:
 - `build/Debug/bin/slang-test`: run the Debug test suite.
+- `build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 8`: run optimized
+  tests with symbols in parallel using test servers.
 - `build/Release/bin/slang-test -use-test-server -server-count 8`: run Release tests in
   parallel using test servers.
 
