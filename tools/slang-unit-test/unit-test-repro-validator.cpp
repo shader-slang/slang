@@ -17,7 +17,10 @@ using namespace Slang;
 
 static const int kInvalidReproStateDiagnosticId = 99;
 
-#if defined(__clang__) || defined(__GNUC__)
+#if defined(__clang__)
+#define SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED \
+    __attribute__((no_sanitize("undefined"))) __attribute__((no_sanitize("vptr")))
+#elif defined(__GNUC__)
 #define SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED __attribute__((no_sanitize("undefined")))
 #else
 #define SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED
