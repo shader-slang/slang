@@ -21,6 +21,8 @@ struct MinimalVMByteCode
     uint32_t stringOffsetOffset = 0;
 };
 
+static const char kMinimalFunctionName[] = "main";
+
 template<typename T>
 static void appendValue(List<uint8_t>& data, const T& value)
 {
@@ -67,13 +69,14 @@ static MinimalVMByteCode makeMinimalVMByteCode()
     appendValue(result.data, kSlangByteCodeKernelBlobFourCC);
     appendValue(result.data, uint32_t(0));
 
-    const char functionName[] = "main";
     appendValue(result.data, kSlangByteCodeConstantsFourCC);
-    appendValue(result.data, uint32_t(sizeof(functionName)));
+    appendValue(result.data, uint32_t(sizeof(kMinimalFunctionName)));
     appendValue(result.data, uint32_t(1));
     result.stringOffsetOffset = (uint32_t)result.data.getCount();
     appendValue(result.data, uint32_t(0));
-    result.data.addRange(reinterpret_cast<const uint8_t*>(functionName), sizeof(functionName));
+    result.data.addRange(
+        reinterpret_cast<const uint8_t*>(kMinimalFunctionName),
+        sizeof(kMinimalFunctionName));
 
     return result;
 }
@@ -195,7 +198,10 @@ SLANG_UNIT_TEST(slangVMRejectMalformedByteCodeOffsets)
     SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidFunctionName.data)));
 
     auto invalidStringOffset = makeMinimalVMByteCode();
-    patchUInt32(invalidStringOffset.data, invalidStringOffset.stringOffsetOffset, UINT32_MAX);
+    patchUInt32(
+        invalidStringOffset.data,
+        invalidStringOffset.stringOffsetOffset,
+        uint32_t(sizeof(kMinimalFunctionName)));
     SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(invalidStringOffset.data)));
 
     auto unterminatedString = makeMinimalVMByteCode();
