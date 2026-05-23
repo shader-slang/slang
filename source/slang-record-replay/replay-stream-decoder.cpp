@@ -13,20 +13,37 @@ using Slang::StringBuilder;
 namespace
 {
 
+// Nested arrays are legal in replay streams, but decoder recursion still needs a hard
+// ceiling so malformed input cannot exhaust the process stack.
 static const int kMaxReplayDecodeNestingDepth = 64;
+
+// Replay array counts come from the input file. Cap the logical element count so a
+// well-sized but malicious stream cannot make the decoder spend unbounded CPU in
+// decodeValueFromStream or skipValueInStream.
 static const uint64_t kMaxReplayDecodeArrayElementCount = 1000000;
+
+// Keep text dumps useful and bounded: display the first elements, then skip the rest
+// through the same guarded traversal used by ordinary skipping.
 static const uint64_t kMaxDisplayedArrayElementCount = 100;
+
+void reportReplayDecodeError(const char* message)
+{
+    // These checks reject malformed external replay data. Use the decoder's existing
+    // exception path so public dump APIs can catch and print an ERROR line; a
+    // SLANG_RELEASE_ASSERT would turn a bad replay file into a process abort.
+    throw Slang::Exception(message);
+}
 
 void checkReplayDecodeNestingDepth(int recursionDepth)
 {
     if (recursionDepth > kMaxReplayDecodeNestingDepth)
-        throw Slang::Exception("Maximum replay decode nesting depth exceeded");
+        reportReplayDecodeError("Maximum replay decode nesting depth exceeded");
 }
 
 void validateReplayDecodeArrayElementCount(ReplayStream& stream, uint64_t count)
 {
     if (count > kMaxReplayDecodeArrayElementCount)
-        throw Slang::Exception("Array element count exceeds decoder limit");
+        reportReplayDecodeError("Array element count exceeds decoder limit");
 
     size_t position = stream.getPosition();
     size_t size = stream.getSize();
@@ -35,7 +52,7 @@ void validateReplayDecodeArrayElementCount(ReplayStream& stream, uint64_t count)
     // Each serialized array element has at least a one-byte TypeId. Reject impossible counts
     // before recursively walking the array.
     if (count > remainingBytes)
-        throw Slang::Exception("Array element count exceeds remaining stream bytes");
+        reportReplayDecodeError("Array element count exceeds remaining stream bytes");
 }
 
 uint64_t readReplayDecodeArrayElementCount(ReplayStream& stream)
@@ -44,7 +61,7 @@ uint64_t readReplayDecodeArrayElementCount(ReplayStream& stream)
     stream.read(&countTypeValue, sizeof(countTypeValue));
     TypeId countType = static_cast<TypeId>(countTypeValue);
     if (countType != TypeId::UInt64)
-        throw Slang::Exception("Array element count has invalid type");
+        reportReplayDecodeError("Array element count has invalid type");
 
     uint64_t count;
     stream.read(&count, sizeof(count));

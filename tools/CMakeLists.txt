@@ -405,6 +405,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             SLANG_NO_DEPRECATION
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
+        INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/source
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools

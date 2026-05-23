@@ -1,4 +1,4 @@
-#include "../../source/slang-record-replay/replay-stream-decoder.h"
+#include "slang-record-replay/replay-stream-decoder.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <cstdint>
