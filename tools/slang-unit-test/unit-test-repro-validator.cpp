@@ -33,6 +33,37 @@ static void buildMinimalValid(List<uint8_t>& outBuf)
     containerToBuffer(container, outBuf);
 }
 
+static uint32_t alignOffset(uint32_t offset, uint32_t alignment)
+{
+    const uint32_t remainder = offset % alignment;
+    return remainder ? offset + alignment - remainder : offset;
+}
+
+static void buildSearchPathBufferWithStringSize(size_t stringSize, List<uint8_t>& outBuf)
+{
+    uint8_t encodedSize[OffsetString::kMaxSizeEncodeSize];
+    const size_t headerSize = OffsetString::calcEncodedSize(stringSize, encodedSize);
+    const uint32_t requestOffset = kStartOffset;
+    const uint32_t arrayOffset = alignOffset(
+        requestOffset + uint32_t(sizeof(ReproUtil::RequestState)),
+        uint32_t(alignof(Offset32Ptr<OffsetString>)));
+    const uint32_t stringOffset = alignOffset(
+        arrayOffset + uint32_t(sizeof(Offset32Ptr<OffsetString>)),
+        uint32_t(alignof(OffsetString)));
+
+    outBuf.setCount(size_t(stringOffset) + headerSize + stringSize + 1);
+    memset(outBuf.getBuffer(), 0, outBuf.getCount());
+
+    auto request = reinterpret_cast<ReproUtil::RequestState*>(outBuf.getBuffer() + requestOffset);
+    request->searchPaths.m_data.m_offset = arrayOffset;
+    request->searchPaths.m_count = 1;
+
+    auto searchPath = reinterpret_cast<Offset32Ptr<OffsetString>*>(outBuf.getBuffer() + arrayOffset);
+    searchPath->m_offset = stringOffset;
+
+    memcpy(outBuf.getBuffer() + stringOffset, encodedSize, headerSize);
+}
+
 static void corruptStringToOversizedPayload(
     List<uint8_t>& buffer,
     Offset32Ptr<OffsetString> stringPtr)
@@ -436,6 +467,19 @@ SLANG_UNIT_TEST(reproStateValidator)
             containerToBuffer(container, buf);
             SLANG_CHECK(isReproStateValid(buf));
         }
+    }
+
+    // 19a. Large strings using 3-byte and 4-byte size encodings pass.
+    // The validator only reads the size header and null terminator, so these
+    // buffers can be built directly without filling the whole payload.
+    {
+        List<uint8_t> buf;
+
+        buildSearchPathBufferWithStringSize(size_t(1) << 16, buf);
+        SLANG_CHECK(isReproStateValid(buf));
+
+        buildSearchPathBufferWithStringSize(size_t(1) << 24, buf);
+        SLANG_CHECK(isReproStateValid(buf));
     }
 
     // 19b. Short-form upper boundary: 251-byte string (firstByte == kSizeBase

@@ -147,11 +147,9 @@ private:
         }
         else
         {
+            static_assert(OffsetString::kSizeBase + 4 == 0xff, "OffsetString uses at most 4 size bytes");
             const int sizeByteCount = firstByte - OffsetString::kSizeBase;
-            if (sizeByteCount < 1 || sizeByteCount > 4)
-            {
-                return false;
-            }
+            SLANG_ASSERT(sizeByteCount >= 1 && sizeByteCount <= 4);
 
             headerSize += size_t(sizeByteCount);
             if (!isRangeInBounds(offset, headerSize, alignof(OffsetString)))
