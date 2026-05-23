@@ -702,7 +702,7 @@ SLANG_UNIT_TEST(reproStateValidator)
     // fails a focused case.
     {
         typedef ReproUtil::FileState FileState;
-        typedef Offset32Ptr<OffsetString> FileState::* FileStringMember;
+        typedef Offset32Ptr<OffsetString> FileState::*FileStringMember;
         struct Case
         {
             FileStringMember member;
@@ -773,8 +773,7 @@ SLANG_UNIT_TEST(reproStateValidator)
         containerToBuffer(container, buf);
         SLANG_CHECK(isReproStateValid(buf));
 
-        const size_t fileOffset =
-            pathInfoPtr.m_offset + offsetof(ReproUtil::PathInfoState, file);
+        const size_t fileOffset = pathInfoPtr.m_offset + offsetof(ReproUtil::PathInfoState, file);
         uint32_t* fileSlot = reinterpret_cast<uint32_t*>(buf.getBuffer() + fileOffset);
         *fileSlot = uint32_t(buf.getCount() + 100);
         SLANG_CHECK(!isReproStateValid(buf));
