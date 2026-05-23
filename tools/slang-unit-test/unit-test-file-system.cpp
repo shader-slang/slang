@@ -591,6 +591,17 @@ static SlangResult _testScopedAllocationRejectsMaxTerminatedSize()
     SLANG_CHECK(RawBlob::tryCreate(nullptr, 1, blob) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(!blob);
 
+    const char replacementContents[] = "replacement";
+    SLANG_RETURN_ON_FAIL(RawBlob::tryCreate(
+        replacementContents,
+        sizeof(replacementContents) - 1,
+        blob));
+    SLANG_RETURN_ON_FAIL(
+        RawBlob::tryCreate(blob->getBufferPointer(), blob->getBufferSize(), blob));
+    SLANG_CHECK(blob->getBufferSize() == sizeof(replacementContents) - 1);
+    SLANG_CHECK(
+        ::memcmp(blob->getBufferPointer(), replacementContents, blob->getBufferSize()) == 0);
+
     return SLANG_OK;
 }
 

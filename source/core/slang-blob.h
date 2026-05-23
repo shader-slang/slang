@@ -304,9 +304,9 @@ public:
         size_t size,
         ComPtr<ISlangBlob>& outBlob)
     {
-        outBlob.setNull();
         if (size > 0 && !inData)
         {
+            outBlob.setNull();
             return SLANG_E_INVALID_ARG;
         }
 
@@ -314,6 +314,7 @@ public:
         if (!blob->init(inData, size))
         {
             delete blob;
+            outBlob.setNull();
             return SLANG_E_OUT_OF_MEMORY;
         }
 
