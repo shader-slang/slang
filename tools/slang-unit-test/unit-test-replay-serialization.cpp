@@ -304,9 +304,9 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedStringLength)
         const char* readStr = nullptr;
         ctx().record(RecordFlag::None, readStr);
     }
-    catch (const Slang::Exception&)
+    catch (const DataMismatchException& e)
     {
-        caughtException = true;
+        caughtException = e.getOffset() == sizeof(typeId) && e.getSize() == sizeof(uint32_t);
     }
 
     SLANG_CHECK(caughtException);

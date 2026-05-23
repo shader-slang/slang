@@ -66,6 +66,7 @@ void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
 
             // Read the recorded value from stream
             size_t offset = m_stream.getPosition();
+            requireReplayStreamBytes(m_stream, offset, size);
             m_stream.read(data, size);
 
             // Compare: recorded value (now in data) vs expected value (in buffer)
@@ -77,6 +78,8 @@ void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
         else
         {
             // For inputs, just read from stream
+            size_t offset = m_stream.getPosition();
+            requireReplayStreamBytes(m_stream, offset, size);
             m_stream.read(data, size);
         }
         break;
