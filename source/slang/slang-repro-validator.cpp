@@ -147,7 +147,9 @@ private:
         }
         else
         {
-            static_assert(OffsetString::kSizeBase + 4 == 0xff, "OffsetString uses at most 4 size bytes");
+            static_assert(
+                OffsetString::kSizeBase + 4 == 0xff,
+                "OffsetString uses at most 4 size bytes");
             const int sizeByteCount = firstByte - OffsetString::kSizeBase;
             SLANG_ASSERT(sizeByteCount >= 1 && sizeByteCount <= 4);
 

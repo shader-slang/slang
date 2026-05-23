@@ -58,7 +58,8 @@ static void buildSearchPathBufferWithStringSize(size_t stringSize, List<uint8_t>
     request->searchPaths.m_data.m_offset = arrayOffset;
     request->searchPaths.m_count = 1;
 
-    auto searchPath = reinterpret_cast<Offset32Ptr<OffsetString>*>(outBuf.getBuffer() + arrayOffset);
+    auto searchPath =
+        reinterpret_cast<Offset32Ptr<OffsetString>*>(outBuf.getBuffer() + arrayOffset);
     searchPath->m_offset = stringOffset;
 
     memcpy(outBuf.getBuffer() + stringOffset, encodedSize, headerSize);
