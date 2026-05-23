@@ -388,5 +388,39 @@ SLANG_UNIT_TEST(offsetContainer)
         }
         SLANG_CHECK(constCaught);
     }
+
+    // Offset32Ref access must also remain a release assert when the serialized
+    // offset is outside the backing buffer.
+    {
+        ScopedEnvVar assertMode("SLANG_ASSERT", "release-assert-only");
+
+        uint8_t data[16] = {};
+        MemoryOffsetBase base;
+        base.set(data, sizeof(data));
+
+        Offset32Ref<uint32_t> badRef(uint32_t(sizeof(data)));
+
+        bool asRawCaught = false;
+        try
+        {
+            (void)base.asRaw(badRef);
+        }
+        catch (const InternalError&)
+        {
+            asRawCaught = true;
+        }
+        SLANG_CHECK(asRawCaught);
+
+        bool operatorCaught = false;
+        try
+        {
+            (void)base[badRef];
+        }
+        catch (const InternalError&)
+        {
+            operatorCaught = true;
+        }
+        SLANG_CHECK(operatorCaught);
+    }
 #endif
 }
