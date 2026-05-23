@@ -53,10 +53,6 @@ jobs:
       # writable by UID/GID 1001. The published image has no named non-root user.
       options: --user 1001:1001
 
-    env:
-      # Store Git's global config in writable /tmp for the numeric non-root user.
-      GIT_CONFIG_GLOBAL: /tmp/gitconfig
-
     defaults:
       run:
         shell: bash
@@ -67,7 +63,15 @@ jobs:
 
     steps:
       - name: Configure Git safe directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        run: |
+          if [[ -n "${RUNNER_TEMP:-}" && -d "$RUNNER_TEMP" && -w "$RUNNER_TEMP" ]]; then
+            git_config_dir="$RUNNER_TEMP"
+          else
+            git_config_dir="/tmp"
+          fi
+          git_config_global="$git_config_dir/gitconfig"
+          echo "GIT_CONFIG_GLOBAL=$git_config_global" >> "$GITHUB_ENV"
+          GIT_CONFIG_GLOBAL="$git_config_global" git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@v4
         with:

@@ -27,8 +27,6 @@ jobs:
 
     env:
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
-      # Store Git's global config in writable /tmp for the numeric non-root user.
-      GIT_CONFIG_GLOBAL: /tmp/gitconfig
 
     defaults:
       run:
@@ -36,7 +34,15 @@ jobs:
 
     steps:
       - name: Configure Git safe directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        run: |
+          if [[ -n "${RUNNER_TEMP:-}" && -d "$RUNNER_TEMP" && -w "$RUNNER_TEMP" ]]; then
+            git_config_dir="$RUNNER_TEMP"
+          else
+            git_config_dir="/tmp"
+          fi
+          git_config_global="$git_config_dir/gitconfig"
+          echo "GIT_CONFIG_GLOBAL=$git_config_global" >> "$GITHUB_ENV"
+          GIT_CONFIG_GLOBAL="$git_config_global" git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@v4
         with:
