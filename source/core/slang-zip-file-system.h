@@ -4,11 +4,6 @@
 #include "slang-archive-file-system.h"
 #include "slang-basic.h"
 
-// Override at build time to allow larger individual entries.
-#ifndef SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE
-#define SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE (256ull * 1024ull * 1024ull)
-#endif
-
 namespace Slang
 {
 

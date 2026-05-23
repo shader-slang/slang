@@ -5,8 +5,33 @@
 #include "slang-com-ptr.h"
 #include "slang-compression-system.h"
 
+// Override at build time to allow larger individual entries in archive-backed file systems.
+// SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE is kept as a compatibility alias.
+#ifndef SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE
+#ifdef SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE
+#define SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE \
+    SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE
+#else
+#define SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE (256ull * 1024ull * 1024ull)
+#endif
+#endif
+
+#ifndef SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE
+#define SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE \
+    SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE
+#endif
+
 namespace Slang
 {
+
+static const UInt64 kMaxArchiveFileUncompressedSize =
+    UInt64(SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE);
+
+static inline bool isArchiveFileUncompressedSizeInBounds(UInt64 size)
+{
+    const UInt64 maxTerminatedAllocationSize = UInt64(~size_t(0) - 1);
+    return size <= kMaxArchiveFileUncompressedSize && size <= maxTerminatedAllocationSize;
+}
 
 class IArchiveFileSystem : public ISlangCastable
 {

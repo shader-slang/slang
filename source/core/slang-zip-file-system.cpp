@@ -10,14 +10,10 @@
 #include "slang-string-util.h"
 #include "slang-uint-set.h"
 
-#include <limits>
 #include <miniz.h>
 
 namespace Slang
 {
-
-static const mz_uint64 kMaxZipFileUncompressedSize =
-    mz_uint64(SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE);
 
 class ZipFileSystemImpl : public ComBaseObject,
                           public ISlangMutableFileSystem,
@@ -491,8 +487,7 @@ SlangResult ZipFileSystemImpl::loadFile(char const* path, ISlangBlob** outBlob)
         return SLANG_E_NOT_FOUND;
     }
 
-    if (fileStat.m_uncomp_size > kMaxZipFileUncompressedSize ||
-        fileStat.m_uncomp_size > mz_uint64(std::numeric_limits<size_t>::max() - 1))
+    if (!isArchiveFileUncompressedSizeInBounds(UInt64(fileStat.m_uncomp_size)))
     {
         return SLANG_E_OUT_OF_MEMORY;
     }
@@ -827,7 +822,8 @@ SlangResult ZipFileSystemImpl::storeArchive(bool blobOwnsContent, ISlangBlob** o
     if (blobOwnsContent)
     {
         // Takes a copy
-        blob = RawBlob::create(m_data.getData(), Index(m_data.getSizeInBytes()));
+        SLANG_RETURN_ON_FAIL(
+            RawBlob::tryCreate(m_data.getData(), Index(m_data.getSizeInBytes()), blob));
     }
     else
     {
