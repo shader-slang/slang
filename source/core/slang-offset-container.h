@@ -139,6 +139,7 @@ a local for the allocation as in
 enum
 {
     kNull32Offset = 0,
+    kMax32Offset = 0xFFFFFFFFu,
     kStartOffset = uint32_t(sizeof(uint64_t)), ///< The offset to the first contained thing
 };
 
@@ -442,9 +443,6 @@ changed.
 class OffsetContainer : public OffsetBase
 {
 public:
-    /// Construct a T inside the container.
-    /// Returns a null Offset32Ptr<T> if the underlying allocation fails (see allocate()
-    /// for the failure modes).
     template<typename T>
     Offset32Ptr<T> newObject()
     {
@@ -457,10 +455,6 @@ public:
         return Offset32Ptr<T>(getOffset(data));
     }
 
-    /// Construct an array of `size` default-initialized Ts inside the container.
-    /// Returns an empty Offset32Array<T> if `size == 0`, if `size` cannot be stored in the
-    /// 32-bit count, if `sizeof(T) * size` would overflow size_t, or if the underlying
-    /// allocation fails (see allocate() for the failure modes).
     template<typename T>
     Offset32Array<T> newArray(size_t size)
     {
@@ -468,9 +462,8 @@ public:
         {
             return Offset32Array<T>();
         }
-        // Reject counts that don't fit in the 32-bit count stored in Offset32Array, or whose
-        // byte size would overflow size_t when computing sizeof(T) * size.
-        if (size > size_t(0xFFFFFFFFu) || size > SIZE_MAX / sizeof(T))
+        // The SIZE_MAX term is needed on 32-bit hosts before computing sizeof(T) * size.
+        if (size > size_t(kMax32Offset) || size > SIZE_MAX / sizeof(T))
         {
             return Offset32Array<T>();
         }
@@ -489,43 +482,15 @@ public:
     /// Get the base - which is needed for turning offsets into things
     OffsetBase& asBase() { return *this; }
 
-    /// Allocate without alignment (effectively 1). Returns nullptr on the same failure
-    /// modes as allocate(size, alignment).
+    /// Allocate without alignment (effectively 1)
     void* allocate(size_t size);
 
-    /// Allocate `size` bytes with the given `alignment`. Returns nullptr if any of the
-    /// following hold:
-    ///   - `alignment` is zero or not a power of two;
-    ///   - `alignment - 1` exceeds the 32-bit offset domain (alignment > 2^32);
-    ///   - the request would grow the backing buffer past the 32-bit offset domain
-    ///     (m_dataSize + alignmentMask > 0xFFFFFFFFu, or size + offset > 0xFFFFFFFFu);
-    ///   - the underlying realloc fails (OOM).
-    /// Callers must treat the return value as nullable. The container itself is unchanged
-    /// on every rejection path (m_dataSize, m_capacity, and m_data are preserved).
-    ///
-    /// TODO(security): callers in `source/slang/slang-repro.cpp` currently treat
-    /// newObject/newArray/newString as infallible and dereference the result without a
-    /// null check. After this PR, the new guards make the null return reachable on
-    /// hostile input (e.g. a crafted repro file with sizes > 4 GiB), turning the prior
-    /// memcpy-past-buffer UB into a deterministic null-deref. The container side is
-    /// now safe; the repro-side audit is tracked as a follow-up. The null-on-overflow
-    /// contract is pinned by the regression block in
-    /// `tools/slang-unit-test/unit-test-offset-container.cpp` that bumps m_dataSize to
-    /// `0xFFFFFFFFu - 3` and asserts each of newObject / newArray / newString returns
-    /// its null sentinel — a future refactor that re-introduces UB at those call sites
-    /// has to break that test first.
     void* allocate(size_t size, size_t alignment);
 
-    /// As allocate(size, alignment) but zero-initializes the result. Returns nullptr on
-    /// the same failure modes as allocate().
     void* allocateAndZero(size_t size, size_t alignment);
 
     void fixAlignment(size_t alignment);
 
-    /// Encode and store `slice` (or the null-terminated `contents`) as an OffsetString.
-    /// Returns a null Offset32Ptr<OffsetString> if `slice.getLength()` would not fit in
-    /// the 32-bit offset domain after adding the encoded header and trailing null, or if
-    /// the underlying allocation fails (see allocate() for the failure modes).
     Offset32Ptr<OffsetString> newString(const UnownedStringSlice& slice);
     Offset32Ptr<OffsetString> newString(const char* contents);
 

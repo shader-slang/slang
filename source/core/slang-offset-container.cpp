@@ -102,6 +102,10 @@ const char* OffsetString::getCstr() const
 
 OffsetContainer::OffsetContainer()
 {
+    static_assert(
+        kStartOffset > 0 && kStartOffset <= kMax32Offset,
+        "kStartOffset must fit in the 32-bit offset domain");
+
     m_capacity = 0;
     m_data = nullptr;
 
@@ -143,7 +147,7 @@ void* OffsetContainer::allocate(size_t size, size_t alignment)
     // allocation that would grow the data beyond the 32-bit addressable range. Using the
     // 32-bit limit (rather than SIZE_MAX) is tighter than required for size_t arithmetic,
     // but prevents silent truncation when offsets are converted to uint32_t.
-    const size_t kMaxDataSize = size_t(0xFFFFFFFFu);
+    const size_t kMaxDataSize = size_t(kMax32Offset);
     const size_t alignmentMask = alignment - 1;
     // On 64-bit hosts a caller can request an alignment larger than the 32-bit offset
     // domain (e.g., 2^33). That would make alignmentMask > kMaxDataSize and cause the
@@ -180,6 +184,10 @@ void* OffsetContainer::allocate(size_t size, size_t alignment)
 
         // We must be at least minSize
         size_t newSize = (calcSize < minSize) ? minSize : calcSize;
+        if (newSize > kMaxDataSize)
+        {
+            newSize = kMaxDataSize;
+        }
 
         // Reallocate space
         uint8_t* newData = (uint8_t*)::realloc(m_data, newSize);
@@ -212,12 +220,9 @@ Offset32Ptr<OffsetString> OffsetContainer::newString(const UnownedStringSlice& s
 {
     size_t stringSize = slice.getLength();
 
-    // OffsetString encodes the size in at most 4 bytes (kSizeBase + 4-byte little-endian),
-    // so the string itself must fit in 32 bits. Subtract kMaxSizeEncodeSize + 1 (the
-    // encoded header plus the trailing null terminator) to also prevent
-    // headSize + stringSize + 1 from wrapping on 32-bit hosts where
-    // size_t == uint32_t.
-    if (stringSize > size_t(0xFFFFFFFFu) - OffsetString::kMaxSizeEncodeSize - 1)
+    // OffsetString encodes the size in at most kMaxSizeEncodeSize bytes: a 1-byte header
+    // followed by up to 4 bytes of little-endian size data.
+    if (stringSize > size_t(kMax32Offset) - OffsetString::kMaxSizeEncodeSize - 1)
     {
         return Offset32Ptr<OffsetString>();
     }

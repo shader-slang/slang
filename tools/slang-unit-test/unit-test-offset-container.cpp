@@ -64,8 +64,8 @@ SLANG_UNIT_TEST(offsetContainer)
     // Exceed the 32-bit offset limit (the container addresses memory via Offset32Ptr, so
     // allocations beyond the 4GB boundary must be rejected even when size_t arithmetic does
     // not overflow on a 64-bit host).
-    _checkAllocateOverflowDoesNotWrap(size_t(0xFFFFFFFFu) - 7, 16, 1);
-    _checkAllocateOverflowDoesNotWrap(size_t(0xFFFFFFFFu) - 3, 1, 8);
+    _checkAllocateOverflowDoesNotWrap(size_t(kMax32Offset) - 7, 16, 1);
+    _checkAllocateOverflowDoesNotWrap(size_t(kMax32Offset) - 3, 1, 8);
     _checkAllocateOverflowDoesNotWrap(size_t(0x80000000u), size_t(0x80000000u), 1);
 
     // Zero and non-power-of-two alignments must be rejected (the bitwise alignment math
@@ -86,7 +86,7 @@ SLANG_UNIT_TEST(offsetContainer)
     // newObject / newArray / newString propagate the failure as their null sentinel.
     {
         OffsetContainer container;
-        container.m_dataSize = size_t(0xFFFFFFFFu) - 3;
+        container.m_dataSize = size_t(kMax32Offset) - 3;
 
         auto obj = container.newObject<uint64_t>();
         SLANG_CHECK(obj.isNull());
@@ -102,7 +102,7 @@ SLANG_UNIT_TEST(offsetContainer)
     // domain, independent of the current m_dataSize.
     {
         OffsetContainer container;
-        auto arr = container.newArray<uint64_t>(size_t(0xFFFFFFFFu) / sizeof(uint64_t) + 1);
+        auto arr = container.newArray<uint64_t>(size_t(kMax32Offset) / sizeof(uint64_t) + 1);
         SLANG_CHECK(arr.getCount() == 0);
     }
 
@@ -135,7 +135,7 @@ SLANG_UNIT_TEST(offsetContainer)
     // allocateAndZero must propagate allocate()'s nullptr instead of memset'ing through it.
     {
         OffsetContainer container;
-        container.m_dataSize = size_t(0xFFFFFFFFu) - 3;
+        container.m_dataSize = size_t(kMax32Offset) - 3;
         void* zeroed = container.allocateAndZero(16, 1);
         SLANG_CHECK(zeroed == nullptr);
     }
