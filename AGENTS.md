@@ -28,7 +28,6 @@ If the skill is unavailable because skills cannot be installed or network access
 
 Examples:
 - `/slang-build build debug`: build the Debug configuration.
-- `/slang-build build release`: build the Release configuration.
 - `/slang-build rebuild debug`: discard the existing build directory and rebuild Debug.
 - `/slang-build configure releasewithdebug`: configure an optimized build with symbols.
 - `/slang-build clean`: rename and remove the existing build directory.
