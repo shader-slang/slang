@@ -139,9 +139,10 @@ a local for the allocation as in
 enum
 {
     kNull32Offset = 0,
-    kMax32Offset = 0xFFFFFFFFu,
     kStartOffset = uint32_t(sizeof(uint64_t)), ///< The offset to the first contained thing
 };
+
+static const uint32_t kMax32Offset = 0xFFFFFFFFu;
 
 template<typename T>
 class Offset32Ref;
