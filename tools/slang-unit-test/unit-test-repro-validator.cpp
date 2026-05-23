@@ -7,7 +7,7 @@
 #include "core/slang-offset-container.h"
 #include "core/slang-stream.h"
 #include "core/slang-string-util.h"
-#include "slang/slang-compiler-api.h"
+#include "slang/slang-end-to-end-request.h"
 #include "slang/slang-repro-validator.h"
 #include "slang/slang-repro.h"
 #include "unit-test/slang-unit-test.h"
@@ -1048,7 +1048,7 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
 
     auto session = spCreateSession();
     auto externalRequest = spCreateCompileRequest(session);
-    auto request = asInternal(externalRequest);
+    auto request = static_cast<EndToEndCompileRequest*>(externalRequest);
 
     OffsetBase& base = container.asBase();
     SLANG_CHECK_ABORT(
