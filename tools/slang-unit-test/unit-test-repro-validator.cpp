@@ -982,10 +982,9 @@ SLANG_UNIT_TEST(reproStateValidator)
         {
             List<uint8_t> buf;
             const uint32_t pathInfoOffset = buildValidPathInfoMap(buf);
-            auto getPathTypeResult =
-                reinterpret_cast<ReproUtil::PathInfoState::CompressedResult*>(
-                    buf.getBuffer() + pathInfoOffset +
-                    offsetof(ReproUtil::PathInfoState, getPathTypeResult));
+            auto getPathTypeResult = reinterpret_cast<ReproUtil::PathInfoState::CompressedResult*>(
+                buf.getBuffer() + pathInfoOffset +
+                offsetof(ReproUtil::PathInfoState, getPathTypeResult));
             *getPathTypeResult = ReproUtil::PathInfoState::CompressedResult(0xFF);
             SLANG_CHECK(!isReproStateValid(buf));
         }
