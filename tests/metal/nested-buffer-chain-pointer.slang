@@ -2,9 +2,9 @@
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Deeply nested buffer chain: ConstantBuffer wrapping a struct that contains
-// an RWStructuredBuffer whose element type itself contains a ConstantBuffer
-// with a pointer field. Exercises multi-layer buffer indirection where pointers
-// at the innermost level must be lowered.
+// an RWStructuredBuffer whose element type is a struct with a single-level
+// pointer field. Single-level pointers (int*) are valid Metal and should NOT
+// be lowered — this test verifies they are preserved as typed device pointers.
 //
 // Requested by reviewer: https://github.com/shader-slang/slang/pull/10947
 
@@ -22,8 +22,9 @@ ConstantBuffer<Middle> params;
 
 RWStructuredBuffer<int> output;
 
-// The inner struct's pointer field should be lowered to ulong inside the
-// storage buffer element type.
+// The inner struct's single-level pointer field should be preserved as a
+// typed device pointer (not lowered to ulong).
+// CHECK: int device* ptr
 // CHECK-NOT: device{{.*}}device
 
 // CHECK-LABEL: computeMain

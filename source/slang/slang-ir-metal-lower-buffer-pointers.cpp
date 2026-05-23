@@ -28,8 +28,9 @@ namespace Slang
 //   - All force-inlined functions have been expanded.
 //   - Phi nodes are eliminated; the IR is in non-SSA form.
 //   - Final simplification has removed dead code.
-// Only applyVariableScopeCorrection and metadata collection run after this
-// pass, neither of which creates new pointer types or inspects field types.
+// After this pass: applyVariableScopeCorrection, collectCooperativeMetadata
+// (conditional), and validateIRModuleIfEnabled. None create new pointer
+// types or inspect field types.
 //
 // ## Type translation consistency
 //
@@ -143,6 +144,11 @@ struct MetalBufferPointerLoweringContext
                 }
                 if (auto nestedStruct = as<IRStructType>(field->getFieldType()))
                     worklist.add(nestedStruct);
+                else if (auto arrayType = as<IRArrayTypeBase>(field->getFieldType()))
+                {
+                    if (auto elemStruct = as<IRStructType>(arrayType->getElementType()))
+                        worklist.add(elemStruct);
+                }
             }
 
             if (fieldsToLower.getCount() > 0)
@@ -236,10 +242,7 @@ struct MetalBufferPointerLoweringContext
                         break;
                     }
                 case kIROp_StructuredBufferLoad:
-                case kIROp_StructuredBufferLoadStatus: // unlikely with pointer elements
                 case kIROp_RWStructuredBufferLoad:
-                case kIROp_RWStructuredBufferLoadStatus: // unlikely with pointer elements
-                case kIROp_StructuredBufferConsume:      // unlikely with pointer elements
                     {
                         inst->setFullType(uintPtrType);
                         builder.setInsertAfter(inst);
@@ -249,17 +252,23 @@ struct MetalBufferPointerLoweringContext
                         break;
                     }
                 case kIROp_RWStructuredBufferStore:
-                case kIROp_StructuredBufferAppend: // unlikely with pointer elements
                     {
-                        UInt valIdx = (inst->getOp() == kIROp_StructuredBufferAppend) ? 1 : 2;
-                        auto val = inst->getOperand(valIdx);
+                        auto val = inst->getOperand(2);
                         builder.setInsertBefore(inst);
                         IRInst* args[] = {val};
                         auto castInst =
                             builder.emitIntrinsicInst(uintPtrType, kIROp_CastPtrToInt, 1, args);
-                        inst->setOperand(valIdx, castInst);
+                        inst->setOperand(2, castInst);
                         break;
                     }
+                // These ops are desugared by lowerAppendConsumeStructuredBuffers
+                // before this pass runs. Assert rather than silently lowering.
+                case kIROp_StructuredBufferLoadStatus:
+                case kIROp_RWStructuredBufferLoadStatus:
+                case kIROp_StructuredBufferConsume:
+                case kIROp_StructuredBufferAppend:
+                    SLANG_UNREACHABLE("structured buffer op should be desugared before this pass");
+                    break;
                 default:
                     break;
                 }

@@ -1,3 +1,4 @@
+//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Verify that struct assignment through a device pointer in a ParameterBlock
@@ -5,6 +6,7 @@
 // _default storage type for the struct, the Metal compiler will reject the
 // cross-type assignment with "no viable overloaded '='".
 //
+// CHECK: computeMain
 // METALLIB: computeMain
 //
 // See: https://github.com/shader-slang/slang/issues/10841
