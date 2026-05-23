@@ -275,8 +275,8 @@ SLANG_UNIT_TEST(reproStateValidator)
         SLANG_CHECK(!isReproStateValid(buf));
     }
 
-    // 17. OffsetString with sizeByteCount == 5 (> 4) — fails.
-    // validateString: sizeByteCount < 1 || sizeByteCount > 4 → return false.
+    // 17. OffsetString with a one-byte extended size that exceeds the allocation — fails.
+    // Exercises the multi-byte size header path in validateString.
     {
         OffsetContainer container;
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
@@ -288,8 +288,10 @@ SLANG_UNIT_TEST(reproStateValidator)
         List<uint8_t> buf;
         containerToBuffer(container, buf);
 
-        // Corrupt: set first byte to kSizeBase + 5, claiming 5 size extension bytes.
-        buf[strPtr.m_offset] = OffsetString::kSizeBase + 5;
+        // Corrupt: encode a one-byte extended size and claim a payload larger than
+        // the "hello" string allocation.
+        buf[strPtr.m_offset] = OffsetString::kSizeBase + 1;
+        buf[strPtr.m_offset + 1] = 255;
 
         SLANG_CHECK(!isReproStateValid(buf));
     }
@@ -472,8 +474,10 @@ SLANG_UNIT_TEST(reproStateValidator)
         // First validate the buffer is otherwise well-formed.
         SLANG_CHECK(isReproStateValid(buf));
 
-        // Corrupt: set first byte of outputPath to kSizeBase + 5 (invalid encoding).
-        buf[outputPathStr.m_offset] = OffsetString::kSizeBase + 5;
+        // Corrupt: encode a one-byte extended size and claim a payload larger than
+        // the outputPath string allocation.
+        buf[outputPathStr.m_offset] = OffsetString::kSizeBase + 1;
+        buf[outputPathStr.m_offset + 1] = 255;
         SLANG_CHECK(!isReproStateValid(buf));
     }
 
@@ -588,8 +592,10 @@ SLANG_UNIT_TEST(reproStateValidator)
         containerToBuffer(container, buf);
         SLANG_CHECK(isReproStateValid(buf));
 
-        // Corrupt: set first byte to kSizeBase + 5 (invalid sizeByteCount).
-        buf[moduleNameStr.m_offset] = OffsetString::kSizeBase + 5;
+        // Corrupt: encode a one-byte extended size and claim a payload larger than
+        // the moduleName string allocation.
+        buf[moduleNameStr.m_offset] = OffsetString::kSizeBase + 1;
+        buf[moduleNameStr.m_offset + 1] = 255;
         SLANG_CHECK(!isReproStateValid(buf));
     }
 
