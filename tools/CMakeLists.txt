@@ -415,19 +415,19 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             SLANG_SHARED_LIBRARY_TOOL
             SLANG_NO_DEPRECATION
         USE_FEWER_WARNINGS
-        # slang-repro-validator.cpp is part of the slang DLL's normal source set,
-        # but isReproStateValid() is a free function in namespace Slang with no
-        # SLANG_API export annotation, so it is not visible from outside the DLL.
-        # The unit tests call it directly, so we compile the .cpp again into this
-        # module. Adding SLANG_API to the function would also work, but it would
-        # publish an internal validator as part of the stable public ABI, which
-        # we do not want.
-        EXPLICIT_SOURCE
-            ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
         LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools
+    )
+    # slang-repro-validator.cpp is part of the slang DLL's normal source set, but
+    # isReproStateValid() is a free function in namespace Slang with no SLANG_API
+    # export annotation, so it is not visible from outside the DLL. The unit tests
+    # call it directly, so compile the .cpp again into this module without
+    # publishing an internal validator as part of the stable public ABI.
+    target_sources(
+        slang-unit-test
+        PRIVATE ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
     )
     # The unit tests include internal slang headers (e.g. slang-repro.h) that
     # transitively pull in FIDDLE / capability generated headers. The `slang`

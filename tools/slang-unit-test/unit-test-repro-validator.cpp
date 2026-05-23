@@ -1,7 +1,11 @@
 // unit-test-repro-validator.cpp
 // Tests for isReproStateValid and the ReproStateValidator graph traversal.
 
+#include "compiler-core/slang-diagnostic-sink.h"
+#include "core/slang-memory-file-system.h"
 #include "core/slang-offset-container.h"
+#include "core/slang-stream.h"
+#include "core/slang-string-util.h"
 #include "slang/slang-repro-validator.h"
 #include "slang/slang-repro.h"
 #include "unit-test/slang-unit-test.h"
@@ -23,6 +27,66 @@ static void buildMinimalValid(List<uint8_t>& outBuf)
     OffsetContainer container;
     container.newObject<ReproUtil::RequestState>();
     containerToBuffer(container, outBuf);
+}
+
+static StableHashCode32 calcReproTypeHashForTest()
+{
+    typedef ReproUtil Util;
+
+    // Mirror slang-repro.cpp's private type hash inputs so this test can build
+    // a valid repro header without exporting an internal helper.
+    const uint32_t sizes[] = {
+        uint32_t(sizeof(Util::FileState)),
+        uint32_t(sizeof(Util::PathInfoState)),
+        uint32_t(sizeof(Util::PathInfoState::CompressedResult)),
+        uint32_t(sizeof(SlangPathType)),
+        uint32_t(sizeof(Util::PathAndPathInfo)),
+        uint32_t(sizeof(Util::TargetRequestState)),
+        uint32_t(sizeof(Profile)),
+        uint32_t(sizeof(CodeGenTarget)),
+        uint32_t(sizeof(SlangTargetFlags)),
+        uint32_t(sizeof(FloatingPointMode)),
+        uint32_t(sizeof(Util::StringPair)),
+        uint32_t(sizeof(Util::SourceFileState)),
+        uint32_t(sizeof(PathInfo::Type)),
+        uint32_t(sizeof(Util::TranslationUnitRequestState)),
+        uint32_t(sizeof(SourceLanguage)),
+        uint32_t(sizeof(Util::EntryPointState)),
+        uint32_t(sizeof(Profile)),
+        uint32_t(sizeof(Util::RequestState)),
+        uint32_t(sizeof(SlangCompileFlags)),
+        uint32_t(sizeof(bool)),
+        uint32_t(sizeof(LineDirectiveMode)),
+        uint32_t(sizeof(DebugInfoLevel)),
+        uint32_t(sizeof(OptimizationLevel)),
+        uint32_t(sizeof(ContainerFormat)),
+        uint32_t(sizeof(PassThroughMode)),
+        uint32_t(sizeof(SlangMatrixLayoutMode)),
+    };
+
+    return getStableHashCode32((const char*)sizes, sizeof(sizes));
+}
+
+static void buildStateRiff(const List<uint8_t>& payload, List<uint8_t>& outRiff)
+{
+    RIFF::Builder riff;
+    RIFF::BuildCursor cursor(riff);
+
+    {
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, ReproUtil::kSlangStateFileFourCC);
+        SLANG_SCOPED_RIFF_BUILDER_DATA_CHUNK(cursor, ReproUtil::kSlangStateDataFourCC);
+
+        ReproUtil::Header header;
+        header.m_semanticVersion = ReproUtil::g_semanticVersion;
+        header.m_typeHash = calcReproTypeHashForTest();
+
+        cursor.addData(header);
+        cursor.addUnownedData(payload.getBuffer(), payload.getCount());
+    }
+
+    OwnedMemoryStream stream(FileAccess::Write);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(riff.writeTo(&stream)));
+    stream.swapContents(outRiff);
 }
 
 SLANG_UNIT_TEST(reproStateValidator)
@@ -642,4 +706,75 @@ SLANG_UNIT_TEST(reproStateValidator)
         memset(oversize.getBuffer(), 0, oversize.getCount());
         SLANG_CHECK(ReproUtil::getRequest(oversize) != nullptr);
     }
+}
+
+SLANG_UNIT_TEST(reproStateLoadStateRejectsInvalidPayload)
+{
+    List<uint8_t> invalidPayload;
+    buildMinimalValid(invalidPayload);
+    SLANG_CHECK_ABORT(invalidPayload.getCount() > 0);
+    invalidPayload.setCount(invalidPayload.getCount() - 1);
+
+    List<uint8_t> riffData;
+    buildStateRiff(invalidPayload, riffData);
+
+    OwnedMemoryStream stream(FileAccess::Read);
+    stream.setContent(riffData.getBuffer(), riffData.getCount());
+
+    DiagnosticSink sink;
+    List<uint8_t> outBuffer;
+    outBuffer.add(0xff);
+
+    SlangResult result = ReproUtil::loadState(&stream, &sink, outBuffer);
+    SLANG_CHECK(SLANG_FAILED(result));
+    SLANG_CHECK(outBuffer.getCount() == 0);
+    SLANG_CHECK(sink.getErrorCount() == 1);
+}
+
+SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
+{
+    typedef ReproUtil::RequestState RequestState;
+    typedef ReproUtil::SourceFileState SourceFileState;
+    typedef ReproUtil::TranslationUnitRequestState TranslationUnitRequestState;
+
+    OffsetContainer container;
+    auto requestPtr = container.newObject<RequestState>();
+    auto translationUnits = container.newArray<TranslationUnitRequestState>(2);
+    auto tu0SourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+    auto tu1SourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(2);
+    auto tu0SourceFile = container.newObject<SourceFileState>();
+    auto tu1SourceFileA = container.newObject<SourceFileState>();
+    auto tu1SourceFileB = container.newObject<SourceFileState>();
+
+    container[requestPtr]->translationUnits = translationUnits;
+    container[translationUnits[0]].sourceFiles = tu0SourceFiles;
+    container[translationUnits[1]].sourceFiles = tu1SourceFiles;
+
+    container[tu0SourceFile]->foundPath = container.newString("tu0.slang");
+    container[tu1SourceFileA]->foundPath = container.newString("tu1-a.slang");
+    container[tu1SourceFileB]->foundPath = container.newString("tu1-b.slang");
+
+    container[tu0SourceFiles[0]] = tu0SourceFile;
+    container[tu1SourceFiles[0]] = tu1SourceFileA;
+    container[tu1SourceFiles[1]] = tu1SourceFileB;
+
+    OffsetBase& base = container.asBase();
+    ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(ReproUtil::extractFiles(base, base.asRaw(requestPtr), fileSystem)));
+
+    ComPtr<ISlangBlob> manifestBlob;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(fileSystem->loadFile("manifest.txt", manifestBlob.writeRef())));
+
+    String manifest = StringUtil::getString(manifestBlob);
+    Index tu0Index = manifest.indexOf(UnownedStringSlice("tu0.slang"));
+    Index tu1AIndex = manifest.indexOf(UnownedStringSlice("tu1-a.slang"));
+    Index tu1BIndex = manifest.indexOf(UnownedStringSlice("tu1-b.slang"));
+
+    SLANG_CHECK(tu0Index >= 0);
+    SLANG_CHECK(tu1AIndex >= 0);
+    SLANG_CHECK(tu1BIndex >= 0);
+    SLANG_CHECK(tu0Index < tu1AIndex);
+    SLANG_CHECK(tu1AIndex < tu1BIndex);
 }
