@@ -33,6 +33,16 @@ static void buildMinimalValid(List<uint8_t>& outBuf)
     containerToBuffer(container, outBuf);
 }
 
+static void corruptStringToOversizedPayload(
+    List<uint8_t>& buffer,
+    Offset32Ptr<OffsetString> stringPtr)
+{
+    SLANG_CHECK_ABORT(!stringPtr.isNull());
+    SLANG_CHECK_ABORT(buffer.getCount() >= stringPtr.m_offset + 2);
+    buffer[stringPtr.m_offset] = OffsetString::kSizeBase + 1;
+    buffer[stringPtr.m_offset + 1] = 255;
+}
+
 static bool outputContainsDiagnosticId(DiagnosticSink& sink, Severity severity, int diagnosticId)
 {
     String idString(diagnosticId);
@@ -685,6 +695,100 @@ SLANG_UNIT_TEST(reproStateValidator)
         List<uint8_t> buf;
         containerToBuffer(container, buf);
         SLANG_CHECK(isReproStateValid(buf));
+    }
+
+    // 19n. FileState optional string fields are validated when present.
+    // Corrupt each field in isolation so dropping one validateString term
+    // fails a focused case.
+    {
+        typedef ReproUtil::FileState FileState;
+        typedef Offset32Ptr<OffsetString> FileState::* FileStringMember;
+        struct Case
+        {
+            FileStringMember member;
+            const char* value;
+        };
+        const Case cases[] = {
+            {&FileState::uniqueIdentity, "identity"},
+            {&FileState::canonicalPath, "canonical.slang"},
+            {&FileState::foundPath, "found.slang"},
+        };
+
+        for (const Case& testCase : cases)
+        {
+            OffsetContainer container;
+            auto requestPtr = container.newObject<ReproUtil::RequestState>();
+            auto filesArray = container.newArray<Offset32Ptr<FileState>>(1);
+            auto filePtr = container.newObject<FileState>();
+
+            container[requestPtr]->files = filesArray;
+            container[filesArray[0]] = filePtr;
+            container[filePtr]->uniqueIdentity = container.newString("identity");
+            container[filePtr]->contents = container.newString("int main() {}");
+            container[filePtr]->canonicalPath = container.newString("canonical.slang");
+            container[filePtr]->foundPath = container.newString("found.slang");
+            container[filePtr]->uniqueName = container.newString("unique.slang");
+            container[filePtr]->*(testCase.member) = container.newString(testCase.value);
+
+            List<uint8_t> buf;
+            containerToBuffer(container, buf);
+            SLANG_CHECK(isReproStateValid(buf));
+
+            corruptStringToOversizedPayload(buf, container[filePtr]->*(testCase.member));
+            SLANG_CHECK(!isReproStateValid(buf));
+        }
+    }
+
+    // 19o. SourceFileState.foundPath is validated separately from the required file.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto sourceFilesArray = container.newArray<Offset32Ptr<ReproUtil::SourceFileState>>(1);
+        auto sourceFilePtr = addSourceFileState(container, "source.slang");
+
+        container[requestPtr]->sourceFiles = sourceFilesArray;
+        container[sourceFilesArray[0]] = sourceFilePtr;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(isReproStateValid(buf));
+
+        corruptStringToOversizedPayload(buf, container[sourceFilePtr]->foundPath);
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 19p. PathInfoState.file rejects a non-null offset that points outside the buffer.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto pathAndPathInfoArray = container.newArray<ReproUtil::PathAndPathInfo>(1);
+        auto pathStr = container.newString("shader.slang");
+        auto pathInfoPtr = container.newObject<ReproUtil::PathInfoState>();
+
+        container[requestPtr]->pathInfoMap = pathAndPathInfoArray;
+        container[pathAndPathInfoArray[0]].path = pathStr;
+        container[pathAndPathInfoArray[0]].pathInfo = pathInfoPtr;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(isReproStateValid(buf));
+
+        const size_t fileOffset =
+            pathInfoPtr.m_offset + offsetof(ReproUtil::PathInfoState, file);
+        uint32_t* fileSlot = reinterpret_cast<uint32_t*>(buf.getBuffer() + fileOffset);
+        *fileSlot = uint32_t(buf.getCount() + 100);
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
+    // 19q. OffsetBase pointer access returns null for an out-of-bounds offset.
+    {
+        List<uint8_t> buf;
+        buildMinimalValid(buf);
+
+        MemoryOffsetBase base;
+        base.set(buf.getBuffer(), buf.getCount());
+        Offset32Ptr<ReproUtil::RequestState> badPtr(uint32_t(buf.getCount() + 100));
+        SLANG_CHECK(base[badPtr] == nullptr);
     }
 
     // 20. ReproUtil::getRequest size-guard boundary: N-1 / N / N+1, where
