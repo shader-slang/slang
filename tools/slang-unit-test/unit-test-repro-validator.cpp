@@ -148,8 +148,8 @@ static SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED SlangResult loadReproState(
     return ReproUtil::load(base, requestState, nullptr, asInternal(request));
 }
 
-static SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED
-const List<RefPtr<TranslationUnitRequest>>& getLoadedTranslationUnits(SlangCompileRequest* request)
+static SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED const List<RefPtr<TranslationUnitRequest>>&
+getLoadedTranslationUnits(SlangCompileRequest* request)
 {
     return asInternal(request)->getFrontEndReq()->translationUnits;
 }
