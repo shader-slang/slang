@@ -729,6 +729,7 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsInvalidPayload)
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(outBuffer.getCount() == 0);
     SLANG_CHECK(sink.getErrorCount() == 1);
+    SLANG_CHECK(sink.outputBuffer.produceString().contains("malformed offsets"));
 }
 
 SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
