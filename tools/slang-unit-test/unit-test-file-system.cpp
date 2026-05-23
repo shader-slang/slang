@@ -1,7 +1,7 @@
 // unit-test-file-system.cpp
 
-#include "../../source/core/slang-castable.h"
 #include "../../source/core/slang-blob.h"
+#include "../../source/core/slang-castable.h"
 #include "../../source/core/slang-deflate-compression-system.h"
 #include "../../source/core/slang-file-system.h"
 #include "../../source/core/slang-io.h"
@@ -441,9 +441,8 @@ static SlangResult _setZipEntryUncompressedSize(List<uint8_t>& archiveData, uint
 
 static SlangResult _setRiffEntryUncompressedSize(List<uint8_t>& archiveData, uint32_t size)
 {
-    auto rootList = RIFF::RootChunk::getFromBlob(
-        archiveData.getBuffer(),
-        size_t(archiveData.getCount()));
+    auto rootList =
+        RIFF::RootChunk::getFromBlob(archiveData.getBuffer(), size_t(archiveData.getCount()));
     if (!rootList || rootList->getType() != RiffFileSystemBinary::kContainerFourCC)
     {
         return SLANG_FAIL;
