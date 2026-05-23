@@ -6,6 +6,7 @@
 #include "core/slang-offset-container.h"
 #include "core/slang-stream.h"
 #include "core/slang-string-util.h"
+#include "slang/slang-compiler-api.h"
 #include "slang/slang-repro-validator.h"
 #include "slang/slang-repro.h"
 #include "unit-test/slang-unit-test.h"
@@ -87,6 +88,26 @@ static void buildStateRiff(const List<uint8_t>& payload, List<uint8_t>& outRiff)
     OwnedMemoryStream stream(FileAccess::Write);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(riff.writeTo(&stream)));
     stream.swapContents(outRiff);
+}
+
+static Offset32Ptr<ReproUtil::SourceFileState> addSourceFileState(
+    OffsetContainer& container,
+    const char* path)
+{
+    auto sourceFile = container.newObject<ReproUtil::SourceFileState>();
+    auto file = container.newObject<ReproUtil::FileState>();
+    auto pathString = container.newString(path);
+    auto contents = container.newString("void test() {}");
+
+    container[file]->contents = contents;
+    container[file]->foundPath = pathString;
+    container[file]->uniqueName = pathString;
+    container[file]->uniqueIdentity = pathString;
+
+    container[sourceFile]->foundPath = pathString;
+    container[sourceFile]->file = file;
+
+    return sourceFile;
 }
 
 SLANG_UNIT_TEST(reproStateValidator)
@@ -743,17 +764,15 @@ SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
     auto translationUnits = container.newArray<TranslationUnitRequestState>(2);
     auto tu0SourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
     auto tu1SourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(2);
-    auto tu0SourceFile = container.newObject<SourceFileState>();
-    auto tu1SourceFileA = container.newObject<SourceFileState>();
-    auto tu1SourceFileB = container.newObject<SourceFileState>();
+    auto tu0SourceFile = addSourceFileState(container, "tu0.slang");
+    auto tu1SourceFileA = addSourceFileState(container, "tu1-a.slang");
+    auto tu1SourceFileB = addSourceFileState(container, "tu1-b.slang");
 
     container[requestPtr]->translationUnits = translationUnits;
+    container[translationUnits[0]].language = SourceLanguage::Slang;
     container[translationUnits[0]].sourceFiles = tu0SourceFiles;
+    container[translationUnits[1]].language = SourceLanguage::Slang;
     container[translationUnits[1]].sourceFiles = tu1SourceFiles;
-
-    container[tu0SourceFile]->foundPath = container.newString("tu0.slang");
-    container[tu1SourceFileA]->foundPath = container.newString("tu1-a.slang");
-    container[tu1SourceFileB]->foundPath = container.newString("tu1-b.slang");
 
     container[tu0SourceFiles[0]] = tu0SourceFile;
     container[tu1SourceFiles[0]] = tu1SourceFileA;
@@ -778,4 +797,52 @@ SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
     SLANG_CHECK(tu1BIndex >= 0);
     SLANG_CHECK(tu0Index < tu1AIndex);
     SLANG_CHECK(tu1AIndex < tu1BIndex);
+}
+
+SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
+{
+    typedef ReproUtil::RequestState RequestState;
+    typedef ReproUtil::SourceFileState SourceFileState;
+    typedef ReproUtil::TranslationUnitRequestState TranslationUnitRequestState;
+
+    OffsetContainer container;
+    auto requestPtr = container.newObject<RequestState>();
+    auto translationUnits = container.newArray<TranslationUnitRequestState>(2);
+    auto tu0SourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+    auto tu1SourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(2);
+    auto tu0SourceFile = addSourceFileState(container, "load-tu0.slang");
+    auto tu1SourceFileA = addSourceFileState(container, "load-tu1-a.slang");
+    auto tu1SourceFileB = addSourceFileState(container, "load-tu1-b.slang");
+
+    container[requestPtr]->translationUnits = translationUnits;
+    container[translationUnits[0]].language = SourceLanguage::Slang;
+    container[translationUnits[0]].sourceFiles = tu0SourceFiles;
+    container[translationUnits[1]].language = SourceLanguage::Slang;
+    container[translationUnits[1]].sourceFiles = tu1SourceFiles;
+
+    container[tu0SourceFiles[0]] = tu0SourceFile;
+    container[tu1SourceFiles[0]] = tu1SourceFileA;
+    container[tu1SourceFiles[1]] = tu1SourceFileB;
+
+    auto session = spCreateSession();
+    auto externalRequest = spCreateCompileRequest(session);
+    auto request = asInternal(externalRequest);
+
+    OffsetBase& base = container.asBase();
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(ReproUtil::load(base, base.asRaw(requestPtr), nullptr, request)));
+
+    auto& loadedTranslationUnits = request->getFrontEndReq()->translationUnits;
+    SLANG_CHECK_ABORT(loadedTranslationUnits.getCount() == 2);
+    const auto& loadedTu0SourceFiles = loadedTranslationUnits[0]->getSourceFiles();
+    const auto& loadedTu1SourceFiles = loadedTranslationUnits[1]->getSourceFiles();
+
+    SLANG_CHECK_ABORT(loadedTu0SourceFiles.getCount() == 1);
+    SLANG_CHECK_ABORT(loadedTu1SourceFiles.getCount() == 2);
+    SLANG_CHECK(loadedTu0SourceFiles[0]->getPathInfo().foundPath == "load-tu0.slang");
+    SLANG_CHECK(loadedTu1SourceFiles[0]->getPathInfo().foundPath == "load-tu1-a.slang");
+    SLANG_CHECK(loadedTu1SourceFiles[1]->getPathInfo().foundPath == "load-tu1-b.slang");
+
+    spDestroyCompileRequest(externalRequest);
+    spDestroySession(session);
 }
