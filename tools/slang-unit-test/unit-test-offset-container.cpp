@@ -1,7 +1,10 @@
 // unit-test-offset-container.cpp
 
-#include "../../source/core/slang-offset-container.h"
+#include "core/slang-exception.h"
+#include "core/slang-offset-container.h"
 #include "unit-test/slang-unit-test.h"
+
+#include <stdlib.h>
 
 using namespace Slang;
 
@@ -45,6 +48,70 @@ struct Root
     Offset32Array<Offset32Ptr<OffsetString>> dirs;
     Offset32Ptr<OffsetString> name;
     float value;
+};
+
+static int _writeEnvironmentVariable(const char* key, const char* val)
+{
+#ifdef _WIN32
+    String var = String(key) + "=" + val;
+    return _putenv(var.getBuffer());
+#else
+    return setenv(key, val, 1);
+#endif
+}
+
+static int _unsetEnvironmentVariable(const char* key)
+{
+#ifdef _WIN32
+    String var = String(key) + "=";
+    return _putenv(var.getBuffer());
+#else
+    return unsetenv(key);
+#endif
+}
+
+struct ScopedEnvVar
+{
+    const char* key;
+    bool hadOldValue = false;
+    String oldValue;
+
+    ScopedEnvVar(const char* inKey, const char* inVal)
+        : key(inKey)
+    {
+#ifdef _WIN32
+        char* value = nullptr;
+        size_t valueLength = 0;
+        if (_dupenv_s(&value, &valueLength, key) == 0 && value)
+        {
+            hadOldValue = true;
+            oldValue = value;
+            free(value);
+        }
+#else
+        if (const char* value = getenv(key))
+        {
+            hadOldValue = true;
+            oldValue = value;
+        }
+#endif
+        _writeEnvironmentVariable(key, inVal);
+    }
+
+    ScopedEnvVar(const ScopedEnvVar&) = delete;
+    ScopedEnvVar& operator=(const ScopedEnvVar&) = delete;
+
+    ~ScopedEnvVar()
+    {
+        if (hadOldValue)
+        {
+            _writeEnvironmentVariable(key, oldValue.getBuffer());
+        }
+        else
+        {
+            _unsetEnvironmentVariable(key);
+        }
+    }
 };
 
 } // namespace
@@ -287,4 +354,39 @@ SLANG_UNIT_TEST(offsetContainer)
         SLANG_CHECK(base[arr[0]] == 100u);
         SLANG_CHECK(base[arr[2]] == 300u);
     }
+
+#if SLANG_HAS_EXCEPTIONS
+    // Offset32Array::operator[] must remain a release assert. With
+    // release-assert-only enabled, a debug-only SLANG_ASSERT would be ignored
+    // in debug builds, but SLANG_RELEASE_ASSERT still raises InternalError.
+    {
+        ScopedEnvVar assertMode("SLANG_ASSERT", "release-assert-only");
+
+        OffsetContainer container;
+        auto arr = container.newArray<uint32_t>(1);
+
+        bool nonConstCaught = false;
+        try
+        {
+            (void)arr[Index(5)];
+        }
+        catch (const InternalError&)
+        {
+            nonConstCaught = true;
+        }
+        SLANG_CHECK(nonConstCaught);
+
+        const Offset32Array<uint32_t>& constArr = arr;
+        bool constCaught = false;
+        try
+        {
+            (void)constArr[Index(5)];
+        }
+        catch (const InternalError&)
+        {
+            constCaught = true;
+        }
+        SLANG_CHECK(constCaught);
+    }
+#endif
 }
