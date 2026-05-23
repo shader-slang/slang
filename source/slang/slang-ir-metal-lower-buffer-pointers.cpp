@@ -45,8 +45,9 @@ namespace Slang
 // ## Instruction coverage
 //
 // For struct fields: load and store on rewritten field addresses get casts.
-// For storage buffer elements: all structured buffer access opcodes are
-// handled (Load, LoadStatus, Store, GetElementPtr, Consume, Append).
+// For storage buffer elements: Load, Store, and GetElementPtr are actively
+// lowered; LoadStatus, Consume, and Append assert as unreachable (desugared
+// by lowerAppendConsumeStructuredBuffers before this pass).
 //
 // ## Relationship to the early ParameterBlock pass
 //
@@ -70,6 +71,8 @@ static bool isMultiLevelPointer(IRType* type)
 {
     if (auto ptrType = as<IRPtrType>(type))
         return as<IRPtrType>(ptrType->getValueType()) != nullptr;
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+        return isMultiLevelPointer(arrayType->getElementType());
     return false;
 }
 
@@ -149,6 +152,11 @@ struct MetalBufferPointerLoweringContext
                     if (auto elemStruct = as<IRStructType>(arrayType->getElementType()))
                         worklist.add(elemStruct);
                 }
+                else if (auto ptrType = as<IRPtrType>(field->getFieldType()))
+                {
+                    if (auto pointeeStruct = as<IRStructType>(ptrType->getValueType()))
+                        worklist.add(pointeeStruct);
+                }
             }
 
             if (fieldsToLower.getCount() > 0)
@@ -158,13 +166,20 @@ struct MetalBufferPointerLoweringContext
         return result;
     }
 
-    void rewriteStructFields(Dictionary<IRStructType*, List<FieldLoweringInfo>>& structsToLower)
+    IRType* getLoweredFieldType(IRType* originalType)
     {
         auto uintPtrType = getUIntPtrType();
+        if (auto arrayType = as<IRArrayTypeBase>(originalType))
+            return builder.getArrayType(uintPtrType, arrayType->getElementCount());
+        return uintPtrType;
+    }
+
+    void rewriteStructFields(Dictionary<IRStructType*, List<FieldLoweringInfo>>& structsToLower)
+    {
         for (auto& [_, fields] : structsToLower)
         {
             for (auto& fieldInfo : fields)
-                fieldInfo.field->setFieldType(uintPtrType);
+                fieldInfo.field->setFieldType(getLoweredFieldType(fieldInfo.originalPtrType));
         }
     }
 
@@ -185,14 +200,21 @@ struct MetalBufferPointerLoweringContext
                         fieldAddressInsts.add(user);
                 }
 
+                auto loweredFieldType = getLoweredFieldType(fieldInfo.originalPtrType);
+                // The original element pointer type (unwrapped from any array).
+                auto origElemPtrType =
+                    as<IRArrayTypeBase>(fieldInfo.originalPtrType)
+                        ? (IRType*)as<IRArrayTypeBase>(fieldInfo.originalPtrType)->getElementType()
+                        : fieldInfo.originalPtrType;
+
                 for (auto inst : fieldAddressInsts)
                 {
                     auto fieldAddr = cast<IRFieldAddress>(inst);
                     auto ptrToField = as<IRPtrTypeBase>(fieldAddr->getFullType());
                     if (ptrToField)
-                        fieldAddr->setFullType(builder.getPtrType(uintPtrType, ptrToField));
+                        fieldAddr->setFullType(builder.getPtrType(loweredFieldType, ptrToField));
 
-                    insertCastsForPointerUses(fieldAddr, fieldInfo.originalPtrType, uintPtrType);
+                    insertCastsForPointerUses(fieldAddr, origElemPtrType, uintPtrType);
                 }
             }
         }
@@ -305,6 +327,15 @@ struct MetalBufferPointerLoweringContext
                 IRInst* args[] = {val};
                 auto castInst = builder.emitIntrinsicInst(uintPtrType, kIROp_CastPtrToInt, 1, args);
                 storeInst->setOperand(1, castInst);
+            }
+            else if (user->getOp() == kIROp_GetElementPtr)
+            {
+                // Array indexing through the field address — update the GEP
+                // result type and recurse into its uses.
+                auto ptrToElem = as<IRPtrTypeBase>(user->getFullType());
+                if (ptrToElem)
+                    user->setFullType(builder.getPtrType(uintPtrType, ptrToElem));
+                insertCastsForPointerUses(user, originalPtrType, uintPtrType);
             }
             else
             {
