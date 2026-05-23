@@ -305,6 +305,10 @@ public:
         ComPtr<ISlangBlob>& outBlob)
     {
         outBlob.setNull();
+        if (size > 0 && !inData)
+        {
+            return SLANG_E_INVALID_ARG;
+        }
 
         RawBlob* blob = new RawBlob;
         if (!blob->init(inData, size))

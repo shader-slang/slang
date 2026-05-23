@@ -588,6 +588,9 @@ static SlangResult _testScopedAllocationRejectsMaxTerminatedSize()
     ComPtr<ISlangBlob> blob = RawBlob::create(contents, std::numeric_limits<size_t>::max());
     SLANG_CHECK(!blob);
 
+    SLANG_CHECK(RawBlob::tryCreate(nullptr, 1, blob) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(!blob);
+
     return SLANG_OK;
 }
 
