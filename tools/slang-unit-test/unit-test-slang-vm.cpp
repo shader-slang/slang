@@ -195,6 +195,11 @@ SLANG_UNIT_TEST(slangVMRejectMalformedByteCodeOffsets)
     auto invalidStringOffset = makeMinimalVMByteCode();
     patchUInt32(invalidStringOffset.data, invalidStringOffset.stringOffsetOffset, UINT32_MAX);
     SLANG_CHECK(SLANG_FAILED(initVMModuleForTest(invalidStringOffset.data)));
+
+    auto unterminatedString = makeMinimalVMByteCode();
+    auto stringDataOffset = unterminatedString.stringOffsetOffset + sizeof(uint32_t);
+    unterminatedString.data[stringDataOffset + 4] = '!';
+    SLANG_CHECK(SLANG_FAILED(initVMModuleForTest(unterminatedString.data)));
 }
 
 struct ExtCallState
