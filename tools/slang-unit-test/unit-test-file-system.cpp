@@ -408,8 +408,8 @@ static SlangResult _setZipEntryUncompressedSize(List<uint8_t>& archiveData, uint
     static const uint32_t kLocalFileHeaderSignature = 0x04034b50;
     static const uint32_t kCentralDirectoryHeaderSignature = 0x02014b50;
 
-    bool foundLocalHeader = false;
-    bool foundCentralDirectoryHeader = false;
+    Index localHeaderCount = 0;
+    Index centralDirectoryHeaderCount = 0;
 
     uint8_t* data = archiveData.getBuffer();
     const Index count = archiveData.getCount();
@@ -424,16 +424,16 @@ static SlangResult _setZipEntryUncompressedSize(List<uint8_t>& archiveData, uint
         if (signature == kLocalFileHeaderSignature && i + 26 <= count)
         {
             _writeUInt32LE(data + i + 22, size);
-            foundLocalHeader = true;
+            ++localHeaderCount;
         }
         else if (signature == kCentralDirectoryHeaderSignature && i + 28 <= count)
         {
             _writeUInt32LE(data + i + 24, size);
-            foundCentralDirectoryHeader = true;
+            ++centralDirectoryHeaderCount;
         }
     }
 
-    return foundLocalHeader && foundCentralDirectoryHeader ? SLANG_OK : SLANG_FAIL;
+    return localHeaderCount == 1 && centralDirectoryHeaderCount == 1 ? SLANG_OK : SLANG_FAIL;
 }
 
 static SlangResult _testZipRejectsOversizedUncompressedEntry()

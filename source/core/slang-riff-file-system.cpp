@@ -56,6 +56,10 @@ SlangResult RiffFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
         // Okay lets decompress into a blob
         ScopedAllocation alloc;
         void* dst = alloc.allocateTerminated(entry->m_uncompressedSizeInBytes);
+        if (!dst)
+        {
+            return SLANG_E_OUT_OF_MEMORY;
+        }
         SLANG_RETURN_ON_FAIL(m_compressionSystem->decompress(
             contents->getBufferPointer(),
             contents->getBufferSize(),

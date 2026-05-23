@@ -156,7 +156,7 @@ public:
         if (!data)
         {
             // allocate() updates m_sizeInBytes/m_capacityInBytes even when
-            // ::malloc returns nullptr — reset to a fully deallocated state
+            // ::malloc returns nullptr; reset to a fully deallocated state
             // so callers don't see inconsistent sizes alongside a null buffer.
             deallocate();
             return nullptr;
@@ -296,10 +296,15 @@ protected:
     // NOTE! Takes a copy of the input data
     RawBlob(const void* data, size_t size)
     {
-        m_data.allocateTerminated(size);
+        void* dst = m_data.allocateTerminated(size);
+        if (!dst)
+        {
+            return;
+        }
+
         if (size > 0)
         {
-            memcpy(m_data.getData(), data, size);
+            memcpy(dst, data, size);
         }
     }
 
