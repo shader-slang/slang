@@ -7,9 +7,9 @@
 #include "core/slang-offset-container.h"
 #include "core/slang-stream.h"
 #include "core/slang-string-util.h"
+#include "slang.h"
 #include "slang/slang-repro-validator.h"
 #include "slang/slang-repro.h"
-#include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
