@@ -244,14 +244,13 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
         {
             uint32_t length;
             recordRaw(RecordFlag::None, &length, sizeof(length));
-            if (length > kMaxReplayStringLength)
-                throw Slang::Exception("Replay string length exceeds maximum");
+            SLANG_RELEASE_ASSERT(length <= kMaxReplayStringLength);
 
             size_t stringSize = size_t(length);
             size_t streamPosition = m_stream.getPosition();
             size_t streamSize = m_stream.getSize();
-            if (streamPosition > streamSize || stringSize > streamSize - streamPosition)
-                throw Slang::Exception("Replay string length exceeds remaining stream data");
+            SLANG_RELEASE_ASSERT(
+                streamPosition <= streamSize && stringSize <= streamSize - streamPosition);
 
             char* buf = m_arena.allocateArray<char>(stringSize + 1);
             if (length > 0)
