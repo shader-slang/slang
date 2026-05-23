@@ -146,9 +146,14 @@ int foo = undefined;
 
 **DO NOT USE** these options as they are unmaintained, unreliable or unnecessary:
 
-- slangc with `-dump-ast`, `-dump-intermediate-prefix`, `-dump-intermediates`, `-dump-ir-ids`, `-serial-ir`, and `-dump-repro`.
-- `-load-repro` and `-extract-repro` are specialized repro tools; use them when working on repro handling.
+- slangc with `-dump-ast`, `-dump-intermediate-prefix`, `-dump-intermediates`,
+  `-dump-ir-ids`, `-serial-ir`, and `-dump-repro`.
 - slang-test with `-category` and `-api`
+
+### Repro Tooling
+
+`-load-repro` and `-extract-repro` are specialized repro tools; use them when
+working on repro handling. Inputs are validated before use.
 
 ## Architecture Overview
 
