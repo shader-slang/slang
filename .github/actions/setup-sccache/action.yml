@@ -44,7 +44,11 @@ runs:
           mv "$sccache_dir/sccache" /usr/local/bin/
           chmod +x /usr/local/bin/sccache
         else
-          install_parent="${RUNNER_TEMP:-/tmp}"
+          if [[ -n "${RUNNER_TEMP:-}" && -d "$RUNNER_TEMP" && -w "$RUNNER_TEMP" ]]; then
+            install_parent="$RUNNER_TEMP"
+          else
+            install_parent="/tmp"
+          fi
           mkdir -p "$install_parent"
           install_dir=$(mktemp -d "$install_parent/sccache-bin.XXXXXX")
           mv "$sccache_dir/sccache" "$install_dir/"
