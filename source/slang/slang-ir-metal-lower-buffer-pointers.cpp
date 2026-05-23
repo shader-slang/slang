@@ -168,10 +168,11 @@ struct MetalBufferPointerLoweringContext
 
     IRType* getLoweredFieldType(IRType* originalType)
     {
-        auto uintPtrType = getUIntPtrType();
         if (auto arrayType = as<IRArrayTypeBase>(originalType))
-            return builder.getArrayType(uintPtrType, arrayType->getElementCount());
-        return uintPtrType;
+            return builder.getArrayType(
+                getLoweredFieldType(arrayType->getElementType()),
+                arrayType->getElementCount());
+        return getUIntPtrType();
     }
 
     void rewriteStructFields(Dictionary<IRStructType*, List<FieldLoweringInfo>>& structsToLower)
@@ -201,11 +202,10 @@ struct MetalBufferPointerLoweringContext
                 }
 
                 auto loweredFieldType = getLoweredFieldType(fieldInfo.originalPtrType);
-                // The original element pointer type (unwrapped from any array).
-                auto origElemPtrType =
-                    as<IRArrayTypeBase>(fieldInfo.originalPtrType)
-                        ? (IRType*)as<IRArrayTypeBase>(fieldInfo.originalPtrType)->getElementType()
-                        : fieldInfo.originalPtrType;
+                // Unwrap nested arrays to find the innermost pointer type.
+                auto origElemPtrType = fieldInfo.originalPtrType;
+                while (auto arr = as<IRArrayTypeBase>(origElemPtrType))
+                    origElemPtrType = (IRType*)arr->getElementType();
 
                 for (auto inst : fieldAddressInsts)
                 {
