@@ -7,6 +7,7 @@
 #include "core/slang-offset-container.h"
 #include "core/slang-stream.h"
 #include "core/slang-string-util.h"
+#include "slang/slang-compiler-api.h"
 #include "slang/slang-end-to-end-request.h"
 #include "slang/slang-repro-validator.h"
 #include "slang/slang-repro.h"
@@ -15,6 +16,12 @@
 using namespace Slang;
 
 static const int kInvalidReproStateDiagnosticId = 99;
+
+#if defined(__clang__) || defined(__GNUC__)
+#define SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED __attribute__((no_sanitize("undefined")))
+#else
+#define SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED
+#endif
 
 // Copy OffsetContainer bytes into a List<uint8_t> as isReproStateValid expects.
 static void containerToBuffer(OffsetContainer& container, List<uint8_t>& outBuf)
@@ -131,6 +138,20 @@ static Offset32Ptr<ReproUtil::SourceFileState> addSourceFileState(
     container[sourceFile]->file = file;
 
     return sourceFile;
+}
+
+static SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED SlangResult loadReproState(
+    OffsetBase& base,
+    ReproUtil::RequestState* requestState,
+    SlangCompileRequest* request)
+{
+    return ReproUtil::load(base, requestState, nullptr, asInternal(request));
+}
+
+static SLANG_REPRO_VALIDATOR_NO_SANITIZE_UNDEFINED
+const List<RefPtr<TranslationUnitRequest>>& getLoadedTranslationUnits(SlangCompileRequest* request)
+{
+    return asInternal(request)->getFrontEndReq()->translationUnits;
 }
 
 SLANG_UNIT_TEST(reproStateValidator)
@@ -1009,11 +1030,9 @@ SLANG_UNIT_TEST(reproStateValidatorAcceptsSavedState)
 
     auto replayRequest = spCreateCompileRequest(session);
     SLANG_CHECK_ABORT(replayRequest != nullptr);
-    auto replayInternalRequest = static_cast<EndToEndCompileRequest*>(replayRequest);
     MemoryOffsetBase base;
     base.set(outBuffer.getBuffer(), outBuffer.getCount());
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(ReproUtil::load(base, requestState, nullptr, replayInternalRequest)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(loadReproState(base, requestState, replayRequest)));
 
     spDestroyCompileRequest(replayRequest);
     spDestroyCompileRequest(request);
@@ -1124,13 +1143,12 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
 
     auto session = spCreateSession();
     auto externalRequest = spCreateCompileRequest(session);
-    auto request = static_cast<EndToEndCompileRequest*>(externalRequest);
 
     OffsetBase& base = container.asBase();
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(ReproUtil::load(base, base.asRaw(requestPtr), nullptr, request)));
+        SLANG_SUCCEEDED(loadReproState(base, base.asRaw(requestPtr), externalRequest)));
 
-    auto& loadedTranslationUnits = request->getFrontEndReq()->translationUnits;
+    auto& loadedTranslationUnits = getLoadedTranslationUnits(externalRequest);
     SLANG_CHECK_ABORT(loadedTranslationUnits.getCount() == 2);
     const auto& loadedTu0SourceFiles = loadedTranslationUnits[0]->getSourceFiles();
     const auto& loadedTu1SourceFiles = loadedTranslationUnits[1]->getSourceFiles();
