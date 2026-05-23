@@ -250,6 +250,7 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
             size_t stringSize = size_t(length);
             size_t streamPosition = m_stream.getPosition();
             requireReplayStreamBytes(m_stream, streamPosition, stringSize);
+            requireReplayArenaAllocation(streamPosition, stringSize + 1);
 
             char* buf = m_arena.allocateArray<char>(stringSize + 1);
             if (length > 0)

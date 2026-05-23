@@ -14,6 +14,7 @@
 #include <slang-com-helper.h>
 #include <slang-com-ptr.h>
 #include <slang.h>
+#include <type_traits>
 
 namespace SlangRecord
 {
@@ -59,6 +60,8 @@ constexpr uint64_t kFirstValidHandle = 0x100; ///< First handle for tracked obje
 constexpr uint32_t kMaxReplayStringLength = 64 * 1024 * 1024;
 constexpr uint64_t kMaxReplayArrayCount = 16 * 1024 * 1024;
 constexpr size_t kMaxReplayArrayAllocationSize = 64 * 1024 * 1024;
+constexpr size_t kMaxReplayTotalAllocationSize = 256 * 1024 * 1024;
+constexpr size_t kMaxReplayAllocationToStreamSizeRatio = 16;
 
 /// Fixed-size index entry for the call index stream.
 /// Each entry stores only the byte offset of a call in stream.bin.
@@ -220,6 +223,7 @@ inline void validateReplayArrayCount(
     uint64_t arrayCount,
     uint64_t maxCountForCountType,
     size_t elementSize,
+    size_t minStreamBytesPerElement,
     size_t countOffset)
 {
     if (arrayCount > maxCountForCountType || arrayCount > kMaxReplayArrayCount)
@@ -229,13 +233,26 @@ inline void validateReplayArrayCount(
         throw DataMismatchException(countOffset, sizeof(arrayCount));
 
     const size_t sizeCount = static_cast<size_t>(arrayCount);
-    if (elementSize == 0 || sizeCount > kMaxReplayArrayAllocationSize / elementSize)
+    if (elementSize == 0 || minStreamBytesPerElement == 0 ||
+        sizeCount > kMaxReplayArrayAllocationSize / elementSize)
         throw DataMismatchException(countOffset, sizeof(arrayCount));
 
     const size_t streamPosition = stream.getPosition();
     const size_t streamSize = stream.getSize();
-    if (streamPosition > streamSize || arrayCount > uint64_t(streamSize - streamPosition))
+    if (streamPosition > streamSize)
         throw DataMismatchException(streamPosition, sizeof(arrayCount));
+
+    const size_t bytesAvailable = streamSize - streamPosition;
+    if (arrayCount > uint64_t(bytesAvailable / minStreamBytesPerElement))
+        throw DataMismatchException(streamPosition, sizeof(arrayCount));
+}
+
+template<typename T>
+inline constexpr size_t getReplayArrayMinStreamBytesPerElement()
+{
+    using ElementType = typename std::remove_cv<T>::type;
+    return (std::is_arithmetic<ElementType>::value || std::is_enum<ElementType>::value) ? sizeof(T)
+                                                                                        : 1;
 }
 
 /// Unified serializer for binary I/O during record/replay.
@@ -724,6 +741,7 @@ private:
     SLANG_API void setupRecordingMirror();
     SLANG_API void closeRecordingMirror();
     SLANG_API static String generateTimestampFolderName();
+    SLANG_API void requireReplayArenaAllocation(size_t offset, size_t size);
 
     /// Record a COM interface pointer (internal implementation).
     template<typename T>
@@ -735,6 +753,7 @@ private:
     ReplayStream m_indexStream;     ///< Index stream for call navigation (index.bin)
     ReplayStream m_referenceStream; ///< Reference stream for sync mode comparison
     MemoryArena m_arena;
+    size_t m_replayArenaAllocationSize = 0;
     Mode m_mode;
     List<uint8_t> m_compareBuffer; ///< Reusable buffer for sync comparisons
 
@@ -783,18 +802,21 @@ void ReplayContext::recordArray(RecordFlag flags, T*& arr, CountT& count)
     {
         expectTypeId(TypeId::Array);
         uint64_t arrayCount;
-        size_t countOffset = m_stream.getPosition();
         record(flags, arrayCount);
+        size_t countOffset = m_stream.getPosition() - sizeof(arrayCount);
         validateReplayArrayCount(
             m_stream,
             arrayCount,
             uint64_t((std::numeric_limits<CountT>::max)()),
             sizeof(T),
+            getReplayArrayMinStreamBytesPerElement<T>(),
             countOffset);
         count = static_cast<CountT>(arrayCount);
         if (arrayCount > 0)
         {
             size_t sizeCount = static_cast<size_t>(arrayCount);
+            size_t allocationSize = sizeCount * sizeof(T);
+            requireReplayArenaAllocation(countOffset, allocationSize);
             T* buf = m_arena.allocateArray<T>(sizeCount);
             for (size_t i = 0; i < sizeCount; ++i)
             {
@@ -827,18 +849,21 @@ void ReplayContext::recordArray(RecordFlag flags, const T*& arr, CountT& count)
     {
         expectTypeId(TypeId::Array);
         uint64_t arrayCount;
-        size_t countOffset = m_stream.getPosition();
         record(flags, arrayCount);
+        size_t countOffset = m_stream.getPosition() - sizeof(arrayCount);
         validateReplayArrayCount(
             m_stream,
             arrayCount,
             uint64_t((std::numeric_limits<CountT>::max)()),
             sizeof(T),
+            getReplayArrayMinStreamBytesPerElement<T>(),
             countOffset);
         count = static_cast<CountT>(arrayCount);
         if (arrayCount > 0)
         {
             size_t sizeCount = static_cast<size_t>(arrayCount);
+            size_t allocationSize = sizeCount * sizeof(T);
+            requireReplayArenaAllocation(countOffset, allocationSize);
             T* buf = m_arena.allocateArray<T>(sizeCount);
             for (size_t i = 0; i < sizeCount; ++i)
             {

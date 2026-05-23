@@ -316,6 +316,45 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedStringLength)
 // Array Type
 // =============================================================================
 
+static void writeArrayHeader(uint64_t arrayCount)
+{
+    uint8_t arrayTypeId = uint8_t(TypeId::Array);
+    uint8_t countTypeId = uint8_t(TypeId::UInt64);
+    ctx().getStream().write(&arrayTypeId, sizeof(arrayTypeId));
+    ctx().getStream().write(&countTypeId, sizeof(countTypeId));
+    ctx().getStream().write(&arrayCount, sizeof(arrayCount));
+}
+
+SLANG_UNIT_TEST(replayContextAcceptsMaxArrayCountAtAllocationLimit)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    writeRepeatedBytes(kMaxReplayArrayAllocationSize, 0);
+
+    ctx().switchToPlayback();
+
+    bool caughtException = false;
+    try
+    {
+        validateReplayArrayCount(
+            ctx().getStream(),
+            kMaxReplayArrayCount,
+            uint64_t((std::numeric_limits<uint64_t>::max)()),
+            sizeof(uint32_t),
+            sizeof(uint32_t),
+            0);
+    }
+    catch (const DataMismatchException&)
+    {
+        caughtException = true;
+    }
+
+    SLANG_CHECK(!caughtException);
+}
+
 SLANG_UNIT_TEST(replayContextRejectsOversizedArrayCount)
 {
     REPLAY_TEST;
@@ -323,13 +362,7 @@ SLANG_UNIT_TEST(replayContextRejectsOversizedArrayCount)
 
     ctx().reset();
     ctx().setMode(Mode::Record);
-
-    uint8_t arrayTypeId = uint8_t(TypeId::Array);
-    uint8_t countTypeId = uint8_t(TypeId::UInt64);
-    uint64_t arrayCount = kMaxReplayArrayCount + 1;
-    ctx().getStream().write(&arrayTypeId, sizeof(arrayTypeId));
-    ctx().getStream().write(&countTypeId, sizeof(countTypeId));
-    ctx().getStream().write(&arrayCount, sizeof(arrayCount));
+    writeArrayHeader(kMaxReplayArrayCount + 1);
 
     ctx().switchToPlayback();
 
@@ -348,6 +381,58 @@ SLANG_UNIT_TEST(replayContextRejectsOversizedArrayCount)
     SLANG_CHECK(caughtException);
 }
 
+SLANG_UNIT_TEST(replayContextRejectsArrayAllocationPastLimit)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    writeArrayHeader(kMaxReplayArrayAllocationSize / sizeof(uint64_t) + 1);
+
+    ctx().switchToPlayback();
+
+    bool caughtException = false;
+    try
+    {
+        uint64_t* arr = nullptr;
+        uint64_t count = 0;
+        ctx().recordArray(RecordFlag::None, arr, count);
+    }
+    catch (const DataMismatchException&)
+    {
+        caughtException = true;
+    }
+
+    SLANG_CHECK(caughtException);
+}
+
+SLANG_UNIT_TEST(replayContextRejectsArrayCountThatDoesNotFitCountType)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    writeArrayHeader(uint64_t((std::numeric_limits<uint16_t>::max)()) + 1);
+
+    ctx().switchToPlayback();
+
+    bool caughtException = false;
+    try
+    {
+        uint8_t* arr = nullptr;
+        uint16_t count = 0;
+        ctx().recordArray(RecordFlag::None, arr, count);
+    }
+    catch (const DataMismatchException&)
+    {
+        caughtException = true;
+    }
+
+    SLANG_CHECK(caughtException);
+}
+
 SLANG_UNIT_TEST(replayContextRejectsTruncatedArrayPayload)
 {
     REPLAY_TEST;
@@ -355,13 +440,7 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedArrayPayload)
 
     ctx().reset();
     ctx().setMode(Mode::Record);
-
-    uint8_t arrayTypeId = uint8_t(TypeId::Array);
-    uint8_t countTypeId = uint8_t(TypeId::UInt64);
-    uint64_t arrayCount = 4;
-    ctx().getStream().write(&arrayTypeId, sizeof(arrayTypeId));
-    ctx().getStream().write(&countTypeId, sizeof(countTypeId));
-    ctx().getStream().write(&arrayCount, sizeof(arrayCount));
+    writeArrayHeader(4);
 
     ctx().switchToPlayback();
 
