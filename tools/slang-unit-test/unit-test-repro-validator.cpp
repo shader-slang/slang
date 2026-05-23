@@ -902,6 +902,48 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload)
     SLANG_CHECK(outputContainsDiagnosticId(sink, Severity::Error, kInvalidReproStateDiagnosticId));
 }
 
+SLANG_UNIT_TEST(reproStateValidatorAcceptsSavedState)
+{
+    auto session = spCreateSession();
+    auto request = spCreateCompileRequest(session);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(spEnableReproCapture(request)));
+    spAddCodeGenTarget(request, SLANG_HLSL);
+
+    int translationUnitIndex =
+        spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "roundTrip");
+    spAddTranslationUnitSourceString(
+        request,
+        translationUnitIndex,
+        "round-trip.slang",
+        "[shader(\"compute\")]\n"
+        "[numthreads(1, 1, 1)]\n"
+        "void computeMain() {}\n");
+    spAddEntryPoint(request, translationUnitIndex, "computeMain", SLANG_STAGE_COMPUTE);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(spCompile(request)));
+
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(spSaveRepro(request, reproBlob.writeRef())));
+    SLANG_CHECK_ABORT(reproBlob && reproBlob->getBufferSize() != 0);
+
+    DiagnosticSink sink;
+    List<uint8_t> outBuffer;
+    SlangResult loadResult = ReproUtil::loadState(
+        static_cast<const uint8_t*>(reproBlob->getBufferPointer()),
+        reproBlob->getBufferSize(),
+        &sink,
+        outBuffer);
+
+    SLANG_CHECK(SLANG_SUCCEEDED(loadResult));
+    SLANG_CHECK(sink.getErrorCount() == 0);
+    SLANG_CHECK(isReproStateValid(outBuffer));
+    SLANG_CHECK(ReproUtil::getRequest(outBuffer) != nullptr);
+
+    spDestroyCompileRequest(request);
+    spDestroySession(session);
+}
+
 SLANG_UNIT_TEST(reproExtractFilesToDirectoryRejectsInvalidPayload)
 {
     List<uint8_t> invalidPayload;
