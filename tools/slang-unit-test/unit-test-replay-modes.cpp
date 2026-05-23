@@ -407,6 +407,20 @@ static void checkReplayContextIsPristine()
     SLANG_CHECK(ctx().getCurrentThisHandle() == kNullHandle);
 }
 
+static void readStringIntoReplayArena()
+{
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    const char* text = "arena allocation";
+    ctx().record(RecordFlag::None, text);
+    ctx().switchToPlayback();
+
+    const char* readText = nullptr;
+    ctx().record(RecordFlag::None, readText);
+    SLANG_CHECK(readText != nullptr);
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() > 0);
+}
+
 // Build a dirty singleton state covering everything reset() clears that has an
 // observable post-condition: a non-Idle mode, non-empty main and reference
 // streams (via switchToSync), and entries in the handle dictionaries with
@@ -496,6 +510,41 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyPlaybackState)
     SLANG_UNUSED(unitTestContext);
 
     checkReplayContextIsPristine();
+}
+
+SLANG_UNIT_TEST(replayContextSwitchToSyncClearsReplayArenaAllocation)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    readStringIntoReplayArena();
+
+    ctx().switchToSync();
+    SLANG_CHECK(ctx().getMode() == Mode::Sync);
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() == 0);
+}
+
+SLANG_UNIT_TEST(replayContextLoadReplayClearsReplayArenaAllocation)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    readStringIntoReplayArena();
+
+    String tempReplayPath;
+    SLANG_CHECK(SLANG_SUCCEEDED(File::generateTemporary(toSlice("slang-replay"), tempReplayPath)));
+    SLANG_CHECK(SLANG_SUCCEEDED(File::remove(tempReplayPath)));
+    SLANG_CHECK(Path::createDirectoryRecursive(tempReplayPath));
+
+    String streamPath = Path::combine(tempReplayPath, "stream.bin");
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        File::writeAllBytes(streamPath, ctx().getStream().getData(), ctx().getStream().getSize())));
+
+    SLANG_CHECK(SLANG_SUCCEEDED(ctx().loadReplay(tempReplayPath.getBuffer())));
+    SLANG_CHECK(ctx().isPlayback());
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() == 0);
+
+    SLANG_CHECK(SLANG_SUCCEEDED(Path::removeNonEmpty(tempReplayPath)));
 }
 
 // Dtor side of the REPLAY_TEST contract: when a test leaves the singleton

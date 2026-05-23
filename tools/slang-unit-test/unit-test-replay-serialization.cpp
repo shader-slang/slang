@@ -74,6 +74,33 @@ SLANG_UNIT_TEST(replayContextUInt32)
     SLANG_CHECK(roundTripCheck<uint32_t>(2147483648U));
 }
 
+SLANG_UNIT_TEST(replayContextRejectsTruncatedOutputUInt32)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+
+    uint8_t typeId = uint8_t(TypeId::UInt32);
+    ctx().getStream().write(&typeId, sizeof(typeId));
+
+    ctx().switchToPlayback();
+
+    bool caughtException = false;
+    try
+    {
+        uint32_t expectedValue = 42;
+        ctx().record(RecordFlag::Output, expectedValue);
+    }
+    catch (const DataMismatchException& e)
+    {
+        caughtException = e.getOffset() == sizeof(typeId) && e.getSize() == sizeof(uint32_t);
+    }
+
+    SLANG_CHECK(caughtException);
+}
+
 SLANG_UNIT_TEST(replayContextUInt64)
 {
     REPLAY_TEST;
@@ -362,6 +389,33 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedStringLength)
     SLANG_CHECK(caughtException);
 }
 
+SLANG_UNIT_TEST(replayContextRejectsCumulativeReplayArenaAllocationPastBudget)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    ctx().switchToPlayback();
+
+    size_t budget = size_t(kMaxReplayStringLength) + 1;
+    ctx().testsOnlyRequireReplayArenaAllocation(0, budget);
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() == budget);
+
+    bool caughtException = false;
+    try
+    {
+        ctx().testsOnlyRequireReplayArenaAllocation(0, 1);
+    }
+    catch (const DataMismatchException& e)
+    {
+        caughtException = e.getOffset() == 0 && e.getSize() == 1;
+    }
+
+    SLANG_CHECK(caughtException);
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() == budget);
+}
+
 // =============================================================================
 // Array Type
 // =============================================================================
@@ -507,6 +561,35 @@ SLANG_UNIT_TEST(replayContextRejectsTruncatedArrayPayload)
     }
 
     SLANG_CHECK(caughtException);
+}
+
+SLANG_UNIT_TEST(replayContextCountsNestedStringArrayAllocations)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    const char* values[] = {"first", "second"};
+    const char* const* writeValues = values;
+    uint32_t writeCount = 2;
+
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    ctx().recordArray(RecordFlag::None, writeValues, writeCount);
+
+    ctx().switchToPlayback();
+
+    const char* const* readValues = nullptr;
+    uint32_t readCount = 0;
+    ctx().recordArray(RecordFlag::None, readValues, readCount);
+
+    SLANG_CHECK(readCount == writeCount);
+    SLANG_CHECK(strcmp(readValues[0], values[0]) == 0);
+    SLANG_CHECK(strcmp(readValues[1], values[1]) == 0);
+
+    size_t expectedAllocation = sizeof(const char*) * writeCount;
+    expectedAllocation += strlen(values[0]) + 1;
+    expectedAllocation += strlen(values[1]) + 1;
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() == expectedAllocation);
 }
 
 // =============================================================================

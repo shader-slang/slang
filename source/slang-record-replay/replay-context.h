@@ -388,6 +388,10 @@ public:
     {
         return m_replayArenaAllocationSize;
     }
+    SLANG_API void testsOnlyRequireReplayArenaAllocation(size_t offset, size_t size)
+    {
+        requireReplayArenaAllocation(offset, size);
+    }
 
     /// Lock the context for thread-safe access.
     /// Returns an RAII lock guard.
@@ -751,6 +755,9 @@ private:
     template<typename T>
     void recordInterfaceImpl(RecordFlag flags, T*& obj);
 
+    template<typename T, typename CountT>
+    T* readArrayInPlayback(RecordFlag flags, CountT& count);
+
     // Core streams + mutex
     std::recursive_mutex m_mutex;
     ReplayStream m_stream;          ///< Main stream for record/playback
@@ -790,6 +797,36 @@ private:
 // Template implementations
 
 template<typename T, typename CountT>
+T* ReplayContext::readArrayInPlayback(RecordFlag flags, CountT& count)
+{
+    expectTypeId(TypeId::Array);
+    uint64_t arrayCount;
+    record(flags, arrayCount);
+    size_t countOffset = m_stream.getPosition() - sizeof(arrayCount);
+    validateReplayArrayCount(
+        m_stream,
+        arrayCount,
+        uint64_t((std::numeric_limits<CountT>::max)()),
+        sizeof(T),
+        getReplayArrayMinStreamBytesPerElement<T>(),
+        countOffset);
+    count = static_cast<CountT>(arrayCount);
+    if (arrayCount == 0)
+        return nullptr;
+
+    size_t sizeCount = static_cast<size_t>(arrayCount);
+    size_t allocationSize = sizeCount * sizeof(T);
+    requireReplayArenaAllocation(countOffset, allocationSize);
+    T* buf = m_arena.allocateArray<T>(sizeCount);
+    for (size_t i = 0; i < sizeCount; ++i)
+    {
+        new (&buf[i]) T{};
+        record(flags, buf[i]);
+    }
+    return buf;
+}
+
+template<typename T, typename CountT>
 void ReplayContext::recordArray(RecordFlag flags, T*& arr, CountT& count)
 {
     if (m_mode == Mode::Idle)
@@ -804,35 +841,7 @@ void ReplayContext::recordArray(RecordFlag flags, T*& arr, CountT& count)
     }
     else
     {
-        expectTypeId(TypeId::Array);
-        uint64_t arrayCount;
-        record(flags, arrayCount);
-        size_t countOffset = m_stream.getPosition() - sizeof(arrayCount);
-        validateReplayArrayCount(
-            m_stream,
-            arrayCount,
-            uint64_t((std::numeric_limits<CountT>::max)()),
-            sizeof(T),
-            getReplayArrayMinStreamBytesPerElement<T>(),
-            countOffset);
-        count = static_cast<CountT>(arrayCount);
-        if (arrayCount > 0)
-        {
-            size_t sizeCount = static_cast<size_t>(arrayCount);
-            size_t allocationSize = sizeCount * sizeof(T);
-            requireReplayArenaAllocation(countOffset, allocationSize);
-            T* buf = m_arena.allocateArray<T>(sizeCount);
-            for (size_t i = 0; i < sizeCount; ++i)
-            {
-                new (&buf[i]) T{};
-                record(flags, buf[i]);
-            }
-            arr = buf;
-        }
-        else
-        {
-            arr = nullptr;
-        }
+        arr = readArrayInPlayback<T>(flags, count);
     }
 }
 
@@ -851,35 +860,7 @@ void ReplayContext::recordArray(RecordFlag flags, const T*& arr, CountT& count)
     }
     else
     {
-        expectTypeId(TypeId::Array);
-        uint64_t arrayCount;
-        record(flags, arrayCount);
-        size_t countOffset = m_stream.getPosition() - sizeof(arrayCount);
-        validateReplayArrayCount(
-            m_stream,
-            arrayCount,
-            uint64_t((std::numeric_limits<CountT>::max)()),
-            sizeof(T),
-            getReplayArrayMinStreamBytesPerElement<T>(),
-            countOffset);
-        count = static_cast<CountT>(arrayCount);
-        if (arrayCount > 0)
-        {
-            size_t sizeCount = static_cast<size_t>(arrayCount);
-            size_t allocationSize = sizeCount * sizeof(T);
-            requireReplayArenaAllocation(countOffset, allocationSize);
-            T* buf = m_arena.allocateArray<T>(sizeCount);
-            for (size_t i = 0; i < sizeCount; ++i)
-            {
-                new (&buf[i]) T{};
-                record(flags, buf[i]);
-            }
-            arr = buf;
-        }
-        else
-        {
-            arr = nullptr;
-        }
+        arr = readArrayInPlayback<T>(flags, count);
     }
 }
 
