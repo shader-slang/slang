@@ -974,7 +974,7 @@ SLANG_UNIT_TEST(reproStateValidator)
         SLANG_CHECK(ReproUtil::getRequest(oversize) != nullptr);
     }
 
-    // 21. Direct loader helpers fail cleanly on null request pointers.
+    // 21. Exported loader helpers fail cleanly on null request pointers.
     {
         List<uint8_t> buf;
         buildMinimalValid(buf);
@@ -982,8 +982,6 @@ SLANG_UNIT_TEST(reproStateValidator)
         MemoryOffsetBase base;
         base.set(buf.getBuffer(), buf.getCount());
 
-        ComPtr<ISlangFileSystemExt> fileSystemExt;
-        SLANG_CHECK(SLANG_FAILED(ReproUtil::loadFileSystem(base, nullptr, nullptr, fileSystemExt)));
         SLANG_CHECK(SLANG_FAILED(ReproUtil::load(base, nullptr, nullptr, nullptr)));
 
         ComPtr<ISlangMutableFileSystem> mutableFileSystem(new MemoryFileSystem);
