@@ -21,7 +21,6 @@ static TypeId readTypeIdFromStream(ReplayStream& stream)
 SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Start recording
     ctx().setMode(Mode::Record);
@@ -91,7 +90,6 @@ SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
 SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Start recording
     ctx().setMode(Mode::Record);
@@ -181,7 +179,6 @@ SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
 SLANG_UNIT_TEST(replayContextReplayDirectory)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Test default directory
     SLANG_CHECK(strcmp(ctx().getReplayDirectory(), ".slang-replays") == 0);
@@ -200,7 +197,6 @@ SLANG_UNIT_TEST(replayContextReplayDirectory)
 SLANG_UNIT_TEST(replayContextMirrorFileCreation)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Use a unique test directory
     ctx().setReplayDirectory(".slang-replays-test");
@@ -232,7 +228,6 @@ SLANG_UNIT_TEST(replayContextMirrorFileCreation)
 SLANG_UNIT_TEST(replayContextLoadLatestReplay)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Use a unique test directory
     ctx().setReplayDirectory(".slang-replays-test");
@@ -276,7 +271,6 @@ SLANG_UNIT_TEST(replayContextLoadLatestReplay)
 SLANG_UNIT_TEST(replayContextFindLatestFolder)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Test that the timestamp sorting works correctly
     // We'll create two recordings with a small delay between them
@@ -323,7 +317,6 @@ SLANG_UNIT_TEST(replayContextFindLatestFolder)
 SLANG_UNIT_TEST(replayContextRecordGetSessionDescDigestCall)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     ctx().setMode(Mode::Record);
 
@@ -400,7 +393,6 @@ SLANG_UNIT_TEST(replayContextRecordGetSessionDescDigestCall)
 SLANG_UNIT_TEST(replayContextGetSessionDescDigestPlayback)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     ctx().setMode(Mode::Record);
 

@@ -10,7 +10,6 @@
 SLANG_UNIT_TEST(replayContextHandle)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // This test verifies that blob content survives a record/playback round-trip
     // using hash-based serialization. Blobs are serialized by content hash to disk,
@@ -60,7 +59,6 @@ SLANG_UNIT_TEST(replayContextHandle)
 SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Test with multiple blobs with different content to ensure hash-based
     // serialization correctly distinguishes them by content
@@ -125,7 +123,6 @@ SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
 SLANG_UNIT_TEST(replayContextHandleNull)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Test that null pointers are handled correctly
 
@@ -149,7 +146,6 @@ SLANG_UNIT_TEST(replayContextHandleNull)
 SLANG_UNIT_TEST(replayContextInlineBlob)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Test inline blob serialization - when a user-provided blob (not tracked)
     // is passed as input, its data should be serialized inline and reconstructed
@@ -193,7 +189,6 @@ SLANG_UNIT_TEST(replayContextInlineBlob)
 SLANG_UNIT_TEST(replayContextInlineBlobThenTracked)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Test that the same blob content serialized multiple times (as input then output
     // then input again) is correctly de-duplicated on disk and round-trips properly.

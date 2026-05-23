@@ -11,7 +11,6 @@
 SLANG_UNIT_TEST(replayContextStreamState)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Test isReading/isWriting
     ctx().reset();
@@ -34,7 +33,6 @@ SLANG_UNIT_TEST(replayContextStreamState)
 SLANG_UNIT_TEST(replayContextSessionWrappedWhenActive)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Save original state using the public C API
     bool wasActive = slang_isRecordLayerEnabled();
@@ -63,7 +61,6 @@ SLANG_UNIT_TEST(replayContextSessionWrappedWhenActive)
 SLANG_UNIT_TEST(replayContextSessionNotWrappedWhenInactive)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Save original state using the public C API
     bool wasActive = slang_isRecordLayerEnabled();
@@ -93,7 +90,6 @@ SLANG_UNIT_TEST(replayContextSessionNotWrappedWhenInactive)
 SLANG_UNIT_TEST(replayContextIdleMode)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // In Idle mode, record operations should be no-ops
     ctx().reset();
@@ -117,7 +113,6 @@ SLANG_UNIT_TEST(replayContextIdleMode)
 SLANG_UNIT_TEST(replayContextRecordMode)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // In Record mode, data should be written to stream
     ctx().reset();
@@ -141,7 +136,6 @@ SLANG_UNIT_TEST(replayContextRecordMode)
 SLANG_UNIT_TEST(replayContextPlaybackMode)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // First record some data
     ctx().reset();
@@ -178,7 +172,6 @@ SLANG_UNIT_TEST(replayContextPlaybackMode)
 SLANG_UNIT_TEST(replayContextSyncModeMatching)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // First, record reference data
     ctx().reset();
@@ -215,7 +208,6 @@ SLANG_UNIT_TEST(replayContextSyncModeMatching)
 SLANG_UNIT_TEST(replayContextSyncModeMismatch)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // First, record reference data
     ctx().reset();
@@ -245,7 +237,6 @@ SLANG_UNIT_TEST(replayContextSyncModeMismatch)
 SLANG_UNIT_TEST(replayContextPlaybackOutputVerification)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Record data with Output flag
     ctx().reset();
@@ -283,7 +274,6 @@ SLANG_UNIT_TEST(replayContextPlaybackOutputVerification)
 SLANG_UNIT_TEST(replayContextPlaybackOutputMismatch)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Record an output value
     ctx().reset();
@@ -313,7 +303,6 @@ SLANG_UNIT_TEST(replayContextPlaybackOutputMismatch)
 SLANG_UNIT_TEST(replayContextModeTransitions)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     ctx().reset();
     SLANG_CHECK(ctx().getMode() == Mode::Idle);
@@ -344,7 +333,6 @@ SLANG_UNIT_TEST(replayContextModeTransitions)
 SLANG_UNIT_TEST(replayContextReset)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     ctx().reset();
     ctx().setMode(Mode::Record);
@@ -362,7 +350,6 @@ SLANG_UNIT_TEST(replayContextReset)
 SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
 {
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     // Record reference data
     ctx().reset();
@@ -398,12 +385,12 @@ SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
 // source/slang-record-replay/replay-context.cpp.
 static void checkReplayContextIsPristine()
 {
-    SLANG_CHECK(ctx().getMode() == Mode::Idle);
-    SLANG_CHECK(!ctx().isActive());
-    SLANG_CHECK(ctx().getStream().getSize() == 0);
-    SLANG_CHECK(!ctx().hasCallIndex());
-    SLANG_CHECK(ctx().getNextHandle() == kFirstValidHandle);
-    SLANG_CHECK(ctx().getCurrentThisHandle() == kNullHandle);
+    SLANG_CHECK_ABORT(ctx().getMode() == Mode::Idle);
+    SLANG_CHECK_ABORT(!ctx().isActive());
+    SLANG_CHECK_ABORT(ctx().getStream().getSize() == 0);
+    SLANG_CHECK_ABORT(!ctx().hasCallIndex());
+    SLANG_CHECK_ABORT(ctx().getNextHandle() == kFirstValidHandle);
+    SLANG_CHECK_ABORT(ctx().getCurrentThisHandle() == kNullHandle);
 }
 
 // Build a dirty singleton state covering everything reset() clears that has an
@@ -447,7 +434,6 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyState)
     // ScopedReplayContext's ctor must force the singleton back to its
     // post-reset() state.
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     checkReplayContextIsPristine();
 
@@ -485,7 +471,6 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyPlaybackState)
     SLANG_CHECK(ctx().getStream().getPosition() > 0);
 
     REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
 
     checkReplayContextIsPristine();
 }
@@ -508,7 +493,6 @@ SLANG_UNIT_TEST(replayContextDtorLeavesSingletonClean)
     Slang::ComPtr<MutableFileSystemProxy> fsProxy;
     {
         REPLAY_TEST;
-        SLANG_UNUSED(unitTestContext);
 
         fsProxy = dirtyReplayContext(99);
     }
