@@ -35,7 +35,7 @@ struct ReproUtil
     static const FourCC::RawValue kSlangStateDataFourCC =
         SLANG_FOUR_CC('d', 'a', 't', 'a'); ///< Holds the actual binary data.
 
-    static const SemanticVersion g_semanticVersion;
+    SLANG_API static const SemanticVersion g_semanticVersion;
 
     struct Header
     {
@@ -192,28 +192,31 @@ struct ReproUtil
     /// Load the requestState into request
     /// The overrideFileSystem is optional and can be passed as nullptr. If set, as each file is
     /// loaded it will attempt to load from fileSystem the *uniqueName*
-    static SlangResult load(
+    SLANG_API static SlangResult load(
         OffsetBase& base,
         RequestState* requestState,
         ISlangFileSystem* overrideFileSystem,
         EndToEndCompileRequest* request);
 
-    static SlangResult loadState(
+    SLANG_API static SlangResult loadState(
         const String& filename,
         DiagnosticSink* sink,
         List<uint8_t>& outBuffer);
-    static SlangResult loadState(Stream* stream, DiagnosticSink* sink, List<uint8_t>& outBuffer);
-    static SlangResult loadState(
+    SLANG_API static SlangResult loadState(
+        Stream* stream,
+        DiagnosticSink* sink,
+        List<uint8_t>& outBuffer);
+    SLANG_API static SlangResult loadState(
         const uint8_t* data,
         size_t size,
         DiagnosticSink* sink,
         List<uint8_t>& outBuffer);
 
-    static RequestState* getRequest(const List<uint8_t>& inBuffer);
+    SLANG_API static RequestState* getRequest(const List<uint8_t>& inBuffer);
 
     static SlangResult extractFilesToDirectory(const String& file, DiagnosticSink* sink);
 
-    static SlangResult extractFiles(
+    SLANG_API static SlangResult extractFiles(
         OffsetBase& base,
         RequestState* requestState,
         ISlangMutableFileSystem* fileSystem);

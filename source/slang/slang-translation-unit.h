@@ -40,7 +40,7 @@ public:
     /// Get the source files.
     /// Since lazily evaluated requires calling requireSourceFiles to know it's in sync
     /// with sourceArtifacts.
-    List<SourceFile*> const& getSourceFiles();
+    SLANG_API List<SourceFile*> const& getSourceFiles();
 
     /// Get the source artifacts associated
     const List<ComPtr<IArtifact>>& getSourceArtifacts() const { return m_sourceArtifacts; }
