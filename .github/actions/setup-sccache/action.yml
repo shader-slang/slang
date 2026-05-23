@@ -18,18 +18,22 @@ runs:
         ARCH=$(uname -m)
         if [[ "$ARCH" == "x86_64" ]]; then
           SCCACHE_ARCH="x86_64-unknown-linux-musl"
+          SCCACHE_SHA256="42612b161343e8b74d1feac6418c1286e036854983e7a16d567cfde3c74a8baf"
         elif [[ "$ARCH" == "aarch64" ]]; then
           SCCACHE_ARCH="aarch64-unknown-linux-musl"
+          SCCACHE_SHA256="f491b6080da49547622d2a3ea388232293a1a0bb99acb53557dad7c34608b8d9"
         else
           echo "Unsupported architecture: $ARCH"
           exit 1
         fi
 
         echo "Installing sccache for $ARCH ($SCCACHE_ARCH)"
-        curl -fL --retry 3 --retry-delay 5 -o /tmp/sccache.tar.gz \
+        sccache_archive="/tmp/sccache.tar.gz"
+        curl -fL --retry 3 --retry-delay 5 -o "$sccache_archive" \
           https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-${SCCACHE_ARCH}.tar.gz
-        tar xz -f /tmp/sccache.tar.gz
-        rm /tmp/sccache.tar.gz
+        printf '%s  %s\n' "$SCCACHE_SHA256" "$sccache_archive" | sha256sum -c -
+        tar xz -f "$sccache_archive"
+        rm "$sccache_archive"
         sccache_dir="sccache-v0.7.4-${SCCACHE_ARCH}"
 
         # Prefer a system install when available, but support non-root containers.
@@ -79,6 +83,11 @@ runs:
           # Use .zip release to avoid tar path issues on Windows
           $zipFile = Join-Path $env:RUNNER_TEMP "sccache.zip"
           curl.exe -fL --retry 3 --retry-delay 5 -o $zipFile https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-x86_64-pc-windows-msvc.zip
+          $expectedHash = "1b9809836e2e3e24a27cc447e5d801fab9486ebf31c8597e77461c1764b2d72b"
+          $actualHash = (Get-FileHash -Path $zipFile -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) {
+            throw "sccache archive SHA-256 mismatch: expected $expectedHash, got $actualHash"
+          }
           Expand-Archive -Path $zipFile -DestinationPath $env:RUNNER_TEMP -Force
           Move-Item (Join-Path $env:RUNNER_TEMP "sccache-v0.7.4-x86_64-pc-windows-msvc\sccache.exe") (Join-Path $installDir "sccache.exe")
           $installDir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
