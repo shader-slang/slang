@@ -40,8 +40,9 @@ runs:
           mv "$sccache_dir/sccache" /usr/local/bin/
           chmod +x /usr/local/bin/sccache
         else
-          install_dir="${RUNNER_TEMP:-/tmp}/sccache-bin"
-          mkdir -p "$install_dir"
+          install_parent="${RUNNER_TEMP:-/tmp}"
+          mkdir -p "$install_parent"
+          install_dir=$(mktemp -d "$install_parent/sccache-bin.XXXXXX")
           mv "$sccache_dir/sccache" "$install_dir/"
           chmod +x "$install_dir/sccache"
           echo "$install_dir" >> "$GITHUB_PATH"
