@@ -741,7 +741,11 @@ bool ByteCodeInterpreter::validateCurrentInstruction(VMExecInstHeader* inst)
         if (inst->opcodeExtension > m_currentFunction->m_header->returnValueSizeInBytes)
             return failExecution("VM return size exceeds the function return value size.");
         if (inst->opcodeExtension == 0)
-            return validateOperandCount(this, inst, 0);
+        {
+            // Void returns do not read a result operand, and existing emitted bytecode
+            // can leave an unused operand attached.
+            return true;
+        }
         return validateOperandCount(this, inst, 1) &&
                check(0, inst->opcodeExtension, OperandAccess::Read);
     case VMOp::Jump:

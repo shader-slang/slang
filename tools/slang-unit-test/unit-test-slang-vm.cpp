@@ -495,6 +495,29 @@ SLANG_UNIT_TEST(slangVMAllowsNopWithUnusedOperand)
     List<uint8_t> instCode;
     appendVMTestInst(instCode, VMOp::Nop, 0, operands.getArrayView());
 
+    List<VMOperand> noOperands;
+    appendVMTestInst(instCode, VMOp::Ret, 0, noOperands.getArrayView());
+
+    auto blob = createVMTestBlob(instCode, 8, 0, constants);
+    ComPtr<slang::IByteCodeRunner> runner;
+    slang::ByteCodeRunnerDesc runnerDesc = {};
+    SLANG_CHECK(slang_createByteCodeRunner(&runnerDesc, runner.writeRef()) == SLANG_OK);
+    SLANG_CHECK(runner->loadModule(blob) == SLANG_OK);
+    SLANG_CHECK(runner->selectFunctionByIndex(0) == SLANG_OK);
+    SLANG_CHECK(runner->execute(nullptr, 0) == SLANG_OK);
+}
+
+SLANG_UNIT_TEST(slangVMAllowsVoidRetWithUnusedOperand)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+
+    List<VMOperand> operands;
+    operands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(uint32_t)));
+
+    List<uint8_t> instCode;
+    appendVMTestInst(instCode, VMOp::Ret, 0, operands.getArrayView());
+
     auto blob = createVMTestBlob(instCode, 8, 0, constants);
     ComPtr<slang::IByteCodeRunner> runner;
     slang::ByteCodeRunnerDesc runnerDesc = {};
