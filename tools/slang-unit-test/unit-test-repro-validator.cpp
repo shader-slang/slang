@@ -944,8 +944,18 @@ SLANG_UNIT_TEST(reproStateValidatorAcceptsSavedState)
     SLANG_CHECK(SLANG_SUCCEEDED(loadResult));
     SLANG_CHECK(sink.getErrorCount() == 0);
     SLANG_CHECK(isReproStateValid(outBuffer));
-    SLANG_CHECK(ReproUtil::getRequest(outBuffer) != nullptr);
+    auto requestState = ReproUtil::getRequest(outBuffer);
+    SLANG_CHECK_ABORT(requestState != nullptr);
 
+    auto replayRequest = spCreateCompileRequest(session);
+    SLANG_CHECK_ABORT(replayRequest != nullptr);
+    auto replayInternalRequest = static_cast<EndToEndCompileRequest*>(replayRequest);
+    MemoryOffsetBase base;
+    base.set(outBuffer.getBuffer(), outBuffer.getCount());
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(ReproUtil::load(base, requestState, nullptr, replayInternalRequest)));
+
+    spDestroyCompileRequest(replayRequest);
     spDestroyCompileRequest(request);
     spDestroySession(session);
 }
