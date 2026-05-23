@@ -10,10 +10,11 @@
 #include "slang/slang-compiler-api.h"
 #include "slang/slang-repro-validator.h"
 #include "slang/slang-repro.h"
-#include "slang/slang-rich-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
+
+static const int kInvalidReproStateDiagnosticId = 99;
 
 // Copy OffsetContainer bytes into a List<uint8_t> as isReproStateValid expects.
 static void containerToBuffer(OffsetContainer& container, List<uint8_t>& outBuf)
@@ -32,10 +33,13 @@ static void buildMinimalValid(List<uint8_t>& outBuf)
     containerToBuffer(container, outBuf);
 }
 
-static bool outputContainsDiagnosticId(DiagnosticSink& sink, const DiagnosticInfo* info)
+static bool outputContainsDiagnosticId(DiagnosticSink& sink, Severity severity, int diagnosticId)
 {
+    String idString(diagnosticId);
     StringBuilder expected;
-    expected << getSeverityName(info->severity) << " " << info->id << ":";
+    expected << getSeverityName(severity) << "[E";
+    expected.appendRepeatedChar('0', Math::Max<Index>(0, 5 - idString.getLength()));
+    expected << idString << "]:";
     return sink.outputBuffer.produceString().contains(expected.produceString());
 }
 
@@ -727,7 +731,7 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsInvalidPayload)
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(outBuffer.getCount() == 0);
     SLANG_CHECK(sink.getErrorCount() == 1);
-    SLANG_CHECK(outputContainsDiagnosticId(sink, Diagnostics::InvalidReproState::getInfo()));
+    SLANG_CHECK(outputContainsDiagnosticId(sink, Severity::Error, kInvalidReproStateDiagnosticId));
 }
 
 SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload)
@@ -747,7 +751,7 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload)
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(outBuffer.getCount() == 0);
     SLANG_CHECK(sink.getErrorCount() == 1);
-    SLANG_CHECK(outputContainsDiagnosticId(sink, Diagnostics::InvalidReproState::getInfo()));
+    SLANG_CHECK(outputContainsDiagnosticId(sink, Severity::Error, kInvalidReproStateDiagnosticId));
 }
 
 SLANG_UNIT_TEST(reproExtractFilesToDirectoryRejectsInvalidPayload)
@@ -774,7 +778,7 @@ SLANG_UNIT_TEST(reproExtractFilesToDirectoryRejectsInvalidPayload)
     SlangResult result = ReproUtil::extractFilesToDirectory(filePath, &sink);
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(sink.getErrorCount() == 1);
-    SLANG_CHECK(outputContainsDiagnosticId(sink, Diagnostics::InvalidReproState::getInfo()));
+    SLANG_CHECK(outputContainsDiagnosticId(sink, Severity::Error, kInvalidReproStateDiagnosticId));
     SLANG_CHECK(!File::exists(outputDir));
 
     SLANG_CHECK(SLANG_SUCCEEDED(File::remove(filePath)));
