@@ -308,8 +308,33 @@ private:
         return true;
     }
 
+    bool isCompressedResultValid(PathInfoState::CompressedResult result) const
+    {
+        return uint8_t(result) < uint8_t(PathInfoState::CompressedResult::CountOf);
+    }
+
+    bool isPathTypeValid(SlangPathType pathType) const
+    {
+        switch (pathType)
+        {
+        case SLANG_PATH_TYPE_DIRECTORY:
+        case SLANG_PATH_TYPE_FILE:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     bool validatePathInfoState(const PathInfoState& pathInfo) const
     {
+        if (!isPathTypeValid(pathInfo.pathType) ||
+            !isCompressedResultValid(pathInfo.loadFileResult) ||
+            !isCompressedResultValid(pathInfo.getPathTypeResult) ||
+            !isCompressedResultValid(pathInfo.getCanonicalPathResult))
+        {
+            return false;
+        }
+
         return validateFilePtr(pathInfo.file, false);
     }
 

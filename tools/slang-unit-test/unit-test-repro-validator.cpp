@@ -40,6 +40,21 @@ static void buildMinimalValid(List<uint8_t>& outBuf)
     containerToBuffer(container, outBuf);
 }
 
+static uint32_t buildValidPathInfoMap(List<uint8_t>& outBuf)
+{
+    OffsetContainer container;
+    auto requestPtr = container.newObject<ReproUtil::RequestState>();
+    auto pathAndPathInfoArray = container.newArray<ReproUtil::PathAndPathInfo>(1);
+    auto pathInfoPtr = container.newObject<ReproUtil::PathInfoState>();
+
+    container[requestPtr]->pathInfoMap = pathAndPathInfoArray;
+    container[pathAndPathInfoArray[0]].path = container.newString("shader.slang");
+    container[pathAndPathInfoArray[0]].pathInfo = pathInfoPtr;
+
+    containerToBuffer(container, outBuf);
+    return pathInfoPtr.m_offset;
+}
+
 static uint32_t alignOffset(uint32_t offset, uint32_t alignment)
 {
     const uint32_t remainder = offset % alignment;
@@ -941,7 +956,53 @@ SLANG_UNIT_TEST(reproStateValidator)
         SLANG_CHECK(!isReproStateValid(buf));
     }
 
-    // 19q. OffsetBase pointer access returns null for an out-of-bounds offset.
+    // 19q. PathInfoState scalar fields reject invalid serialized enum values.
+    {
+        {
+            List<uint8_t> buf;
+            const uint32_t pathInfoOffset = buildValidPathInfoMap(buf);
+            SLANG_CHECK(isReproStateValid(buf));
+
+            auto pathType = reinterpret_cast<SlangPathType*>(
+                buf.getBuffer() + pathInfoOffset + offsetof(ReproUtil::PathInfoState, pathType));
+            *pathType = SlangPathType(2);
+            SLANG_CHECK(!isReproStateValid(buf));
+        }
+
+        {
+            List<uint8_t> buf;
+            const uint32_t pathInfoOffset = buildValidPathInfoMap(buf);
+            auto loadFileResult = reinterpret_cast<ReproUtil::PathInfoState::CompressedResult*>(
+                buf.getBuffer() + pathInfoOffset +
+                offsetof(ReproUtil::PathInfoState, loadFileResult));
+            *loadFileResult = ReproUtil::PathInfoState::CompressedResult(0xFF);
+            SLANG_CHECK(!isReproStateValid(buf));
+        }
+
+        {
+            List<uint8_t> buf;
+            const uint32_t pathInfoOffset = buildValidPathInfoMap(buf);
+            auto getPathTypeResult =
+                reinterpret_cast<ReproUtil::PathInfoState::CompressedResult*>(
+                    buf.getBuffer() + pathInfoOffset +
+                    offsetof(ReproUtil::PathInfoState, getPathTypeResult));
+            *getPathTypeResult = ReproUtil::PathInfoState::CompressedResult(0xFF);
+            SLANG_CHECK(!isReproStateValid(buf));
+        }
+
+        {
+            List<uint8_t> buf;
+            const uint32_t pathInfoOffset = buildValidPathInfoMap(buf);
+            auto getCanonicalPathResult =
+                reinterpret_cast<ReproUtil::PathInfoState::CompressedResult*>(
+                    buf.getBuffer() + pathInfoOffset +
+                    offsetof(ReproUtil::PathInfoState, getCanonicalPathResult));
+            *getCanonicalPathResult = ReproUtil::PathInfoState::CompressedResult(0xFF);
+            SLANG_CHECK(!isReproStateValid(buf));
+        }
+    }
+
+    // 19r. OffsetBase pointer access returns null for an out-of-bounds offset.
     {
         List<uint8_t> buf;
         buildMinimalValid(buf);
