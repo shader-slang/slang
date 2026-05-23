@@ -107,13 +107,28 @@ SLANG_UNIT_TEST(offsetContainer)
     }
 
 #if SIZE_MAX > 0xFFFFFFFFu
-    // On 64-bit hosts, exercise newArray's own count cap (size > 0xFFFFFFFFu) directly
-    // rather than relying on allocate()'s byte-cap as a backstop. The uint8_t element
-    // type makes sizeof(T) * size inert, isolating the count-cap branch.
+    // On 64-bit hosts, exercise newArray's count cap (size > 0xFFFFFFFFu). Note that
+    // allocate()'s 32-bit byte-cap also rejects this input (0x100000000 bytes > 4 GiB),
+    // so the test covers both guards together rather than isolating just the count-cap
+    // branch. Choosing an element type that would isolate the count-cap branch isn't
+    // feasible on a 64-bit host: with sizeof(T) > 0, size > 0xFFFFFFFFu always implies
+    // sizeof(T) * size > 0xFFFFFFFFu.
     {
         OffsetContainer container;
         auto arr = container.newArray<uint8_t>(size_t(0x100000000ull));
         SLANG_CHECK(arr.getCount() == 0);
+    }
+
+    // newString must reject a slice whose length exceeds the 32-bit offset domain after
+    // accounting for the encoded header and trailing null. The size-cap branch fires
+    // before any read of the slice contents, so we can use a non-deref'd placeholder
+    // pointer with a fabricated length. Gated to 64-bit because b + len overflows
+    // size_t on 32-bit hosts.
+    {
+        const char* fake = reinterpret_cast<const char*>(uintptr_t(1));
+        UnownedStringSlice slice(fake, size_t(0xFFFFFFFEu));
+        OffsetContainer container;
+        SLANG_CHECK(container.newString(slice).isNull());
     }
 #endif
 
