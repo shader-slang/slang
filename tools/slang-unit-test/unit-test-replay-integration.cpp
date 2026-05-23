@@ -24,6 +24,48 @@ static void writeTypeIdToStream(ReplayStream& stream, TypeId typeId)
     stream.write(&byte, 1);
 }
 
+static void writeStringBytesToStream(ReplayStream& stream, const void* data, uint32_t length)
+{
+    writeTypeIdToStream(stream, TypeId::String);
+    stream.write(&length, sizeof(length));
+    if (length > 0)
+        stream.write(data, length);
+}
+
+static void writeStringToStream(ReplayStream& stream, const char* str)
+{
+    writeStringBytesToStream(stream, str, uint32_t(strlen(str)));
+}
+
+static void writeBlobHashToStream(ReplayStream& stream, const char* hash)
+{
+    writeTypeIdToStream(stream, TypeId::Blob);
+    writeStringToStream(stream, hash);
+}
+
+static void checkNextReplayBlobContent(const char* expectedContent)
+{
+    ISlangBlob* replayedBlobRaw = nullptr;
+    ctx().record(RecordFlag::Output, replayedBlobRaw);
+    ComPtr<ISlangBlob> replayedBlob;
+    replayedBlob.attach(replayedBlobRaw);
+
+    size_t expectedSize = strlen(expectedContent);
+    SLANG_CHECK(replayedBlob != nullptr);
+    SLANG_CHECK(replayedBlob->getBufferSize() == expectedSize);
+    SLANG_CHECK(memcmp(replayedBlob->getBufferPointer(), expectedContent, expectedSize) == 0);
+}
+
+static void checkNextReplayBlobRejected()
+{
+    ISlangBlob* replayedBlobRaw = nullptr;
+    ctx().record(RecordFlag::Output, replayedBlobRaw);
+    ComPtr<ISlangBlob> replayedBlob;
+    replayedBlob.attach(replayedBlobRaw);
+
+    SLANG_CHECK(replayedBlob == nullptr);
+}
+
 SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
 {
     REPLAY_TEST;
@@ -329,8 +371,20 @@ SLANG_UNIT_TEST(replayContextRejectsInvalidBlobHash)
     const char* replayDirectory = ".slang-replays-security-test";
     const char* sensitiveFileName = "sensitive-blob.bin";
     const char* sensitiveContent = "content outside the replay blob store";
-    const char* invalidHash = "../../sensitive-blob.bin";
 
+    struct ValidBlobHashCase
+    {
+        const char* hash;
+        const char* content;
+    };
+
+    ValidBlobHashCase validCases[] = {
+        {"0123456789abcdef0123456789abcdef01234567", "lowercase hash content"},
+        {"FEDCBA9876543210FEDCBA9876543210FEDCBA98", "uppercase hash content"},
+        {"0123456789aBcDeFfedcba9876543210AbCdEf01", "mixed-case hash content"},
+    };
+
+    Path::removeNonEmpty(String(replayDirectory));
     ctx().setReplayDirectory(replayDirectory);
     ctx().setMode(Mode::Record);
 
@@ -340,26 +394,89 @@ SLANG_UNIT_TEST(replayContextRejectsInvalidBlobHash)
     String filesDir = Path::combine(String(replayPath), "files");
     SLANG_CHECK(Path::createDirectoryRecursive(filesDir));
 
-    String sensitivePath = Path::combine(String(replayDirectory), sensitiveFileName);
-    SLANG_CHECK(SLANG_SUCCEEDED(
-        File::writeAllBytes(sensitivePath, sensitiveContent, strlen(sensitiveContent))));
+    for (auto& validCase : validCases)
+    {
+        String contentPath = Path::combine(filesDir, validCase.hash);
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            File::writeAllBytes(contentPath, validCase.content, strlen(validCase.content))));
+        writeBlobHashToStream(ctx().getStream(), validCase.hash);
+    }
 
+    String replayDirectorySensitivePath = Path::combine(String(replayDirectory), sensitiveFileName);
+    SLANG_CHECK(SLANG_SUCCEEDED(File::writeAllBytes(
+        replayDirectorySensitivePath,
+        sensitiveContent,
+        strlen(sensitiveContent))));
+    writeBlobHashToStream(ctx().getStream(), "../../sensitive-blob.bin");
+
+    char thirtyNineHexChars[40];
+    for (size_t i = 0; i < 39; ++i)
+        thirtyNineHexChars[i] = 'a';
+    thirtyNineHexChars[39] = '\0';
+    writeBlobHashToStream(ctx().getStream(), thirtyNineHexChars);
+
+    char fortyOneHexChars[42];
+    for (size_t i = 0; i < 41; ++i)
+        fortyOneHexChars[i] = 'a';
+    fortyOneHexChars[41] = '\0';
+    writeBlobHashToStream(ctx().getStream(), fortyOneHexChars);
+
+    char fortyHexCharsWithTrailingTraversal[40 + sizeof("/../../sensitive-blob.bin")];
+    for (size_t i = 0; i < 40; ++i)
+        fortyHexCharsWithTrailingTraversal[i] = 'a';
+    strcpy(fortyHexCharsWithTrailingTraversal + 40, "/../../sensitive-blob.bin");
+    String fortyHexCharDirectory =
+        Path::combine(filesDir, String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    SLANG_CHECK(Path::createDirectoryRecursive(fortyHexCharDirectory));
+    String replayPathSensitivePath = Path::combine(String(replayPath), sensitiveFileName);
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        File::writeAllBytes(replayPathSensitivePath, sensitiveContent, strlen(sensitiveContent))));
+    writeBlobHashToStream(ctx().getStream(), fortyHexCharsWithTrailingTraversal);
+
+    char nonHexAtStart[41];
+    for (size_t i = 0; i < 40; ++i)
+        nonHexAtStart[i] = 'a';
+    nonHexAtStart[0] = 'g';
+    nonHexAtStart[40] = '\0';
+    writeBlobHashToStream(ctx().getStream(), nonHexAtStart);
+
+    char nonHexAtEnd[41];
+    for (size_t i = 0; i < 40; ++i)
+        nonHexAtEnd[i] = 'a';
+    nonHexAtEnd[39] = 'g';
+    nonHexAtEnd[40] = '\0';
+    writeBlobHashToStream(ctx().getStream(), nonHexAtEnd);
+
+    char embeddedNullHash[40];
+    for (size_t i = 0; i < 40; ++i)
+        embeddedNullHash[i] = 'a';
+    embeddedNullHash[20] = '\0';
     writeTypeIdToStream(ctx().getStream(), TypeId::Blob);
-    const char* recordedHash = invalidHash;
-    ctx().record(RecordFlag::None, recordedHash);
+    writeStringBytesToStream(
+        ctx().getStream(),
+        embeddedNullHash,
+        uint32_t(sizeof(embeddedNullHash)));
+
+    writeBlobHashToStream(ctx().getStream(), "");
+    writeBlobHashToStream(ctx().getStream(), "..\\..\\sensitive-blob.bin");
 
     ctx().switchToPlayback();
 
-    ISlangBlob* replayedBlobRaw = nullptr;
-    ctx().record(RecordFlag::Output, replayedBlobRaw);
-    ComPtr<ISlangBlob> replayedBlob;
-    replayedBlob.attach(replayedBlobRaw);
+    for (auto& validCase : validCases)
+        checkNextReplayBlobContent(validCase.content);
 
-    SLANG_CHECK(replayedBlob == nullptr);
+    checkNextReplayBlobRejected(); // Non-hex traversal at index 0.
+    checkNextReplayBlobRejected(); // 39 hex characters.
+    checkNextReplayBlobRejected(); // 41 hex characters.
+    checkNextReplayBlobRejected(); // 40 hex characters with trailing traversal.
+    checkNextReplayBlobRejected(); // Non-hex at index 0.
+    checkNextReplayBlobRejected(); // Non-hex at index 39.
+    checkNextReplayBlobRejected(); // Embedded null at index 20.
+    checkNextReplayBlobRejected(); // Empty hash.
+    checkNextReplayBlobRejected(); // Windows-style traversal.
     SLANG_CHECK(ctx().getStream().atEnd());
 
     ctx().reset();
-    File::remove(sensitivePath);
     Path::removeNonEmpty(String(replayDirectory));
     ctx().setReplayDirectory(".slang-replays");
 }
