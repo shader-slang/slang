@@ -19,14 +19,18 @@ Key directories:
 
 ## Build, Test, and Development Commands
 
-- `cmake --preset default`: configure the default Ninja Multi-Config build in `build/`.
-- `cmake --build --preset debug`: build the Debug configuration.
-- `cmake --build --preset releaseWithDebugInfo`: build an optimized configuration with symbols.
-- `cmake --workflow --preset release`: configure, build, and package a release build.
-- `build/Debug/bin/slang-test`: run the test suite from the repository root.
-- `build/Release/bin/slang-test -use-test-server -server-count 8`: run tests in parallel
-  using test servers.
-- `cmake --preset vs2026`: preferred Windows configuration preset for Visual Studio 2026.
+Slang build setup is platform-specific, especially under WSL. For compiler builds, use the
+`slang-build` skill from the `shader-slang/slang-skills` repository instead of following
+hard-coded commands in this file.
+
+Examples:
+- `/slang-build build debug`: build the Debug configuration.
+- `/slang-build rebuild debug`: discard the existing build directory and rebuild Debug.
+- `/slang-build configure releasewithdebug`: configure an optimized build with symbols.
+- `/slang-build clean`: rename and remove the existing build directory.
+
+Do not infer WSL build commands from generic Linux instructions. Follow the platform detection,
+host-tool selection, CMake preset choice, and clean-build steps defined by the skill.
 
 ## Coding Style & Naming Conventions
 
