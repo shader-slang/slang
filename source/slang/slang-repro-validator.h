@@ -15,8 +15,9 @@ namespace Slang
 /// Checks offset and array bounds, alignment, OffsetString encodings and
 /// terminators, required file/string relationships, and entry point/output
 /// index ranges. Returns false on any violation; callers should emit
-/// Diagnostics::InvalidReproState and abort the load.
-bool isReproStateValid(const List<uint8_t>& buffer);
+/// Diagnostics::InvalidReproState, discard the invalid buffer, and abort the
+/// load. ReproUtil::loadState implements that rejection contract.
+[[nodiscard]] bool isReproStateValid(const List<uint8_t>& buffer);
 
 } // namespace Slang
 

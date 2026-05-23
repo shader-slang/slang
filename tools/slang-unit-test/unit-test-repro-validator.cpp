@@ -701,6 +701,36 @@ SLANG_UNIT_TEST(reproStateValidator)
         SLANG_CHECK(isReproStateValid(buf));
     }
 
+    // 19h5. The same FileState can be reached through requestState->files and
+    // pathInfoMap.pathInfo.file. The validator must memoize by object address so
+    // a shared file does not trip duplicate uniqueIdentity checks.
+    {
+        OffsetContainer container;
+        auto requestPtr = container.newObject<ReproUtil::RequestState>();
+        auto filesArray = container.newArray<Offset32Ptr<ReproUtil::FileState>>(1);
+        auto pathAndPathInfoArray = container.newArray<ReproUtil::PathAndPathInfo>(1);
+        auto pathInfoPtr = container.newObject<ReproUtil::PathInfoState>();
+        auto file = container.newObject<ReproUtil::FileState>();
+
+        container[requestPtr]->files = filesArray;
+        container[requestPtr]->pathInfoMap = pathAndPathInfoArray;
+        container[filesArray[0]] = file;
+        container[file]->uniqueName = container.newString("shared.slang");
+        container[file]->uniqueIdentity = container.newString("shared-identity");
+        container[pathAndPathInfoArray[0]].path = container.newString("shared.slang");
+        container[pathAndPathInfoArray[0]].pathInfo = pathInfoPtr;
+        container[pathInfoPtr]->file = file;
+
+        List<uint8_t> buf;
+        containerToBuffer(container, buf);
+        SLANG_CHECK(isReproStateValid(buf));
+
+        const size_t fileOffset = pathInfoPtr.m_offset + offsetof(ReproUtil::PathInfoState, file);
+        uint32_t* fileSlot = reinterpret_cast<uint32_t*>(buf.getBuffer() + fileOffset);
+        *fileSlot = uint32_t(buf.getCount() + 100);
+        SLANG_CHECK(!isReproStateValid(buf));
+    }
+
     // 19i. validateStringPtrArray with requireElements = false: an entry point
     // whose specializationArgStrings is a 1-element array with a null element
     // must be accepted. Pins the only `requireElements = false` call site so a
@@ -942,6 +972,24 @@ SLANG_UNIT_TEST(reproStateValidator)
         oversize.setCount(N + 1);
         memset(oversize.getBuffer(), 0, oversize.getCount());
         SLANG_CHECK(ReproUtil::getRequest(oversize) != nullptr);
+    }
+
+    // 21. Direct loader helpers fail cleanly on null request pointers.
+    {
+        List<uint8_t> buf;
+        buildMinimalValid(buf);
+
+        MemoryOffsetBase base;
+        base.set(buf.getBuffer(), buf.getCount());
+
+        ComPtr<ISlangFileSystemExt> fileSystemExt;
+        SLANG_CHECK(
+            SLANG_FAILED(ReproUtil::loadFileSystem(base, nullptr, nullptr, fileSystemExt)));
+        SLANG_CHECK(SLANG_FAILED(ReproUtil::load(base, nullptr, nullptr, nullptr)));
+
+        ComPtr<ISlangMutableFileSystem> mutableFileSystem(new MemoryFileSystem);
+        SLANG_CHECK(SLANG_FAILED(ReproUtil::extractFiles(base, nullptr, mutableFileSystem)));
+        SLANG_CHECK(SLANG_FAILED(ReproUtil::extractFiles(base, ReproUtil::getRequest(buf), nullptr)));
     }
 }
 

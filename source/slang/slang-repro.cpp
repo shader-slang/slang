@@ -875,6 +875,11 @@ struct LoadContext
     ISlangFileSystem* replaceFileSystem,
     ComPtr<ISlangFileSystemExt>& outFileSystem)
 {
+    if (!requestState)
+    {
+        return SLANG_FAIL;
+    }
+
     LoadContext context(nullptr, replaceFileSystem, &base);
 
     CacheFileSystem* cacheFileSystem = new CacheFileSystem(nullptr);
@@ -933,6 +938,11 @@ struct LoadContext
     ISlangFileSystem* optionalFileSystem,
     EndToEndCompileRequest* request)
 {
+    if (!requestState || !request)
+    {
+        return SLANG_FAIL;
+    }
+
     auto externalRequest = asExternal(request);
 
     auto linkage = request->getLinkage();
@@ -1637,6 +1647,11 @@ static SlangResult _calcCommandLine(
     RequestState* requestState,
     ISlangMutableFileSystem* fileSystem)
 {
+    if (!requestState || !fileSystem)
+    {
+        return SLANG_FAIL;
+    }
+
     StringBuilder builder;
 
     builder << "[command-line]\n";

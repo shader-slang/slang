@@ -346,7 +346,11 @@ class OffsetBase
 public:
     typedef OffsetBase ThisType;
 
-    /// Turn an offset into a raw regular pointer or reference
+    /// Turn an offset into a raw regular pointer or reference.
+    ///
+    /// This validates that the fixed-size object header fits in the backing buffer. Types with
+    /// variable-length trailing data, such as OffsetString, must still validate their payload
+    /// before consuming it.
     template<typename T>
     T* asRaw(const Offset32Ptr<T>& ptr)
     {
@@ -414,7 +418,10 @@ public:
     /// Get the first allocated thing. Typically the root of the structure contained
     void* getFirst() { return (m_dataSize < kStartOffset) ? nullptr : (m_data + kStartOffset); }
 
-    /// Get a raw pointer from the offset
+    /// Get a raw pointer from the offset if [offset, offset + size) is inside the backing buffer.
+    /// Returns nullptr for the null offset, missing backing data, or an out-of-bounds range.
+    /// The size covers only the fixed-size object being requested; variable-length trailing data
+    /// must be validated by the consumer before it is read.
     uint8_t* _getRaw(uint32_t offset, size_t size)
     {
         if (offset == kNull32Offset)

@@ -162,7 +162,7 @@ private:
 
             for (int i = 0; i < sizeByteCount; ++i)
             {
-                stringSize |= size_t(m_data[offset + 1 + i]) << (i * 8);
+                stringSize |= size_t(m_data[size_t(offset) + 1 + i]) << (i * 8);
             }
         }
 
