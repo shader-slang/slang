@@ -214,7 +214,7 @@ struct ReproUtil
 
     SLANG_API static RequestState* getRequest(const List<uint8_t>& inBuffer);
 
-    static SlangResult extractFilesToDirectory(const String& file, DiagnosticSink* sink);
+    SLANG_API static SlangResult extractFilesToDirectory(const String& file, DiagnosticSink* sink);
 
     SLANG_API static SlangResult extractFiles(
         OffsetBase& base,
@@ -222,7 +222,9 @@ struct ReproUtil
         ISlangMutableFileSystem* fileSystem);
 
     /// Given the repo file work out a suitable path
-    static SlangResult calcDirectoryPathFromFilename(const String& filename, String& outPath);
+    SLANG_API static SlangResult calcDirectoryPathFromFilename(
+        const String& filename,
+        String& outPath);
 
     /// Given a request trys to determine a suitable dump file name, that is unique.
     static SlangResult findUniqueReproDumpStream(
