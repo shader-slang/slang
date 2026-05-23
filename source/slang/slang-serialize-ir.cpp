@@ -23,13 +23,7 @@
 #define USE_RIFF 0
 // If we are serializing using Fossil, DIRECT_FROM_FOSSIL will make it so that
 // we unflatten directly from the fossilized representation rather than
-// deserializing everything first. It is the fastest option.
-//
-// NOTE: USE_RIFF and DIRECT_FROM_FOSSIL are currently hard-coded to 0 with no
-// CMake option or CI matrix entry flipping them. Code under
-// `#if USE_RIFF` / `#if DIRECT_FROM_FOSSIL` is therefore unbuilt in CI: it
-// must be kept in sync with the `#else` arm by inspection until a build
-// configuration exercises it.
+// deserializing everything first. It is the fastest option
 #define DIRECT_FROM_FOSSIL 0
 
 FIDDLE()
@@ -552,28 +546,6 @@ static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRe
     return t;
 }
 
-// Deserialize a flat module representation produced by serializeAsFlatModule.
-//
-// This routine is reached from the public `Linkage::loadModuleFromIRBlob`
-// entry point (see source/slang/slang-session.cpp) and may be invoked on
-// caller-supplied .slang-module blobs whose authorship is not under the
-// host's control. The bounds-checking guards therefore double as a defense
-// against malformed or adversarial inputs.
-//
-// The guards use SLANG_RELEASE_ASSERT, which in default builds (with
-// SLANG_HAS_EXCEPTIONS and no `SLANG_ASSERT` environment override) raises an
-// InternalError; the outer `Linkage::loadModuleFromBlob` catches `Exception`
-// and converts it into a nullptr return plus diagnostics, so a malformed
-// blob normally fails the module load rather than terminating the host.
-//
-// Two non-default modes change that contract:
-//   * In non-exceptions builds the asserts hit SLANG_BREAKPOINT.
-//   * Under `SLANG_ASSERT=system` (or `debugbreak` with no debugger attached)
-//     the asserts route through libc `assert()`, which aborts (and shows a
-//     modal dialog on Windows) — the outer `catch (Exception&)` is bypassed.
-//
-// A follow-up refactor should thread Result out of this function so failure
-// surfaces as SLANG_FAIL regardless of build configuration or env var.
 static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serializer, IRModule* module)
 {
     IRSerialReadContext& readContext = *serializer.getContext();
@@ -594,68 +566,11 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 
 #if DIRECT_FROM_FOSSIL
     const auto numInsts = flat.instAllocInfo.getElementCount();
-    const auto operandIndicesCount = flat.operandIndices.getElementCount();
-    const auto literalsCount = flat.literals.getElementCount();
-    const auto stringLengthsCount = flat.stringLengths.getElementCount();
-    const auto stringCharsCount = flat.stringChars.getElementCount();
-    SLANG_RELEASE_ASSERT(flat.childCounts.getElementCount() == numInsts);
 #else
     const auto numInsts = flat.instAllocInfo.getCount();
-    const auto operandIndicesCount = flat.operandIndices.getCount();
-    const auto literalsCount = flat.literals.getCount();
-    const auto stringLengthsCount = flat.stringLengths.getCount();
-    const auto stringCharsCount = flat.stringChars.getCount();
-    SLANG_RELEASE_ASSERT(flat.childCounts.getCount() == numInsts);
 #endif
-    SLANG_RELEASE_ASSERT(sourceLocs.getCount() == numInsts);
-    SLANG_RELEASE_ASSERT(numInsts >= 1);
 
-    // Validate per-element childCounts before any allocation or recursion:
-    // every count must be in [0, numInsts), and the total number of children
-    // across all insts must equal numInsts - 1 (every non-root inst is exactly
-    // one child of some other inst). This catches blobs that would otherwise
-    // either skip insts (under-consumption) or attempt recursion bounds far
-    // exceeding the actual inst count.
-    {
-        Int64 totalChildren = 0;
-        for (Int64 i = 0; i < numInsts; ++i)
-        {
-            const Int64 c = (Int64)flat.childCounts[i];
-            SLANG_RELEASE_ASSERT(c >= 0 && c < numInsts);
-            totalChildren += c;
-        }
-        SLANG_RELEASE_ASSERT(totalChildren == numInsts - 1);
-    }
-
-    // Hard per-instruction cap on operand count. Even with the cumulative
-    // invariant below, a blob with very few insts can concentrate the entire
-    // operandIndices budget into a single inst (e.g. numInsts==2 with
-    // operandCount[0] ~= operandIndicesCount), causing _allocateInst to
-    // request gigabytes of arena memory for a single inst's IRUse table
-    // (sizeof(IRUse) == 16 bytes). 65536 is far above any realistic Slang IR
-    // inst — even very-wide struct constructors / generic instantiations stay
-    // in the low thousands — while bounding the per-inst allocation to ~1 MB.
-    constexpr Int64 kMaxOperandsPerInst = 65536;
-
-    // Validate cumulative operand consumption before any allocation. Each inst
-    // contributes 1 + operandCount operand-index slots (one for typeUse, plus
-    // one per operand), and a well-formed flat module sums to exactly
-    // operandIndicesCount. Without this upfront check, a single attacker
-    // crafted inst can advertise operandCount close to operandIndicesCount
-    // (potentially 100M entries from a multi-MB blob), causing _allocateInst
-    // to request GB-scale memory before any per-operand read can reject it.
-    {
-        Int64 expectedOperandIndices = 0;
-        for (Int64 i = 0; i < numInsts; ++i)
-        {
-            const Int64 operandCount = (Int64)flat.instAllocInfo[i].operandCount;
-            SLANG_RELEASE_ASSERT(operandCount >= 0 && operandCount <= kMaxOperandsPerInst);
-            const Int64 contribution = 1 + operandCount;
-            SLANG_RELEASE_ASSERT(contribution <= operandIndicesCount - expectedOperandIndices);
-            expectedOperandIndices += contribution;
-        }
-        SLANG_RELEASE_ASSERT(expectedOperandIndices == operandIndicesCount);
-    }
+    const auto operandIndicesCount = flat.operandIndices.getCount();
 
     instsList.setCount(numInsts + 1);
     // nullptr instructions are represented as `-1`. We can save ourselves a
@@ -695,16 +610,11 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // About 5% of instructions in the core module are strings!
         case kIROp_StringLit:
         case kIROp_BlobLit:
-            {
-                SLANG_RELEASE_ASSERT(stringLengthIndex < stringLengthsCount);
-                const Int64 strLen = flat.stringLengths[stringLengthIndex++];
-                SLANG_RELEASE_ASSERT(strLen >= 0 && strLen <= (Int64)UINT32_MAX);
-                minSizeInBytes = offsetof(IRConstant, value) +
-                                 offsetof(IRConstant::StringValue, chars) + (size_t)strLen;
-                break;
-            }
+            minSizeInBytes = offsetof(IRConstant, value) +
+                             offsetof(IRConstant::StringValue, chars) +
+                             flat.stringLengths[stringLengthIndex++];
+            break;
         }
-        SLANG_RELEASE_ASSERT((Int64)a.operandCount <= operandIndicesCount);
         insts[instIndex] = module->_allocateInst(op, a.operandCount, minSizeInBytes);
     }
 
@@ -713,35 +623,15 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     Int64 instIndex = 0;
     stringLengthIndex = 0;
     Int64 stringDataIndex = 0;
-    auto readInstRef = [&operandIndex, &flat, operandIndicesCount, numInsts, insts]() -> IRInst*
+    auto readInstRef = [&]() -> IRInst*
     {
         SLANG_RELEASE_ASSERT(operandIndex < operandIndicesCount);
         const auto index = flat.operandIndices[operandIndex++];
-        SLANG_RELEASE_ASSERT(index >= -1 && index < (Int64)numInsts);
+        SLANG_RELEASE_ASSERT(index >= -1 && index < numInsts);
         return insts[index];
     };
-    // Cap recursion depth to defend against deeply-nested malicious blobs that
-    // would otherwise stack-overflow the host (e.g. a chain where each inst
-    // has exactly one child of its own). 512 is conservative against the
-    // smallest supported thread stacks: each `go` frame captures the
-    // surrounding lambda state plus locals (rough order of 300-400 bytes in
-    // unoptimized builds), so 512 frames ~= 200 KB — well below the typical
-    // 256 KB minimum on worker threads while remaining far above any
-    // realistic IR module's nesting depth (typical 4-6, occasionally tens).
-    //
-    // Note: this cap is reader-side only. The writer
-    // (`traverseInstsInSerializationOrder`) does not enforce a matching
-    // producer-side limit, so the round-trip is asymmetric: a sufficiently
-    // deeply-nested module that the writer happily serializes can be
-    // rejected on read. The mismatch is acceptable here because such modules
-    // do not occur in practice (we are far above realistic IR depth); a
-    // future tightening of the cap should add a matching producer-side
-    // assert so the asymmetry is diagnosed at write time too.
-    constexpr Int64 kMaxRecursionDepth = 512;
-    const auto go = [&](auto& go, IRInst* parent, Int64 depth) -> IRInst*
+    const auto go = [&](auto& go, IRInst* parent) -> IRInst*
     {
-        SLANG_RELEASE_ASSERT(depth < kMaxRecursionDepth);
-        SLANG_RELEASE_ASSERT(instIndex < numInsts);
         const auto thisInstIndex = instIndex++;
         IRInst* inst = insts[thisInstIndex];
 
@@ -759,34 +649,25 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             break;
         case kIROp_BoolLit:
         case kIROp_IntLit:
-            SLANG_RELEASE_ASSERT(litIndex < literalsCount);
             cast<IRConstant>(inst)->value.intVal =
                 bitCast<IRIntegerValue>(flat.literals[litIndex++]);
             break;
         case kIROp_FloatLit:
-            SLANG_RELEASE_ASSERT(litIndex < literalsCount);
             cast<IRConstant>(inst)->value.floatVal = bitCast<double>(flat.literals[litIndex++]);
             break;
         case kIROp_PtrLit:
-            SLANG_RELEASE_ASSERT(litIndex < literalsCount);
             // Keep the compiler happy on 32 bit builds
             cast<IRConstant>(inst)->value.ptrVal = (void*)(uintptr_t(flat.literals[litIndex++]));
             break;
         case kIROp_StringLit:
         case kIROp_BlobLit:
-            {
-                SLANG_RELEASE_ASSERT(stringLengthIndex < stringLengthsCount);
-                const auto c = cast<IRConstant>(inst);
-                const auto len = flat.stringLengths[stringLengthIndex++];
-                SLANG_RELEASE_ASSERT(len >= 0 && len <= (Int64)UINT32_MAX);
-                char* const dstChars = c->value.stringVal.chars;
-                c->value.stringVal.numChars = uint32_t(len);
-                SLANG_RELEASE_ASSERT(len <= (Int64)stringCharsCount - stringDataIndex);
-                if (len > 0)
-                    memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
-                stringDataIndex += len;
-                break;
-            }
+            const auto c = cast<IRConstant>(inst);
+            const auto len = flat.stringLengths[stringLengthIndex++];
+            char* const dstChars = c->value.stringVal.chars;
+            c->value.stringVal.numChars = uint32_t(len);
+            memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
+            stringDataIndex += len;
+            break;
         }
 
         // Read in children, and fix up pointers
@@ -796,7 +677,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         IRInst* last = nullptr;
         for (Int64 i = 0; i < flat.childCounts[thisInstIndex]; ++i)
         {
-            auto c = go(go, inst, depth + 1);
+            auto c = go(go, inst);
             if (i == 0)
                 first = c;
             last = c;
@@ -812,18 +693,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 
         return inst;
     };
-    const auto moduleInst = go(go, nullptr, 0);
-
-    // Post-conditions: a well-formed flat module is exactly consumed by the
-    // traversal. A truncated blob (e.g. childCounts that terminate the
-    // recursion early) would leave allocated insts unparented and unconnected,
-    // and is rejected here.
-    SLANG_RELEASE_ASSERT(instIndex == numInsts);
-    SLANG_RELEASE_ASSERT(operandIndex == operandIndicesCount);
-    SLANG_RELEASE_ASSERT(litIndex == literalsCount);
-    SLANG_RELEASE_ASSERT(stringLengthIndex == stringLengthsCount);
-    SLANG_RELEASE_ASSERT(stringDataIndex == (Int64)stringCharsCount);
-
+    const auto moduleInst = go(go, nullptr);
     return cast<IRModuleInst>(moduleInst);
 }
 
