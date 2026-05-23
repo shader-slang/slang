@@ -983,13 +983,13 @@ SLANG_UNIT_TEST(reproStateValidator)
         base.set(buf.getBuffer(), buf.getCount());
 
         ComPtr<ISlangFileSystemExt> fileSystemExt;
-        SLANG_CHECK(
-            SLANG_FAILED(ReproUtil::loadFileSystem(base, nullptr, nullptr, fileSystemExt)));
+        SLANG_CHECK(SLANG_FAILED(ReproUtil::loadFileSystem(base, nullptr, nullptr, fileSystemExt)));
         SLANG_CHECK(SLANG_FAILED(ReproUtil::load(base, nullptr, nullptr, nullptr)));
 
         ComPtr<ISlangMutableFileSystem> mutableFileSystem(new MemoryFileSystem);
         SLANG_CHECK(SLANG_FAILED(ReproUtil::extractFiles(base, nullptr, mutableFileSystem)));
-        SLANG_CHECK(SLANG_FAILED(ReproUtil::extractFiles(base, ReproUtil::getRequest(buf), nullptr)));
+        SLANG_CHECK(
+            SLANG_FAILED(ReproUtil::extractFiles(base, ReproUtil::getRequest(buf), nullptr)));
     }
 }
 
