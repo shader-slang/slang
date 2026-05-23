@@ -580,13 +580,16 @@ SLANG_UNIT_TEST(reproStateValidator)
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
         // entryPointCount = 1 so that entryPointIndex = 0 is in range.
         auto entryPoints = container.newArray<ReproUtil::EntryPointState>(1);
+        auto translationUnits = container.newArray<ReproUtil::TranslationUnitRequestState>(1);
         auto targetArray = container.newArray<ReproUtil::TargetRequestState>(1);
         auto outputArray = container.newArray<ReproUtil::OutputState>(1);
         auto outputPathStr = container.newString("out.spv");
 
         container[requestPtr]->entryPoints = entryPoints;
+        container[requestPtr]->translationUnits = translationUnits;
         container[requestPtr]->targetRequests = targetArray;
         container[targetArray[0]].outputStates = outputArray;
+        container[entryPoints[0]].translationUnitIndex = 0;
         container[outputArray[0]].entryPointIndex = 0;
         container[outputArray[0]].outputPath = outputPathStr;
 
@@ -728,12 +731,15 @@ SLANG_UNIT_TEST(reproStateValidator)
         auto requestPtr = container.newObject<ReproUtil::RequestState>();
         // entryPointCount = 1 so that entryPointIndex = 0 is in range.
         auto entryPoints = container.newArray<ReproUtil::EntryPointState>(1);
+        auto translationUnits = container.newArray<ReproUtil::TranslationUnitRequestState>(1);
         auto targetArray = container.newArray<ReproUtil::TargetRequestState>(1);
         auto outputArray = container.newArray<ReproUtil::OutputState>(1);
 
         container[requestPtr]->entryPoints = entryPoints;
+        container[requestPtr]->translationUnits = translationUnits;
         container[requestPtr]->targetRequests = targetArray;
         container[targetArray[0]].outputStates = outputArray;
+        container[entryPoints[0]].translationUnitIndex = 0;
         container[outputArray[0]].entryPointIndex = 0;
         // outputPath left null (zero-init) — must be accepted.
 
