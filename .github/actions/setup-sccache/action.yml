@@ -30,22 +30,24 @@ runs:
           https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-${SCCACHE_ARCH}.tar.gz
         tar xz -f /tmp/sccache.tar.gz
         rm /tmp/sccache.tar.gz
+        sccache_dir="sccache-v0.7.4-${SCCACHE_ARCH}"
 
         # Prefer a system install when available, but support non-root containers.
         if command -v sudo &> /dev/null && sudo -n true 2>/dev/null; then
-          sudo mv sccache-v0.7.4-${SCCACHE_ARCH}/sccache /usr/local/bin/
+          sudo mv "$sccache_dir/sccache" /usr/local/bin/
           sudo chmod +x /usr/local/bin/sccache
         elif [ -w /usr/local/bin ]; then
-          mv sccache-v0.7.4-${SCCACHE_ARCH}/sccache /usr/local/bin/
+          mv "$sccache_dir/sccache" /usr/local/bin/
           chmod +x /usr/local/bin/sccache
         else
           install_dir="${RUNNER_TEMP:-/tmp}/sccache-bin"
           mkdir -p "$install_dir"
-          mv sccache-v0.7.4-${SCCACHE_ARCH}/sccache "$install_dir/"
+          mv "$sccache_dir/sccache" "$install_dir/"
           chmod +x "$install_dir/sccache"
           echo "$install_dir" >> "$GITHUB_PATH"
           export PATH="$install_dir:$PATH"
         fi
+        rm -rf "$sccache_dir"
 
         sccache --version
 
