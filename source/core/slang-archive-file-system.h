@@ -6,6 +6,8 @@
 #include "slang-compression-system.h"
 
 // Override at build time to allow larger individual entries in archive-backed file systems.
+// This cap is per loaded entry. Callers that load many entries should enforce their own
+// aggregate uncompressed-byte and entry-count budgets.
 // SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE is kept as a compatibility alias.
 #ifndef SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE
 #ifdef SLANG_ZIP_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE

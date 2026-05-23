@@ -391,7 +391,13 @@ static SlangResult _createFileSystem(
     return outFileSystem ? SLANG_OK : SLANG_FAIL;
 }
 
-#if SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE < 0xffffffffull
+// The ZIP and RIFF patchers below write legacy 32-bit uncompressed-size fields. If the
+// configured cap cannot be exceeded with those fields, the end-to-end rejection tests report
+// as ignored instead of silently passing.
+#define SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE \
+    (SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE < 0xffffffffull)
+
+#if SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE
 static uint32_t _readUInt32LE(const uint8_t* data)
 {
     return uint32_t(data[0]) | (uint32_t(data[1]) << 8) | (uint32_t(data[2]) << 16) |
@@ -571,6 +577,9 @@ static SlangResult _testArchiveUncompressedSizeBounds()
                                         ? kMaxArchiveFileUncompressedSize
                                         : maxTerminatedAllocationSize;
 
+    // Keep the exact-cap check at the predicate level. An end-to-end success case at the
+    // default cap would allocate the full cap-sized output buffer, while patching a small
+    // archive's metadata to the cap is not a valid positive decompression fixture.
     SLANG_CHECK(isArchiveFileUncompressedSizeInBounds(effectiveMaxSize));
     SLANG_CHECK(!isArchiveFileUncompressedSizeInBounds(effectiveMaxSize + 1));
     return SLANG_OK;
@@ -592,16 +601,20 @@ static SlangResult _testScopedAllocationRejectsMaxTerminatedSize()
     SLANG_CHECK(!blob);
 
     const char replacementContents[] = "replacement";
-    SLANG_RETURN_ON_FAIL(RawBlob::tryCreate(
-        replacementContents,
-        sizeof(replacementContents) - 1,
-        blob));
     SLANG_RETURN_ON_FAIL(
-        RawBlob::tryCreate(blob->getBufferPointer(), blob->getBufferSize(), blob));
+        RawBlob::tryCreate(replacementContents, sizeof(replacementContents) - 1, blob));
+    SLANG_RETURN_ON_FAIL(RawBlob::tryCreate(blob->getBufferPointer(), blob->getBufferSize(), blob));
     SLANG_CHECK(blob->getBufferSize() == sizeof(replacementContents) - 1);
     SLANG_CHECK(
         ::memcmp(blob->getBufferPointer(), replacementContents, blob->getBufferSize()) == 0);
 
+    return SLANG_OK;
+}
+
+static SlangResult _testMemoryFileSystemRejectsNullNonEmptySave()
+{
+    ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
+    SLANG_CHECK(fileSystem->saveFile("foo", nullptr, 1) == SLANG_E_INVALID_ARG);
     return SLANG_OK;
 }
 
@@ -795,7 +808,7 @@ SLANG_UNIT_TEST(fileSystem)
 
 SLANG_UNIT_TEST(zipRejectsOversizedUncompressedEntry)
 {
-#if SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE < 0xffffffffull
+#if SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE
     SLANG_CHECK(SLANG_SUCCEEDED(_testZipRejectsOversizedUncompressedEntry()));
 #else
     SLANG_IGNORE_TEST;
@@ -804,7 +817,7 @@ SLANG_UNIT_TEST(zipRejectsOversizedUncompressedEntry)
 
 SLANG_UNIT_TEST(riffRejectsOversizedUncompressedEntry)
 {
-#if SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE < 0xffffffffull
+#if SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE
     SLANG_CHECK(SLANG_SUCCEEDED(_testRiffRejectsOversizedUncompressedEntry()));
 #else
     SLANG_IGNORE_TEST;
@@ -819,4 +832,9 @@ SLANG_UNIT_TEST(archiveUncompressedSizeBounds)
 SLANG_UNIT_TEST(scopedAllocationRejectsMaxTerminatedSize)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testScopedAllocationRejectsMaxTerminatedSize()));
+}
+
+SLANG_UNIT_TEST(memoryFileSystemRejectsNullNonEmptySave)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_testMemoryFileSystemRejectsNullNonEmptySave()));
 }
