@@ -65,7 +65,7 @@ static StableHashCode32 _calcTypeHash()
     return getStableHashCode32((const char*)&sizes, sizeof(sizes));
 }
 
-static StableHashCode32 _getTypeHash()
+/* static */ StableHashCode32 ReproUtil::getTypeHash()
 {
     static StableHashCode32 s_hash = _calcTypeHash();
     return s_hash;
@@ -1176,7 +1176,7 @@ struct LoadContext
 
     Header header;
     header.m_semanticVersion = g_semanticVersion;
-    header.m_typeHash = _getTypeHash();
+    header.m_typeHash = getTypeHash();
 
     cursor.addData(header);
     cursor.addUnownedData(container.getData(), container.getDataCount());
@@ -1272,7 +1272,7 @@ struct LoadContext
         return SLANG_FAIL;
     }
 
-    if (header.m_typeHash != _getTypeHash())
+    if (header.m_typeHash != getTypeHash())
     {
         sink->diagnose(Diagnostics::RiffHashMismatch{});
         return SLANG_FAIL;

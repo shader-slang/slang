@@ -22,6 +22,9 @@ repeat the compilation, or extracted such that everything that was specified in 
 can be inspected and modified. */
 struct ReproUtil
 {
+    // ReproUtil is an internal compiler helper declared under source/, not part of the public
+    // include/slang.h API. Selected members carry SLANG_API so dynamically loaded tools and unit
+    // tests can link against the compiler DLL without duplicating repro serialization logic.
     enum
     {
         kMajorVersion = 0,
@@ -35,7 +38,8 @@ struct ReproUtil
     static const FourCC::RawValue kSlangStateDataFourCC =
         SLANG_FOUR_CC('d', 'a', 't', 'a'); ///< Holds the actual binary data.
 
-    SLANG_API static const SemanticVersion g_semanticVersion;
+    static const SemanticVersion g_semanticVersion;
+    SLANG_API static StableHashCode32 getTypeHash();
 
     struct Header
     {

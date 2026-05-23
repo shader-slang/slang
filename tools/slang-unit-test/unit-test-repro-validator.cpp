@@ -8,8 +8,9 @@
 #include "core/slang-stream.h"
 #include "core/slang-string-util.h"
 #include "slang/slang-compiler-api.h"
-#include "slang/slang-repro-validator.h"
 #include "slang/slang-repro.h"
+#include "slang/slang-repro-validator.h"
+#include "slang/slang-rich-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -31,42 +32,11 @@ static void buildMinimalValid(List<uint8_t>& outBuf)
     containerToBuffer(container, outBuf);
 }
 
-static StableHashCode32 calcReproTypeHashForTest()
+static bool outputContainsDiagnosticId(DiagnosticSink& sink, const DiagnosticInfo* info)
 {
-    typedef ReproUtil Util;
-
-    // Mirror slang-repro.cpp's private type hash inputs so this test can build
-    // a valid repro header without exporting an internal helper.
-    const uint32_t sizes[] = {
-        uint32_t(sizeof(Util::FileState)),
-        uint32_t(sizeof(Util::PathInfoState)),
-        uint32_t(sizeof(Util::PathInfoState::CompressedResult)),
-        uint32_t(sizeof(SlangPathType)),
-        uint32_t(sizeof(Util::PathAndPathInfo)),
-        uint32_t(sizeof(Util::TargetRequestState)),
-        uint32_t(sizeof(Profile)),
-        uint32_t(sizeof(CodeGenTarget)),
-        uint32_t(sizeof(SlangTargetFlags)),
-        uint32_t(sizeof(FloatingPointMode)),
-        uint32_t(sizeof(Util::StringPair)),
-        uint32_t(sizeof(Util::SourceFileState)),
-        uint32_t(sizeof(PathInfo::Type)),
-        uint32_t(sizeof(Util::TranslationUnitRequestState)),
-        uint32_t(sizeof(SourceLanguage)),
-        uint32_t(sizeof(Util::EntryPointState)),
-        uint32_t(sizeof(Profile)),
-        uint32_t(sizeof(Util::RequestState)),
-        uint32_t(sizeof(SlangCompileFlags)),
-        uint32_t(sizeof(bool)),
-        uint32_t(sizeof(LineDirectiveMode)),
-        uint32_t(sizeof(DebugInfoLevel)),
-        uint32_t(sizeof(OptimizationLevel)),
-        uint32_t(sizeof(ContainerFormat)),
-        uint32_t(sizeof(PassThroughMode)),
-        uint32_t(sizeof(SlangMatrixLayoutMode)),
-    };
-
-    return getStableHashCode32((const char*)sizes, sizeof(sizes));
+    StringBuilder expected;
+    expected << getSeverityName(info->severity) << " " << info->id << ":";
+    return sink.outputBuffer.produceString().contains(expected.produceString());
 }
 
 static void buildStateRiff(const List<uint8_t>& payload, List<uint8_t>& outRiff)
@@ -79,8 +49,11 @@ static void buildStateRiff(const List<uint8_t>& payload, List<uint8_t>& outRiff)
         SLANG_SCOPED_RIFF_BUILDER_DATA_CHUNK(cursor, ReproUtil::kSlangStateDataFourCC);
 
         ReproUtil::Header header;
-        header.m_semanticVersion = ReproUtil::g_semanticVersion;
-        header.m_typeHash = calcReproTypeHashForTest();
+        header.m_semanticVersion = SemanticVersion(
+            ReproUtil::kMajorVersion,
+            ReproUtil::kMinorVersion,
+            ReproUtil::kPatchVersion);
+        header.m_typeHash = ReproUtil::getTypeHash();
 
         cursor.addData(header);
         if (payload.getCount())
@@ -754,7 +727,7 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsInvalidPayload)
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(outBuffer.getCount() == 0);
     SLANG_CHECK(sink.getErrorCount() == 1);
-    SLANG_CHECK(sink.outputBuffer.produceString().contains("malformed offsets"));
+    SLANG_CHECK(outputContainsDiagnosticId(sink, Diagnostics::InvalidReproState::getInfo()));
 }
 
 SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload)
@@ -774,7 +747,7 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload)
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(outBuffer.getCount() == 0);
     SLANG_CHECK(sink.getErrorCount() == 1);
-    SLANG_CHECK(sink.outputBuffer.produceString().contains("malformed offsets"));
+    SLANG_CHECK(outputContainsDiagnosticId(sink, Diagnostics::InvalidReproState::getInfo()));
 }
 
 SLANG_UNIT_TEST(reproExtractFilesToDirectoryRejectsInvalidPayload)
@@ -801,7 +774,7 @@ SLANG_UNIT_TEST(reproExtractFilesToDirectoryRejectsInvalidPayload)
     SlangResult result = ReproUtil::extractFilesToDirectory(filePath, &sink);
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(sink.getErrorCount() == 1);
-    SLANG_CHECK(sink.outputBuffer.produceString().contains("malformed offsets"));
+    SLANG_CHECK(outputContainsDiagnosticId(sink, Diagnostics::InvalidReproState::getInfo()));
     SLANG_CHECK(!File::exists(outputDir));
 
     SLANG_CHECK(SLANG_SUCCEEDED(File::remove(filePath)));
