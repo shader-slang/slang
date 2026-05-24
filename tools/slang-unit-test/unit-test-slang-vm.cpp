@@ -411,6 +411,35 @@ SLANG_UNIT_TEST(slangVMRejectsOversizedCopy)
     SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
 
+SLANG_UNIT_TEST(slangVMAllowsUnalignedWorkingSetSize)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+    while (constants.getCount() % sizeof(uint32_t))
+        constants.add(0);
+    uint32_t value = 123;
+    auto valueOffset = (uint32_t)constants.getCount();
+    appendVMTestValue(constants, value);
+
+    List<VMOperand> copyOperands;
+    copyOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 16, sizeof(value)));
+    copyOperands.add(makeVMTestOperand(kSlangByteCodeSectionConstants, valueOffset, sizeof(value)));
+
+    List<uint8_t> instCode;
+    appendVMTestInst(instCode, VMOp::Copy, sizeof(value), copyOperands.getArrayView());
+
+    List<VMOperand> noOperands;
+    appendVMTestInst(instCode, VMOp::Ret, 0, noOperands.getArrayView());
+
+    auto blob = createVMTestBlob(instCode, 20, 0, constants);
+    ComPtr<slang::IByteCodeRunner> runner;
+    slang::ByteCodeRunnerDesc runnerDesc = {};
+    SLANG_CHECK(slang_createByteCodeRunner(&runnerDesc, runner.writeRef()) == SLANG_OK);
+    SLANG_CHECK(runner->loadModule(blob) == SLANG_OK);
+    SLANG_CHECK(runner->selectFunctionByIndex(0) == SLANG_OK);
+    SLANG_CHECK(runner->execute(nullptr, 0) == SLANG_OK);
+}
+
 SLANG_UNIT_TEST(slangVMRejectsWorkingSetPointerEscape)
 {
     List<uint8_t> constants;

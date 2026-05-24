@@ -205,11 +205,6 @@ SlangResult ByteCodeInterpreter::validateFunctionForExecution(
         reportError("Invalid function header.");
         return SLANG_FAIL;
     }
-    if (header->workingSetSizeInBytes % sizeof(uint64_t) != 0)
-    {
-        reportError("Function working set size must be 8-byte aligned.");
-        return SLANG_FAIL;
-    }
     if (header->parameterSizeInBytes > header->workingSetSizeInBytes)
     {
         reportError("Function parameter size exceeds working set size.");
