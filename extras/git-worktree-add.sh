@@ -26,6 +26,7 @@ default_tool() {
 
 GIT_EXE="${GIT_EXE:-$(default_tool git)}"
 GH_EXE="${GH_EXE:-$(default_tool gh)}"
+TMUX_EXE="${TMUX_EXE:-tmux}"
 
 show_usage() {
   me=$(basename "$0")
@@ -43,11 +44,14 @@ Options:
                      by dashes.
   --issue <issue>    Create and checkout the branch through GitHub CLI so it
                      is linked to the issue.
+  --tmux             Start a tmux session named after the branch in the new
+                     worktree after setup completes.
   --no-submodules    Skip submodule initialization.
   -h, --help         Show this help.
 
 Examples:
   $me git-worktree-add
+  $me --tmux git-worktree-add
   $me descriptor-heap-access --issue 1234
   $me --base release/2026.1 --dir ../descriptor-fix descriptor-heap-access
 
@@ -139,6 +143,22 @@ git_run() {
   "$GIT_EXE" "$@"
 }
 
+start_tmux_session() {
+  local sessionName="$1"
+  local sessionDir="$2"
+
+  if "$TMUX_EXE" has-session -t "=$sessionName" 2>/dev/null; then
+    die "tmux session already exists: $sessionName"
+  fi
+
+  if [[ -n "${TMUX:-}" ]]; then
+    "$TMUX_EXE" new-session -d -s "$sessionName" -c "$sessionDir"
+    "$TMUX_EXE" switch-client -t "=$sessionName"
+  else
+    exec "$TMUX_EXE" new-session -s "$sessionName" -c "$sessionDir"
+  fi
+}
+
 resolve_issue_base() {
   local ref="$1"
 
@@ -170,6 +190,7 @@ baseRef=""
 dstDirInput=""
 githubIssue=""
 initSubmodules=1
+startTmux=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -197,6 +218,9 @@ while [[ $# -gt 0 ]]; do
     fi
     githubIssue="$2"
     shift
+    ;;
+  --tmux)
+    startTmux=1
     ;;
   --no-submodules)
     initSubmodules=0
@@ -237,6 +261,10 @@ if [[ -n "$githubIssue" ]]; then
   require_command "$GH_EXE"
   log_tool "GitHub CLI" "$GH_EXE"
 fi
+if [[ $startTmux -eq 1 ]]; then
+  require_command "$TMUX_EXE"
+  log_tool "tmux" "$TMUX_EXE"
+fi
 
 startDirShell="$(pwd -P)"
 
@@ -254,6 +282,10 @@ fi
 
 if git_run show-ref --verify --quiet "refs/heads/$branchName"; then
   die "Branch already exists: $branchName"
+fi
+
+if [[ $startTmux -eq 1 ]] && "$TMUX_EXE" has-session -t "=$branchName" 2>/dev/null; then
+  die "tmux session already exists: $branchName"
 fi
 
 if [[ -z "$baseRef" ]]; then
@@ -355,4 +387,7 @@ else
   fi
 fi
 
-log "Done."
+if [[ $startTmux -eq 1 ]]; then
+  log "Starting tmux session: $branchName"
+  start_tmux_session "$branchName" "$dstDirShell"
+fi
