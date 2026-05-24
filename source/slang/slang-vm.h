@@ -67,6 +67,11 @@ public:
     size_t m_returnValSize = 0;
     bool m_executionFailed = false;
 
+    static size_t getWorkingSetWordCount(uint32_t byteSize)
+    {
+        return (size_t(byteSize) + sizeof(uint64_t) - 1) / sizeof(uint64_t);
+    }
+
     void pushFrame(uint32_t size)
     {
         StackFrame frame;
@@ -76,7 +81,7 @@ public:
             (uint32_t)((uint64_t*)m_currentWorkingSet - m_workingSetBuffer.getBuffer());
         m_stack.add(frame);
         auto stackBufferCount = m_workingSetBuffer.getCount();
-        m_workingSetBuffer.setCount(m_workingSetBuffer.getCount() + size / sizeof(uint64_t));
+        m_workingSetBuffer.setCount(m_workingSetBuffer.getCount() + getWorkingSetWordCount(size));
         m_currentWorkingSet = m_workingSetBuffer.getBuffer() + stackBufferCount;
         m_currentWorkingSetSizeInBytes = size;
     }

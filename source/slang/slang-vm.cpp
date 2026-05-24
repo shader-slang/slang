@@ -972,7 +972,7 @@ ByteCodeInterpreter::selectFunctionByIndex(uint32_t functionIndex)
     m_currentFuncCode = m_functions[functionIndex].m_codeBuffer.getBuffer();
     m_currentInst = reinterpret_cast<VMExecInstHeader*>(m_currentFuncCode);
     m_currentFunction = &m_functions[functionIndex];
-    m_workingSetBuffer.setCount(func.header->workingSetSizeInBytes / sizeof(uint64_t));
+    m_workingSetBuffer.setCount(getWorkingSetWordCount(func.header->workingSetSizeInBytes));
     m_currentWorkingSet = m_workingSetBuffer.getBuffer();
     m_currentWorkingSetSizeInBytes = func.header->workingSetSizeInBytes;
     return SLANG_OK;
