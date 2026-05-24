@@ -4,6 +4,9 @@
 ```
 slangc [options...] [--] <input files>
 
+Pass '-' as an input file to read source from standard input.
+-lang <language> is required when reading from stdin.
+
 # Read source from stdin (-lang is required)
 slangc -lang slang -target spirv -- -
 

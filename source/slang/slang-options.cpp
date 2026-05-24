@@ -2268,7 +2268,9 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
             buf << "```\n";
             buf << "slangc [options...] [--] <input files>\n\n"
                    "Pass '-' as an input file to read source from standard input.\n"
-                   "-lang <language> is required when reading from stdin.\n\n";
+                   "-lang <language> is required when reading from stdin.\n\n"
+                   "# Read source from stdin (-lang is required)\n"
+                   "slangc -lang slang -target spirv -- -\n\n";
             buf << "# For help\n";
             buf << "slangc -h\n\n";
             buf << "# To generate this file\n";
