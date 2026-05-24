@@ -101,7 +101,7 @@ to_git_path() {
   local path="$1"
   case "$path" in
   /*)
-    if command -v wslpath >/dev/null 2>&1; then
+    if is_wsl && git_uses_windows_paths && command -v wslpath >/dev/null 2>&1; then
       wslpath -w "$path"
     else
       printf '%s\n' "$path"
@@ -110,6 +110,13 @@ to_git_path() {
   *)
     printf '%s\n' "$path"
     ;;
+  esac
+}
+
+git_uses_windows_paths() {
+  case "${GIT_EXE##*/}" in
+  *.exe | *.EXE) return 0 ;;
+  *) return 1 ;;
   esac
 }
 
@@ -130,6 +137,33 @@ make_abs_shell_path() {
 
 git_run() {
   "$GIT_EXE" "$@"
+}
+
+resolve_issue_base() {
+  local ref="$1"
+
+  case "$ref" in
+  refs/heads/*)
+    ref="${ref#refs/heads/}"
+    ;;
+  refs/remotes/*/*)
+    ref="${ref#refs/remotes/}"
+    ref="${ref#*/}"
+    ;;
+  esac
+
+  if git_run show-ref --verify --quiet "refs/heads/$ref" ||
+    git_run show-ref --verify --quiet "refs/remotes/origin/$ref"; then
+    printf '%s\n' "$ref"
+    return 0
+  fi
+
+  if git_run show-ref --verify --quiet "refs/remotes/$ref"; then
+    printf '%s\n' "${ref#*/}"
+    return 0
+  fi
+
+  return 1
 }
 
 branchInput=""
@@ -229,8 +263,7 @@ if [[ -z "$baseRef" ]]; then
     die "Cannot infer a base branch from detached HEAD. Use --base <ref>."
   fi
   case "$baseRef" in
-  master | main | release | release/*)
-    ;;
+  master | main | release | release/*) ;;
   *)
     die "Current branch must be master, main, or release/*. Current branch: $baseRef"
     ;;
@@ -241,17 +274,21 @@ if ! git_run rev-parse --verify --quiet "$baseRef^{commit}" >/dev/null; then
   die "Base ref does not resolve to a commit: $baseRef"
 fi
 
+issueBase=""
+if [[ -n "$githubIssue" ]] && ! issueBase="$(resolve_issue_base "$baseRef")"; then
+  die "--issue requires --base to be a branch name, because gh issue develop does not accept arbitrary commits: $baseRef"
+fi
+
 worktreeName="$branchName"
 worktreeName="${worktreeName//\//-}"
 
 maxWorktreeNameLength=50
-if [[ ${#worktreeName} -gt $maxWorktreeNameLength ]]; then
-  die "Worktree directory name is too long (${#worktreeName} characters). Maximum is $maxWorktreeNameLength: $worktreeName"
-fi
-
 if [[ -n "$dstDirInput" ]]; then
   dstDirShell="$(make_abs_shell_path "$dstDirInput")"
 else
+  if [[ ${#worktreeName} -gt $maxWorktreeNameLength ]]; then
+    die "Worktree directory name is too long (${#worktreeName} characters). Maximum is $maxWorktreeNameLength: $worktreeName"
+  fi
   dstDirShell="$(dirname "$repoRootShell")/$worktreeName"
 fi
 dstDirGit="$(to_git_path "$dstDirShell")"
@@ -278,9 +315,8 @@ if [[ -n "$githubIssue" ]]; then
   git_run worktree add -q --detach "$dstDirGit" "$baseRef"
 
   cd "$dstDirShell"
-  ghBase="${baseRef#origin/}"
   log "Creating GitHub issue branch for issue $githubIssue..."
-  "$GH_EXE" issue develop "$githubIssue" --name "$branchName" --base "$ghBase" --checkout
+  "$GH_EXE" issue develop "$githubIssue" --name "$branchName" --base "$issueBase" --checkout
 else
   log "Adding worktree and creating branch..."
   git_run worktree add -q -b "$branchName" "$dstDirGit" "$baseRef"
