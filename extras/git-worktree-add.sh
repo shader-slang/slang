@@ -148,7 +148,6 @@ resolve_issue_base() {
     ;;
   refs/remotes/*/*)
     ref="${ref#refs/remotes/}"
-    ref="${ref#*/}"
     ;;
   esac
 
