@@ -1562,8 +1562,23 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         List<Byte> bytes;
         SLANG_RETURN_ON_FAIL(StreamUtil::readAll(stdinStream, bytes));
 
-        m_currentTranslationUnitIndex =
-            addTranslationUnit(SlangSourceLanguage(langOverride), Stage::Unknown);
+        SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
+        if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+        {
+            if (m_requestImpl->getLinkage()->m_optionSet.hasOption(CompilerOptionName::Language))
+                sourceLanguage =
+                    m_requestImpl->getLinkage()->m_optionSet.getEnumOption<SlangSourceLanguage>(
+                        CompilerOptionName::Language);
+        }
+        if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+        {
+            m_requestImpl->getSink()->diagnose(
+                Diagnostics::CannotDeduceSourceLanguage{.path = "<stdin>"});
+            return SLANG_FAIL;
+        }
+
+        m_translationUnitCount++;
+        m_currentTranslationUnitIndex = addTranslationUnit(sourceLanguage, Stage::Unknown);
         m_compileRequest->addTranslationUnitSourceStringSpan(
             m_rawTranslationUnits[m_currentTranslationUnitIndex].translationUnitID,
             "<stdin>",
