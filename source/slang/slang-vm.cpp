@@ -265,22 +265,21 @@ SlangResult ByteCodeInterpreter::validateFunctionForExecution(
             switch (operand.sectionId)
             {
             case kSlangByteCodeSectionWorkingSet:
-                if (!isRangeInBounds(operand.offset, operand.size, header->workingSetSizeInBytes))
+                if (!isRangeInBounds(operand.offset, 0, header->workingSetSizeInBytes))
                 {
                     reportError("VM operand points outside the working set.");
                     return SLANG_FAIL;
                 }
                 break;
             case kSlangByteCodeSectionConstants:
-                if (!isRangeInBounds(operand.offset, operand.size, m_moduleView.constantBlobSize))
+                if (!isRangeInBounds(operand.offset, 0, m_moduleView.constantBlobSize))
                 {
                     reportError("VM operand points outside the constants section.");
                     return SLANG_FAIL;
                 }
                 break;
             case kSlangByteCodeSectionInsts:
-                if (!isRangeInBounds(operand.offset, operand.size, header->codeSize) ||
-                    (operand.size == 0 && operand.offset >= header->codeSize))
+                if (!isRangeInBounds(operand.offset, 0, header->codeSize))
                 {
                     reportError("VM operand points outside the instruction section.");
                     return SLANG_FAIL;

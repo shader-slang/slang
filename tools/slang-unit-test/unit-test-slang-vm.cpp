@@ -422,7 +422,7 @@ SLANG_UNIT_TEST(slangVMAllowsUnalignedWorkingSetSize)
     appendVMTestValue(constants, value);
 
     List<VMOperand> copyOperands;
-    copyOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 16, sizeof(value)));
+    copyOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 16, 12));
     copyOperands.add(makeVMTestOperand(kSlangByteCodeSectionConstants, valueOffset, sizeof(value)));
 
     List<uint8_t> instCode;
