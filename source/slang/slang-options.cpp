@@ -32,6 +32,7 @@
 
 #include <assert.h>
 #include <limits>
+#include <sstream>
 
 namespace Slang
 {
@@ -1552,7 +1553,20 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     // how we should handle it.
     String path = String(inPath);
 
-    if (path.endsWith(".slang-module") || path.endsWith(".slang-lib"))
+    if (strcmp(inPath, "-") == 0) {
+        std::ostringstream oss;
+        oss << std::cin.rdbuf();
+        std::string source = oss.str();
+
+        m_currentTranslationUnitIndex = addTranslationUnit(SlangSourceLanguage(langOverride), Stage::Unknown);
+        m_compileRequest->addTranslationUnitSourceString(
+            m_rawTranslationUnits[m_currentTranslationUnitIndex].translationUnitID,
+            "<stdin>",
+            source.c_str());
+
+        return SLANG_OK;
+    }
+    else if (path.endsWith(".slang-module") || path.endsWith(".slang-lib"))
     {
         return addReferencedModule(path, SourceLoc(), false);
     }
