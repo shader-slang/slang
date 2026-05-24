@@ -364,21 +364,42 @@ else
     fi
   done < <(git_run config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null || true)
 
+  if [[ ${#submodules[@]} -gt 0 ]]; then
+    git_run submodule -q init -- "${submodules[@]}"
+  fi
+
+  submoduleUpdatePids=()
   for submodulePath in "${submodules[@]}"; do
-    moduleReferenceGit="$repoRootGit/$submodulePath"
-    moduleReferenceShell="$(to_shell_path "$moduleReferenceGit")"
     log "Initializing: $submodulePath"
-    if [[ -d "$moduleReferenceShell" ]]; then
-      git_run submodule -q update --init --reference "$moduleReferenceGit" -- "$submodulePath"
-    else
-      git_run submodule -q update --init -- "$submodulePath"
+    (
+      moduleReferenceGit="$repoRootGit/$submodulePath"
+      moduleReferenceShell="$(to_shell_path "$moduleReferenceGit")"
+      if [[ -d "$moduleReferenceShell" ]]; then
+        git_run submodule -q update --reference "$moduleReferenceGit" -- "$submodulePath"
+      else
+        git_run submodule -q update -- "$submodulePath"
+      fi
+    ) &
+    submoduleUpdatePids+=("$!")
+  done
+
+  submoduleUpdateFailed=0
+  for submoduleUpdatePid in "${submoduleUpdatePids[@]}"; do
+    if ! wait "$submoduleUpdatePid"; then
+      submoduleUpdateFailed=1
     fi
   done
 
-  log "Updating submodules recursively..."
-  if ! git_run submodule -q update --init --recursive; then
+  if [[ $submoduleUpdateFailed -ne 0 ]]; then
     echo "Submodule update failed. You may want to manually run:" >&2
-    echo "  git.exe submodule update --init --recursive" >&2
+    echo "  $GIT_EXE submodule update --init --recursive --jobs 0" >&2
+    exit 2
+  fi
+
+  log "Updating submodules recursively..."
+  if ! git_run submodule -q update --init --recursive --jobs 0; then
+    echo "Submodule update failed. You may want to manually run:" >&2
+    echo "  $GIT_EXE submodule update --init --recursive --jobs 0" >&2
     exit 2
   fi
 fi
