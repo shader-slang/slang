@@ -531,6 +531,9 @@ SLANG_UNIT_TEST(slangVMAllowsWorkingSetEndPointerOffsetBack)
         makeVMTestOperand(kSlangByteCodeSectionConstants, valueOffset, sizeof(value)));
     appendVMTestInst(instCode, VMOp::Store, sizeof(value), storeOperands.getArrayView());
 
+    List<VMOperand> noOperands;
+    appendVMTestInst(instCode, VMOp::Ret, 0, noOperands.getArrayView());
+
     auto blob = createVMTestBlob(instCode, 16, 0, constants);
     ComPtr<slang::IByteCodeRunner> runner;
     slang::ByteCodeRunnerDesc runnerDesc = {};
