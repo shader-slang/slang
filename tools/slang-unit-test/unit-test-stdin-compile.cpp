@@ -199,6 +199,15 @@ static SlangResult _testStdinTwice(UnitTestContext* context)
     if (count != 1)
         return SLANG_FAIL;
 
+    // Silent no-op contract: the second '-' must produce no diagnostic.
+    // Any future change that emits a warning or error on the second '-' must
+    // update this test to reflect the new intentional behavior.
+    UnownedStringSlice err = result.standardError.getUnownedSlice();
+    if (err.indexOf(toSlice("no source code found")) >= 0)
+        return SLANG_FAIL;
+    if (err.indexOf(toSlice("can't deduce language")) >= 0)
+        return SLANG_FAIL;
+
     return SLANG_OK;
 }
 
