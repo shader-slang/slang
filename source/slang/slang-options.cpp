@@ -1588,8 +1588,21 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
             return SLANG_FAIL;
         }
 
-        m_translationUnitCount++;
-        m_currentTranslationUnitIndex = addTranslationUnit(sourceLanguage, Stage::Unknown);
+        if (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG)
+        {
+            if (m_slangTranslationUnitIndex == -1)
+            {
+                m_translationUnitCount++;
+                m_slangTranslationUnitIndex =
+                    addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
+            }
+            m_currentTranslationUnitIndex = m_slangTranslationUnitIndex;
+        }
+        else
+        {
+            m_translationUnitCount++;
+            m_currentTranslationUnitIndex = addTranslationUnit(sourceLanguage, Stage::Unknown);
+        }
         m_compileRequest->addTranslationUnitSourceStringSpan(
             m_rawTranslationUnits[m_currentTranslationUnitIndex].translationUnitID,
             "<stdin>",
