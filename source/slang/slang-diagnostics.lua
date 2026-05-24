@@ -159,6 +159,8 @@ err("cannot-deduce-source-language", 12, "can't deduce language for input file '
 
 err("empty-source-input", 106, "no source code found in '~path'")
 
+err("cannot-read-from-stdin", 107, "failed to read source from stdin")
+
 err(
     "unknown-code-generation-target",
     13,

@@ -1568,17 +1568,18 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         if (m_stdinConsumed)
             return SLANG_OK;
 
+        // Process::getStdStream for StdStreamType::In is unconditionally SLANG_OK on all
+        // implemented platforms; SLANG_RELEASE_ASSERT catches a future platform regression.
         RefPtr<Stream> stdinStream;
-        if (SLANG_FAILED(Process::getStdStream(StdStreamType::In, stdinStream)))
-        {
-            m_requestImpl->getSink()->diagnose(Diagnostics::CannotOpenFile{.path = "<stdin>"});
-            return SLANG_FAIL;
-        }
+        SLANG_RELEASE_ASSERT(
+            SLANG_SUCCEEDED(Process::getStdStream(StdStreamType::In, stdinStream)));
 
         List<Byte> bytes;
         if (SLANG_FAILED(StreamUtil::readAll(stdinStream, bytes)))
         {
-            m_requestImpl->getSink()->diagnose(Diagnostics::CannotOpenFile{.path = "<stdin>"});
+            // The stream was opened but the read failed (e.g. a broken pipe or EIO).
+            // CannotOpenFile would be misleading here — the file descriptor was valid.
+            m_requestImpl->getSink()->diagnose(Diagnostics::CannotReadFromStdin{});
             return SLANG_FAIL;
         }
         if (bytes.getCount() == 0)
