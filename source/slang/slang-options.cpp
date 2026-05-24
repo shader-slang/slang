@@ -16,6 +16,8 @@
 #include "../core/slang-char-util.h"
 #include "../core/slang-command-options-writer.h"
 #include "../core/slang-file-system.h"
+#include "../core/slang-process.h"
+#include "../core/slang-stream.h"
 #include "../core/slang-hex-dump-util.h"
 #include "../core/slang-name-value.h"
 #include "../core/slang-string-slice-pool.h"
@@ -32,7 +34,6 @@
 
 #include <assert.h>
 #include <limits>
-#include <sstream>
 
 namespace Slang
 {
@@ -1553,16 +1554,21 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     // how we should handle it.
     String path = String(inPath);
 
-    if (strcmp(inPath, "-") == 0) {
-        std::ostringstream oss;
-        oss << std::cin.rdbuf();
-        std::string source = oss.str();
+    if (strcmp(inPath, "-") == 0)
+    {
+        RefPtr<Stream> stdinStream;
+        SLANG_RETURN_ON_FAIL(Process::getStdStream(StdStreamType::In, stdinStream));
 
-        m_currentTranslationUnitIndex = addTranslationUnit(SlangSourceLanguage(langOverride), Stage::Unknown);
-        m_compileRequest->addTranslationUnitSourceString(
+        List<Byte> bytes;
+        SLANG_RETURN_ON_FAIL(StreamUtil::readAll(stdinStream, bytes));
+
+        m_currentTranslationUnitIndex =
+            addTranslationUnit(SlangSourceLanguage(langOverride), Stage::Unknown);
+        m_compileRequest->addTranslationUnitSourceStringSpan(
             m_rawTranslationUnits[m_currentTranslationUnitIndex].translationUnitID,
             "<stdin>",
-            source.c_str());
+            (const char*)bytes.getBuffer(),
+            (const char*)bytes.getBuffer() + bytes.getCount());
 
         return SLANG_OK;
     }
