@@ -145,7 +145,7 @@ static SlangResult _testEmptyStdin(UnitTestContext* context)
     ExecuteResult result;
     SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, "", result));
 
-    // Empty stdin should emit the EmptySourceInput diagnostic (error 170:
+    // Empty stdin should emit the EmptySourceInput diagnostic (error 106:
     // "no source code found in '<stdin>'") and fail, not silently create an
     // empty translation unit or crash.
     if (result.resultCode == 0)
@@ -233,16 +233,17 @@ static SlangResult _testStdinDiagnosticLocation(UnitTestContext* context)
         return SLANG_FAIL;
 
     // Diagnostic format is: <stdin>(line): error N: message
-    // Verify both the path token and a line-number marker are present so that
-    // IDE/tooling consumers can parse stdin errors the same way as file errors.
+    // Assert the exact line number so a BOM or off-by-one regression in SourceLoc
+    // tracking surfaces here rather than silently passing.
+    // undeclared_identifier; is on line 2 of the stdin source.
     UnownedStringSlice err = result.standardError.getUnownedSlice();
-    if (err.indexOf(toSlice("<stdin>(")) < 0)
+    if (err.indexOf(toSlice("<stdin>(2):")) < 0)
         return SLANG_FAIL;
 
     return SLANG_OK;
 }
 
-// Case 7: stdin source with a UTF-8 BOM should compile correctly.
+// Case 7a: stdin source with a UTF-8 BOM should compile correctly.
 // SourceFile does BOM detection; verify it works for the stdin blob path too.
 static SlangResult _testStdinWithBom(UnitTestContext* context)
 {
@@ -267,6 +268,42 @@ static SlangResult _testStdinWithBom(UnitTestContext* context)
     if (result.resultCode != 0)
         return SLANG_FAIL;
     if (result.standardOutput.getUnownedSlice().indexOf(toSlice("OpEntryPoint")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+// Case 7b: BOM + deliberate error on line 2 should report <stdin>(2): so a
+// BOM-handling regression that treats the BOM as a newline would shift line
+// numbers and fail this assertion.
+static SlangResult _testStdinBomDiagnosticLocation(UnitTestContext* context)
+{
+    List<String> args;
+    args.add("-lang");
+    args.add("slang");
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("--");
+    args.add("-");
+
+    // BOM on byte 0, valid line 1, error on line 2.
+    const char* source =
+        "\xEF\xBB\xBF[shader(\"compute\")] void main() {\n"
+        "    undeclared_identifier;\n"
+        "}\n";
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
+
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+
+    // If the BOM were consumed as a newline, the error would appear on line 3.
+    if (result.standardError.getUnownedSlice().indexOf(toSlice("<stdin>(2):")) < 0)
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -313,8 +350,19 @@ static SlangResult _testStdinWithLangGlsl(UnitTestContext* context)
 // and fail this test.
 static SlangResult _testStdinMixedWithFile(UnitTestContext* context)
 {
-    // Write a helper file containing a function the stdin entry point will call.
-    String helperPath = String("slangc-stdin-helper-") + String(Process::getId()) + ".slang";
+    // Generate a uniquely-named temp file in the OS temp directory so the test
+    // is safe in read-only cwds and parallel/re-run CI environments.
+    String helperPath;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slangc-stdin-helper"), helperPath));
+    helperPath = helperPath + ".slang";
+
+    // RAII guard: removes the file on any return path, including early-out failures.
+    struct FileGuard
+    {
+        String path;
+        ~FileGuard() { File::remove(path); }
+    } guard{helperPath};
+
     SLANG_RETURN_ON_FAIL(File::writeAllText(helperPath, "void foo() {}\n"));
 
     List<String> args;
@@ -334,12 +382,7 @@ static SlangResult _testStdinMixedWithFile(UnitTestContext* context)
     const char* source = "[shader(\"compute\")] void main() { foo(); }\n";
 
     ExecuteResult result;
-    SlangResult spawnRes = _spawnSlangcWithStdin(context, args, source, result);
-
-    // Clean up the temp file regardless of outcome.
-    File::remove(helperPath);
-
-    SLANG_RETURN_ON_FAIL(spawnRes);
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
 
     if (result.resultCode != 0)
         return SLANG_FAIL;
