@@ -523,7 +523,10 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::InputFilesRemain,
          "--",
          nullptr,
-         "Treat the rest of the command line as input files."},
+         "Treat the rest of the command line as input files. "
+         "Use '-' as a filename to read source from standard input; "
+         "-lang <language> is required in that case because the source language cannot be "
+         "deduced from a file extension. Example: slangc -lang slang -target spirv -- -"},
         {OptionKind::ReportDownstreamTime,
          "-report-downstream-time",
          nullptr,
@@ -1557,10 +1560,18 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     if (strcmp(inPath, "-") == 0)
     {
         RefPtr<Stream> stdinStream;
-        SLANG_RETURN_ON_FAIL(Process::getStdStream(StdStreamType::In, stdinStream));
+        if (SLANG_FAILED(Process::getStdStream(StdStreamType::In, stdinStream)))
+        {
+            m_requestImpl->getSink()->diagnose(Diagnostics::CannotOpenFile{.path = "<stdin>"});
+            return SLANG_FAIL;
+        }
 
         List<Byte> bytes;
-        SLANG_RETURN_ON_FAIL(StreamUtil::readAll(stdinStream, bytes));
+        if (SLANG_FAILED(StreamUtil::readAll(stdinStream, bytes)))
+        {
+            m_requestImpl->getSink()->diagnose(Diagnostics::CannotOpenFile{.path = "<stdin>"});
+            return SLANG_FAIL;
+        }
 
         SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
         if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
@@ -1880,7 +1891,9 @@ SlangResult OptionsParser::_dumpDiagnostics(Severity originalSeverity)
 
 void OptionsParser::_appendUsageTitle(StringBuilder& out)
 {
-    out << "Usage: slangc [options...] [--] <input files>\n\n";
+    out << "Usage: slangc [options...] [--] <input files>\n\n"
+           "Pass '-' as an input file to read source from standard input.\n"
+           "-lang <language> is required when reading from stdin.\n\n";
 }
 
 void OptionsParser::_outputMinimalUsage()
@@ -2240,7 +2253,9 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
             buf << "# Slang Command Line Options\n\n";
             buf << "*Usage:*\n";
             buf << "```\n";
-            buf << "slangc [options...] [--] <input files>\n\n";
+            buf << "slangc [options...] [--] <input files>\n\n"
+                   "Pass '-' as an input file to read source from standard input.\n"
+                   "-lang <language> is required when reading from stdin.\n\n";
             buf << "# For help\n";
             buf << "slangc -h\n\n";
             buf << "# To generate this file\n";

@@ -4,6 +4,9 @@
 ```
 slangc [options...] [--] <input files>
 
+# Read source from stdin (-lang is required)
+slangc -lang slang -target spirv -- -
+
 # For help
 slangc -h
 
@@ -277,7 +280,7 @@ Dump to output list of warning diagnostic numeric and name ids.
 
 <a id="id"></a>
 ### --
-Treat the rest of the command line as input files. 
+Treat the rest of the command line as input files. Use `-` as a filename to read source from standard input; `-lang <language>` is required in that case because the source language cannot be deduced from a file extension. Example: `slangc -lang slang -target spirv -- -`
 
 
 <a id="report-downstream-time"></a>
