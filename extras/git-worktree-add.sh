@@ -392,14 +392,14 @@ else
 
   if [[ $submoduleUpdateFailed -ne 0 ]]; then
     echo "Submodule update failed. You may want to manually run:" >&2
-    echo "  $GIT_EXE submodule update --init --recursive --jobs 0" >&2
+    echo "  \"$GIT_EXE\" submodule update --init --recursive --jobs 0" >&2
     exit 2
   fi
 
   log "Updating submodules recursively..."
   if ! git_run submodule -q update --init --recursive --jobs 0; then
     echo "Submodule update failed. You may want to manually run:" >&2
-    echo "  $GIT_EXE submodule update --init --recursive --jobs 0" >&2
+    echo "  \"$GIT_EXE\" submodule update --init --recursive --jobs 0" >&2
     exit 2
   fi
 fi
