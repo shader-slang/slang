@@ -384,7 +384,9 @@ SLANG_UNIT_TEST(slangVMRejectsOutOfBoundsOperand)
     ComPtr<slang::IByteCodeRunner> runner;
     slang::ByteCodeRunnerDesc runnerDesc = {};
     SLANG_CHECK(slang_createByteCodeRunner(&runnerDesc, runner.writeRef()) == SLANG_OK);
-    SLANG_CHECK(SLANG_FAILED(runner->loadModule(blob)));
+    SLANG_CHECK(runner->loadModule(blob) == SLANG_OK);
+    SLANG_CHECK(runner->selectFunctionByIndex(0) == SLANG_OK);
+    SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
 
 SLANG_UNIT_TEST(slangVMRejectsOversizedCopy)
