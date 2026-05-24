@@ -177,9 +177,92 @@ static SlangResult _testStdinTwice(UnitTestContext* context)
     ExecuteResult result;
     SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
 
-    // Both '-' tokens go into the same Slang translation unit (m_slangTranslationUnitIndex
-    // reuse), so the second read appends nothing meaningful. Compilation should still
-    // succeed since the first read provided a valid entry point.
+    // The second '-' is a no-op (m_stdinConsumed guard short-circuits before re-reading
+    // the drained pipe). The source from the first '-' should compile to exactly one
+    // entry point — if the second '-' were incorrectly processed it could produce two.
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+
+    // Count OpEntryPoint occurrences to confirm only one entry point was compiled.
+    Index count = 0;
+    const UnownedStringSlice marker = toSlice("OpEntryPoint");
+    UnownedStringSlice remaining = result.standardOutput.getUnownedSlice();
+    while (true)
+    {
+        Index found = remaining.indexOf(marker);
+        if (found < 0)
+            break;
+        count++;
+        remaining = remaining.tail(found + marker.getLength());
+    }
+    if (count != 1)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+// Case 6: a deliberate syntax error in stdin source should produce a diagnostic that
+// includes both "<stdin>" as the path and a line number, confirming the SourceFile
+// path-info flows correctly through the diagnostic sink for tooling integrations.
+static SlangResult _testStdinDiagnosticLocation(UnitTestContext* context)
+{
+    List<String> args;
+    args.add("-lang");
+    args.add("slang");
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("--");
+    args.add("-");
+
+    // Line 1 is a valid declaration; line 2 references an undeclared identifier.
+    // This pins that the line number in the diagnostic refers to the stdin source.
+    const char* source =
+        "[shader(\"compute\")] void main() {\n"
+        "    undeclared_identifier;\n"
+        "}\n";
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
+
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+
+    // Diagnostic format is: <stdin>(line): error N: message
+    // Verify both the path token and a line-number marker are present so that
+    // IDE/tooling consumers can parse stdin errors the same way as file errors.
+    UnownedStringSlice err = result.standardError.getUnownedSlice();
+    if (err.indexOf(toSlice("<stdin>(")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+// Case 7: stdin source with a UTF-8 BOM should compile correctly.
+// SourceFile does BOM detection; verify it works for the stdin blob path too.
+static SlangResult _testStdinWithBom(UnitTestContext* context)
+{
+    List<String> args;
+    args.add("-lang");
+    args.add("slang");
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("--");
+    args.add("-");
+
+    // UTF-8 BOM (\xEF\xBB\xBF) prepended to a valid shader.
+    const char* source = "\xEF\xBB\xBF[shader(\"compute\")] void main() {}\n";
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
+
     if (result.resultCode != 0)
         return SLANG_FAIL;
     if (result.standardOutput.getUnownedSlice().indexOf(toSlice("OpEntryPoint")) < 0)
@@ -195,4 +278,6 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithoutLang(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testEmptyStdin(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinTwice(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinDiagnosticLocation(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithBom(unitTestContext)));
 }

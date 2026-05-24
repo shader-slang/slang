@@ -1392,6 +1392,7 @@ struct OptionsParser
     int m_translationUnitCount = 0;
     int m_currentTranslationUnitIndex = -1;
 
+    bool m_stdinConsumed = false;
     bool m_hasLoadedRepro = false;
     bool m_compileCoreModule = false;
     slang::CompileCoreModuleFlags m_compileCoreModuleFlags;
@@ -1559,6 +1560,11 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
 
     if (strcmp(inPath, "-") == 0)
     {
+        // Stdin can only be read once; a second '-' token is a no-op so the user
+        // does not get a confusing "no source code found" error on an already-drained pipe.
+        if (m_stdinConsumed)
+            return SLANG_OK;
+
         RefPtr<Stream> stdinStream;
         if (SLANG_FAILED(Process::getStdStream(StdStreamType::In, stdinStream)))
         {
@@ -1615,6 +1621,7 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
             (const char*)bytes.getBuffer(),
             (const char*)bytes.getBuffer() + bytes.getCount());
 
+        m_stdinConsumed = true;
         return SLANG_OK;
     }
     else if (path.endsWith(".slang-module") || path.endsWith(".slang-lib"))
