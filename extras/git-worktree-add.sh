@@ -151,7 +151,7 @@ start_tmux_session() {
     "$TMUX_EXE" new-session -d -s "$sessionName" -c "$sessionDir"
     "$TMUX_EXE" switch-client -t "=$sessionName"
   else
-    exec "$TMUX_EXE" new-session -s "$sessionName" -c "$sessionDir"
+    "$TMUX_EXE" new-session -s "$sessionName" -c "$sessionDir"
   fi
 }
 
