@@ -526,7 +526,7 @@ void initCommandOptions(CommandOptions& options)
          "Treat the rest of the command line as input files. "
          "Use '-' as a filename to read source from standard input; "
          "-lang <language> is required in that case because the source language cannot be "
-         "deduced from a file extension. Example: slangc -lang slang -target spirv -- -"},
+         "deduced from a file extension. Example: slangc -lang slang -target spirv-asm -entry main -stage compute -- -"},
         {OptionKind::ReportDownstreamTime,
          "-report-downstream-time",
          nullptr,
@@ -1572,6 +1572,12 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
             m_requestImpl->getSink()->diagnose(Diagnostics::CannotOpenFile{.path = "<stdin>"});
             return SLANG_FAIL;
         }
+        if (bytes.getCount() == 0)
+        {
+            m_requestImpl->getSink()->diagnose(
+                Diagnostics::EmptySourceInput{.path = "<stdin>"});
+            return SLANG_FAIL;
+        }
 
         SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
         if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
@@ -2270,7 +2276,7 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
                    "Pass '-' as an input file to read source from standard input.\n"
                    "-lang <language> is required when reading from stdin.\n\n"
                    "# Read source from stdin (-lang is required)\n"
-                   "slangc -lang slang -target spirv -- -\n\n";
+                   "slangc -lang slang -target spirv-asm -entry main -stage compute -- -\n\n";
             buf << "# For help\n";
             buf << "slangc -h\n\n";
             buf << "# To generate this file\n";

@@ -144,13 +144,13 @@ static SlangResult _testEmptyStdin(UnitTestContext* context)
     ExecuteResult result;
     SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, "", result));
 
-    // Empty source with -entry main should emit the EntryPointFunctionNotFound diagnostic
-    // (error 3782: "no function found matching entry point name 'main'").
-    // Matching this specific phrase distinguishes a clean compiler error from a crash/assert.
+    // Empty stdin should emit the EmptySourceInput diagnostic (error 170:
+    // "no source code found in '<stdin>'") and fail, not silently create an
+    // empty translation unit or crash.
     if (result.resultCode == 0)
         return SLANG_FAIL;
     if (result.standardError.getUnownedSlice().indexOf(
-            toSlice("no function found matching entry point name 'main'")) < 0)
+            toSlice("no source code found in '<stdin>'")) < 0)
         return SLANG_FAIL;
     return SLANG_OK;
 }

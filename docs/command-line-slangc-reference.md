@@ -8,7 +8,7 @@ Pass '-' as an input file to read source from standard input.
 -lang <language> is required when reading from stdin.
 
 # Read source from stdin (-lang is required)
-slangc -lang slang -target spirv -- -
+slangc -lang slang -target spirv-asm -entry main -stage compute -- -
 
 # For help
 slangc -h
@@ -283,7 +283,7 @@ Dump to output list of warning diagnostic numeric and name ids.
 
 <a id="id"></a>
 ### --
-Treat the rest of the command line as input files. Use `-` as a filename to read source from standard input; `-lang <language>` is required in that case because the source language cannot be deduced from a file extension. Example: `slangc -lang slang -target spirv -- -`
+Treat the rest of the command line as input files. Use `-` as a filename to read source from standard input; `-lang <language>` is required in that case because the source language cannot be deduced from a file extension. Example: `slangc -lang slang -target spirv-asm -entry main -stage compute -- -`
 
 
 <a id="report-downstream-time"></a>
