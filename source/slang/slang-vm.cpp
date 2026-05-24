@@ -516,11 +516,6 @@ static bool getPointerRange(const void* ptr, size_t size, uintptr_t& start, uint
     return true;
 }
 
-static bool isPointerInRange(uintptr_t ptr, uintptr_t rangeStart, uintptr_t rangeEnd)
-{
-    return ptr >= rangeStart && ptr < rangeEnd;
-}
-
 static bool isPointerInRangeOrAtEnd(uintptr_t ptr, uintptr_t rangeStart, uintptr_t rangeEnd)
 {
     return ptr >= rangeStart && ptr <= rangeEnd;
