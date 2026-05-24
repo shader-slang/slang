@@ -370,7 +370,7 @@ else
 
   submoduleUpdatePids=()
   for submodulePath in "${submodules[@]}"; do
-    log "Initializing: $submodulePath"
+    log "Updating: $submodulePath"
     (
       moduleReferenceGit="$repoRootGit/$submodulePath"
       moduleReferenceShell="$(to_shell_path "$moduleReferenceGit")"
