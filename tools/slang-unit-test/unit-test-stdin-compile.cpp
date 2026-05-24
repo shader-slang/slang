@@ -401,6 +401,7 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinTwice(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinDiagnosticLocation(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithBom(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinBomDiagnosticLocation(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithLangGlsl(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinMixedWithFile(unitTestContext)));
 }
