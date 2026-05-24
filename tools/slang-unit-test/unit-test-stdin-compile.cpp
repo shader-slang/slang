@@ -2,6 +2,7 @@
 //
 // Tests that slangc can read shader source from stdin when '-' is passed as the input path.
 
+#include "../../source/core/slang-io.h"
 #include "../../source/core/slang-process-util.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -271,6 +272,83 @@ static SlangResult _testStdinWithBom(UnitTestContext* context)
     return SLANG_OK;
 }
 
+// Case 8: GLSL shader piped via stdin with -lang glsl and -stage compute.
+// For GLSL the stage is normally inferred from the file extension (.comp, .vert, etc.);
+// stdin has no extension so -stage is always required. This pins that the path works
+// and that the documented requirement is enforced.
+static SlangResult _testStdinWithLangGlsl(UnitTestContext* context)
+{
+    List<String> args;
+    args.add("-lang");
+    args.add("glsl");
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("--");
+    args.add("-");
+
+    const char* source =
+        "#version 450\n"
+        "layout(local_size_x = 1) in;\n"
+        "void main() {}\n";
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
+
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (result.standardOutput.getUnownedSlice().indexOf(toSlice("OpEntryPoint")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+// Case 9: stdin combined with an on-disk .slang file.
+// Both inputs go into the same Slang translation unit (m_slangTranslationUnitIndex reuse),
+// so the stdin entry point can call a function defined in the on-disk file.
+// A future refactor that allocates a fresh TU for stdin would break cross-file visibility
+// and fail this test.
+static SlangResult _testStdinMixedWithFile(UnitTestContext* context)
+{
+    // Write a helper file containing a function the stdin entry point will call.
+    String helperPath = String("slangc-stdin-helper-") + String(Process::getId()) + ".slang";
+    SLANG_RETURN_ON_FAIL(File::writeAllText(helperPath, "void foo() {}\n"));
+
+    List<String> args;
+    args.add("-lang");
+    args.add("slang");
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add(helperPath);
+    args.add("--");
+    args.add("-");
+
+    // Entry point in stdin calls foo() defined in the on-disk file.
+    const char* source = "[shader(\"compute\")] void main() { foo(); }\n";
+
+    ExecuteResult result;
+    SlangResult spawnRes = _spawnSlangcWithStdin(context, args, source, result);
+
+    // Clean up the temp file regardless of outcome.
+    File::remove(helperPath);
+
+    SLANG_RETURN_ON_FAIL(spawnRes);
+
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (result.standardOutput.getUnownedSlice().indexOf(toSlice("OpEntryPoint")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithLangSlang(unitTestContext)));
@@ -280,4 +358,6 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinTwice(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinDiagnosticLocation(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithBom(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithLangGlsl(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinMixedWithFile(unitTestContext)));
 }

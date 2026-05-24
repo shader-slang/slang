@@ -526,7 +526,10 @@ void initCommandOptions(CommandOptions& options)
          "Treat the rest of the command line as input files. "
          "Use '-' as a filename to read source from standard input; "
          "-lang <language> is required in that case because the source language cannot be "
-         "deduced from a file extension. Example: slangc -lang slang -target spirv-asm -entry main -stage compute -- -"},
+         "deduced from a file extension. "
+         "When -lang glsl is used with stdin, -stage <stage> is also required because "
+         "the shader stage cannot be inferred from a file extension. "
+         "Example: slangc -lang slang -target spirv-asm -entry main -stage compute -- -"},
         {OptionKind::ReportDownstreamTime,
          "-report-downstream-time",
          nullptr,
