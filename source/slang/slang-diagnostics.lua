@@ -157,7 +157,7 @@ err(
 
 err("cannot-deduce-source-language", 12, "can't deduce language for input file '~path'")
 
-err("empty-source-input", 170, "no source code found in '~path'")
+err("empty-source-input", 106, "no source code found in '~path'")
 
 err(
     "unknown-code-generation-target",
