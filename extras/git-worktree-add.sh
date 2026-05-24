@@ -147,10 +147,6 @@ start_tmux_session() {
   local sessionName="$1"
   local sessionDir="$2"
 
-  if "$TMUX_EXE" has-session -t "=$sessionName" 2>/dev/null; then
-    die "tmux session already exists: $sessionName"
-  fi
-
   if [[ -n "${TMUX:-}" ]]; then
     "$TMUX_EXE" new-session -d -s "$sessionName" -c "$sessionDir"
     "$TMUX_EXE" switch-client -t "=$sessionName"
