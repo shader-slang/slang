@@ -110,9 +110,9 @@ static SlangResult _testEmptyStdin(UnitTestContext* context)
     ExecuteResult result;
     SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, "", result));
 
-    // Empty source is valid to parse but has no entry point — should fail cleanly.
-    // The important thing is it doesn't crash (resultCode is defined).
-    (void)result.resultCode;
+    // Empty source with explicit entry/stage should fail cleanly.
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
     return SLANG_OK;
 }
 
