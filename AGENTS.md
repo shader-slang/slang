@@ -17,6 +17,25 @@ Key directories:
 - `cmake/`: CMake helpers.
 - `external/`: vendored dependencies.
 
+## WSL and Windows Tooling
+
+When working in this repository from WSL on Windows, use Windows-native developer tools by
+default unless the user explicitly asks for the WSL/Linux version.
+
+- Use `git.exe`, not bare `git`. These worktrees use Windows path conventions; WSL Git can
+  corrupt or misinterpret worktree state, and Windows Git has much better file I/O performance
+  on this checkout.
+- When the `slang-build` skill invokes CMake, use `cmake.exe`, not bare `cmake`, for
+  Windows-hosted configure and build commands. Windows CMake can find Visual Studio 2026 and
+  the Windows toolchains required by the `vs2026` preset.
+- Use `gh.exe` instead of bare `gh` when GitHub CLI commands need to share the same
+  Windows-native Git and credential context.
+- Convert WSL paths before passing them to Windows tools, for example `wslpath -w "$path"`.
+  Convert paths printed by Windows tools back before using them in shell commands, for example
+  `wslpath -u "$win_path"`.
+- If a required `.exe` tool is unavailable, stop and report it instead of silently falling back
+  to the WSL/Linux tool.
+
 ## Build, Test, and Development Commands
 
 Slang build setup is platform-specific, especially under WSL. For compiler builds, use the
