@@ -521,6 +521,11 @@ static bool isPointerInRange(uintptr_t ptr, uintptr_t rangeStart, uintptr_t rang
     return ptr >= rangeStart && ptr < rangeEnd;
 }
 
+static bool isPointerInRangeOrAtEnd(uintptr_t ptr, uintptr_t rangeStart, uintptr_t rangeEnd)
+{
+    return ptr >= rangeStart && ptr <= rangeEnd;
+}
+
 static bool isPointerRangeInRange(
     uintptr_t start,
     uintptr_t end,
@@ -545,14 +550,14 @@ bool ByteCodeInterpreter::validatePointerAccess(const void* ptr, size_t size, bo
     uintptr_t constantsStart = reinterpret_cast<uintptr_t>(m_moduleView.constants);
     uintptr_t constantsEnd = constantsStart + m_moduleView.constantBlobSize;
 
-    if (isPointerInRange(accessStart, workingSetStart, workingSetEnd))
+    if (isPointerInRangeOrAtEnd(accessStart, workingSetStart, workingSetEnd))
     {
         if (!isPointerRangeInRange(accessStart, accessEnd, workingSetStart, workingSetEnd))
             return failExecution("VM pointer access exceeded the current working set.");
         return true;
     }
 
-    if (isPointerInRange(accessStart, constantsStart, constantsEnd))
+    if (isPointerInRangeOrAtEnd(accessStart, constantsStart, constantsEnd))
     {
         if (isWrite)
             return failExecution("VM attempted to write through a constants pointer.");
@@ -627,13 +632,13 @@ bool ByteCodeInterpreter::validatePointerOffset(
         return failExecution("VM pointer offset access overflow.");
     accessEnd = result + accessSize;
 
-    if (isPointerInRange(base, workingSetStart, workingSetEnd) &&
+    if (isPointerInRangeOrAtEnd(base, workingSetStart, workingSetEnd) &&
         !isPointerRangeInRange(result, accessEnd, workingSetStart, workingSetEnd))
     {
         return failExecution("VM working-set pointer arithmetic went out of bounds.");
     }
 
-    if (isPointerInRange(base, constantsStart, constantsEnd) &&
+    if (isPointerInRangeOrAtEnd(base, constantsStart, constantsEnd) &&
         !isPointerRangeInRange(result, accessEnd, constantsStart, constantsEnd))
     {
         return failExecution("VM constants pointer arithmetic went out of bounds.");

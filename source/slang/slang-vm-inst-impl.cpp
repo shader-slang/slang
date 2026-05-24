@@ -571,7 +571,7 @@ static void jumpIfHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 static void getWorkingSetPtrHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 {
     auto ctx = convert(inCtx);
-    if (inst->opcodeExtension >= ctx->m_currentWorkingSetSizeInBytes)
+    if (inst->opcodeExtension > ctx->m_currentWorkingSetSizeInBytes)
     {
         ctx->failExecution("VM working-set pointer offset is out of bounds.");
         return;
@@ -588,12 +588,7 @@ static void getElementPtrHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst,
     uint32_t elementIndex;
     memcpy(&elementIndex, inst->getOperand(2).getPtr(), sizeof(elementIndex));
     void* result = nullptr;
-    if (!ctx->validatePointerOffset(
-            basePtr,
-            elementIndex,
-            inst->opcodeExtension,
-            inst->opcodeExtension,
-            &result))
+    if (!ctx->validatePointerOffset(basePtr, elementIndex, inst->opcodeExtension, 0, &result))
     {
         return;
     }
@@ -623,12 +618,7 @@ static void offsetPtrHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, voi
     int32_t offset;
     memcpy(&offset, inst->getOperand(2).getPtr(), sizeof(offset));
     void* result = nullptr;
-    if (!ctx->validatePointerOffset(
-            basePtr,
-            offset,
-            inst->opcodeExtension,
-            inst->opcodeExtension,
-            &result))
+    if (!ctx->validatePointerOffset(basePtr, offset, inst->opcodeExtension, 0, &result))
     {
         return;
     }
