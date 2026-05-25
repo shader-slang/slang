@@ -507,10 +507,10 @@ EOF
       cat >>"${OUTPUT_FILE}" <<EOF
                     <tr style="border-bottom: 1px solid #ddd; background: #f8f9fa;">
                         <td style="padding: 15px;"><strong>🧩 Merged (cross-OS)</strong></td>
-                        <td style="padding: 15px; text-align: center;"><span class="${merged_line_class}">${MERGED_LINE_COV}%</span><br><small>${MERGED_LINES_HIT}/${MERGED_LINES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${merged_line_class}">${MERGED_LINE_COV}</span><br><small>${MERGED_LINES_HIT}/${MERGED_LINES_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
-                        <td style="padding: 15px; text-align: center;"><span class="${merged_function_class}">${MERGED_FUNCTION_COV}%</span><br><small>${MERGED_FUNCTIONS_HIT}/${MERGED_FUNCTIONS_FOUND}</small></td>
-                        <td style="padding: 15px; text-align: center;"><span class="${merged_branch_class}">${MERGED_BRANCH_COV}%</span><br><small>${MERGED_BRANCHES_HIT}/${MERGED_BRANCHES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${merged_function_class}">${MERGED_FUNCTION_COV}</span><br><small>${MERGED_FUNCTIONS_HIT}/${MERGED_FUNCTIONS_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${merged_branch_class}">${MERGED_BRANCH_COV}</span><br><small>${MERGED_BRANCHES_HIT}/${MERGED_BRANCHES_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center;"><a href="${LINK_PREFIX}latest/merged/full/index.html" style="color: #667eea;">View</a></td>
                     </tr>
 EOF
@@ -574,7 +574,7 @@ EOF
       cat >>"${OUTPUT_FILE}" <<EOF
                     <tr style="border-bottom: 1px solid #ddd;">
                         <td style="padding: 15px;"><strong>🪟 Windows (x86_64)</strong></td>
-                        <td style="padding: 15px; text-align: center;"><span class="${windows_line_class}">${WINDOWS_LINE_COV}%</span><br><small>${WINDOWS_LINES_HIT}/${WINDOWS_LINES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${windows_line_class}">${WINDOWS_LINE_COV}</span><br><small>${WINDOWS_LINES_HIT}/${WINDOWS_LINES_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
                         <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
                         <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
@@ -633,10 +633,10 @@ EOF
         cat >>"${OUTPUT_FILE}" <<EOF
                     <tr style="border-bottom: 1px solid #ddd; background: #f8f9fa;">
                         <td style="padding: 15px;"><strong>🧩 Merged (cross-OS)</strong></td>
-                        <td style="padding: 15px; text-align: center;"><span class="${merged_sl_line_class}">${MERGED_SLANGC_LINE_COV}%</span><br><small>${MERGED_SLANGC_LINES_HIT}/${MERGED_SLANGC_LINES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${merged_sl_line_class}">${MERGED_SLANGC_LINE_COV}</span><br><small>${MERGED_SLANGC_LINES_HIT}/${MERGED_SLANGC_LINES_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
-                        <td style="padding: 15px; text-align: center;"><span class="${merged_sl_function_class}">${MERGED_SLANGC_FUNCTION_COV}%</span><br><small>${MERGED_SLANGC_FUNCTIONS_HIT}/${MERGED_SLANGC_FUNCTIONS_FOUND}</small></td>
-                        <td style="padding: 15px; text-align: center;"><span class="${merged_sl_branch_class}">${MERGED_SLANGC_BRANCH_COV}%</span><br><small>${MERGED_SLANGC_BRANCHES_HIT}/${MERGED_SLANGC_BRANCHES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${merged_sl_function_class}">${MERGED_SLANGC_FUNCTION_COV}</span><br><small>${MERGED_SLANGC_FUNCTIONS_HIT}/${MERGED_SLANGC_FUNCTIONS_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${merged_sl_branch_class}">${MERGED_SLANGC_BRANCH_COV}</span><br><small>${MERGED_SLANGC_BRANCHES_HIT}/${MERGED_SLANGC_BRANCHES_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center;"><a href="${LINK_PREFIX}latest/merged/slangc/index.html" style="color: #667eea;">View</a></td>
                     </tr>
 EOF
@@ -684,7 +684,7 @@ EOF
         cat >>"${OUTPUT_FILE}" <<EOF
                     <tr style="border-bottom: 1px solid #ddd;">
                         <td style="padding: 15px;"><strong>🪟 Windows (x86_64)</strong></td>
-                        <td style="padding: 15px; text-align: center;"><span class="${windows_sl_line_class}">${WINDOWS_SLANGC_LINE_COV}%</span><br><small>${WINDOWS_SLANGC_LINES_HIT}/${WINDOWS_SLANGC_LINES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${windows_sl_line_class}">${WINDOWS_SLANGC_LINE_COV}</span><br><small>${WINDOWS_SLANGC_LINES_HIT}/${WINDOWS_SLANGC_LINES_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
                         <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>
                         <td style="padding: 15px; text-align: center; color: #95a5a6;">n/a</td>

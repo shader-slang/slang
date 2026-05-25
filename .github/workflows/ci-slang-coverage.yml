@@ -495,8 +495,11 @@ jobs:
           ) -join "`n"
           $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
-          # coverage-summary.json for historical tracking. Schema mirrors the
-          # Linux/macOS output but omits region/function/branch fields.
+          # coverage-summary.json for historical tracking. Schema mirrors
+          # the Linux/macOS output but omits region/function/branch
+          # fields. Percent strings keep the trailing `%` to match the
+          # Linux/macOS shape (which interpolates llvm-cov's own
+          # `75.71%`-style output verbatim).
           $commitShort = (git rev-parse --short HEAD).Trim()
           $reportDate = (Get-Date -AsUTC).ToString('yyyy-MM-dd')
           $json = [ordered]@{
@@ -504,10 +507,10 @@ jobs:
               commit = $commitShort
               platform = 'windows'
               platform_detail = "windows-${{ inputs.platform }}"
-              line_coverage = "$line_pct"
+              line_coverage = "$line_pct%"
               lines_hit = $lines_hit
               lines_found = $lines_total
-              slangc_line_coverage = "$slangc_pct"
+              slangc_line_coverage = "$slangc_pct%"
               slangc_lines_hit = $slangc_hit
               slangc_lines_found = $slangc_total
               _version = 2
