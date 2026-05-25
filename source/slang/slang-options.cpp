@@ -1576,11 +1576,13 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
             SLANG_SUCCEEDED(Process::getStdStream(StdStreamType::In, stdinStream)));
 
         List<Byte> bytes;
-        if (SLANG_FAILED(StreamUtil::readAll(stdinStream, bytes)))
+        if (SLANG_FAILED(StreamUtil::readAll(stdinStream, bytes)) ||
+            bytes.getCount() > kMaxIndex)
         {
             // The stream was opened but the read itself failed (e.g. the fd is
-            // write-only, EIO from a failing device, or a platform-level error).
-            // CannotOpenFile would be misleading here — the fd was valid.
+            // write-only, EIO from a failing device, or a platform-level error),
+            // or the input exceeds the maximum representable source size (kMaxIndex),
+            // mirroring the guard in File::readAllBytes.
             m_requestImpl->getSink()->diagnose(Diagnostics::CannotReadFromStdin{});
             return SLANG_FAIL;
         }
