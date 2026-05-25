@@ -16,10 +16,10 @@
 #include "../core/slang-char-util.h"
 #include "../core/slang-command-options-writer.h"
 #include "../core/slang-file-system.h"
-#include "../core/slang-process.h"
-#include "../core/slang-stream.h"
 #include "../core/slang-hex-dump-util.h"
 #include "../core/slang-name-value.h"
+#include "../core/slang-process.h"
+#include "../core/slang-stream.h"
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-type-text-util.h"
 #include "slang-compiler-options.h"
@@ -1576,13 +1576,10 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
             SLANG_SUCCEEDED(Process::getStdStream(StdStreamType::In, stdinStream)));
 
         List<Byte> bytes;
-        if (SLANG_FAILED(StreamUtil::readAll(stdinStream, bytes)) ||
-            bytes.getCount() > kMaxIndex)
+        if (SLANG_FAILED(StreamUtil::readAll(stdinStream, bytes)))
         {
             // The stream was opened but the read itself failed (e.g. the fd is
-            // write-only, EIO from a failing device, or a platform-level error),
-            // or the input exceeds the maximum representable source size (kMaxIndex),
-            // mirroring the guard in File::readAllBytes.
+            // write-only, EIO from a failing device, or a platform-level error).
             m_requestImpl->getSink()->diagnose(Diagnostics::CannotReadFromStdin{});
             return SLANG_FAIL;
         }
