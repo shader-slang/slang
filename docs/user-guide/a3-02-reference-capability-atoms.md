@@ -1504,7 +1504,14 @@ Compound Capabilities
 > New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 
 `texture_shadowlod`
-> Capabilities required to query shadow texture lod info
+> Capabilities required for shadow texture LOD sampling on types
+> natively supported by GLSL 1.50 (sampler1DShadow, sampler1DArrayShadow,
+> sampler2DShadow).
+
+`texture_shadowlod_ext`
+> Capabilities required for shadow texture LOD sampling on types
+> that need GL_EXT_texture_shadow_lod (sampler2DArrayShadow, samplerCubeShadow,
+> samplerCubeArrayShadow).
 
 `texture_size`
 > Capabilities required to query texture sample info
