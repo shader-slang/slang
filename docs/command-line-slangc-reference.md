@@ -285,7 +285,7 @@ Dump to output list of warning diagnostic numeric and name ids.
 
 <a id="id"></a>
 ### --
-Treat the rest of the command line as input files. Use '-' as a filename to read source from standard input; [-lang](#lang) [&lt;language&gt;](#language) is required in that case because the source language cannot be deduced from a file extension. When stdin is used with pass-through compilation ([-pass-through](#pass-through) glslang/dxc/fxc), [-stage](#stage-1) [&lt;stage&gt;](#stage) is required because the shader stage cannot be inferred from a file extension; omitting it may produce a downstream error rather than a clean CLI diagnostic. Stdin input is capped at 256 MiB. Example: slangc [-lang](#lang) slang [-target](#target-2) spirv-asm [-entry](#entry) main [--](#id) - 
+Treat the rest of the command line as input files. Use '-' as a filename to read source from standard input; [-lang](#lang) [&lt;language&gt;](#language) is required in that case because the source language cannot be deduced from a file extension. When stdin is used with pass-through compilation ([-pass-through](#pass-through) glslang/dxc/fxc), [-stage](#stage-1) [&lt;stage&gt;](#stage) is required because the shader stage cannot be inferred from a file extension; slangc emits a clean CLI diagnostic (error 35) when it is omitted. Stdin input is capped at 256 MiB. Example: slangc [-lang](#lang) slang [-target](#target-2) spirv-asm [-entry](#entry) main [--](#id) - 
 
 
 <a id="report-downstream-time"></a>

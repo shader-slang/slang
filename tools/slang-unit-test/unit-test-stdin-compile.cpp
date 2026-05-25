@@ -959,6 +959,60 @@ static SlangResult _testStdinMultipleFreads(UnitTestContext* context)
     return SLANG_OK;
 }
 
+// Case 16: stdin + -pass-through dxc without -stage emits NoStageSpecifiedInPassThroughMode
+// (error 35) from slangc itself — not from dxc.  The check at _passThroughRequiresStage in
+// slang-options.cpp fires before any downstream compiler is invoked, so this test works even
+// when dxc is not installed.  It also serves as the regression test for the doc claim in the
+// -- option description: "slangc emits a clean CLI diagnostic (error 35) when it is omitted."
+static SlangResult _testStdinPassThroughMissingStage(UnitTestContext* context)
+{
+    List<String> args;
+    args.add("-pass-through");
+    args.add("dxc");
+    args.add("-entry");
+    args.add("main");
+    // Deliberately no -stage.
+    args.add("--");
+    args.add("-");
+
+    const char* source = "void main() {}\n";
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
+
+    // Must fail — slangc catches the missing stage with a clean diagnostic.
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+
+    // Verify the specific diagnostic text (error 35: no-stage-specified-in-pass-through-mode).
+    if (result.standardError.getUnownedSlice().indexOf(
+            toSlice("no stage was specified for entry point")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+// Case 17: slangc -h output contains the stdin usage preamble.
+// kStdinUsagePreamble is injected into _appendUsageTitle and _parseHelp; a regression
+// that drops one of those calls compiles cleanly but silently removes the help text.
+// This test runs slangc -h and asserts the first sentence of the preamble is present
+// on stdout, covering the _appendUsageTitle path.
+static SlangResult _testHelpContainsStdinPreamble(UnitTestContext* context)
+{
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(ExecutableLocation(context->executableDirectory, "slangc"));
+    cmdLine.addArg("-h");
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, result));
+
+    if (result.standardOutput.getUnownedSlice().indexOf(
+            toSlice("Pass '-' as an input file to read source from standard input.")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithLangSlang(unitTestContext)));
@@ -980,4 +1034,6 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinExactlyAtCap(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinCtrlZNotTruncating(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinMultipleFreads(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinPassThroughMissingStage(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testHelpContainsStdinPreamble(unitTestContext)));
 }

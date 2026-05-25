@@ -540,7 +540,7 @@ void initCommandOptions(CommandOptions& options)
          "deduced from a file extension. "
          "When stdin is used with pass-through compilation (-pass-through glslang/dxc/fxc), "
          "-stage <stage> is required because the shader stage cannot be inferred from a file "
-         "extension; omitting it may produce a downstream error rather than a clean CLI diagnostic. "
+         "extension; slangc emits a clean CLI diagnostic (error 35) when it is omitted. "
          "Stdin input is capped at 256 MiB. "
          "Example: slangc -lang slang -target spirv-asm -entry main -- -"},
         {OptionKind::ReportDownstreamTime,
