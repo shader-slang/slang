@@ -7030,21 +7030,21 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             const auto indexValue = indexLit->getValue();
             if (indexValue >= 0)
             {
-                const auto index = (UInt)indexValue;
                 switch (baseVal.flavor)
                 {
                 case LoweredValInfo::Flavor::SwizzledLValue:
                     {
                         auto baseSwizzleInfo = baseVal.getSwizzledLValueInfo();
-                        if (index < (UInt)baseSwizzleInfo->elementIndices.getCount())
+                        if (indexValue < (IRIntegerValue)baseSwizzleInfo->elementIndices.getCount())
                         {
+                            const auto index = (Index)indexValue;
                             RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo();
                             context->shared->extValues.add(swizzledLValue);
 
                             swizzledLValue->type = type;
                             swizzledLValue->base = baseSwizzleInfo->base;
                             swizzledLValue->elementIndices.add(
-                                baseSwizzleInfo->elementIndices[(Index)index]);
+                                baseSwizzleInfo->elementIndices[index]);
                             return LoweredValInfo::swizzledLValue(swizzledLValue);
                         }
                     }
@@ -7053,8 +7053,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 case LoweredValInfo::Flavor::SwizzledMatrixLValue:
                     {
                         auto baseSwizzleInfo = baseVal.getSwizzledMatrixLValueInfo();
-                        if (index < baseSwizzleInfo->elementCount)
+                        if (indexValue < (IRIntegerValue)baseSwizzleInfo->elementCount)
                         {
+                            const auto index = (Index)indexValue;
                             RefPtr<SwizzledMatrixLValueInfo> swizzledLValue =
                                 new SwizzledMatrixLValueInfo();
                             context->shared->extValues.add(swizzledLValue);
@@ -7063,7 +7064,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                             swizzledLValue->base = baseSwizzleInfo->base;
                             swizzledLValue->elementCount = 1;
                             swizzledLValue->elementCoords[0] =
-                                baseSwizzleInfo->elementCoords[(Index)index];
+                                baseSwizzleInfo->elementCoords[index];
                             return LoweredValInfo::swizzledMatrixLValue(swizzledLValue);
                         }
                     }
