@@ -619,8 +619,15 @@ static SlangResult _testStdinGlslWithoutStage(UnitTestContext* context)
     args.add("--");
     args.add("-");
 
+    // Use the same source that Case 8 proves compiles when -stage compute is given.
+    // This ensures the failure here is due to the missing stage, not invalid source.
+    const char* source =
+        "#version 450\n"
+        "layout(local_size_x = 1) in;\n"
+        "void main() {}\n";
+
     ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, "void main() {}\n", result));
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
 
     if (result.resultCode == 0)
         return SLANG_FAIL;
