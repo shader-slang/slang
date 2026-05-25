@@ -1578,8 +1578,9 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         List<Byte> bytes;
         if (SLANG_FAILED(StreamUtil::readAll(stdinStream, bytes)))
         {
-            // The stream was opened but the read failed (e.g. a broken pipe or EIO).
-            // CannotOpenFile would be misleading here — the file descriptor was valid.
+            // The stream was opened but the read itself failed (e.g. the fd is
+            // write-only, EIO from a failing device, or a platform-level error).
+            // CannotOpenFile would be misleading here — the fd was valid.
             m_requestImpl->getSink()->diagnose(Diagnostics::CannotReadFromStdin{});
             return SLANG_FAIL;
         }

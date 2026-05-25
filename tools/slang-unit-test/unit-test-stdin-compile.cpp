@@ -8,6 +8,13 @@
 
 #include <string.h>
 
+#if SLANG_UNIX_FAMILY
+// For Case 11: fork+exec with a custom stdin fd.
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
+
 using namespace Slang;
 
 static SlangResult _spawnSlangcWithStdin(
@@ -401,6 +408,115 @@ static SlangResult _testStdinMixedWithFile(UnitTestContext* context)
     return SLANG_OK;
 }
 
+// Case 11 (POSIX only): pass a write-only regular-file fd as slangc's stdin.
+// On POSIX, poll(2) always reports POLLIN for regular files regardless of the fd's
+// access mode.  UnixPipeStream therefore calls read(2), which returns EBADF because
+// the fd was opened O_WRONLY.  EBADF is not EAGAIN/EWOULDBLOCK, so read() returns
+// SLANG_FAIL, which propagates out of StreamUtil::readAll and causes slangc to emit
+// CannotReadFromStdin (error 107: "failed to read source from stdin").
+// On non-POSIX platforms the test is a no-op: triggering a genuine readAll failure
+// requires platform-specific handle manipulation outside the test framework's reach.
+static SlangResult _testStdinReadError(UnitTestContext* context)
+{
+#if SLANG_UNIX_FAMILY
+    // Create a temp file, close it, and reopen it write-only.
+    char tmpPath[] = "/tmp/slangc-stdin-err-XXXXXX";
+    const int tmpRW = mkstemp(tmpPath);
+    if (tmpRW < 0)
+        return SLANG_FAIL;
+    close(tmpRW);
+
+    const int wfd = ::open(tmpPath, O_WRONLY);
+    ::unlink(tmpPath); // delete the path; wfd keeps the inode alive until closed
+    if (wfd < 0)
+        return SLANG_FAIL;
+
+    // Pipe to capture slangc's stderr so we can inspect the diagnostic text.
+    int stderrPipe[2];
+    if (::pipe(stderrPipe) != 0)
+    {
+        ::close(wfd);
+        return SLANG_FAIL;
+    }
+
+    const String slangcPath = String(context->executableDirectory) + "/slangc";
+
+    const pid_t pid = ::fork();
+    if (pid < 0)
+    {
+        ::close(wfd);
+        ::close(stderrPipe[0]);
+        ::close(stderrPipe[1]);
+        return SLANG_FAIL;
+    }
+
+    if (pid == 0)
+    {
+        // Child: wire fds, then exec slangc.
+        // fd 0 (stdin) = write-only file fd → read(0,...) returns EBADF → diagnostic 107.
+        ::dup2(wfd, STDIN_FILENO);
+        ::dup2(stderrPipe[1], STDERR_FILENO);
+        const int devNull = ::open("/dev/null", O_WRONLY);
+        if (devNull >= 0)
+        {
+            ::dup2(devNull, STDOUT_FILENO);
+            ::close(devNull);
+        }
+        ::close(wfd);
+        ::close(stderrPipe[0]);
+        ::close(stderrPipe[1]);
+
+        ::execl(
+            slangcPath.getBuffer(),
+            slangcPath.getBuffer(),
+            "-lang",
+            "slang",
+            "-target",
+            "spirv-asm",
+            "-entry",
+            "main",
+            "-stage",
+            "compute",
+            "--",
+            "-",
+            (char*)nullptr);
+        ::_exit(127); // execl failed
+    }
+
+    // Parent: close the fds the child inherited.
+    ::close(wfd);
+    ::close(stderrPipe[1]);
+
+    // Drain slangc's stderr.
+    List<Byte> stderrBytes;
+    {
+        char buf[256];
+        ssize_t n;
+        while ((n = ::read(stderrPipe[0], buf, sizeof(buf))) > 0)
+            for (ssize_t i = 0; i < n; ++i)
+                stderrBytes.add(Byte(buf[i]));
+    }
+    ::close(stderrPipe[0]);
+
+    int status = 0;
+    ::waitpid(pid, &status, 0);
+    const int exitCode = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+
+    if (exitCode == 0)
+        return SLANG_FAIL;
+
+    const UnownedStringSlice stderrSlice(
+        (const char*)stderrBytes.getBuffer(), size_t(stderrBytes.getCount()));
+    if (stderrSlice.indexOf(toSlice("failed to read source from stdin")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+#else
+    SLANG_UNUSED(context);
+    return SLANG_OK;
+#endif
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithLangSlang(unitTestContext)));
@@ -413,4 +529,5 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinBomDiagnosticLocation(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithLangGlsl(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinMixedWithFile(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinReadError(unitTestContext)));
 }
