@@ -363,32 +363,37 @@ static SlangResult _testStdinWithLangGlsl(UnitTestContext* context)
 }
 
 // Case 9: stdin combined with an on-disk .slang file.
-// Both inputs go into the same Slang translation unit (m_slangTranslationUnitIndex reuse),
-// so the stdin entry point can call a function defined in the on-disk file.
+// Both inputs must have the .slang extension (or be recognised as Slang by extension) so
+// that addInputPath routes them through addInputSlangPath, which reuses
+// m_slangTranslationUnitIndex and places both sources into the same translation unit.
 // A future refactor that allocates a fresh TU for stdin would break cross-file visibility
 // and fail this test.
 static SlangResult _testStdinMixedWithFile(UnitTestContext* context)
 {
     // Generate a uniquely-named temp file in the OS temp directory so the test
     // is safe in read-only cwds and parallel/re-run CI environments.
-    // No suffix is appended: the test passes -lang slang explicitly so the extension
-    // is irrelevant, and keeping the generateTemporary path ensures the FileGuard
-    // below removes the same inode that was atomically created here.
-    String helperPath;
-    SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slangc-stdin-helper"), helperPath));
+    // We append ".slang" so the file is routed through addInputSlangPath, which is
+    // the path that sets/reuses m_slangTranslationUnitIndex.  Both the base path
+    // (created by generateTemporary) and the ".slang" path must be removed on exit.
+    String basePath;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slangc-stdin-helper"), basePath));
+    const String helperPath = basePath + ".slang";
 
-    // RAII guard: removes the file on any return path, including early-out failures.
+    // RAII guard: removes both the base inode (created by generateTemporary) and
+    // the ".slang" file written below on any return path, including early-out failures.
     struct FileGuard
     {
-        String path;
-        ~FileGuard() { File::remove(path); }
-    } guard{helperPath};
+        String base, slang;
+        ~FileGuard()
+        {
+            File::remove(base);
+            File::remove(slang);
+        }
+    } guard{basePath, helperPath};
 
     SLANG_RETURN_ON_FAIL(File::writeAllText(helperPath, "void foo() {}\n"));
 
     List<String> args;
-    args.add("-lang");
-    args.add("slang");
     args.add("-target");
     args.add("spirv-asm");
     args.add("-entry");
@@ -635,6 +640,74 @@ static SlangResult _testStdinGlslWithoutStage(UnitTestContext* context)
     return SLANG_OK;
 }
 
+// Helper: set an environment variable for the duration of a scope, then restore it.
+struct ScopedEnvVar
+{
+    const char* key;
+    bool hadOld;
+    String oldVal;
+
+    ScopedEnvVar(const char* k, const char* v) : key(k), hadOld(false)
+    {
+        if (const char* cur = getenv(k))
+        {
+            hadOld = true;
+            oldVal = cur;
+        }
+#ifdef _WIN32
+        String s = String(k) + "=" + v;
+        _putenv(s.getBuffer());
+#else
+        setenv(k, v, 1);
+#endif
+    }
+    ~ScopedEnvVar()
+    {
+#ifdef _WIN32
+        String s = String(key) + "=" + (hadOld ? oldVal.getBuffer() : "");
+        _putenv(s.getBuffer());
+#else
+        if (hadOld)
+            setenv(key, oldVal.getBuffer(), 1);
+        else
+            unsetenv(key);
+#endif
+    }
+};
+
+// Case 13: stdin input exceeds the cap → StdinInputTooLarge diagnostic (error 108).
+// The production cap is 256 MiB; we lower it to 10 bytes via SLANG_TEST_MAX_STDIN_BYTES
+// so the test can trigger the diagnostic without allocating hundreds of megabytes.
+static SlangResult _testStdinTooLarge(UnitTestContext* context)
+{
+    ScopedEnvVar capEnv("SLANG_TEST_MAX_STDIN_BYTES", "10");
+
+    List<String> args;
+    args.add("-lang");
+    args.add("slang");
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("--");
+    args.add("-");
+
+    // 11 bytes — one more than the cap set above.
+    const char* source = "12345678901";
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
+
+    // Must fail with a non-zero exit code.
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+
+    // The StdinInputTooLarge message must appear in the output.
+    if (result.standardError.getUnownedSlice().indexOf(
+            toSlice("stdin input exceeds the maximum allowed size")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithLangSlang(unitTestContext)));
@@ -649,4 +722,5 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinMixedWithFile(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinReadError(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinGlslWithoutStage(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinTooLarge(unitTestContext)));
 }

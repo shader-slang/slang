@@ -161,6 +161,8 @@ err("empty-source-input", 106, "no source code found in '~path'")
 
 err("cannot-read-from-stdin", 107, "failed to read source from stdin")
 
+err("stdin-input-too-large", 108, "stdin input exceeds the maximum allowed size")
+
 err(
     "unknown-code-generation-target",
     13,

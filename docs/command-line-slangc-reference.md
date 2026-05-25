@@ -9,7 +9,7 @@ Pass '-' as an input file to read source from standard input.
 With pass-through compilation (-pass-through glslang/dxc/fxc), -stage <stage> is also required.
 
 # Read source from stdin (-lang is required)
-slangc -lang slang -target spirv-asm -entry main -stage compute -- -
+slangc -lang slang -target spirv-asm -entry main -- -
 
 # For help
 slangc -h
@@ -284,7 +284,7 @@ Dump to output list of warning diagnostic numeric and name ids.
 
 <a id="id"></a>
 ### --
-Treat the rest of the command line as input files. Use '-' as a filename to read source from standard input; -lang <language> is required in that case because the source language cannot be deduced from a file extension. When -lang glsl is used with stdin, -stage <stage> is required for pass-through compilation because the shader stage cannot be inferred from a file extension; omitting it may produce a downstream error rather than a clean CLI diagnostic. Example: slangc -lang slang -target spirv-asm -entry main -stage compute -- -
+Treat the rest of the command line as input files. Use '-' as a filename to read source from standard input; -lang <language> is required in that case because the source language cannot be deduced from a file extension. When -lang glsl is used with stdin, -stage <stage> is required for pass-through compilation because the shader stage cannot be inferred from a file extension; omitting it may produce a downstream error rather than a clean CLI diagnostic. Example: slangc -lang slang -target spirv-asm -entry main -- -
 
 
 <a id="report-downstream-time"></a>

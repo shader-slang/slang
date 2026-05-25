@@ -528,7 +528,7 @@ void initCommandOptions(CommandOptions& options)
          "When stdin is used with pass-through compilation (-pass-through glslang/dxc/fxc), "
          "-stage <stage> is required because the shader stage cannot be inferred from a file "
          "extension; omitting it may produce a downstream error rather than a clean CLI diagnostic. "
-         "Example: slangc -lang slang -target spirv-asm -entry main -stage compute -- -"},
+         "Example: slangc -lang slang -target spirv-asm -entry main -- -"},
         {OptionKind::ReportDownstreamTime,
          "-report-downstream-time",
          nullptr,
@@ -1567,15 +1567,37 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         if (m_stdinConsumed)
             return SLANG_OK;
 
+        // Mark consumed immediately so that any early-return error path (read error, empty
+        // input, unknown language) does not trigger a second attempt on a drained pipe.
+        m_stdinConsumed = true;
+
         // Use fread rather than StreamUtil::readAll over a PipeStream.  PipeStream uses
         // poll(timeout=0), which busy-spins at 100% CPU while waiting for data.  fread
         // is a standard blocking call that sleeps the thread until the producer writes.
+        //
+        // The default cap is 256 MiB.  Tests may lower it via SLANG_TEST_MAX_STDIN_BYTES
+        // to trigger the StdinInputTooLarge diagnostic without allocating 256+ MiB.
+        Index kMaxStdinBytes = Index(256) << 20; // 256 MiB
+        if (const char* envCap = getenv("SLANG_TEST_MAX_STDIN_BYTES"))
+        {
+            char* end = nullptr;
+            long long cap = strtoll(envCap, &end, 10);
+            if (end != envCap && cap > 0)
+                kMaxStdinBytes = Index(cap);
+        }
         List<Byte> bytes;
         {
             char buf[4096];
             size_t n;
             while ((n = fread(buf, 1, sizeof(buf), stdin)) > 0)
+            {
+                if (bytes.getCount() + Index(n) > kMaxStdinBytes)
+                {
+                    m_requestImpl->getSink()->diagnose(Diagnostics::StdinInputTooLarge{});
+                    return SLANG_FAIL;
+                }
                 bytes.addRange(reinterpret_cast<const Byte*>(buf), Index(n));
+            }
             if (ferror(stdin))
             {
                 m_requestImpl->getSink()->diagnose(Diagnostics::CannotReadFromStdin{});
@@ -1625,7 +1647,6 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
             (const char*)bytes.getBuffer(),
             (const char*)bytes.getBuffer() + bytes.getCount());
 
-        m_stdinConsumed = true;
         return SLANG_OK;
     }
     else if (path.endsWith(".slang-module") || path.endsWith(".slang-lib"))
@@ -2289,7 +2310,7 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
                    "-lang <language> is required when reading from stdin.\n"
                    "With pass-through compilation (-pass-through glslang/dxc/fxc), -stage <stage> is also required.\n\n"
                    "# Read source from stdin (-lang is required)\n"
-                   "slangc -lang slang -target spirv-asm -entry main -stage compute -- -\n\n";
+                   "slangc -lang slang -target spirv-asm -entry main -- -\n\n";
             buf << "# For help\n";
             buf << "slangc -h\n\n";
             buf << "# To generate this file\n";
