@@ -1,9 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
-// Struct returned by value with a multi-level pointer field. The caller
-// extracts the field via FieldExtract (by-value access) rather than
-// FieldAddress+Load. The pass must insert CastIntToPtr after the extract.
+// Struct with a multi-level pointer field returned by value from a function.
+// The caller accesses the pointer field from the returned struct value, not
+// through a buffer address.
 //
 // See: https://github.com/shader-slang/slang/issues/10841
 

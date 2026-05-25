@@ -1,9 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
-// Combined load and store on RWStructuredBuffer<int*>. Both reading a pointer
-// element (needs CastIntToPtr after load) and writing a pointer element (needs
-// CastPtrToInt before store) must work correctly in the same kernel.
+// Combined read and write of pointer elements in RWStructuredBuffer<int*>.
+// Both directions must produce correct casts between ulong and typed pointers.
 //
 // See: https://github.com/shader-slang/slang/issues/10841
 

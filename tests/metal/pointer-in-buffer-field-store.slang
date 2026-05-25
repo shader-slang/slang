@@ -1,9 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
-// Store a multi-level pointer value into a struct field inside a storage
-// buffer. Exercises the kIROp_Store branch in insertCastsForPointerUses:
-// the stored value must be cast from pointer to ulong via CastPtrToInt.
+// Store a multi-level pointer into a struct field in an RWStructuredBuffer.
+// The stored pointer value must be cast to ulong before writing.
 //
 // See: https://github.com/shader-slang/slang/issues/10841
 
