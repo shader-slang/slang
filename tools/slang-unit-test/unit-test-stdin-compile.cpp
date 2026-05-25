@@ -371,9 +371,11 @@ static SlangResult _testStdinMixedWithFile(UnitTestContext* context)
 {
     // Generate a uniquely-named temp file in the OS temp directory so the test
     // is safe in read-only cwds and parallel/re-run CI environments.
+    // No suffix is appended: the test passes -lang slang explicitly so the extension
+    // is irrelevant, and keeping the generateTemporary path ensures the FileGuard
+    // below removes the same inode that was atomically created here.
     String helperPath;
     SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slangc-stdin-helper"), helperPath));
-    helperPath = helperPath + ".slang";
 
     // RAII guard: removes the file on any return path, including early-out failures.
     struct FileGuard
@@ -411,14 +413,12 @@ static SlangResult _testStdinMixedWithFile(UnitTestContext* context)
     return SLANG_OK;
 }
 
-// Case 11 (POSIX only): pass a write-only regular-file fd as slangc's stdin.
-// On POSIX, poll(2) always reports POLLIN for regular files regardless of the fd's
-// access mode.  UnixPipeStream therefore calls read(2), which returns EBADF because
-// the fd was opened O_WRONLY.  EBADF is not EAGAIN/EWOULDBLOCK, so read() returns
-// SLANG_FAIL, which propagates out of StreamUtil::readAll and causes slangc to emit
-// CannotReadFromStdin (error 107: "failed to read source from stdin").
-// On non-POSIX platforms the test is a no-op: triggering a genuine readAll failure
-// requires platform-specific handle manipulation outside the test framework's reach.
+// Case 11: pass a write-only fd/handle as slangc's stdin to trigger diagnostic 107.
+// The stdin read in addInputPath uses fread/ferror directly (not PipeStream/readAll).
+// POSIX: fread on an O_WRONLY fd calls read(2), which returns EBADF; fread returns 0
+//        and sets ferror(stdin), satisfying the if (ferror(stdin)) guard → diagnostic 107.
+// Windows: fread on a write-only pipe handle goes through the CRT, which calls ReadFile;
+//          ReadFile fails on a write-only handle, the CRT sets ferror(stdin) → diagnostic 107.
 static SlangResult _testStdinReadError(UnitTestContext* context)
 {
 #if SLANG_UNIX_FAMILY
@@ -516,9 +516,9 @@ static SlangResult _testStdinReadError(UnitTestContext* context)
     return SLANG_OK;
 #elif SLANG_WINDOWS_FAMILY
     // Create an anonymous pipe and pass the write end as the child's stdin.
-    // WinPipeStream detects FILE_TYPE_PIPE and calls PeekNamedPipe; PeekNamedPipe
-    // fails on a write-only handle (ERROR_ACCESS_DENIED), which propagates through
-    // _updateState → StreamUtil::readAll as SLANG_FAIL → diagnostic 107.
+    // fread in slangc calls ReadFile via the CRT; ReadFile fails on a write-only
+    // pipe handle, the CRT sets the stdio error indicator, and ferror(stdin)
+    // fires in addInputPath → diagnostic 107.
     SECURITY_ATTRIBUTES sa = {};
     sa.nLength = sizeof(sa);
     sa.bInheritHandle = TRUE;
