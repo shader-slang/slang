@@ -16,6 +16,9 @@
 // CHECK_HLSL-NOT: this_type
 // CHECK_HLSL-NOT: IMaterialInstance_collect_properties
 // CHECK_HLSL: void main(
+// CHECK_HLSL-NOT: this_type
+// CHECK_HLSL-NOT: IMaterialInstance_collect_properties
+// CHECK_HLSL: return;
 
 // SPIR-V should compile successfully (no ICE) and produce an entry point.
 // CHECK_SPV: OpEntryPoint
