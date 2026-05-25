@@ -525,9 +525,9 @@ void initCommandOptions(CommandOptions& options)
          "Use '-' as a filename to read source from standard input; "
          "-lang <language> is required in that case because the source language cannot be "
          "deduced from a file extension. "
-         "When -lang glsl is used with stdin, -stage <stage> is required for pass-through "
-         "compilation because the shader stage cannot be inferred from a file extension; "
-         "omitting it may produce a downstream error rather than a clean CLI diagnostic. "
+         "When stdin is used with pass-through compilation (-pass-through glslang/dxc/fxc), "
+         "-stage <stage> is required because the shader stage cannot be inferred from a file "
+         "extension; omitting it may produce a downstream error rather than a clean CLI diagnostic. "
          "Example: slangc -lang slang -target spirv-asm -entry main -stage compute -- -"},
         {OptionKind::ReportDownstreamTime,
          "-report-downstream-time",
@@ -1924,7 +1924,7 @@ void OptionsParser::_appendUsageTitle(StringBuilder& out)
     out << "Usage: slangc [options...] [--] <input files>\n\n"
            "Pass '-' as an input file to read source from standard input.\n"
            "-lang <language> is required when reading from stdin.\n"
-           "For -lang glsl, -stage <stage> is also required.\n\n";
+           "With pass-through compilation (-pass-through glslang/dxc/fxc), -stage <stage> is also required.\n\n";
 }
 
 void OptionsParser::_outputMinimalUsage()
@@ -2287,7 +2287,7 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
             buf << "slangc [options...] [--] <input files>\n\n"
                    "Pass '-' as an input file to read source from standard input.\n"
                    "-lang <language> is required when reading from stdin.\n"
-                   "For -lang glsl, -stage <stage> is also required.\n\n"
+                   "With pass-through compilation (-pass-through glslang/dxc/fxc), -stage <stage> is also required.\n\n"
                    "# Read source from stdin (-lang is required)\n"
                    "slangc -lang slang -target spirv-asm -entry main -stage compute -- -\n\n";
             buf << "# For help\n";

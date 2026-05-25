@@ -6,7 +6,7 @@ slangc [options...] [--] <input files>
 
 Pass '-' as an input file to read source from standard input.
 -lang <language> is required when reading from stdin.
-For -lang glsl, -stage <stage> is also required.
+With pass-through compilation (-pass-through glslang/dxc/fxc), -stage <stage> is also required.
 
 # Read source from stdin (-lang is required)
 slangc -lang slang -target spirv-asm -entry main -stage compute -- -
