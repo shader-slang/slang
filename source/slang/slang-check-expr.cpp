@@ -187,9 +187,15 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
         expr,
         [&](DeclRef<VarDeclBase> varDeclRef)
         {
+            // The interface type stored on the `ExtractExistentialType` should
+            // be the bare interface, not a `ModifiedType` wrapping it (e.g. the
+            // `no_diff` modifier that `[Differentiable]` adds to non-
+            // differentiable return types). Otherwise downstream consumers that
+            // look at the cached "original interface type" by `DeclRefType`
+            // would not recognize it as an interface.
             ExtractExistentialType* openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
                 varDeclRef,
-                expr->type.type,
+                unwrapModifiedType(expr->type.type),
                 interfaceDeclRef);
 
             ExtractExistentialValueExpr* openedValue =
@@ -232,7 +238,13 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
 ///
 Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
 {
-    auto exprType = expr->type.type;
+    // Look through `ModifiedType` (e.g. an interface return wrapped in
+    // `no_diff` by the `[Differentiable]` checker) so the interface check
+    // below succeeds. If we miss this, member lookup never produces an
+    // `ExtractExistentialValueExpr`, the IR never emits the standard
+    // existential-dispatch idiom, and a raw `this_type(...)` leaks all the
+    // way to codegen.
+    auto exprType = unwrapModifiedType(expr->type.type);
 
     if (auto declRefType = as<DeclRefType>(exprType))
     {
