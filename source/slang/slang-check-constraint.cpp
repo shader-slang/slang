@@ -1278,7 +1278,8 @@ private:
         // known, comparing its actual conformance shape against `IFoo<U>` can
         // discover `U = X`; the witness still waits until that new ordinary
         // constraint has solved `U`.
-        tryInferOrdinaryArgsFromWitnessConstraint(constraint);
+        if (tryInferOrdinaryArgsFromWitnessConstraint(constraint))
+            return ConstraintSolvingState::Blocked;
 
         // A witness can only be proved after the ordinary and witness arguments
         // it mentions are ready. For example, `T : IFoo<U>` waits for both `T`
@@ -1317,7 +1318,7 @@ private:
     }
 
     // Try to discover ordinary-argument constraints from one witness constraint.
-    void tryInferOrdinaryArgsFromWitnessConstraint(SolverConstraint const& constraint)
+    bool tryInferOrdinaryArgsFromWitnessConstraint(SolverConstraint const& constraint)
     {
         // Only subtype/equality constraints have a conformance shape that can
         // expose more ordinary arguments. Coercion, pack, and differentiability
@@ -1325,7 +1326,7 @@ private:
         // solved subject type against an interface with generic arguments.
         auto typeConstraintDecl = as<GenericTypeConstraintDecl>(constraint.decl);
         if (!typeConstraintDecl)
-            return;
+            return false;
 
         // The subject side must be ready before the shape comparison is useful.
         // In `T : IFoo<U>`, comparing before `T` is known would only restate the
@@ -1333,7 +1334,7 @@ private:
         // system can find its actual `IFoo<X>` facet and unification can
         // discover `U = X`.
         if (hasUnreadyDependenciesForVal(typeConstraintDecl->sub.type))
-            return;
+            return false;
 
         // Substitute the source constraint through the current argument list.
         // The target side may still contain default substitution args, such as
@@ -1346,11 +1347,47 @@ private:
 
         // `TryJoinTypes()` is the existing path that compares a concrete type
         // against an interface shape and uses facet unification to append
-        // ordinary constraints into `m_context.discoveredConstraints`. The witness solver
-        // does not interpret failure here as proof failure; the normal witness
-        // step below remains responsible for accepting optional constraints or
-        // rejecting required ones.
-        m_visitor->TryJoinTypes(&m_context, QualType(sub), QualType(sup));
+        // ordinary constraints into `m_context.discoveredConstraints`. The
+        // witness solver does not interpret failure here as proof failure; the
+        // normal witness step below remains responsible for accepting optional
+        // constraints or rejecting required ones.
+        auto joinedSub = m_visitor->TryJoinTypes(&m_context, QualType(sub), QualType(sup));
+
+        // Joining can also produce a better subject type. For `sqrt(1)`, call
+        // inference first solves `T` as `int`, then the source constraint
+        // `T : __BuiltinFloatingPointType` joins `int` with the floating-point
+        // interface and selects `float`. That `float` is not a witness yet; it
+        // is a better ordinary argument for `T`, so add it to the same
+        // work-list loop and let the witness retry after `T` changes.
+        return addSubjectConstraintForJoinedSubtypeIfNeeded(typeConstraintDecl, sub, joinedSub);
+    }
+
+    // Add an ordinary constraint when subtype joining improves the subject type.
+    bool addSubjectConstraintForJoinedSubtypeIfNeeded(
+        GenericTypeConstraintDecl* constraintDecl,
+        Type* currentSub,
+        Type* joinedSub)
+    {
+        // If joining failed, or if it confirmed the subject type already in the
+        // argument list, there is no new ordinary argument to solve before the
+        // witness is attempted.
+        if (!joinedSub || currentSub->equals(joinedSub))
+            return false;
+
+        // Re-unify the declaration-time subject with the joined type rather
+        // than writing to one parameter directly. This keeps the general
+        // unification behavior for subjects such as `vector<T, N>`: a joined
+        // subject `vector<float, N>` should discover `T = float`, while a
+        // direct subject `T` discovers the simpler `T = float` constraint.
+        UnificationOptions unificationOptions;
+        unificationOptions.optionalConstraint =
+            constraintDecl->hasModifier<OptionalConstraintModifier>();
+        unificationOptions.equalityConstraint = constraintDecl->isEqualityConstraint;
+        return m_visitor->TryUnifyTypes(
+            m_context,
+            unificationOptions,
+            QualType(constraintDecl->sub.type),
+            QualType(joinedSub));
     }
 
     // Substitute a dependent ordinary constraint through current arguments.
