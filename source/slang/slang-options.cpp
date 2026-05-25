@@ -40,6 +40,15 @@
 namespace Slang
 {
 
+// Single canonical description of the stdin feature for use in every user-facing surface
+// (_appendUsageTitle, _parseHelp, and the InputFilesRemain option description).
+// Having one definition prevents wording drift when the cap or pass-through list changes.
+static const char* const kStdinUsagePreamble =
+    "Pass '-' as an input file to read source from standard input.\n"
+    "-lang <language> is required when reading from stdin.\n"
+    "With pass-through compilation (-pass-through glslang/dxc/fxc), -stage <stage> is required.\n"
+    "Stdin input is capped at 256 MiB.\n";
+
 namespace
 { // anonymous
 
@@ -1596,7 +1605,11 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
             errno = 0;
             char* end = nullptr;
             long long cap = strtoll(envCap, &end, 10);
-            if (end != envCap && errno != ERANGE && cap > 0 &&
+            // *end == '\0' rejects trailing junk (e.g. "100abc" → rejected).
+            // Raw stdlib is used here rather than PlatformUtil/stringToInt because
+            // PlatformUtil is not a dependency of this file and stringToInt returns
+            // int, which is too narrow for Index on 64-bit builds.
+            if (end != envCap && *end == '\0' && errno != ERANGE && cap > 0 &&
                 cap <= (long long)kMaxStdinBytes)
             {
                 kMaxStdinBytes = Index(cap);
@@ -1959,10 +1972,9 @@ SlangResult OptionsParser::_dumpDiagnostics(Severity originalSeverity)
 
 void OptionsParser::_appendUsageTitle(StringBuilder& out)
 {
-    out << "Usage: slangc [options...] [--] <input files>\n\n"
-           "Pass '-' as an input file to read source from standard input.\n"
-           "-lang <language> is required when reading from stdin.\n"
-           "With pass-through compilation (-pass-through glslang/dxc/fxc), -stage <stage> is also required.\n\n";
+    out << "Usage: slangc [options...] [--] <input files>\n\n";
+    out << kStdinUsagePreamble;
+    out << "\n";
 }
 
 void OptionsParser::_outputMinimalUsage()
@@ -2322,10 +2334,9 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
             buf << "# Slang Command Line Options\n\n";
             buf << "*Usage:*\n";
             buf << "```\n";
-            buf << "slangc [options...] [--] <input files>\n\n"
-                   "Pass '-' as an input file to read source from standard input.\n"
-                   "-lang <language> is required when reading from stdin.\n"
-                   "With pass-through compilation (-pass-through glslang/dxc/fxc), -stage <stage> is also required.\n\n"
+            buf << "slangc [options...] [--] <input files>\n\n";
+            buf << kStdinUsagePreamble;
+            buf << "\n"
                    "# Read source from stdin (-lang is required)\n"
                    "slangc -lang slang -target spirv-asm -entry main -- -\n\n";
             buf << "# For help\n";

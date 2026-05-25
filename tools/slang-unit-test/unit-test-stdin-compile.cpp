@@ -883,6 +883,82 @@ static SlangResult _testStdinExactlyAtCap(UnitTestContext* context)
     return SLANG_OK;
 }
 
+// Case 14: source containing 0x1A (Ctrl-Z) mid-stream compiles correctly.
+// On Windows, text-mode stdin treats 0x1A as EOF, silently truncating the source.
+// _setmode(_fileno(stdin), _O_BINARY) prevents this; removing that call would
+// cause the entry point (which comes after the 0x1A byte) to be invisible to the
+// compiler, producing an "entry point not found" error and a non-zero exit code.
+static SlangResult _testStdinCtrlZNotTruncating(UnitTestContext* context)
+{
+    List<String> args;
+    args.add("-lang");
+    args.add("slang");
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("--");
+    args.add("-");
+
+    // 0x1A sits inside a block comment — harmless to the Slang lexer in binary mode,
+    // but it would truncate the stream in Windows text mode, hiding the entry point.
+    const char* source =
+        "void foo() { /* \x1A */ }\n"
+        "[shader(\"compute\")] void main() { foo(); }\n";
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
+
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (result.standardOutput.getUnownedSlice().indexOf(toSlice("OpEntryPoint")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+// Case 15: source larger than the 4096-byte fread buffer compiles correctly.
+// The read loop uses a 4096-byte stack buffer and iterates.  A regression that
+// replaces the while loop with a single-shot fread call would truncate the shader
+// at 4096 bytes.  The entry point calls tail_fn, which is declared well past the
+// 4096-byte boundary; a truncated read would produce an "undefined identifier" error.
+static SlangResult _testStdinMultipleFreads(UnitTestContext* context)
+{
+    List<String> args;
+    args.add("-lang");
+    args.add("slang");
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("--");
+    args.add("-");
+
+    // Build ~8 KiB of valid Slang: 350 trivial helper functions (~24 bytes each = ~8.4 KiB)
+    // followed by tail_fn and the entry point.  tail_fn is declared well past byte 4096
+    // so a single-shot fread would never see it.
+    StringBuilder sb;
+    for (int i = 0; i < 350; i++)
+        sb << "void helper_" << i << "() {}\n";
+    sb << "void tail_fn() {}\n";
+    sb << "[shader(\"compute\")] void main() { tail_fn(); }\n";
+    const String source = sb.produceString();
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source.getBuffer(), result));
+
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (result.standardOutput.getUnownedSlice().indexOf(toSlice("OpEntryPoint")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithLangSlang(unitTestContext)));
@@ -902,4 +978,6 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinGlslWithoutStage(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinTooLarge(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinExactlyAtCap(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinCtrlZNotTruncating(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinMultipleFreads(unitTestContext)));
 }
