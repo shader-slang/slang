@@ -8,8 +8,8 @@
 # - .github/workflows/ci-slang-test-container.yml
 #
 # Build and push:
-#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.0 .
-#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.0
+#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1 .
+#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
 #
 # IMPORTANT: After pushing a new version, update all references in:
 #   - .github/workflows/ci-slang-build-container.yml
