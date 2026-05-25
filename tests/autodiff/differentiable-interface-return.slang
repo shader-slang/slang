@@ -19,6 +19,11 @@
 // CHECK_HLSL-NOT: this_type
 // CHECK_HLSL-NOT: IMaterialInstance_collect_properties
 // CHECK_HLSL: return;
+// A trailing negative block after the final positive `CHECK_HLSL` extends
+// the scope to end-of-input, so an out-of-line dispatcher emitted after
+// `main` (e.g. via a future regression) still fails the test.
+// CHECK_HLSL-NOT: this_type
+// CHECK_HLSL-NOT: IMaterialInstance_collect_properties
 
 // SPIR-V should compile successfully (no ICE) and produce an entry point.
 // CHECK_SPV: OpEntryPoint
