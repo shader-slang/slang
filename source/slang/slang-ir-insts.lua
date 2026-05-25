@@ -1102,8 +1102,8 @@ local insts = {
 	-- preserved and never stripped by `stripDebugInfo`. The coverage-
 	-- instrument IR pass later rewrites each occurrence into an atomic
 	-- add on the IR-synthesized `__slang_coverage` buffer; counter slots are
-	-- assigned one-per-op in traversal order. Host-side tooling can
-	-- aggregate those slots back to `(file, line)` when producing LCOV.
+	-- assigned one-per-op in traversal order. Host-side tooling reads
+	-- source coverage entries and aggregates line entries when producing LCOV.
 	-- Inherent side-effect semantics keep the optimizer from deleting
 	-- or hoisting this op.
 	{ IncrementCoverageCounter = {} },
@@ -1157,6 +1157,8 @@ local insts = {
 	},
 	-- Store into an Image.
 	{ imageStore = { operands = { { "image" }, { "coord" }, { "value" } } } },
+	-- Load from a SubpassInput.
+	{ SubpassLoad = { operands = { { "subpassInput" }, { "sample", optional = true } } } },
 	-- Load (almost) arbitrary-type data from a byte-address buffer
 	-- %dst = byteAddressBufferLoad(%buffer, %offset, %alignment)
 	-- where

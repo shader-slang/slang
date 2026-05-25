@@ -302,7 +302,7 @@ Reports information about checkpoint contexts used for reverse-mode automatic di
 
 <a id="trace-coverage"></a>
 ### -trace-coverage
-Instrument the shader with per-statement execution counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping counter slots to source positions. 
+Instrument the shader with per-statement execution counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping source coverage entries to counters. 
 
 
 <a id="trace-coverage-binding"></a>
@@ -310,7 +310,15 @@ Instrument the shader with per-statement execution counters. When writing compil
 
 **-trace-coverage-binding &lt;index&gt; &lt;space&gt;**
 
-Bind the synthesized `__slang_coverage` buffer at an explicit (register index, space) instead of auto-allocating a slot. Useful when the host needs the binding fixed at compile time (e.g. for a pre-built D3D12 root signature). Implies `-trace-coverage`. 
+Bind the synthesized `__slang_coverage` buffer at an explicit (register index, space) instead of auto-allocating a slot. Useful when the host needs the binding fixed at compile time before any host metadata reads run. Implies `-trace-coverage`. 
+
+
+<a id="trace-coverage-reserved-space"></a>
+### -trace-coverage-reserved-space
+
+**-trace-coverage-reserved-space &lt;space&gt;**
+
+Reserve a descriptor set when auto-allocating the synthesized `__slang_coverage` buffer. Use this when the host pipeline layout owns descriptor sets that are not visible in the compiled shader IR. Repeat for multiple spaces; duplicates are idempotent. Applies to Khronos descriptor-set targets. 
 
 
 <a id="report-dynamic-dispatch-sites"></a>
@@ -360,7 +368,7 @@ Disable short-circuiting for "&amp;&amp;" and "||" operations
 
 <a id="unscoped-enum"></a>
 ### -unscoped-enum
-Treat enums types as unscoped by default. 
+Treat enum types as unscoped by default. (Note: enum class remains scoped.) 
 
 
 <a id="preserve-params"></a>

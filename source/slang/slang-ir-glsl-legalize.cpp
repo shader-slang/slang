@@ -379,6 +379,11 @@ GLSLSystemValueInfo* getMeshOutputIndicesSystemValueInfo(
     auto vectorCount = composeGetters<IRIntLit>(type, &IRVectorType::getElementCount);
     auto elemType = composeGetters<IRType>(type, &IRVectorType::getElementType);
 
+    // Defence in depth: the front-end rejects invalid OutputIndices element
+    // types, but serialized IR modules can bypass AST validation entirely.
+    if (!vectorCount || !elemType)
+        SLANG_UNEXPECTED("invalid OutputIndices element type reached GLSL legalization");
+
     // Lines
     if (vectorCount->getValue() == 2 && isIntegralType(elemType))
     {
