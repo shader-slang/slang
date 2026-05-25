@@ -18,8 +18,6 @@
 #include "../core/slang-file-system.h"
 #include "../core/slang-hex-dump-util.h"
 #include "../core/slang-name-value.h"
-#include "../core/slang-process.h"
-#include "../core/slang-stream.h"
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-type-text-util.h"
 #include "slang-compiler-options.h"
@@ -1569,19 +1567,20 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         if (m_stdinConsumed)
             return SLANG_OK;
 
-        // Process::getStdStream for StdStreamType::In is unconditionally SLANG_OK on all
-        // implemented platforms; SLANG_RELEASE_ASSERT catches a future platform regression.
-        RefPtr<Stream> stdinStream;
-        SLANG_RELEASE_ASSERT(
-            SLANG_SUCCEEDED(Process::getStdStream(StdStreamType::In, stdinStream)));
-
+        // Use fread rather than StreamUtil::readAll over a PipeStream.  PipeStream uses
+        // poll(timeout=0), which busy-spins at 100% CPU while waiting for data.  fread
+        // is a standard blocking call that sleeps the thread until the producer writes.
         List<Byte> bytes;
-        if (SLANG_FAILED(StreamUtil::readAll(stdinStream, bytes)))
         {
-            // The stream was opened but the read itself failed (e.g. the fd is
-            // write-only, EIO from a failing device, or a platform-level error).
-            m_requestImpl->getSink()->diagnose(Diagnostics::CannotReadFromStdin{});
-            return SLANG_FAIL;
+            char buf[4096];
+            size_t n;
+            while ((n = fread(buf, 1, sizeof(buf), stdin)) > 0)
+                bytes.addRange(reinterpret_cast<const Byte*>(buf), Index(n));
+            if (ferror(stdin))
+            {
+                m_requestImpl->getSink()->diagnose(Diagnostics::CannotReadFromStdin{});
+                return SLANG_FAIL;
+            }
         }
         if (bytes.getCount() == 0)
         {
@@ -1924,7 +1923,8 @@ void OptionsParser::_appendUsageTitle(StringBuilder& out)
 {
     out << "Usage: slangc [options...] [--] <input files>\n\n"
            "Pass '-' as an input file to read source from standard input.\n"
-           "-lang <language> is required when reading from stdin.\n\n";
+           "-lang <language> is required when reading from stdin.\n"
+           "For -lang glsl, -stage <stage> is also required.\n\n";
 }
 
 void OptionsParser::_outputMinimalUsage()
@@ -2286,7 +2286,8 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
             buf << "```\n";
             buf << "slangc [options...] [--] <input files>\n\n"
                    "Pass '-' as an input file to read source from standard input.\n"
-                   "-lang <language> is required when reading from stdin.\n\n"
+                   "-lang <language> is required when reading from stdin.\n"
+                   "For -lang glsl, -stage <stage> is also required.\n\n"
                    "# Read source from stdin (-lang is required)\n"
                    "slangc -lang slang -target spirv-asm -entry main -stage compute -- -\n\n";
             buf << "# For help\n";
