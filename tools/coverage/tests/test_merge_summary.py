@@ -108,6 +108,19 @@ class ParseTotalTests(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_non_integer_count_column_returns_none(self):
+        """Count columns are always integers in llvm-cov's output. A
+        non-integer there means the column layout has drifted; the row
+        must be omitted rather than silently coerced to 0 (which would
+        publish misleading merged metrics)."""
+        path = write_tmp(
+            "TOTAL  BOGUS  10  90.00%  20  5  75.00%  500  50  90.00%  200  20  90.00%\n"
+        )
+        try:
+            self.assertIsNone(merge_summary.parse_total(path))
+        finally:
+            os.unlink(path)
+
 
 class BuildSummaryTests(unittest.TestCase):
     """build_summary combines full + slangc parses with metadata."""

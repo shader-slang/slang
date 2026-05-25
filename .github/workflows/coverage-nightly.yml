@@ -377,6 +377,14 @@ jobs:
             cp ../coverage-reports/merged/slangc/coverage.lcov "${REPORT_DIR}/merged/slangc/" || true
             cp ../coverage-reports/merged/slangc/coverage-report.txt "${REPORT_DIR}/merged/slangc/" 2>/dev/null || true
           fi
+          # Publish the merged coverage-summary.json alongside the HTML.
+          # generate-landing-page.sh reads reports/latest/merged/coverage-summary.json
+          # to populate the cross-OS Merged row and headline badge -- if
+          # this copy is missing the row never renders.
+          if [ -f ../coverage-reports/merged/coverage-summary.json ]; then
+            mkdir -p "${REPORT_DIR}/merged"
+            cp ../coverage-reports/merged/coverage-summary.json "${REPORT_DIR}/merged/"
+          fi
 
           # Update latest. Same per-OS structure as the history archive
           # above, sourcing from the in-tree renderer.
@@ -407,6 +415,10 @@ jobs:
             cp -r ../coverage-reports/merged/slangc/html/* reports/latest/merged/slangc/
             cp ../coverage-reports/merged/slangc/coverage.lcov reports/latest/merged/slangc/ || true
             cp ../coverage-reports/merged/slangc/coverage-report.txt reports/latest/merged/slangc/ 2>/dev/null || true
+          fi
+          if [ -f ../coverage-reports/merged/coverage-summary.json ]; then
+            mkdir -p reports/latest/merged
+            cp ../coverage-reports/merged/coverage-summary.json reports/latest/merged/
           fi
 
           # Cleanup old reports (keep last 7 days + monthly snapshots)

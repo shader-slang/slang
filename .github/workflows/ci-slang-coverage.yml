@@ -447,6 +447,12 @@ jobs:
         id: coverage-summary-windows
         if: inputs.os == 'windows'
         shell: pwsh
+        env:
+          # Read inputs.platform from env so the pwsh script does not embed
+          # the workflow expression verbatim. Today's callers pass fixed
+          # values, but reading from env keeps this reusable workflow safe
+          # if a future caller passes a value containing `$(...)`.
+          INPUT_PLATFORM: ${{ inputs.platform }}
         run: |
           # OpenCppCoverage has already produced the Cobertura XML via
           # run-coverage-windows.ps1. Parse it for the JSON summary used by
@@ -506,7 +512,7 @@ jobs:
               date = $reportDate
               commit = $commitShort
               platform = 'windows'
-              platform_detail = "windows-${{ inputs.platform }}"
+              platform_detail = "windows-$env:INPUT_PLATFORM"
               line_coverage = "$line_pct%"
               lines_hit = $lines_hit
               lines_found = $lines_total

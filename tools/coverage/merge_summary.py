@@ -28,14 +28,6 @@ import sys
 from typing import Any, Dict, Optional
 
 
-def _int(s: str) -> int:
-    """Parse a column value; treat ``-`` and unparseable strings as 0."""
-    try:
-        return int(s)
-    except ValueError:
-        return 0
-
-
 def _pct(s: str) -> str:
     """Return a percent string verbatim if it ends with ``%``, otherwise
     the empty string. ``llvm-cov report`` emits ``-`` in the Cover column
@@ -76,10 +68,23 @@ def parse_total(path: Optional[str]) -> Optional[Dict[str, Any]]:
                     file=sys.stderr,
                 )
                 return None
-            r_tot, r_miss = _int(p[1]), _int(p[2])
-            f_tot, f_miss = _int(p[4]), _int(p[5])
-            l_tot, l_miss = _int(p[7]), _int(p[8])
-            b_tot, b_miss = _int(p[10]), _int(p[11])
+            # Count columns are integer hit/miss totals -- llvm-cov never
+            # emits ``-`` here (only in the percent columns). A non-integer
+            # in these slots means the report layout has drifted and we
+            # cannot trust any of the derived counts, so omit the row
+            # rather than publish misleading metrics.
+            try:
+                r_tot, r_miss = int(p[1]), int(p[2])
+                f_tot, f_miss = int(p[4]), int(p[5])
+                l_tot, l_miss = int(p[7]), int(p[8])
+                b_tot, b_miss = int(p[10]), int(p[11])
+            except ValueError:
+                print(
+                    f"merge_summary: non-integer TOTAL counts in {path}. "
+                    f"Merged row will be omitted from the landing page.",
+                    file=sys.stderr,
+                )
+                return None
             return {
                 "region_coverage": _pct(p[3]),
                 "regions_hit": r_tot - r_miss,
