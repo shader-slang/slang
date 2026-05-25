@@ -532,6 +532,7 @@ void initCommandOptions(CommandOptions& options)
          "When stdin is used with pass-through compilation (-pass-through glslang/dxc/fxc), "
          "-stage <stage> is required because the shader stage cannot be inferred from a file "
          "extension; omitting it may produce a downstream error rather than a clean CLI diagnostic. "
+         "Stdin input is capped at 256 MiB. "
          "Example: slangc -lang slang -target spirv-asm -entry main -- -"},
         {OptionKind::ReportDownstreamTime,
          "-report-downstream-time",
@@ -1586,8 +1587,9 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         // poll(timeout=0), which busy-spins at 100% CPU while waiting for data.  fread
         // is a standard blocking call that sleeps the thread until the producer writes.
         //
-        // The default cap is 256 MiB.  Tests may lower it via SLANG_TEST_MAX_STDIN_BYTES
-        // to trigger the StdinInputTooLarge diagnostic without allocating 256+ MiB.
+        // The default cap is 256 MiB.  Tests may lower it (never raise it) via
+        // SLANG_TEST_MAX_STDIN_BYTES to trigger the StdinInputTooLarge diagnostic
+        // without allocating 256+ MiB.  Values above the default are silently ignored.
         Index kMaxStdinBytes = Index(256) << 20; // 256 MiB
         if (const char* envCap = getenv("SLANG_TEST_MAX_STDIN_BYTES"))
         {
@@ -1595,7 +1597,7 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
             char* end = nullptr;
             long long cap = strtoll(envCap, &end, 10);
             if (end != envCap && errno != ERANGE && cap > 0 &&
-                cap <= (long long)std::numeric_limits<Index>::max())
+                cap <= (long long)kMaxStdinBytes)
             {
                 kMaxStdinBytes = Index(cap);
             }
@@ -1606,7 +1608,7 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
             size_t n;
             while ((n = fread(buf, 1, sizeof(buf), stdin)) > 0)
             {
-                if (bytes.getCount() + Index(n) > kMaxStdinBytes)
+                if (Index(n) > kMaxStdinBytes - bytes.getCount())
                 {
                     m_requestImpl->getSink()->diagnose(Diagnostics::StdinInputTooLarge{});
                     return SLANG_FAIL;
