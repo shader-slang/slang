@@ -25,8 +25,17 @@
 // CHECK_HLSL-NOT: this_type
 // CHECK_HLSL-NOT: IMaterialInstance_collect_properties
 
-// SPIR-V should compile successfully (no ICE) and produce an entry point.
+// SPIR-V should compile successfully (no ICE) and emit the dispatch chain
+// fully constant-folded into a store of `(1, 2, 3)` into `out_buf`. Pinning
+// the composite + store catches silent miscompilation that an
+// `OpEntryPoint`-only check would miss (e.g. a future regression that
+// produces a clean module but folds the call away to undef).
 // CHECK_SPV: OpEntryPoint
+// CHECK_SPV-DAG: %[[F1:[A-Za-z0-9_]+]] = OpConstant %float 1
+// CHECK_SPV-DAG: %[[F2:[A-Za-z0-9_]+]] = OpConstant %float 2
+// CHECK_SPV-DAG: %[[F3:[A-Za-z0-9_]+]] = OpConstant %float 3
+// CHECK_SPV-DAG: %[[V:[A-Za-z0-9_]+]] = OpConstantComposite %v3float %[[F1]] %[[F2]] %[[F3]]
+// CHECK_SPV: OpStore {{.*}} %[[V]]
 
 public struct SurfaceInteraction { public float3 pos; }
 public struct MaterialProperties { public float3 albedo; }
