@@ -13,6 +13,9 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#elif SLANG_WINDOWS_FAMILY
+// For Case 11: CreateProcess with a write-only pipe handle as stdin.
+#include <windows.h>
 #endif
 
 using namespace Slang;
@@ -511,10 +514,118 @@ static SlangResult _testStdinReadError(UnitTestContext* context)
         return SLANG_FAIL;
 
     return SLANG_OK;
+#elif SLANG_WINDOWS_FAMILY
+    // Create an anonymous pipe and pass the write end as the child's stdin.
+    // WinPipeStream detects FILE_TYPE_PIPE and calls PeekNamedPipe; PeekNamedPipe
+    // fails on a write-only handle (ERROR_ACCESS_DENIED), which propagates through
+    // _updateState → StreamUtil::readAll as SLANG_FAIL → diagnostic 107.
+    SECURITY_ATTRIBUTES sa = {};
+    sa.nLength = sizeof(sa);
+    sa.bInheritHandle = TRUE;
+
+    HANDLE stdinRead = INVALID_HANDLE_VALUE;
+    HANDLE stdinWrite = INVALID_HANDLE_VALUE;
+    if (!CreatePipe(&stdinRead, &stdinWrite, &sa, 0))
+        return SLANG_FAIL;
+    CloseHandle(stdinRead); // only the write end is passed to the child
+
+    // Pipe to capture slangc's stderr.
+    HANDLE stderrRead = INVALID_HANDLE_VALUE;
+    HANDLE stderrWrite = INVALID_HANDLE_VALUE;
+    if (!CreatePipe(&stderrRead, &stderrWrite, &sa, 0))
+    {
+        CloseHandle(stdinWrite);
+        return SLANG_FAIL;
+    }
+    SetHandleInformation(stderrRead, HANDLE_FLAG_INHERIT, 0); // parent-only
+
+    HANDLE devNull =
+        CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE, &sa, OPEN_EXISTING, 0, nullptr);
+
+    const String slangcPath = String(context->executableDirectory) + "/slangc.exe";
+
+    // Build a mutable command-line buffer; CreateProcessA requires non-const lpCommandLine.
+    const String cmdStr = String("\"") + slangcPath +
+                          "\" -lang slang -target spirv-asm -entry main -stage compute -- -";
+    List<char> cmdBuf;
+    for (Index i = 0; i < cmdStr.getLength(); ++i)
+        cmdBuf.add(cmdStr[i]);
+    cmdBuf.add('\0');
+
+    STARTUPINFOA si = {};
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = stdinWrite; // write-only → PeekNamedPipe fails → diagnostic 107
+    si.hStdOutput = devNull != INVALID_HANDLE_VALUE ? devNull : GetStdHandle(STD_OUTPUT_HANDLE);
+    si.hStdError = stderrWrite;
+
+    PROCESS_INFORMATION pi = {};
+    const BOOL ok =
+        CreateProcessA(nullptr, cmdBuf.getBuffer(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi);
+
+    CloseHandle(stdinWrite);
+    CloseHandle(stderrWrite);
+    if (devNull != INVALID_HANDLE_VALUE)
+        CloseHandle(devNull);
+
+    if (!ok)
+    {
+        CloseHandle(stderrRead);
+        return SLANG_FAIL;
+    }
+
+    List<Byte> stderrBytes;
+    {
+        char buf[256];
+        DWORD bytesRead = 0;
+        while (ReadFile(stderrRead, buf, sizeof(buf), &bytesRead, nullptr) && bytesRead > 0)
+            for (DWORD i = 0; i < bytesRead; ++i)
+                stderrBytes.add(Byte(buf[i]));
+    }
+    CloseHandle(stderrRead);
+
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD exitCode = 0;
+    GetExitCodeProcess(pi.hProcess, &exitCode);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    if (exitCode == 0)
+        return SLANG_FAIL;
+
+    const UnownedStringSlice stderrSlice(
+        (const char*)stderrBytes.getBuffer(), size_t(stderrBytes.getCount()));
+    if (stderrSlice.indexOf(toSlice("failed to read source from stdin")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
 #else
     SLANG_UNUSED(context);
     return SLANG_OK;
 #endif
+}
+
+// Case 12: GLSL via stdin without -stage fails. The shader stage cannot be inferred
+// from a file extension when reading stdin, so pass-through GLSL compilation requires
+// an explicit -stage flag. This pins that omitting it does NOT silently succeed — a
+// future change that adds an implicit default stage would be caught here.
+static SlangResult _testStdinGlslWithoutStage(UnitTestContext* context)
+{
+    List<String> args;
+    args.add("-lang");
+    args.add("glsl");
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("--");
+    args.add("-");
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, "void main() {}\n", result));
+
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
 }
 
 SLANG_UNIT_TEST(SlangcReadFromStdin)
@@ -530,4 +641,5 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithLangGlsl(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinMixedWithFile(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinReadError(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinGlslWithoutStage(unitTestContext)));
 }
