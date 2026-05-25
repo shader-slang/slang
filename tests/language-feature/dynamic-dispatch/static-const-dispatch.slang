@@ -4,7 +4,7 @@
 // parameters with dynamic dispatch. It covers representative integer entries
 // (including negative values) and bool entries — the value categories the
 // language currently permits for `static const` interface requirements (see
-// error 30302). The `bool` case exercises `IRBoolLit`, proving the lowering is
+// error 30306). The `bool` case exercises `IRBoolLit`, proving the lowering is
 // not restricted to `IRIntLit`.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type

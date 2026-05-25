@@ -434,7 +434,8 @@ IRFunc* createIntegerMappingFunc(IRModule* module, Dictionary<UInt, UInt>& mappi
 }
 
 // This context lowers `GetTagOfElementInSet`, `GetTagForSuperSet`,
-// `GetTagForMappedSet`, and `GetTagForMappedValueSet` instructions,
+// `GetTagForSubSet`, `GetTagForMappedSet`, and `GetTagForMappedValueSet`
+// instructions,
 //
 struct TagOpsLoweringContext : public InstPassBase
 {
