@@ -328,6 +328,48 @@ static SlangResult _testStdinBomDiagnosticLocation(UnitTestContext* context)
     return SLANG_OK;
 }
 
+// Case 7c: source with \r\n line endings should produce correct line numbers.
+// On Windows, stdin is opened in text mode by default; text mode converts \r\n to \n,
+// which is consistent and does NOT change line counts, but it is inconsistent with
+// file-based compilation (binary FileStream) and silently strips \r from diagnostics.
+// More critically, text mode treats 0x1A (Ctrl-Z) as EOF, silently truncating source.
+// The fix is _setmode(_fileno(stdin), _O_BINARY) before fread.
+// This test sends \r\n-terminated source with a deliberate error on line 2 and asserts
+// that <stdin>(2): appears — ensuring \r\n is not treated as two newlines (which would
+// report line 3 instead).
+static SlangResult _testStdinCrlfLineNumbers(UnitTestContext* context)
+{
+    List<String> args;
+    args.add("-lang");
+    args.add("slang");
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("--");
+    args.add("-");
+
+    // Line 1: valid.  Line 2: deliberate error.  All endings are \r\n.
+    const char* source =
+        "[shader(\"compute\")] void main() {\r\n"
+        "    undeclared_identifier;\r\n"
+        "}\r\n";
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
+
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+
+    // If \r\n were treated as two newlines the error would appear on line 3.
+    if (result.standardError.getUnownedSlice().indexOf(toSlice("<stdin>(2):")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 // Case 8: GLSL shader piped via stdin with -lang glsl and -stage compute.
 // For GLSL the stage is normally inferred from the file extension (.comp, .vert, etc.);
 // stdin has no extension so -stage is always required. This pins that the path works
@@ -405,6 +447,103 @@ static SlangResult _testStdinMixedWithFile(UnitTestContext* context)
     args.add("-");
 
     // Entry point in stdin calls foo() defined in the on-disk file.
+    const char* source = "[shader(\"compute\")] void main() { foo(); }\n";
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
+
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (result.standardOutput.getUnownedSlice().indexOf(toSlice("OpEntryPoint")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+// Case 10a: stdin first, file second — reverse of Case 9.
+// -- - <file.slang>: stdin is processed first (initialising m_slangTranslationUnitIndex),
+// then the .slang file is processed and reuses the same translation unit.
+// The entry point is in stdin and calls a function defined in the on-disk file,
+// so cross-file visibility must hold regardless of argument order.
+static SlangResult _testStdinThenFile(UnitTestContext* context)
+{
+    String basePath;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slangc-stdin-helper2"), basePath));
+    const String helperPath = basePath + ".slang";
+
+    struct FileGuard
+    {
+        String base, slang;
+        ~FileGuard()
+        {
+            File::remove(base);
+            File::remove(slang);
+        }
+    } guard{basePath, helperPath};
+
+    SLANG_RETURN_ON_FAIL(File::writeAllText(helperPath, "void foo() {}\n"));
+
+    List<String> args;
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("--");
+    args.add("-");
+    args.add(helperPath);
+
+    // Entry point in stdin calls foo() defined in the on-disk file.
+    const char* source = "[shader(\"compute\")] void main() { foo(); }\n";
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
+
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (result.standardOutput.getUnownedSlice().indexOf(toSlice("OpEntryPoint")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+// Case 10b: file sandwiched between two '-' tokens — -- <file.slang> - -.
+// The file defines foo(); the first '-' reads stdin (entry point calling foo());
+// the second '-' hits m_stdinConsumed and is a no-op.
+// Verifies that the m_stdinConsumed guard interacts correctly with a file argument
+// between the two '-' tokens and that the single TU is used throughout.
+static SlangResult _testFileBetweenStdins(UnitTestContext* context)
+{
+    String basePath;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slangc-stdin-helper3"), basePath));
+    const String helperPath = basePath + ".slang";
+
+    struct FileGuard
+    {
+        String base, slang;
+        ~FileGuard()
+        {
+            File::remove(base);
+            File::remove(slang);
+        }
+    } guard{basePath, helperPath};
+
+    SLANG_RETURN_ON_FAIL(File::writeAllText(helperPath, "void foo() {}\n"));
+
+    List<String> args;
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("--");
+    args.add(helperPath);
+    args.add("-");
+    args.add("-");
+
+    // Entry point in stdin calls foo() from the file; second '-' is a no-op.
     const char* source = "[shader(\"compute\")] void main() { foo(); }\n";
 
     ExecuteResult result;
@@ -718,8 +857,11 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinDiagnosticLocation(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithBom(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinBomDiagnosticLocation(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinCrlfLineNumbers(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithLangGlsl(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinMixedWithFile(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinThenFile(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testFileBetweenStdins(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinReadError(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinGlslWithoutStage(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinTooLarge(unitTestContext)));

@@ -32,6 +32,10 @@
 
 #include <assert.h>
 #include <limits>
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 namespace Slang
 {
@@ -1571,6 +1575,13 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         // input, unknown language) does not trigger a second attempt on a drained pipe.
         m_stdinConsumed = true;
 
+        // Switch stdin to binary mode on Windows so that \r\n is not silently collapsed to
+        // \n and 0x1A (Ctrl-Z) is not treated as end-of-file.  File-based compilation uses
+        // binary FileStream, so stdin must be consistent.
+#ifdef _WIN32
+        _setmode(_fileno(stdin), _O_BINARY);
+#endif
+
         // Use fread rather than StreamUtil::readAll over a PipeStream.  PipeStream uses
         // poll(timeout=0), which busy-spins at 100% CPU while waiting for data.  fread
         // is a standard blocking call that sleeps the thread until the producer writes.
@@ -1580,10 +1591,14 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         Index kMaxStdinBytes = Index(256) << 20; // 256 MiB
         if (const char* envCap = getenv("SLANG_TEST_MAX_STDIN_BYTES"))
         {
+            errno = 0;
             char* end = nullptr;
             long long cap = strtoll(envCap, &end, 10);
-            if (end != envCap && cap > 0)
+            if (end != envCap && errno != ERANGE && cap > 0 &&
+                cap <= (long long)std::numeric_limits<Index>::max())
+            {
                 kMaxStdinBytes = Index(cap);
+            }
         }
         List<Byte> bytes;
         {
