@@ -6737,6 +6737,7 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     auto valueType = expr->value->type.type;
     if (auto typeType = as<TypeType>(valueType))
         valueType = typeType->getType();
+    valueType = unwrapModifiedType(valueType);
 
     // If value is a subtype of `type`, then this expr is always true.
     auto witness = isSubtype(valueType, expr->typeExpr.type, IsSubTypeOptions::None);
@@ -6771,7 +6772,7 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     if (expr->witnessArg)
     {
         // For now we can only support the scenario where `expr->value` is an interface type.
-        if (!optionalWitness && !isInterfaceType(originalVal->type))
+        if (!optionalWitness && !isInterfaceType(valueType))
         {
             getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
         }
@@ -6808,6 +6809,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     }
 
     expr->value = CheckTerm(expr->value);
+    auto valueType = unwrapModifiedType(expr->value->type.type);
 
     // Reject `expr as OpaqueType` (and structs containing opaque fields) because
     // Optional<T> cannot wrap resource/opaque types.
@@ -6823,7 +6825,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     expr->type = optType;
 
     // If value is a subtype of `type`, then this expr is equivalent to a CastToSuperTypeExpr.
-    if (auto witness = tryGetSubtypeWitness(expr->value->type.type, typeExpr.type))
+    if (auto witness = tryGetSubtypeWitness(valueType, typeExpr.type))
     {
         auto castToSuperType = createCastToSuperTypeExpr(typeExpr.type, expr->value, witness);
         auto makeOptional = m_astBuilder->create<MakeOptionalExpr>();
@@ -6837,11 +6839,11 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
 
     // If target type is an interface type, we will obtain the witness here for
     // runtime casting.
-    expr->witnessArg = tryGetSubtypeWitness(typeExpr.type, expr->value->type.type);
+    expr->witnessArg = tryGetSubtypeWitness(typeExpr.type, valueType);
     if (expr->witnessArg)
     {
         // For now we can only support the scenario where `expr->value` is an interface type.
-        if (!isInterfaceType(expr->value->type.type))
+        if (!isInterfaceType(valueType))
         {
             getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
         }
@@ -6852,10 +6854,8 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     // If we reach here with no witness and both the value type and target type are concrete
     // (not generic type parameters, associated types, or ThisType), the `as` cast always
     // fails and the user is using `as` incorrectly on unrelated concrete types.
-    auto asValueType = expr->value->type.type;
-    if (!as<ErrorType>(asValueType) && !as<ErrorType>(typeExpr.type) &&
-        !isInterfaceType(asValueType) && !_isTypeParametric(asValueType) &&
-        !_isTypeParametric(typeExpr.type))
+    if (!as<ErrorType>(valueType) && !as<ErrorType>(typeExpr.type) && !isInterfaceType(valueType) &&
+        !_isTypeParametric(valueType) && !_isTypeParametric(typeExpr.type))
     {
         getSink()->diagnose(Diagnostics::IsAsOnUnrelatedConcreteTypes{.expr = expr});
     }

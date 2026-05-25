@@ -61,6 +61,21 @@ IMaterialInstance get_inst(SurfaceInteraction si)
     return MyInst();
 }
 
+// These helpers exercise the same modified-interface return type through
+// `is`/`as`, not just through member lookup.
+bool is_my_inst(SurfaceInteraction si)
+{
+    return get_inst(si) is MyInst;
+}
+
+float3 cast_my_inst(SurfaceInteraction si)
+{
+    let castResult = get_inst(si) as MyInst;
+    if (castResult.hasValue)
+        return castResult.value.collect_properties(si).albedo;
+    return float3(0);
+}
+
 RWStructuredBuffer<float3> out_buf;
 
 [shader("compute")]
