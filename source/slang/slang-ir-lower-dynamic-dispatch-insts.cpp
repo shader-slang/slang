@@ -454,7 +454,28 @@ struct TagOpsLoweringContext : public InstPassBase
     {
     }
 
-    Dictionary<KeyValuePair<IRInst*, IRInst*>, IRFunc*> valueSetDispatchFuncCache;
+    struct ValueSetDispatchFuncKey
+    {
+        IRWitnessTableSet* srcSet;
+        IRStructKey* requirementKey;
+        IRType* resultType;
+
+        HashCode getHashCode() const
+        {
+            return combineHash(
+                Slang::getHashCode(srcSet),
+                Slang::getHashCode(requirementKey),
+                Slang::getHashCode(resultType));
+        }
+
+        bool operator==(const ValueSetDispatchFuncKey& other) const
+        {
+            return srcSet == other.srcSet && requirementKey == other.requirementKey &&
+                   resultType == other.resultType;
+        }
+    };
+
+    Dictionary<ValueSetDispatchFuncKey, IRFunc*> valueSetDispatchFuncCache;
 
     void lowerGetTagForSuperSet(IRGetTagForSuperSet* inst)
     {
@@ -497,14 +518,11 @@ struct TagOpsLoweringContext : public InstPassBase
         IRStructKey* requirementKey,
         IRType* resultType)
     {
-        KeyValuePair<IRInst*, IRInst*> cacheKey(srcSet, requirementKey);
+        ValueSetDispatchFuncKey cacheKey = {srcSet, requirementKey, resultType};
 
         IRFunc* dispatchFunc = nullptr;
         if (valueSetDispatchFuncCache.tryGetValue(cacheKey, dispatchFunc))
-        {
-            SLANG_RELEASE_ASSERT(dispatchFunc->getResultType() == resultType);
             return dispatchFunc;
-        }
 
         // Collect (witness-tag, value-entry) pairs.
         List<UInt> caseTags;
