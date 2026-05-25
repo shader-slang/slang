@@ -218,6 +218,59 @@ SLANG_UNIT_TEST(functionReflection)
     SLANG_CHECK(ctor != nullptr);
 }
 
+// Regression test for shader-slang/slang#11277. When a `[Differentiable]`
+// generic is specialized via the reflection API, the auto-`no_diff` wrapper
+// on the return type used to leak out as a `ModifiedType`, causing
+// `getKind()` to return `None`, layout to be zero-sized, and downstream
+// consumers like slangpy to treat the type as unknown. The reflection
+// boundary now unwraps `ModifiedType` so all structural queries see the
+// inner type.
+SLANG_UNIT_TEST(functionReflectionNoDiffSpecializedReturn)
+{
+    const char* source = R"(
+        [Differentiable]
+        public T multiply<T : IArithmetic>(T x, T y) { return x * y; }
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diag;
+    auto module = session->loadModuleFromSourceString("m", "m.slang", source, diag.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto layout = module->getLayout();
+    auto func = layout->findFunctionByName("multiply");
+    SLANG_CHECK_ABORT(func != nullptr);
+
+    auto float4Type = layout->findTypeByName("float4");
+    SLANG_CHECK_ABORT(float4Type != nullptr);
+
+    slang::TypeReflection* argTypes[2] = {float4Type, float4Type};
+    auto specFunc = func->specializeWithArgTypes(2, argTypes);
+    SLANG_CHECK_ABORT(specFunc != nullptr);
+
+    auto retType = specFunc->getReturnType();
+    SLANG_CHECK_ABORT(retType != nullptr);
+
+    SLANG_CHECK(retType->getKind() == slang::TypeReflection::Kind::Vector);
+    SLANG_CHECK(retType->getElementCount() == 4);
+    SLANG_CHECK(getTypeFullName(retType) == "vector<float,4>");
+
+    auto elementType = retType->getElementType();
+    SLANG_CHECK_ABORT(elementType != nullptr);
+    SLANG_CHECK(elementType->getKind() == slang::TypeReflection::Kind::Scalar);
+    SLANG_CHECK(elementType->getScalarType() == slang::TypeReflection::ScalarType::Float32);
+}
+
 // Test that findFunctionByNameInType finds all functions with the same name but different
 // signatures
 SLANG_UNIT_TEST(findFunctionByNameInType)

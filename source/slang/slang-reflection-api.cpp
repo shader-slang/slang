@@ -37,7 +37,16 @@ static inline SlangReflectionUserAttribute* convert(Attribute* attrib)
 
 static inline Type* convert(SlangReflectionType* type)
 {
-    return (Type*)type;
+    // Defensive symmetry with convert(Type*): pointers produced by that
+    // helper are already modifier-unwrapped, but callers may pass
+    // SlangReflectionType* values that originated elsewhere. Peel any
+    // remaining ModifiedType wrappers so structural queries never see them.
+    auto t = (Type*)type;
+    while (auto modifiedType = as<ModifiedType>(t))
+    {
+        t = modifiedType->getBase();
+    }
+    return t;
 }
 
 static inline SlangReflectionType* convert(Type* type)
@@ -47,6 +56,16 @@ static inline SlangReflectionType* convert(Type* type)
     if (auto atomicType = as<AtomicType>(type))
     {
         return (SlangReflectionType*)atomicType->getElementType();
+    }
+    // Peel off any modifier wrappers (e.g. `no_diff`). These can appear on
+    // function return/parameter types after generic specialization (see
+    // issue #11277) and on `no_diff`-qualified struct fields. Without this
+    // unwrap, every structural query (`getKind`, `getElementType`, layout,
+    // …) falls through to its `UNEXPECTED` path and reports NONE / zero,
+    // which downstream consumers like slangpy treat as an unknown type.
+    while (auto modifiedType = as<ModifiedType>(type))
+    {
+        type = modifiedType->getBase();
     }
     return (SlangReflectionType*)type;
 }
