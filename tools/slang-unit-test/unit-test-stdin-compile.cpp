@@ -847,6 +847,42 @@ static SlangResult _testStdinTooLarge(UnitTestContext* context)
     return SLANG_OK;
 }
 
+// Case 13b: exactly at the cap should succeed; this pins the check as > not >=.
+// A regression that changes > to >= would reject input of exactly kMaxStdinBytes bytes,
+// and this test would fail.
+static SlangResult _testStdinExactlyAtCap(UnitTestContext* context)
+{
+    const char* source = "[shader(\"compute\")] void main() {}\n";
+    const Index sourceLen = Index(strlen(source));
+
+    // Set the cap to exactly the source length so the check sits on the boundary.
+    char capStr[32];
+    snprintf(capStr, sizeof(capStr), "%lld", (long long)sourceLen);
+    ScopedEnvVar capEnv("SLANG_TEST_MAX_STDIN_BYTES", capStr);
+
+    List<String> args;
+    args.add("-lang");
+    args.add("slang");
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("--");
+    args.add("-");
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_spawnSlangcWithStdin(context, args, source, result));
+
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (result.standardOutput.getUnownedSlice().indexOf(toSlice("OpEntryPoint")) < 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithLangSlang(unitTestContext)));
@@ -865,4 +901,5 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinReadError(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinGlslWithoutStage(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinTooLarge(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinExactlyAtCap(unitTestContext)));
 }
