@@ -467,11 +467,25 @@ public:
             case kIROp_Call:
                 if (shouldTreatCallAsDifferentiable(inst))
                     return false;
-                return isDifferentiableFunc(
-                           diffTypeContext,
-                           as<IRCall>(inst)->getCallee(),
-                           requiredDiffLevel) &&
-                       diffTypeContext.isDifferentiableType(inst->getFullType());
+                if (!isDifferentiableFunc(
+                        diffTypeContext,
+                        as<IRCall>(inst)->getCallee(),
+                        requiredDiffLevel) ||
+                    !diffTypeContext.isDifferentiableType(inst->getFullType()))
+                    return false;
+                // A call to a differentiable function only carries a derivative
+                // when at least one argument does. If every input is provably
+                // diff-zero (e.g. derived only from `no_diff` parameters), the
+                // result cannot carry one either, and treating it as if it did
+                // produces a false-positive
+                // `LossOfDerivativeAssigningToNonDifferentiableLocation` at any
+                // store into a non-differentiable location (see #11285).
+                for (UInt i = 0; i < as<IRCall>(inst)->getArgCount(); i++)
+                {
+                    if (carryNonTrivialDiffSet.contains(as<IRCall>(inst)->getArg(i)))
+                        return true;
+                }
+                return false;
             case kIROp_Load:
                 // We don't have more knowledge on whether diff is available at the destination
                 // address. Just assume it is producing diff if the dest address can hold a
