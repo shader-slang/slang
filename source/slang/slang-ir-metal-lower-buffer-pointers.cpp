@@ -194,11 +194,14 @@ struct MetalBufferPointerLoweringContext
             for (auto& fieldInfo : fields)
             {
                 List<IRInst*> fieldAddressInsts;
+                List<IRInst*> fieldExtractInsts;
                 for (auto use = fieldInfo.key->firstUse; use; use = use->nextUse)
                 {
                     auto user = use->getUser();
                     if (user->getOp() == kIROp_FieldAddress)
                         fieldAddressInsts.add(user);
+                    else if (user->getOp() == kIROp_FieldExtract)
+                        fieldExtractInsts.add(user);
                 }
 
                 auto loweredFieldType = getLoweredFieldType(fieldInfo.originalPtrType);
@@ -215,6 +218,17 @@ struct MetalBufferPointerLoweringContext
                         fieldAddr->setFullType(builder.getPtrType(loweredFieldType, ptrToField));
 
                     insertCastsForPointerUses(fieldAddr, origElemPtrType, uintPtrType);
+                }
+
+                // FieldExtract returns the field value directly (by-value access).
+                // Same treatment as a load: rewrite type and insert CastIntToPtr.
+                for (auto inst : fieldExtractInsts)
+                {
+                    inst->setFullType(uintPtrType);
+                    builder.setInsertAfter(inst);
+                    auto castInst = builder.emitCastIntToPtr(origElemPtrType, inst);
+                    inst->replaceUsesWith(castInst);
+                    castInst->setOperand(0, inst);
                 }
             }
         }
