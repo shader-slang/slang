@@ -58,7 +58,8 @@ The body uses one of the following forms:
 - hexadecimal: prefixed by `0x` or `0X` and followed by one or more hexadecimal digits.
 - binary: prefixed by `0b` or `0B` and followed by zeroes and ones.
 - octal: prefixed by `0` and followed by one or more octal digits. Octal integer literals are deprecated and
-  supported only for compatibility; their use triggers a warning.
+  supported only for backwards compatibility; their use triggers a warning. Note that the literal `0` alone
+  is decimal, while `00`, `01`, etc. are (deprecated) octal literals.
 
 The integer literal suffix is optional. When specified, it consists of an unsigned specifier, a width
 specifier, or both in either order. The unsigned specifier forces the literal to have an unsigned integer
@@ -75,8 +76,8 @@ Suffix        | Decimal base                     | Hex, binary, octal bases
 `Z`           | `intptr_t`                       | `intptr_t`
 `UZ`/`ZU`     | `uintptr_t`                      | `uintptr_t`
 
-Types marked with (\*) trigger a warning; they are intended only as a fallback to avoid undefined
-behavior.
+Types marked with (\*) trigger a warning; they are intended only as a fallback to silently accept values
+that would otherwise overflow the signed integer type.
 
 In addition, the following exceptions are made to allow expressing the smallest negative integer directly:
 
@@ -117,7 +118,9 @@ Suffix                 | Base        | Value range                              
 
 (\*) marks a warning.
 
-(\*\*) marks the value extension for the type when the literal is preceded by unary minus.
+(\*\*) marks rows whose value range is extended by one when the literal is preceded by unary minus, per
+the special cases listed above (for example, the `int` row also accepts `2147483648` when negated, since
+`-2147483648` is representable as `int`).
 
 **Examples:**
 
@@ -131,7 +134,7 @@ Suffix                 | Base        | Value range                              
 -2147483648             // expression, type int
 -2147483648LL           // expression, type int64_t
 
--9223372036854775808    // expression, type int64_t
+-9223372036854775808    // expression, type int64_t (no warning per special case)
 
 0U                      // decimal literal, type uint
 5000000000U             // decimal literal, type uint64_t
@@ -156,25 +159,26 @@ Suffix                 | Base        | Value range                              
 
 0377                    // octal literal, type int (warning)
 
-0x10494810000UZ         // hexadecimal literal, type uintptr_t
+0x10494810000UZ         // hexadecimal literal, type uintptr_t (64-bit pointers only;
+                        //                                     overflows on 32-bit)
 ```
 
 > 📝 **Remark 1:** Hexadecimal, binary, and octal literals whose deduced type is unsigned (`uint` or
 > `uint64_t`) and that have no `U` or `Z` suffix may be implicitly converted to the corresponding signed
-> integer type without triggering diagnostics. This allows expressions such as `int x = 0xFFFFFFFF;`. The
-> binary representation is not changed by the conversion. See
+> integer type without triggering a narrowing-conversion warning. This allows expressions such as
+> `int x = 0xFFFFFFFF;`. The binary representation is not changed by the conversion. See
 > [expression type conversions](expressions-conversions.md) for details.
 
 > 📝 **Remark 2:** Integer literal types follow the C++11 rules, with additional special-case handling for
 > minimum integer values preceded by unary minus.
 
+> 📝 **Remark 3:** The current implementation does not fully conform to the language manual.
+> This is tracked by GitHub issue [#11216](https://github.com/shader-slang/slang/issues/11216).
 
 ## Floating-Point Literal Expressions
 
-> *`FloatLiteral`* = (<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`DecFloatLiteralBody`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`HexFloatLiteralBody`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`FloatLiteralInfinity`* )<br>
+> *`FloatLiteral`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;( *`DecFloatLiteralBody`* \| *`HexFloatLiteralBody`* )<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`FloatSuffix`*?
 >
 > *`DecFloatLiteralBody`* = <br>
@@ -188,8 +192,11 @@ Suffix                 | Base        | Value range                              
 >
 > *`DecFloatLiteralBodyForm3`* = *`DecDigit`*\* **`'.'`** *`DecDigit`*+ *`DecExponent`*?
 >
-> *`DecExponent`* = (**`'e'`** \| **`'E'`**) (**`'+'`** \| **`'-'`**)? *`DecDigit`*+
+> *`DecExponent`* = *`DecExponentNumeric`* \| *`InfinityExponent`*
 >
+> *`DecExponentNumeric`* = (**`'e'`** \| **`'E'`**) (**`'+'`** \| **`'-'`**)? *`DecDigit`*+
+>
+> *`InfinityExponent`* = **`'#INF'`**
 >
 > *`HexFloatLiteralBody`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`'0x'`**\|**`'0X'`**) (<br>
@@ -203,9 +210,9 @@ Suffix                 | Base        | Value range                              
 >
 > *`HexFloatLiteralBodyForm3`* = *`HexDigit`*\* **`'.'`** *`HexDigit`*+ *`HexExponent`*
 >
-> *`HexExponent`* = (**`'p'`** \| **`'P'`**) (**`'+'`** \| **`'-'`**)? *`DecDigit`*+
+> *`HexExponent`* = *`HexExponentNumeric`* \| *`InfinityExponent`*
 >
-> *`FloatLiteralInfinity`* = **`'#INF'`**
+> *`HexExponentNumeric`* = (**`'p'`** \| **`'P'`**) (**`'+'`** \| **`'-'`**)? *`DecDigit`*+
 >
 > *`FloatSuffix`* = *`FloatSuffixF16`* \| *`FloatSuffixF32`* \| *`FloatSuffixF64`*
 >
@@ -216,7 +223,7 @@ Suffix                 | Base        | Value range                              
 > *`FloatSuffixF64`* = **`'l'`** \| **`'L'`** \| **`'lf'`** \| **`'LF'`** \| **`'fl'`** \| **`'FL'`**
 
 A floating-point literal represents a [floating-point](types-fundamental.md#floating) value. The numeric form
-consist of three parts:
+consists of three parts:
 
 - the body, which can be either decimal or hexadecimal.
 - an exponent, which is optional in decimal form when the body contains a decimal separator.
@@ -228,29 +235,59 @@ The decimal body has two variants:
 2. Decimal digits separated by a decimal separator, and an optional exponent. (*`DecFloatLiteralBodyForm2`*
    and *`DecFloatLiteralBodyForm3`*)
 
-The decimal digits and the optional separator form the decimal significand. The value is significand \* *10^x*
-where *x* is the number with the optional sign in *`DecExponent`* or 0 if *`DecExponent`* is not specified.
+The decimal digits and the optional separator form the decimal significand. The value is
+*significand \* 10^x*, where *x* is the signed decimal number given by *`DecExponentNumeric`*, or 0
+if no exponent is specified.
 
-The hexadecimal body form has one or more hexadecimal digits, optional radix separator, and a mandatory
-hexadecimal exponent. (*`HexFloatLiteralBodyForm1`*, *`HexFloatLiteralBodyForm2`*, *`HexFloatLiteralBodyForm3`*)
+The hexadecimal body consists of hexadecimal digits, an optional radix separator, and a mandatory
+hexadecimal exponent (*`HexFloatLiteralBodyForm1`*, *`HexFloatLiteralBodyForm2`*,
+*`HexFloatLiteralBodyForm3`*).
 
-The hexadecimal digits and the optional separator form the hexadecimal significand. The value is *significand* \* *2^y*
-where *y* is the number with the optional sign in *`HexExponent`*. Note that the number 
+The hexadecimal digits and the optional separator form the hexadecimal significand. The value of the
+literal is *significand \* 2^y*, where *y* is the signed decimal number given by
+*`HexExponentNumeric`*. Note that the exponent is always written in decimal.
 
-The non-numeric form `#INF` represents the positive infinity. (*`FloatLiteralInfinity`)
+In either decimal or hexadecimal form, using `#INF` as the exponent signifies that the literal value is
+positive infinity. The digits before the exponent are ignored. Negative infinity is expressed by preceding
+the literal with unary minus, e.g. `-1#INFf`.
 
 
 **Examples:**
 
 ```hlsl
-TODO
+123.0         // 32-bit float, value 123.0
+123.          // 32-bit float, value 123.0
+.5            // 32-bit float, value 0.5
+123e3         // 32-bit float, value 123000.0
+123e+3        // 32-bit float, value 123000.0
+123e-3        // 32-bit float, value 0.123   (not exact)
+1.23e2        // 32-bit float, value 123.0
+
+0x123p4       // 32-bit float, value 4656.0  (= 291 * 2^4)
+0xC8p-4       // 32-bit float, value 12.5    (= 200 * 2^-4)
+
+123.0lf       // 64-bit float, value 123.0
+123.0hf       // 16-bit float, value 123.0
+
+1#INFhf       // 16-bit float, positive infinity
+1#INFf        // 32-bit float, positive infinity
+1#INFlf       // 64-bit float, positive infinity
+
+123f          // error: '123' is an integer literal and 'f' is not a valid
+              //        integer suffix. Write '123.f' or '123e0f' for a float.
 ```
 
 > 📝 **Remark 1:** A floating-point literal expression without a suffix has type `float`.
 
-## String Literal Expressions (todo)
+> 📝 **Remark 2:** The current implementation does not fully conform to the language manual.
+> This is tracked by GitHub issue [#11276](https://github.com/shader-slang/slang/issues/11276).
 
-A string literal expressions consists of one or more string literal tokens in a row:
+
+## String Literal Expressions
+
+<!-- TODO: complete this section. -->
+
+A string literal expression consists of one or more string literal tokens in a row:
 
 ```hlsl
 "This" "is one" "string"
