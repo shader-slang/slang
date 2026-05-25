@@ -17,7 +17,28 @@ permissions:
   pull-requests: write # For PR comments (if needed)
 
 jobs:
+  # Each per-OS coverage job is paired with a `<job>-retry` that fires only
+  # if the original failed. `merge-and-deploy` accepts success from either
+  # the original or the retry. The retry doesn't run on healthy nights, so
+  # there's no time cost; on a flaky night the workflow trades wall-clock
+  # for not paging someone to re-run by hand.
   coverage-linux:
+    uses: ./.github/workflows/ci-slang-coverage.yml
+    with:
+      os: linux
+      compiler: clang-18
+      platform: x86_64
+      config: relwithdebinfo
+      runs-on: '["ubuntu-22.04"]'
+      container: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
+      build-llvm: true
+      deploy-pages: false
+      server-count: 1
+    secrets: inherit
+
+  coverage-linux-retry:
+    needs: coverage-linux
+    if: always() && needs.coverage-linux.result == 'failure'
     uses: ./.github/workflows/ci-slang-coverage.yml
     with:
       os: linux
@@ -44,6 +65,21 @@ jobs:
       server-count: 1
     secrets: inherit
 
+  coverage-macos-retry:
+    needs: coverage-macos
+    if: always() && needs.coverage-macos.result == 'failure'
+    uses: ./.github/workflows/ci-slang-coverage.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: relwithdebinfo
+      runs-on: '["macos-latest"]'
+      build-llvm: true
+      deploy-pages: false
+      server-count: 1
+    secrets: inherit
+
   coverage-windows:
     uses: ./.github/workflows/ci-slang-coverage.yml
     with:
@@ -57,19 +93,43 @@ jobs:
       server-count: 1
     secrets: inherit
 
+  coverage-windows-retry:
+    needs: coverage-windows
+    if: always() && needs.coverage-windows.result == 'failure'
+    uses: ./.github/workflows/ci-slang-coverage.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: relwithdebinfo
+      runs-on: '["windows-latest"]'
+      build-llvm: true
+      deploy-pages: false
+      server-count: 1
+    secrets: inherit
+
   merge-and-deploy:
-    needs: [coverage-linux, coverage-macos, coverage-windows]
+    needs:
+      - coverage-linux
+      - coverage-linux-retry
+      - coverage-macos
+      - coverage-macos-retry
+      - coverage-windows
+      - coverage-windows-retry
     # The merge / render work runs on any branch so dispatches off feature
     # branches can validate the rendering pipeline (an artifact upload at
     # the end exposes the output for inspection); the deploy-to-
     # slang-coverage-reports steps below are still gated to master only.
     # Linux + macOS success is required because the Organize Coverage Data
     # step assumes their artifacts are present; Windows is allowed to fail
-    # (its block is guarded by `if [ -d ... ]`).
+    # (its block is guarded by `if [ -d ... ]`). For each OS, the run is
+    # considered successful if either the original or the retry passed.
+    # A skipped retry counts as not-failure (retries are gated on the
+    # original failing, so a skip means the original succeeded).
     if: |
       !cancelled() &&
-      needs.coverage-linux.result == 'success' &&
-      needs.coverage-macos.result == 'success'
+      (needs.coverage-linux.result == 'success' || needs.coverage-linux-retry.result == 'success') &&
+      (needs.coverage-macos.result == 'success' || needs.coverage-macos-retry.result == 'success')
     runs-on: ubuntu-22.04
     permissions:
       contents: write
