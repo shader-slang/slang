@@ -4,17 +4,21 @@
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-process-util.h"
+#include "slang-com-ptr.h"
+#include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #if SLANG_UNIX_FAMILY
-// For Case 11: fork+exec with a custom stdin fd.
+// For Case 11 (fork+exec) and Case 18 (dup/dup2 stdin redirect).
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #elif SLANG_WINDOWS_FAMILY
-// For Case 11: CreateProcess with a write-only pipe handle as stdin.
+// For Case 11 (CreateProcess) and Case 18 (_dup/_dup2 stdin redirect).
+#include <io.h>
 #include <windows.h>
 #endif
 
@@ -1013,6 +1017,118 @@ static SlangResult _testHelpContainsStdinPreamble(UnitTestContext* context)
     return SLANG_OK;
 }
 
+// Case 18: session-level Language fallback in addInputPath.
+// When -lang <lang> appears before -- in argv, two things happen at option-parse time:
+//   (a) the per-file langOverride is NOT passed to addInputPath for - (which comes after --,
+//       processed by InputFilesRemain with langOverride=UNKNOWN), and
+//   (b) the session-level CompilerOptionName::Language is set on the linkage's OptionSet.
+// addInputPath("-", UNKNOWN) therefore falls through to the session-level branch to deduce
+// the language.  This test makes that path explicit: it calls processCommandLineArguments
+// twice on the same request — first with "-lang slang" only (sets session Language, reads
+// no files) and then with "-- -" only (addInputPath receives langOverride=UNKNOWN, must
+// use the session-level Language).  A regression that flips to a different OptionSet in
+// the fallback check would compile clean and pass every subprocess test while silently
+// producing cannot-deduce-source-language for embedders using this call pattern.
+//
+// Stdin is redirected from a temp file for the second call so the unit-test process does
+// not stall waiting for interactive input.
+static SlangResult _testSessionLanguageFallback(UnitTestContext* context)
+{
+    // Write valid Slang source to a temp file that will be used as stdin.
+    const char* source = "[shader(\"compute\")] void main() {}\n";
+    String tempBase;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slangc-stdin-lang-test"), tempBase));
+    struct TempGuard
+    {
+        String path;
+        ~TempGuard() { File::remove(path); }
+    } guard{tempBase};
+    SLANG_RETURN_ON_FAIL(File::writeAllText(tempBase, source));
+
+    // Redirect the C runtime's stdin to the temp file.  fread inside addInputPath reads
+    // directly from the C FILE* stdin so this is the only way to inject source without
+    // spawning a subprocess.  We use dup2/fileno to redirect the underlying file descriptor,
+    // then restore it to a null device before returning.
+#ifdef _WIN32
+    FILE* srcFile = fopen(tempBase.getBuffer(), "rb");
+    if (!srcFile)
+        return SLANG_FAIL;
+    const int savedStdinFd = _dup(_fileno(stdin));
+    _dup2(_fileno(srcFile), _fileno(stdin));
+    fclose(srcFile);
+    struct StdinRestoreGuard
+    {
+        int saved;
+        ~StdinRestoreGuard()
+        {
+            if (saved >= 0)
+            {
+                _dup2(saved, _fileno(stdin));
+                _close(saved);
+            }
+        }
+    } stdinRestoreGuard{savedStdinFd};
+#else
+    FILE* srcFile = fopen(tempBase.getBuffer(), "rb");
+    if (!srcFile)
+        return SLANG_FAIL;
+    const int savedStdinFd = dup(fileno(stdin));
+    dup2(fileno(srcFile), fileno(stdin));
+    fclose(srcFile);
+    struct StdinRestoreGuard
+    {
+        int saved;
+        ~StdinRestoreGuard()
+        {
+            if (saved >= 0)
+            {
+                dup2(saved, fileno(stdin));
+                close(saved);
+            }
+        }
+    } stdinRestoreGuard{savedStdinFd};
+#endif
+
+    // Create a session and compile request.
+    SlangSession* session = spCreateSession();
+    if (!session)
+        return SLANG_FAIL;
+    struct SessionGuard
+    {
+        SlangSession* s;
+        ~SessionGuard() { spDestroySession(s); }
+    } sessionGuard{session};
+
+    SlangCompileRequest* req = spCreateCompileRequest(session);
+    if (!req)
+        return SLANG_FAIL;
+    struct RequestGuard
+    {
+        SlangCompileRequest* r;
+        ~RequestGuard() { spDestroyCompileRequest(r); }
+    } requestGuard{req};
+
+    spAddCodeGenTarget(req, SLANG_SPIRV);
+
+    // First call: "-lang slang" with no adjacent files.  The InputFilesRemain while loop
+    // in the option parser stops before any file args (there are none), so addInputPath is
+    // NOT called here.  Only the session-level Language option is set on the linkage.
+    const char* langArgv[] = {"-lang", "slang"};
+    if (SLANG_FAILED(spProcessCommandLineArguments(req, langArgv, 2)))
+        return SLANG_FAIL;
+
+    // Second call: "-- -" without -lang.  addInputPath("-", UNKNOWN) falls through to the
+    // session-level Language option (set above) to deduce SLANG_SOURCE_LANGUAGE_SLANG.
+    const char* stdinArgv[] = {"-entry", "main", "-stage", "compute", "--", "-"};
+    if (SLANG_FAILED(spProcessCommandLineArguments(req, stdinArgv, 6)))
+        return SLANG_FAIL;
+
+    if (SLANG_FAILED(spCompile(req)))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinWithLangSlang(unitTestContext)));
@@ -1036,4 +1152,5 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinMultipleFreads(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinPassThroughMissingStage(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpContainsStdinPreamble(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testSessionLanguageFallback(unitTestContext)));
 }

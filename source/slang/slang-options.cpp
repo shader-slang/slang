@@ -40,9 +40,10 @@
 namespace Slang
 {
 
-// Single canonical description of the stdin feature for use in every user-facing surface
-// (_appendUsageTitle, _parseHelp, and the InputFilesRemain option description).
-// Having one definition prevents wording drift when the cap or pass-through list changes.
+// Quick-start summary of the stdin feature, shared between _appendUsageTitle and _parseHelp
+// so that the usage header and the generated markdown reference stay in sync.
+// The InputFilesRemain option description (in the options table below) is a separate,
+// more detailed prose block; keep both up-to-date when changing the cap or pass-through list.
 static const char* const kStdinUsagePreamble =
     "Pass '-' as an input file to read source from standard input.\n"
     "-lang <language> is required when reading from stdin.\n"
@@ -1588,8 +1589,19 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         // Switch stdin to binary mode on Windows so that \r\n is not silently collapsed to
         // \n and 0x1A (Ctrl-Z) is not treated as end-of-file.  File-based compilation uses
         // binary FileStream, so stdin must be consistent.
+        // The mode is restored before every return so this function does not permanently
+        // alter a host process that calls processCommandLineArguments with "-" as input.
 #ifdef _WIN32
-        _setmode(_fileno(stdin), _O_BINARY);
+        const int stdinPrevMode = _setmode(_fileno(stdin), _O_BINARY);
+        struct StdinModeGuard
+        {
+            int prev;
+            ~StdinModeGuard()
+            {
+                if (prev != -1)
+                    _setmode(_fileno(stdin), prev);
+            }
+        } stdinModeGuard{stdinPrevMode};
 #endif
 
         // Use fread rather than StreamUtil::readAll over a PipeStream.  PipeStream uses
