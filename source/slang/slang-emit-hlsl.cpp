@@ -2133,10 +2133,13 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
         }
     }
 
-    if (auto readAccessSemantic = inst->findDecoration<IRStageReadAccessDecoration>())
-        _emitStageAccessSemantic(readAccessSemantic, "read");
-    if (auto writeAccessSemantic = inst->findDecoration<IRStageWriteAccessDecoration>())
-        _emitStageAccessSemantic(writeAccessSemantic, "write");
+    if (_shouldEmitPayloadAccessQualifiers())
+    {
+        if (auto readAccessSemantic = inst->findDecoration<IRStageReadAccessDecoration>())
+            _emitStageAccessSemantic(readAccessSemantic, "read");
+        if (auto writeAccessSemantic = inst->findDecoration<IRStageWriteAccessDecoration>())
+            _emitStageAccessSemantic(writeAccessSemantic, "write");
+    }
 
     if (auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
     {
@@ -2175,21 +2178,19 @@ void HLSLSourceEmitter::_emitStageAccessSemantic(
     m_writer->emit(")");
 }
 
+bool HLSLSourceEmitter::_shouldEmitPayloadAccessQualifiers()
+{
+    if (m_effectiveProfile.getFamily() != ProfileFamily::DX)
+        return false;
+
+    // PAQs are required on [raypayload] struct members starting with SM 6.7.
+    return m_effectiveProfile.getVersion() >= ProfileVersion::DX_6_7;
+}
+
 void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
 {
 
-    // Get the target profile to determine if PAQs are supported
-    bool enablePAQs = false;
-    auto profile = getTargetProgram()->getOptionSet().getProfile();
-    if (profile.getFamily() == ProfileFamily::DX)
-    {
-        // PAQs are default in Shader Model 6.7 and above when called with `--profile lib_6_7`
-
-        auto version = profile.getVersion();
-        enablePAQs = version >= ProfileVersion::DX_6_7;
-    }
-
-    if (enablePAQs)
+    if (_shouldEmitPayloadAccessQualifiers())
     {
         if (const auto payloadDecoration = inst->findDecoration<IRRayPayloadDecoration>();
             payloadDecoration)
