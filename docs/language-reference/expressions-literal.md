@@ -285,10 +285,118 @@ the literal with unary minus, e.g. `-1#INFf`.
 
 ## String Literal Expressions
 
-<!-- TODO: complete this section. -->
+> *`StringLiteral`* = *`StringLiteralToken`*+
+>
+> *`StringLiteralToken`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DQuotedString`* |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`RawString`*
+>
+> *`DQuotedString`* = **`'"'`** *`DStringChar`*\* **`'"'`**
+>
+> *`DStringChar`* = <br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharUnquoted`* |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuoted`* |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedOctal`* |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedHex`*
+>
+> *`DStringCharUnquoted`* = **`<[^\"\n\r]>`**
+>
+> *`DStringCharQuoted`* = **`<\['"\?abfnrtv]>`**
+>
+> *`DStringCharQuotedOctal`* = **`<\[0-7]{1,3}>`**
+>
+> *`DStringCharQuotedHex`* = **`<\x[0-9A-Fa-f]{1,2}>`**
+>
+> *`RawString`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'R"'`** *`RawStringDelim`* **`'('`**<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`RawStringContent`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`')'`** *`RawStringDelim`* **`'"'`**
+>
+> *`RawStringContent`* = **`<.*>`**
 
-A string literal expression consists of one or more string literal tokens in a row:
+A string literal expression consists of one or more consecutive string literal tokens. The value of the string
+literal is the concatenation of the string-token values, followed by a terminating null character (`'\0'`).
+
+Consecutive string tokens may be separated by any amount of whitespace, including none. Unlike most other
+grammar productions, whitespace within a string token is significant and forms part of the string value.
+
+A string token has two forms:
+
+1. Double-quoted string (*`DQuotedString`*)
+2. Raw string (*`RawString`*)
+
+The double-quoted string starts with a double-quote (`"`), followed by any number of string characters
+(*`DStringChar`*), and ends with a double-quote.
+
+A string character is a sequence that encodes a single character. The following table describes the sequences
+and their respective character values:
+
+Sequence                                 | Encoded character value
+---------------------------------------- | --------------------------------------
+**`<[^\"\n\r]>`**                        | Character as is, excluding backslash (`\`), double quote (`"`), newline (ASCII 10), and carriage return (ASCII 13).
+**`<\'>`**                               | Character `'`
+**`<\">`**                               | Character `"`
+**`<\\>`**                               | Character `\`
+**`<\?>`**                               | Character `?`
+**`<\a>`**                               | ASCII character 7 (bell)
+**`<\b>`**                               | ASCII character 8 (backspace)
+**`<\f>`**                               | ASCII character 12 (form feed)
+**`<\n>`**                               | ASCII character 10 (newline)
+**`<\r>`**                               | ASCII character 13 (carriage return)
+**`<\t>`**                               | ASCII character 9 (horizontal tab)
+**`<\v>`**                               | ASCII character 11 (vertical tab)
+**`<\[0-7]{1,3}>`**                      | Octal number specifying an 8-bit character code (1-3 digits)
+**`<\x[0-9A-Fa-f]{1,2}>`**               | Hexadecimal number specifying an 8-bit character code (1-2 digits)
+
+A raw string starts with **`'R"'`**, followed by a user-defined delimiter *`RawStringDelim`* and **`'('`**.
+The character sequence *`RawStringContent`* that follows is taken verbatim — no escape processing is
+performed — and may contain any sequence of characters that does not include the termination sequence. The
+raw string terminates with **`')'`** followed by the same *`RawStringDelim`* and the closing double quote
+**`'"'`**.
+
+**Examples:**
 
 ```hlsl
-"This" "is one" "string"
+""                      // empty string (only the terminating '\0')
+"123"                   // string "123" (and the terminating '\0')
+"some\nstring"          // "some" and ASCII 10 (newline) and "string"
+"a \"quoted\" string"   // a "quoted" string
+"contains a ' quote"    // single quote needs no escape in a double-quoted string
+"\110\145\154\154\157"  // "Hello"
+"\x48\x65\x6C\x6C\x6F"  // "Hello"
+R"(Raw " string)"       // "Raw \" string"
+R"xz(Raw " string)xz"   // "Raw \" string"
+R"a(Raw )a" string)a"   // Raw string ends after "Raw "; the leftover
+                        // ` string)a"' is a syntax error (unterminated
+                        // string after `a`).
+"123" "456"             // "123456"
+```
+
+## Character Literal Expressions
+
+> *`CharLiteral`* = **`<'>`** *`SChar`* **`<'>`**
+>
+> *`SChar`* = <br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`SCharUnquoted`* |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuoted`* |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedOctal`* |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedHex`*
+>
+> *`SCharUnquoted`* = **`<[^\'\n\r]>`**
+
+A character literal expression evaluates to a single character value. The character expression is a single
+encoded character (*`SChar`*) enclosed within single quotes (`'`). *`SChar`* follows the same rules as
+*`DStringChar`* in a double-quoted string, except that an unquoted character may be a double quote (`"`) but
+may not be a single quote (`'`). Conversely, a single quote must be escaped as `\'`, while a double quote
+needs no escape.
+
+```hlsl
+'\0'                    // Character 0 (null character)
+'A'                     // Character 65 (A)
+'\t'                    // Character 9 (horizontal tab)
+'\x53'                  // Character 83 (S)
+'"'                     // Character 34 (") -- double quote needs no escape
+'\''                    // Character 39 (') -- single quote must be escaped
+'\\'                    // Character 92 (\)
+'\110'                  // Character 72 (H) via octal escape
 ```
