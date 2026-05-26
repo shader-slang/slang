@@ -3894,7 +3894,7 @@ err(
 standalone_note(
     "differentiable-requirement-needs-differentiable-member",
     -1,
-    "member '~member:Decl' cannot satisfy differentiable interface requirement '~requirement:Decl' because it does not provide the required differentiability",
+    "member '~member:Decl' cannot satisfy differentiable interface requirement '~requirement:Decl' because it does not provide the required differentiability; it may be missing an appropriate differentiability attribute, such as [Differentiable]",
     span { loc = "member:Decl" }
 )
 

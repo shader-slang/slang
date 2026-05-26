@@ -8,7 +8,7 @@ struct MyFloat : IDifferentiable
     static MyFloat dzero()
 //CHECK:           ^^^^^ interface requirement mismatch
 //CHECK:           ^^^^^ member 'dzero' does not match interface requirement.
-//CHECK:           ^^^^^ member 'dzero' cannot satisfy differentiable interface requirement 'dzero'
+//CHECK:           ^^^^^ may be missing an appropriate differentiability attribute, such as [Differentiable]
     {
         return { 0.0 };
     }
@@ -16,7 +16,7 @@ struct MyFloat : IDifferentiable
     static MyFloat dadd(MyFloat a, MyFloat b)
 //CHECK:           ^^^^ interface requirement mismatch
 //CHECK:           ^^^^ member 'dadd' does not match interface requirement.
-//CHECK:           ^^^^ member 'dadd' cannot satisfy differentiable interface requirement 'dadd'
+//CHECK:           ^^^^ may be missing an appropriate differentiability attribute, such as [Differentiable]
     {
         return { a.val + b.val };
     }
@@ -25,17 +25,17 @@ struct MyFloat : IDifferentiable
 interface IForwardRequirement
 {
     [ForwardDifferentiable]
-    static float eval(float x);
+    static float eval(This value, float x);
 }
 
-// A hard forward-differentiable interface requirement should reject a
-// non-differentiable witness.
+// A hard forward-differentiable static interface requirement should reject a
+// synthesized wrapper that forwards to a non-differentiable non-static witness.
 struct MissingForwardDerivative : IForwardRequirement
 {
-    static float eval(float x)
-//CHECK:         ^^^^ interface requirement mismatch
-//CHECK:         ^^^^ member 'eval' does not match interface requirement.
-//CHECK:         ^^^^ member 'eval' cannot satisfy differentiable interface requirement 'eval'
+    float eval(float x)
+//CHECK:  ^^^^ interface requirement mismatch
+//CHECK:  ^^^^ member 'eval' does not match interface requirement.
+//CHECK:  ^^^^ may be missing an appropriate differentiability attribute, such as [Differentiable]
     {
         return x * x;
     }
