@@ -89,6 +89,11 @@ Function Coverage: `-trace-function-coverage`
 Function coverage inserts one counter at the entry of each
 user-authored function body that is lowered to executable IR. It
 counts function entry, not every basic block in the function.
+This includes entry points, free functions, user-authored
+constructors, instance/static methods, `[ForceInline]` functions, and
+lambda bodies as they are represented by lowering. Compiler-synthesized
+helpers that do not carry a user source location are not part of the
+function-coverage contract.
 
 Conceptually:
 
@@ -124,7 +129,10 @@ The coverage metadata records both display and mangled function names
 when available. Reports can aggregate multiple runtime counters that
 attribute to the same source function, but hosts must use the metadata
 rather than assuming counter-slot identity across compiles or shader
-permutations.
+permutations. Lambda and constructor entries can have compiler-facing
+display names such as `$init` or `()`; consumers should treat the
+mangled name and source location as the stable identity for those
+entries.
 
 Branch Coverage: `-trace-branch-coverage`
 -----------------------------------------

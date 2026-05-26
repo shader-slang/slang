@@ -1608,6 +1608,194 @@ SLANG_UNIT_TEST(coverageTracingFunctionEntryMetadataForMultipleReturns)
     SLANG_CHECK(computeMainCount == 1);
 }
 
+SLANG_UNIT_TEST(coverageTracingFunctionEntryCallableKindsMetadata)
+{
+    const char* shaderSource = R"(
+        RWStructuredBuffer<uint> outputBuffer;
+
+        struct CallableKinds
+        {
+            uint value;
+
+            __init(uint v)
+            {
+                value = v;
+            }
+
+            uint instanceMethod(uint x)
+            {
+                return value + x;
+            }
+
+            static uint staticMethod(uint x)
+            {
+                return x + 3u;
+            }
+        };
+
+        [ForceInline]
+        uint forceInlineHelper(uint x)
+        {
+            return x + 5u;
+        }
+
+        uint freeHelper(uint x)
+        {
+            return forceInlineHelper(x) + forceInlineHelper(x + 1u);
+        }
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void computeMain(uint3 tid : SV_DispatchThreadID)
+        {
+            let lambda = (uint x) => x + 9u;
+            CallableKinds callable = CallableKinds(tid.x);
+            outputBuffer[0] =
+                freeHelper(tid.x) + callable.instanceMethod(tid.y) +
+                CallableKinds::staticMethod(tid.z) + lambda(tid.x);
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_CPP_SOURCE;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+
+    slang::CompilerOptionEntry coverageOption = {};
+    coverageOption.name = slang::CompilerOptionName::TraceFunctionCoverage;
+    coverageOption.value.kind = slang::CompilerOptionValueKind::Int;
+    coverageOption.value.intValue0 = 1;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &coverageOption;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "coverageCallableKinds",
+        "coverageCallableKinds.slang",
+        shaderSource,
+        diagnostics.writeRef());
+    if (!module && diagnostics)
+    {
+        fprintf(
+            stderr,
+            "coverageTracingFunctionEntryCallableKindsMetadata module diagnostics:\n%s\n",
+            (const char*)diagnostics->getBufferPointer());
+    }
+    SLANG_CHECK(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    module->findAndCheckEntryPoint(
+        "computeMain",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnostics.writeRef());
+    SLANG_CHECK(entryPoint != nullptr);
+
+    slang::IComponentType* components[] = {module, entryPoint.get()};
+    ComPtr<slang::IComponentType> program;
+    SLANG_CHECK(
+        session->createCompositeComponentType(
+            components,
+            SLANG_COUNT_OF(components),
+            program.writeRef(),
+            diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IComponentType> linked;
+    SLANG_CHECK(program->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> codeBlob;
+    SLANG_CHECK(
+        linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IMetadata> metadata;
+    SLANG_CHECK(
+        linked->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnostics.writeRef()) ==
+        SLANG_OK);
+
+    auto coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
+        slang::ICoverageTracingMetadata::getTypeGuid());
+    SLANG_CHECK(coverage != nullptr);
+
+    uint32_t functionEntryCount = 0;
+    uint32_t constructorCount = 0;
+    uint32_t forceInlineHelperCount = 0;
+    uint32_t freeHelperCount = 0;
+    uint32_t instanceMethodCount = 0;
+    uint32_t staticMethodCount = 0;
+    uint32_t lambdaInitCount = 0;
+    uint32_t lambdaCallCount = 0;
+    uint32_t computeMainCount = 0;
+    List<uint32_t> functionCounters;
+
+    for (uint32_t i = 0; i < coverage->getEntryCount(); ++i)
+    {
+        slang::CoverageEntryInfo entry;
+        SLANG_CHECK(coverage->getEntryInfo(i, &entry) == SLANG_OK);
+        if (entry.kind != slang::CoverageEntryKind::Function)
+            continue;
+
+        functionEntryCount++;
+        SLANG_CHECK(entry.file != nullptr);
+        SLANG_CHECK(
+            UnownedStringSlice(entry.file).indexOf(toSlice("coverageCallableKinds.slang")) != -1);
+        SLANG_CHECK(entry.line > 0);
+        SLANG_CHECK(entry.counterIndex != slang::kInvalidCoverageCounterIndex);
+        SLANG_CHECK(entry.counterIndex < coverage->getCounterCount());
+        for (auto counterIndex : functionCounters)
+            SLANG_CHECK(counterIndex != entry.counterIndex);
+        functionCounters.add(entry.counterIndex);
+        SLANG_CHECK(entry.functionName != nullptr);
+        SLANG_CHECK(entry.functionMangledName != nullptr);
+
+        auto functionName = UnownedStringSlice(entry.functionName);
+        auto mangledName = UnownedStringSlice(entry.functionMangledName);
+
+        if (functionName == toSlice("forceInlineHelper"))
+            forceInlineHelperCount++;
+        else if (functionName == toSlice("freeHelper"))
+            freeHelperCount++;
+        else if (functionName == toSlice("instanceMethod"))
+            instanceMethodCount++;
+        else if (functionName == toSlice("staticMethod"))
+            staticMethodCount++;
+        else if (functionName == toSlice("computeMain"))
+            computeMainCount++;
+        else if (
+            functionName == toSlice("$init") &&
+            mangledName.indexOf(toSlice("Lambda_computeMain")) != -1)
+            lambdaInitCount++;
+        else if (
+            functionName == toSlice("()") &&
+            mangledName.indexOf(toSlice("Lambda_computeMain")) != -1)
+            lambdaCallCount++;
+        else if (
+            functionName == toSlice("$init") &&
+            mangledName.indexOf(toSlice("13CallableKinds")) != -1)
+            constructorCount++;
+    }
+
+    SLANG_CHECK(functionEntryCount == 8);
+    SLANG_CHECK(constructorCount == 1);
+    // The helper is called twice, but function coverage records the
+    // source callable once rather than fanning out by call site.
+    SLANG_CHECK(forceInlineHelperCount == 1);
+    SLANG_CHECK(freeHelperCount == 1);
+    SLANG_CHECK(instanceMethodCount == 1);
+    SLANG_CHECK(staticMethodCount == 1);
+    SLANG_CHECK(lambdaInitCount == 1);
+    SLANG_CHECK(lambdaCallCount == 1);
+    SLANG_CHECK(computeMainCount == 1);
+}
+
 SLANG_UNIT_TEST(coverageTracingSpecializedMultiEntryPointMetadata)
 {
     const char* shaderSource = R"(
