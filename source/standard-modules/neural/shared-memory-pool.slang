@@ -375,8 +375,34 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
     // With MMAHelperNew (CUDA + OptimalLayout), forward and backward MMA
     // use zero shmem (LoadRaw + FromLocal). This term only applies to
     // the legacy shmem-based MMAHelper/TiledMMAHelper paths (non-CUDA).
-    static const uint BytesForMMA =
-        (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);
+    //
+    // Metal forward/backward transpose: on-demand per-k fromVectorViaShMem for
+    // both half and float. Shmem per warp = SubgroupSize * TileWidthUint4 (in
+    // uint4 units). Half: 8 halfs / 8 per uint4 = 1 uint4 per lane. Float:
+    // 8 floats / 4 per uint4 = 2 uint4s per lane (stored as bit_cast, not
+    // converted to half).
+    static const int MetalTile_ = 8;
+    static const int MetalElemsPerUint4_ = sizeof(uint4) / sizeof(T);
+    static const int MetalTileWidthUint4_ = (MetalTile_ + MetalElemsPerUint4_ - 1) / MetalElemsPerUint4_;
+    static const uint MetalBytesForMMA =
+        uint(SubgroupCount) * uint(SubgroupSize * MetalTileWidthUint4_) * sizeof(uint4);
+
+    // Metal outer-product backward stages two 8-row dOut tiles, two 8-column
+    // input tiles, and one 8x8 accumulator tile per warp in T-typed shmem.
+    static const int MetalOPMBlock_ = 2;
+    static const int MetalOPNBlock_ = 2;
+    static const int MetalOPStageAElemsPerWarp_ = MetalOPMBlock_ * MetalTile_ * SubgroupSize;
+    static const int MetalOPStageBElemsPerWarp_ = MetalOPNBlock_ * MetalTile_ * SubgroupSize;
+    static const int MetalOPAccumElemsPerWarp_ = MetalTile_ * MetalTile_;
+    static const uint MetalBytesForOuterProduct =
+        !ShMemInfo.IsTraining ? 0 :
+        uint(SubgroupCount) *
+            uint(MetalOPStageAElemsPerWarp_ + MetalOPStageBElemsPerWarp_ + MetalOPAccumElemsPerWarp_) *
+            sizeof(T);
+
+    static const uint BytesForMMA = (Target == TargetEnum.Metal)
+        ? Max(MetalBytesForMMA, MetalBytesForOuterProduct)
+        : (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);
 
     // Cross-warp butterfly reduction for outer product.
     // The first butterfly pass has G/2 warps storing simultaneously, each
@@ -407,7 +433,9 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
         (SubgroupCount * SubgroupSize * HeightInVecB_SR + SubgroupCount * TileStrideVec_SR * CMShape.ROW_C) * sizeof(uint4)
         + ((SubgroupCount * MPadded_SR * sizeof(T) + sizeof(uint4) - 1) / sizeof(uint4)) * sizeof(uint4);
 
-    public static const uint Bytes = Max(Max(Max(BytesForMMA, BytesForOuterProductStore), BytesForCrossWarpReduction), BytesForSumReduceRows);
+    public static const uint Bytes = Max(Max(Max(BytesForMMA, BytesForOuterProductStore),
+                                          BytesForCrossWarpReduction),
+                                                BytesForSumReduceRows);
 }
 
 // The following code is a macro-based implementation of the shared memory size calculation.

@@ -9403,6 +9403,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     SLANG_ASSERT(synFunc);
 
     addModifier(synFunc, m_astBuilder->create<BackwardDifferentiableAttribute>());
+    addModifier(synFunc, m_astBuilder->create<ForceInlineAttribute>());
 
 
     synth.pushContainerScope(synFunc);

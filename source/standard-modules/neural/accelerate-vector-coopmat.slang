@@ -14,10 +14,10 @@ implementing neural;
 #define PERF_OPA_ACTIVE 1
 #endif
 
-// Cooperative matrix is only supported by CUDA and SPIR-V
+// Cooperative matrix is supported by CUDA, Metal, and SPIR-V here.
 // WaveTangledVector is a vector type that emulates the Cooperative Vector type by using Cooperative Matrix feature which is
-// supported by CUDA and SPIR-V.
-[require(cooperative_matrix, subgroup_basic, cuda_spirv)]
+// supported by CUDA, Metal, and SPIR-V.
+[require(cuda_metal_spirv, cooperative_matrix, subgroup_basic)]
 public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int SubgroupSize, int SubgroupCount> : IVector<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
@@ -36,31 +36,40 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     internal T[Uint4AlignedInputSize] data;
     public int getCount() { return N; }
 
-    public __init() { data = {}; }
+    [ForceInline]
+    public __init() {}
 
+    [ForceInline]
     public __init(T value)
     {
+        [ForceUnroll]
         for (int i = 0; i < N; i++)
             this.data[i] = value;
         cleanPaddingData();
     }
 
+    [ForceInline]
     public __init(T[Size] inData)
     {
+        [ForceUnroll]
         for (int i = 0; i < N; i++)
             this.data[i] = inData[i];
         cleanPaddingData();
     }
 
+    [ForceInline]
     internal __init(T[Uint4AlignedInputSize] inData)
     {
         this.data = inData;
     }
 
+    [ForceInline]
     public __init(This other) { this.data = other.data; }
 
+    [ForceInline]
     public __init<InputArray : IArray<T>>(InputArray inData)
     {
+        [ForceUnroll]
         for (int i = 0; i < N; i++)
             this.data[i] = inData[i];
         cleanPaddingData();
@@ -72,6 +81,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     {
         const int elementCountPerUint4 = sizeof(uint4) / sizeof(DTypeMatC);
         const int alignedSize = ((N + (elementCountPerUint4 - 1)) / elementCountPerUint4) * elementCountPerUint4;
+        [ForceUnroll]
         for (int i = N; i < alignedSize; i++)
             this.data[i] = T(0.0f);
     }
@@ -180,7 +190,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     [ForceInline]
     [HasTrivialForwardDerivative]
     [BackwardDerivative(linearTransformBwd)]
-    [require(cuda_spirv)]
+    [require(cuda_metal_spirv)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress)
             where Address : IPointerLikeAddress<T>
@@ -194,6 +204,8 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
             return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.CUDA, false>(weightAddress, none);
         case spirv:
             return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.SPIR_V, false>(weightAddress, none);
+        case metal:
+            return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.Metal, false>(weightAddress, none);
         }
     }
 
@@ -216,13 +228,15 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
             linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.CUDA, false>(dthis, dWeightAddress, biasAddress, doutput);
         case spirv:
             linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.SPIR_V, false>(dthis, dWeightAddress, biasAddress, doutput);
+        case metal:
+            linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.Metal, false>(dthis, dWeightAddress, biasAddress, doutput);
         }
     }
 
     [ForceInline]
     [HasTrivialForwardDerivative]
     [BackwardDerivative(linearTransformBwd)]
-    [require(cuda_spirv)]
+    [require(cuda_metal_spirv)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)
             where Address : IPointerLikeAddress<T>
@@ -236,6 +250,8 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
             return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.CUDA, true>(weightAddress, biasAddress);
         case spirv:
             return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.SPIR_V, true>(weightAddress, biasAddress);
+        case metal:
+            return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.Metal, true>(weightAddress, biasAddress);
         }
     }
 
@@ -258,6 +274,8 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
             linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.CUDA, true>(dthis, dWeightAddress, dBiasAddress, doutput);
         case spirv:
             linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.SPIR_V, true>(dthis, dWeightAddress, dBiasAddress, doutput);
+        case metal:
+            linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.Metal, true>(dthis, dWeightAddress, dBiasAddress, doutput);
         }
     }
 }

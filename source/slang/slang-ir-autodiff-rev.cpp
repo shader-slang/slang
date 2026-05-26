@@ -20,6 +20,25 @@
 namespace Slang
 {
 
+static bool _hasForceInlineDecoration(IRInst* inst)
+{
+    if (!inst)
+        return false;
+
+    if (inst->findDecoration<IRForceInlineDecoration>())
+        return true;
+
+    auto resolvedInst = getResolvedInstForDecorations(inst, true);
+    return resolvedInst && resolvedInst != inst &&
+           resolvedInst->findDecoration<IRForceInlineDecoration>();
+}
+
+static void _addForceInlineDecoration(IRBuilder* builder, IRInst* inst)
+{
+    if (inst && !inst->findDecoration<IRForceInlineDecoration>())
+        builder->addForceInlineDecoration(inst);
+}
+
 // Puts parameters into their own block.
 void makeParameterBlock(IRBuilder* inBuilder, IRFunc* func)
 {
@@ -315,7 +334,16 @@ struct BackwardDiffTranslationContext
 
         // --------------------------------------------------------------------------
 
-        builder->addForceInlineDecoration(rematFuncResult);
+        if (_hasForceInlineDecoration(targetFunc))
+        {
+            _addForceInlineDecoration(builder, applyFunc);
+            _addForceInlineDecoration(builder, propagateFunc);
+            _addForceInlineDecoration(builder, rematFuncResult);
+        }
+        else
+        {
+            builder->addForceInlineDecoration(rematFuncResult);
+        }
 
         initializeLocalVariables(builder->getModule(), applyFunc);
         initializeLocalVariables(builder->getModule(), propagateFunc);
@@ -650,7 +678,16 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
 
     bwdPropPostCallBuilder.emitReturn();
 
-    builder.addForceInlineDecoration(rematFunc);
+    if (_hasForceInlineDecoration(primalFunc))
+    {
+        _addForceInlineDecoration(&builder, applyFunc);
+        _addForceInlineDecoration(&builder, rematFunc);
+        _addForceInlineDecoration(&builder, bwdPropFunc);
+    }
+    else
+    {
+        builder.addForceInlineDecoration(rematFunc);
+    }
 
     generateName(&builder, primalFunc, applyFunc, "s_apply_");
     generateName(&builder, primalFunc, rematFunc, "s_remat_");
@@ -702,6 +739,10 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
     //
     auto bwdDiffFunc = builder.createFunc();
     bwdDiffFunc->setFullType(bwdDiffFuncType);
+    if (_hasForceInlineDecoration(applyBwdFunc) || _hasForceInlineDecoration(bwdPropFunc))
+    {
+        builder.addForceInlineDecoration(bwdDiffFunc);
+    }
 
     // TODO: do all the decorator and naming stuff here.
 

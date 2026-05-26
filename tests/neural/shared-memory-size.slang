@@ -1,5 +1,7 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
@@ -28,7 +30,7 @@ static const int SubgroupSize = 32;
 // This verify function uses naive implementation to calculate the shared memory size at run time.
 // It just calculate the shared memory size for a single layer, and store the result in the result array.
 // Then we will find the maximum value in the result array.
-void computeOneLayer<ExecutionMode Mode, T, U, Arr:IRWArray<uint>>(T inputSize, U outputSize, inout uint index, out Arr result)
+void computeOneLayer<TargetEnum Target, ExecutionMode Mode, T, U, Arr:IRWArray<uint>>(T inputSize, U outputSize, inout uint index, out Arr result)
     where T == uint
     where U == uint
 {
@@ -49,7 +51,24 @@ void computeOneLayer<ExecutionMode Mode, T, U, Arr:IRWArray<uint>>(T inputSize, 
                 coopMatShape * (max(alignedN, alignedK)) * sizeof(half);
 
     const int tileCSize = tileBSize * sizeof(DType) / sizeof(half);
-    const int bytesForMMA = tileASize + tileCSize * subgroupCount;
+    const int bytesForMMAOtherTargets = tileASize + tileCSize * subgroupCount;
+
+    const int metalTile = 8;
+    const int metalElemsPerUint4 = sizeof(uint4) / sizeof(DType);
+    const int metalTileWidthUint4 = (metalTile + metalElemsPerUint4 - 1) / metalElemsPerUint4;
+    const int metalBytesForMMA = subgroupCount * SubgroupSize * metalTileWidthUint4 * sizeof(uint4);
+
+    const int metalOPMBlock = 2;
+    const int metalOPNBlock = 2;
+    const int metalOPStageAElemsPerWarp = metalOPMBlock * metalTile * SubgroupSize;
+    const int metalOPStageBElemsPerWarp = metalOPNBlock * metalTile * SubgroupSize;
+    const int metalOPAccumElemsPerWarp = metalTile * metalTile;
+    const int metalBytesForOuterProduct = !isTraining ? 0 :
+        subgroupCount * (metalOPStageAElemsPerWarp + metalOPStageBElemsPerWarp + metalOPAccumElemsPerWarp) * sizeof(DType);
+
+    const int bytesForMMA = (Target == TargetEnum.Metal) ?
+        max(metalBytesForMMA, metalBytesForOuterProduct) :
+        bytesForMMAOtherTargets;
 
     // Term 2: BytesForCrossWarpReduction — butterfly outer product reduction
     const int nTileRows = (int(outputSize) + coopMatShape - 1) / coopMatShape;
@@ -76,13 +95,13 @@ void computeOneLayer<ExecutionMode Mode, T, U, Arr:IRWArray<uint>>(T inputSize, 
 }
 
 
-uint verifySize<ExecutionMode Mode, each T, each U>(expand each T a, expand each U b)
+uint verifySize<TargetEnum Target, ExecutionMode Mode, each T, each U>(expand each T a, expand each U b)
     where T == uint
     where U == uint
 {
     uint index = 0;
     uint resBuffer[countof(T)];
-    expand computeOneLayer<Mode>(each a, each b, index, resBuffer);
+    expand computeOneLayer<Target, Mode>(each a, each b, index, resBuffer);
 
     int maxSize = 0;
 
@@ -177,15 +196,35 @@ uint verifySize<ExecutionMode Mode, each T, each U>(expand each T a, expand each
 #define TEST_CASE_16_PAIR_1 14U, 3U, 49U, 8U, 37U, 6U, 28U, 11U, 41U, 2U, 33U, 17U, 55U, 9U, 44U, 12U
 #define TEST_CASE_16_PAIR_2 3U, 49U, 8U, 37U, 6U, 28U, 11U, 41U, 2U, 33U, 17U, 55U, 9U, 44U, 12U, 29U
 
-#define RunTest(N) \
+#define RunTestForTarget(TARGET, N) \
 do { \
-    uint expectedValue = verifySize<ExecutionMode.Inference>(TEST_CASE_##N##_PAIR_1, TEST_CASE_##N##_PAIR_2); \
+    uint expectedValue = verifySize<TARGET, ExecutionMode.Inference>(TEST_CASE_##N##_PAIR_1, TEST_CASE_##N##_PAIR_2); \
     uint actualValue = SharedMemorySizeInference.OfLayer##N<TEST_CASE_##N>.Bytes; \
     bool isCorrect = expectedValue == actualValue; \
     actualValue = SharedMemorySizeTraining.OfLayer##N<TEST_CASE_##N>.Bytes; \
-    expectedValue = verifySize<ExecutionMode.Training>(TEST_CASE_##N##_PAIR_1, TEST_CASE_##N##_PAIR_2); \
+    expectedValue = verifySize<TARGET, ExecutionMode.Training>(TEST_CASE_##N##_PAIR_1, TEST_CASE_##N##_PAIR_2); \
     isCorrect = isCorrect && (expectedValue == actualValue); \
     outputBuffer[N-1] = isCorrect ? 1U : 0U; \
+} while (false)
+
+#define RunAllTestsForTarget(TARGET) \
+do { \
+    RunTestForTarget(TARGET, 1); \
+    RunTestForTarget(TARGET, 2); \
+    RunTestForTarget(TARGET, 3); \
+    RunTestForTarget(TARGET, 4); \
+    RunTestForTarget(TARGET, 5); \
+    RunTestForTarget(TARGET, 6); \
+    RunTestForTarget(TARGET, 7); \
+    RunTestForTarget(TARGET, 8); \
+    RunTestForTarget(TARGET, 9); \
+    RunTestForTarget(TARGET, 10); \
+    RunTestForTarget(TARGET, 11); \
+    RunTestForTarget(TARGET, 12); \
+    RunTestForTarget(TARGET, 13); \
+    RunTestForTarget(TARGET, 14); \
+    RunTestForTarget(TARGET, 15); \
+    RunTestForTarget(TARGET, 16); \
 } while (false)
 
 
@@ -198,41 +237,15 @@ void computeMain(uint tid: SV_DispatchThreadID)
     case cuda:
         typealias SharedMemorySizeInference = SharedMemorySize<DType, TargetEnum.CUDA, ExecutionMode.Inference, SubgroupSize, BatchSize/SubgroupSize>;
         typealias SharedMemorySizeTraining = SharedMemorySize< DType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, BatchSize/SubgroupSize>;
-        RunTest(1);
-        RunTest(2);
-        RunTest(3);
-        RunTest(4);
-        RunTest(5);
-        RunTest(6);
-        RunTest(7);
-        RunTest(8);
-        RunTest(9);
-        RunTest(10);
-        RunTest(11);
-        RunTest(12);
-        RunTest(13);
-        RunTest(14);
-        RunTest(15);
-        RunTest(16);
+        RunAllTestsForTarget(TargetEnum.CUDA);
     case spirv:
         typealias SharedMemorySizeInference = SharedMemorySize<DType, TargetEnum.SPIR_V, ExecutionMode.Inference, SubgroupSize, BatchSize/SubgroupSize>;
         typealias SharedMemorySizeTraining = SharedMemorySize< DType, TargetEnum.SPIR_V, ExecutionMode.Training, SubgroupSize, BatchSize/SubgroupSize>;
-        RunTest(1);
-        RunTest(2);
-        RunTest(3);
-        RunTest(4);
-        RunTest(5);
-        RunTest(6);
-        RunTest(7);
-        RunTest(8);
-        RunTest(9);
-        RunTest(10);
-        RunTest(11);
-        RunTest(12);
-        RunTest(13);
-        RunTest(14);
-        RunTest(15);
-        RunTest(16);
+        RunAllTestsForTarget(TargetEnum.SPIR_V);
+    case metal:
+        typealias SharedMemorySizeInference = SharedMemorySize<DType, TargetEnum.Metal, ExecutionMode.Inference, SubgroupSize, BatchSize/SubgroupSize>;
+        typealias SharedMemorySizeTraining = SharedMemorySize<DType, TargetEnum.Metal, ExecutionMode.Training, SubgroupSize, BatchSize/SubgroupSize>;
+        RunAllTestsForTarget(TargetEnum.Metal);
     }
 
     // BUFFER: 1
