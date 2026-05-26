@@ -110,7 +110,7 @@ struct IROpInfo
 IROpInfo getIROpInfo(IROp op);
 
 // A use of another value/inst within an IR operation
-struct IRUse
+struct SLANG_INTERNAL_TEST_API IRUse
 {
     IRInst* get() const { return usedValue; }
     IRInst* getUser() const { return user; }
@@ -2074,7 +2074,7 @@ public:
         kMemoryArenaBlockSize = 16 * 1024, ///< Use 16k block size for memory arena
     };
 
-    static RefPtr<IRModule> create(Session* session);
+    SLANG_INTERNAL_TEST_API static RefPtr<IRModule> create(Session* session);
 
     SLANG_FORCE_INLINE Session* getSession() const { return m_session; }
     SLANG_FORCE_INLINE IRModuleInst* getModuleInst() const { return m_moduleInst; }

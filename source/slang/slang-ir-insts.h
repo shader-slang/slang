@@ -3026,7 +3026,7 @@ struct IR$(inst.struct_name) : IR$(inst.parent_struct)
 
 struct IRBuilderSourceLocRAII;
 
-struct IRBuilder
+struct SLANG_INTERNAL_TEST_API IRBuilder
 {
 private:
     /// Deduplication context from the module.

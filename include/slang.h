@@ -261,6 +261,32 @@ convention for interface methods.
     #define SLANG_API
 #endif
 
+// `SLANG_INTERNAL_TEST_API` decorates internal symbols with default
+// visibility so that the slang-unit-test plugin can link against them.
+//
+// In normal builds the macro expands to nothing — the symbol stays
+// hidden, just like every other internal symbol in
+// `libslang-compiler.dylib`. When CMake is configured with
+// `-DSLANG_BUILD_FOR_TESTING=ON`, it expands to the same
+// dllexport / visibility(default) attribute used by `SLANG_API`.
+//
+// The escape hatch is intended for test-only access to internal
+// utilities. See `docs/design/ir-pass-unit-testing.md` and
+// shader-slang/slang#10950 for context.
+#if defined(SLANG_BUILD_FOR_TESTING)
+    #if defined(_MSC_VER)
+        #ifdef SLANG_DYNAMIC_EXPORT
+            #define SLANG_INTERNAL_TEST_API SLANG_DLL_EXPORT
+        #else
+            #define SLANG_INTERNAL_TEST_API __declspec(dllimport)
+        #endif
+    #else
+        #define SLANG_INTERNAL_TEST_API SLANG_DLL_EXPORT
+    #endif
+#else
+    #define SLANG_INTERNAL_TEST_API
+#endif
+
 // GCC Specific
 #if SLANG_GCC_FAMILY
     #define SLANG_NO_INLINE __attribute__((noinline))

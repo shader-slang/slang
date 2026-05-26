@@ -129,6 +129,14 @@ option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(
+    SLANG_BUILD_FOR_TESTING
+    "Expose internal symbols decorated with SLANG_INTERNAL_TEST_API so that the slang-unit-test plugin can link against them. See docs/design/ir-pass-unit-testing.md and shader-slang/slang#10950."
+    ON
+)
+if(SLANG_BUILD_FOR_TESTING)
+    add_compile_definitions(SLANG_BUILD_FOR_TESTING=1)
+endif()
+option(
     SLANG_IGNORE_ABORT_MSG
     "Ignore the system modal assert dialog while running build tools to help LLM workflow."
     OFF
