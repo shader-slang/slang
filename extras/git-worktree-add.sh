@@ -415,6 +415,7 @@ else
         : >"$submoduleFailureFile"
       fi
     ) &
+    sleep 1 # Stagger background submodule updates to reduce Git lock contention.
   done
 
   wait
