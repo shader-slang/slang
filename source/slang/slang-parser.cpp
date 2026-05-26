@@ -7870,19 +7870,22 @@ static BaseType _determineNonSuffixedIntegerLiteralType(
     {
         baseType = BaseType::UInt64;
 
-        // Emit warning if the value is too large for signed 64-bit, regardless of base
-
-        // There is an edge case here where 9223372036854775808 or INT64_MAX + 1
-        // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and is
-        // valid. Unfortunately because the lexer handles the negative(-) part of the literal
-        // separately it is impossible to know whether the literal has a negative sign or not.
-        // We emit the warning and initially process it as a uint64 anyways, and the negative
-        // sign will be properly parsed and the value will still be properly stored as a
-        // negative INT64_MIN.
-
-        // Decimal integer is too large to be represented as signed.
-        // Output warning that it is represented as unsigned instead.
-        sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
+        // The type ladder for non-decimal integer literals (hex / oct / bin)
+        // explicitly admits `uint64_t` as a valid choice — landing on it should
+        // not warn. Only decimal literals warn here, because for decimal the
+        // ladder is `[int, int64_t]` and reaching `uint64_t` means the value
+        // overflowed the documented signed range.
+        //
+        // There is an edge case where 9223372036854775808 (INT64_MAX + 1)
+        // brings us here, but the complete literal is -9223372036854775808
+        // (INT64_MIN) and is valid. The lexer handles the negative sign
+        // separately, so we cannot tell the literal is going to be negated.
+        // We still emit the warning for that decimal case; the negation will
+        // be parsed and the value will still be stored as INT64_MIN.
+        if (isDecimalBase)
+        {
+            sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
+        }
     }
 
     return baseType;

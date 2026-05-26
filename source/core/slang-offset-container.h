@@ -142,6 +142,8 @@ enum
     kStartOffset = uint32_t(sizeof(uint64_t)), ///< The offset to the first contained thing
 };
 
+static const uint32_t kMax32Offset = 0xFFFFFFFFu;
+
 template<typename T>
 class Offset32Ref;
 
@@ -277,12 +279,12 @@ public:
 
     Offset32Ref<const T> operator[](Index i) const
     {
-        SLANG_ASSERT(i >= 0 && uint32_t(i) < m_count);
+        SLANG_RELEASE_ASSERT(i >= 0 && uint32_t(i) < m_count);
         return Offset32Ref<const T>((m_data + i).m_offset);
     }
     Offset32Ref<T> operator[](Index i)
     {
-        SLANG_ASSERT(i >= 0 && uint32_t(i) < m_count);
+        SLANG_RELEASE_ASSERT(i >= 0 && uint32_t(i) < m_count);
         return Offset32Ref<T>((m_data + i).m_offset);
     }
 
@@ -446,6 +448,10 @@ public:
     Offset32Ptr<T> newObject()
     {
         void* data = allocate(sizeof(T), alignof(T));
+        if (!data)
+        {
+            return Offset32Ptr<T>();
+        }
         new (data) T();
         return Offset32Ptr<T>(getOffset(data));
     }
@@ -457,7 +463,16 @@ public:
         {
             return Offset32Array<T>();
         }
+        // The SIZE_MAX term is needed on 32-bit hosts before computing sizeof(T) * size.
+        if (size > size_t(kMax32Offset) || size > SIZE_MAX / sizeof(T))
+        {
+            return Offset32Array<T>();
+        }
         T* data = (T*)allocate(sizeof(T) * size, alignof(T));
+        if (!data)
+        {
+            return Offset32Array<T>();
+        }
         for (size_t i = 0; i < size; ++i)
         {
             new (data + i) T();
@@ -470,7 +485,9 @@ public:
 
     /// Allocate without alignment (effectively 1)
     void* allocate(size_t size);
+
     void* allocate(size_t size, size_t alignment);
+
     void* allocateAndZero(size_t size, size_t alignment);
 
     void fixAlignment(size_t alignment);
@@ -481,6 +498,10 @@ public:
     /// Ctor
     OffsetContainer();
     ~OffsetContainer();
+
+    /// Returns the current backing-buffer capacity. Exposed primarily so tests can
+    /// verify that the rejection paths in allocate() do not mutate the buffer.
+    size_t getCapacity() const { return m_capacity; }
 
 protected:
     size_t m_capacity;

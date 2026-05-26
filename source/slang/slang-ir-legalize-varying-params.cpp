@@ -4050,6 +4050,13 @@ protected:
                 result.permittedTypes.add(builder.getUInt16Type());
                 break;
             }
+        case SystemValueSemanticName::WaveIndex:
+            {
+                result.systemValueName = toSlice("simdgroup_index_in_threadgroup");
+                result.permittedTypes.add(builder.getUIntType());
+                result.permittedTypes.add(builder.getUInt16Type());
+                break;
+            }
         case SystemValueSemanticName::QuadLaneIndex:
             {
                 result.systemValueName = toSlice("thread_index_in_quadgroup");
@@ -4676,6 +4683,13 @@ protected:
         case SystemValueSemanticName::WaveLaneIndex:
             {
                 result.systemValueName = toSlice("subgroup_invocation_id");
+                result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
+
+        case SystemValueSemanticName::WaveIndex:
+            {
+                result.systemValueName = toSlice("subgroup_id");
                 result.permittedTypes.add(builder.getUIntType());
                 break;
             }
