@@ -25,7 +25,6 @@ default_tool() {
 }
 
 GIT_EXE="${GIT_EXE:-$(default_tool git)}"
-GH_EXE="${GH_EXE:-$(default_tool gh)}"
 TMUX_EXE="${TMUX_EXE:-tmux}"
 
 show_usage() {
@@ -42,8 +41,6 @@ Options:
   --dir <path>       Destination directory. Defaults to ../<branch-name>.
                      If the branch name contains slashes, they are replaced
                      by dashes.
-  --issue <issue>    Create and checkout the branch through GitHub CLI so it
-                     is linked to the issue.
   --tmux             Start a tmux session named after the branch in the new
                      worktree after setup completes.
   --no-submodules    Skip submodule initialization.
@@ -52,7 +49,6 @@ Options:
 Examples:
   $me git-worktree-add
   $me --tmux git-worktree-add
-  $me descriptor-heap-access --issue 1234
   $me --base release/2026.1 --dir ../descriptor-fix descriptor-heap-access
 
 Prefer branch names without slashes for predictable worktree directory names.
@@ -143,6 +139,14 @@ git_run() {
   "$GIT_EXE" "$@"
 }
 
+git_run_noninteractive() {
+  GIT_TERMINAL_PROMPT=0 "$GIT_EXE" "$@" </dev/null
+}
+
+is_git_repository() {
+  git_run -C "$1" rev-parse --git-dir >/dev/null 2>&1
+}
+
 start_tmux_session() {
   local sessionName="$1"
   local sessionDir="$2"
@@ -155,36 +159,9 @@ start_tmux_session() {
   fi
 }
 
-resolve_issue_base() {
-  local ref="$1"
-
-  case "$ref" in
-  refs/heads/*)
-    ref="${ref#refs/heads/}"
-    ;;
-  refs/remotes/*/*)
-    ref="${ref#refs/remotes/}"
-    ;;
-  esac
-
-  if git_run show-ref --verify --quiet "refs/heads/$ref" ||
-    git_run show-ref --verify --quiet "refs/remotes/origin/$ref"; then
-    printf '%s\n' "$ref"
-    return 0
-  fi
-
-  if git_run show-ref --verify --quiet "refs/remotes/$ref"; then
-    printf '%s\n' "${ref#*/}"
-    return 0
-  fi
-
-  return 1
-}
-
 branchInput=""
 baseRef=""
 dstDirInput=""
-githubIssue=""
 initSubmodules=1
 startTmux=0
 
@@ -206,13 +183,6 @@ while [[ $# -gt 0 ]]; do
       die "--dir requires a value."
     fi
     dstDirInput="$2"
-    shift
-    ;;
-  --issue | -issue)
-    if [[ $# -lt 2 || -z "${2:-}" ]]; then
-      die "--issue requires a value."
-    fi
-    githubIssue="$2"
     shift
     ;;
   --tmux)
@@ -253,10 +223,6 @@ fi
 
 require_command "$GIT_EXE"
 log_tool "Git" "$GIT_EXE"
-if [[ -n "$githubIssue" ]]; then
-  require_command "$GH_EXE"
-  log_tool "GitHub CLI" "$GH_EXE"
-fi
 if [[ $startTmux -eq 1 ]]; then
   require_command "$TMUX_EXE"
   log_tool "tmux" "$TMUX_EXE"
@@ -301,11 +267,6 @@ if ! git_run rev-parse --verify --quiet "$baseRef^{commit}" >/dev/null; then
   die "Base ref does not resolve to a commit: $baseRef"
 fi
 
-issueBase=""
-if [[ -n "$githubIssue" ]] && ! issueBase="$(resolve_issue_base "$baseRef")"; then
-  die "--issue requires --base to be a branch name, because gh issue develop does not accept arbitrary commits: $baseRef"
-fi
-
 worktreeName="$branchName"
 worktreeName="${worktreeName//\//-}"
 
@@ -337,18 +298,9 @@ log "Worktree: $dstDirShell"
 log "Pruning stale worktree records..."
 git_run worktree prune
 
-if [[ -n "$githubIssue" ]]; then
-  log "Adding detached worktree..."
-  git_run worktree add -q --detach "$dstDirGit" "$baseRef"
-
-  cd "$dstDirShell"
-  log "Creating GitHub issue branch for issue $githubIssue..."
-  "$GH_EXE" issue develop "$githubIssue" --name "$branchName" --base "$issueBase" --checkout
-else
-  log "Adding worktree and creating branch..."
-  git_run worktree add -q -b "$branchName" "$dstDirGit" "$baseRef"
-  cd "$dstDirShell"
-fi
+log "Adding worktree and creating branch..."
+git_run worktree add -q -b "$branchName" "$dstDirGit" "$baseRef"
+cd "$dstDirShell"
 
 if [[ $initSubmodules -eq 0 ]]; then
   log "Skipping submodule initialization."
@@ -363,43 +315,52 @@ else
       submodules+=("$submodulePath")
     fi
   done < <(git_run config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null || true)
+  submoduleJobCount="${#submodules[@]}"
+  if [[ $submoduleJobCount -eq 0 ]]; then
+    submoduleJobCount=1
+  fi
 
   if [[ ${#submodules[@]} -gt 0 ]]; then
     git_run submodule -q init -- "${submodules[@]}"
   fi
 
-  submoduleUpdatePids=()
+  log "Updating top-level submodules concurrently..."
+  submoduleTempDir="$(mktemp -d "${TMPDIR:-/tmp}/git-worktree-add-submodules.XXXXXX")"
+  trap 'rm -rf "$submoduleTempDir"' EXIT
+  submoduleErrorFile="$submoduleTempDir/errors"
+  submoduleFailureFile="$submoduleTempDir/failed"
   for submodulePath in "${submodules[@]}"; do
     log "Updating: $submodulePath"
+
     (
       moduleReferenceGit="$repoRootGit/$submodulePath"
-      moduleReferenceShell="$(to_shell_path "$moduleReferenceGit")"
-      if [[ -d "$moduleReferenceShell" ]]; then
-        git_run submodule -q update --reference "$moduleReferenceGit" -- "$submodulePath"
-      else
-        git_run submodule -q update -- "$submodulePath"
+      submoduleUpdateArgs=(submodule -q update)
+      if is_git_repository "$moduleReferenceGit"; then
+        submoduleUpdateArgs+=(--reference "$moduleReferenceGit")
+      fi
+      submoduleUpdateArgs+=(-- "$submodulePath")
+
+      if ! git_run_noninteractive "${submoduleUpdateArgs[@]}" >/dev/null 2>>"$submoduleErrorFile"; then
+        : >"$submoduleFailureFile"
       fi
     ) &
-    submoduleUpdatePids+=("$!")
   done
 
-  submoduleUpdateFailed=0
-  for submoduleUpdatePid in "${submoduleUpdatePids[@]}"; do
-    if ! wait "$submoduleUpdatePid"; then
-      submoduleUpdateFailed=1
+  wait
+
+  if [[ -e "$submoduleFailureFile" ]]; then
+    if [[ -s "$submoduleErrorFile" ]]; then
+      sed 's/^/  /' "$submoduleErrorFile" >&2
     fi
-  done
-
-  if [[ $submoduleUpdateFailed -ne 0 ]]; then
     echo "Submodule update failed. You may want to manually run:" >&2
-    echo "  \"$GIT_EXE\" submodule update --init --recursive" >&2
+    echo "  \"$GIT_EXE\" submodule update --init --recursive --jobs $submoduleJobCount" >&2
     exit 2
   fi
 
   log "Updating submodules recursively..."
-  if ! git_run submodule -q update --init --recursive; then
+  if ! git_run_noninteractive submodule -q update --init --recursive --jobs "$submoduleJobCount"; then
     echo "Submodule update failed. You may want to manually run:" >&2
-    echo "  \"$GIT_EXE\" submodule update --init --recursive" >&2
+    echo "  \"$GIT_EXE\" submodule update --init --recursive --jobs $submoduleJobCount" >&2
     exit 2
   fi
 
