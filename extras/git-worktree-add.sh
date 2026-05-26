@@ -327,6 +327,7 @@ else
   log "Updating top-level submodules concurrently..."
   submoduleTempDir="$(mktemp -d "${TMPDIR:-/tmp}/git-worktree-add-submodules.XXXXXX")"
   trap 'rm -rf "$submoduleTempDir"' EXIT
+  submoduleErrorFile="$submoduleTempDir/errors"
   submoduleFailureFile="$submoduleTempDir/failed"
   for submodulePath in "${submodules[@]}"; do
     log "Updating: $submodulePath"
@@ -339,7 +340,7 @@ else
       fi
       submoduleUpdateArgs+=(-- "$submodulePath")
 
-      if ! git_run_noninteractive "${submoduleUpdateArgs[@]}" >/dev/null 2>&1; then
+      if ! git_run_noninteractive "${submoduleUpdateArgs[@]}" >/dev/null 2>>"$submoduleErrorFile"; then
         : >"$submoduleFailureFile"
       fi
     ) &
@@ -348,6 +349,9 @@ else
   wait
 
   if [[ -e "$submoduleFailureFile" ]]; then
+    if [[ -s "$submoduleErrorFile" ]]; then
+      sed 's/^/  /' "$submoduleErrorFile" >&2
+    fi
     echo "Submodule update failed. You may want to manually run:" >&2
     echo "  \"$GIT_EXE\" submodule update --init --recursive --jobs $submoduleJobCount" >&2
     exit 2
