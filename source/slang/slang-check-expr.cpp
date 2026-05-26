@@ -6737,7 +6737,8 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     auto valueType = expr->value->type.type;
     if (auto typeType = as<TypeType>(valueType))
         valueType = typeType->getType();
-    valueType = unwrapModifiedType(valueType);
+    auto unwrappedValueType = unwrapModifiedType(valueType);
+    auto valueInterfaceType = isInterfaceType(unwrappedValueType) ? unwrappedValueType : valueType;
 
     // If value is a subtype of `type`, then this expr is always true.
     auto witness = isSubtype(valueType, expr->typeExpr.type, IsSubTypeOptions::None);
@@ -6768,11 +6769,12 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // subtype witness for runtime checks.
 
     expr->value = maybeOpenExistential(originalVal);
-    expr->witnessArg = witness ? witness : tryGetSubtypeWitness(expr->typeExpr.type, valueType);
+    expr->witnessArg =
+        witness ? witness : tryGetSubtypeWitness(expr->typeExpr.type, valueInterfaceType);
     if (expr->witnessArg)
     {
         // For now we can only support the scenario where `expr->value` is an interface type.
-        if (!optionalWitness && !isInterfaceType(valueType))
+        if (!optionalWitness && !isInterfaceType(valueInterfaceType))
         {
             getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
         }
@@ -6785,8 +6787,8 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // Note: _isTypeParametric only handles DeclRefType-based types (incl. recursive generic args).
     // Builtin composite types like arrays or vectors with embedded generic params are not checked,
     // but these are unlikely to appear in `is`/`as` expressions in practice.
-    if (!as<ErrorType>(valueType) && !as<ErrorType>(expr->typeExpr.type) &&
-        !isInterfaceType(valueType) && !_isTypeParametric(valueType) &&
+    if (!as<ErrorType>(valueInterfaceType) && !as<ErrorType>(expr->typeExpr.type) &&
+        !isInterfaceType(valueInterfaceType) && !_isTypeParametric(valueInterfaceType) &&
         !_isTypeParametric(expr->typeExpr.type))
     {
         getSink()->diagnose(Diagnostics::IsAsOnUnrelatedConcreteTypes{.expr = expr});
@@ -6809,7 +6811,9 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     }
 
     expr->value = CheckTerm(expr->value);
-    auto valueType = unwrapModifiedType(expr->value->type.type);
+    auto valueType = expr->value->type.type;
+    auto unwrappedValueType = unwrapModifiedType(valueType);
+    auto valueInterfaceType = isInterfaceType(unwrappedValueType) ? unwrappedValueType : valueType;
 
     // Reject `expr as OpaqueType` (and structs containing opaque fields) because
     // Optional<T> cannot wrap resource/opaque types.
@@ -6839,11 +6843,11 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
 
     // If target type is an interface type, we will obtain the witness here for
     // runtime casting.
-    expr->witnessArg = tryGetSubtypeWitness(typeExpr.type, valueType);
+    expr->witnessArg = tryGetSubtypeWitness(typeExpr.type, valueInterfaceType);
     if (expr->witnessArg)
     {
         // For now we can only support the scenario where `expr->value` is an interface type.
-        if (!isInterfaceType(valueType))
+        if (!isInterfaceType(valueInterfaceType))
         {
             getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
         }
@@ -6854,8 +6858,9 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     // If we reach here with no witness and both the value type and target type are concrete
     // (not generic type parameters, associated types, or ThisType), the `as` cast always
     // fails and the user is using `as` incorrectly on unrelated concrete types.
-    if (!as<ErrorType>(valueType) && !as<ErrorType>(typeExpr.type) && !isInterfaceType(valueType) &&
-        !_isTypeParametric(valueType) && !_isTypeParametric(typeExpr.type))
+    if (!as<ErrorType>(valueInterfaceType) && !as<ErrorType>(typeExpr.type) &&
+        !isInterfaceType(valueInterfaceType) && !_isTypeParametric(valueInterfaceType) &&
+        !_isTypeParametric(typeExpr.type))
     {
         getSink()->diagnose(Diagnostics::IsAsOnUnrelatedConcreteTypes{.expr = expr});
     }

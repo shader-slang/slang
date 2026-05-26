@@ -84,5 +84,7 @@ void main()
 {
     SurfaceInteraction si;
     si.pos = float3(1, 2, 3);
-    out_buf[0] = get_inst(si).collect_properties(si).albedo;
+    bool matched = is_my_inst(si);
+    float3 castResult = cast_my_inst(si);
+    out_buf[0] = matched ? get_inst(si).collect_properties(si).albedo : castResult;
 }
