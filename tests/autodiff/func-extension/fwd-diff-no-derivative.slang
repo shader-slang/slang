@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive): -experimental-feature
 
 // Test: calling fwd_diff on a specialization that lacks a derivative extension
 

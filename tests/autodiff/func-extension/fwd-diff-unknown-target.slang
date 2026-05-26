@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature
 
 // Test: __func_extension naming an unknown function should diagnose
 

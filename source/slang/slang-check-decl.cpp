@@ -15163,6 +15163,13 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     //   extension<T:IFloat> foo<T> : IForwardDifferentiable<foo<T>> { fwd_diff(...) -> ... { ... }
     //   }
 
+    if (!getOptionSet().getBoolOption(CompilerOptionName::ExperimentalFeature))
+    {
+        getSink()->diagnose(
+            Diagnostics::FuncExtensionRequiresExperimentalFeature{.location = decl->loc});
+        return;
+    }
+
     auto astBuilder = getASTBuilder();
 
     // 1. Resolve the base function from the target expression.

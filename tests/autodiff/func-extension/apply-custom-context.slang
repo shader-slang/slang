@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
 
 // Test: verify that __apply's custom context is ACTUALLY used, not auto-synthesis.
 // The context stores a deliberately wrong "cached" value (999.0) that the

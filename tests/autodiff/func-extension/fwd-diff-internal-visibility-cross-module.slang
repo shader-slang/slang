@@ -1,4 +1,4 @@
-//DISABLE_TEST:SIMPLE(diag=CHECK):
+//DISABLE_TEST:SIMPLE(diag=CHECK): -experimental-feature
 
 // TODO: re-enable when func-extension visibility is implemented separately.
 

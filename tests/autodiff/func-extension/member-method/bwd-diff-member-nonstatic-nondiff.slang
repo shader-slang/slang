@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
 
 // Test: __func_extension bwd_diff for a non-static method of a non-differentiable type.
 // The this param appears as no_diff MyData in the bwd_diff signature.

@@ -5341,6 +5341,18 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
 
 Expr* SemanticsExprVisitor::visitApplyForBwdExpr(ApplyForBwdExpr* expr)
 {
+    if (!getOptionSet().getBoolOption(CompilerOptionName::ExperimentalFeature))
+    {
+        getSink()->diagnose(Diagnostics::ApplyForBwdRequiresExperimentalFeature{.expr = expr});
+
+        // Warnings allow compilation to continue; a non-callable placeholder prevents later
+        // stages from treating the gated syntax as an apply expression.
+        auto placeholderExpr = getASTBuilder()->create<DefaultConstructExpr>();
+        placeholderExpr->loc = expr->loc;
+        placeholderExpr->type = getASTBuilder()->getVoidType();
+        return placeholderExpr;
+    }
+
     ApplyForBwdExprCheckingActions actions;
     return _checkHigherOrderInvokeExpr(this, expr, &actions);
 }

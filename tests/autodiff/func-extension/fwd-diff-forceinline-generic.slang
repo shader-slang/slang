@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry computeMain -O0 -g3
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry computeMain -O0 -g3 -experimental-feature
 
 // Test: callable decorators on generic `__func_extension` declarations are
 // applied to the synthesized derivative function.

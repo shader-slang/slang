@@ -1908,6 +1908,20 @@ err(
     span { loc = "expr:Expr", message = "__apply expressions must be invoked directly so they can resolve to apply_bwd." }
 )
 
+warning(
+    "func-extension-requires-experimental-feature",
+    30131,
+    "__func_extension is experimental and requires '-experimental-feature'",
+    span { loc = "location", message = "__func_extension declarations are rejected unless '-experimental-feature' is enabled." }
+)
+
+warning(
+    "apply-for-bwd-requires-experimental-feature",
+    30132,
+    "__apply is experimental and requires '-experimental-feature'",
+    span { loc = "expr:Expr", message = "__apply expressions are rejected unless '-experimental-feature' is enabled." }
+)
+
 -- type pack diagnostics
 
 err(
