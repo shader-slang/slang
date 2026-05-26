@@ -4,6 +4,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-reserved-space 2147483648
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-function-coverage -trace-coverage-reserved-space 2147483648
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-branch-coverage -trace-coverage-reserved-space 2147483648
 
 //CHECK: option '-trace-coverage-reserved-space' expects a value in range 0..2147483647, but got '2147483648'
 

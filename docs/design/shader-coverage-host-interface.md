@@ -191,8 +191,9 @@ the compiled shader IR. Khronos descriptor-set hosts with such externally
 owned sets should pass `-trace-coverage-reserved-space <space>` when
 compiling, or set `CompilerOptionName::TraceCoverageReservedSpace`
 through the API while also enabling at least one coverage mode, such as
-`CompilerOptionName::TraceCoverage`, `TraceFunctionCoverage`, or
-`TraceBranchCoverage`.
+`CompilerOptionName::TraceCoverage`,
+`CompilerOptionName::TraceFunctionCoverage`, or
+`CompilerOptionName::TraceBranchCoverage`.
 The option is repeatable and duplicate values are idempotent. It is an
 auto-allocation hint for whole Khronos descriptor sets; explicit
 `-trace-coverage-binding` still wins. Metal, CPU, CUDA, and D3D targets
