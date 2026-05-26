@@ -190,7 +190,8 @@ SlangResult MemoryFileSystem::saveFile(const char* path, const void* data, size_
 {
     Entry* entry;
     SLANG_RETURN_ON_FAIL(_requireFile(path, &entry));
-    auto contents = RawBlob::create(data, size);
+    ComPtr<ISlangBlob> contents;
+    SLANG_RETURN_ON_FAIL(RawBlob::tryCreate(data, size, contents));
     entry->setContents(size, contents);
     return SLANG_OK;
 }
