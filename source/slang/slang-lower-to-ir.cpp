@@ -5956,7 +5956,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->indexExprs[0]));
 
-        return subscriptValue(type, baseVal, indexVal);
+        return subscriptValue(type, baseVal, indexVal, expr->indexExprs[0]->loc);
     }
 
     LoweredValInfo visitThisExpr(ThisExpr* /*expr*/) { return context->thisVal; }
@@ -7016,7 +7016,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return this->dispatch(expr->valueArg);
     }
 
-    LoweredValInfo subscriptValue(IRType* type, LoweredValInfo baseVal, IRInst* indexVal)
+    LoweredValInfo subscriptValue(
+        IRType* type,
+        LoweredValInfo baseVal,
+        IRInst* indexVal,
+        SourceLoc indexLoc)
     {
         auto builder = getBuilder();
 
@@ -7074,6 +7078,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     break;
                 }
             }
+        }
+
+        if (!as<IRIntLit>(indexVal) && isLValueContext() &&
+            (baseVal.flavor == LoweredValInfo::Flavor::SwizzledLValue ||
+             baseVal.flavor == LoweredValInfo::Flavor::SwizzledMatrixLValue))
+        {
+            context->getSink()->diagnose(Diagnostics::NeedCompileTimeConstant{
+                .location = indexLoc,
+            });
+            return LoweredValInfo::ptr(builder->emitVar(type));
         }
 
         // The `materialize` operation should ensure that we only have to deal
@@ -7445,9 +7459,10 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
             auto index2 =
                 builder->getIntValue(irIntType, (IRIntegerValue)expr->elementCoords[ii].col);
             // First index expression
-            auto irExtract1 = subscriptValue(subscript1, base, index1);
+            auto irExtract1 = subscriptValue(subscript1, base, index1, expr->loc);
             // Second index expression
-            irExtracts[ii] = getSimpleVal(context, subscriptValue(subscript2, irExtract1, index2));
+            irExtracts[ii] =
+                getSimpleVal(context, subscriptValue(subscript2, irExtract1, index2, expr->loc));
         }
 
         if (elementCount > 1)
