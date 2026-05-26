@@ -396,7 +396,7 @@ SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact
 // If the artifact carries coverage tracing metadata, write it to
 // `<path>.coverage-mapping.json` alongside the compiled code. Hosts
 // can read this sidecar to attribute runtime counter values back to
-// source `(file, line)` pairs. The JSON content is produced by the
+// source entries. The JSON content is produced by the
 // public `slang_writeCoverageManifestJson` API; both that API and
 // this sidecar writer emit byte-identical output, so customers
 // working in-process can pipe the API output through the same
@@ -408,7 +408,11 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
     if (!artifact || path.getLength() == 0)
         return SLANG_OK;
     auto coverage = findAssociatedRepresentation<slang::ICoverageTracingMetadata>(artifact);
-    if (!coverage || coverage->getCounterCount() == 0)
+    // Emit the sidecar if either dimension has data. Future coverage
+    // modes may record source entries without runtime counters, or
+    // runtime counter allocation before all source-entry metadata is
+    // populated; the sidecar is the persisted handoff for both.
+    if (!coverage || (coverage->getCounterCount() == 0 && coverage->getEntryCount() == 0))
         return SLANG_OK;
     ComPtr<ISlangBlob> jsonBlob;
     SLANG_RETURN_ON_FAIL(slang_writeCoverageManifestJson(coverage, jsonBlob.writeRef()));
