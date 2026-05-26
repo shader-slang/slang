@@ -147,6 +147,11 @@ counters are inserted, with examples, see
      into the standard `GlobalParams` struct. WGSL and LLVM-emitted
      CPU targets currently skip instrumentation entirely (warning
      E45102) until their coverage atomic lowering paths are supported.
+   - **Reserves the implementation resource name `__slang_coverage`**
+     whenever any coverage tracing mode is enabled. User shaders that
+     declare a global parameter with that name now fail code generation
+     with error E45100; rename the user declaration or compile without
+     coverage tracing.
    - **Picks a (set, binding)** — either honoring
      `-trace-coverage-binding <reg> <space>` if supplied, or
      auto-allocating a non-conflicting location for the chosen
