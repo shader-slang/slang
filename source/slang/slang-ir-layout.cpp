@@ -336,7 +336,10 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         {
             auto matType = cast<IRMatrixType>(type);
             IRBuilder builder(type->getModule());
-            if (getIntegerValueFromInst(matType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
+            auto layout = matType->getLayout();
+            if (!layout || layout->getOp() != kIROp_IntLit)
+                return SLANG_FAIL;
+            if (getIntegerValueFromInst(layout) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
             {
                 auto colVector =
                     builder.getVectorType(matType->getElementType(), matType->getRowCount());
