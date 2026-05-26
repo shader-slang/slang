@@ -279,12 +279,12 @@ public:
 
     Offset32Ref<const T> operator[](Index i) const
     {
-        SLANG_ASSERT(i >= 0 && uint32_t(i) < m_count);
+        SLANG_RELEASE_ASSERT(i >= 0 && uint32_t(i) < m_count);
         return Offset32Ref<const T>((m_data + i).m_offset);
     }
     Offset32Ref<T> operator[](Index i)
     {
-        SLANG_ASSERT(i >= 0 && uint32_t(i) < m_count);
+        SLANG_RELEASE_ASSERT(i >= 0 && uint32_t(i) < m_count);
         return Offset32Ref<T>((m_data + i).m_offset);
     }
 
