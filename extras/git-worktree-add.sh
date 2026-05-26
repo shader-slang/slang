@@ -139,6 +139,14 @@ git_run() {
   "$GIT_EXE" "$@"
 }
 
+git_run_noninteractive() {
+  GIT_TERMINAL_PROMPT=0 "$GIT_EXE" "$@" </dev/null
+}
+
+is_git_repository() {
+  git_run -C "$1" rev-parse --git-dir >/dev/null 2>&1
+}
+
 start_tmux_session() {
   local sessionName="$1"
   local sessionDir="$2"
@@ -307,43 +315,48 @@ else
       submodules+=("$submodulePath")
     fi
   done < <(git_run config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null || true)
+  submoduleJobCount="${#submodules[@]}"
+  if [[ $submoduleJobCount -eq 0 ]]; then
+    submoduleJobCount=1
+  fi
 
   if [[ ${#submodules[@]} -gt 0 ]]; then
     git_run submodule -q init -- "${submodules[@]}"
   fi
 
-  submoduleUpdatePids=()
+  log "Updating top-level submodules concurrently..."
+  submoduleTempDir="$(mktemp -d "${TMPDIR:-/tmp}/git-worktree-add-submodules.XXXXXX")"
+  trap 'rm -rf "$submoduleTempDir"' EXIT
+  submoduleFailureFile="$submoduleTempDir/failed"
   for submodulePath in "${submodules[@]}"; do
     log "Updating: $submodulePath"
+
     (
       moduleReferenceGit="$repoRootGit/$submodulePath"
-      moduleReferenceShell="$(to_shell_path "$moduleReferenceGit")"
-      if [[ -d "$moduleReferenceShell" ]]; then
-        git_run submodule -q update --reference "$moduleReferenceGit" -- "$submodulePath"
-      else
-        git_run submodule -q update -- "$submodulePath"
+      submoduleUpdateArgs=(submodule -q update)
+      if is_git_repository "$moduleReferenceGit"; then
+        submoduleUpdateArgs+=(--reference "$moduleReferenceGit")
+      fi
+      submoduleUpdateArgs+=(-- "$submodulePath")
+
+      if ! git_run_noninteractive "${submoduleUpdateArgs[@]}" >/dev/null 2>&1; then
+        : >"$submoduleFailureFile"
       fi
     ) &
-    submoduleUpdatePids+=("$!")
   done
 
-  submoduleUpdateFailed=0
-  for submoduleUpdatePid in "${submoduleUpdatePids[@]}"; do
-    if ! wait "$submoduleUpdatePid"; then
-      submoduleUpdateFailed=1
-    fi
-  done
+  wait
 
-  if [[ $submoduleUpdateFailed -ne 0 ]]; then
+  if [[ -e "$submoduleFailureFile" ]]; then
     echo "Submodule update failed. You may want to manually run:" >&2
-    echo "  \"$GIT_EXE\" submodule update --init --recursive" >&2
+    echo "  \"$GIT_EXE\" submodule update --init --recursive --jobs $submoduleJobCount" >&2
     exit 2
   fi
 
   log "Updating submodules recursively..."
-  if ! git_run submodule -q update --init --recursive; then
+  if ! git_run_noninteractive submodule -q update --init --recursive --jobs "$submoduleJobCount"; then
     echo "Submodule update failed. You may want to manually run:" >&2
-    echo "  \"$GIT_EXE\" submodule update --init --recursive" >&2
+    echo "  \"$GIT_EXE\" submodule update --init --recursive --jobs $submoduleJobCount" >&2
     exit 2
   fi
 
