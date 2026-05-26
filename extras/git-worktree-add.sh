@@ -173,8 +173,11 @@ parse_review_pr_url() {
   clean="${clean%%#*}"
   clean="${clean%%\?*}"
   clean="${clean%/}"
+  clean="${clean#http://}"
+  clean="${clean#https://}"
+  clean="${clean#www.}"
 
-  if [[ "$clean" =~ ^https?://github\.com/([^/]+)/([^/]+)/pull/([0-9]+)(/.*)?$ ]]; then
+  if [[ "$clean" =~ ^github\.com/([^/]+)/([^/]+)/pull/([0-9]+)(/.*)?$ ]]; then
     reviewOwner="${BASH_REMATCH[1]}"
     reviewRepo="${BASH_REMATCH[2]%.git}"
     reviewNumber="${BASH_REMATCH[3]}"
@@ -287,12 +290,6 @@ if [[ -n "$reviewInput" ]]; then
   if [[ -z "$branchName" ]]; then
     branchName="review-pr-$reviewNumber"
   fi
-  worktreeName="$branchName"
-  worktreeName="${worktreeName//\//-}"
-  sessionName="$worktreeName"
-
-  log "Fetching PR #$reviewNumber from $reviewRepoUrl..."
-  git_run fetch -q "$reviewRepoUrl" "+pull/$reviewNumber/head:$baseRef"
 
   if ! git_run check-ref-format --branch "$branchName" >/dev/null 2>&1; then
     die "Invalid branch name: $branchName"
@@ -301,6 +298,12 @@ if [[ -n "$reviewInput" ]]; then
   if git_run show-ref --verify --quiet "refs/heads/$branchName"; then
     die "Branch already exists: $branchName"
   fi
+  worktreeName="$branchName"
+  worktreeName="${worktreeName//\//-}"
+  sessionName="$worktreeName"
+
+  log "Fetching PR #$reviewNumber from $reviewRepoUrl..."
+  git_run fetch -q "$reviewRepoUrl" "+pull/$reviewNumber/head:$baseRef"
 else
   branchName="$branchInput"
 
@@ -415,7 +418,7 @@ else
         : >"$submoduleFailureFile"
       fi
     ) &
-    sleep 1 # Stagger background submodule updates to reduce Git lock contention.
+    sleep 0.2 # Stagger background submodule updates to reduce Git lock contention.
   done
 
   wait
