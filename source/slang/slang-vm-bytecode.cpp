@@ -37,6 +37,24 @@ static SlangResult readUInt32(MemoryStreamBase& stream, uint32_t& value)
     return readValue(stream, value);
 }
 
+static bool isRangeInBounds(uint32_t offset, uint64_t size, uint32_t bufferSize)
+{
+    return uint64_t(offset) <= bufferSize && size <= uint64_t(bufferSize) - offset;
+}
+
+static bool isNullTerminatedStringInBounds(
+    const uint8_t* buffer,
+    uint32_t offset,
+    uint32_t bufferSize)
+{
+    for (uint32_t i = offset; i < bufferSize; ++i)
+    {
+        if (buffer[i] == 0)
+            return true;
+    }
+    return false;
+}
+
 SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleView)
 {
     MemoryStreamBase stream(FileAccess::Read, code, codeSize);
@@ -58,16 +76,30 @@ SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleV
     SLANG_RETURN_ON_FAIL(consumeFourCC(stream, kSlangByteCodeFunctionsFourCC));
     uint32_t functionSectionSize = 0;
     SLANG_RETURN_ON_FAIL(readUInt32(stream, functionSectionSize));
-    auto funcDataStart = stream.getPosition();
+    auto funcDataStart = (uint32_t)stream.getPosition();
     if (functionSectionSize < sizeof(uint32_t)) // At least the function count
+    {
+        return SLANG_FAIL; // Invalid section size
+    }
+    if (!isRangeInBounds(funcDataStart, functionSectionSize, codeSize))
     {
         return SLANG_FAIL; // Invalid section size
     }
 
     SLANG_RETURN_ON_FAIL(readUInt32(stream, moduleView->functionCount));
-    moduleView->functionOffsets = reinterpret_cast<uint32_t*>(code + stream.getPosition());
+    uint64_t functionOffsetsSize = uint64_t(moduleView->functionCount) * sizeof(uint32_t);
+    if (functionOffsetsSize > functionSectionSize - sizeof(uint32_t))
+    {
+        return SLANG_FAIL; // Invalid function offset table size
+    }
+    auto functionOffsetsStart = (uint32_t)stream.getPosition();
+    if (!isRangeInBounds(functionOffsetsStart, functionOffsetsSize, codeSize))
+    {
+        return SLANG_FAIL; // Invalid function offset table
+    }
+    moduleView->functionOffsets = reinterpret_cast<uint32_t*>(code + functionOffsetsStart);
 
-    stream.seek(SeekOrigin::Start, funcDataStart + functionSectionSize);
+    SLANG_RETURN_ON_FAIL(stream.seek(SeekOrigin::Start, funcDataStart + functionSectionSize));
 
     // Read the kernel blob section
     SLANG_RETURN_ON_FAIL(consumeFourCC(stream, kSlangByteCodeKernelBlobFourCC));
@@ -77,27 +109,65 @@ SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleV
         return SLANG_FAIL; // Invalid kernel blob size
     }
     moduleView->kernelBlob = code + stream.getPosition();
-    stream.seek(SeekOrigin::Current, moduleView->kernelBlobSize);
+    SLANG_RETURN_ON_FAIL(stream.seek(SeekOrigin::Current, moduleView->kernelBlobSize));
 
     // Read the constants section
     SLANG_RETURN_ON_FAIL(consumeFourCC(stream, kSlangByteCodeConstantsFourCC));
     SLANG_RETURN_ON_FAIL(readUInt32(stream, moduleView->constantBlobSize));
-    if (moduleView->constantBlobSize < sizeof(uint32_t)) // At least the constant count
-    {
-        return SLANG_FAIL; // Invalid section size
-    }
     SLANG_RETURN_ON_FAIL(readUInt32(stream, moduleView->stringCount));
-    moduleView->stringOffsets = reinterpret_cast<uint32_t*>(code + stream.getPosition());
-    stream.seek(SeekOrigin::Current, moduleView->stringCount * sizeof(uint32_t));
+    uint64_t stringOffsetsSize = uint64_t(moduleView->stringCount) * sizeof(uint32_t);
+    auto stringOffsetsStart = (uint32_t)stream.getPosition();
+    if (!isRangeInBounds(stringOffsetsStart, stringOffsetsSize, codeSize))
+    {
+        return SLANG_FAIL; // Invalid string offset table
+    }
+    moduleView->stringOffsets = reinterpret_cast<uint32_t*>(code + stringOffsetsStart);
+    SLANG_RETURN_ON_FAIL(stream.seek(SeekOrigin::Current, (Int64)stringOffsetsSize));
+    auto constantsStart = (uint32_t)stream.getPosition();
+    if (!isRangeInBounds(constantsStart, moduleView->constantBlobSize, codeSize))
+    {
+        return SLANG_FAIL; // Invalid constant blob size
+    }
     moduleView->constants = code + stream.getPosition();
+
+    for (uint32_t i = 0; i < moduleView->stringCount; i++)
+    {
+        auto stringOffset = moduleView->stringOffsets[i];
+        if (stringOffset >= moduleView->constantBlobSize)
+        {
+            return SLANG_FAIL; // Invalid string offset
+        }
+        if (!isNullTerminatedStringInBounds(
+                moduleView->constants,
+                stringOffset,
+                moduleView->constantBlobSize))
+        {
+            return SLANG_FAIL; // Invalid string literal
+        }
+    }
 
     for (uint32_t i = 0; i < moduleView->functionCount; i++)
     {
-        auto functionStart = code + moduleView->functionOffsets[i];
+        auto functionOffset = moduleView->functionOffsets[i];
+        if (!isRangeInBounds(functionOffset, sizeof(VMFuncHeader), codeSize))
+        {
+            return SLANG_FAIL; // Invalid function offset
+        }
+        auto functionStart = code + functionOffset;
         auto header = (VMFuncHeader*)(functionStart);
+        uint64_t paramOffsetsSize = uint64_t(header->parameterCount) * sizeof(uint32_t);
+        uint64_t functionSize = sizeof(VMFuncHeader) + paramOffsetsSize + header->codeSize;
+        if (!isRangeInBounds(functionOffset, functionSize, codeSize))
+        {
+            return SLANG_FAIL; // Invalid function size
+        }
+        if (header->name.offset >= moduleView->stringCount)
+        {
+            return SLANG_FAIL; // Invalid function name
+        }
         VMFunctionView functionView;
         functionView.moduleView = moduleView;
-        functionView.header = (VMFuncHeader*)(functionStart);
+        functionView.header = header;
         functionView.paramOffsets = (uint32_t*)(functionStart + sizeof(VMFuncHeader));
         functionView.name = (const char*)moduleView->constants +
                             moduleView->stringOffsets[functionView.header->name.offset];

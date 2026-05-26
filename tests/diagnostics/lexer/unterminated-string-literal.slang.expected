@@ -1,0 +1,14 @@
+result code = -1
+standard error = {
+tests/diagnostics/lexer/unterminated-string-literal.slang(18): error 10005: newline in literal
+
+^
+tests/diagnostics/lexer/unterminated-string-literal.slang(24): error 10005: newline in literal
+
+^
+tests/diagnostics/lexer/unterminated-string-literal.slang(28): error 10005: newline in literal
+
+^
+}
+standard output = {
+}
