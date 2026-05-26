@@ -159,7 +159,13 @@ jobs:
             cmake --workflow --preset generators --fresh
             mkdir generators
             cmake --install build --config Release --component generators --prefix generators
-            emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+            # TODO(#11146): Remove this CI override with SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
+            # once the SPIRV-Tools MergeReturnPass UAF workaround is no longer needed.
+            emcmake cmake \
+              -DSLANG_GENERATORS_PATH=generators/bin \
+              --preset emscripten \
+              -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+              -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON
             cmake --build --preset emscripten --config "$cmake_config" --target slang-wasm
             mkdir "build.em/$cmake_config/bin/smoke"
             cp tests/wasm/smoke/* "build.em/$cmake_config/bin/smoke/"
@@ -184,6 +190,11 @@ jobs:
             else
               echo "ℹ️  No cache compiler launcher available"
             fi
+
+            # TODO(#11146): Keep CI artifacts on the previous SPIRV-Tools optimizer
+            # path for now. Remove this override together with
+            # SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN when the workaround is retired.
+            cmake_launcher_defines+=("-DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON")
 
             # When save-sccache is requested, sccache must be available
             if [[ "${{ inputs.save-sccache }}" == "true" && -z "${sccache_path:-}" ]]; then

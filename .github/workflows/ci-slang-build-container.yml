@@ -137,9 +137,13 @@ jobs:
 
           # Configure with CUDA support, use LLVM from GCS, use sccache
           # Disable PCH when using sccache (known incompatibility causes linker errors)
+          # TODO(#11146): Keep CI artifacts on the previous SPIRV-Tools optimizer
+          # path for now. Remove this override together with
+          # SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN when the workaround is retired.
           cmake --preset default --fresh \
             -DSLANG_ENABLE_CUDA=ON \
             -DSLANG_ENABLE_PCH=OFF \
+            -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}"

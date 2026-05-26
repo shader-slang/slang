@@ -223,6 +223,7 @@ advanced_option(
 
 # TODO: Remove this option once SPIRV-Tools fixes the MergeReturnPass UAF:
 # https://github.com/KhronosGroup/SPIRV-Tools/issues/6711
+# Slang tracking issue: https://github.com/shader-slang/slang/issues/11146
 advanced_option(
     SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
     "Enable SPIRV-Tools MergeReturnPass + InlineExhaustivePass in SPIR-V optimization (workaround for upstream UAF)"
