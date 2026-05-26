@@ -89,21 +89,18 @@ struct ReinterpretLoweringContext
         auto fromType = operand->getDataType();
         auto toType = inst->getDataType();
         SlangInt fromTypeSize = getAnyValueSize(fromType, targetProgram->getTargetReq());
-        if (fromTypeSize < 0)
-        {
-            sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
-                .type = fromType,
-                .location = inst->sourceLoc,
-            });
-        }
         SlangInt toTypeSize = getAnyValueSize(toType, targetProgram->getTargetReq());
-        if (toTypeSize < 0)
-        {
-            sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
-                .type = toType,
-                .location = inst->sourceLoc,
-            });
-        }
+        // If we cannot size one of the types (for example, when it contains
+        // an unresolved generic parameter such as `vector<double,N>` from a
+        // not-yet-specialized witness table that survived linking), skip
+        // this reinterpret silently. A later specialization pass will
+        // produce a concrete type, and the user only sees a hard error if
+        // the reinterpret reaches code that is genuinely concrete. Emitting
+        // a `TypeCannotBePackedIntoAnyValue` here would fire on unused
+        // witness-table code and surface as a false positive (#11285 follow-on
+        // surfaced by falcor2 `test_warp.py` on d3d12).
+        if (fromTypeSize < 0 || toTypeSize < 0)
+            return;
         SlangInt anyValueSize = Math::Max(fromTypeSize, toTypeSize);
 
         IRBuilder builder(module);
