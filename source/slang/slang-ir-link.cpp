@@ -2459,12 +2459,9 @@ struct IRPrelinkContext : IRSpecContext
         case kIROp_WitnessTable:
             {
                 auto witnessTable = as<IRWitnessTable>(originalVal);
-                auto oldBuilder = builder;
-                builder = builderForClone;
                 clonedInst = builderForClone->createWitnessTable(
                     cloneType(this, (IRType*)witnessTable->getConformanceType()),
                     cloneType(this, witnessTable->getConcreteType()));
-                builder = oldBuilder;
                 break;
             }
         case kIROp_Func:
