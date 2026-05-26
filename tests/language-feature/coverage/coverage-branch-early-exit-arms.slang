@@ -3,7 +3,8 @@
 // start of the selected arm, before `continue`, `break`, or `return`
 // transfers control away.
 
-//TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -trace-branch-coverage
+//TEST:SIMPLE(filecheck=CPP):-target cpp -stage compute -entry computeMain -trace-branch-coverage
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain -trace-branch-coverage -profile cs_5_0
 
 RWStructuredBuffer<uint> outputBuffer;
 
@@ -50,13 +51,24 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //   - continue if true/false
 //   - break if true/false
 //   - return if true/false
-//CHECK: RWStructuredBuffer{{.*}}_slang_coverage
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(0\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(3\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(4\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(5\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(6\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(7\)}}
-//CHECK-NOT: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(8\)}}
+//CPP: RWStructuredBuffer{{.*}}_slang_coverage
+//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(0\)}}
+//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
+//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}
+//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(3\)}}
+//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(4\)}}
+//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(5\)}}
+//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(6\)}}
+//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(7\)}}
+//CPP-NOT: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(8\)}}
+
+//HLSL: _slang_coverage
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(0\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(1\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(2\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(3\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(4\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(5\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(6\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(7\)}}
+//HLSL-NOT: InterlockedAdd{{.*_slang_coverage.*int\(8\)}}
