@@ -21,3 +21,22 @@ struct MyFloat : IDifferentiable
         return { a.val + b.val };
     }
 };
+
+interface IForwardRequirement
+{
+    [ForwardDifferentiable]
+    static float eval(float x);
+}
+
+// A hard forward-differentiable interface requirement should reject a
+// non-differentiable witness.
+struct MissingForwardDerivative : IForwardRequirement
+{
+    static float eval(float x)
+//CHECK:         ^^^^ interface requirement mismatch
+//CHECK:         ^^^^ member 'eval' does not match interface requirement.
+//CHECK:         ^^^^ member 'eval' cannot satisfy differentiable interface requirement 'eval'
+    {
+        return x * x;
+    }
+};
