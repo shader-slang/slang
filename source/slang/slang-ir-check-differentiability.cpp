@@ -474,18 +474,40 @@ public:
                     !diffTypeContext.isDifferentiableType(inst->getFullType()))
                     return false;
                 // A call to a differentiable function only carries a derivative
-                // when at least one argument does. If every input is provably
-                // diff-zero (e.g. derived only from `no_diff` parameters), the
-                // result cannot carry one either, and treating it as if it did
-                // produces a false-positive
+                // when at least one of its *differentiable-input* arguments
+                // does. If every input is either non-differentiable by callee
+                // signature (`no_diff` / output-only) or provably diff-zero,
+                // the result cannot carry one either, and treating it as if it
+                // did produces a false-positive
                 // `LossOfDerivativeAssigningToNonDifferentiableLocation` at any
-                // store into a non-differentiable location (see #11285).
-                for (UInt i = 0; i < as<IRCall>(inst)->getArgCount(); i++)
+                // store into a non-differentiable location (#11285).
                 {
-                    if (carryNonTrivialDiffSet.contains(as<IRCall>(inst)->getArg(i)))
-                        return true;
+                    auto callInst = as<IRCall>(inst);
+                    auto calleeFuncType =
+                        as<IRFuncType>(callInst->getCallee()->getFullType());
+                    UInt argCount = callInst->getArgCount();
+                    for (UInt i = 0; i < argCount; i++)
+                    {
+                        // If we know the callee's parameter types, ignore args
+                        // bound to non-differentiable parameter slots: no
+                        // derivative flows through them regardless of whether
+                        // the argument value carries one elsewhere.
+                        if (calleeFuncType && calleeFuncType->getParamCount() == argCount)
+                        {
+                            auto paramType = calleeFuncType->getParamType(i);
+                            auto [paramDirectionInfo, paramBaseType] =
+                                splitParameterDirectionAndType(paramType);
+                            if (paramDirectionInfo.kind ==
+                                ParameterDirectionInfo::Kind::Out)
+                                continue;
+                            if (!diffTypeContext.isDifferentiableType(paramBaseType))
+                                continue;
+                        }
+                        if (carryNonTrivialDiffSet.contains(callInst->getArg(i)))
+                            return true;
+                    }
+                    return false;
                 }
-                return false;
             case kIROp_Load:
                 // We don't have more knowledge on whether diff is available at the destination
                 // address. Just assume it is producing diff if the dest address can hold a
@@ -523,10 +545,16 @@ public:
         };
 
         // Run data flow analysis and generate `produceDiffSet` and an intial `expectDiffSet`.
+        // `carryNonTrivialDiffSet` derives from `produceDiffSet` plus its own
+        // phi-propagation, so the fixed-point loop must terminate only when
+        // BOTH sets stop growing — watching only `produceDiffSet` can miss a
+        // carry-set update that arrives via a back-edge call result (#11285).
         Index lastProduceDiffCount = 0;
+        Index lastCarryDiffCount = 0;
         do
         {
             lastProduceDiffCount = produceDiffSet.getCount();
+            lastCarryDiffCount = carryNonTrivialDiffSet.getCount();
             for (auto block : funcInst->getBlocks())
             {
                 if (block != funcInst->getFirstBlock())
@@ -543,6 +571,18 @@ public:
                                 if (branch->getArgCount() > paramIndex)
                                 {
                                     auto arg = branch->getArg(paramIndex);
+                                    // Don't propagate derivative tracking into a
+                                    // block param whose type cannot hold a derivative
+                                    // (e.g. a `no_diff`-wrapped type). The author has
+                                    // explicitly opted that location out of derivative
+                                    // flow; propagating either set into it causes a
+                                    // downstream `LossOfDerivativeAssigningToNonDifferentiableLocation`
+                                    // false positive when the param is read and stored
+                                    // into a similarly-untracked location (#11285).
+                                    auto [_, paramBaseType] =
+                                        splitParameterDirectionAndType(param->getDataType());
+                                    if (!diffTypeContext.isDifferentiableType(paramBaseType))
+                                        continue;
                                     if (produceDiffSet.contains(arg))
                                         produceDiffSet.add(param);
                                     if (carryNonTrivialDiffSet.contains(arg))
@@ -596,7 +636,8 @@ public:
                     }
                 }
             }
-        } while (produceDiffSet.getCount() != lastProduceDiffCount);
+        } while (produceDiffSet.getCount() != lastProduceDiffCount ||
+                 carryNonTrivialDiffSet.getCount() != lastCarryDiffCount);
 
         // Reverse propagate `expectDiffSet`.
         for (int i = 0; i < expectDiffInstWorkList.getCount(); i++)
