@@ -107,13 +107,13 @@ struct ReinterpretLoweringContext
             return false;
 
         HashSet<IRInst*> seen;
-        List<IRInst*> workList;
-        workList.add(inst);
+        List<IRInst*> genericWorkList;
+        genericWorkList.add(inst);
 
-        while (workList.getCount() != 0)
+        while (genericWorkList.getCount() != 0)
         {
-            auto current = workList.getLast();
-            workList.removeLast();
+            auto current = genericWorkList.getLast();
+            genericWorkList.removeLast();
 
             if (!current || seen.contains(current))
                 continue;
@@ -128,7 +128,7 @@ struct ReinterpretLoweringContext
                 // declaration as its base. Only the specialization arguments
                 // describe whether this use site is still unresolved.
                 for (UInt i = 0; i < specialize->getArgCount(); ++i)
-                    workList.add(specialize->getArg(i));
+                    genericWorkList.add(specialize->getArg(i));
                 continue;
             }
 
@@ -145,7 +145,7 @@ struct ReinterpretLoweringContext
             }
 
             for (UInt i = 0; i < current->getOperandCount(); ++i)
-                workList.add(current->getOperand(i));
+                genericWorkList.add(current->getOperand(i));
         }
 
         return false;

@@ -259,7 +259,11 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             // its own handling instead of segfaulting.
             auto count = vecType->getElementCount();
             if (!count || count->getOp() != kIROp_IntLit)
+            {
+                *outSizeAndAlignment =
+                    IRSizeAndAlignment(IRSizeAndAlignment::kIndeterminateSize, 1);
                 return SLANG_FAIL;
+            }
             *outSizeAndAlignment =
                 getVectorSizeAndAlignment(elementTypeLayout, getIntegerValueFromInst(count));
             return SLANG_OK;
@@ -338,7 +342,11 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             IRBuilder builder(type->getModule());
             auto layout = matType->getLayout();
             if (!layout || layout->getOp() != kIROp_IntLit)
+            {
+                *outSizeAndAlignment =
+                    IRSizeAndAlignment(IRSizeAndAlignment::kIndeterminateSize, 1);
                 return SLANG_FAIL;
+            }
             if (getIntegerValueFromInst(layout) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
             {
                 auto colVector =
