@@ -188,6 +188,51 @@ parse_review_pr_url() {
   die "Unsupported review URL: $input. Expected https://github.com/<owner>/<repo>/pull/<number>."
 }
 
+github_repo_from_url() {
+  local input="$1"
+  local clean="$input"
+
+  clean="${clean%%#*}"
+  clean="${clean%%\?*}"
+  clean="${clean%/}"
+  clean="${clean%.git}"
+  clean="${clean#http://}"
+  clean="${clean#https://}"
+  clean="${clean#ssh://git@}"
+  clean="${clean#git@}"
+  clean="${clean#www.}"
+
+  if [[ "$clean" =~ ^github\.com[:/]([^/]+)/([^/]+)$ ]]; then
+    printf '%s/%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+    return
+  fi
+
+  return 1
+}
+
+review_repo_matches_configured_remote() {
+  local remoteName
+  local remoteUrl
+  local remoteRepo
+  local reviewRepoFull="$reviewOwner/$reviewRepo"
+
+  while IFS= read -r remoteName; do
+    remoteName="${remoteName%$'\r'}"
+    if ! remoteUrl="$(git_run remote get-url "$remoteName" </dev/null 2>/dev/null)"; then
+      continue
+    fi
+    remoteUrl="${remoteUrl%$'\r'}"
+    if ! remoteRepo="$(github_repo_from_url "$remoteUrl")"; then
+      continue
+    fi
+    if [[ "${remoteRepo,,}" == "${reviewRepoFull,,}" ]]; then
+      return 0
+    fi
+  done < <(git_run remote)
+
+  return 1
+}
+
 branchInput=""
 baseRef=""
 dstDirInput=""
@@ -286,6 +331,9 @@ branchName=""
 if [[ -n "$reviewInput" ]]; then
   parse_review_pr_url "$reviewInput"
   baseRef="refs/pr/$reviewNumber/head"
+  if ! review_repo_matches_configured_remote; then
+    die "Review URL repository does not match any configured GitHub remote: $reviewOwner/$reviewRepo"
+  fi
   branchName="$branchInput"
   if [[ -z "$branchName" ]]; then
     branchName="review-pr-$reviewNumber"
