@@ -18,6 +18,25 @@ static void _checkEncodeDecode(uint32_t size)
     SLANG_CHECK(chars - (const char*)encode == encodeSize);
 }
 
+static void _checkAllocateOverflowDoesNotWrap(size_t dataSize, size_t size, size_t alignment)
+{
+    OffsetContainer container;
+    container.m_dataSize = dataSize;
+
+    // Snapshot capacity and data pointer so we can verify the rejection path leaves the
+    // backing buffer untouched. This guards against future regressions where a new guard
+    // is added after the realloc/capacity-bump block instead of before it.
+    const size_t capBefore = container.getCapacity();
+    const uint8_t* dataBefore = container.getData();
+
+    void* data = container.allocate(size, alignment);
+
+    SLANG_CHECK(data == nullptr);
+    SLANG_CHECK(container.getDataCount() == dataSize);
+    SLANG_CHECK(container.getCapacity() == capBefore);
+    SLANG_CHECK(container.getData() == dataBefore);
+}
+
 namespace
 { // anonymous
 
@@ -37,6 +56,88 @@ SLANG_UNIT_TEST(offsetContainer)
     for (int64_t i = 0; i < 0x100000000; i += (i / 2) + 1)
     {
         _checkEncodeDecode(uint32_t(i));
+    }
+
+    _checkAllocateOverflowDoesNotWrap(SIZE_MAX - 7, 16, 1);
+    _checkAllocateOverflowDoesNotWrap(SIZE_MAX - 3, 1, 8);
+
+    // Exceed the 32-bit offset limit (the container addresses memory via Offset32Ptr, so
+    // allocations beyond the 4GB boundary must be rejected even when size_t arithmetic does
+    // not overflow on a 64-bit host).
+    _checkAllocateOverflowDoesNotWrap(size_t(kMax32Offset) - 7, 16, 1);
+    _checkAllocateOverflowDoesNotWrap(size_t(kMax32Offset) - 3, 1, 8);
+    _checkAllocateOverflowDoesNotWrap(size_t(0x80000000u), size_t(0x80000000u), 1);
+
+    // Zero and non-power-of-two alignments must be rejected (the bitwise alignment math
+    // relies on a non-zero power of two).
+    _checkAllocateOverflowDoesNotWrap(0, 1, 0);
+    _checkAllocateOverflowDoesNotWrap(0, 1, 3);
+    _checkAllocateOverflowDoesNotWrap(0, 1, 5);
+    _checkAllocateOverflowDoesNotWrap(0, 1, 6);
+
+#if SIZE_MAX > 0xFFFFFFFFu
+    // On 64-bit hosts a power-of-two alignment larger than the 32-bit offset domain must be
+    // rejected before alignmentMask = alignment - 1 underflows kMaxDataSize - alignmentMask.
+    _checkAllocateOverflowDoesNotWrap(0, 1, size_t(1) << 33);
+    _checkAllocateOverflowDoesNotWrap(8, 1, size_t(1) << 40);
+#endif
+
+    // Exhaust the 32-bit offset domain so allocate() returns nullptr, then verify that
+    // newObject / newArray / newString propagate the failure as their null sentinel.
+    {
+        OffsetContainer container;
+        container.m_dataSize = size_t(kMax32Offset) - 3;
+
+        auto obj = container.newObject<uint64_t>();
+        SLANG_CHECK(obj.isNull());
+
+        auto arr = container.newArray<uint64_t>(2);
+        SLANG_CHECK(arr.getCount() == 0);
+
+        auto str = container.newString(UnownedStringSlice("xyz"));
+        SLANG_CHECK(str.isNull());
+    }
+
+    // newArray must reject a count whose sizeof(T) * count would exceed the 32-bit offset
+    // domain, independent of the current m_dataSize.
+    {
+        OffsetContainer container;
+        auto arr = container.newArray<uint64_t>(size_t(kMax32Offset) / sizeof(uint64_t) + 1);
+        SLANG_CHECK(arr.getCount() == 0);
+    }
+
+#if SIZE_MAX > 0xFFFFFFFFu
+    // On 64-bit hosts, exercise newArray's count cap (size > 0xFFFFFFFFu). Note that
+    // allocate()'s 32-bit byte-cap also rejects this input (0x100000000 bytes > 4 GiB),
+    // so the test covers both guards together rather than isolating just the count-cap
+    // branch. Choosing an element type that would isolate the count-cap branch isn't
+    // feasible on a 64-bit host: with sizeof(T) > 0, size > 0xFFFFFFFFu always implies
+    // sizeof(T) * size > 0xFFFFFFFFu.
+    {
+        OffsetContainer container;
+        auto arr = container.newArray<uint8_t>(size_t(0x100000000ull));
+        SLANG_CHECK(arr.getCount() == 0);
+    }
+
+    // newString must reject a slice whose length exceeds the 32-bit offset domain after
+    // accounting for the encoded header and trailing null. The size-cap branch fires
+    // before any read of the slice contents, so we can use a non-deref'd placeholder
+    // pointer with a fabricated length. Gated to 64-bit because b + len overflows
+    // size_t on 32-bit hosts.
+    {
+        const char* fake = reinterpret_cast<const char*>(uintptr_t(1));
+        UnownedStringSlice slice(fake, size_t(0xFFFFFFFEu));
+        OffsetContainer container;
+        SLANG_CHECK(container.newString(slice).isNull());
+    }
+#endif
+
+    // allocateAndZero must propagate allocate()'s nullptr instead of memset'ing through it.
+    {
+        OffsetContainer container;
+        container.m_dataSize = size_t(kMax32Offset) - 3;
+        void* zeroed = container.allocateAndZero(16, 1);
+        SLANG_CHECK(zeroed == nullptr);
     }
 
     {

@@ -827,7 +827,8 @@ static bool resolveHumaneLoc(
     SourceManager* sourceManager,
     IRInst* counterOp,
     String& outFile,
-    uint32_t& outLine)
+    uint32_t& outLine,
+    uint32_t& outColumn)
 {
     if (!sourceManager || !counterOp->sourceLoc.isValid())
         return false;
@@ -836,6 +837,7 @@ static bool resolveHumaneLoc(
         return false;
     outFile = humane.pathInfo.foundPath;
     outLine = (uint32_t)humane.line;
+    outColumn = humane.column > 0 ? (uint32_t)humane.column : 0;
     return true;
 }
 
@@ -868,7 +870,10 @@ struct CoverageInstrumenter
     void lowerCounterOp(IRInst* counterOp, UInt slot)
     {
         CoverageTracingEntry entry;
-        resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line);
+        entry.counterIndex = (uint32_t)slot;
+        entry.kind = slang::CoverageEntryKind::Line;
+        entry.counterMode = slang::CoverageCounterMode::Count;
+        resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line, entry.startColumn);
         outMetadata.m_coverageEntries.add(entry);
 
         IRBuilder builder(module);
@@ -904,14 +909,22 @@ struct CoverageInstrumenter
 
     void run(List<IRInst*> const& counterOps)
     {
-        outMetadata.m_coverageEntries.reserve(counterOps.getCount());
+        const auto counterCount = counterOps.getCount();
+        // Public coverage metadata stores counter indices as uint32_t
+        // because the runtime buffer is indexed by 32-bit elements in
+        // the generated shader code.
+        SLANG_RELEASE_ASSERT(counterCount >= 0);
+        SLANG_RELEASE_ASSERT(
+            uint64_t(counterCount) <= uint64_t(std::numeric_limits<uint32_t>::max()));
+        outMetadata.m_coverageCounterCount = (uint32_t)counterCount;
+        outMetadata.m_coverageEntries.reserve(counterCount);
         // Each counter op gets its own slot: the op's identity IS the
         // UID, and we assign a consecutive index in traversal order.
         // Multiple ops on the same source line get distinct slots; the
         // LCOV converter aggregates per (file, line) at the host side
         // via summation.
-        for (UInt slot = 0; slot < (UInt)counterOps.getCount(); ++slot)
-            lowerCounterOp(counterOps[slot], slot);
+        for (Index slot = 0; slot < counterCount; ++slot)
+            lowerCounterOp(counterOps[slot], UInt(slot));
     }
 };
 

@@ -1503,6 +1503,10 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::InternalModifier:
         return ASTNodeType::VisibilityModifier;
 
+    case ASTNodeType::EnumClassModifier:
+    case ASTNodeType::UnscopedEnumAttribute:
+        return ASTNodeType::EnumClassModifier;
+
     default:
         return ASTNodeType::NodeBase;
     }
@@ -2247,21 +2251,6 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     bool ignoreUnallowedModifier = false;
     while (modifier)
     {
-        // Check if a modifier belonging to the same conflict group is already
-        // defined.
-        Modifier* existingModifier = nullptr;
-        auto conflictGroup = getModifierConflictGroupKind(modifier->astNodeType);
-        if (conflictGroup != ASTNodeType::NodeBase)
-        {
-            if (mapExclusiveGroupToModifier.tryGetValue(conflictGroup, existingModifier))
-            {
-                getSink()->diagnose(Diagnostics::DuplicateModifier{
-                    .existingModifier = existingModifier,
-                    .modifier = modifier});
-            }
-            mapExclusiveGroupToModifier[conflictGroup] = modifier;
-        }
-
         // Because we are rewriting the list in place, we need to extract
         // the next modifier here (not at the end of the loop).
         auto next = modifier->next;
@@ -2301,6 +2290,25 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
 
         // Move along to the next modifier
         modifier = next;
+    }
+
+    // Check for mutually exclusive modifier conflicts
+    for (modifier = resultModifiers; modifier; modifier = modifier->next)
+    {
+        // Check if a modifier belonging to the same conflict group is already
+        // defined.
+        Modifier* existingModifier = nullptr;
+        auto conflictGroup = getModifierConflictGroupKind(modifier->astNodeType);
+        if (conflictGroup != ASTNodeType::NodeBase)
+        {
+            if (mapExclusiveGroupToModifier.tryGetValue(conflictGroup, existingModifier))
+            {
+                getSink()->diagnose(Diagnostics::DuplicateModifier{
+                    .existingModifier = existingModifier,
+                    .modifier = modifier});
+            }
+            mapExclusiveGroupToModifier[conflictGroup] = modifier;
+        }
     }
 
     // Whether we actually re-wrote anything or note, lets

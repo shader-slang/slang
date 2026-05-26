@@ -19,9 +19,9 @@ class ArtifactPostEmitMetadata;
 // `collectGlobalUniformParameters` packaging on targets that need it
 // (CPU, CUDA), assigns one counter slot per `IncrementCoverageCounter`
 // op, and rewrites each op into an atomic add on its slot. The pass
-// writes the resulting `(slot → file, line)` mapping and the chosen
-// buffer binding into `outMetadata` so hosts can query it via
-// `ICoverageTracingMetadata`.
+// writes the resulting source coverage entries and the chosen buffer
+// binding into `outMetadata` so hosts can query them via
+// `ICoverageTracingMetadata` and `ISyntheticResourceMetadata`.
 //
 // `explicitBinding` / `explicitSpace` are the values supplied by
 // `-trace-coverage-binding`; pass `-1` for either to request auto-
