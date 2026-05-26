@@ -854,6 +854,93 @@ static bool _matchVectorBoolType(Type* type)
     return elemType->getBaseType() == BaseType::Bool;
 }
 
+static bool _matchHLSLStreamOutputType(Type* type)
+{
+    return as<HLSLStreamOutputType>(type) != nullptr;
+}
+
+static bool _matchMeshOutputType(Type* type)
+{
+    return as<MeshOutputType>(type) != nullptr;
+}
+
+static bool _isNonGeometryStage(Stage stage)
+{
+    return stage != Stage::Geometry && stage != Stage::Unknown;
+}
+
+static bool _isNonMeshStage(Stage stage)
+{
+    return stage != Stage::Mesh && stage != Stage::Unknown;
+}
+
+// Returns true if `type` is `OutputIndices<T, N>` (`IndicesType`) whose
+// element type `T` is anything other than the three valid mesh-output
+// index shapes: `uint` for point indices, `uint2` for line indices, or
+// `uint3` for triangle indices. Any other element type makes downstream
+// codegen crash: non-integral scalars (e.g. `float`) cause a null
+// `IRIntLit` dereference in GLSL legalization, while wrong-width vectors
+// (e.g. `uint4`) and struct types hit `SLANG_UNREACHABLE` (issue #9435).
+static bool _matchInvalidIndicesElementType(Type* type)
+{
+    auto indicesType = as<IndicesType>(type);
+    if (!indicesType)
+        return false;
+    auto elementType = indicesType->getElementType();
+
+    // If the element type is an error (unresolved name, failed generic, etc.)
+    // a diagnostic has already been emitted — don't pile on a second one.
+    if (!elementType || as<ErrorType>(elementType))
+        return false;
+
+    // Unwrap typedef / type-alias sugar so that e.g.
+    // `typedef uint3 Triangle; OutputIndices<Triangle, N>` is accepted.
+    elementType = elementType->getCanonicalType();
+
+    if (auto basicType = as<BasicExpressionType>(elementType))
+    {
+        // Point indices: scalar `uint`.
+        return basicType->getBaseType() != BaseType::UInt;
+    }
+    if (auto vectorType = as<VectorExpressionType>(elementType))
+    {
+        // Line/triangle indices: `uint2`/`uint3`.
+        auto basicElem = as<BasicExpressionType>(vectorType->getElementType());
+        if (!basicElem || basicElem->getBaseType() != BaseType::UInt)
+            return true;
+        auto count = as<ConstantIntVal>(vectorType->getElementCount());
+        if (!count)
+            return true;
+        auto n = count->getValue();
+        return n != 2 && n != 3;
+    }
+    return true;
+}
+
+static bool _matchMatrixWithNonFloatElementType(Type* type)
+{
+    // SPIR-V's `OpTypeMatrix` requires column vectors to have a floating-point
+    // scalar component type (half/float/double). Matrices with integer or bool
+    // element types are legalized to arrays in IR, but that legalization does
+    // not produce valid SPIR-V when the matrix appears in an interface block
+    // (entry-point varyings). Diagnose them up front (issue #9451).
+    auto matType = as<MatrixExpressionType>(type);
+    if (!matType)
+        return false;
+    auto elemType = as<BasicExpressionType>(matType->getElementType());
+    if (!elemType)
+        return false;
+    switch (elemType->getBaseType())
+    {
+    case BaseType::Half:
+    case BaseType::Float:
+    case BaseType::Double:
+        return false; // valid floating-point element types
+    default:
+        return true; // integer, bool, etc. — not valid for SPIR-V matrices
+    }
+}
+
 static bool _matchMatrixWithOutOfRangeDimensions(Type* type)
 {
     // Row and column counts outside the 1..4 range break downstream codegen
@@ -934,10 +1021,46 @@ static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
      isSPIRV,
      _isInterfaceBlockVaryingStage},
 
+    // `matrix<T, R, C>` where T is not a floating-point type (half/float/double)
+    // generates invalid SPIR-V because `OpTypeMatrix` requires floating-point
+    // column vectors. Integer and bool matrices are legalized to arrays in IR
+    // but that legalization does not cover interface-block varyings (issue #9451).
+    {_matchMatrixWithNonFloatElementType,
+     "matrix element type must be a floating-point type (half, float, or double) for "
+     "SPIR-V entry-point varyings",
+     isSPIRV,
+     _isInterfaceBlockVaryingStage},
+
     // `matrix<T, R, C>` with row/column count outside 1..4 breaks downstream
     // codegen on the interface-block stages (issue #9450).
     {_matchMatrixWithOutOfRangeDimensions,
      "matrix row and column counts must be between 1 and 4 inclusive",
+     nullptr,
+     _isInterfaceBlockVaryingStage},
+
+    // Geometry-shader stream output wrappers
+    // (`PointStream`/`LineStream`/`TriangleStream<T>`) only make sense on
+    // a `[shader("geometry")]` entry point. Using them on any other stage
+    // segfaults during code generation (issue #9430).
+    {_matchHLSLStreamOutputType,
+     "stream output types are only valid on a geometry shader entry point",
+     nullptr,
+     _isNonGeometryStage},
+
+    // Mesh-shader output wrappers
+    // (`OutputVertices`/`OutputIndices`/`OutputPrimitives<T>`) only make
+    // sense on a `[shader("mesh")]` entry point. The mesh-side counterpart
+    // of #9430 — without this rule the SPIR-V generator produces invalid
+    // or crashing output.
+    {_matchMeshOutputType,
+     "mesh output types are only valid on a mesh shader entry point",
+     nullptr,
+     _isNonMeshStage},
+
+    // `OutputIndices<T, N>` requires `T` to be `uint`/`uint2`/`uint3`.
+    // Other element types crash downstream codegen (issue #9435).
+    {_matchInvalidIndicesElementType,
+     "OutputIndices element type must be uint, uint2, or uint3",
      nullptr,
      _isInterfaceBlockVaryingStage},
 };

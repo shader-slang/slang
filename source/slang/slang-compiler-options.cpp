@@ -126,6 +126,18 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                 sb << " " << name << v.intValue << " " << v.intValue2;
             }
             break;
+        case CompilerOptionName::TraceCoverageBinding: // intValue0: index; intValue1: space
+            for (auto v : option.value)
+            {
+                sb << " " << name << " " << v.intValue << " " << v.intValue2;
+            }
+            break;
+        case CompilerOptionName::TraceCoverageReservedSpace: // intValue0: space
+            for (auto v : option.value)
+            {
+                sb << " " << name << " " << v.intValue;
+            }
+            break;
         case CompilerOptionName::Optimization:
             for (auto v : option.value)
             {
@@ -205,6 +217,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::TypeConformance:
     case CompilerOptionName::DumpIRBefore:
     case CompilerOptionName::DumpIRAfter:
+    case CompilerOptionName::TraceCoverageReservedSpace:
         return true;
     }
     return false;

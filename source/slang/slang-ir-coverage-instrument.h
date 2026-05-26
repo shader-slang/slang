@@ -19,13 +19,16 @@ class ArtifactPostEmitMetadata;
 // `collectGlobalUniformParameters` packaging on targets that need it
 // (CPU, CUDA), assigns one counter slot per `IncrementCoverageCounter`
 // op, and rewrites each op into an atomic add on its slot. The pass
-// writes the resulting `(slot → file, line)` mapping and the chosen
-// buffer binding into `outMetadata` so hosts can query it via
-// `ICoverageTracingMetadata`.
+// writes the resulting source coverage entries and the chosen buffer
+// binding into `outMetadata` so hosts can query them via
+// `ICoverageTracingMetadata` and `ISyntheticResourceMetadata`.
 //
 // `explicitBinding` / `explicitSpace` are the values supplied by
 // `-trace-coverage-binding`; pass `-1` for either to request auto-
 // allocation.
+// `reservedSpaces` is the optional list supplied by
+// `-trace-coverage-reserved-space`; auto-allocation treats each space
+// as externally occupied even if no shader-visible resource uses it.
 //
 // `globalScopeVarLayout` is taken by reference: when the pass extends
 // the program-scope layout to include the synthesized buffer, it
@@ -42,8 +45,22 @@ void instrumentCoverage(
     bool enabled,
     int explicitBinding,
     int explicitSpace,
+    const int* reservedSpaces,
+    int reservedSpaceCount,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
+    ArtifactPostEmitMetadata& outMetadata);
+
+// Finalize coverage-related synthetic resource metadata after global
+// and entry-point uniform packing has run. This updates CPU/CUDA
+// uniform-marshaling fields that can only be determined from the
+// final post-packing IR layout.
+void finalizeCoverageInstrumentationMetadata(
+    IRModule* module,
+    DiagnosticSink* sink,
+    bool enabled,
+    IRVarLayout* globalScopeVarLayout,
+    TargetRequest* targetRequest,
     ArtifactPostEmitMetadata& outMetadata);
 
 } // namespace Slang
