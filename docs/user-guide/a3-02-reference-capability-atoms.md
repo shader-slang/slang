@@ -701,6 +701,9 @@ Extensions
 `SPV_NV_ray_tracing_motion_blur`
 > Represents the SPIR-V extension for ray tracing motion blur.
 
+`SPV_NV_shader_atomic_fp16_vector`
+> Represents the SPIR-V extension for vector atomic float16 operations.
+
 `SPV_NV_shader_image_footprint`
 > Represents the SPIR-V extension for shader image footprint.
 
@@ -722,6 +725,9 @@ Extensions
 
 `spvAtomicFloat16MinMaxEXT`
 > Represents the SPIR-V capability for atomic float 16 min/max operations.
+
+`spvAtomicFloat16VectorNV`
+> Represents the SPIR-V capability for vector atomic float16 operations.
 
 `spvAtomicFloat32AddEXT`
 > Represents the SPIR-V capability for atomic float 32 add operations.
@@ -957,6 +963,12 @@ Compound Capabilities
 
 `atomic_glsl_float2`
 > (GLSL/SPIRV) Capabilities required to use GLSL-tier-2 float-atomic operations
+
+`atomic_glsl_halfadd`
+> (SPIRV) Capabilities required to use either native or halfvec-emulated fp16 atomic add
+
+`atomic_glsl_halfscalar`
+> (SPIRV) Capabilities required to use single-lane fp16 float-atomic operations
 
 `atomic_glsl_halfvec`
 > (GLSL/SPIRV) Capabilities required to use NVAPI GLSL-fp16 float-atomic operations

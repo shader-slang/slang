@@ -547,6 +547,10 @@ def SPV_EXT_shader_atomic_float_add : _spirv_1_0;
 /// [EXT]
 def SPV_EXT_shader_atomic_float16_add : SPV_EXT_shader_atomic_float_add;
 
+/// Represents the SPIR-V extension for vector atomic float16 operations.
+/// [EXT]
+def SPV_NV_shader_atomic_fp16_vector : _spirv_1_0;
+
 /// Represents the SPIR-V extension for atomic float min/max operations.
 /// [EXT]
 def SPV_EXT_shader_atomic_float_min_max : _spirv_1_0;
@@ -703,6 +707,10 @@ def spvAtomicFloat32AddEXT : SPV_EXT_shader_atomic_float_add;
 /// Represents the SPIR-V capability for atomic float 16 add operations.
 /// [EXT]
 def spvAtomicFloat16AddEXT : SPV_EXT_shader_atomic_float16_add;
+
+/// Represents the SPIR-V capability for vector atomic float16 operations.
+/// [EXT]
+def spvAtomicFloat16VectorNV : SPV_NV_shader_atomic_fp16_vector;
 
 /// Represents the SPIR-V capability for atomic float 64 add operations.
 /// [EXT]
@@ -1265,7 +1273,7 @@ alias GL_NV_ray_tracing_motion_blur = _GL_NV_ray_tracing_motion_blur | spvRayTra
 
 /// Represents the GL_NV_shader_atomic_fp16_vector extension.
 /// [EXT]
-alias GL_NV_shader_atomic_fp16_vector = _GL_NV_shader_atomic_fp16_vector + _GL_NV_gpu_shader5 | _spirv_1_0;
+alias GL_NV_shader_atomic_fp16_vector = _GL_NV_shader_atomic_fp16_vector + _GL_NV_gpu_shader5 | spvAtomicFloat16VectorNV;
 
 /// Represents the GL_NV_shader_invocation_reorder extension (NVIDIA-specific).
 /// [EXT]
@@ -2381,9 +2389,15 @@ alias atomic_glsl_float1 = GL_EXT_shader_atomic_float;
 /// (GLSL/SPIRV) Capabilities required to use GLSL-tier-2 float-atomic operations
 /// [Compound]
 alias atomic_glsl_float2 = GL_EXT_shader_atomic_float2;
+/// (SPIRV) Capabilities required to use single-lane fp16 float-atomic operations
+/// [Compound]
+alias atomic_glsl_halfscalar = spvAtomicFloat16AddEXT;
 /// (GLSL/SPIRV) Capabilities required to use NVAPI GLSL-fp16 float-atomic operations
 /// [Compound]
 alias atomic_glsl_halfvec = GL_NV_shader_atomic_fp16_vector;
+/// (SPIRV) Capabilities required to use either native or halfvec-emulated fp16 atomic add
+/// [Compound]
+alias atomic_glsl_halfadd = atomic_glsl_halfscalar | atomic_glsl_halfvec;
 /// (GLSL/SPIRV) Capabilities required to use GLSL-400 atomic operations
 /// [Compound]
 alias atomic_glsl = spirv_1_0 | _GLSL_400;
