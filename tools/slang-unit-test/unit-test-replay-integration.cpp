@@ -447,6 +447,20 @@ SLANG_UNIT_TEST(replayContextRejectsInvalidBlobHash)
     nonHexAtEnd[40] = '\0';
     writeBlobHashToStream(ctx().getStream(), nonHexAtEnd);
 
+    char nonHexUppercase[41];
+    for (size_t i = 0; i < 40; ++i)
+        nonHexUppercase[i] = 'a';
+    nonHexUppercase[10] = 'G';
+    nonHexUppercase[40] = '\0';
+    writeBlobHashToStream(ctx().getStream(), nonHexUppercase);
+
+    char highBitByteHash[41];
+    for (size_t i = 0; i < 40; ++i)
+        highBitByteHash[i] = 'a';
+    highBitByteHash[20] = char(0xC3);
+    highBitByteHash[40] = '\0';
+    writeBlobHashToStream(ctx().getStream(), highBitByteHash);
+
     char embeddedNullHash[40];
     for (size_t i = 0; i < 40; ++i)
         embeddedNullHash[i] = 'a';
@@ -471,6 +485,8 @@ SLANG_UNIT_TEST(replayContextRejectsInvalidBlobHash)
     checkNextReplayBlobRejected(); // 40 hex characters with trailing traversal.
     checkNextReplayBlobRejected(); // Non-hex at index 0.
     checkNextReplayBlobRejected(); // Non-hex at index 39.
+    checkNextReplayBlobRejected(); // Uppercase non-hex at index 10.
+    checkNextReplayBlobRejected(); // High-bit byte at index 20.
     checkNextReplayBlobRejected(); // Embedded null at index 20.
     checkNextReplayBlobRejected(); // Empty hash.
     checkNextReplayBlobRejected(); // Windows-style traversal.
