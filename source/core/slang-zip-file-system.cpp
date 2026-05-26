@@ -487,6 +487,11 @@ SlangResult ZipFileSystemImpl::loadFile(char const* path, ISlangBlob** outBlob)
         return SLANG_E_NOT_FOUND;
     }
 
+    if (!isArchiveFileUncompressedSizeInBounds(UInt64(fileStat.m_uncomp_size)))
+    {
+        return SLANG_E_OUT_OF_MEMORY;
+    }
+
     ScopedAllocation alloc;
     if (!alloc.allocateTerminated(size_t(fileStat.m_uncomp_size)))
     {
@@ -817,7 +822,8 @@ SlangResult ZipFileSystemImpl::storeArchive(bool blobOwnsContent, ISlangBlob** o
     if (blobOwnsContent)
     {
         // Takes a copy
-        blob = RawBlob::create(m_data.getData(), Index(m_data.getSizeInBytes()));
+        SLANG_RETURN_ON_FAIL(
+            RawBlob::tryCreate(m_data.getData(), Index(m_data.getSizeInBytes()), blob));
     }
     else
     {
