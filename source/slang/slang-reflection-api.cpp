@@ -41,12 +41,7 @@ static inline Type* convert(SlangReflectionType* type)
     // helper are already modifier-unwrapped, but callers may pass
     // SlangReflectionType* values that originated elsewhere. Peel any
     // remaining ModifiedType wrappers so structural queries never see them.
-    auto t = (Type*)type;
-    while (auto modifiedType = as<ModifiedType>(t))
-    {
-        t = modifiedType->getBase();
-    }
-    return t;
+    return unwrapModifiedType((Type*)type);
 }
 
 static inline SlangReflectionType* convert(Type* type)
@@ -63,11 +58,7 @@ static inline SlangReflectionType* convert(Type* type)
     // unwrap, every structural query (`getKind`, `getElementType`, layout,
     // …) falls through to its `UNEXPECTED` path and reports NONE / zero,
     // which downstream consumers like slangpy treat as an unknown type.
-    while (auto modifiedType = as<ModifiedType>(type))
-    {
-        type = modifiedType->getBase();
-    }
-    return (SlangReflectionType*)type;
+    return (SlangReflectionType*)unwrapModifiedType(type);
 }
 
 static inline TypeLayout* convert(SlangReflectionTypeLayout* type)
