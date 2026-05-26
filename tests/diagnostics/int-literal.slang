@@ -43,8 +43,9 @@ int doSomething(int a)
 
     // No warning: the type ladder for non-decimal integer literals admits
     // `uint64_t`, so `0xFFFFFFFFFFFFFFFF` is silently typed as `uint64_t`
-    // before being narrowed by the assignment to `int` (#11216).
-    int x4 = 0xFFFFFFFFFFFFFFFF;
+    // (#11216). Reinterpreting that bit pattern as `int64_t` is `-1`, so
+    // there is no overflowing-assignment warning either.
+    int64_t x4 = 0xFFFFFFFFFFFFFFFF;
 
     // No warning: hex literal in the (INT64_MAX, UINT64_MAX] range is `uint64_t`
     // per the documented type ladder for non-decimal literals (#11216).
