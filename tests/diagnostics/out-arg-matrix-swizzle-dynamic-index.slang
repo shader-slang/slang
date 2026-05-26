@@ -15,4 +15,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float4x4 m = float4x4(0);
     writeOut(m._41_32[tid.x], 7.0);
 //CHECK:                  ^ expected a compile-time constant
+
+    float4 v = float4(0);
+    writeOut(v.yx[tid.x], 7.0);
+//CHECK:              ^ expected a compile-time constant
 }
