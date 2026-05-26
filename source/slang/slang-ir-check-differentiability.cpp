@@ -483,8 +483,7 @@ public:
                 // store into a non-differentiable location (#11285).
                 {
                     auto callInst = as<IRCall>(inst);
-                    auto calleeFuncType =
-                        as<IRFuncType>(callInst->getCallee()->getFullType());
+                    auto calleeFuncType = as<IRFuncType>(callInst->getCallee()->getFullType());
                     UInt argCount = callInst->getArgCount();
                     for (UInt i = 0; i < argCount; i++)
                     {
@@ -497,8 +496,7 @@ public:
                             auto paramType = calleeFuncType->getParamType(i);
                             auto [paramDirectionInfo, paramBaseType] =
                                 splitParameterDirectionAndType(paramType);
-                            if (paramDirectionInfo.kind ==
-                                ParameterDirectionInfo::Kind::Out)
+                            if (paramDirectionInfo.kind == ParameterDirectionInfo::Kind::Out)
                                 continue;
                             if (!diffTypeContext.isDifferentiableType(paramBaseType))
                                 continue;
@@ -576,9 +574,10 @@ public:
                                     // (e.g. a `no_diff`-wrapped type). The author has
                                     // explicitly opted that location out of derivative
                                     // flow; propagating either set into it causes a
-                                    // downstream `LossOfDerivativeAssigningToNonDifferentiableLocation`
-                                    // false positive when the param is read and stored
-                                    // into a similarly-untracked location (#11285).
+                                    // downstream
+                                    // `LossOfDerivativeAssigningToNonDifferentiableLocation` false
+                                    // positive when the param is read and stored into a
+                                    // similarly-untracked location (#11285).
                                     auto [_, paramBaseType] =
                                         splitParameterDirectionAndType(param->getDataType());
                                     if (!diffTypeContext.isDifferentiableType(paramBaseType))
