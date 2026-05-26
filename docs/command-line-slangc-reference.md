@@ -921,7 +921,7 @@ Embed downstream IR into emitted slang IR
 
 <a id="experimental-feature"></a>
 ### -experimental-feature
-Enable experimental features (loading builtin neural module) 
+Enable experimental language and module features 
 
 
 <a id="enable-experimental-rich-diagnostics"></a>
