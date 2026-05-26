@@ -310,6 +310,14 @@ jobs:
       - name: Generate Coverage Summary (Linux/macOS)
         id: coverage-summary
         if: inputs.os != 'windows'
+        env:
+          # Read inputs.os / inputs.platform from env so the unquoted
+          # heredoc below does not embed the workflow expressions
+          # verbatim. Today's callers pass fixed values, but reading from
+          # env keeps this reusable workflow safe if a future caller
+          # passes a value containing `$(...)`. Matches the Windows step.
+          INPUT_OS: ${{ inputs.os }}
+          INPUT_PLATFORM: ${{ inputs.platform }}
         run: |
           # Ensure git works in container (ownership check)
           git config --global --add safe.directory "$PWD"
@@ -420,8 +428,8 @@ jobs:
           {
             "date": "${REPORT_DATE}",
             "commit": "${COMMIT_SHORT}",
-            "platform": "${{ inputs.os }}",
-            "platform_detail": "${{ inputs.os }}-${{ inputs.platform }}",
+            "platform": "${INPUT_OS}",
+            "platform_detail": "${INPUT_OS}-${INPUT_PLATFORM}",
             "line_coverage": "${line_pct}",
             "lines_hit": ${lines_hit},
             "lines_found": ${lines_total},
@@ -468,7 +476,13 @@ jobs:
 
           [xml]$cob = Get-Content -LiteralPath $xmlPath
           $c = $cob.coverage
-          $line_pct = [math]::Round([double]$c.'line-rate' * 100, 2)
+          # Format percents as fixed-2 invariant-culture strings so the
+          # written JSON matches the Linux/macOS `75.71%` shape verbatim.
+          # PowerShell's default double-to-string would render 0.548 as
+          # `54.8` and 0.75 as `75`, breaking schema parity with the
+          # llvm-cov-formatted values on Linux/macOS.
+          $invariant = [System.Globalization.CultureInfo]::InvariantCulture
+          $line_pct = ([math]::Round([double]$c.'line-rate' * 100, 2)).ToString("F2", $invariant)
           $lines_hit = [int]$c.'lines-covered'
           $lines_total = [int]$c.'lines-valid'
 
@@ -481,7 +495,9 @@ jobs:
                   elseif ($line.StartsWith('LH:')) { $slangc_hit += [int]$line.Substring(3) }
               }
           }
-          $slangc_pct = if ($slangc_total -gt 0) { [math]::Round($slangc_hit / $slangc_total * 100, 2) } else { 0 }
+          $slangc_pct = if ($slangc_total -gt 0) {
+              ([math]::Round($slangc_hit / $slangc_total * 100, 2)).ToString("F2", $invariant)
+          } else { "0.00" }
 
           "coverage=$line_pct" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding ascii
 
@@ -529,11 +545,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ inputs.os }}-${{ inputs.platform }}
-          # libslang.* and the Cobertura XML are Linux/macOS-only;
-          # coverage-report*.txt are Linux/macOS-only (llvm-cov report
-          # text, not produced from OpenCppCoverage). upload-artifact
-          # silently skips missing paths, so one path list works for
-          # all OSes.
+          # libslang.* is Linux/macOS-only; full.cobertura.xml is
+          # Windows-only (OpenCppCoverage output -- llvm-cov does not
+          # emit Cobertura); coverage-report*.txt are Linux/macOS-only
+          # (llvm-cov report text, not produced from OpenCppCoverage).
+          # upload-artifact silently skips missing paths, so one path
+          # list works for all OSes.
           path: |
             coverage-summary.json
             coverage-report.txt
