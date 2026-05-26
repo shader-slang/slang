@@ -439,7 +439,7 @@ internal struct SharedMemorySizeForLayer<
         (SubgroupCount * SubgroupSize * HeightInVecB_SR + SubgroupCount * TileStrideVec_SR * CMShape.ROW_C) * sizeof(uint4)
         + ((SubgroupCount * MPadded_SR * sizeof(T) + sizeof(uint4) - 1) / sizeof(uint4)) * sizeof(uint4);
 
-    public static const uint Bytes = Max(Max(Max(BytesForMMA, BytesForOuterProductStore),
+    static const uint Bytes = Max(Max(Max(BytesForMMA, BytesForOuterProductStore),
                                           BytesForCrossWarpReduction),
                                                 BytesForSumReduceRows);
 }
