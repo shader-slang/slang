@@ -1269,6 +1269,17 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     UncheckedAttribute* uncheckedAttr,
     ModifiableSyntaxNode* attrTarget)
 {
+    // `__func_extension` is syntax sugar for a generated extension containing
+    // a synthesized derivative/apply function. Validate attributes against the
+    // eventual inner function so callable attributes like `[ForceInline]` work
+    // the same way they would on the desugared declaration.
+    auto effectiveAttrTarget = attrTarget;
+    if (auto funcExtensionDecl = as<FuncExtensionDecl>(attrTarget))
+    {
+        if (funcExtensionDecl->innerFunc)
+            effectiveAttrTarget = funcExtensionDecl->innerFunc;
+    }
+
     auto attrName = uncheckedAttr->getKeywordName();
     auto attrDecl = lookUpAttributeDecl(attrName, uncheckedAttr->scope);
 
@@ -1368,7 +1379,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     bool validTarget = false;
     for (auto attrTargetMod : attrDecl->getModifiersOfType<AttributeTargetModifier>())
     {
-        if (attrTarget->getClass().isSubClassOf(attrTargetMod->syntaxClass))
+        if (effectiveAttrTarget->getClass().isSubClassOf(attrTargetMod->syntaxClass))
         {
             validTarget = true;
             break;
@@ -1381,7 +1392,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     {
     // Allowed only on struct fields.
     case ASTNodeType::VkStructOffsetAttribute:
-        auto targetDecl = as<Decl>(attrTarget);
+        auto targetDecl = as<Decl>(effectiveAttrTarget);
         validTarget = validTarget && targetDecl && as<StructDecl>(getParentDecl(targetDecl));
         break;
     };
@@ -1394,7 +1405,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     }
 
     // Now apply type-specific validation to the attribute.
-    if (!validateAttribute(attr, attrDecl, attrTarget))
+    if (!validateAttribute(attr, attrDecl, effectiveAttrTarget))
     {
         return uncheckedAttr;
     }
@@ -1599,10 +1610,14 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::PostfixModifier:
         return as<CallableDecl>(decl);
 
-    case ASTNodeType::BuiltinModifier:
     case ASTNodeType::PublicModifier:
     case ASTNodeType::PrivateModifier:
     case ASTNodeType::InternalModifier:
+        return as<VarDeclBase>(decl) || as<AggTypeDeclBase>(decl) || as<NamespaceDeclBase>(decl) ||
+               as<CallableDecl>(decl) || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) ||
+               as<SyntaxDecl>(decl) || as<AttributeDecl>(decl) || as<InheritanceDecl>(decl);
+
+    case ASTNodeType::BuiltinModifier:
     case ASTNodeType::ExternModifier:
     case ASTNodeType::HLSLExportModifier:
     case ASTNodeType::ExternCppModifier:
