@@ -3,6 +3,7 @@
 #include "slang-ir-autodiff.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
@@ -467,30 +468,32 @@ public:
             case kIROp_Call:
                 if (shouldTreatCallAsDifferentiable(inst))
                     return false;
-                if (!isDifferentiableFunc(
-                        diffTypeContext,
-                        as<IRCall>(inst)->getCallee(),
-                        requiredDiffLevel) ||
-                    !diffTypeContext.isDifferentiableType(inst->getFullType()))
-                    return false;
-                // A call to a differentiable function only carries a derivative
-                // when at least one of its *differentiable-input* arguments
-                // does. If every input is either non-differentiable by callee
-                // signature (`no_diff` / output-only) or provably diff-zero,
-                // the result cannot carry one either, and treating it as if it
-                // did produces a false-positive
-                // `LossOfDerivativeAssigningToNonDifferentiableLocation` at any
-                // store into a non-differentiable location (#11285).
                 {
                     auto callInst = as<IRCall>(inst);
-                    auto calleeFuncType = as<IRFuncType>(callInst->getCallee()->getFullType());
+                    auto callee = callInst->getCallee();
+                    if (!isDifferentiableFunc(diffTypeContext, callee, requiredDiffLevel) ||
+                        !diffTypeContext.isDifferentiableType(inst->getFullType()))
+                        return false;
+                    // The "no carrying input ⇒ no carrying output" tightening
+                    // (#11285) is only sound for functions whose result can
+                    // only depend on their arguments. A function with side
+                    // effects or memory reads (e.g. a texture/buffer load with
+                    // a user-supplied `[BackwardDerivative]`) can legitimately
+                    // produce a derivative from captured state without any
+                    // differentiable input. For non-readNone callees, fall
+                    // back to the original conservative behavior of treating
+                    // every differentiable-function call as carrying.
+                    if (!isReadNoneCallee(callee))
+                        return true;
+
+                    // For readNone callees, a call carries a derivative only
+                    // when at least one of its *differentiable-input*
+                    // arguments does. Arguments bound to a callee parameter
+                    // slot that is output-only or `no_diff` are skipped.
+                    auto calleeFuncType = as<IRFuncType>(callee->getFullType());
                     UInt argCount = callInst->getArgCount();
                     for (UInt i = 0; i < argCount; i++)
                     {
-                        // If we know the callee's parameter types, ignore args
-                        // bound to non-differentiable parameter slots: no
-                        // derivative flows through them regardless of whether
-                        // the argument value carries one elsewhere.
                         if (calleeFuncType && calleeFuncType->getParamCount() == argCount)
                         {
                             auto paramType = calleeFuncType->getParamType(i);
