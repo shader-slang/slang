@@ -1,7 +1,10 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-assembly -emit-spirv-via-glsl -entry computeMain -stage compute -O1
+//TEST:SIMPLE(filecheck=CHECK_O1): -target spirv-assembly -emit-spirv-via-glsl -entry computeMain -stage compute -O1
+//TEST:SIMPLE(filecheck=CHECK_O3): -target spirv-assembly -emit-spirv-via-glsl -entry computeMain -stage compute -O3
 
-// CHECK: OpEntryPoint GLCompute
-// CHECK: OpReturn
+// CHECK_O1: OpEntryPoint GLCompute
+// CHECK_O1: OpReturn
+// CHECK_O3: OpEntryPoint GLCompute
+// CHECK_O3: OpReturn
 
 RWStructuredBuffer<int> result;
 
