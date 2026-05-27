@@ -1181,7 +1181,7 @@ SLANG_UNIT_TEST(slangVMRejectsParameterPointerAccessOutsideCallerWorkingSet)
     appendVMTestMainString(constants);
     while (constants.getCount() % sizeof(uint32_t))
         constants.add(0);
-    uint32_t elementIndex = 3;
+    uint32_t elementIndex = 16;
     auto indexOffset = (uint32_t)constants.getCount();
     appendVMTestValue(constants, elementIndex);
     uint32_t value = 123;

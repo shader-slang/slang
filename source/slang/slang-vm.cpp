@@ -539,54 +539,6 @@ static bool isPointerRangeInRange(
     return start >= rangeStart && end <= rangeEnd;
 }
 
-static bool isPointerRangeInAncestorWorkingSet(
-    ByteCodeInterpreter* ctx,
-    uintptr_t pointerStart,
-    uintptr_t accessStart,
-    uintptr_t accessEnd)
-{
-    if (accessStart < pointerStart)
-        return false;
-
-    auto workingSetBuffer = ctx->m_workingSetBuffer.getBuffer();
-    for (auto& stackFrame : ctx->m_stack)
-    {
-        auto frameStart =
-            reinterpret_cast<uintptr_t>(workingSetBuffer + stackFrame.m_workingSetOffset);
-        auto frameEnd = frameStart + stackFrame.m_currentWorkingSetSizeInBytes;
-        if (isPointerInRangeOrAtEnd(pointerStart, frameStart, frameEnd) &&
-            isPointerRangeInRange(accessStart, accessEnd, frameStart, frameEnd))
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool isPointerParameterValue(ByteCodeInterpreter* ctx, uintptr_t ptr)
-{
-    auto currentFunction = ctx->m_currentFunction;
-    if (!currentFunction)
-        return false;
-
-    auto parameterCount = currentFunction->m_header->parameterCount;
-    auto parameterBytes = reinterpret_cast<uint8_t*>(ctx->m_currentWorkingSet);
-    for (uint32_t i = 0; i < parameterCount; i++)
-    {
-        auto parameterOffset = currentFunction->m_parameterOffsets[i];
-        auto nextParameterOffset = currentFunction->m_parameterOffsets[i + 1];
-        if (nextParameterOffset - parameterOffset != sizeof(void*))
-            continue;
-
-        void* parameterPtr = nullptr;
-        memcpy(&parameterPtr, parameterBytes + parameterOffset, sizeof(parameterPtr));
-        if (reinterpret_cast<uintptr_t>(parameterPtr) == ptr)
-            return true;
-    }
-
-    return false;
-}
-
 static bool findAncestorWorkingSetContainingPointer(
     ByteCodeInterpreter* ctx,
     uintptr_t ptr,
@@ -630,35 +582,19 @@ static bool isAccessThroughPointerParameter(
         void* parameterPtr = nullptr;
         memcpy(&parameterPtr, parameterBytes + parameterOffset, sizeof(parameterPtr));
         auto parameterPtrStart = reinterpret_cast<uintptr_t>(parameterPtr);
-        if (isPointerRangeInAncestorWorkingSet(ctx, parameterPtrStart, accessStart, accessEnd))
+        if (accessStart < parameterPtrStart)
+            continue;
+
+        uintptr_t frameStart = 0;
+        uintptr_t frameEnd = 0;
+        if (findAncestorWorkingSetContainingPointer(ctx, parameterPtrStart, frameStart, frameEnd) &&
+            isPointerRangeInRange(accessStart, accessEnd, frameStart, frameEnd))
+        {
             return true;
+        }
     }
 
     return false;
-}
-
-static bool isOffsetFromPointerParameterInBounds(
-    ByteCodeInterpreter* ctx,
-    uintptr_t base,
-    uintptr_t result,
-    uintptr_t accessEnd,
-    size_t accessSize)
-{
-    if (!isPointerParameterValue(ctx, base))
-        return true;
-
-    uintptr_t frameStart = 0;
-    uintptr_t frameEnd = 0;
-    if (!findAncestorWorkingSetContainingPointer(ctx, base, frameStart, frameEnd))
-        return true;
-
-    if (result < base)
-        return false;
-
-    if (accessSize == 0 && result == frameEnd)
-        return false;
-
-    return isPointerRangeInRange(result, accessEnd, frameStart, frameEnd);
 }
 
 bool ByteCodeInterpreter::validatePointerAccess(const void* ptr, size_t size, bool isWrite)
@@ -777,9 +713,6 @@ bool ByteCodeInterpreter::validatePointerOffset(
     if (accessSize > UINTPTR_MAX - result)
         return failExecution("VM pointer offset access overflow.");
     accessEnd = result + accessSize;
-
-    if (!isOffsetFromPointerParameterInBounds(this, base, result, accessEnd, accessSize))
-        return failExecution("VM parameter pointer arithmetic went out of bounds.");
 
     if (isPointerInRangeOrAtEnd(base, workingSetStart, workingSetEnd) &&
         ((accessSize == 0 && result == workingSetEnd) ||
