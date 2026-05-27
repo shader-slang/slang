@@ -1344,6 +1344,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_EXT_descriptor_indexing` : enables the SPV_EXT_descriptor_indexing extension 
 * `SPV_EXT_shader_atomic_float_add` : enables the SPV_EXT_shader_atomic_float_add extension 
 * `SPV_EXT_shader_atomic_float16_add` : enables the SPV_EXT_shader_atomic_float16_add extension 
+* `SPV_NV_shader_atomic_fp16_vector` : enables the SPV_NV_shader_atomic_fp16_vector extension 
 * `SPV_EXT_shader_atomic_float_min_max` : enables the SPV_EXT_shader_atomic_float_min_max extension 
 * `SPV_EXT_mesh_shader` : enables the SPV_EXT_mesh_shader extension 
 * `SPV_EXT_demote_to_helper_invocation` : enables the SPV_EXT_demote_to_helper_invocation extension 
@@ -1381,6 +1382,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
 * `spvAtomicFloat16AddEXT` 
+* `spvAtomicFloat16VectorNV` 
 * `spvAtomicFloat64AddEXT` 
 * `spvInt64Atomics` 
 * `spvAtomicFloat32MinMaxEXT` 
@@ -1750,7 +1752,9 @@ A capability describes an optional feature that a target may or may not support.
 * `texture_shadowgrad` 
 * `atomic_glsl_float1` 
 * `atomic_glsl_float2` 
+* `atomic_glsl_halfscalar` 
 * `atomic_glsl_halfvec` 
+* `atomic_glsl_halfadd` 
 * `atomic_glsl` 
 * `atomic_glsl_int64` 
 * `GLSL_430_SPIRV_1_0_compute` : enables the GLSL_430_SPIRV_1_0_compute extension 
