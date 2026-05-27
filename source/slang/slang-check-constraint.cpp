@@ -3582,11 +3582,24 @@ void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
     auto intParam = as<DeclRefIntVal>(param);
     if (!intParam)
         return;
+    auto intParamDecl = intParam->getDeclRef().getDecl();
+
+    // Unification can compare a generic being inferred against a type or value
+    // that still mentions some surrounding generic declaration. Only the generic
+    // currently being solved should receive new solver constraints here; an
+    // unrelated integer parameter, such as the `N` from an enclosing
+    // `extension vector<T, N>`, is already fixed by the decl-ref that selected
+    // the extension and must not be added as a fresh argument for this solver.
+    if (!isGenericValueParam(intParamDecl) ||
+        !isRelevantGeneric(constraints, intParamDecl->parentDecl))
+    {
+        return;
+    }
     for (auto c : constraints.discoveredConstraints)
-        if (c.decl == intParam->getDeclRef().getDecl())
+        if (c.decl == intParamDecl)
             return;
     constraints.discoveredConstraints.add(SolverConstraint::makeOrdinaryArg(
-        intParam->getDeclRef().getDecl(),
+        intParamDecl,
         arg,
         ConstraintPriority::Optional,
         SolverConstraint::OrdinaryArgMergeMode::Exact,

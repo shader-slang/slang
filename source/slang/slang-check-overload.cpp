@@ -2579,8 +2579,20 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     // Function-like generics infer ordinary arguments by matching value-level
     // call arguments against the generic function's parameter types. Other
     // generic declaration shapes do not have enough call context here.
-    if (auto funcDeclRef = as<CallableDecl>(genericDeclRef.getDecl()->inner))
+    if (auto innerCallableDecl = as<CallableDecl>(genericDeclRef.getDecl()->inner))
     {
+        // Parameter types must be read through the generic declaration reference
+        // being specialized, not from the raw inner callable declaration. A
+        // generic constructor can live inside a generic extension, such as
+        // `extension vector<ToType, N> { __init<FromType>(vector<FromType, N>) }`;
+        // the `N` in the constructor parameter belongs to the already-selected
+        // extension, while `FromType` belongs to the constructor itself. Building
+        // the callable decl-ref through `genericDeclRef` substitutes the outer
+        // extension arguments before unification, so the constructor solver only
+        // solves its own generic parameters.
+        DeclRef<CallableDecl> funcDeclRef =
+            m_astBuilder->getMemberDeclRef(genericDeclRef, innerCallableDecl);
+
         List<QualType> paramTypes;
         if (!innerParameterTypes)
         {
