@@ -111,6 +111,22 @@ static SlangResult _testMissingLanguage(UnitTestContext* context)
     return SLANG_OK;
 }
 
+static SlangResult _testEmptyStdin(UnitTestContext* context)
+{
+    List<String> args;
+    _addStdinCompileArgs(args, "slang");
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangcWithStdin(context, args, "", result));
+
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "no function found matching entry point name 'main'"))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 static SlangResult _testDuplicateStdin(UnitTestContext* context)
 {
     List<String> args;
@@ -298,6 +314,23 @@ static SlangResult _readStdinSourceForTest(
     return SLANG_OK;
 }
 
+static SlangResult _testInputExactFitReadResult()
+{
+    List<Byte> source;
+    StdinSourceReadResult result;
+
+    SLANG_RETURN_ON_FAIL(_readStdinSourceForTest("abcd", 4, source, result));
+
+    if (result != StdinSourceReadResult::Success)
+        return SLANG_FAIL;
+    if (source.getCount() != 4)
+        return SLANG_FAIL;
+    if (memcmp(source.getBuffer(), "abcd", 4) != 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 static SlangResult _testInputTooLargeReadResult()
 {
     StringBuilder sourceText;
@@ -361,6 +394,7 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testSlangStdin(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testHlslStdin(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testMissingLanguage(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testEmptyStdin(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testDuplicateStdin(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testDiagnosticLocation(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCrlfDiagnosticLocation(unitTestContext)));
@@ -369,6 +403,7 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinAndFileShareSlangTranslationUnit(unitTestContext, true)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCtrlZIsNotEndOfFile(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargerThanReadBuffer(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testInputExactFitReadResult()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeReadResult()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinReadResult()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
