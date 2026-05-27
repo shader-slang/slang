@@ -30,9 +30,8 @@ jobs:
 
       - name: Build Slang
         run: |
-          # TODO(#11146): Skip MergeReturnPass for debug-info SPIR-V in CI.
-          # Remove this override together with
-          # SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN when the workaround is retired.
+          # TODO(#11146): Exercise the temporary MergeReturnPass workaround in this workflow.
+          # Remove this override with SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN when retired.
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
             -DSLANG_ENABLE_TESTS=OFF \
