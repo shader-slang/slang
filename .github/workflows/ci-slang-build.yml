@@ -159,8 +159,9 @@ jobs:
             cmake --workflow --preset generators --fresh
             mkdir generators
             cmake --install build --config Release --component generators --prefix generators
-            # TODO(#11146): Remove this CI override with SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
-            # once the SPIRV-Tools MergeReturnPass UAF workaround is no longer needed.
+            # TODO(#11146): Keep CI artifacts on the SPIRV-Tools UAF workaround
+            # path for now. Remove this override together with
+            # SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN when the workaround is retired.
             emcmake cmake \
               -DSLANG_GENERATORS_PATH=generators/bin \
               --preset emscripten \

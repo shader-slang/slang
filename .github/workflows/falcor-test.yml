@@ -62,8 +62,9 @@ jobs:
           cd ..\
       - name: Build Slang
         run: |
-          # TODO(#11146): Remove this CI override with SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
-          # once the SPIRV-Tools MergeReturnPass UAF workaround is no longer needed.
+          # TODO(#11146): Keep CI artifacts on the SPIRV-Tools UAF workaround
+          # path for now. Remove this override together with
+          # SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN when the workaround is retired.
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
