@@ -413,6 +413,12 @@ SlangResult ByteCodeInterpreter::prepareModuleForExecution()
                     execOpernad.section = (uint8_t**)&m_stringLitsPtr;
                     execOpernad.offset *= sizeof(const char*);
                     break;
+                case kSlangByteCodeSectionImmediate:
+                case kSlangByteCodeSectionFuncs:
+                    // These sections are ids, not addressable byte ranges. Keep the raw
+                    // section id in the relocated operand so validation can classify it.
+                    execOpernad.section = reinterpret_cast<uint8_t**>((uintptr_t)operand.sectionId);
+                    break;
                 }
             }
         }
