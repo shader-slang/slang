@@ -2255,3 +2255,137 @@ SLANG_UNIT_TEST(coverageTracingNestedBranchSiteIDs)
     SLANG_CHECK(ifSiteCount == 2);
     SLANG_CHECK(switchSiteCount == 1);
 }
+
+SLANG_UNIT_TEST(coverageTracingDoWhileBranchArmKinds)
+{
+    const char* shaderSource = R"(
+        RWStructuredBuffer<uint> outputBuffer;
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void computeMain(uint3 tid : SV_DispatchThreadID)
+        {
+            uint value = 0u;
+            do
+            {
+                value += 1u;
+            }
+            while (value < (tid.x & 1u));
+            outputBuffer[0] = value;
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_CPP_SOURCE;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+
+    slang::CompilerOptionEntry coverageOption = {};
+    coverageOption.name = slang::CompilerOptionName::TraceBranchCoverage;
+    coverageOption.value.kind = slang::CompilerOptionValueKind::Int;
+    coverageOption.value.intValue0 = 1;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &coverageOption;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "coverageDoWhileBranchArmKinds",
+        "coverageDoWhileBranchArmKinds.slang",
+        shaderSource,
+        diagnostics.writeRef());
+    if (!module && diagnostics)
+    {
+        fprintf(
+            stderr,
+            "coverageTracingDoWhileBranchArmKinds module diagnostics:\n%s\n",
+            (const char*)diagnostics->getBufferPointer());
+    }
+    SLANG_CHECK(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    module->findAndCheckEntryPoint(
+        "computeMain",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnostics.writeRef());
+    SLANG_CHECK(entryPoint != nullptr);
+
+    slang::IComponentType* components[] = {module, entryPoint.get()};
+    ComPtr<slang::IComponentType> program;
+    SLANG_CHECK(
+        session->createCompositeComponentType(
+            components,
+            SLANG_COUNT_OF(components),
+            program.writeRef(),
+            diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IComponentType> linked;
+    SLANG_CHECK(program->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> codeBlob;
+    SLANG_CHECK(
+        linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IMetadata> metadata;
+    SLANG_CHECK(
+        linked->getEntryPointMetadata(0, 0, metadata.writeRef(), diagnostics.writeRef()) ==
+        SLANG_OK);
+
+    auto coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
+        slang::ICoverageTracingMetadata::getTypeGuid());
+    SLANG_CHECK(coverage != nullptr);
+
+    uint32_t siteID = 0;
+    uint32_t branchEntryCount = 0;
+    bool seenTrueArm = false;
+    bool seenFalseArm = false;
+    for (uint32_t i = 0; i < coverage->getEntryCount(); ++i)
+    {
+        slang::CoverageEntryInfo entry;
+        SLANG_CHECK(coverage->getEntryInfo(i, &entry) == SLANG_OK);
+        if (entry.kind != slang::CoverageEntryKind::Branch)
+            continue;
+
+        SLANG_CHECK(entry.file != nullptr);
+        auto file = UnownedStringSlice(entry.file);
+        SLANG_CHECK(file.indexOf(toSlice("coverageDoWhileBranchArmKinds.slang")) != -1);
+        SLANG_CHECK(entry.counterIndex != slang::kInvalidCoverageCounterIndex);
+        SLANG_CHECK(entry.counterIndex < coverage->getCounterCount());
+        SLANG_CHECK(entry.branchSiteID != 0);
+        SLANG_CHECK(entry.branchArmID != 0);
+
+        if (siteID == 0)
+            siteID = entry.branchSiteID;
+        SLANG_CHECK(entry.branchSiteID == siteID);
+        branchEntryCount++;
+
+        if (entry.branchArmKind == slang::CoverageBranchArmKind::TrueArm)
+        {
+            SLANG_CHECK(entry.branchArmID == 1);
+            seenTrueArm = true;
+        }
+        else if (entry.branchArmKind == slang::CoverageBranchArmKind::FalseArm)
+        {
+            SLANG_CHECK(entry.branchArmID == 2);
+            seenFalseArm = true;
+        }
+        else
+        {
+            SLANG_CHECK_MSG(false, "unexpected do-while branch arm kind");
+        }
+    }
+
+    SLANG_CHECK(siteID != 0);
+    SLANG_CHECK(branchEntryCount == 2);
+    SLANG_CHECK(seenTrueArm);
+    SLANG_CHECK(seenFalseArm);
+}

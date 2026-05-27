@@ -281,6 +281,96 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         )
         self.assertEqual(result.stderr, "")
 
+    def test_dedups_function_entries_keeping_minimum_line(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 2,
+            "entries": [
+                {
+                    "kind": "function",
+                    "counter": 0,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 30,
+                    "function": "helper",
+                },
+                {
+                    "kind": "function",
+                    "counter": 1,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 12,
+                    "function": "helper",
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "3 5\n")
+
+        self.assertEqual(
+            result.stdout,
+            "TN:shader_coverage\n"
+            "SF:shader.slang\n"
+            "FN:12,helper\n"
+            "FNDA:8,helper\n"
+            "FNF:1\n"
+            "FNH:1\n"
+            "end_of_record\n",
+        )
+        self.assertEqual(result.stderr, "")
+
+    def test_emits_multiple_source_files(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 3,
+            "entries": [
+                {
+                    "kind": "line",
+                    "counter": 0,
+                    "mode": "count",
+                    "file": "a.slang",
+                    "line": 10,
+                },
+                {
+                    "kind": "function",
+                    "counter": 1,
+                    "mode": "count",
+                    "file": "b.slang",
+                    "line": 20,
+                    "function": "helper",
+                },
+                {
+                    "kind": "branch",
+                    "counter": 2,
+                    "mode": "count",
+                    "file": "b.slang",
+                    "line": 21,
+                    "branch_site": 1,
+                    "branch_arm": 1,
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "2 3 4\n")
+
+        self.assertEqual(
+            result.stdout,
+            "TN:shader_coverage\n"
+            "SF:a.slang\n"
+            "DA:10,2\n"
+            "end_of_record\n"
+            "SF:b.slang\n"
+            "FN:20,helper\n"
+            "FNDA:3,helper\n"
+            "FNF:1\n"
+            "FNH:1\n"
+            "BRDA:21,1,1,4\n"
+            "BRF:1\n"
+            "BRH:1\n"
+            "end_of_record\n",
+        )
+        self.assertEqual(result.stderr, "")
+
     def test_skips_v2_function_entries_without_names(self):
         manifest = {
             "version": 2,
@@ -460,6 +550,45 @@ class SlangCoverageToLcovTests(unittest.TestCase):
         self.assertIn("BRDA:12,2,1,4\n", result.stdout)
         self.assertIn("BRF:2\n", result.stdout)
         self.assertIn("BRH:2\n", result.stdout)
+
+    def test_aggregates_duplicate_branch_keys(self):
+        manifest = {
+            "version": 2,
+            "counter_count": 2,
+            "entries": [
+                {
+                    "kind": "branch",
+                    "counter": 0,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 12,
+                    "branch_site": 1,
+                    "branch_arm": 1,
+                },
+                {
+                    "kind": "branch",
+                    "counter": 1,
+                    "mode": "count",
+                    "file": "shader.slang",
+                    "line": 12,
+                    "branch_site": 1,
+                    "branch_arm": 1,
+                },
+            ],
+        }
+
+        result = self.run_converter(manifest, "3 4\n")
+
+        self.assertEqual(
+            result.stdout,
+            "TN:shader_coverage\n"
+            "SF:shader.slang\n"
+            "BRDA:12,1,1,7\n"
+            "BRF:1\n"
+            "BRH:1\n"
+            "end_of_record\n",
+        )
+        self.assertEqual(result.stderr, "")
 
     def test_rejects_unknown_manifest_version(self):
         manifest = {
