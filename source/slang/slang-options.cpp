@@ -18,7 +18,9 @@
 #include "../core/slang-file-system.h"
 #include "../core/slang-hex-dump-util.h"
 #include "../core/slang-name-value.h"
+#include "../core/slang-platform.h"
 #include "../core/slang-string-slice-pool.h"
+#include "../core/slang-string-util.h"
 #include "../core/slang-type-text-util.h"
 #include "slang-compiler-options.h"
 #include "slang-compiler.h"
@@ -31,27 +33,80 @@
 #include "slang.h"
 
 #include <assert.h>
-#include <limits>
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
 #endif
+#include <limits>
+#include <stdio.h>
+#include <string.h>
 
 namespace Slang
 {
 
-// Quick-start summary of the stdin feature, shared between _appendUsageTitle and _parseHelp
-// so that the usage header and the generated markdown reference stay in sync.
-// The InputFilesRemain option description (in the options table below) is a separate,
-// more detailed prose block; keep both up-to-date when changing the cap or pass-through list.
-static const char* const kStdinUsagePreamble =
-    "Pass '-' as an input file to read source from standard input.\n"
-    "-lang <language> is required when reading from stdin.\n"
-    "With pass-through compilation (-pass-through glslang/dxc/fxc), -stage <stage> is required.\n"
-    "Stdin input is capped at 256 MiB.\n";
+static const char* const kStdinDisplayPath = "<stdin>";
+static const char* const kStdinCommandLinePath = "-";
+static const Index kMaxStdinBytes = Index(256) << 20;
 
 namespace
 { // anonymous
+
+enum class StdinSourceReadResult
+{
+    Success,
+    CannotRead,
+    TooLarge,
+};
+
+static StdinSourceReadResult _readStdinSource(FILE* input, Index maxBytes, List<Byte>& outSource)
+{
+    outSource.clear();
+
+    if (!input)
+        return StdinSourceReadResult::CannotRead;
+
+#ifdef _WIN32
+    const int previousMode = _setmode(_fileno(input), _O_BINARY);
+    if (previousMode == -1)
+        return StdinSourceReadResult::CannotRead;
+
+    struct StdinModeGuard
+    {
+        FILE* input;
+        int mode;
+        ~StdinModeGuard() { _setmode(_fileno(input), mode); }
+    } stdinModeGuard{input, previousMode};
+#endif
+
+    clearerr(input);
+
+    // Use blocking stdio here. The process PipeStream path is optimized for polling child
+    // process output and can spin while waiting for piped stdin.
+    char buffer[16 * 1024];
+    for (;;)
+    {
+        const size_t readByteCount = fread(buffer, 1, sizeof(buffer), input);
+        if (readByteCount != 0)
+        {
+            const Index readCount = Index(readByteCount);
+            if (outSource.getCount() > maxBytes || readCount > maxBytes - outSource.getCount())
+            {
+                outSource.clear();
+                return StdinSourceReadResult::TooLarge;
+            }
+            outSource.addRange(reinterpret_cast<const Byte*>(buffer), readCount);
+            continue;
+        }
+
+        if (ferror(input))
+        {
+            outSource.clear();
+            return StdinSourceReadResult::CannotRead;
+        }
+
+        return StdinSourceReadResult::Success;
+    }
+}
 
 // All of the options are given an unique enum
 typedef CompilerOptionName OptionKind;
@@ -438,7 +493,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::Language,
          "-lang",
          "-lang <language>",
-         "Set the language for the following input files."},
+         "Set the language for the following input files. Required when an input is '-' "
+         "(standard input), because stdin has no file extension."},
         {OptionKind::MatrixLayoutColumn,
          "-matrix-layout-column-major",
          nullptr,
@@ -535,15 +591,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::InputFilesRemain,
          "--",
          nullptr,
-         "Treat the rest of the command line as input files. "
-         "Use '-' as a filename to read source from standard input; "
-         "-lang <language> is required in that case because the source language cannot be "
-         "deduced from a file extension. "
-         "When stdin is used with pass-through compilation (-pass-through glslang/dxc/fxc), "
-         "-stage <stage> is required because the shader stage cannot be inferred from a file "
-         "extension; slangc emits a clean CLI diagnostic (error 35) when it is omitted. "
-         "Stdin input is capped at 256 MiB. "
-         "Example: slangc -lang slang -target spirv-asm -entry main -- -"},
+         "Treat the rest of the command line as input files. Use '-' once to read from standard "
+         "input; -lang is required, stdin is limited to 256 MiB, and diagnostics use `<stdin>`."},
         {OptionKind::ReportDownstreamTime,
          "-report-downstream-time",
          nullptr,
@@ -1282,6 +1331,8 @@ struct OptionsParser
 
     static Profile::RawVal findGlslProfileFromPath(const String& path);
 
+    SlangResult addInputStdin(SlangSourceLanguage sourceLanguage);
+
     SlangResult addInputPath(
         char const* inPath,
         SourceLanguage langOverride = SourceLanguage::Unknown);
@@ -1376,6 +1427,7 @@ struct OptionsParser
     SlangResult _parseDebugInformation(const CommandLineArg& arg);
     SlangResult _parseProfile(const CommandLineArg& arg);
     SlangResult _parseHelp(const CommandLineArg& arg);
+    SlangResult _readStdin(List<Byte>& outSource);
 
     SlangSession* m_session = nullptr;
     SlangCompileRequest* m_compileRequest = nullptr;
@@ -1569,129 +1621,96 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
     return SLANG_SOURCE_LANGUAGE_UNKNOWN;
 }
 
+SlangResult OptionsParser::_readStdin(List<Byte>& outSource)
+{
+    const StdinSourceReadResult readResult = _readStdinSource(stdin, kMaxStdinBytes, outSource);
+
+    if (readResult == StdinSourceReadResult::CannotRead)
+        outSource.clear();
+
+    switch (readResult)
+    {
+    case StdinSourceReadResult::Success:
+        return SLANG_OK;
+    case StdinSourceReadResult::TooLarge:
+        m_sink->diagnose(Diagnostics::StdinInputTooLarge{});
+        return SLANG_FAIL;
+    case StdinSourceReadResult::CannotRead:
+        m_sink->diagnose(Diagnostics::CannotReadFromStdin{});
+        return SLANG_FAIL;
+    }
+
+    SLANG_UNREACHABLE("unexpected stdin read result");
+}
+
+SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
+{
+    if (m_stdinConsumed)
+    {
+        m_sink->diagnose(Diagnostics::StdinInputAlreadyUsed{});
+        return SLANG_FAIL;
+    }
+
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        m_sink->diagnose(Diagnostics::CannotDeduceSourceLanguage{.path = kStdinDisplayPath});
+        return SLANG_FAIL;
+    }
+
+    m_stdinConsumed = true;
+
+    List<Byte> source;
+    SLANG_RETURN_ON_FAIL(_readStdin(source));
+
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG)
+    {
+        if (m_slangTranslationUnitIndex == -1)
+        {
+            m_translationUnitCount++;
+            m_slangTranslationUnitIndex =
+                addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
+        }
+        m_currentTranslationUnitIndex = m_slangTranslationUnitIndex;
+    }
+    else
+    {
+        m_translationUnitCount++;
+        m_currentTranslationUnitIndex = addTranslationUnit(sourceLanguage, Stage::Unknown);
+    }
+
+    const char* sourceBegin =
+        source.getCount() != 0 ? reinterpret_cast<const char*>(source.getBuffer()) : "";
+    const char* sourceEnd = sourceBegin + source.getCount();
+    m_compileRequest->addTranslationUnitSourceStringSpan(
+        m_rawTranslationUnits[m_currentTranslationUnitIndex].translationUnitID,
+        kStdinDisplayPath,
+        sourceBegin,
+        sourceEnd);
+
+    return SLANG_OK;
+}
+
 SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langOverride)
 {
+    SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        auto linkage = m_requestImpl->getLinkage();
+        if (linkage->m_optionSet.hasOption(CompilerOptionName::Language))
+        {
+            sourceLanguage = linkage->m_optionSet.getEnumOption<SlangSourceLanguage>(
+                CompilerOptionName::Language);
+        }
+    }
+
+    if (strcmp(inPath, kStdinCommandLinePath) == 0)
+        return addInputStdin(sourceLanguage);
+
     // look at the extension on the file name to determine
     // how we should handle it.
     String path = String(inPath);
 
-    if (strcmp(inPath, "-") == 0)
-    {
-        // Stdin can only be read once; a second '-' token is a no-op so the user
-        // does not get a confusing "no source code found" error on an already-drained pipe.
-        if (m_stdinConsumed)
-            return SLANG_OK;
-
-        // Mark consumed immediately so that any early-return error path (read error, empty
-        // input, unknown language) does not trigger a second attempt on a drained pipe.
-        m_stdinConsumed = true;
-
-        // Switch stdin to binary mode on Windows so that \r\n is not silently collapsed to
-        // \n and 0x1A (Ctrl-Z) is not treated as end-of-file.  File-based compilation uses
-        // binary FileStream, so stdin must be consistent.
-        // The mode is restored before every return so this function does not permanently
-        // alter a host process that calls processCommandLineArguments with "-" as input.
-#ifdef _WIN32
-        const int stdinPrevMode = _setmode(_fileno(stdin), _O_BINARY);
-        struct StdinModeGuard
-        {
-            int prev;
-            ~StdinModeGuard()
-            {
-                if (prev != -1)
-                    _setmode(_fileno(stdin), prev);
-            }
-        } stdinModeGuard{stdinPrevMode};
-#endif
-
-        // Use fread rather than StreamUtil::readAll over a PipeStream.  PipeStream uses
-        // poll(timeout=0), which busy-spins at 100% CPU while waiting for data.  fread
-        // is a standard blocking call that sleeps the thread until the producer writes.
-        //
-        // The default cap is 256 MiB.  Tests may lower it (never raise it) via
-        // SLANG_TEST_MAX_STDIN_BYTES to trigger the StdinInputTooLarge diagnostic
-        // without allocating 256+ MiB.  Values above the default are silently ignored.
-        Index kMaxStdinBytes = Index(256) << 20; // 256 MiB
-        if (const char* envCap = getenv("SLANG_TEST_MAX_STDIN_BYTES"))
-        {
-            errno = 0;
-            char* end = nullptr;
-            long long cap = strtoll(envCap, &end, 10);
-            // *end == '\0' rejects trailing junk (e.g. "100abc" → rejected).
-            // Raw stdlib is used here rather than PlatformUtil/stringToInt because
-            // PlatformUtil is not a dependency of this file and stringToInt returns
-            // int, which is too narrow for Index on 64-bit builds.
-            if (end != envCap && *end == '\0' && errno != ERANGE && cap > 0 &&
-                cap <= (long long)kMaxStdinBytes)
-            {
-                kMaxStdinBytes = Index(cap);
-            }
-        }
-        List<Byte> bytes;
-        {
-            char buf[4096];
-            size_t n;
-            while ((n = fread(buf, 1, sizeof(buf), stdin)) > 0)
-            {
-                if (Index(n) > kMaxStdinBytes - bytes.getCount())
-                {
-                    m_requestImpl->getSink()->diagnose(Diagnostics::StdinInputTooLarge{});
-                    return SLANG_FAIL;
-                }
-                bytes.addRange(reinterpret_cast<const Byte*>(buf), Index(n));
-            }
-            if (ferror(stdin))
-            {
-                m_requestImpl->getSink()->diagnose(Diagnostics::CannotReadFromStdin{});
-                return SLANG_FAIL;
-            }
-        }
-        if (bytes.getCount() == 0)
-        {
-            m_requestImpl->getSink()->diagnose(
-                Diagnostics::EmptySourceInput{.path = "<stdin>"});
-            return SLANG_FAIL;
-        }
-
-        SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
-        if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
-        {
-            if (m_requestImpl->getLinkage()->m_optionSet.hasOption(CompilerOptionName::Language))
-                sourceLanguage =
-                    m_requestImpl->getLinkage()->m_optionSet.getEnumOption<SlangSourceLanguage>(
-                        CompilerOptionName::Language);
-        }
-        if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
-        {
-            m_requestImpl->getSink()->diagnose(
-                Diagnostics::CannotDeduceSourceLanguage{.path = "<stdin>"});
-            return SLANG_FAIL;
-        }
-
-        if (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG)
-        {
-            if (m_slangTranslationUnitIndex == -1)
-            {
-                m_translationUnitCount++;
-                m_slangTranslationUnitIndex =
-                    addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
-            }
-            m_currentTranslationUnitIndex = m_slangTranslationUnitIndex;
-        }
-        else
-        {
-            m_translationUnitCount++;
-            m_currentTranslationUnitIndex = addTranslationUnit(sourceLanguage, Stage::Unknown);
-        }
-        m_compileRequest->addTranslationUnitSourceStringSpan(
-            m_rawTranslationUnits[m_currentTranslationUnitIndex].translationUnitID,
-            "<stdin>",
-            (const char*)bytes.getBuffer(),
-            (const char*)bytes.getBuffer() + bytes.getCount());
-
-        return SLANG_OK;
-    }
-    else if (path.endsWith(".slang-module") || path.endsWith(".slang-lib"))
+    if (path.endsWith(".slang-module") || path.endsWith(".slang-lib"))
     {
         return addReferencedModule(path, SourceLoc(), false);
     }
@@ -1705,15 +1724,9 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     }
 
     Stage impliedStage = Stage::Unknown;
-    SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
-        if (m_requestImpl->getLinkage()->m_optionSet.hasOption(CompilerOptionName::Language))
-            sourceLanguage = SlangSourceLanguage(
-                m_requestImpl->getLinkage()->m_optionSet.getEnumOption<SlangSourceLanguage>(
-                    CompilerOptionName::Language));
-        else
-            sourceLanguage = findSourceLanguageFromPath(path, impliedStage);
+        sourceLanguage = findSourceLanguageFromPath(path, impliedStage);
     }
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
@@ -1985,8 +1998,6 @@ SlangResult OptionsParser::_dumpDiagnostics(Severity originalSeverity)
 void OptionsParser::_appendUsageTitle(StringBuilder& out)
 {
     out << "Usage: slangc [options...] [--] <input files>\n\n";
-    out << kStdinUsagePreamble;
-    out << "\n";
 }
 
 void OptionsParser::_outputMinimalUsage()
@@ -2347,10 +2358,6 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
             buf << "*Usage:*\n";
             buf << "```\n";
             buf << "slangc [options...] [--] <input files>\n\n";
-            buf << kStdinUsagePreamble;
-            buf << "\n"
-                   "# Read source from stdin (-lang is required)\n"
-                   "slangc -lang slang -target spirv-asm -entry main -- -\n\n";
             buf << "# For help\n";
             buf << "slangc -h\n\n";
             buf << "# To generate this file\n";
