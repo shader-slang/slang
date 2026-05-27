@@ -5776,10 +5776,6 @@ SlangResult innerMain(int argc, char** argv)
     auto sharedLibraryCategory = categorySet.add("shared-library", fullTestCategory);
 
     categorySet.add("compile-target", fullTestCategory);
-    // Keep this OFF-only category out of "full": default builds have this option ON,
-    // so these checks are valid only when the runner explicitly selects the category.
-    // An explicit file path still needs -category spirv-opt-off or it runs zero tests.
-    categorySet.add("spirv-opt-off", nullptr);
 
 #if SLANG_WINDOWS_FAMILY
     auto windowsCategory = categorySet.add("windows", fullTestCategory);

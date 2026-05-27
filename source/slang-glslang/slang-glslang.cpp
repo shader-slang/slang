@@ -298,7 +298,6 @@ static int glslang_optimizeSPIRV(
     // line information into all SPIR-V instructions. This avoids loss of
     // information when instructions are deleted or moved. Later, remove
     // redundant information to minimize final SPRIR-V size.
-    //
     if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
     {
         optimizer.RegisterPass(spvtools::CreatePropagateLineInfoPass());
@@ -324,15 +323,11 @@ static int glslang_optimizeSPIRV(
     default:
     case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
         {
-            // Use a minimal set of performance settings. InlineExhaustivePass is paired with
-            // MergeReturnPass because it needs single-return form first. Disabling this pair
-            // avoids the upstream MergeReturnPass UAF, but also skips inlining and can make
-            // following local/SROA/DCE passes less effective.
+            // Use a minimal set of performance settings
+            // If we run CreateInlineExhaustivePass, We need to run CreateMergeReturnPass first.
 
 #if 0
             // This is the previous 'default optimization' passes setting for glslang
-            // Keep the temporary MergeReturn/Inline gate here as well in case this reference
-            // pass list is re-enabled before the upstream SPIRV-Tools issue is fixed.
 #if SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());

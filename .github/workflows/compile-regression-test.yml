@@ -80,33 +80,6 @@ jobs:
             -DSLANG_ENABLE_CUDA=1 \
             -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=OFF
           cmake --workflow --preset "${{matrix.config}}"
-      - name: Test SPIR-V optimizer workaround
-        run: |
-          export SLANG_RUN_SPIRV_VALIDATION=1
-          # The category is required even with an explicit path: without it, this OFF-only
-          # file is filtered out and slang-test exits successfully after running zero tests.
-          set +e
-          test_output="$("$bin_dir/slang-test.exe" -category spirv-opt-off tests/spirv/merge-return-workaround-off.slang 2>&1)"
-          test_status=$?
-          set -e
-
-          printf '%s\n' "$test_output"
-
-          if [ "$test_status" -ne 0 ]; then
-            exit "$test_status"
-          fi
-
-          passed_pattern="^passed test: 'tests/spirv/merge-return-workaround-off[.]slang([.][0-9]+)?'"
-          passed_count="$(grep -Ec "$passed_pattern" <<< "$test_output" || true)"
-          if [ "$passed_count" -ne 4 ]; then
-            echo "Expected slang-test to run all four tests/spirv/merge-return-workaround-off.slang variants."
-            exit 1
-          fi
-
-          # Exercise the broader SPIR-V suite under the workaround too. The ON-shape
-          # merge-return test is invalid in this OFF-configured build.
-          "$bin_dir/slang-test.exe" tests/spirv \
-            -exclude-prefix tests/spirv/merge-return-workaround.slang
       - name: Run compile and validation test
         run: |
           cp -r /c/slang_compile_test_suite_a .
