@@ -1,3 +1,4 @@
+//TEST_CATEGORY(spirv-opt-off):
 //TEST:SIMPLE(filecheck=CHECK_OFF_O1): -target spirv-assembly -emit-spirv-via-glsl -entry computeMain -stage compute -O1
 //TEST:SIMPLE(filecheck=CHECK_OFF_O3): -target spirv-assembly -emit-spirv-via-glsl -entry computeMain -stage compute -O3
 
@@ -15,4 +16,4 @@
 // CHECK_OFF_O3: = OpFunction
 // CHECK_OFF_O3-COUNT-3: OpReturnValue
 
-#include "../../tests/spirv/merge-return-workaround.slang"
+#include "merge-return-workaround.slang"

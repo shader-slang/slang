@@ -5776,6 +5776,7 @@ SlangResult innerMain(int argc, char** argv)
     auto sharedLibraryCategory = categorySet.add("shared-library", fullTestCategory);
 
     categorySet.add("compile-target", fullTestCategory);
+    categorySet.add("spirv-opt-off", nullptr);
 
 #if SLANG_WINDOWS_FAMILY
     auto windowsCategory = categorySet.add("windows", fullTestCategory);

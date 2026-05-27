@@ -83,7 +83,21 @@ jobs:
       - name: Test SPIR-V optimizer workaround
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
-          "$bin_dir/slang-test.exe" -test-dir . .github/slang-tests/merge-return-workaround-off.slang
+          set +e
+          test_output="$("$bin_dir/slang-test.exe" -category spirv-opt-off tests/spirv/merge-return-workaround-off.slang 2>&1)"
+          test_status=$?
+          set -e
+
+          printf '%s\n' "$test_output"
+
+          if [ "$test_status" -ne 0 ]; then
+            exit "$test_status"
+          fi
+
+          if ! grep -q "passed test: 'tests/spirv/merge-return-workaround-off.slang" <<< "$test_output"; then
+            echo "Expected slang-test to run tests/spirv/merge-return-workaround-off.slang."
+            exit 1
+          fi
       - name: Run compile and validation test
         run: |
           cp -r /c/slang_compile_test_suite_a .
