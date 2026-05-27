@@ -813,13 +813,6 @@ Index getGenericParamIndex(Decl* genericParamDecl)
     return -1;
 }
 
-// Return true if a generic declaration is directly nested in another generic
-// declaration.
-bool isGenericDeclDirectlyNestedInGenericDecl(GenericDecl* genericDecl)
-{
-    return genericDecl && as<GenericDecl>(genericDecl->parentDecl) != nullptr;
-}
-
 // Return the outermost generic declaration in a nested generic declaration
 // chain.
 GenericDecl* getOutermostGenericDecl(GenericDecl* genericDecl)
@@ -884,15 +877,15 @@ public:
     {
         // Build the fixed work table and initial argument arrays up front. The
         // caller can then install known ordinary arguments with
-        // `setProvidedArgs` before starting the work-list solve.
+        // `setProvidedArg` before starting the work-list solve.
         collectSolverConstraints();
         m_isInitialized = initializeArgs();
     }
 
-    // Install caller-provided ordinary arguments for one non-nested generic.
+    // Install caller-provided ordinary arguments for one generic declaration.
     // Call this during solver setup, before `solve()`, when the use site
     // supplied ordinary generic arguments.
-    bool setProvidedArgs(GenericDecl* genericDecl, ArrayView<Val*> providedOrdinaryArgs)
+    bool setProvidedArg(GenericDecl* genericDecl, ArrayView<Val*> providedOrdinaryArgs)
     {
         if (providedOrdinaryArgs.getCount() == 0)
             return true;
@@ -916,6 +909,7 @@ public:
         return true;
     }
 
+private:
     // Install one caller-provided ordinary argument into the live argument list.
     // This method is part of solver setup and must be called before `solve()`.
     bool setProvidedArg(Decl* paramDecl, Val* arg)
@@ -939,6 +933,7 @@ public:
         return true;
     }
 
+public:
     // Solve the generic application and return the substituted inner decl-ref.
     DeclRef<Decl> solve()
     {
@@ -3052,14 +3047,15 @@ DeclRef<Decl> SemanticsVisitor::trySolveGenericArguments(
     // the call boundary.
     GenericArgumentSolver solver(this, _Move(inferenceContext), genericDeclRef, outBaseCost);
 
-    // `providedOrdinaryArgs` follows the historical convention used by this
-    // solver: it applies to the outermost generic declaration in the chain. For
-    // `Outer<T>.Inner<U>`, that means the provided array is matched against
-    // `Outer`'s ordinary parameters.
-    auto genericDeclForProvidedArgs = getOutermostGenericDecl(genericDeclRef.getDecl());
-    SLANG_ASSERT(!isGenericDeclDirectlyNestedInGenericDecl(genericDeclForProvidedArgs));
-    if (!solver.setProvidedArgs(genericDeclForProvidedArgs, providedOrdinaryArgs))
-        return DeclRef<Decl>();
+    if (providedOrdinaryArgs.getCount() != 0)
+    {
+        auto genericDecl = genericDeclRef.getDecl();
+        auto outermostGenericDecl = getOutermostGenericDecl(genericDecl);
+        SLANG_ASSERT(outermostGenericDecl == genericDecl);
+
+        if (!solver.setProvidedArg(outermostGenericDecl, providedOrdinaryArgs))
+            return DeclRef<Decl>();
+    }
 
     // The caller only needs the final substituted inner decl-ref and the output
     // cost. All work-list state, current arguments, and witness arguments remain
