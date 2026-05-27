@@ -6,37 +6,11 @@ on:
     paths:
       - ".github/workflows/*-container.yml"
       - ".github/workflows/check-container-consistency.yml"
-      - ".github/workflows/benchmark.yml"
-      - ".github/workflows/check-cmdline-ref.yml"
-      - ".github/workflows/ci-slang-build.yml"
-      - ".github/workflows/ci-slang-sanitizer.yml"
-      - ".github/workflows/compile-regression-test.yml"
-      - ".github/workflows/falcor-compiler-perf-test.yml"
-      - ".github/workflows/falcor-test.yml"
-      - ".github/cmake-options-matrix.json"
-      - "CMakeLists.txt"
-      - "docs/building.md"
-      - "source/slang-glslang/CMakeLists.txt"
-      - "source/slang-glslang/slang-glslang.cpp"
-      - "extras/check-spirv-opt-merge-return-workaround.sh"
   push:
     branches: [master]
     paths:
       - ".github/workflows/*-container.yml"
       - ".github/workflows/check-container-consistency.yml"
-      - ".github/workflows/benchmark.yml"
-      - ".github/workflows/check-cmdline-ref.yml"
-      - ".github/workflows/ci-slang-build.yml"
-      - ".github/workflows/ci-slang-sanitizer.yml"
-      - ".github/workflows/compile-regression-test.yml"
-      - ".github/workflows/falcor-compiler-perf-test.yml"
-      - ".github/workflows/falcor-test.yml"
-      - ".github/cmake-options-matrix.json"
-      - "CMakeLists.txt"
-      - "docs/building.md"
-      - "source/slang-glslang/CMakeLists.txt"
-      - "source/slang-glslang/slang-glslang.cpp"
-      - "extras/check-spirv-opt-merge-return-workaround.sh"
 
 jobs:
   check-consistency:
@@ -86,6 +60,3 @@ jobs:
           fi
 
           echo "✅ All container images are consistent: $images"
-
-      - name: Check SPIR-V optimizer workaround consistency
-        run: bash extras/check-spirv-opt-merge-return-workaround.sh

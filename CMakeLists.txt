@@ -224,11 +224,11 @@ advanced_option(
 # TODO: Remove this option once SPIRV-Tools fixes the MergeReturnPass UAF:
 # https://github.com/KhronosGroup/SPIRV-Tools/issues/6711
 # Slang tracking issue: https://github.com/shader-slang/slang/issues/11146
-# Keep the source-build default ON to preserve existing SPIR-V output. PR CI build
-# workflows that feed artifact tests set this OFF as the temporary workaround above.
+# Keep the source-build default ON to preserve existing SPIR-V output. PR CI workflows
+# set this OFF so debug-info SPIR-V skips MergeReturnPass until the workaround is retired.
 advanced_option(
     SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
-    "Enable SPIRV-Tools MergeReturnPass + InlineExhaustivePass in SPIR-V optimization (workaround for upstream UAF)"
+    "Enable MergeReturnPass + InlineExhaustivePass for debug-info SPIR-V (workaround for UAF)"
     ON
 )
 

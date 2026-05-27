@@ -72,8 +72,8 @@ jobs:
           build-llvm: true
       - name: Build Slang
         run: |
-          # TODO(#11146): Keep CI artifacts on the SPIRV-Tools UAF workaround
-          # path for now. Remove this override together with
+          # TODO(#11146): Skip MergeReturnPass for debug-info SPIR-V in CI.
+          # Remove this override together with
           # SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN when the workaround is retired.
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \

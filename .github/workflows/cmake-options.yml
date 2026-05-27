@@ -1,8 +1,8 @@
 name: CMake Options
 
-# Verifies that each CMake option compiles successfully with the matrix value
-# selected in .github/cmake-options-matrix.json, usually the non-default value
-# for that option. This is "depth-1" coverage: no multi-option combinations are
+# Verifies that each CMake option compiles successfully when set to its
+# non-default value (one option changed at a time, all others at their
+# defaults). This is "depth-1" coverage: no multi-option combinations are
 # tested.
 
 on:

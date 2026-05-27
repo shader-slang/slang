@@ -1,7 +1,7 @@
 name: CMake Options Build (reusable)
 
-# Reusable workflow: builds Slang once per matrix entry for a given platform /
-# compiler / config combination.
+# Reusable workflow: builds Slang once per matrix entry (each option set to
+# its non-default value) for a given platform / compiler / config combination.
 # Called from cmake-options.yml.
 #
 # The option list lives in .github/cmake-options-matrix.json (single source of
