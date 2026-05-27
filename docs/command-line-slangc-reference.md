@@ -121,7 +121,7 @@ Add a path to be used in resolving '#include' and 'import' operations.
 
 **-lang &lt;[language](#language)&gt;**
 
-Set the language for the following input files. 
+Set the language for the following input files. Required when an input is '-' (standard input), because stdin has no file extension. 
 
 
 <a id="matrix-layout-column-major"></a>
@@ -277,7 +277,7 @@ Dump to output list of warning diagnostic numeric and name ids.
 
 <a id="id"></a>
 ### --
-Treat the rest of the command line as input files. 
+Treat the rest of the command line as input files. Use '-' once to read from standard input; [-lang](#lang) is required, stdin is limited to 256 MiB, and diagnostics use `&lt;stdin&gt;`. 
 
 
 <a id="report-downstream-time"></a>
