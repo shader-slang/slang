@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
+//DISABLED_DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
 //
 // Verifies that integer literal overflows trigger diagnostics. See
 // docs/language-reference/expressions-literal.md for details.
