@@ -9,6 +9,9 @@
 // the copy-in/copy-out that caused the bad atomic destination.
 
 //CHECK: OpEntryPoint
+// Verify the atomic target is in StorageBuffer address space, not a Function-local copy.
+//CHECK-NOT: OpTypePointer Function
+//CHECK-DAG: OpTypePointer StorageBuffer
 //CHECK: OpAtomicFAddEXT
 
 public struct TestAtomic {

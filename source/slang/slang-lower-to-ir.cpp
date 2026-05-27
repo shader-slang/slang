@@ -3453,11 +3453,10 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 }
 
 
-/// Returns true if `type` is, or transitively contains, a non-copyable field.
-/// Used to determine whether copy-in/copy-out semantics are invalid for a type.
-/// `astBuilder` is used to apply generic substitutions when traversing struct fields;
-/// if null, substitutions are skipped (generic cases may be missed).
-static bool typeContainsNonCopyable(Type* type, ASTBuilder* astBuilder)
+/// Implementation of typeContainsNonCopyable with cycle detection via a visited set.
+/// `visited` tracks StructDecl pointers already on the recursion stack to break cycles
+/// introduced by recursive struct definitions or mutual references.
+static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, HashSet<Decl*>& visited)
 {
     // Unwrap modifier wrappers (e.g. NoDiffType applied to `this` by autodiff)
     // so the underlying type is visible.
@@ -3465,7 +3464,7 @@ static bool typeContainsNonCopyable(Type* type, ASTBuilder* astBuilder)
     // Recurse into array element types (ArrayExpressionType is a DeclRefType,
     // but its decl is not a StructDecl, so the struct branch below would miss it).
     if (auto arrayType = as<ArrayExpressionType>(type))
-        return typeContainsNonCopyable(arrayType->getElementType(), astBuilder);
+        return typeContainsNonCopyableImpl(arrayType->getElementType(), astBuilder, visited);
     auto declRefType = as<DeclRefType>(type);
     if (!declRefType)
         return false;
@@ -3473,6 +3472,9 @@ static bool typeContainsNonCopyable(Type* type, ASTBuilder* astBuilder)
         return true;
     if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
     {
+        // Guard against cycles (e.g. recursive struct definitions).
+        if (!visited.add(structDecl))
+            return false;
         auto substs = SubstitutionSet(declRefType->getDeclRef());
         for (auto field : structDecl->getFields())
         {
@@ -3480,7 +3482,7 @@ static bool typeContainsNonCopyable(Type* type, ASTBuilder* astBuilder)
                 continue;
             Type* fieldType = astBuilder ? substituteType(substs, astBuilder, field->type.type)
                                          : field->type.type;
-            if (typeContainsNonCopyable(fieldType, astBuilder))
+            if (typeContainsNonCopyableImpl(fieldType, astBuilder, visited))
                 return true;
         }
         for (auto inh : structDecl->getMembersOfType<InheritanceDecl>())
@@ -3489,11 +3491,27 @@ static bool typeContainsNonCopyable(Type* type, ASTBuilder* astBuilder)
                 continue;
             Type* baseType =
                 astBuilder ? substituteType(substs, astBuilder, inh->base.type) : inh->base.type;
-            if (typeContainsNonCopyable(baseType, astBuilder))
+            // Only follow struct inheritance, not interface conformances.
+            // InheritanceDecl is used for both; filtering here prevents treating
+            // interface base types as struct fields and descending into them.
+            auto baseDeclRefType = as<DeclRefType>(baseType);
+            if (!baseDeclRefType || !baseDeclRefType->getDeclRef().as<StructDecl>())
+                continue;
+            if (typeContainsNonCopyableImpl(baseType, astBuilder, visited))
                 return true;
         }
     }
     return false;
+}
+
+/// Returns true if `type` is, or transitively contains, a non-copyable field.
+/// Used to determine whether copy-in/copy-out semantics are invalid for a type.
+/// `astBuilder` is used to apply generic substitutions when traversing struct fields;
+/// if null, substitutions are skipped (generic cases may be missed).
+static bool typeContainsNonCopyable(Type* type, ASTBuilder* astBuilder)
+{
+    HashSet<Decl*> visited;
+    return typeContainsNonCopyableImpl(type, astBuilder, visited);
 }
 
 ParamPassingMode adjustParamPassingModeBasedOnParamType(

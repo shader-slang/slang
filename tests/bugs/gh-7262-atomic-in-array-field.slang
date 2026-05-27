@@ -5,6 +5,9 @@
 // Exercises the ArrayExpressionType branch in typeContainsNonCopyable.
 
 //CHECK: OpEntryPoint
+// Verify the atomic target is in StorageBuffer address space, not a Function-local copy.
+//CHECK-NOT: OpTypePointer Function
+//CHECK-DAG: OpTypePointer StorageBuffer
 //CHECK: OpAtomicIIncrement
 
 struct TestArray {

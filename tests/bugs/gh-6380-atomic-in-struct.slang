@@ -5,6 +5,9 @@
 // [mutating] this-parameters on types containing Atomic<T> fields to [__ref] semantics.
 
 //CHECK: OpEntryPoint
+// Verify the atomic target is in StorageBuffer address space, not a Function-local copy.
+//CHECK-NOT: OpTypePointer Function %int
+//CHECK-DAG: OpTypePointer StorageBuffer %int
 //CHECK: OpAtomicIIncrement
 
 struct Test {

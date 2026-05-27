@@ -6,6 +6,9 @@
 // field type is Atomic<T>, which after substituting T=int becomes Atomic<int>.
 
 //CHECK: OpEntryPoint
+// Verify the atomic target is in StorageBuffer address space, not a Function-local copy.
+//CHECK-NOT: OpTypePointer Function
+//CHECK-DAG: OpTypePointer StorageBuffer
 //CHECK: OpAtomicExchange
 
 struct Wrapper<T : IAtomicable> {
