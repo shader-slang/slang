@@ -58,15 +58,3 @@ jobs:
             echo "Please run 'slangc -help-style markdown -h > docs/command-line-slangc-reference.md' or comment '/regenerate-cmdline-ref' on your PR."
             exit 1
           fi
-
-      - name: Build default SPIR-V optimizer path
-        run: |
-          cmake --preset default --fresh \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
-            -DSLANG_ENABLE_TESTS=OFF \
-            -DSLANG_ENABLE_EXAMPLES=OFF \
-            -DSLANG_ENABLE_GFX=OFF \
-            -DSLANG_ENABLE_SLANGD=OFF \
-            -DSLANG_EXCLUDE_DAWN=ON \
-            -DSLANG_EXCLUDE_TINT=ON
-          cmake --build --preset release --target slang-glslang

@@ -295,9 +295,6 @@ static int glslang_optimizeSPIRV(
     // information when instructions are deleted or moved. Later, remove
     // redundant information to minimize final SPRIR-V size.
     //
-    // PropagateLineInfoPass is independent of the MergeReturnPass/InlineExhaustivePass
-    // workaround below. Keep it paired with the RedundantLineInfoElimPass call later in
-    // this function.
     if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
     {
         optimizer.RegisterPass(spvtools::CreatePropagateLineInfoPass());
