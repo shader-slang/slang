@@ -2,8 +2,8 @@
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-process-util.h"
+#include "../../source/slang/slang-internal.h"
 #include "slang-com-ptr.h"
-#include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
 #ifdef _WIN32
@@ -13,11 +13,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 #endif
+#include <mutex>
 #include <string.h>
 
 using namespace Slang;
-
-SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
 static bool _contains(const String& text, const char* expected)
 {
@@ -84,6 +83,8 @@ struct ScopedWriteOnlyStdin
 private:
     int m_savedStdinFd = -1;
 };
+
+static std::mutex g_stdinRedirectMutex;
 
 static void _addStdinCompileArgs(List<String>& args, const char* language)
 {
@@ -491,6 +492,8 @@ static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
 
 static SlangResult _testCannotReadFromStdinDiagnostic(UnitTestContext* context)
 {
+    std::lock_guard<std::mutex> lock(g_stdinRedirectMutex);
+
     ScopedWriteOnlyStdin stdinRedirect;
     SLANG_RETURN_ON_FAIL(stdinRedirect.redirect());
 
