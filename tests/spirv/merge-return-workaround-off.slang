@@ -5,13 +5,19 @@
 //TEST:SIMPLE(filecheck=CHECK_OFF_O3): -target spirv-assembly -emit-spirv-via-glsl -entry computeMain -stage compute -O3
 
 // CHECK_OFF_O1: OpEntryPoint GLCompute
-// CHECK_OFF_O1-DAG-COUNT-2: = OpFunction {{.*}}
-// CHECK_OFF_O1-DAG-COUNT-1: OpFunctionCall
-// CHECK_OFF_O1-DAG-COUNT-3: OpReturnValue
+// CHECK_OFF_O1-DAG: = OpFunction {{.*}}
+// CHECK_OFF_O1-DAG: = OpFunction {{.*}}
+// CHECK_OFF_O1-DAG: OpFunctionCall
+// CHECK_OFF_O1-DAG: OpReturnValue
+// CHECK_OFF_O1-DAG: OpReturnValue
+// CHECK_OFF_O1-DAG: OpReturnValue
 
 // CHECK_OFF_O3: OpEntryPoint GLCompute
-// CHECK_OFF_O3-DAG-COUNT-2: = OpFunction {{.*}}
-// CHECK_OFF_O3-DAG-COUNT-1: OpFunctionCall
-// CHECK_OFF_O3-DAG-COUNT-3: OpReturnValue
+// CHECK_OFF_O3-DAG: = OpFunction {{.*}}
+// CHECK_OFF_O3-DAG: = OpFunction {{.*}}
+// CHECK_OFF_O3-DAG: OpFunctionCall
+// CHECK_OFF_O3-DAG: OpReturnValue
+// CHECK_OFF_O3-DAG: OpReturnValue
+// CHECK_OFF_O3-DAG: OpReturnValue
 
 #include "merge-return-workaround.slang"
