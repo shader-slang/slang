@@ -1,10 +1,21 @@
-//TEST:SIMPLE(filecheck=CHECK_O1): -target spirv-assembly -emit-spirv-via-glsl -entry computeMain -stage compute -O1
-//TEST:SIMPLE(filecheck=CHECK_O3): -target spirv-assembly -emit-spirv-via-glsl -entry computeMain -stage compute -O3
+//TEST:SIMPLE(filecheck=CHECK_ON_O1): -target spirv-assembly -emit-spirv-via-glsl -entry computeMain -stage compute -O1
+//TEST:SIMPLE(filecheck=CHECK_ON_O3): -target spirv-assembly -emit-spirv-via-glsl -entry computeMain -stage compute -O3
 
-// CHECK_O1: OpEntryPoint GLCompute
-// CHECK_O1: OpReturn
-// CHECK_O3: OpEntryPoint GLCompute
-// CHECK_O3: OpReturn
+// CHECK_ON_O1: OpEntryPoint GLCompute
+// CHECK_ON_O1: = OpFunction
+// CHECK_ON_O1-NOT: OpFunctionCall
+// CHECK_ON_O1-NOT: OpReturnValue
+// CHECK_ON_O1: OpReturn
+// CHECK_ON_O1-NOT: = OpFunction
+// CHECK_ON_O1-NOT: OpReturnValue
+
+// CHECK_ON_O3: OpEntryPoint GLCompute
+// CHECK_ON_O3: = OpFunction
+// CHECK_ON_O3-NOT: OpFunctionCall
+// CHECK_ON_O3-NOT: OpReturnValue
+// CHECK_ON_O3: OpReturn
+// CHECK_ON_O3-NOT: = OpFunction
+// CHECK_ON_O3-NOT: OpReturnValue
 
 RWStructuredBuffer<int> result;
 

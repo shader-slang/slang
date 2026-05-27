@@ -83,27 +83,7 @@ jobs:
       - name: Test SPIR-V optimizer workaround
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
-          "$bin_dir/slang-test.exe" tests/spirv/merge-return-workaround
-
-          check_workaround_path() {
-            local opt_level="$1"
-            local output_file="merge-return-workaround-${opt_level}.spvasm"
-
-            "$bin_dir/slangc.exe" tests/spirv/merge-return-workaround.slang \
-              -target spirv-assembly \
-              -emit-spirv-via-glsl \
-              -entry computeMain \
-              -stage compute \
-              "-${opt_level}" > "$output_file"
-
-            if ! grep -q "OpFunctionCall .*%helper" "$output_file"; then
-              echo "Expected helper call to remain with ${opt_level} when MergeReturnPass and InlineExhaustivePass are disabled."
-              exit 1
-            fi
-          }
-
-          check_workaround_path O1
-          check_workaround_path O3
+          "$bin_dir/slang-test.exe" -test-dir . .github/slang-tests/merge-return-workaround-off.slang
       - name: Run compile and validation test
         run: |
           cp -r /c/slang_compile_test_suite_a .
