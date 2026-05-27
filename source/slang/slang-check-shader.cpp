@@ -917,6 +917,30 @@ static bool _matchInvalidIndicesElementType(Type* type)
     return true;
 }
 
+static bool _matchMatrixWithNonFloatElementType(Type* type)
+{
+    // SPIR-V's `OpTypeMatrix` requires column vectors to have a floating-point
+    // scalar component type (half/float/double). Matrices with integer or bool
+    // element types are legalized to arrays in IR, but that legalization does
+    // not produce valid SPIR-V when the matrix appears in an interface block
+    // (entry-point varyings). Diagnose them up front (issue #9451).
+    auto matType = as<MatrixExpressionType>(type);
+    if (!matType)
+        return false;
+    auto elemType = as<BasicExpressionType>(matType->getElementType());
+    if (!elemType)
+        return false;
+    switch (elemType->getBaseType())
+    {
+    case BaseType::Half:
+    case BaseType::Float:
+    case BaseType::Double:
+        return false; // valid floating-point element types
+    default:
+        return true; // integer, bool, etc. — not valid for SPIR-V matrices
+    }
+}
+
 static bool _matchMatrixWithOutOfRangeDimensions(Type* type)
 {
     // Row and column counts outside the 1..4 range break downstream codegen
@@ -994,6 +1018,16 @@ static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
     // practice; only diagnose where the failure actually occurs.
     {_matchVectorBoolType,
      "vector<bool> is not a valid SPIR-V varying type for this stage",
+     isSPIRV,
+     _isInterfaceBlockVaryingStage},
+
+    // `matrix<T, R, C>` where T is not a floating-point type (half/float/double)
+    // generates invalid SPIR-V because `OpTypeMatrix` requires floating-point
+    // column vectors. Integer and bool matrices are legalized to arrays in IR
+    // but that legalization does not cover interface-block varyings (issue #9451).
+    {_matchMatrixWithNonFloatElementType,
+     "matrix element type must be a floating-point type (half, float, or double) for "
+     "SPIR-V entry-point varyings",
      isSPIRV,
      _isInterfaceBlockVaryingStage},
 

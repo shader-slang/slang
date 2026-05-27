@@ -545,7 +545,7 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Instrument the shader with per-statement execution counters. "
          "When writing compiled output to a file, slangc also emits "
-         "`<output>.coverage-mapping.json` mapping counter slots to source positions."},
+         "`<output>.coverage-mapping.json` mapping source coverage entries to counters."},
         {OptionKind::TraceCoverageBinding,
          "-trace-coverage-binding",
          "-trace-coverage-binding <index> <space>",
@@ -1041,7 +1041,7 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::ExperimentalFeature,
          "-experimental-feature",
          nullptr,
-         "Enable experimental features (loading builtin neural module)"},
+         "Enable experimental language and module features"},
         {OptionKind::EnableRichDiagnostics,
          "-enable-experimental-rich-diagnostics",
          nullptr,

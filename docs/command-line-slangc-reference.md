@@ -302,7 +302,7 @@ Reports information about checkpoint contexts used for reverse-mode automatic di
 
 <a id="trace-coverage"></a>
 ### -trace-coverage
-Instrument the shader with per-statement execution counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping counter slots to source positions. 
+Instrument the shader with per-statement execution counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping source coverage entries to counters. 
 
 
 <a id="trace-coverage-binding"></a>
@@ -921,7 +921,7 @@ Embed downstream IR into emitted slang IR
 
 <a id="experimental-feature"></a>
 ### -experimental-feature
-Enable experimental features (loading builtin neural module) 
+Enable experimental language and module features 
 
 
 <a id="enable-experimental-rich-diagnostics"></a>
@@ -1715,6 +1715,7 @@ A capability describes an optional feature that a target may or may not support.
 * `texture_querylod` 
 * `texture_querylevels` 
 * `texture_shadowlod` 
+* `texture_shadowlod_ext` 
 * `texture_shadowgrad` 
 * `atomic_glsl_float1` 
 * `atomic_glsl_float2` 
