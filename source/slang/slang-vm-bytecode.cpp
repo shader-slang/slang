@@ -139,7 +139,8 @@ SlangResult initVMModule(
     if (!isPointerAligned<uint32_t>(code + stream.getPosition()))
         return reportBytecodeError(errorSink, "string offset table is misaligned.");
     moduleView->stringOffsets = reinterpret_cast<uint32_t*>(code + stream.getPosition());
-    stream.seek(SeekOrigin::Current, moduleView->stringCount * sizeof(uint32_t));
+    SLANG_RETURN_ON_FAIL(
+        stream.seek(SeekOrigin::Current, moduleView->stringCount * sizeof(uint32_t)));
     if (moduleView->constantBlobSize > codeSize - stream.getPosition())
         return reportBytecodeError(errorSink, "constant blob overruns the bytecode blob.");
     moduleView->constants = code + stream.getPosition();
