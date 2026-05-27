@@ -379,7 +379,7 @@ SlangResult ByteCodeInterpreter::prepareModuleForExecution()
         if (func.header->codeSize)
             memcpy(exeFunc.m_codeBuffer.getBuffer(), func.functionCode, func.header->codeSize);
 
-        // Replace the instruction headers with function pointers
+            // Replace the instruction headers with function pointers
 #if SLANG_ENABLE_VM_BYTECODE_VALIDATION
         for (auto instOffset : exeFunc.m_instOffsets)
         {
@@ -595,8 +595,8 @@ bool ByteCodeInterpreter::validatePointerOffset(
 {
 #if !SLANG_ENABLE_VM_BYTECODE_VALIDATION
     SLANG_UNUSED(accessSize);
-    uint64_t elementCount = elementOffset < 0 ? uint64_t(-(elementOffset + 1)) + 1
-                                              : uint64_t(elementOffset);
+    uint64_t elementCount =
+        elementOffset < 0 ? uint64_t(-(elementOffset + 1)) + 1 : uint64_t(elementOffset);
     auto byteOffset = elementCount * uint64_t(stride);
     *outPtr = elementOffset < 0 ? (uint8_t*)basePtr - byteOffset : (uint8_t*)basePtr + byteOffset;
     return true;
