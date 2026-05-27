@@ -603,8 +603,14 @@ static void getElementHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, vo
     auto basePtr = (uint8_t*)inst->getOperand(1).getPtr();
     uint32_t elementIndex;
     memcpy(&elementIndex, inst->getOperand(2).getPtr(), sizeof(elementIndex));
-    auto byteOffset =
-        static_cast<uint64_t>(elementIndex) * static_cast<uint64_t>(inst->opcodeExtension);
+    auto elementIndex64 = static_cast<uint64_t>(elementIndex);
+    auto stride = static_cast<uint64_t>(inst->opcodeExtension);
+    if (stride != 0 && elementIndex64 > UINT64_MAX / stride)
+    {
+        ctx->failExecution("VM GetElement index overflow.");
+        return;
+    }
+    auto byteOffset = elementIndex64 * stride;
     if (!ctx->validateOperandAccess(inst->getOperand(1), inst->opcodeExtension, false, byteOffset))
     {
         return;

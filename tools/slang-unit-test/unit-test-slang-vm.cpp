@@ -745,6 +745,7 @@ SLANG_UNIT_TEST(slangVMAllowsVoidRetWithUnusedOperand)
 
 SLANG_UNIT_TEST(slangVMRejectsArgumentsOutsideParameterArea)
 {
+    // Argument-size rejection is intentionally active even when bytecode validation is disabled.
     List<uint8_t> constants;
     appendVMTestMainString(constants);
 

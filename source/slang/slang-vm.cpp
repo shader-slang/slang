@@ -460,7 +460,7 @@ bool ByteCodeInterpreter::validateOperandAccess(
     const VMExecOperand& operand,
     size_t size,
     bool isWrite,
-    size_t additionalOffset)
+    uint64_t additionalOffset)
 {
 #if !SLANG_ENABLE_VM_BYTECODE_VALIDATION
     SLANG_UNUSED(operand);
@@ -820,7 +820,7 @@ bool ByteCodeInterpreter::validateCurrentInstruction(VMExecInstHeader* inst)
                check(0, inst->opcodeExtension, OperandAccess::Write) &&
                check(1, inst->opcodeExtension, OperandAccess::Read);
     case VMOp::GetWorkingSetPtr:
-        if (!isRangeInBounds(inst->opcodeExtension, 0, m_currentWorkingSetSizeInBytes))
+        if (inst->opcodeExtension >= m_currentWorkingSetSizeInBytes)
             return failExecution("VM working-set pointer offset is out of bounds.");
         return validateOperandCount(this, inst, 1) && check(0, sizeof(void*), OperandAccess::Write);
     case VMOp::GetElementPtr:

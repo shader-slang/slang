@@ -133,7 +133,7 @@ public:
         const VMExecOperand& operand,
         size_t size,
         bool isWrite,
-        size_t additionalOffset = 0);
+        uint64_t additionalOffset = 0);
     bool validatePointerAccess(const void* ptr, size_t size, bool isWrite);
     bool validatePointerOffset(
         const void* basePtr,
