@@ -897,7 +897,6 @@ public:
         if (providedOrdinaryArgs.getCount() == 0)
             return true;
 
-        SLANG_ASSERT(!isGenericDeclDirectlyNestedInGenericDecl(genericDecl));
         SLANG_ASSERT(!m_hasStartedSolving);
 
         if (!m_isInitialized || m_hasStartedSolving)
