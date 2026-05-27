@@ -62,6 +62,11 @@ jobs:
           echo "=== Disk space after cleanup ==="
           df -h /host_root || true
 
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+
       - name: Configure Git safe directory
         run: |
           # RUNNER_TEMP is GitHub Actions' job-local temporary directory.
@@ -73,11 +78,6 @@ jobs:
           git_config_global="$git_config_dir/gitconfig"
           echo "GIT_CONFIG_GLOBAL=$git_config_global" >> "$GITHUB_ENV"
           GIT_CONFIG_GLOBAL="$git_config_global" git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-      - uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-          fetch-depth: "2"
 
       - name: Check disk space
         uses: ./.github/actions/check-disk-space
