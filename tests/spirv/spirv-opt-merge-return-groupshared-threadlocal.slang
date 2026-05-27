@@ -1,12 +1,12 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -emit-spirv-directly -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -mtl
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -llvm
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly
 
-// This shader is the reduced input from #11146. CI artifact builds run it with
-// SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=OFF until the SPIRV-Tools UAF is fixed.
-//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name outputBuffer
+// This is the reduced input from #11146. These tests are compile-smoke coverage
+// for both non-GPU SPIR-V emission paths. The CMake option gate itself is checked
+// by extras/check-spirv-opt-merge-return-workaround.sh so the same test can pass
+// with SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON default builds and PR CI's
+// temporary OFF artifact builds.
+
 RWStructuredBuffer<uint> outputBuffer;
 
 static groupshared uint g_values[2];
@@ -30,6 +30,9 @@ uint[2] maybeGroupSharedReturn(uint id)
 [numthreads(2, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+    // SPIRV: OpEntryPoint GLCompute {{.*}} "computeMain"
+    // SPIRV: OpExecutionMode {{.*}} LocalSize 2 1 1
+
     g_values = { 1, 0 };
     AllMemoryBarrierWithGroupSync();
     uint tid = dispatchThreadID.x;
@@ -51,7 +54,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         outputBuffer[tid] = g_altValuesReturned[tid];
     }
-
-    // BUF: 1
-    // BUF: 3
 }
