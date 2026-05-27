@@ -10,9 +10,16 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_POINTER=1
 
+// Metal tests — bindless address path.
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=0 -xslang -DTEST_METAL=1
+
 #pragma warning(disable: 41017)
 import slang.neural;
 import common;
+
+#ifndef TEST_METAL
+#define TEST_METAL 0
+#endif
 
 #if TEST_HALF
 typealias ElementType = half;
@@ -32,24 +39,29 @@ RWStructuredBuffer<uint> testResult;
 //
 // Bias = {9, 10} stored separately at offset 256.
 
-// Float source for parameter initialization
-//TEST_INPUT: set parametersFloat = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4)
-uniform RWStructuredBuffer<float> parametersFloat;
-
 // Tiled layout weight buffer: 258 elements (one 16x16 tile + 2 bias).
 // Use stride=4 so the buffer is large enough for both half (258*2=516B) and float (258*4=1032B).
-//TEST_INPUT: set parameters = ubuffer(stride=4, count=258)
+//TEST_INPUT: set buffers.parameters = ubuffer(stride=4, count=258)
 
 // Tiled layout dW buffer (same layout as parameters).
-//TEST_INPUT: set dParameters = ubuffer(stride=4, count=258)
+//TEST_INPUT: set buffers.dParameters = ubuffer(stride=4, count=258)
+
+struct TestBuffers
+{
+#if TEST_POINTER
+    ElementType* parameters;
+    ElementType* dParameters;
+#else
+    RWStructuredBuffer<ElementType>.Handle parameters;
+    RWStructuredBuffer<ElementType>.Handle dParameters;
+#endif
+}
+
+ParameterBlock<TestBuffers> buffers;
 
 #if TEST_POINTER
-    uniform ElementType* parameters;
-    uniform ElementType* dParameters;
     typealias Address = PointerAddress<ElementType>;
 #else
-    uniform RWStructuredBuffer<ElementType>.Handle parameters;
-    uniform RWStructuredBuffer<ElementType>.Handle dParameters;
     typealias Address = BindlessAddress<ElementType>;
 #endif
 
@@ -59,9 +71,15 @@ static const int BatchSize = 32;
 static const int SubgroupSize = 32;
 static const int workgroupCount = BatchSize / SubgroupSize;
 
+#if TEST_METAL
+#define TEST_TARGET TargetEnum.Metal
+#else
+#define TEST_TARGET TargetEnum.CUDA
+#endif
+
 typealias ShMemSizeLayer1 = SharedMemorySize<
     ElementType,
-    TargetEnum.CUDA,
+    TEST_TARGET,
     ExecutionMode.Training,
     SubgroupSize,
     workgroupCount,
@@ -73,17 +91,18 @@ void setupParameters(uint tid)
     if (tid == 0)
     {
         for (int i = 0; i < 258; i++)
-            parameters[i] = ElementType(0.0);
+            buffers.parameters[i] = ElementType(0.0);
 
         for (int col = 0; col < InputSize; col++)
-            parameters[tiledWeightOffset(0, col)] = ElementType(parametersFloat[col]);
+            buffers.parameters[tiledWeightOffset<InputSize>(0, col)] = ElementType(col + 1);
 
         for (int col = 0; col < InputSize; col++)
-            parameters[tiledWeightOffset(1, col)] = ElementType(parametersFloat[InputSize + col]);
+            buffers.parameters[tiledWeightOffset<InputSize>(1, col)] = ElementType(InputSize + col + 1);
 
-        parameters[256] = ElementType(parametersFloat[8]);
-        parameters[257] = ElementType(parametersFloat[9]);
+        buffers.parameters[256] = ElementType(9);
+        buffers.parameters[257] = ElementType(10);
     }
+
 }
 
 void cleanupDParameters(uint tid)
@@ -91,7 +110,7 @@ void cleanupDParameters(uint tid)
     if (tid == 0)
     {
         for (int i = 0; i < 258; i++)
-            dParameters[i] = ElementType(0.0);
+            buffers.dParameters[i] = ElementType(0.0);
     }
 }
 
@@ -104,7 +123,7 @@ void ForwardTestWithoutBias(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
 
-    Address weightAddress = Address(parameters);
+    Address weightAddress = Address(buffers.parameters);
 
     let outputVec = input.linearTransform<Address, OptimalLayout, OutVectorType>(weightAddress);
 
@@ -116,9 +135,6 @@ void ForwardTestWithoutBias(int tid, int resIndex)
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
-        if (!isPassed)
-            printf("ForwardTestWithoutBias FAIL: got [%f, %f], expected [30, 70]\n",
-                float(outputVec[0]), float(outputVec[1]));
         testResult[resIndex] = isPassed ? 1 : 0;
     }
 }
@@ -132,7 +148,7 @@ void ForwardTestWithBias(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
 
-    Address weightAddress = Address(parameters);
+    Address weightAddress = Address(buffers.parameters);
     Address biasAddress = weightAddress.getOffset(256);
 
     let outputVec = input.linearTransform<Address, OptimalLayout, OutVectorType>(weightAddress, biasAddress);
@@ -144,9 +160,6 @@ void ForwardTestWithBias(int tid, int resIndex)
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
-        if (!isPassed)
-            printf("ForwardTestWithBias FAIL: got [%f, %f], expected [39, 80]\n",
-                float(outputVec[0]), float(outputVec[1]));
         testResult[resIndex] = isPassed ? 1 : 0;
     }
 }
@@ -181,8 +194,8 @@ void BackwardTestWithoutBias(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
 
-    Address weightAddress = Address(parameters);
-    Address dWeightAddress = Address(dParameters);
+    Address weightAddress = Address(buffers.parameters);
+    Address dWeightAddress = Address(buffers.dParameters);
 
     let outputVec = MatVecMul<InVectorType, OutVectorType>(input, weightAddress);
 
@@ -204,16 +217,14 @@ void BackwardTestWithoutBias(int tid, int resIndex)
     // dW = dOutput * input^T = [[1],[1]] * [1,2,3,4] = [[1,2,3,4],[1,2,3,4]]
     // Accumulated across 32 threads: 32x.
     isPassed = isPassed &&
-        equals(dParameters[tiledDWeightOffset(0, 0)], ElementType(32.0)) && equals(dParameters[tiledDWeightOffset(0, 1)], ElementType(64.0)) &&
-        equals(dParameters[tiledDWeightOffset(0, 2)], ElementType(96.0)) && equals(dParameters[tiledDWeightOffset(0, 3)], ElementType(128.0)) &&
-        equals(dParameters[tiledDWeightOffset(1, 0)], ElementType(32.0)) && equals(dParameters[tiledDWeightOffset(1, 1)], ElementType(64.0)) &&
-        equals(dParameters[tiledDWeightOffset(1, 2)], ElementType(96.0)) && equals(dParameters[tiledDWeightOffset(1, 3)], ElementType(128.0));
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 1)], ElementType(64.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 3)], ElementType(128.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 1)], ElementType(64.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 3)], ElementType(128.0));
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
-        if (!isPassed)
-            printf("BackwardTestWithoutBias FAIL\n");
         testResult[resIndex] = isPassed ? 1 : 0;
     }
 }
@@ -227,9 +238,9 @@ void BackwardTestWithBias(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
 
-    Address weightAddress = Address(parameters);
+    Address weightAddress = Address(buffers.parameters);
     Address biasAddress = weightAddress.getOffset(256);
-    Address dWeightAddress = Address(dParameters);
+    Address dWeightAddress = Address(buffers.dParameters);
     Address dBiasAddress = dWeightAddress.getOffset(256);
 
     let outputVec = MatVecMulAdd<InVectorType, OutVectorType>(input, weightAddress, biasAddress);
@@ -252,44 +263,42 @@ void BackwardTestWithBias(int tid, int resIndex)
 
     // dW: same as BackwardTestWithoutBias.
     isPassed = isPassed &&
-        equals(dParameters[tiledDWeightOffset(0, 0)], ElementType(32.0)) && equals(dParameters[tiledDWeightOffset(0, 1)], ElementType(64.0)) &&
-        equals(dParameters[tiledDWeightOffset(0, 2)], ElementType(96.0)) && equals(dParameters[tiledDWeightOffset(0, 3)], ElementType(128.0)) &&
-        equals(dParameters[tiledDWeightOffset(1, 0)], ElementType(32.0)) && equals(dParameters[tiledDWeightOffset(1, 1)], ElementType(64.0)) &&
-        equals(dParameters[tiledDWeightOffset(1, 2)], ElementType(96.0)) && equals(dParameters[tiledDWeightOffset(1, 3)], ElementType(128.0));
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 1)], ElementType(64.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 3)], ElementType(128.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 0)], ElementType(32.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 1)], ElementType(64.0)) &&
+        equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 2)], ElementType(96.0)) && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 3)], ElementType(128.0));
 
     // dBias = dOutput accumulated across 32 threads = [32, 32]
     isPassed = isPassed &&
-        equals(dParameters[256], ElementType(32.0)) && equals(dParameters[257], ElementType(32.0));
+        equals(buffers.dParameters[256], ElementType(32.0)) && equals(buffers.dParameters[257], ElementType(32.0));
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
-        if (!isPassed)
-            printf("BackwardTestWithBias FAIL\n");
         testResult[resIndex] = isPassed ? 1 : 0;
     }
 }
 
 [shader("compute")]
 [numthreads(BatchSize, 1, 1)]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid : SV_GroupIndex)
 {
     setupParameters(tid);
     AllMemoryBarrierWithGroupSync();
 
     ForwardTestWithoutBias(tid, 0);
-    // BUFFER: 1
+    // BUFFER: {{^}}1{{$}}
 
     ForwardTestWithBias(tid, 1);
-    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 
     cleanupDParameters(tid);
     AllMemoryBarrierWithGroupSync();
     BackwardTestWithoutBias(tid, 2);
-    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 
     cleanupDParameters(tid);
     AllMemoryBarrierWithGroupSync();
     BackwardTestWithBias(tid, 3);
-    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 }
