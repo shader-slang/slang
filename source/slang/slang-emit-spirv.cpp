@@ -6883,6 +6883,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
+    // IR-side builtin globals that require Volatile semantics. Under
+    // the Vulkan memory model the variable cannot carry an
+    // `OpDecorate Volatile`; instead each load/store must OR the
+    // `Volatile` mask into its memory access operand. This set is
+    // populated in `getBuiltinGlobalVar` and consulted by
+    // `getMemoryAccessOperandsOfLoadStore`.
+    HashSet<IRInst*> m_volatileBuiltinGlobalVars;
     SpvInst* m_descriptorHeapUntypedPointerType = nullptr;
     Dictionary<SpvStorageClass, SpvInst*> m_descriptorHeapBufferDescriptorTypes;
     Dictionary<SpvInst*, SpvInst*> m_descriptorHeapRuntimeArrayTypes;
@@ -6925,6 +6932,64 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return false;
     }
 
+    // Stages in which subgroup / SM builtins require `Volatile` semantics
+    // per the Vulkan SPIR-V environment spec. Note this is a strict subset
+    // of `isRaytracingStage`: AnyHit is intentionally excluded because the
+    // spec does not require `Volatile` there.
+    static bool isRaytracingStageRequiringVolatileBuiltins(Stage stage)
+    {
+        switch (stage)
+        {
+        case Stage::RayGeneration:
+        case Stage::ClosestHit:
+        case Stage::Miss:
+        case Stage::Intersection:
+        case Stage::Callable:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    bool needVolatileDecorationForBuiltinVar(SpvBuiltIn builtinVal, IRInst* irInst)
+    {
+        if (!irInst)
+            return false;
+        switch (builtinVal)
+        {
+        case SpvBuiltInSubgroupLocalInvocationId:
+        case SpvBuiltInSubgroupSize:
+        case SpvBuiltInSubgroupEqMask:
+        case SpvBuiltInSubgroupGeMask:
+        case SpvBuiltInSubgroupGtMask:
+        case SpvBuiltInSubgroupLeMask:
+        case SpvBuiltInSubgroupLtMask:
+        // SubgroupId omitted: VUID-SubgroupId-SubgroupId-04367 (RT-stage
+        // usability tracked in #11303). SMIDNV/WarpIDNV kept for
+        // hand-rolled `spirv_asm` users.
+        case SpvBuiltInSMIDNV:
+        case SpvBuiltInWarpIDNV:
+            {
+                auto* refs = m_referencingEntryPoints.tryGetValue(irInst);
+                if (!refs)
+                    return false;
+                for (auto entryPoint : *refs)
+                {
+                    if (auto d = entryPoint->findDecoration<IREntryPointDecoration>())
+                    {
+                        if (isRaytracingStageRequiringVolatileBuiltins(d->getProfile().getStage()))
+                            return true;
+                    }
+                }
+                return false;
+            }
+        case SpvBuiltInRayTmaxKHR:
+            return isInstUsedInStage(irInst, Stage::Intersection);
+        default:
+            return false;
+        }
+    }
+
     SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal, IRInst* irInst)
     {
         SpvInst* result = nullptr;
@@ -6932,7 +6997,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(ptrType && "`getBuiltinGlobalVar`: `type` must be ptr type.");
         auto storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
         bool isFlat = needFlatDecorationForBuiltinVar(irInst);
+        bool isVolatile = needVolatileDecorationForBuiltinVar(builtinVal, irInst);
         auto key = BuiltinSpvVarKey(builtinVal, storageClass, isFlat, ptrType->getValueType());
+        // Track the IR inst even on cache hit so the per-access `Volatile`
+        // mask in `emitSPIRVAsm` fires for every alias under vk_mem_model.
+        if (isVolatile)
+            m_volatileBuiltinGlobalVars.add(irInst);
         if (m_builtinGlobalVars.tryGetValue(key, result))
         {
             return result;
@@ -6967,6 +7037,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             _maybeEmitInterpolationModifierDecoration(
                 IRInterpolationMode::NoInterpolation,
                 getID(varInst));
+        }
+
+        if (isVolatile && m_memoryModel != SpvMemoryModelVulkan)
+        {
+            // Under the Vulkan memory model the `Volatile` semantics
+            // are expressed via a per-access mask on each load/store
+            // (see `getMemoryAccessOperandsOfLoadStore`); attaching
+            // `OpDecorate ... Volatile` to the variable would be an
+            // invalid combination there. Under the legacy GLSL450
+            // model, the variable-level decoration is the supported
+            // form.
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                varInst,
+                SpvDecorationVolatile);
         }
 
         return varInst;
@@ -8380,6 +8466,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     memoryAccessMaskOut |= SpvMemoryAccessAlignedMask;
             }
         }
+
+        // Volatile builtins flagged in `getBuiltinGlobalVar` are reached
+        // only via `spirv_asm` `OpLoad` today (see `emitSPIRVAsm`'s
+        // `SpvOpLoad` branch). A regular-IR load/store landing on one
+        // would silently miss the `Volatile` mask under vk_mem_model;
+        // assert so a future IR-pipeline change is caught here.
+        SLANG_ASSERT(!m_volatileBuiltinGlobalVars.contains(ptr));
     }
 
     SpvInst* emitLoad(SpvInstParent* parent, IRInst* inst, IRInst* ptr)
@@ -11109,6 +11202,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
 
                 bool needToUseCoherentLoadOrStore = false;
+                bool needVolatileBuiltinMask = false;
                 if (m_memoryModel == SpvMemoryModelVulkan)
                 {
                     switch (opcode)
@@ -11140,6 +11234,30 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     case SpvOpImageWrite:
                         needToUseCoherentLoadOrStore =
                             NeedToUseCoherentImageLoadOrStore(spvInst->getOperand(1));
+                        break;
+                    case SpvOpLoad:
+                        // Wave / SM intrinsics in `hlsl.meta.slang` lower
+                        // to an `OpLoad builtin(...)` inside a `spirv_asm`
+                        // block, which bypasses the regular emit path.
+                        // Detect a flagged builtin pointer regardless of
+                        // whether the author supplied a memory-access
+                        // mask — the emit loop below either appends a
+                        // fresh `Volatile` word (minimal form) or ORs it
+                        // into the user's existing mask (extended form,
+                        // e.g. `OpLoad ... Aligned 4`). `spvInst->getOperand(N)`
+                        // includes the opcode at N=0, so result-type is
+                        // at 1, result-id at 2, and the pointer is at 3.
+                        if (spvInst->getOperandCount() >= 4)
+                        {
+                            auto ptrOperand = as<IRSPIRVAsmOperand>(spvInst->getOperand(3));
+                            if (ptrOperand &&
+                                ptrOperand->getOp() == kIROp_SPIRVAsmOperandBuiltinVar)
+                            {
+                                ensureInst(ptrOperand);
+                                if (m_volatileBuiltinGlobalVars.contains(ptrOperand))
+                                    needVolatileBuiltinMask = true;
+                            }
+                        }
                         break;
                     }
                 }
@@ -11226,14 +11344,57 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         opcode,
                         [&]()
                         {
-                            for (const auto operand : spvInst->getSPIRVOperands())
+                            auto operands = spvInst->getSPIRVOperands();
+
+                            if (opcode == SpvOpLoad && needVolatileBuiltinMask)
+                            {
+                                // `OpLoad` of a flagged volatile builtin
+                                // under `vk_mem_model`. Emit type / id /
+                                // pointer, then either OR `Volatile` into
+                                // the user-supplied memory-access mask
+                                // (operand[3]) or append a fresh `Volatile`
+                                // word. Forwarding a user mask without
+                                // the merge would ship a load missing the
+                                // spec-required `Volatile` semantics; for
+                                // the bare minimal-form load it would
+                                // produce two consecutive memory-access
+                                // bitmask words, which is invalid grammar.
+                                Index i = 0;
+                                for (; i < 3 && i < operands.getCount(); ++i)
+                                    emitSpvAsmOperand(operands[i]);
+
+                                uint32_t mergedMask = uint32_t(SpvMemoryAccessVolatileMask);
+                                if (i < operands.getCount())
+                                {
+                                    auto userMaskOp = operands[i];
+                                    // The memory-access mask appears as
+                                    // either a Literal (numeric mask) or
+                                    // an Enum (named keyword like
+                                    // `Aligned`); both store the resolved
+                                    // SPIR-V mask value as an IRIntLit
+                                    // accessible via `getValue()`.
+                                    if (userMaskOp->getOp() == kIROp_SPIRVAsmOperandLiteral ||
+                                        userMaskOp->getOp() == kIROp_SPIRVAsmOperandEnum)
+                                    {
+                                        if (auto val = as<IRIntLit>(userMaskOp->getValue()))
+                                            mergedMask |= uint32_t(val->getValue());
+                                    }
+                                    ++i;
+                                }
+                                emitOperand(mergedMask);
+                                for (; i < operands.getCount(); ++i)
+                                    emitSpvAsmOperand(operands[i]);
+                                return;
+                            }
+
+                            for (const auto operand : operands)
                                 emitSpvAsmOperand(operand);
 
                             if (needToUseCoherentLoadOrStore)
                             {
                                 // Check if user specified memory operand explicitly
                                 uint32_t usedMask = 0;
-                                for (auto operand : spvInst->getSPIRVOperands())
+                                for (auto operand : operands)
                                 {
                                     if (operand->getOp() == kIROp_SPIRVAsmOperandLiteral)
                                     {
