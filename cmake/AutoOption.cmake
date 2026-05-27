@@ -44,6 +44,6 @@ function(enum_option name init description)
 endfunction()
 
 function(advanced_option name description default)
-    option(${name} ${description} ${default})
+    option(${name} "${description}" ${default})
     mark_as_advanced(${name})
 endfunction()

@@ -83,6 +83,16 @@ jobs:
       - name: Test SPIR-V optimizer workaround
         run: |
           "$bin_dir/slang-test.exe" tests/spirv/merge-return-workaround
+          "$bin_dir/slangc.exe" tests/spirv/merge-return-workaround.slang \
+            -target spirv-assembly \
+            -emit-spirv-via-glsl \
+            -entry computeMain \
+            -stage compute \
+            -O1 > merge-return-workaround.spvasm
+          if ! grep -q "OpFunctionCall" merge-return-workaround.spvasm; then
+            echo "Expected helper call to remain when MergeReturnPass and InlineExhaustivePass are disabled."
+            exit 1
+          fi
       - name: Run compile and validation test
         run: |
           cp -r /c/slang_compile_test_suite_a .
