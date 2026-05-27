@@ -98,8 +98,8 @@ jobs:
 
           passed_pattern="^passed test: 'tests/spirv/merge-return-workaround-off[.]slang([.][0-9]+)?'"
           passed_count="$(grep -Ec "$passed_pattern" <<< "$test_output" || true)"
-          if [ "$passed_count" -ne 2 ]; then
-            echo "Expected slang-test to run both tests/spirv/merge-return-workaround-off.slang variants."
+          if [ "$passed_count" -ne 4 ]; then
+            echo "Expected slang-test to run all four tests/spirv/merge-return-workaround-off.slang variants."
             exit 1
           fi
 
