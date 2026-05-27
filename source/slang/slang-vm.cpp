@@ -545,6 +545,9 @@ static bool findAncestorWorkingSetContainingPointer(
     uintptr_t& outFrameStart,
     uintptr_t& outFrameEnd)
 {
+    // A callee can legally receive an out/ref pointer into one of its caller's
+    // working sets. Find that ancestor frame so later validation can bound the
+    // actual access to the same frame instead of accepting an arbitrary pointer.
     auto workingSetBuffer = ctx->m_workingSetBuffer.getBuffer();
     for (auto& stackFrame : ctx->m_stack)
     {
@@ -566,6 +569,11 @@ static bool isAccessThroughPointerParameter(
     uintptr_t accessStart,
     uintptr_t accessEnd)
 {
+    // Pointer-sized parameters may be by-ref/out arguments that alias caller
+    // storage. In static-const-array-requirement.slang, eval() receives
+    // `output` this way, and `output[i]` stores through offsets from that
+    // parameter pointer. Accept such accesses only when the parameter points
+    // into an ancestor frame and the whole access stays inside that frame.
     auto currentFunction = ctx->m_currentFunction;
     if (!currentFunction)
         return false;
@@ -628,6 +636,11 @@ bool ByteCodeInterpreter::validatePointerAccess(const void* ptr, size_t size, bo
         return true;
     }
 
+    // Current-frame and constants accesses were handled above. Check bounded
+    // pointer-parameter accesses here so out/ref array elements like
+    // static-const-array-requirement.slang's `output[i]` are accepted, while
+    // the exact pointer fallback below remains available for parameters whose
+    // pointee range is not represented by a VM working-set frame.
     if (isAccessThroughPointerParameter(this, accessStart, accessEnd))
         return true;
 
