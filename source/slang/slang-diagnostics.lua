@@ -157,6 +157,12 @@ err(
 
 err("cannot-deduce-source-language", 12, "can't deduce language for input file '~path'")
 
+err("cannot-read-from-stdin", 106, "failed to read source from stdin")
+
+err("stdin-input-too-large", 107, "stdin input exceeds the maximum allowed size")
+
+err("stdin-input-already-used", 108, "standard input can only be used once")
+
 err(
     "unknown-code-generation-target",
     13,
