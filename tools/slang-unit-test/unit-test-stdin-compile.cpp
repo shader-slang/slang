@@ -75,10 +75,7 @@ static SlangResult _testSlangStdin(UnitTestContext* context)
     List<String> args;
     _addStdinCompileArgs(args, "slang");
 
-    return _expectSlangcSuccess(
-        context,
-        args,
-        "[shader(\"compute\")] void main() {}\n");
+    return _expectSlangcSuccess(context, args, "[shader(\"compute\")] void main() {}\n");
 }
 
 static SlangResult _testHlslStdin(UnitTestContext* context)
@@ -86,10 +83,7 @@ static SlangResult _testHlslStdin(UnitTestContext* context)
     List<String> args;
     _addStdinCompileArgs(args, "hlsl");
 
-    return _expectSlangcSuccess(
-        context,
-        args,
-        "[numthreads(1, 1, 1)] void main() {}\n");
+    return _expectSlangcSuccess(context, args, "[numthreads(1, 1, 1)] void main() {}\n");
 }
 
 static SlangResult _testMissingLanguage(UnitTestContext* context)
@@ -122,11 +116,8 @@ static SlangResult _testDuplicateStdin(UnitTestContext* context)
     args.add("-");
 
     ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(_runSlangcWithStdin(
-        context,
-        args,
-        "[shader(\"compute\")] void main() {}\n",
-        result));
+    SLANG_RETURN_ON_FAIL(
+        _runSlangcWithStdin(context, args, "[shader(\"compute\")] void main() {}\n", result));
 
     if (result.resultCode == 0)
         return SLANG_FAIL;
@@ -207,8 +198,7 @@ static SlangResult _testStdinAndFileShareSlangTranslationUnit(
     bool stdinFirst)
 {
     TempSlangFile helper;
-    SLANG_RETURN_ON_FAIL(
-        _createTempSlangFile("slangc-stdin-helper", "void helper() {}\n", helper));
+    SLANG_RETURN_ON_FAIL(_createTempSlangFile("slangc-stdin-helper", "void helper() {}\n", helper));
 
     List<String> args;
     args.add("-lang");
@@ -231,10 +221,7 @@ static SlangResult _testStdinAndFileShareSlangTranslationUnit(
         args.add("-");
     }
 
-    return _expectSlangcSuccess(
-        context,
-        args,
-        "[shader(\"compute\")] void main() { helper(); }\n");
+    return _expectSlangcSuccess(context, args, "[shader(\"compute\")] void main() { helper(); }\n");
 }
 
 static SlangResult _testCtrlZIsNotEndOfFile(UnitTestContext* context)
@@ -291,8 +278,7 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testCrlfDiagnosticLocation(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testStdinAndFileShareSlangTranslationUnit(unitTestContext, false)));
-    SLANG_CHECK(
-        SLANG_SUCCEEDED(_testStdinAndFileShareSlangTranslationUnit(unitTestContext, true)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testStdinAndFileShareSlangTranslationUnit(unitTestContext, true)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCtrlZIsNotEndOfFile(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargerThanReadBuffer(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
