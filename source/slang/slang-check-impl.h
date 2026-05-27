@@ -312,8 +312,11 @@ struct OverloadCandidate
     // The type of the result expression if this candidate is selected
     Type* resultType = nullptr;
 
-    // Generic overload candidates now store their solved substitution directly
-    // in `subst`.
+    // Generic overload candidates store the substitution used to type-check the
+    // candidate. Before constraint validation this may contain only ordinary
+    // generic arguments inferred from the call. After generic-constraint
+    // validation succeeds, it is replaced with the full generic application
+    // substitution, including compiler-solved witness arguments.
 
     // How much conversion cost should be considered for this overload,
     // when ranking candidates.
