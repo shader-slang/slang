@@ -302,17 +302,17 @@ Reports information about checkpoint contexts used for reverse-mode automatic di
 
 <a id="trace-coverage"></a>
 ### -trace-coverage
-Instrument the shader with per-statement line coverage counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping source coverage entries to counters. 
+Instrument the shader with per-statement line coverage counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping source coverage entries to counters.
 
 
 <a id="trace-function-coverage"></a>
 ### -trace-function-coverage
-Instrument the shader with per-function-entry coverage counters. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
+Instrument the shader with per-function-entry coverage counters. Shares the synthesized `__slang_coverage` buffer and coverage metadata path.
 
 
 <a id="trace-branch-coverage"></a>
 ### -trace-branch-coverage
-Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths. Expression-level short-circuit and ternary branches are not instrumented by this mode yet. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
+Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths. Expression-level short-circuit and ternary branches are not instrumented by this mode yet. Shares the synthesized `__slang_coverage` buffer and coverage metadata path.
 
 
 <a id="trace-coverage-binding"></a>
@@ -1859,4 +1859,3 @@ Available help categories for the [-h](#h) option
 * `capability` : A capability describes an optional feature that a target may or may not support. When a [-capability](#capability-1) is specified, the compiler may assume that the target supports that capability, and generate code accordingly. 
 * `file-extension` : A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) may be inferred from the extension of an input or [-o](#o) path 
 * `help-category` : Available help categories for the [-h](#h) option 
-
