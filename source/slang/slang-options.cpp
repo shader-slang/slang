@@ -18,7 +18,9 @@
 #include "../core/slang-file-system.h"
 #include "../core/slang-hex-dump-util.h"
 #include "../core/slang-name-value.h"
+#include "../core/slang-platform.h"
 #include "../core/slang-string-slice-pool.h"
+#include "../core/slang-string-util.h"
 #include "../core/slang-type-text-util.h"
 #include "slang-compiler-options.h"
 #include "slang-compiler.h"
@@ -42,6 +44,10 @@ namespace Slang
 static const char* const kStdinDisplayPath = "<stdin>";
 static const char* const kStdinCommandLinePath = "-";
 static const Index kMaxStdinBytes = Index(256) << 20;
+// Test-only hooks let spawned slangc tests exercise stdin diagnostics without a huge pipe or
+// platform-specific invalid handle setup.
+static const char* const kTestStdinMaxBytesEnvVar = "SLANG_TEST_STDIN_MAX_BYTES";
+static const char* const kTestStdinForceCannotReadEnvVar = "SLANG_TEST_STDIN_FORCE_CANNOT_READ";
 
 namespace
 { // anonymous
@@ -431,7 +437,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::Language,
          "-lang",
          "-lang <language>",
-         "Set the language for the following input files."},
+         "Set the language for the following input files. Required when an input is '-' "
+         "(standard input), because stdin has no file extension."},
         {OptionKind::MatrixLayoutColumn,
          "-matrix-layout-column-major",
          nullptr,
@@ -528,8 +535,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::InputFilesRemain,
          "--",
          nullptr,
-         "Treat the rest of the command line as input files; use '-' to read from standard "
-         "input with -lang."},
+         "Treat the rest of the command line as input files. Use '-' once to read from standard "
+         "input; -lang is required, stdin is limited to 256 MiB, and diagnostics use `<stdin>`."},
         {OptionKind::ReportDownstreamTime,
          "-report-downstream-time",
          nullptr,
@@ -1507,6 +1514,49 @@ void OptionsParser::addInputForeignShaderPath(
     return Profile::Unknown;
 }
 
+static Index _getMaxStdinBytes()
+{
+    StringBuilder envValue;
+    if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice(kTestStdinMaxBytesEnvVar),
+            envValue)))
+    {
+        return kMaxStdinBytes;
+    }
+
+    int64_t parsedValue = 0;
+    if (SLANG_FAILED(StringUtil::parseInt64(envValue.getUnownedSlice(), parsedValue)))
+        return kMaxStdinBytes;
+
+    if (parsedValue < 0 || parsedValue > kMaxStdinBytes)
+        return kMaxStdinBytes;
+
+    return Index(parsedValue);
+}
+
+static bool _isStdinCannotReadForcedForTest()
+{
+    StringBuilder envValue;
+    return SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+               UnownedStringSlice(kTestStdinForceCannotReadEnvVar),
+               envValue)) &&
+           envValue.getUnownedSlice() == "1";
+}
+
+static StdinSourceReadResult _readStdinSourceForOptions(
+    FILE* input,
+    Index maxBytes,
+    List<Byte>& outSource)
+{
+    if (_isStdinCannotReadForcedForTest())
+    {
+        outSource.clear();
+        return StdinSourceReadResult::CannotRead;
+    }
+
+    return readStdinSource(input, maxBytes, outSource);
+}
+
 SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImpliedStage)
 {
     struct Entry
@@ -1560,7 +1610,7 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
 
 SlangResult OptionsParser::_readStdin(List<Byte>& outSource)
 {
-    switch (readStdinSource(stdin, kMaxStdinBytes, outSource))
+    switch (_readStdinSourceForOptions(stdin, _getMaxStdinBytes(), outSource))
     {
     case StdinSourceReadResult::Success:
         return SLANG_OK;

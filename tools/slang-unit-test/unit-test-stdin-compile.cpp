@@ -7,6 +7,7 @@
 #include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 using namespace Slang;
@@ -29,6 +30,64 @@ static void _addStdinCompileArgs(List<String>& args, const char* language)
     args.add("--");
     args.add("-");
 }
+
+static int _writeEnvironmentVariable(const char* key, const char* value)
+{
+#ifdef _WIN32
+    String variable = String(key) + "=" + value;
+    return _putenv(variable.getBuffer());
+#else
+    return setenv(key, value, 1);
+#endif
+}
+
+static int _unsetEnvironmentVariable(const char* key)
+{
+#ifdef _WIN32
+    String variable = String(key) + "=";
+    return _putenv(variable.getBuffer());
+#else
+    return unsetenv(key);
+#endif
+}
+
+struct ScopedEnvVar
+{
+    const char* key;
+    bool hadOldValue = false;
+    bool isSet = false;
+    String oldValue;
+
+    ScopedEnvVar(const char* inKey, const char* value)
+        : key(inKey)
+    {
+#ifdef _WIN32
+        char* oldValueBuffer = nullptr;
+        size_t oldValueLength = 0;
+        if (_dupenv_s(&oldValueBuffer, &oldValueLength, key) == 0 && oldValueBuffer)
+        {
+            hadOldValue = true;
+            oldValue = oldValueBuffer;
+            free(oldValueBuffer);
+        }
+#else
+        if (const char* oldValueBuffer = getenv(key))
+        {
+            hadOldValue = true;
+            oldValue = oldValueBuffer;
+        }
+#endif
+        isSet = _writeEnvironmentVariable(key, value) == 0;
+    }
+
+    ~ScopedEnvVar()
+    {
+        if (hadOldValue)
+            _writeEnvironmentVariable(key, oldValue.getBuffer());
+        else
+            _unsetEnvironmentVariable(key);
+    }
+};
 
 static SlangResult _runSlangcWithStdin(
     UnitTestContext* context,
@@ -352,6 +411,26 @@ static SlangResult _testInputTooLargeReadResult()
     return SLANG_OK;
 }
 
+static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
+{
+    ScopedEnvVar maxBytes("SLANG_TEST_STDIN_MAX_BYTES", "4");
+    if (!maxBytes.isSet)
+        return SLANG_FAIL;
+
+    List<String> args;
+    _addStdinCompileArgs(args, "slang");
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangcWithStdin(context, args, "abcde", result));
+
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "stdin input exceeds the maximum allowed size"))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 static SlangResult _testCannotReadFromStdinReadResult()
 {
     TempFile temp;
@@ -372,6 +451,27 @@ static SlangResult _testCannotReadFromStdinReadResult()
     return SLANG_OK;
 }
 
+static SlangResult _testCannotReadFromStdinDiagnostic(UnitTestContext* context)
+{
+    ScopedEnvVar forceCannotRead("SLANG_TEST_STDIN_FORCE_CANNOT_READ", "1");
+    if (!forceCannotRead.isSet)
+        return SLANG_FAIL;
+
+    List<String> args;
+    _addStdinCompileArgs(args, "slang");
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(
+        _runSlangcWithStdin(context, args, "[shader(\"compute\")] void main() {}\n", result));
+
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "failed to read source from stdin"))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 static SlangResult _testHelpMentionsStdin(UnitTestContext* context)
 {
     CommandLine cmdLine;
@@ -383,7 +483,7 @@ static SlangResult _testHelpMentionsStdin(UnitTestContext* context)
 
     if (result.resultCode != 0)
         return SLANG_FAIL;
-    if (!_contains(result.standardOutput, "use '-' to read from standard input"))
+    if (!_contains(result.standardOutput, "Use '-' once to read from standard input"))
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -405,6 +505,8 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargerThanReadBuffer(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputExactFitReadResult()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeReadResult()));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeDiagnostic(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinReadResult()));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinDiagnostic(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
 }
