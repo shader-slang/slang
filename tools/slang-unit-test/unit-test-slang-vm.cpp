@@ -11,6 +11,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef SLANG_ENABLE_VM_BYTECODE_VALIDATION
+#define SLANG_ENABLE_VM_BYTECODE_VALIDATION 1
+#endif
+
 using namespace Slang;
 
 struct MinimalVMByteCode
@@ -390,6 +394,7 @@ SLANG_UNIT_TEST(slangVMRejectMalformedByteCodeOffsets)
     SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(unterminatedString.data)));
 }
 
+#if SLANG_ENABLE_VM_BYTECODE_VALIDATION
 SLANG_UNIT_TEST(slangVMRejectsOutOfBoundsOperand)
 {
     List<uint8_t> constants;
@@ -434,6 +439,7 @@ SLANG_UNIT_TEST(slangVMRejectsOversizedCopy)
     SLANG_CHECK(runner->selectFunctionByIndex(0) == SLANG_OK);
     SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
+#endif
 
 SLANG_UNIT_TEST(slangVMAllowsUnalignedWorkingSetSize)
 {
@@ -464,6 +470,7 @@ SLANG_UNIT_TEST(slangVMAllowsUnalignedWorkingSetSize)
     SLANG_CHECK(runner->execute(nullptr, 0) == SLANG_OK);
 }
 
+#if SLANG_ENABLE_VM_BYTECODE_VALIDATION
 SLANG_UNIT_TEST(slangVMRejectsNonZeroFirstParameterOffset)
 {
     List<uint8_t> constants;
@@ -575,6 +582,7 @@ SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerDereference)
     SLANG_CHECK(runner->selectFunctionByIndex(0) == SLANG_OK);
     SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
+#endif
 
 SLANG_UNIT_TEST(slangVMAllowsInteriorWorkingSetPointerOffsetBack)
 {
@@ -621,6 +629,7 @@ SLANG_UNIT_TEST(slangVMAllowsInteriorWorkingSetPointerOffsetBack)
     SLANG_CHECK(runner->execute(nullptr, 0) == SLANG_OK);
 }
 
+#if SLANG_ENABLE_VM_BYTECODE_VALIDATION
 SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerOffsetForward)
 {
     List<uint8_t> constants;
@@ -689,6 +698,7 @@ SLANG_UNIT_TEST(slangVMRejectsUndersizedStringOperand)
     SLANG_CHECK(slang_createByteCodeRunner(&runnerDesc, runner.writeRef()) == SLANG_OK);
     SLANG_CHECK(SLANG_FAILED(runner->loadModule(blob)));
 }
+#endif
 
 SLANG_UNIT_TEST(slangVMAllowsNopWithUnusedOperand)
 {
