@@ -99,6 +99,18 @@ struct MetalBufferPointerLoweringContext
 
     // --- Buffer struct field lowering ---
 
+    // Metal's pointer-to-pointer restriction ONLY applies to buffer pointee
+    // types — structs bound via [[buffer(N)]] as device* or constant*.
+    // Structs used in threadgroup memory, thread-local variables, or function
+    // parameters are free to contain int** — Metal accepts those. We therefore
+    // seed the worklist only from structs directly referenced by buffer types.
+    //
+    // Note: because we mutate the struct field type in-place (not cloning),
+    // if the same IRStructType is shared between a buffer binding and a
+    // non-buffer context (e.g. groupshared), the lowering affects both.
+    // This is safe because CastIntToPtr/CastPtrToInt are inserted at ALL
+    // access sites (reached via the field key's use chain), so the round-trip
+    // is consistent regardless of which address space the struct lives in.
     Dictionary<IRStructType*, List<FieldLoweringInfo>> collectStructsToLower()
     {
         Dictionary<IRStructType*, List<FieldLoweringInfo>> result;
@@ -191,6 +203,23 @@ struct MetalBufferPointerLoweringContext
         return getUIntPtrType();
     }
 
+    // In-place field type mutation is sound because:
+    //
+    // 1. The struct key's firstUse chain reaches EVERY FieldAddress and
+    //    FieldExtract instruction in the module that references this field.
+    //    insertCastsForStructFields walks that chain and patches all sites.
+    //
+    // 2. At this late pipeline stage (post-performForceInlining, post-SSA
+    //    elimination), struct fields are accessed only via FieldAddress
+    //    (→ Load/Store/GEP) or FieldExtract (by-value). No function calls
+    //    carry struct values across boundaries — all non-entry-point
+    //    functions have been inlined.
+    //
+    // 3. Varying inputs are lowered to flat parameters before this pass;
+    //    they don't carry struct types with multi-level pointers.
+    //
+    // 4. Global variables with these struct types appear as buffer bindings
+    //    (caught by the seed set in collectStructsToLower).
     void rewriteStructFields(Dictionary<IRStructType*, List<FieldLoweringInfo>>& structsToLower)
     {
         for (auto& [_, fields] : structsToLower)
@@ -236,15 +265,45 @@ struct MetalBufferPointerLoweringContext
                     insertCastsForPointerUses(fieldAddr, origElemPtrType, uintPtrType);
                 }
 
-                // FieldExtract returns the field value directly (by-value access).
-                // Same treatment as a load: rewrite type and insert CastIntToPtr.
+                // FieldExtract returns the field value directly (by-value access,
+                // e.g. when a struct is returned from a function). For scalar
+                // pointer fields, we cast the ulong back to the original pointer
+                // type. For array-of-pointer fields, we set the type to the
+                // lowered array type (Array(UIntPtr, N)) and insert casts at each
+                // GetElement (by-value array indexing) that extracts an element.
                 for (auto inst : fieldExtractInsts)
                 {
-                    inst->setFullType(uintPtrType);
-                    builder.setInsertAfter(inst);
-                    auto castInst = builder.emitCastIntToPtr(origElemPtrType, inst);
-                    inst->replaceUsesWith(castInst);
-                    castInst->setOperand(0, inst);
+                    if (as<IRArrayTypeBase>(fieldInfo.originalPtrType))
+                    {
+                        inst->setFullType(loweredFieldType);
+                        // Walk uses of the extracted array to find GetElement ops
+                        // that extract individual ulong elements — these need a
+                        // CastIntToPtr to restore the pointer type.
+                        List<IRInst*> arrayUses;
+                        for (auto use = inst->firstUse; use; use = use->nextUse)
+                            arrayUses.add(use->getUser());
+                        for (auto arrayUser : arrayUses)
+                        {
+                            if (arrayUser->getOp() == kIROp_GetElement)
+                            {
+                                arrayUser->setFullType(uintPtrType);
+                                builder.setInsertAfter(arrayUser);
+                                auto castInst =
+                                    builder.emitCastIntToPtr(origElemPtrType, arrayUser);
+                                arrayUser->replaceUsesWith(castInst);
+                                castInst->setOperand(0, arrayUser);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Scalar pointer field: cast ulong back to typed pointer.
+                        inst->setFullType(uintPtrType);
+                        builder.setInsertAfter(inst);
+                        auto castInst = builder.emitCastIntToPtr(origElemPtrType, inst);
+                        inst->replaceUsesWith(castInst);
+                        castInst->setOperand(0, inst);
+                    }
                 }
             }
         }
@@ -252,6 +311,23 @@ struct MetalBufferPointerLoweringContext
 
     // --- StorageBuffer element lowering ---
 
+    // Handles RWStructuredBuffer<T*> where the element type itself is a pointer.
+    // The buffer is already a device pointer, so any pointer element creates
+    // pointer-to-pointer which Metal rejects.
+    //
+    // The two-level use walk (bufType->firstUse → bufVar->firstUse) works because:
+    // - bufType->firstUse enumerates every user of the buffer TYPE, which includes
+    //   the IRGlobalParam (or ParameterBlock field) that declares the buffer variable.
+    // - bufVar->firstUse then enumerates every instruction that references that
+    //   variable, which includes all structured buffer access ops.
+    // - The default: break in the switch safely drops non-access-op users (e.g.
+    //   decorations, type references, KernelContext field addresses).
+    //
+    // For ParameterBlock-wrapped buffers (ParameterBlock<struct { RWStructuredBuffer<T*> }>):
+    // the buffer access ops appear on the LOADED buffer value, not directly on
+    // the struct field. This path handles standalone buffer bindings; the struct
+    // field path (collectStructsToLower + insertCastsForStructFields) handles
+    // the ParameterBlock's element struct separately.
     void lowerStorageBufferElements()
     {
         auto uintPtrType = getUIntPtrType();
@@ -330,6 +406,24 @@ struct MetalBufferPointerLoweringContext
 
     // --- Shared cast insertion logic ---
 
+    // This function handles ALL possible users of a rewritten field address
+    // (or storage buffer element pointer). The handlers are exhaustive for
+    // this pipeline stage because:
+    //
+    // - Load: the primary read pattern (FieldAddress → Load → use value)
+    // - Store (as destination): the primary write pattern (value → Store → FieldAddress)
+    // - Store (as value): field address used as a pointer value, e.g. via
+    //   __getAddress. The address of a ulong field IS a valid device pointer;
+    //   stored as-is without casting.
+    // - GetElementPtr: array indexing through the field address. For multi-dim
+    //   arrays, intermediate GEP result types collapse to Ptr(ulong) rather than
+    //   Ptr(Array(ulong,N)) — this is correct because the C-like emitter folds
+    //   GEP chains into subscript expressions (struct->field[i][j]) without
+    //   inspecting intermediate pointer types.
+    // - else (fallthrough): any other user is a pointer-value use (e.g. passed
+    //   as an argument). At this stage no function calls exist (all inlined)
+    //   and no phi nodes exist (SSA eliminated). Atomics on pointer fields are
+    //   excluded by the type system (IAtomicable doesn't include pointer types).
     void insertCastsForPointerUses(
         IRInst* addressInst,
         IRType* originalPtrType,
