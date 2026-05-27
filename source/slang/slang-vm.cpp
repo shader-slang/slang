@@ -570,7 +570,20 @@ bool ByteCodeInterpreter::validatePointerAccess(const void* ptr, size_t size, bo
         return true;
     }
 
-    return true;
+    auto parameterSize = m_currentFunction ? m_currentFunction->m_header->parameterSizeInBytes : 0;
+    if (parameterSize >= sizeof(void*))
+    {
+        auto parameterBytes = reinterpret_cast<uint8_t*>(m_currentWorkingSet);
+        for (uint32_t offset = 0; offset <= parameterSize - sizeof(void*); offset++)
+        {
+            void* parameterPtr = nullptr;
+            memcpy(&parameterPtr, parameterBytes + offset, sizeof(parameterPtr));
+            if (reinterpret_cast<uintptr_t>(parameterPtr) == accessStart)
+                return true;
+        }
+    }
+
+    return failExecution("VM pointer access does not belong to a known section or parameter.");
 }
 
 bool ByteCodeInterpreter::validatePointerOffset(

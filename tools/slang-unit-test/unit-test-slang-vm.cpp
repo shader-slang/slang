@@ -23,6 +23,8 @@ struct MinimalVMByteCode
     uint32_t functionSectionSizeOffset = 0;
     uint32_t functionOffsetOffset = 0;
     uint32_t functionHeaderOffset = 0;
+    uint32_t kernelBlobSizeOffset = 0;
+    uint32_t constantsFourCCOffset = 0;
     uint32_t constantBlobSizeOffset = 0;
     uint32_t stringCountOffset = 0;
     uint32_t stringOffsetOffset = 0;
@@ -89,8 +91,10 @@ static MinimalVMByteCode makeMinimalVMByteCode()
     writeVMTestUInt32At(result.data, result.functionSectionSizeOffset, functionSectionSize);
 
     appendVMTestValue(result.data, kSlangByteCodeKernelBlobFourCC);
+    result.kernelBlobSizeOffset = (uint32_t)result.data.getCount();
     appendVMTestValue(result.data, uint32_t(0));
 
+    result.constantsFourCCOffset = (uint32_t)result.data.getCount();
     appendVMTestValue(result.data, kSlangByteCodeConstantsFourCC);
     result.constantBlobSizeOffset = (uint32_t)result.data.getCount();
     appendVMTestValue(result.data, uint32_t(sizeof(kMinimalFunctionName)));
@@ -112,6 +116,13 @@ static SlangResult validateVMModuleForTest(List<uint8_t>& data)
     return slang_disassembleByteCode(moduleBlob, disassemblyBlob.writeRef());
 }
 
+static ComPtr<slang::IBlob> createRawVMTestBlob(List<uint8_t>& data)
+{
+    ComPtr<slang::IBlob> blob;
+    blob.attach(slang_createBlob(data.getBuffer(), data.getCount()));
+    return blob;
+}
+
 static VMOperand makeVMTestOperand(uint32_t sectionId, uint32_t offset, uint32_t size)
 {
     VMOperand operand = {};
@@ -120,6 +131,20 @@ static VMOperand makeVMTestOperand(uint32_t sectionId, uint32_t offset, uint32_t
     operand.size = size;
     operand.setType(slang::OperandDataType::General);
     return operand;
+}
+
+static uint32_t makeVMTestArithmeticExtCode(
+    uint32_t scalarType,
+    uint32_t scalarBitWidth,
+    uint32_t vectorSize)
+{
+    ArithmeticExtCode extCode = {};
+    extCode.scalarType = scalarType;
+    extCode.scalarBitWidth = scalarBitWidth;
+    extCode.vectorSize = vectorSize;
+    uint32_t result = 0;
+    memcpy(&result, &extCode, sizeof(result));
+    return result;
 }
 
 static void appendVMTestInst(
@@ -213,7 +238,10 @@ static void appendVMTestFunction(
     List<uint8_t>& data,
     uint32_t functionOffsetOffset,
     List<uint8_t>& instCode,
-    uint32_t workingSetSize)
+    uint32_t workingSetSize,
+    uint32_t returnValueSize,
+    ArrayView<uint32_t> parameterOffsets,
+    uint32_t parameterSize)
 {
     auto functionOffset = (uint32_t)data.getCount();
     writeVMTestUInt32At(data, functionOffsetOffset, functionOffset);
@@ -223,8 +251,94 @@ static void appendVMTestFunction(
     funcHeader.name.offset = 0;
     funcHeader.workingSetSizeInBytes = workingSetSize;
     funcHeader.codeSize = (uint32_t)instCode.getCount();
+    funcHeader.parameterCount = (uint32_t)parameterOffsets.getCount();
+    funcHeader.returnValueSizeInBytes = returnValueSize;
+    funcHeader.parameterSizeInBytes = parameterSize;
     appendVMTestValue(data, funcHeader);
+    for (auto parameterOffset : parameterOffsets)
+        appendVMTestValue(data, parameterOffset);
     data.addRange(instCode.getBuffer(), instCode.getCount());
+}
+
+static void appendVMTestFunction(
+    List<uint8_t>& data,
+    uint32_t functionOffsetOffset,
+    List<uint8_t>& instCode,
+    uint32_t workingSetSize)
+{
+    List<uint32_t> parameterOffsets;
+    appendVMTestFunction(
+        data,
+        functionOffsetOffset,
+        instCode,
+        workingSetSize,
+        0,
+        parameterOffsets.getArrayView(),
+        0);
+}
+
+static ComPtr<slang::IBlob> createVMTestBlobWithTwoFunctions(
+    List<uint8_t>& firstInstCode,
+    uint32_t firstWorkingSetSize,
+    uint32_t firstReturnValueSize,
+    List<uint8_t>& secondInstCode,
+    uint32_t secondWorkingSetSize,
+    uint32_t secondReturnValueSize,
+    ArrayView<uint32_t> secondParameterOffsets,
+    uint32_t secondParameterSize,
+    List<uint8_t>& constants)
+{
+    List<uint8_t> data;
+    appendVMTestValue(data, kSlangByteCodeFourCC);
+    appendVMTestValue(data, kSlangByteCodeVersion);
+
+    appendVMTestValue(data, kSlangByteCodeFunctionsFourCC);
+    auto functionSectionSizeOffset = reserveVMTestUInt32(data);
+    auto functionSectionStart = (uint32_t)data.getCount();
+    uint32_t functionCount = 2;
+    appendVMTestValue(data, functionCount);
+
+    uint32_t functionOffsetOffsets[2];
+    for (uint32_t i = 0; i < functionCount; i++)
+        functionOffsetOffsets[i] = reserveVMTestUInt32(data);
+
+    List<uint32_t> firstParameterOffsets;
+    appendVMTestFunction(
+        data,
+        functionOffsetOffsets[0],
+        firstInstCode,
+        firstWorkingSetSize,
+        firstReturnValueSize,
+        firstParameterOffsets.getArrayView(),
+        0);
+    appendVMTestFunction(
+        data,
+        functionOffsetOffsets[1],
+        secondInstCode,
+        secondWorkingSetSize,
+        secondReturnValueSize,
+        secondParameterOffsets,
+        secondParameterSize);
+
+    auto functionSectionSize = (uint32_t)data.getCount() - functionSectionStart;
+    writeVMTestUInt32At(data, functionSectionSizeOffset, functionSectionSize);
+
+    appendVMTestValue(data, kSlangByteCodeKernelBlobFourCC);
+    uint32_t kernelBlobSize = 0;
+    appendVMTestValue(data, kernelBlobSize);
+
+    appendVMTestValue(data, kSlangByteCodeConstantsFourCC);
+    auto constantBlobSize = (uint32_t)constants.getCount();
+    appendVMTestValue(data, constantBlobSize);
+    uint32_t stringCount = 1;
+    uint32_t mainStringOffset = 0;
+    appendVMTestValue(data, stringCount);
+    appendVMTestValue(data, mainStringOffset);
+    data.addRange(constants.getBuffer(), constants.getCount());
+
+    ComPtr<slang::IBlob> blob;
+    blob.attach(slang_createBlob(data.getBuffer(), data.getCount()));
+    return blob;
 }
 
 static ComPtr<slang::IBlob> createVMTestBlobWithThreeFunctions(
@@ -279,6 +393,24 @@ static void appendVMTestMainString(List<uint8_t>& constants)
 {
     char mainName[] = "main";
     constants.addRange((uint8_t*)mainName, sizeof(mainName));
+}
+
+static void expectVMLoadFails(slang::IBlob* blob)
+{
+    ComPtr<slang::IByteCodeRunner> runner;
+    slang::ByteCodeRunnerDesc runnerDesc = {};
+    SLANG_CHECK(slang_createByteCodeRunner(&runnerDesc, runner.writeRef()) == SLANG_OK);
+    SLANG_CHECK(SLANG_FAILED(runner->loadModule(blob)));
+}
+
+static void expectVMExecuteFails(slang::IBlob* blob)
+{
+    ComPtr<slang::IByteCodeRunner> runner;
+    slang::ByteCodeRunnerDesc runnerDesc = {};
+    SLANG_CHECK(slang_createByteCodeRunner(&runnerDesc, runner.writeRef()) == SLANG_OK);
+    SLANG_CHECK(runner->loadModule(blob) == SLANG_OK);
+    SLANG_CHECK(runner->selectFunctionByIndex(0) == SLANG_OK);
+    SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
 
 SLANG_UNIT_TEST(slangVM)
@@ -458,6 +590,46 @@ SLANG_UNIT_TEST(slangVMRejectMalformedByteCodeOffsets)
     stringDataOffset = unterminatedString.stringOffsetOffset + sizeof(uint32_t);
     unterminatedString.data[stringDataOffset + 4] = '!';
     SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(unterminatedString.data)));
+
+    auto misalignedFunctionHeader = makeMinimalVMByteCode();
+    uint8_t paddingByte = 0;
+    misalignedFunctionHeader.data.insertRange(
+        misalignedFunctionHeader.functionHeaderOffset,
+        &paddingByte,
+        1);
+    writeVMTestUInt32At(
+        misalignedFunctionHeader.data,
+        misalignedFunctionHeader.functionOffsetOffset,
+        misalignedFunctionHeader.functionHeaderOffset + 1);
+    writeVMTestUInt32At(
+        misalignedFunctionHeader.data,
+        misalignedFunctionHeader.functionSectionSizeOffset,
+        misalignedFunctionHeader.kernelBlobSizeOffset + 1 - sizeof(uint32_t) -
+            (misalignedFunctionHeader.functionSectionSizeOffset + sizeof(uint32_t)));
+    SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(misalignedFunctionHeader.data)));
+
+    auto misalignedStringOffsetTable = makeMinimalVMByteCode();
+    misalignedStringOffsetTable.data.insertRange(
+        misalignedStringOffsetTable.constantsFourCCOffset,
+        &paddingByte,
+        1);
+    writeVMTestUInt32At(
+        misalignedStringOffsetTable.data,
+        misalignedStringOffsetTable.kernelBlobSizeOffset,
+        1);
+    SLANG_CHECK(SLANG_FAILED(validateVMModuleForTest(misalignedStringOffsetTable.data)));
+
+    auto truncatedInstructionHeader = makeMinimalVMByteCode();
+    getFunctionHeaderForTest(truncatedInstructionHeader)->codeSize = sizeof(VMInstHeader) - 1;
+    auto truncatedInstructionHeaderBlob = createRawVMTestBlob(truncatedInstructionHeader.data);
+    expectVMLoadFails(truncatedInstructionHeaderBlob);
+
+    auto oversizedOperandCount = makeMinimalVMByteCode();
+    auto inst =
+        reinterpret_cast<VMInstHeader*>(getFunctionHeaderForTest(oversizedOperandCount)->getCode());
+    inst->operandCount = UINT32_MAX;
+    auto oversizedOperandCountBlob = createRawVMTestBlob(oversizedOperandCount.data);
+    expectVMLoadFails(oversizedOperandCountBlob);
 }
 
 #if SLANG_ENABLE_VALIDATION_VM_BYTECODE
@@ -505,6 +677,227 @@ SLANG_UNIT_TEST(slangVMRejectsOversizedCopy)
     SLANG_CHECK(runner->selectFunctionByIndex(0) == SLANG_OK);
     SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
+
+SLANG_UNIT_TEST(slangVMRejectsRawCopiedPointerStore)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+    while (constants.getCount() % sizeof(void*))
+        constants.add(0);
+    uint32_t externalValue = 0x12345678;
+    void* externalPtr = &externalValue;
+    auto pointerOffset = (uint32_t)constants.getCount();
+    appendVMTestValue(constants, externalPtr);
+    uint32_t writeValue = 0x9abcdef0;
+    auto valueOffset = (uint32_t)constants.getCount();
+    appendVMTestValue(constants, writeValue);
+
+    List<uint8_t> instCode;
+
+    List<VMOperand> copyOperands;
+    copyOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(void*)));
+    copyOperands.add(
+        makeVMTestOperand(kSlangByteCodeSectionConstants, pointerOffset, sizeof(void*)));
+    appendVMTestInst(instCode, VMOp::Copy, sizeof(void*), copyOperands.getArrayView());
+
+    List<VMOperand> storeOperands;
+    storeOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(void*)));
+    storeOperands.add(
+        makeVMTestOperand(kSlangByteCodeSectionConstants, valueOffset, sizeof(writeValue)));
+    appendVMTestInst(instCode, VMOp::Store, sizeof(writeValue), storeOperands.getArrayView());
+
+    auto blob = createVMTestBlob(instCode, (uint32_t)sizeof(void*), 0, constants);
+    expectVMExecuteFails(blob);
+    SLANG_CHECK(externalValue == 0x12345678);
+}
+
+SLANG_UNIT_TEST(slangVMRejectsJumpTargetMidInstruction)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+
+    List<VMOperand> operands;
+    operands.add(makeVMTestOperand(kSlangByteCodeSectionInsts, 4, 0));
+
+    List<uint8_t> instCode;
+    appendVMTestInst(instCode, VMOp::Jump, 0, operands.getArrayView());
+
+    auto blob = createVMTestBlob(instCode, 8, 0, constants);
+    expectVMLoadFails(blob);
+}
+
+SLANG_UNIT_TEST(slangVMRejectsCallToInvalidFunction)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+
+    List<VMOperand> operands;
+    operands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, 0));
+    operands.add(makeVMTestOperand(kSlangByteCodeSectionFuncs, 1, 0));
+
+    List<uint8_t> instCode;
+    appendVMTestInst(instCode, VMOp::Call, 0, operands.getArrayView());
+
+    auto blob = createVMTestBlob(instCode, 8, 0, constants);
+    expectVMLoadFails(blob);
+}
+
+SLANG_UNIT_TEST(slangVMRejectsCallArgumentCountMismatch)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+    uint32_t value = 1;
+    auto valueOffset = (uint32_t)constants.getCount();
+    appendVMTestValue(constants, value);
+
+    List<VMOperand> callOperands;
+    callOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, 0));
+    callOperands.add(makeVMTestOperand(kSlangByteCodeSectionFuncs, 1, 0));
+    callOperands.add(makeVMTestOperand(kSlangByteCodeSectionConstants, valueOffset, sizeof(value)));
+
+    List<uint8_t> callerCode;
+    appendVMTestInst(callerCode, VMOp::Call, 0, callOperands.getArrayView());
+
+    List<VMOperand> noOperands;
+    List<uint8_t> calleeCode;
+    appendVMTestInst(calleeCode, VMOp::Ret, 0, noOperands.getArrayView());
+
+    List<uint32_t> parameterOffsets;
+    auto blob = createVMTestBlobWithTwoFunctions(
+        callerCode,
+        8,
+        0,
+        calleeCode,
+        8,
+        0,
+        parameterOffsets.getArrayView(),
+        0,
+        constants);
+    expectVMExecuteFails(blob);
+}
+
+SLANG_UNIT_TEST(slangVMRejectsArithmeticOperandCountMismatch)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+    uint32_t value = 1;
+    auto valueOffset = (uint32_t)constants.getCount();
+    appendVMTestValue(constants, value);
+    auto extCode = makeVMTestArithmeticExtCode(kSlangByteCodeScalarTypeSignedInt, 2, 1);
+
+    List<VMOperand> binaryOperands;
+    binaryOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(value)));
+    binaryOperands.add(
+        makeVMTestOperand(kSlangByteCodeSectionConstants, valueOffset, sizeof(value)));
+
+    List<uint8_t> binaryCode;
+    appendVMTestInst(binaryCode, VMOp::Add, extCode, binaryOperands.getArrayView());
+    auto binaryBlob = createVMTestBlob(binaryCode, 8, 0, constants);
+    expectVMExecuteFails(binaryBlob);
+
+    List<VMOperand> unaryOperands;
+    unaryOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(value)));
+    unaryOperands.add(
+        makeVMTestOperand(kSlangByteCodeSectionConstants, valueOffset, sizeof(value)));
+    unaryOperands.add(
+        makeVMTestOperand(kSlangByteCodeSectionConstants, valueOffset, sizeof(value)));
+
+    List<uint8_t> unaryCode;
+    appendVMTestInst(unaryCode, VMOp::Neg, extCode, unaryOperands.getArrayView());
+    auto unaryBlob = createVMTestBlob(unaryCode, 8, 0, constants);
+    expectVMExecuteFails(unaryBlob);
+}
+
+SLANG_UNIT_TEST(slangVMRejectsCastWithOversizedOperandSize)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+    uint64_t value = 1;
+    auto valueOffset = (uint32_t)constants.getCount();
+    appendVMTestValue(constants, value);
+    auto toExtCode = makeVMTestArithmeticExtCode(kSlangByteCodeScalarTypeSignedInt, 2, 16);
+    auto fromExtCode = makeVMTestArithmeticExtCode(kSlangByteCodeScalarTypeSignedInt, 3, 16);
+    auto castExtCode = toExtCode | (fromExtCode << 16);
+
+    List<VMOperand> operands;
+    operands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(uint32_t) * 16));
+    operands.add(makeVMTestOperand(kSlangByteCodeSectionConstants, valueOffset, sizeof(value)));
+
+    List<uint8_t> instCode;
+    appendVMTestInst(instCode, VMOp::Cast, castExtCode, operands.getArrayView());
+
+    auto blob = createVMTestBlob(instCode, sizeof(uint32_t) * 16, 0, constants);
+    expectVMExecuteFails(blob);
+}
+
+SLANG_UNIT_TEST(slangVMRejectsPrintNonStringOperand)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+    while (constants.getCount() < sizeof(const char*))
+        constants.add(0);
+
+    List<VMOperand> operands;
+    operands.add(makeVMTestOperand(kSlangByteCodeSectionConstants, 0, sizeof(const char*)));
+
+    List<uint8_t> instCode;
+    appendVMTestInst(instCode, VMOp::Print, 0, operands.getArrayView());
+
+    auto blob = createVMTestBlob(instCode, 8, 0, constants);
+    expectVMExecuteFails(blob);
+}
+
+SLANG_UNIT_TEST(slangVMRejectsCallReturnLargerThanCaller)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+    uint64_t result = 0x123456789abcdef0;
+    auto resultOffset = (uint32_t)constants.getCount();
+    appendVMTestValue(constants, result);
+
+    List<VMOperand> callOperands;
+    callOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(uint32_t)));
+    callOperands.add(makeVMTestOperand(kSlangByteCodeSectionFuncs, 1, 0));
+
+    List<uint8_t> callerCode;
+    appendVMTestInst(callerCode, VMOp::Call, sizeof(uint32_t), callOperands.getArrayView());
+
+    List<VMOperand> retOperands;
+    retOperands.add(
+        makeVMTestOperand(kSlangByteCodeSectionConstants, resultOffset, sizeof(result)));
+
+    List<uint8_t> calleeCode;
+    appendVMTestInst(calleeCode, VMOp::Ret, sizeof(result), retOperands.getArrayView());
+
+    List<uint32_t> parameterOffsets;
+    auto blob = createVMTestBlobWithTwoFunctions(
+        callerCode,
+        8,
+        0,
+        calleeCode,
+        8,
+        sizeof(result),
+        parameterOffsets.getArrayView(),
+        0,
+        constants);
+    expectVMExecuteFails(blob);
+}
+
+SLANG_UNIT_TEST(slangVMRejectsImmediateOperandAsMemory)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+
+    List<VMOperand> operands;
+    operands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(uint32_t)));
+    operands.add(makeVMTestOperand(kSlangByteCodeSectionImmediate, 0, sizeof(uint32_t)));
+
+    List<uint8_t> instCode;
+    appendVMTestInst(instCode, VMOp::Copy, sizeof(uint32_t), operands.getArrayView());
+
+    auto blob = createVMTestBlob(instCode, 8, 0, constants);
+    expectVMExecuteFails(blob);
+}
 #endif
 
 SLANG_UNIT_TEST(slangVMAllowsUnalignedWorkingSetSize)
@@ -524,16 +917,21 @@ SLANG_UNIT_TEST(slangVMAllowsUnalignedWorkingSetSize)
     List<uint8_t> instCode;
     appendVMTestInst(instCode, VMOp::Copy, sizeof(value), copyOperands.getArrayView());
 
-    List<VMOperand> noOperands;
-    appendVMTestInst(instCode, VMOp::Ret, 0, noOperands.getArrayView());
+    List<VMOperand> retOperands;
+    retOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 16, sizeof(value)));
+    appendVMTestInst(instCode, VMOp::Ret, sizeof(value), retOperands.getArrayView());
 
-    auto blob = createVMTestBlob(instCode, 20, 0, constants);
+    auto blob = createVMTestBlob(instCode, 20, sizeof(value), constants);
     ComPtr<slang::IByteCodeRunner> runner;
     slang::ByteCodeRunnerDesc runnerDesc = {};
     SLANG_CHECK(slang_createByteCodeRunner(&runnerDesc, runner.writeRef()) == SLANG_OK);
     SLANG_CHECK(runner->loadModule(blob) == SLANG_OK);
     SLANG_CHECK(runner->selectFunctionByIndex(0) == SLANG_OK);
     SLANG_CHECK(runner->execute(nullptr, 0) == SLANG_OK);
+    size_t returnValSize = 0;
+    auto returnVal = (uint32_t*)runner->getReturnValue(&returnValSize);
+    SLANG_CHECK(returnValSize == sizeof(value));
+    SLANG_CHECK(*returnVal == value);
 }
 
 #if SLANG_ENABLE_VALIDATION_VM_BYTECODE
