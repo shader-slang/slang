@@ -3,6 +3,11 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
 
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
+
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
@@ -19,11 +24,15 @@ typealias DType = half;
 typealias DType = float;
 #endif
 
-// TEST_INPUT: set weightBuffer = ubuffer(data=[0], stride=4, count=4096)
-uniform RWStructuredBuffer<DType>.Handle weightBuffer;
+struct TestBuffers
+{
+    RWStructuredBuffer<DType>.Handle weightBuffer;
+    RWStructuredBuffer<DType>.Handle biasBuffer;
+}
 
-// TEST_INPUT: set biasBuffer = ubuffer(data=[0], stride=4, count=64)
-uniform RWStructuredBuffer<DType>.Handle biasBuffer;
+// TEST_INPUT: set buffers.weightBuffer = ubuffer(data=[0], stride=4, count=4096)
+// TEST_INPUT: set buffers.biasBuffer = ubuffer(data=[0], stride=4, count=64)
+ParameterBlock<TestBuffers> buffers;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -39,7 +48,7 @@ static const uint OffsetB = 256;
 
 void fillWeightMatrixTiled<int InputSize, int OutputSize>(uint tid)
 {
-    fillForwardWeightTiled<DType, InputSize, OutputSize, BatchSize>(tid, weightBuffer, DType(0.5));
+    fillForwardWeightTiled<DType, InputSize, OutputSize, BatchSize>(tid, buffers.weightBuffer, DType(0.5));
 }
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
@@ -47,16 +56,17 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
-    DType inputData[InputSize];
+    typealias InputVec = WaveTangledVector<DType, TestShMemSize, PaddedInputSize, SubgroupSize, 1>;
+    InputVec inputData = InputVec(DType(0));
     for (int i = 0; i < InputSize; i++)
         inputData[i] = DType(tid + 1);
 
 #if TEST_BIAS
-    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, InputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, true, 1, false>(
-        inputData, weightBuffer, Optional<RWStructuredBuffer<DType>.Handle>(biasBuffer));
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, true, 1, false>(
+        inputData, buffers.weightBuffer, Optional<RWStructuredBuffer<DType>.Handle>(buffers.biasBuffer));
 #else
-    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, InputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 1, false>(
-        inputData, weightBuffer, none);
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 1, false>(
+        inputData, buffers.weightBuffer, none);
 #endif
 
     bool res = true;
@@ -71,8 +81,6 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 #endif
             if (!equals(output[i], expected))
             {
-                if (tid == 0)
-                    printf("FAIL resIndex=%d i=%d expected=%f got=%f\n", resIndex, i, float(expected), float(output[i]));
                 res = false;
                 break;
             }
@@ -86,9 +94,9 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 
 [numthreads(BatchSize, 1, 1)]
 [shader("compute")]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid : SV_GroupIndex)
 {
-    initBias<DType, 64, BatchSize>(tid, biasBuffer);
+    initBias<DType, 64, BatchSize>(tid, buffers.biasBuffer);
 
     // 3x5 (InputSize=3, OutputSize=5, padded to 16x16)
     {
@@ -124,9 +132,9 @@ void computeMain(uint tid : SV_DispatchThreadID)
         AllMemoryBarrierWithGroupSync();
         test<17, 64>(tid, 4);
     }
-    // BUFFER: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
+    // BUFFER: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
 }

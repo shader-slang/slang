@@ -18,7 +18,9 @@
 #include "../core/slang-file-system.h"
 #include "../core/slang-hex-dump-util.h"
 #include "../core/slang-name-value.h"
+#include "../core/slang-platform.h"
 #include "../core/slang-string-slice-pool.h"
+#include "../core/slang-string-util.h"
 #include "../core/slang-type-text-util.h"
 #include "slang-compiler-options.h"
 #include "slang-compiler.h"
@@ -31,13 +33,80 @@
 #include "slang.h"
 
 #include <assert.h>
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
 #include <limits>
+#include <stdio.h>
+#include <string.h>
 
 namespace Slang
 {
 
+static const char* const kStdinDisplayPath = "<stdin>";
+static const char* const kStdinCommandLinePath = "-";
+static const Index kMaxStdinBytes = Index(256) << 20;
+
 namespace
 { // anonymous
+
+enum class StdinSourceReadResult
+{
+    Success,
+    CannotRead,
+    TooLarge,
+};
+
+static StdinSourceReadResult _readStdinSource(FILE* input, Index maxBytes, List<Byte>& outSource)
+{
+    outSource.clear();
+
+    if (!input)
+        return StdinSourceReadResult::CannotRead;
+
+#ifdef _WIN32
+    const int previousMode = _setmode(_fileno(input), _O_BINARY);
+    if (previousMode == -1)
+        return StdinSourceReadResult::CannotRead;
+
+    struct StdinModeGuard
+    {
+        FILE* input;
+        int mode;
+        ~StdinModeGuard() { _setmode(_fileno(input), mode); }
+    } stdinModeGuard{input, previousMode};
+#endif
+
+    clearerr(input);
+
+    // Use blocking stdio here. The process PipeStream path is optimized for polling child
+    // process output and can spin while waiting for piped stdin.
+    char buffer[16 * 1024];
+    for (;;)
+    {
+        const size_t readByteCount = fread(buffer, 1, sizeof(buffer), input);
+        if (readByteCount != 0)
+        {
+            const Index readCount = Index(readByteCount);
+            if (outSource.getCount() > maxBytes || readCount > maxBytes - outSource.getCount())
+            {
+                outSource.clear();
+                return StdinSourceReadResult::TooLarge;
+            }
+            outSource.addRange(reinterpret_cast<const Byte*>(buffer), readCount);
+            continue;
+        }
+
+        if (ferror(input))
+        {
+            outSource.clear();
+            return StdinSourceReadResult::CannotRead;
+        }
+
+        return StdinSourceReadResult::Success;
+    }
+}
 
 // All of the options are given an unique enum
 typedef CompilerOptionName OptionKind;
@@ -424,7 +493,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::Language,
          "-lang",
          "-lang <language>",
-         "Set the language for the following input files."},
+         "Set the language for the following input files. Required when an input is '-' "
+         "(standard input), because stdin has no file extension."},
         {OptionKind::MatrixLayoutColumn,
          "-matrix-layout-column-major",
          nullptr,
@@ -521,7 +591,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::InputFilesRemain,
          "--",
          nullptr,
-         "Treat the rest of the command line as input files."},
+         "Treat the rest of the command line as input files. Use '-' once to read from standard "
+         "input; -lang is required, stdin is limited to 256 MiB, and diagnostics use `<stdin>`."},
         {OptionKind::ReportDownstreamTime,
          "-report-downstream-time",
          nullptr,
@@ -545,7 +616,7 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Instrument the shader with per-statement execution counters. "
          "When writing compiled output to a file, slangc also emits "
-         "`<output>.coverage-mapping.json` mapping counter slots to source positions."},
+         "`<output>.coverage-mapping.json` mapping source coverage entries to counters."},
         {OptionKind::TraceCoverageBinding,
          "-trace-coverage-binding",
          "-trace-coverage-binding <index> <space>",
@@ -1041,7 +1112,7 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::ExperimentalFeature,
          "-experimental-feature",
          nullptr,
-         "Enable experimental features (loading builtin neural module)"},
+         "Enable experimental language and module features"},
         {OptionKind::EnableRichDiagnostics,
          "-enable-experimental-rich-diagnostics",
          nullptr,
@@ -1260,6 +1331,8 @@ struct OptionsParser
 
     static Profile::RawVal findGlslProfileFromPath(const String& path);
 
+    SlangResult addInputStdin(SlangSourceLanguage sourceLanguage);
+
     SlangResult addInputPath(
         char const* inPath,
         SourceLanguage langOverride = SourceLanguage::Unknown);
@@ -1354,6 +1427,7 @@ struct OptionsParser
     SlangResult _parseDebugInformation(const CommandLineArg& arg);
     SlangResult _parseProfile(const CommandLineArg& arg);
     SlangResult _parseHelp(const CommandLineArg& arg);
+    SlangResult _readStdin(List<Byte>& outSource);
 
     SlangSession* m_session = nullptr;
     SlangCompileRequest* m_compileRequest = nullptr;
@@ -1387,6 +1461,7 @@ struct OptionsParser
     int m_translationUnitCount = 0;
     int m_currentTranslationUnitIndex = -1;
 
+    bool m_stdinConsumed = false;
     bool m_hasLoadedRepro = false;
     bool m_compileCoreModule = false;
     slang::CompileCoreModuleFlags m_compileCoreModuleFlags;
@@ -1546,8 +1621,91 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
     return SLANG_SOURCE_LANGUAGE_UNKNOWN;
 }
 
+SlangResult OptionsParser::_readStdin(List<Byte>& outSource)
+{
+    const StdinSourceReadResult readResult = _readStdinSource(stdin, kMaxStdinBytes, outSource);
+
+    if (readResult == StdinSourceReadResult::CannotRead)
+        outSource.clear();
+
+    switch (readResult)
+    {
+    case StdinSourceReadResult::Success:
+        return SLANG_OK;
+    case StdinSourceReadResult::TooLarge:
+        m_sink->diagnose(Diagnostics::StdinInputTooLarge{});
+        return SLANG_FAIL;
+    case StdinSourceReadResult::CannotRead:
+        m_sink->diagnose(Diagnostics::CannotReadFromStdin{});
+        return SLANG_FAIL;
+    }
+
+    SLANG_UNREACHABLE("unexpected stdin read result");
+}
+
+SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
+{
+    if (m_stdinConsumed)
+    {
+        m_sink->diagnose(Diagnostics::StdinInputAlreadyUsed{});
+        return SLANG_FAIL;
+    }
+
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        m_sink->diagnose(Diagnostics::CannotDeduceSourceLanguage{.path = kStdinDisplayPath});
+        return SLANG_FAIL;
+    }
+
+    m_stdinConsumed = true;
+
+    List<Byte> source;
+    SLANG_RETURN_ON_FAIL(_readStdin(source));
+
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG)
+    {
+        if (m_slangTranslationUnitIndex == -1)
+        {
+            m_translationUnitCount++;
+            m_slangTranslationUnitIndex =
+                addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
+        }
+        m_currentTranslationUnitIndex = m_slangTranslationUnitIndex;
+    }
+    else
+    {
+        m_translationUnitCount++;
+        m_currentTranslationUnitIndex = addTranslationUnit(sourceLanguage, Stage::Unknown);
+    }
+
+    const char* sourceBegin =
+        source.getCount() != 0 ? reinterpret_cast<const char*>(source.getBuffer()) : "";
+    const char* sourceEnd = sourceBegin + source.getCount();
+    m_compileRequest->addTranslationUnitSourceStringSpan(
+        m_rawTranslationUnits[m_currentTranslationUnitIndex].translationUnitID,
+        kStdinDisplayPath,
+        sourceBegin,
+        sourceEnd);
+
+    return SLANG_OK;
+}
+
 SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langOverride)
 {
+    SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        auto linkage = m_requestImpl->getLinkage();
+        if (linkage->m_optionSet.hasOption(CompilerOptionName::Language))
+        {
+            sourceLanguage = linkage->m_optionSet.getEnumOption<SlangSourceLanguage>(
+                CompilerOptionName::Language);
+        }
+    }
+
+    if (strcmp(inPath, kStdinCommandLinePath) == 0)
+        return addInputStdin(sourceLanguage);
+
     // look at the extension on the file name to determine
     // how we should handle it.
     String path = String(inPath);
@@ -1566,15 +1724,9 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     }
 
     Stage impliedStage = Stage::Unknown;
-    SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
-        if (m_requestImpl->getLinkage()->m_optionSet.hasOption(CompilerOptionName::Language))
-            sourceLanguage = SlangSourceLanguage(
-                m_requestImpl->getLinkage()->m_optionSet.getEnumOption<SlangSourceLanguage>(
-                    CompilerOptionName::Language));
-        else
-            sourceLanguage = findSourceLanguageFromPath(path, impliedStage);
+        sourceLanguage = findSourceLanguageFromPath(path, impliedStage);
     }
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {

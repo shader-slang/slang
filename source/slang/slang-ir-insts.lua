@@ -1102,8 +1102,8 @@ local insts = {
 	-- preserved and never stripped by `stripDebugInfo`. The coverage-
 	-- instrument IR pass later rewrites each occurrence into an atomic
 	-- add on the IR-synthesized `__slang_coverage` buffer; counter slots are
-	-- assigned one-per-op in traversal order. Host-side tooling can
-	-- aggregate those slots back to `(file, line)` when producing LCOV.
+	-- assigned one-per-op in traversal order. Host-side tooling reads
+	-- source coverage entries and aggregates line entries when producing LCOV.
 	-- Inherent side-effect semantics keep the optimizer from deleting
 	-- or hoisting this op.
 	{ IncrementCoverageCounter = {} },
@@ -2595,6 +2595,10 @@ local insts = {
 		{ SynthesizedBackwardDerivativeWitnessTable = { min_operands = 1 } },
 		{ MakeIDifferentiableWitness = { min_operands = 1 } },
 		{ SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc = { min_operands = 2 } },
+
+		-- For user-provided apply (__func_extension __apply(fn)).
+		-- Identity remat for when MinimalContext == BwdCallable.
+		{ IdentityRemat = { min_operands = 1 } },
 	} },
 	{ DispatchKernel = { operands = { { "baseFn" }, { "threadGroupSize" }, { "dispatchSize" } } } },
 	{
