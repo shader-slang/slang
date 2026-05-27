@@ -2794,6 +2794,61 @@ public:
         // True while this constraint's index is already present in the work-list
         // queue. This scheduling bit applies to every `Kind`.
         bool queued = false;
+
+        // Build a constraint for an ordinary argument supplied by the generic application.
+        static SolverConstraint makeProvidedArg(GenericDecl* genericDecl, Decl* paramDecl, Val* arg)
+        {
+            SolverConstraint constraint;
+            constraint.kind = Kind::ProvidedArgConstraint;
+            constraint.genericDecl = genericDecl;
+            constraint.decl = paramDecl;
+            constraint.val = arg;
+            return constraint;
+        }
+
+        // Build a constraint that merges one inferred ordinary type/value argument.
+        static SolverConstraint makeOrdinaryArg(
+            Decl* paramDecl,
+            Val* arg,
+            ConstraintPriority priority,
+            OrdinaryArgMergeMode mergeMode,
+            Index indexInPack = 0,
+            bool isUsedAsLValue = false,
+            bool potentiallyDependent = false)
+        {
+            SolverConstraint constraint;
+            constraint.kind = Kind::OrdinaryArgConstraint;
+            constraint.decl = paramDecl;
+            constraint.indexInPack = indexInPack;
+            constraint.val = arg;
+            constraint.isUsedAsLValue = isUsedAsLValue;
+            constraint.priority = priority;
+            constraint.ordinaryArgMergeMode = mergeMode;
+            constraint.potentiallyDependent = potentiallyDependent;
+            return constraint;
+        }
+
+        // Build a constraint that substitutes a declaration-time default argument.
+        static SolverConstraint makeDefaultArg(GenericDecl* genericDecl, Decl* paramDecl, Val* arg)
+        {
+            SolverConstraint constraint;
+            constraint.kind = Kind::DefaultArgConstraint;
+            constraint.genericDecl = genericDecl;
+            constraint.decl = paramDecl;
+            constraint.val = arg;
+            constraint.potentiallyDependent = true;
+            return constraint;
+        }
+
+        // Build a constraint that solves one compiler-formed witness argument.
+        static SolverConstraint makeWitness(GenericDecl* genericDecl, Decl* constraintDecl)
+        {
+            SolverConstraint constraint;
+            constraint.kind = Kind::WitnessConstraint;
+            constraint.genericDecl = genericDecl;
+            constraint.decl = constraintDecl;
+            return constraint;
+        }
     };
 
     // The shared context used while semantic checking, type joining, and

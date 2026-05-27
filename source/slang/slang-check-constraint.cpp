@@ -774,12 +774,11 @@ void addProvidedOrdinaryArgConstraints(
         // place: initialization only creates default-substitution values, while
         // every caller-provided or inferred update is represented as a solver
         // constraint.
-        SemanticsVisitor::SolverConstraint constraint;
-        constraint.kind = SemanticsVisitor::SolverConstraint::Kind::ProvidedArgConstraint;
-        constraint.genericDecl = genericDecl;
-        constraint.decl = member;
-        constraint.val = providedOrdinaryArgs[argIndex];
-        inferenceContext.discoveredConstraints.add(constraint);
+        inferenceContext.discoveredConstraints.add(
+            SemanticsVisitor::SolverConstraint::makeProvidedArg(
+                genericDecl,
+                member,
+                providedOrdinaryArgs[argIndex]));
     }
 
     for (auto constraint : discoveredConstraints)
@@ -1077,12 +1076,7 @@ private:
 
         // The parameter declaration is the ordinary argument that will be
         // updated when this constraint solves.
-        SolverConstraint constraint;
-        constraint.kind = SolverConstraint::Kind::DefaultArgConstraint;
-        constraint.genericDecl = genericDecl;
-        constraint.decl = paramDecl;
-        constraint.val = defaultArg;
-        addSolverConstraint(constraint);
+        addSolverConstraint(SolverConstraint::makeDefaultArg(genericDecl, paramDecl, defaultArg));
     }
 
     // Add a solver constraint for one source generic constraint.
@@ -1091,11 +1085,7 @@ private:
         // The constraint declaration is also the declaration that owns the
         // witness argument position. For `T : IFoo`, solving this constraint
         // sets the subtype witness at that position in `m_args`.
-        SolverConstraint constraint;
-        constraint.kind = SolverConstraint::Kind::WitnessConstraint;
-        constraint.genericDecl = genericDecl;
-        constraint.decl = constraintDecl;
-        addSolverConstraint(constraint);
+        addSolverConstraint(SolverConstraint::makeWitness(genericDecl, constraintDecl));
     }
 
     // -------------------------------------------------------------------------
@@ -3198,16 +3188,15 @@ bool SemanticsVisitor::TryUnifyTypeParam(
 {
     // We want to constrain the given type parameter
     // to equal the given type.
-    SolverConstraint constraint;
-    constraint.kind = SolverConstraint::Kind::OrdinaryArgConstraint;
-    constraint.decl = typeParamDecl;
-    constraint.indexInPack = unificationOptions.indexInTypePack;
-    constraint.val = type;
-    constraint.isUsedAsLValue = type.isLeftValue;
-    constraint.priority = unificationOptions.optionalConstraint ? ConstraintPriority::Optional
-                                                                : ConstraintPriority::Required;
-    constraint.ordinaryArgMergeMode = getOrdinaryArgMergeMode(unificationOptions);
-    constraints.discoveredConstraints.add(constraint);
+    auto priority = unificationOptions.optionalConstraint ? ConstraintPriority::Optional
+                                                          : ConstraintPriority::Required;
+    constraints.discoveredConstraints.add(SolverConstraint::makeOrdinaryArg(
+        typeParamDecl,
+        type,
+        priority,
+        getOrdinaryArgMergeMode(unificationOptions),
+        unificationOptions.indexInTypePack,
+        type.isLeftValue));
 
     return true;
 }
@@ -3230,21 +3219,20 @@ bool SemanticsVisitor::TryUnifyIntParam(
     // Value arguments are exact answers. Even if value unification is reached
     // while a witness is doing shape inference, the discovered fact is still
     // `N = 4`, not something that should use type-join merging.
-    SolverConstraint constraint;
-    constraint.kind = SolverConstraint::Kind::OrdinaryArgConstraint;
-    constraint.decl = paramDecl;
-    constraint.ordinaryArgMergeMode = SolverConstraint::OrdinaryArgMergeMode::Exact;
-    constraint.priority = unificationOptions.optionalConstraint ? ConstraintPriority::Optional
-                                                                : ConstraintPriority::Required;
+    auto priority = unificationOptions.optionalConstraint ? ConstraintPriority::Optional
+                                                          : ConstraintPriority::Required;
     // If `val` is of different type than `paramDecl`, we want to insert a type cast.
     if (val->getType() != paramDecl->getType())
     {
         auto cast = m_astBuilder->getTypeCastIntVal(paramDecl->getType(), val);
         val = cast;
     }
-    constraint.val = val;
 
-    constraints.discoveredConstraints.add(constraint);
+    constraints.discoveredConstraints.add(SolverConstraint::makeOrdinaryArg(
+        paramDecl,
+        val,
+        priority,
+        SolverConstraint::OrdinaryArgMergeMode::Exact));
 
     return true;
 }
@@ -3267,14 +3255,13 @@ bool SemanticsVisitor::TryUnifyIntParam(
     {
         if (!isRelevantGeneric(constraints, genericValuePackParamRef.getDecl()->parentDecl))
             return false;
-        SolverConstraint constraint;
-        constraint.kind = SolverConstraint::Kind::OrdinaryArgConstraint;
-        constraint.decl = genericValuePackParamRef.getDecl();
-        constraint.val = val;
-        constraint.priority = unificationOptions.optionalConstraint ? ConstraintPriority::Optional
-                                                                    : ConstraintPriority::Required;
-        constraint.ordinaryArgMergeMode = SolverConstraint::OrdinaryArgMergeMode::Exact;
-        constraints.discoveredConstraints.add(constraint);
+        auto priority = unificationOptions.optionalConstraint ? ConstraintPriority::Optional
+                                                              : ConstraintPriority::Required;
+        constraints.discoveredConstraints.add(SolverConstraint::makeOrdinaryArg(
+            genericValuePackParamRef.getDecl(),
+            val,
+            priority,
+            SolverConstraint::OrdinaryArgMergeMode::Exact));
         return true;
     }
     else
@@ -3554,14 +3541,13 @@ void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
     for (auto c : constraints.discoveredConstraints)
         if (c.decl == intParam->getDeclRef().getDecl())
             return;
-    SolverConstraint c;
-    c.kind = SolverConstraint::Kind::OrdinaryArgConstraint;
-    c.decl = intParam->getDeclRef().getDecl();
-    c.isUsedAsLValue = paramIsLVal;
-    c.val = arg;
-    c.priority = ConstraintPriority::Optional;
-    c.ordinaryArgMergeMode = SolverConstraint::OrdinaryArgMergeMode::Exact;
-    constraints.discoveredConstraints.add(c);
+    constraints.discoveredConstraints.add(SolverConstraint::makeOrdinaryArg(
+        intParam->getDeclRef().getDecl(),
+        arg,
+        ConstraintPriority::Optional,
+        SolverConstraint::OrdinaryArgMergeMode::Exact,
+        0,
+        paramIsLVal));
 }
 
 struct IndexSpan
