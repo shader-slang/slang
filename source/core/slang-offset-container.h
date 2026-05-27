@@ -279,11 +279,15 @@ public:
 
     Offset32Ref<const T> operator[](Index i) const
     {
+        // Serialized repro data can drive these offsets in release builds, so this must remain a
+        // release assert rather than a debug-only SLANG_ASSERT.
         SLANG_RELEASE_ASSERT(i >= 0 && uint32_t(i) < m_count);
         return Offset32Ref<const T>((m_data + i).m_offset);
     }
     Offset32Ref<T> operator[](Index i)
     {
+        // Serialized repro data can drive these offsets in release builds, so this must remain a
+        // release assert rather than a debug-only SLANG_ASSERT.
         SLANG_RELEASE_ASSERT(i >= 0 && uint32_t(i) < m_count);
         return Offset32Ref<T>((m_data + i).m_offset);
     }
@@ -342,16 +346,24 @@ class OffsetBase
 public:
     typedef OffsetBase ThisType;
 
-    /// Turn an offset into a raw regular pointer or reference
+    /// Turn an offset into a raw regular pointer or reference.
+    ///
+    /// This validates that the fixed-size object header fits in the backing buffer. Types with
+    /// variable-length trailing data, such as OffsetString, must still validate their payload
+    /// before consuming it.
     template<typename T>
     T* asRaw(const Offset32Ptr<T>& ptr)
     {
-        return (T*)_getRaw(ptr.m_offset);
+        return (T*)_getRaw(ptr.m_offset, sizeof(T));
     }
     template<typename T>
     T& asRaw(const Offset32Ref<T>& ref)
     {
-        return *(T*)_getRaw(ref.m_offset);
+        uint8_t* raw = _getRaw(ref.m_offset, sizeof(T));
+        // Offset32Ref is non-null by construction; an invalid deserialized offset must trap in
+        // release builds before forming a reference.
+        SLANG_RELEASE_ASSERT(raw);
+        return *(T*)raw;
     }
 
     /// A more terse way to get a raw pointer/reference. Using the [] operator can be seen as
@@ -360,12 +372,16 @@ public:
     template<typename T>
     T* operator[](const Offset32Ptr<T>& ptr)
     {
-        return (T*)_getRaw(ptr.m_offset);
+        return (T*)_getRaw(ptr.m_offset, sizeof(T));
     }
     template<typename T>
     T& operator[](const Offset32Ref<T>& ref)
     {
-        return *(T*)_getRaw(ref.m_offset);
+        uint8_t* raw = _getRaw(ref.m_offset, sizeof(T));
+        // Offset32Ref is non-null by construction; an invalid deserialized offset must trap in
+        // release builds before forming a reference.
+        SLANG_RELEASE_ASSERT(raw);
+        return *(T*)raw;
     }
 
     template<typename T>
@@ -402,10 +418,28 @@ public:
     /// Get the first allocated thing. Typically the root of the structure contained
     void* getFirst() { return (m_dataSize < kStartOffset) ? nullptr : (m_data + kStartOffset); }
 
-    /// Get a raw pointer from the offset
-    uint8_t* _getRaw(uint32_t offset)
+    /// Get a raw pointer from the offset if [offset, offset + size) is inside the backing buffer.
+    /// Returns nullptr for the null offset, missing backing data, or an out-of-bounds range.
+    /// The size covers only the fixed-size object being requested; variable-length trailing data
+    /// must be validated by the consumer before it is read.
+    uint8_t* _getRaw(uint32_t offset, size_t size)
     {
-        return (offset == kNull32Offset) ? nullptr : (m_data + offset);
+        if (offset == kNull32Offset)
+        {
+            return nullptr;
+        }
+
+        if (!m_data)
+        {
+            return nullptr;
+        }
+
+        if (offset > m_dataSize || size > m_dataSize - offset)
+        {
+            return nullptr;
+        }
+
+        return m_data + offset;
     }
 
     OffsetBase()
