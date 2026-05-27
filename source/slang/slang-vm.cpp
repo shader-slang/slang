@@ -15,6 +15,7 @@ static_assert(sizeof(VMInstHeader) == sizeof(VMExecInstHeader));
 
 namespace
 {
+#if SLANG_ENABLE_VALIDATION_VM_BYTECODE
 enum class OperandAccess
 {
     Read,
@@ -188,6 +189,7 @@ static bool validateControlFlowTarget(
     }
     return true;
 }
+#endif
 } // namespace
 
 ISlangUnknown* ByteCodeInterpreter::getInterface(const Guid& guid)
@@ -198,6 +200,7 @@ ISlangUnknown* ByteCodeInterpreter::getInterface(const Guid& guid)
     return nullptr;
 }
 
+#if SLANG_ENABLE_VALIDATION_VM_BYTECODE
 SlangResult ByteCodeInterpreter::validateFunctionForExecution(
     VMFunctionView func,
     ExecutableFunction& exeFunc)
@@ -349,6 +352,7 @@ SlangResult ByteCodeInterpreter::validateFunctionForExecution(
 
     return SLANG_OK;
 }
+#endif
 
 SlangResult ByteCodeInterpreter::prepareModuleForExecution()
 {
@@ -367,7 +371,7 @@ SlangResult ByteCodeInterpreter::prepareModuleForExecution()
     {
         auto func = m_moduleView.getFunction(i);
         auto& exeFunc = m_functions[i];
-#if SLANG_ENABLE_VM_BYTECODE_VALIDATION
+#if SLANG_ENABLE_VALIDATION_VM_BYTECODE
         SLANG_RETURN_ON_FAIL(validateFunctionForExecution(func, exeFunc));
 #endif
         exeFunc.m_codeBuffer.setCount(func.header->codeSize / sizeof(uint64_t));
@@ -383,16 +387,9 @@ SlangResult ByteCodeInterpreter::prepareModuleForExecution()
         if (func.header->codeSize)
             memcpy(exeFunc.m_codeBuffer.getBuffer(), func.functionCode, func.header->codeSize);
 
-            // Replace the instruction headers with function pointers
-#if SLANG_ENABLE_VM_BYTECODE_VALIDATION
-        for (auto instOffset : exeFunc.m_instOffsets)
-        {
-            auto inst = reinterpret_cast<VMExecInstHeader*>(
-                (uint8_t*)exeFunc.m_codeBuffer.getBuffer() + instOffset);
-#else
+        // Replace the instruction headers with function pointers
         for (auto inst : exeFunc)
         {
-#endif
             VMInstHeader* instHeader = reinterpret_cast<VMInstHeader*>(inst);
             auto handler = mapInstToFunction(instHeader, &m_moduleView, m_extInstHandlers);
             if (!handler)
@@ -438,6 +435,7 @@ SlangResult ByteCodeInterpreter::prepareModuleForExecution()
     return SLANG_OK;
 }
 
+#if SLANG_ENABLE_VALIDATION_VM_BYTECODE
 static int getExecOperandSectionId(ByteCodeInterpreter* ctx, const VMExecOperand& operand)
 {
     if (operand.section == &ctx->m_moduleView.constants)
@@ -462,13 +460,6 @@ bool ByteCodeInterpreter::validateOperandAccess(
     bool isWrite,
     uint64_t additionalOffset)
 {
-#if !SLANG_ENABLE_VM_BYTECODE_VALIDATION
-    SLANG_UNUSED(operand);
-    SLANG_UNUSED(size);
-    SLANG_UNUSED(isWrite);
-    SLANG_UNUSED(additionalOffset);
-    return true;
-#else
     uint64_t offset = operand.offset;
     if (additionalOffset > UINT64_MAX - offset)
     {
@@ -523,7 +514,6 @@ bool ByteCodeInterpreter::validateOperandAccess(
             (unsigned long long)sectionSize);
     }
     return true;
-#endif
 }
 
 static bool getPointerRange(const void* ptr, size_t size, uintptr_t& start, uintptr_t& end)
@@ -551,12 +541,6 @@ static bool isPointerRangeInRange(
 
 bool ByteCodeInterpreter::validatePointerAccess(const void* ptr, size_t size, bool isWrite)
 {
-#if !SLANG_ENABLE_VM_BYTECODE_VALIDATION
-    SLANG_UNUSED(ptr);
-    SLANG_UNUSED(size);
-    SLANG_UNUSED(isWrite);
-    return true;
-#else
     if (!ptr && size != 0)
         return failExecution("VM attempted to access a null pointer.");
 
@@ -587,7 +571,6 @@ bool ByteCodeInterpreter::validatePointerAccess(const void* ptr, size_t size, bo
     }
 
     return true;
-#endif
 }
 
 bool ByteCodeInterpreter::validatePointerOffset(
@@ -597,14 +580,6 @@ bool ByteCodeInterpreter::validatePointerOffset(
     size_t accessSize,
     void** outPtr)
 {
-#if !SLANG_ENABLE_VM_BYTECODE_VALIDATION
-    SLANG_UNUSED(accessSize);
-    uint64_t elementCount =
-        elementOffset < 0 ? uint64_t(-(elementOffset + 1)) + 1 : uint64_t(elementOffset);
-    auto byteOffset = elementCount * uint64_t(stride);
-    *outPtr = elementOffset < 0 ? (uint8_t*)basePtr - byteOffset : (uint8_t*)basePtr + byteOffset;
-    return true;
-#else
     auto base = reinterpret_cast<uintptr_t>(basePtr);
     uintptr_t result = base;
     if (stride == 0)
@@ -680,7 +655,6 @@ bool ByteCodeInterpreter::validatePointerOffset(
     }
 
     return true;
-#endif
 }
 
 static bool validateOperandCount(
@@ -731,10 +705,6 @@ static bool validateSpecialOperandSection(
 
 bool ByteCodeInterpreter::validateCurrentInstruction(VMExecInstHeader* inst)
 {
-#if !SLANG_ENABLE_VM_BYTECODE_VALIDATION
-    SLANG_UNUSED(inst);
-    return true;
-#else
     if (!m_currentFunction || !m_currentFuncCode)
         return failExecution("No VM function is active.");
 
@@ -942,8 +912,8 @@ bool ByteCodeInterpreter::validateCurrentInstruction(VMExecInstHeader* inst)
     }
 
     return failExecution("VM instruction has an invalid opcode.");
-#endif
 }
+#endif
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ByteCodeInterpreter::loadModule(IBlob* moduleBlob)
 {
@@ -1058,7 +1028,7 @@ ByteCodeInterpreter::execute(void* argumentData, size_t argumentSize)
     m_executionFailed = false;
     while (m_currentInst)
     {
-#if SLANG_ENABLE_VM_BYTECODE_VALIDATION
+#if SLANG_ENABLE_VALIDATION_VM_BYTECODE
         if (!validateCurrentInstruction(m_currentInst))
             return SLANG_FAIL;
 #endif

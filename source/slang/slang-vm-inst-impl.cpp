@@ -571,13 +571,11 @@ static void jumpIfHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 static void getWorkingSetPtrHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 {
     auto ctx = convert(inCtx);
-#if SLANG_ENABLE_VM_BYTECODE_VALIDATION
     if (inst->opcodeExtension >= ctx->m_currentWorkingSetSizeInBytes)
     {
         ctx->failExecution("VM working-set pointer offset is out of bounds.");
         return;
     }
-#endif
     void* ptr = (uint8_t*)ctx->m_currentWorkingSet + inst->opcodeExtension;
     memcpy(inst->getOperand(0).getPtr(), &ptr, sizeof(void*));
 }

@@ -4,8 +4,8 @@
 #include "core/slang-string-util.h"
 #include "slang-vm-bytecode.h"
 
-#ifndef SLANG_ENABLE_VM_BYTECODE_VALIDATION
-#define SLANG_ENABLE_VM_BYTECODE_VALIDATION 1
+#ifndef SLANG_ENABLE_VALIDATION_VM_BYTECODE
+#define SLANG_ENABLE_VALIDATION_VM_BYTECODE 1
 #endif
 
 using namespace slang;
@@ -60,7 +60,9 @@ public:
     List<ExecutableFunction> m_functions;
     Dictionary<String, VMExtFunction> m_extInstHandlers;
     SlangResult prepareModuleForExecution();
+#if SLANG_ENABLE_VALIDATION_VM_BYTECODE
     SlangResult validateFunctionForExecution(VMFunctionView func, ExecutableFunction& exeFunc);
+#endif
     void* m_extInstHandlerUserData = nullptr;
     List<uint8_t> m_returnRegister;
     List<uint64_t> m_workingSetBuffer;
@@ -128,6 +130,7 @@ public:
         return false;
     }
 
+#if SLANG_ENABLE_VALIDATION_VM_BYTECODE
     bool validateCurrentInstruction(VMExecInstHeader* inst);
     bool validateOperandAccess(
         const VMExecOperand& operand,
@@ -141,6 +144,26 @@ public:
         uint32_t stride,
         size_t accessSize,
         void** outPtr);
+#else
+    bool validateCurrentInstruction(VMExecInstHeader*) { return true; }
+    bool validateOperandAccess(const VMExecOperand&, size_t, bool, uint64_t = 0) { return true; }
+    bool validatePointerAccess(const void*, size_t, bool) { return true; }
+    bool validatePointerOffset(
+        const void* basePtr,
+        int64_t elementOffset,
+        uint32_t stride,
+        size_t accessSize,
+        void** outPtr)
+    {
+        SLANG_UNUSED(accessSize);
+        uint64_t elementCount =
+            elementOffset < 0 ? uint64_t(-(elementOffset + 1)) + 1 : uint64_t(elementOffset);
+        auto byteOffset = elementCount * uint64_t(stride);
+        *outPtr =
+            elementOffset < 0 ? (uint8_t*)basePtr - byteOffset : (uint8_t*)basePtr + byteOffset;
+        return true;
+    }
+#endif
 
     static void defaultPrintCallback(const char* message, void* userData);
     ByteCodeInterpreter();
