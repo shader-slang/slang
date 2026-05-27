@@ -852,15 +852,41 @@ public:
         SemanticsVisitor* visitor,
         GenericInferenceContext&& inferenceContext,
         DeclRef<GenericDecl> genericDeclRef,
-        ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost)
         : m_visitor(visitor)
         , m_astBuilder(visitor->getASTBuilder())
         , m_context(_Move(inferenceContext))
         , m_genericDeclRef(genericDeclRef)
-        , m_providedOrdinaryArgs(providedOrdinaryArgs)
         , m_outBaseCost(outBaseCost)
     {
+        // Build the fixed work table and initial argument arrays up front. The
+        // caller can then install known ordinary arguments with `setProvidedArg`
+        // before starting the work-list solve.
+        collectSolverConstraints();
+        m_isInitialized = initializeArgs();
+    }
+
+    // Install one caller-provided ordinary argument into the live argument list.
+    // This method is part of solver setup and must be called before `solve()`.
+    bool setProvidedArg(Decl* paramDecl, Val* arg)
+    {
+        SLANG_ASSERT(!m_hasStartedSolving);
+        if (!m_isInitialized || m_hasStartedSolving)
+            return false;
+
+        // Some internal callers provide the parameter's own default
+        // substitution arg, such as `T` for the `T` parameter, only to preserve
+        // a dependent declaration shape. That value is ready for substitution,
+        // but it is not fixed user input, so later inference may still replace
+        // it.
+        auto argState = isDefaultSubstitutionArgForParam(paramDecl, arg)
+                            ? ArgState::DependentOrdinaryArg
+                            : ArgState::CallerProvidedOrdinaryArg;
+
+        if (!setCurrentArg(paramDecl, arg))
+            return false;
+        setArgState(paramDecl, argState);
+        return true;
     }
 
     // Solve the generic application and return the substituted inner decl-ref.
@@ -871,18 +897,12 @@ public:
         // inference can add type-promotion cost, and final witness arguments can
         // add conformance cost.
         m_outBaseCost = kConversionCost_None;
+        m_hasStartedSolving = true;
 
-        // The first phase collects every fact that can constrain the argument
-        // list. For `Foo<T : IFoo, U = T.A>(x)`, that includes call-site
-        // unification, the default `U = T.A`, and the witness constraint
-        // `T : IFoo`.
-        collectSolverConstraints();
-        if (!initializeArgs())
-            return DeclRef<Decl>();
-        if (!applyProvidedOrdinaryArgs())
+        if (!m_isInitialized)
             return DeclRef<Decl>();
 
-        // The second phase lets those collected solver constraints solve together. A
+        // The work-list phase lets collected solver constraints solve together. A
         // default argument can wait for a witness, and a witness can wait for an
         // ordinary argument; keeping them in one loop is what lets dependent
         // defaults with associated-type lookups converge.
@@ -916,12 +936,12 @@ private:
     // -------------------------------------------------------------------------
     // Constraint collection
     //
-    // These routines build the solver's complete work table before resolution
-    // begins. They do not try to prove anything. Their job is to put call-site
-    // unification facts, defaults, and witness-producing source constraints
-    // into one representation so the work-list loop can solve them together.
-    // Caller-provided ordinary arguments are already known, so they are
-    // installed directly into the live argument state after initialization.
+    // These routines build the solver's complete work table during
+    // construction. They do not try to prove anything. Their job is to put
+    // call-site unification facts, defaults, and witness-producing source
+    // constraints into one representation so the work-list loop can solve them
+    // together. Caller-provided ordinary arguments are installed separately via
+    // `setProvidedArg()` before `solve()` starts.
 
     // Collect solver constraints before the work-list phase starts.
     void collectSolverConstraints()
@@ -1059,51 +1079,6 @@ private:
                 }
             }
         }
-        return true;
-    }
-
-    // Install ordinary arguments supplied by a generic application before the
-    // work-list starts. These are fixed input facts, not solver conclusions.
-    bool applyProvidedOrdinaryArgs()
-    {
-        if (m_providedOrdinaryArgs.getCount() == 0)
-            return true;
-
-        // `providedOrdinaryArgs` follows the historical convention used by this
-        // solver: it applies to the outermost generic declaration in the chain.
-        // For `Outer<T>.Inner<U>`, that means the provided array is matched
-        // against `Outer`'s ordinary parameters.
-        if (m_genericDecls.getCount() == 0)
-            return true;
-        auto genericDecl = m_genericDecls[0];
-
-        for (auto member : genericDecl->getDirectMemberDecls())
-        {
-            Index argIndex = getGenericParamIndex(member);
-            if (argIndex < 0 || argIndex >= m_providedOrdinaryArgs.getCount())
-                continue;
-
-            if (!setProvidedArg(member, m_providedOrdinaryArgs[argIndex]))
-                return false;
-        }
-        return true;
-    }
-
-    // Install one caller-provided ordinary argument into the live argument list.
-    bool setProvidedArg(Decl* paramDecl, Val* arg)
-    {
-        // Some internal callers provide the parameter's own default
-        // substitution arg, such as `T` for the `T` parameter, only to preserve
-        // a dependent declaration shape. That value is ready for substitution,
-        // but it is not fixed user input, so later inference may still replace
-        // it.
-        auto argState = isDefaultSubstitutionArgForParam(paramDecl, arg)
-                            ? ArgState::DependentOrdinaryArg
-                            : ArgState::CallerProvidedOrdinaryArg;
-
-        if (!setCurrentArg(paramDecl, arg))
-            return false;
-        setArgState(paramDecl, argState);
         return true;
     }
 
@@ -2966,14 +2941,17 @@ private:
     // for source generic constraint declarations.
     DeclRef<GenericDecl> m_genericDeclRef;
 
-    // Caller-provided ordinary arguments, such as `int` in `foo<int>(x)`.
-    // These are installed into `m_args` after initialization and before the
-    // solver work-list starts.
-    ArrayView<Val*> m_providedOrdinaryArgs;
-
     // Output overload cost owned by the caller. The solver writes the final
     // accumulated cost after all ordinary arguments and witnesses are solved.
     ConversionCost& m_outBaseCost;
+
+    // True once construction successfully created the work table and initial
+    // argument arrays. The constructor cannot return failure directly, so
+    // `solve()` and `setProvidedArg()` both consult this bit.
+    bool m_isInitialized = false;
+
+    // Guards the setup-only `setProvidedArg()` phase.
+    bool m_hasStartedSolving = false;
 
     // Nested generic declarations from outermost to innermost. A substituted
     // decl-ref for `Outer<T>.Inner<U>` consumes arguments for `Outer` before it
@@ -3022,8 +3000,29 @@ DeclRef<Decl> SemanticsVisitor::trySolveGenericArguments(
     // ordinary constraints, discovers follow-up constraints through unification,
     // and updates overload cost, so ownership is intentionally transferred at
     // the call boundary.
-    GenericArgumentSolver
-        solver(this, _Move(inferenceContext), genericDeclRef, providedOrdinaryArgs, outBaseCost);
+    GenericArgumentSolver solver(this, _Move(inferenceContext), genericDeclRef, outBaseCost);
+
+    // `providedOrdinaryArgs` follows the historical convention used by this
+    // solver: it applies to the outermost generic declaration in the chain. For
+    // `Outer<T>.Inner<U>`, that means the provided array is matched against
+    // `Outer`'s ordinary parameters.
+    auto genericDeclForProvidedArgs = genericDeclRef.getDecl();
+    for (auto parentGenericDecl = as<GenericDecl>(genericDeclForProvidedArgs->parentDecl);
+         parentGenericDecl;
+         parentGenericDecl = as<GenericDecl>(parentGenericDecl->parentDecl))
+    {
+        genericDeclForProvidedArgs = parentGenericDecl;
+    }
+
+    for (auto member : genericDeclForProvidedArgs->getDirectMemberDecls())
+    {
+        Index argIndex = getGenericParamIndex(member);
+        if (argIndex < 0 || argIndex >= providedOrdinaryArgs.getCount())
+            continue;
+
+        if (!solver.setProvidedArg(member, providedOrdinaryArgs[argIndex]))
+            return DeclRef<Decl>();
+    }
 
     // The caller only needs the final substituted inner decl-ref and the output
     // cost. All work-list state, current arguments, and witness arguments remain
