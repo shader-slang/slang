@@ -31,6 +31,7 @@ static void _addStdinCompileArgs(List<String>& args, const char* language)
     args.add("-");
 }
 
+#if SLANG_ENABLE_STDIN_TEST_HOOKS
 static int _writeEnvironmentVariable(const char* key, const char* value)
 {
 #ifdef _WIN32
@@ -88,6 +89,7 @@ struct ScopedEnvVar
             _unsetEnvironmentVariable(key);
     }
 };
+#endif
 
 struct TestEnvVar
 {
@@ -577,6 +579,7 @@ static SlangResult _testInputLargeBoundaryReadResult()
     return SLANG_OK;
 }
 
+#if SLANG_ENABLE_STDIN_TEST_HOOKS
 static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
 {
 #ifdef _WIN32
@@ -604,6 +607,7 @@ static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
 
     return SLANG_OK;
 }
+#endif
 
 static SlangResult _testCannotReadFromStdinReadResult()
 {
@@ -625,6 +629,7 @@ static SlangResult _testCannotReadFromStdinReadResult()
     return SLANG_OK;
 }
 
+#if SLANG_ENABLE_STDIN_TEST_HOOKS
 static SlangResult _testCannotReadFromStdinDiagnostic(UnitTestContext* context)
 {
 #ifdef _WIN32
@@ -658,6 +663,7 @@ static SlangResult _testCannotReadFromStdinDiagnostic(UnitTestContext* context)
 
     return SLANG_OK;
 }
+#endif
 
 static SlangResult _testHelpMentionsStdin(UnitTestContext* context)
 {
@@ -698,8 +704,12 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputExactFitReadResult()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeReadResult()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargeBoundaryReadResult()));
+#if SLANG_ENABLE_STDIN_TEST_HOOKS
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeDiagnostic(unitTestContext)));
+#endif
     SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinReadResult()));
+#if SLANG_ENABLE_STDIN_TEST_HOOKS
     SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinDiagnostic(unitTestContext)));
+#endif
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
 }

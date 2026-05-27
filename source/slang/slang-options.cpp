@@ -44,11 +44,13 @@ namespace Slang
 static const char* const kStdinDisplayPath = "<stdin>";
 static const char* const kStdinCommandLinePath = "-";
 static const Index kMaxStdinBytes = Index(256) << 20;
+#if SLANG_ENABLE_STDIN_TEST_HOOKS
 // Test-only hooks let spawned slangc tests exercise stdin diagnostics without a huge pipe or
 // platform-specific invalid handle setup.
 static const char* const kTestStdinEnableEnvVar = "SLANG_TEST_STDIN_ENABLE";
 static const char* const kTestStdinMaxBytesEnvVar = "SLANG_TEST_STDIN_MAX_BYTES";
 static const char* const kTestStdinForceCannotReadEnvVar = "SLANG_TEST_STDIN_FORCE_CANNOT_READ";
+#endif
 
 namespace
 { // anonymous
@@ -1515,6 +1517,7 @@ void OptionsParser::addInputForeignShaderPath(
     return Profile::Unknown;
 }
 
+#if SLANG_ENABLE_STDIN_TEST_HOOKS
 static bool _isStdinTestHookEnabled()
 {
     StringBuilder envValue;
@@ -1523,9 +1526,11 @@ static bool _isStdinTestHookEnabled()
                envValue)) &&
            envValue.getUnownedSlice() == "1";
 }
+#endif
 
 static Index _getMaxStdinBytes()
 {
+#if SLANG_ENABLE_STDIN_TEST_HOOKS
     if (!_isStdinTestHookEnabled())
         return kMaxStdinBytes;
 
@@ -1545,10 +1550,14 @@ static Index _getMaxStdinBytes()
         return kMaxStdinBytes;
 
     return Index(parsedValue);
+#else
+    return kMaxStdinBytes;
+#endif
 }
 
 static bool _isStdinCannotReadForcedForTest()
 {
+#if SLANG_ENABLE_STDIN_TEST_HOOKS
     if (!_isStdinTestHookEnabled())
         return false;
 
@@ -1557,6 +1566,9 @@ static bool _isStdinCannotReadForcedForTest()
                UnownedStringSlice(kTestStdinForceCannotReadEnvVar),
                envValue)) &&
            envValue.getUnownedSlice() == "1";
+#else
+    return false;
+#endif
 }
 
 static StdinSourceReadResult _readStdinSourceForOptions(

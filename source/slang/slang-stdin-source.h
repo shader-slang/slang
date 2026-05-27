@@ -13,6 +13,14 @@
 namespace Slang
 {
 
+#ifndef SLANG_ENABLE_STDIN_TEST_HOOKS
+#ifdef _DEBUG
+#define SLANG_ENABLE_STDIN_TEST_HOOKS 1
+#else
+#define SLANG_ENABLE_STDIN_TEST_HOOKS 0
+#endif
+#endif
+
 enum class StdinSourceReadResult
 {
     Success,
