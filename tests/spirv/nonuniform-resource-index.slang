@@ -1,22 +1,10 @@
-// Coverage for `NonUniformResourceIndex` across descriptor-array resource
-// classes when emitting SPIR-V directly.
-//
-// Two things must be correct for each class (cf. glslang's
-// `array[nonuniformEXT(i)]`, and the Vulkan/SPV_EXT_descriptor_indexing spec):
-//
-//   1. NonUniform decoration reaches the operand the access actually consumes:
-//        - sampled/storage images & texel buffers: the OpLoad of the descriptor
-//          that feeds OpSampledImage / OpImageFetch / OpImageWrite;
-//        - uniform/storage buffers: the OpAccessChain into the buffer.
-//   2. The matching type-specific capability is declared (not just
-//      ShaderNonUniform): SampledImage / StorageImage / StorageBuffer /
-//      UniformBuffer / UniformTexelBuffer / StorageTexelBuffer
-//      ArrayNonUniformIndexing.
-//
-// Status when authored (slang ~v2026.9.1-39): the decorations are present for
-// every class EXCEPT ConstantBuffer[] (where NonUniformResourceIndex is dropped
-// entirely), and NONE of the type-specific capabilities are emitted -- slang
-// emits only ShaderNonUniform. These checks pin the fix.
+// nonuniform-resource-index.slang
+
+// Check that `NonUniformResourceIndex` on a descriptor array emits, for each
+// resource class, (1) the NonUniform decoration on the operand the access
+// consumes (the descriptor OpLoad for images/texel buffers, the OpAccessChain
+// for uniform/storage buffers) and (2) the matching type-specific
+// *ArrayNonUniformIndexing capability, alongside the base ShaderNonUniform.
 
 //TEST:SIMPLE(filecheck=COMBINED):-target spirv -entry combinedSampler -stage fragment -emit-spirv-directly
 //TEST:SIMPLE(filecheck=SAMPLED):-target spirv -entry sampledImage -stage fragment -emit-spirv-directly
@@ -30,8 +18,7 @@
 // --- combined sampler array (Sampler2D[] + .Sample) -----------------------
 // Exact form of https://github.com/shader-slang/slang/issues/10930: the
 // NonUniform decoration must reach the descriptor OpLoad consumed by
-// OpImageSampleImplicitLod. (Decoration landed already; the capability is the
-// remaining gap.)
+// OpImageSampleImplicitLod.
 //
 Sampler2D gCombined[];
 
@@ -93,7 +80,6 @@ void storageBuffer(uint3 t : SV_DispatchThreadID)
 
 //
 // --- uniform buffer array (ConstantBuffer[]) ------------------------------
-// Currently broken twice over: no NonUniform decoration AND no capability.
 //
 struct Foo { float4 v; };
 ConstantBuffer<Foo> gCB[];

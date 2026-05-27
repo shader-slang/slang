@@ -456,6 +456,8 @@ template<typename T>
 constexpr bool isSingular = !isPlural<T>;
 
 
+
+
 // Now that we've defined the intermediate data structures we will
 // use to represent SPIR-V code during emission, we will move on
 // to defining the main context type that will drive SPIR-V
@@ -4652,6 +4654,52 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitOpBitcast(parent, inst, inst->getDataType(), vec);
     }
 
+    // In addition to ShaderNonUniform, descriptor-array indexing requires a
+    // resource-class-specific capability (cf. glslang's TranslateNonUniformDecoration
+    // and SPV_EXT_descriptor_indexing). Given the instruction a NonUniform decoration
+    // is attached to, classify it by resource class and return the matching capability
+    // via `outCapability`, or `false` if no resource-class-specific capability applies.
+    SpvCapability getNonUniformDescriptorIndexingCapability(IRInst* decoratedInst)
+    {
+        if (!decoratedInst)
+            return SpvCapabilityMax;
+
+        IRType* type = decoratedInst->getDataType();
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            switch (ptrType->getAddressSpace())
+            {
+            case AddressSpace::StorageBuffer:
+                return SpvCapabilityStorageBufferArrayNonUniformIndexing;
+            case AddressSpace::Uniform:
+                return SpvCapabilityUniformBufferArrayNonUniformIndexing;
+            default:
+                // Textures live in UniformConstant; unwrap and classify by texture type below.
+                type = ptrType->getValueType();
+                break;
+            }
+        }
+
+        while (auto arrayType = as<IRArrayTypeBase>(type))
+            type = arrayType->getElementType();
+
+        if (auto texType = as<IRTextureTypeBase>(type))
+        {
+            // Mirror ensureTextureType(): NONE and READ are sampled (read-only); everything
+            // else (WRITE, READ_WRITE, RASTER_ORDERED) is a storage image/texel buffer.
+            bool isReadWrite = texType->getAccess() != SLANG_RESOURCE_ACCESS_NONE &&
+                               texType->getAccess() != SLANG_RESOURCE_ACCESS_READ;
+            if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER)
+                return isReadWrite ? SpvCapabilityStorageTexelBufferArrayNonUniformIndexing
+                                   : SpvCapabilityUniformTexelBufferArrayNonUniformIndexing;
+            else
+                return isReadWrite ? SpvCapabilityStorageImageArrayNonUniformIndexing
+                                   : SpvCapabilitySampledImageArrayNonUniformIndexing;
+        }
+
+        return SpvCapabilityMax;
+    }
+
     bool isAtomicableAddressSpace(IRInst* type)
     {
         auto ptrType = as<IRPtrTypeBase>(type);
@@ -6287,48 +6335,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 ensureExtensionDeclarationBeforeSpv15(toSlice("SPV_EXT_descriptor_indexing"));
 
                 requireSPIRVCapability(SpvCapabilityShaderNonUniform);
-                // In addition to ShaderNonUniform, descriptor-array indexing requires a
-                // resource-class-specific capability (cf. glslang's
-                // TranslateNonUniformDecoration and SPV_EXT_descriptor_indexing).
-                // requireNonUniformIndexingCapability();
-                IRInst* parentInst = decoration->getParent();
-                if (parentInst)
+                SpvCapability indexingCapability = getNonUniformDescriptorIndexingCapability(decoration->getParent());
+                if (indexingCapability != SpvCapabilityMax)
                 {
-                    IRType* type = parentInst->getDataType();
-                    if (auto ptrType = as<IRPtrTypeBase>(type))
-                    {
-                        switch (ptrType->getAddressSpace())
-                        {
-                        case AddressSpace::StorageBuffer:
-                            requireSPIRVCapability(
-                                SpvCapabilityStorageBufferArrayNonUniformIndexing);
-                            return;
-                        case AddressSpace::Uniform:
-                            requireSPIRVCapability(
-                                SpvCapabilityUniformBufferArrayNonUniformIndexing);
-                            return;
-                        default:
-                            // Textures live in UniformConstant; unwrap and classify by texture type
-                            // below.
-                            type = ptrType->getValueType();
-                            break;
-                        }
-                    }
-                    while (auto arrayType = as<IRArrayTypeBase>(type))
-                        type = arrayType->getElementType();
-                    if (auto texType = as<IRTextureTypeBase>(type))
-                    {
-                        bool isReadWrite = texType->getAccess() != SLANG_RESOURCE_ACCESS_READ;
-                        if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER)
-                            requireSPIRVCapability(
-                                isReadWrite
-                                    ? SpvCapabilityStorageTexelBufferArrayNonUniformIndexing
-                                    : SpvCapabilityUniformTexelBufferArrayNonUniformIndexing);
-                        else
-                            requireSPIRVCapability(
-                                isReadWrite ? SpvCapabilityStorageImageArrayNonUniformIndexing
-                                            : SpvCapabilitySampledImageArrayNonUniformIndexing);
-                    }
+                    requireSPIRVCapability(indexingCapability);
                 }
                 emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
