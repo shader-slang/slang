@@ -3,16 +3,87 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-process-util.h"
 #include "slang-com-ptr.h"
+#include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#else
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 #include <string.h>
 
 using namespace Slang;
+
+SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
 
 static bool _contains(const String& text, const char* expected)
 {
     return text.getUnownedSlice().indexOf(UnownedStringSlice(expected)) >= 0;
 }
+
+static void _appendDiagnostic(char const* message, void* userData)
+{
+    StringBuilder* diagnostics = (StringBuilder*)userData;
+    *diagnostics << message;
+}
+
+struct ScopedWriteOnlyStdin
+{
+    SlangResult redirect()
+    {
+#ifdef _WIN32
+        const int stdinFd = _fileno(stdin);
+        m_savedStdinFd = _dup(stdinFd);
+        if (m_savedStdinFd == -1)
+            return SLANG_FAIL;
+
+        const int writeOnlyFd = _open("NUL", _O_WRONLY);
+        if (writeOnlyFd == -1)
+            return SLANG_FAIL;
+
+        const int result = _dup2(writeOnlyFd, stdinFd);
+        _close(writeOnlyFd);
+#else
+        const int stdinFd = fileno(stdin);
+        m_savedStdinFd = dup(stdinFd);
+        if (m_savedStdinFd == -1)
+            return SLANG_FAIL;
+
+        const int writeOnlyFd = open("/dev/null", O_WRONLY);
+        if (writeOnlyFd == -1)
+            return SLANG_FAIL;
+
+        const int result = dup2(writeOnlyFd, stdinFd);
+        close(writeOnlyFd);
+#endif
+        if (result == -1)
+            return SLANG_FAIL;
+
+        clearerr(stdin);
+        return SLANG_OK;
+    }
+
+    ~ScopedWriteOnlyStdin()
+    {
+        if (m_savedStdinFd == -1)
+            return;
+
+#ifdef _WIN32
+        _dup2(m_savedStdinFd, _fileno(stdin));
+        _close(m_savedStdinFd);
+#else
+        dup2(m_savedStdinFd, fileno(stdin));
+        close(m_savedStdinFd);
+#endif
+        clearerr(stdin);
+    }
+
+private:
+    int m_savedStdinFd = -1;
+};
 
 static void _addStdinCompileArgs(List<String>& args, const char* language)
 {
@@ -32,8 +103,7 @@ static SlangResult _runSlangcWithStdin(
     UnitTestContext* context,
     const List<String>& args,
     const char* stdinSource,
-    ExecuteResult& outResult,
-    bool allowStdinWriteFailure = false)
+    ExecuteResult& outResult)
 {
     CommandLine cmdLine;
     ExecutableLocation slangcLocation(context->executableDirectory, "slangc");
@@ -51,7 +121,7 @@ static SlangResult _runSlangcWithStdin(
         if (length != 0)
         {
             const SlangResult writeResult = stdinStream->write(stdinSource, length);
-            if (SLANG_FAILED(writeResult) && !allowStdinWriteFailure)
+            if (SLANG_FAILED(writeResult))
                 return writeResult;
         }
     }
@@ -419,6 +489,45 @@ static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
     return SLANG_OK;
 }
 
+static SlangResult _testCannotReadFromStdinDiagnostic(UnitTestContext* context)
+{
+    ScopedWriteOnlyStdin stdinRedirect;
+    SLANG_RETURN_ON_FAIL(stdinRedirect.redirect());
+
+    SlangCompileRequest* compileRequest = spCreateCompileRequest(context->slangGlobalSession);
+    if (!compileRequest)
+        return SLANG_FAIL;
+
+    StringBuilder diagnostics;
+    spSetDiagnosticCallback(compileRequest, _appendDiagnostic, &diagnostics);
+    spSetCommandLineCompilerMode(compileRequest);
+
+    const char* args[] = {
+        "-lang",
+        "slang",
+        "-target",
+        "spirv-asm",
+        "-entry",
+        "main",
+        "-stage",
+        "compute",
+        "--",
+        "-",
+    };
+    const SlangResult result =
+        spProcessCommandLineArguments(compileRequest, args, SLANG_COUNT_OF(args));
+    spDestroyCompileRequest(compileRequest);
+
+    if (SLANG_SUCCEEDED(result))
+        return SLANG_FAIL;
+
+    const String diagnosticText = diagnostics.produceString();
+    if (!_contains(diagnosticText, "failed to read source from stdin"))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 static SlangResult _testHelpMentionsStdin(UnitTestContext* context)
 {
     CommandLine cmdLine;
@@ -456,5 +565,6 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testCtrlZIsNotEndOfFile(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargerThanReadBuffer(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeDiagnostic(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinDiagnostic(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
 }
