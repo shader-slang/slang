@@ -133,11 +133,13 @@ static void appendVMTestInst(
         appendVMTestValue(code, operand);
 }
 
-static ComPtr<slang::IBlob> createVMTestBlob(
+static ComPtr<slang::IBlob> createVMTestBlobWithParameters(
     List<uint8_t>& instCode,
     uint32_t workingSetSize,
     uint32_t returnValueSize,
-    List<uint8_t>& constants)
+    List<uint8_t>& constants,
+    ArrayView<uint32_t> parameterOffsets,
+    uint32_t parameterSize)
 {
     List<uint8_t> data;
     appendVMTestValue(data, kSlangByteCodeFourCC);
@@ -158,8 +160,12 @@ static ComPtr<slang::IBlob> createVMTestBlob(
     funcHeader.name.offset = 0;
     funcHeader.workingSetSizeInBytes = workingSetSize;
     funcHeader.codeSize = (uint32_t)instCode.getCount();
+    funcHeader.parameterCount = (uint32_t)parameterOffsets.getCount();
     funcHeader.returnValueSizeInBytes = returnValueSize;
+    funcHeader.parameterSizeInBytes = parameterSize;
     appendVMTestValue(data, funcHeader);
+    for (auto parameterOffset : parameterOffsets)
+        appendVMTestValue(data, parameterOffset);
     data.addRange(instCode.getBuffer(), instCode.getCount());
 
     auto functionSectionSize = (uint32_t)data.getCount() - functionSectionStart;
@@ -181,6 +187,22 @@ static ComPtr<slang::IBlob> createVMTestBlob(
     ComPtr<slang::IBlob> blob;
     blob.attach(slang_createBlob(data.getBuffer(), data.getCount()));
     return blob;
+}
+
+static ComPtr<slang::IBlob> createVMTestBlob(
+    List<uint8_t>& instCode,
+    uint32_t workingSetSize,
+    uint32_t returnValueSize,
+    List<uint8_t>& constants)
+{
+    List<uint32_t> parameterOffsets;
+    return createVMTestBlobWithParameters(
+        instCode,
+        workingSetSize,
+        returnValueSize,
+        constants,
+        parameterOffsets.getArrayView(),
+        0);
 }
 
 static void appendVMTestMainString(List<uint8_t>& constants)
@@ -442,6 +464,31 @@ SLANG_UNIT_TEST(slangVMAllowsUnalignedWorkingSetSize)
     SLANG_CHECK(runner->execute(nullptr, 0) == SLANG_OK);
 }
 
+SLANG_UNIT_TEST(slangVMRejectsNonZeroFirstParameterOffset)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+
+    List<VMOperand> noOperands;
+    List<uint8_t> instCode;
+    appendVMTestInst(instCode, VMOp::Ret, 0, noOperands.getArrayView());
+
+    List<uint32_t> parameterOffsets;
+    parameterOffsets.add(4);
+
+    auto blob = createVMTestBlobWithParameters(
+        instCode,
+        8,
+        0,
+        constants,
+        parameterOffsets.getArrayView(),
+        8);
+    ComPtr<slang::IByteCodeRunner> runner;
+    slang::ByteCodeRunnerDesc runnerDesc = {};
+    SLANG_CHECK(slang_createByteCodeRunner(&runnerDesc, runner.writeRef()) == SLANG_OK);
+    SLANG_CHECK(SLANG_FAILED(runner->loadModule(blob)));
+}
+
 SLANG_UNIT_TEST(slangVMRejectsWorkingSetPointerEscape)
 {
     List<uint8_t> constants;
@@ -479,7 +526,7 @@ SLANG_UNIT_TEST(slangVMRejectsWorkingSetPointerEscape)
     SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
 
-SLANG_UNIT_TEST(slangVMAllowsWorkingSetEndPointerWithoutDereference)
+SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerWithoutDereference)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -500,7 +547,7 @@ SLANG_UNIT_TEST(slangVMAllowsWorkingSetEndPointerWithoutDereference)
     SLANG_CHECK(slang_createByteCodeRunner(&runnerDesc, runner.writeRef()) == SLANG_OK);
     SLANG_CHECK(runner->loadModule(blob) == SLANG_OK);
     SLANG_CHECK(runner->selectFunctionByIndex(0) == SLANG_OK);
-    SLANG_CHECK(runner->execute(nullptr, 0) == SLANG_OK);
+    SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
 
 SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerDereference)
@@ -529,7 +576,7 @@ SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerDereference)
     SLANG_CHECK(SLANG_FAILED(runner->execute(nullptr, 0)));
 }
 
-SLANG_UNIT_TEST(slangVMAllowsWorkingSetEndPointerOffsetBack)
+SLANG_UNIT_TEST(slangVMAllowsInteriorWorkingSetPointerOffsetBack)
 {
     List<uint8_t> constants;
     appendVMTestMainString(constants);
@@ -547,7 +594,7 @@ SLANG_UNIT_TEST(slangVMAllowsWorkingSetEndPointerOffsetBack)
     List<VMOperand> getWorkingSetPtrOperands;
     getWorkingSetPtrOperands.add(
         makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(void*)));
-    appendVMTestInst(instCode, VMOp::GetWorkingSetPtr, 16, getWorkingSetPtrOperands.getArrayView());
+    appendVMTestInst(instCode, VMOp::GetWorkingSetPtr, 12, getWorkingSetPtrOperands.getArrayView());
 
     List<VMOperand> offsetPtrOperands;
     offsetPtrOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 8, sizeof(void*)));

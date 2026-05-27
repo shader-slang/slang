@@ -142,24 +142,27 @@ static bool isUnaryArithmeticOp(VMOp op)
     }
 }
 
-static bool isValidInstOffset(const ExecutableFunction& func, uint32_t offset)
-{
-    for (auto instOffset : func.m_instOffsets)
-    {
-        if (instOffset == offset)
-            return true;
-    }
-    return false;
-}
-
 static Index findInstIndex(const ExecutableFunction& func, uint32_t offset)
 {
-    for (Index i = 0; i < func.m_instOffsets.getCount(); i++)
+    Index first = 0;
+    Index count = func.m_instOffsets.getCount();
+    while (first < count)
     {
-        if (func.m_instOffsets[i] == offset)
-            return i;
+        auto mid = first + (count - first) / 2;
+        auto instOffset = func.m_instOffsets[mid];
+        if (instOffset == offset)
+            return mid;
+        if (instOffset < offset)
+            first = mid + 1;
+        else
+            count = mid;
     }
     return -1;
+}
+
+static bool isValidInstOffset(const ExecutableFunction& func, uint32_t offset)
+{
+    return findInstIndex(func, offset) >= 0;
 }
 
 static bool validateControlFlowTarget(
@@ -214,7 +217,8 @@ SlangResult ByteCodeInterpreter::validateFunctionForExecution(
     for (uint32_t i = 0; i < header->parameterCount; i++)
     {
         auto parameterOffset = header->getParameterOffset(i);
-        if (parameterOffset < lastParameterOffset || parameterOffset > header->parameterSizeInBytes)
+        if ((i == 0 && parameterOffset != 0) || parameterOffset < lastParameterOffset ||
+            parameterOffset > header->parameterSizeInBytes)
         {
             reportError("Invalid parameter offset in function.");
             return SLANG_FAIL;

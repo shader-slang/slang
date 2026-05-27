@@ -572,7 +572,7 @@ static void getWorkingSetPtrHandler(IByteCodeRunner* inCtx, VMExecInstHeader* in
 {
     auto ctx = convert(inCtx);
 #if SLANG_ENABLE_VM_BYTECODE_VALIDATION
-    if (inst->opcodeExtension > ctx->m_currentWorkingSetSizeInBytes)
+    if (inst->opcodeExtension >= ctx->m_currentWorkingSetSizeInBytes)
     {
         ctx->failExecution("VM working-set pointer offset is out of bounds.");
         return;
