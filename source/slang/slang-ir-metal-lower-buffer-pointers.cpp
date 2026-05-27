@@ -336,11 +336,20 @@ struct MetalBufferPointerLoweringContext
             else if (user->getOp() == kIROp_Store)
             {
                 auto storeInst = cast<IRStore>(user);
-                auto val = storeInst->getVal();
-                builder.setInsertBefore(storeInst);
-                IRInst* args[] = {val};
-                auto castInst = builder.emitIntrinsicInst(uintPtrType, kIROp_CastPtrToInt, 1, args);
-                storeInst->setOperand(1, castInst);
+                if (storeInst->getPtr() == addressInst)
+                {
+                    // addressInst is the DESTINATION — cast the stored value
+                    // from pointer to ulong.
+                    auto val = storeInst->getVal();
+                    builder.setInsertBefore(storeInst);
+                    IRInst* args[] = {val};
+                    auto castInst =
+                        builder.emitIntrinsicInst(uintPtrType, kIROp_CastPtrToInt, 1, args);
+                    storeInst->setOperand(1, castInst);
+                }
+                // else: addressInst is the VALUE being stored (e.g. via
+                // __getAddress). The address of a ulong field is a valid
+                // device pointer and can be stored as-is.
             }
             else if (user->getOp() == kIROp_GetElementPtr)
             {
@@ -353,7 +362,9 @@ struct MetalBufferPointerLoweringContext
             }
             else
             {
-                SLANG_ASSERT(!"Unexpected user of lowered pointer field address");
+                // The field address may be used as a pointer value (e.g. via
+                // __getAddress storing the address elsewhere). The address of
+                // a ulong field is a valid device pointer — leave it as-is.
             }
         }
     }

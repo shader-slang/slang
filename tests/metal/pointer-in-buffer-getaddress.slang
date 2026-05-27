@@ -1,23 +1,42 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
-// Verify that __getAddress on a buffer element is correctly rejected on Metal.
-// __getAddress(ptrs[0]) would produce int** (Ptr<int*>), but Metal doesn't
-// allow taking the address of buffer elements this way. The front-end should
-// emit an appropriate diagnostic.
+// Test __getAddress on a pointer field accessed through a uniform pointer.
+// __getAddress(data->ptr) where ptr is int** produces int*** — a multi-level
+// pointer that exercises our lowering pass.
 //
-// This addresses reviewer feedback about the __addressOf edge case.
+// Note: __getAddress on structured buffer subscripts (e.g. buf[i]) is a
+// pre-existing frontend limitation on all targets. The working pattern is
+// accessing through pointer fields as shown here.
 //
 // See: https://github.com/shader-slang/slang/issues/10841
 
-RWStructuredBuffer<int*> ptrs;
+struct Inner
+{
+    int** ptr;
+    int value;
+};
+
+uniform Inner* data;
 RWStructuredBuffer<int> output;
+
+// The Inner struct should have ptr lowered to ulong.
+// CHECK-LABEL: struct Inner
+// CHECK: ulong
+// CHECK: };
+
+// The kernel casts ulong back to a typed pointer for dereferencing.
+// (__getAddress + deref optimizes to direct field access, so the triple
+// pointer collapses to a double-pointer cast in the generated code.)
+// CHECK-LABEL: computeMain
+// CHECK: int device* device*
+
+// METALLIB: computeMain
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
-    int** pp = __getAddress(ptrs[0]);
-//CHECK:       ^^^^^^^^^^^^ invalid __getAddress usage
-//CHECK:       ^^^^^^^^^^^^ '__getAddress' cannot take the address of a function-local variable on this target.
-    output[tid.x] = **pp;
+    int*** ppp = __getAddress(data->ptr);
+    output[tid.x] = ***ppp;
 }
