@@ -25,35 +25,38 @@ default_tool() {
 }
 
 GIT_EXE="${GIT_EXE:-$(default_tool git)}"
-GH_EXE="${GH_EXE:-$(default_tool gh)}"
 TMUX_EXE="${TMUX_EXE:-tmux}"
 
 show_usage() {
   me=$(basename "$0")
   cat <<EOF
-Usage: $me [options] <branch-name>
+Usage:
+  $me [options] <branch-name>
+  $me --review <pull-request-url> [options] [branch-name]
 
-Create a sibling git worktree for a new branch.
+Create a sibling git worktree for a new branch or GitHub pull request review.
 
 Options:
   --base <ref>       Base branch or commit for the new worktree.
                      Defaults to the current branch, which must be master,
                      main, or release/*.
+  --review <url>     Fetch a GitHub pull request head and create a review
+                     branch/worktree. Defaults to review-pr-<number>.
   --dir <path>       Destination directory. Defaults to ../<branch-name>.
                      If the branch name contains slashes, they are replaced
-                     by dashes.
-  --issue <issue>    Create and checkout the branch through GitHub CLI so it
-                     is linked to the issue.
-  --tmux             Start a tmux session named after the branch in the new
-                     worktree after setup completes.
+                     by dashes. In review mode, defaults to
+                     ../review-pr-<number>.
+  --tmux             Start a tmux session named after the branch or review in
+                     the new worktree after setup completes.
   --no-submodules    Skip submodule initialization.
   -h, --help         Show this help.
 
 Examples:
   $me git-worktree-add
   $me --tmux git-worktree-add
-  $me descriptor-heap-access --issue 1234
   $me --base release/2026.1 --dir ../descriptor-fix descriptor-heap-access
+  $me --review https://github.com/shader-slang/slang/pull/11267
+  $me --review https://github.com/shader-slang/slang/pull/11267 review-11267
 
 Prefer branch names without slashes for predictable worktree directory names.
 Use --dir when creating a worktree for an existing branch name that contains slashes.
@@ -143,6 +146,14 @@ git_run() {
   "$GIT_EXE" "$@"
 }
 
+git_run_noninteractive() {
+  GIT_TERMINAL_PROMPT=0 "$GIT_EXE" "$@" </dev/null
+}
+
+is_git_repository() {
+  git_run -C "$1" rev-parse --git-dir >/dev/null 2>&1
+}
+
 start_tmux_session() {
   local sessionName="$1"
   local sessionDir="$2"
@@ -155,28 +166,69 @@ start_tmux_session() {
   fi
 }
 
-resolve_issue_base() {
-  local ref="$1"
+parse_review_pr_url() {
+  local input="$1"
+  local clean="$input"
 
-  case "$ref" in
-  refs/heads/*)
-    ref="${ref#refs/heads/}"
-    ;;
-  refs/remotes/*/*)
-    ref="${ref#refs/remotes/}"
-    ;;
-  esac
+  clean="${clean%%#*}"
+  clean="${clean%%\?*}"
+  clean="${clean%/}"
+  clean="${clean#http://}"
+  clean="${clean#https://}"
+  clean="${clean#www.}"
 
-  if git_run show-ref --verify --quiet "refs/heads/$ref" ||
-    git_run show-ref --verify --quiet "refs/remotes/origin/$ref"; then
-    printf '%s\n' "$ref"
-    return 0
+  if [[ "$clean" =~ ^github\.com/([^/]+)/([^/]+)/pull/([0-9]+)(/.*)?$ ]]; then
+    reviewOwner="${BASH_REMATCH[1]}"
+    reviewRepo="${BASH_REMATCH[2]%.git}"
+    reviewNumber="${BASH_REMATCH[3]}"
+    reviewRepoUrl="https://github.com/$reviewOwner/$reviewRepo.git"
+    return
   fi
 
-  if git_run show-ref --verify --quiet "refs/remotes/$ref"; then
-    printf '%s\n' "${ref#*/}"
-    return 0
+  die "Unsupported review URL: $input. Expected https://github.com/<owner>/<repo>/pull/<number>."
+}
+
+github_repo_from_url() {
+  local input="$1"
+  local clean="$input"
+
+  clean="${clean%%#*}"
+  clean="${clean%%\?*}"
+  clean="${clean%/}"
+  clean="${clean%.git}"
+  clean="${clean#http://}"
+  clean="${clean#https://}"
+  clean="${clean#ssh://git@}"
+  clean="${clean#git@}"
+  clean="${clean#www.}"
+
+  if [[ "$clean" =~ ^github\.com[:/]([^/]+)/([^/]+)$ ]]; then
+    printf '%s/%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+    return
   fi
+
+  return 1
+}
+
+review_repo_matches_configured_remote() {
+  local remoteName
+  local remoteUrl
+  local remoteRepo
+  local reviewRepoFull="$reviewOwner/$reviewRepo"
+
+  while IFS= read -r remoteName; do
+    remoteName="${remoteName%$'\r'}"
+    if ! remoteUrl="$(git_run remote get-url "$remoteName" </dev/null 2>/dev/null)"; then
+      continue
+    fi
+    remoteUrl="${remoteUrl%$'\r'}"
+    if ! remoteRepo="$(github_repo_from_url "$remoteUrl")"; then
+      continue
+    fi
+    if [[ "${remoteRepo,,}" == "${reviewRepoFull,,}" ]]; then
+      return 0
+    fi
+  done < <(git_run remote)
 
   return 1
 }
@@ -184,9 +236,13 @@ resolve_issue_base() {
 branchInput=""
 baseRef=""
 dstDirInput=""
-githubIssue=""
 initSubmodules=1
 startTmux=0
+reviewInput=""
+reviewOwner=""
+reviewRepo=""
+reviewNumber=""
+reviewRepoUrl=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -201,18 +257,18 @@ while [[ $# -gt 0 ]]; do
     baseRef="$2"
     shift
     ;;
+  --review)
+    if [[ $# -lt 2 || -z "${2:-}" ]]; then
+      die "--review requires a pull request URL."
+    fi
+    reviewInput="$2"
+    shift
+    ;;
   --dir | -d)
     if [[ $# -lt 2 || -z "${2:-}" ]]; then
       die "--dir requires a value."
     fi
     dstDirInput="$2"
-    shift
-    ;;
-  --issue | -issue)
-    if [[ $# -lt 2 || -z "${2:-}" ]]; then
-      die "--issue requires a value."
-    fi
-    githubIssue="$2"
     shift
     ;;
   --tmux)
@@ -246,17 +302,17 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-if [[ -z "$branchInput" ]]; then
+if [[ -n "$reviewInput" && -n "$baseRef" ]]; then
+  die "Cannot use --base with --review."
+fi
+
+if [[ -z "$reviewInput" && -z "$branchInput" ]]; then
   show_usage >&2
   exit 1
 fi
 
 require_command "$GIT_EXE"
 log_tool "Git" "$GIT_EXE"
-if [[ -n "$githubIssue" ]]; then
-  require_command "$GH_EXE"
-  log_tool "GitHub CLI" "$GH_EXE"
-fi
 if [[ $startTmux -eq 1 ]]; then
   require_command "$TMUX_EXE"
   log_tool "tmux" "$TMUX_EXE"
@@ -270,44 +326,68 @@ fi
 repoRootShell="$(to_shell_path "$repoRootGit")"
 cd "$repoRootShell"
 
-branchName="$branchInput"
+branchName=""
 
-if ! git_run check-ref-format --branch "$branchName" >/dev/null 2>&1; then
-  die "Invalid branch name: $branchName"
-fi
-
-if git_run show-ref --verify --quiet "refs/heads/$branchName"; then
-  die "Branch already exists: $branchName"
-fi
-
-if [[ $startTmux -eq 1 ]] && "$TMUX_EXE" has-session -t "=$branchName" 2>/dev/null; then
-  die "tmux session already exists: $branchName"
-fi
-
-if [[ -z "$baseRef" ]]; then
-  baseRef="$(git_run branch --show-current)"
-  if [[ -z "$baseRef" ]]; then
-    die "Cannot infer a base branch from detached HEAD. Use --base <ref>."
+if [[ -n "$reviewInput" ]]; then
+  parse_review_pr_url "$reviewInput"
+  baseRef="refs/pr/$reviewNumber/head"
+  if ! review_repo_matches_configured_remote; then
+    die "Review URL repository does not match any configured GitHub remote: $reviewOwner/$reviewRepo"
   fi
-  case "$baseRef" in
-  master | main | release | release/*) ;;
-  *)
-    die "Current branch must be master, main, or release/*. Current branch: $baseRef"
-    ;;
-  esac
+  branchName="$branchInput"
+  if [[ -z "$branchName" ]]; then
+    branchName="review-pr-$reviewNumber"
+  fi
+
+  if ! git_run check-ref-format --branch "$branchName" >/dev/null 2>&1; then
+    die "Invalid branch name: $branchName"
+  fi
+
+  if git_run show-ref --verify --quiet "refs/heads/$branchName"; then
+    die "Branch already exists: $branchName"
+  fi
+  worktreeName="$branchName"
+  worktreeName="${worktreeName//\//-}"
+  sessionName="$worktreeName"
+
+  log "Fetching PR #$reviewNumber from $reviewRepoUrl..."
+  git_run fetch -q "$reviewRepoUrl" "+pull/$reviewNumber/head:$baseRef"
+else
+  branchName="$branchInput"
+
+  if ! git_run check-ref-format --branch "$branchName" >/dev/null 2>&1; then
+    die "Invalid branch name: $branchName"
+  fi
+
+  if git_run show-ref --verify --quiet "refs/heads/$branchName"; then
+    die "Branch already exists: $branchName"
+  fi
+
+  if [[ -z "$baseRef" ]]; then
+    baseRef="$(git_run branch --show-current)"
+    if [[ -z "$baseRef" ]]; then
+      die "Cannot infer a base branch from detached HEAD. Use --base <ref>."
+    fi
+    case "$baseRef" in
+    master | main | release | release/*) ;;
+    *)
+      die "Current branch must be master, main, or release/*. Current branch: $baseRef"
+      ;;
+    esac
+  fi
+
+  worktreeName="$branchName"
+  worktreeName="${worktreeName//\//-}"
+  sessionName="$branchName"
 fi
 
 if ! git_run rev-parse --verify --quiet "$baseRef^{commit}" >/dev/null; then
   die "Base ref does not resolve to a commit: $baseRef"
 fi
 
-issueBase=""
-if [[ -n "$githubIssue" ]] && ! issueBase="$(resolve_issue_base "$baseRef")"; then
-  die "--issue requires --base to be a branch name, because gh issue develop does not accept arbitrary commits: $baseRef"
+if [[ $startTmux -eq 1 ]] && "$TMUX_EXE" has-session -t "=$sessionName" 2>/dev/null; then
+  die "tmux session already exists: $sessionName"
 fi
-
-worktreeName="$branchName"
-worktreeName="${worktreeName//\//-}"
 
 maxWorktreeNameLength=50
 if [[ -n "$dstDirInput" ]]; then
@@ -330,6 +410,9 @@ if [[ ! -d "$dstParent" ]]; then
 fi
 
 log "Repository: $repoRootShell"
+if [[ -n "$reviewInput" ]]; then
+  log "Review: $reviewInput"
+fi
 log "Base ref: $baseRef"
 log "Branch: $branchName"
 log "Worktree: $dstDirShell"
@@ -337,18 +420,9 @@ log "Worktree: $dstDirShell"
 log "Pruning stale worktree records..."
 git_run worktree prune
 
-if [[ -n "$githubIssue" ]]; then
-  log "Adding detached worktree..."
-  git_run worktree add -q --detach "$dstDirGit" "$baseRef"
-
-  cd "$dstDirShell"
-  log "Creating GitHub issue branch for issue $githubIssue..."
-  "$GH_EXE" issue develop "$githubIssue" --name "$branchName" --base "$issueBase" --checkout
-else
-  log "Adding worktree and creating branch..."
-  git_run worktree add -q -b "$branchName" "$dstDirGit" "$baseRef"
-  cd "$dstDirShell"
-fi
+log "Adding worktree and creating branch..."
+git_run worktree add -q -b "$branchName" "$dstDirGit" "$baseRef"
+cd "$dstDirShell"
 
 if [[ $initSubmodules -eq 0 ]]; then
   log "Skipping submodule initialization."
@@ -363,43 +437,53 @@ else
       submodules+=("$submodulePath")
     fi
   done < <(git_run config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null || true)
+  submoduleJobCount="${#submodules[@]}"
+  if [[ $submoduleJobCount -eq 0 ]]; then
+    submoduleJobCount=1
+  fi
 
   if [[ ${#submodules[@]} -gt 0 ]]; then
     git_run submodule -q init -- "${submodules[@]}"
   fi
 
-  submoduleUpdatePids=()
+  log "Updating top-level submodules concurrently..."
+  submoduleTempDir="$(mktemp -d "${TMPDIR:-/tmp}/git-worktree-add-submodules.XXXXXX")"
+  trap 'rm -rf "$submoduleTempDir"' EXIT
+  submoduleErrorFile="$submoduleTempDir/errors"
+  submoduleFailureFile="$submoduleTempDir/failed"
   for submodulePath in "${submodules[@]}"; do
     log "Updating: $submodulePath"
+
     (
       moduleReferenceGit="$repoRootGit/$submodulePath"
-      moduleReferenceShell="$(to_shell_path "$moduleReferenceGit")"
-      if [[ -d "$moduleReferenceShell" ]]; then
-        git_run submodule -q update --reference "$moduleReferenceGit" -- "$submodulePath"
-      else
-        git_run submodule -q update -- "$submodulePath"
+      submoduleUpdateArgs=(submodule -q update)
+      if is_git_repository "$moduleReferenceGit"; then
+        submoduleUpdateArgs+=(--reference "$moduleReferenceGit")
+      fi
+      submoduleUpdateArgs+=(-- "$submodulePath")
+
+      if ! git_run_noninteractive "${submoduleUpdateArgs[@]}" >/dev/null 2>>"$submoduleErrorFile"; then
+        : >"$submoduleFailureFile"
       fi
     ) &
-    submoduleUpdatePids+=("$!")
+    sleep 0.2 # Stagger background submodule updates to reduce Git lock contention.
   done
 
-  submoduleUpdateFailed=0
-  for submoduleUpdatePid in "${submoduleUpdatePids[@]}"; do
-    if ! wait "$submoduleUpdatePid"; then
-      submoduleUpdateFailed=1
+  wait
+
+  if [[ -e "$submoduleFailureFile" ]]; then
+    if [[ -s "$submoduleErrorFile" ]]; then
+      sed 's/^/  /' "$submoduleErrorFile" >&2
     fi
-  done
-
-  if [[ $submoduleUpdateFailed -ne 0 ]]; then
     echo "Submodule update failed. You may want to manually run:" >&2
-    echo "  \"$GIT_EXE\" submodule update --init --recursive" >&2
+    echo "  \"$GIT_EXE\" submodule update --init --recursive --jobs $submoduleJobCount" >&2
     exit 2
   fi
 
   log "Updating submodules recursively..."
-  if ! git_run submodule -q update --init --recursive; then
+  if ! git_run_noninteractive submodule -q update --init --recursive --jobs "$submoduleJobCount"; then
     echo "Submodule update failed. You may want to manually run:" >&2
-    echo "  \"$GIT_EXE\" submodule update --init --recursive" >&2
+    echo "  \"$GIT_EXE\" submodule update --init --recursive --jobs $submoduleJobCount" >&2
     exit 2
   fi
 
@@ -407,6 +491,6 @@ else
 fi
 
 if [[ $startTmux -eq 1 ]]; then
-  log "Starting tmux session: $branchName"
-  start_tmux_session "$branchName" "$dstDirShell"
+  log "Starting tmux session: $sessionName"
+  start_tmux_session "$sessionName" "$dstDirShell"
 fi

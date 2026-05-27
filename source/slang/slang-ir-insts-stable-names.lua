@@ -830,6 +830,7 @@ return {
 	["DebugCompilationUnit"] = 854,
 	["IncrementCoverageCounter"] = 855,
 	["SubpassLoad"] = 856,
-	["IncrementFunctionCoverageCounter"] = 857,
-	["IncrementBranchCoverageCounter"] = 858
+	["TranslateBase.IdentityRemat"] = 857,
+	["IncrementFunctionCoverageCounter"] = 858,
+	["IncrementBranchCoverageCounter"] = 859
 }
