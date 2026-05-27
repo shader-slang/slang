@@ -1732,6 +1732,7 @@ static IRInst* ensureAbstractThisWitnessVisibleFromCurrentScope(
     IRGenContext* context,
     IRInst* abstractThisWitness,
     Type* thisType);
+bool isAbstractWitnessTable(IRInst* inst);
 
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
 {
@@ -1850,10 +1851,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitWitnessLookupIntVal(WitnessLookupIntVal* val)
     {
         auto witnessVal = lowerVal(context, val->getWitness());
-        if (auto thisTypeWitness = as<IRThisTypeWitness>(witnessVal.val))
+        if (isAbstractWitnessTable(witnessVal.val))
         {
             // A static-const requirement used inside an interface signature lowers as a
-            // witness lookup through the interface's abstract `This` witness. In a generic
+            // witness lookup through an abstract witness table. In a generic
             // interface such as `interface I<T> { static const int N; void f(T[N]); }`,
             // the `T` parameter and the lowered lookup for `N` become operands of the same
             // hoistable IR type. Cloning the abstract witness into the current lowering
@@ -1861,7 +1862,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             // dependent lookup with a concrete value.
             witnessVal.val = ensureAbstractThisWitnessVisibleFromCurrentScope(
                 context,
-                thisTypeWitness,
+                witnessVal.val,
                 val->getWitness()->getSub());
         }
         auto key = getInterfaceRequirementKey(context, val->getKey());
