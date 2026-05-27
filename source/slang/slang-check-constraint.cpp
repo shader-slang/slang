@@ -19,9 +19,9 @@
 // ordinary arguments.
 //
 // Before solving, `getDefaultSubstitutionArgs()` provides default substitution
-// arguments for the whole list. These are declaration-shaped stand-ins such as
-// `T`, `N`, or the declared witness for `T : IFoo`. They keep dependent values
-// like `T.Value` structurally valid while the solver is still finding real
+// arguments for the whole list. These are the declaration's own substitution
+// values, such as `T`, `N`, or the declared witness for `T : IFoo`. They keep
+// dependent values like `T.Value` structurally valid while the solver is finding
 // answers. The solver's live argument list is the current `m_args` array: it
 // starts from those default substitution arguments and is updated in place as
 // ordinary arguments and witness arguments become known.
@@ -40,9 +40,9 @@
 // -------------------------------
 //
 // A solver constraint is `Done` when it is satisfied under the current live
-// argument list, `Solved` when it just changed that list, `Blocked` when it is
-// waiting for another ordinary or witness argument, and `Failed` when the
-// generic application is not viable. A solved constraint wakes dependent work
+// argument list, `MadeProgress` when it just changed that list, `Blocked` when
+// it is waiting for another ordinary or witness argument, and `Failed` when the
+// generic application is not viable. Progress wakes dependent work
 // conservatively; exact wake-up precision is an optimization, not part of the
 // semantic contract. A blocked constraint remains unsatisfied, so if the queue
 // becomes empty while blocked work remains, the solver rejects the candidate
@@ -582,7 +582,7 @@ Witness* findDiffTypeInfoWitnessForConstraint(
 {
     // The constraint declaration is substituted through the candidate's current
     // generic arguments before asking for diff-type info. For
-    // `Foo<T>() where T : IDifferentiable`, this is what turns the declaration
+    // `Foo<T>() where __hasDiffTypeInfo(T)`, this is what turns the declaration
     // type `T` into the concrete or inferred type currently stored for `T`.
     auto constraintDeclRef = astBuilder->getGenericAppDeclRef(genericDeclRef, args, constraintDecl)
                                  .as<HasDiffTypeInfoConstraintDecl>();
@@ -660,7 +660,7 @@ enum class ArgState
     // may still provide a more specific value.
     DependentOrdinaryArg,
 
-    // Ordinary solver constraints inferred this ordinary argument.
+    // Ordinary solver constraints produced this ordinary argument.
     SolvedOrdinaryArg,
 
     // A default generic argument produced this ordinary argument. Later
@@ -676,16 +676,52 @@ enum class ArgState
     SolvedWitnessArg,
 };
 
-// `ArgInfo` stores metadata for an argument position. The argument value itself
-// lives in `m_args`; this struct stores the state needed to merge future solver
-// constraints and to preserve overload-ranking information.
+// `ArgInfo` stores the solver-local metadata for one argument position. The
+// argument value itself lives in `m_args`; this type only tracks how that value
+// may be used or replaced, plus payloads used by ordinary-argument solving.
 struct ArgInfo
 {
-    ArgState state = ArgState::DefaultSubstitutionArg;
-    Val* substitutedDefaultArg = nullptr;
-    SemanticsVisitor::ConstraintPriority priority = SemanticsVisitor::ConstraintPriority::Default;
-    ShortList<QualType, 8> types;
-    bool isConstrainedForOverloadRanking = false;
+    using ConstraintPriority = SemanticsVisitor::ConstraintPriority;
+
+    ArgState getState() const { return m_state; }
+
+    void setState(ArgState state)
+    {
+        m_state = state;
+        if (state != ArgState::DefaultGenericArg)
+            m_substitutedDefaultArg = nullptr;
+    }
+
+    Val* getSubstitutedDefaultArg() const
+    {
+        SLANG_ASSERT(m_state == ArgState::DefaultGenericArg || !m_substitutedDefaultArg);
+        return m_substitutedDefaultArg;
+    }
+
+    void setDefaultGenericArg(Val* substitutedDefaultArg)
+    {
+        SLANG_ASSERT(substitutedDefaultArg);
+        m_state = ArgState::DefaultGenericArg;
+        m_substitutedDefaultArg = substitutedDefaultArg;
+    }
+
+    ConstraintPriority getPriority() const { return m_priority; }
+    void setPriority(ConstraintPriority priority) { m_priority = priority; }
+
+    ShortList<QualType, 8>& getTypeConstraints()
+    {
+        SLANG_ASSERT(
+            m_state == ArgState::DefaultSubstitutionArg ||
+            m_state == ArgState::DependentOrdinaryArg || m_state == ArgState::SolvedOrdinaryArg ||
+            m_state == ArgState::DefaultGenericArg || m_state == ArgState::EmptyPackArg);
+        return m_typeConstraints;
+    }
+
+private:
+    ArgState m_state = ArgState::DefaultSubstitutionArg;
+    Val* m_substitutedDefaultArg = nullptr;
+    ConstraintPriority m_priority = ConstraintPriority::Default;
+    ShortList<QualType, 8> m_typeConstraints;
 };
 
 // Return the default generic argument for one ordinary parameter.
@@ -852,10 +888,10 @@ public:
         // The constraint is satisfied and did not change `m_args`.
         Done,
 
-        // The constraint wrote a new or changed ordinary argument or witness
-        // argument. Other solver constraints may need to run again under the
-        // new argument list.
-        Solved,
+        // The constraint wrote a new or changed ordinary/witness argument, or
+        // discovered follow-up ordinary constraints. Other solver constraints
+        // may need to run again under the updated work table and argument list.
+        MadeProgress,
 
         // The constraint cannot be attempted yet because it refers to an
         // argument that still contains a default substitution arg.
@@ -892,7 +928,8 @@ public:
         // list. For `Foo<T : IFoo, U = T.A>(x)`, that includes call-site
         // unification, the default `U = T.A`, and the witness constraint
         // `T : IFoo`.
-        if (!collectConstraints())
+        collectSolverConstraints();
+        if (!initializeArgs())
             return DeclRef<Decl>();
 
         // The second phase lets those collected solver constraints solve together. A
@@ -936,7 +973,7 @@ private:
     // together.
 
     // Collect solver constraints before the work-list phase starts.
-    bool collectConstraints()
+    void collectSolverConstraints()
     {
         // Generic substitutions are nested, so the solver starts by collecting the
         // chain from the outermost generic to the generic being applied.
@@ -951,10 +988,9 @@ private:
         // next. They enter the same work list as ordinary constraints.
         collectGenericMemberConstraints();
 
-        // The argument arrays start from the same declaration-order layout used
-        // by ordinary generic substitution. Solver constraints update `m_args`
-        // in place as they solve ordinary and witness arguments.
-        return initializeArgs();
+        // Argument-array initialization is deliberately separate: collection
+        // decides what work exists, while initialization creates the live
+        // declaration-order storage that the work-list mutates.
     }
 
     // Collect the nested generic declarations being solved.
@@ -1025,7 +1061,7 @@ private:
         // `T : IFoo` and the default generic argument for `U = T.A`.
         for (auto member : genericDecl->getDirectMemberDecls())
         {
-            if (doesParamHasDefault(member))
+            if (ordinaryParamDeclHasDefaultGenericArg(member))
                 addDefaultGenericArgConstraint(genericDecl, member);
             else if (isGenericConstraintDecl(member))
                 addWitnessConstraint(genericDecl, member);
@@ -1078,8 +1114,9 @@ private:
         return true;
     }
 
-    // Return true if an ordinary parameter declares a default generic argument.
-    bool doesParamHasDefault(Decl* member)
+    // Return true if an ordinary generic parameter declares a default argument
+    // that can be serialized as a generic application argument.
+    bool ordinaryParamDeclHasDefaultGenericArg(Decl* member)
     {
         // Pack parameters are handled by omission rules, not default generic
         // arguments. Treating an omitted pack as a default would blur the
@@ -1231,11 +1268,11 @@ private:
             if (state == ConstraintSolvingState::Blocked)
                 continue;
 
-            // `Done` and `Solved` are both terminal for the current argument
-            // list. `Solved` additionally wakes dependent work because the
-            // substitution seen by defaults and witnesses may have changed.
+            // `Done` and `MadeProgress` are both terminal for the current
+            // argument list. `MadeProgress` additionally wakes dependent work
+            // because defaults and witnesses may see a new substitution.
             m_solverConstraints[constraintIndex].satisfied = true;
-            if (state == ConstraintSolvingState::Solved)
+            if (state == ConstraintSolvingState::MadeProgress)
                 wakeSolverConstraintsAfterProgress(constraintIndex);
         }
 
@@ -1317,7 +1354,7 @@ private:
         addSolverConstraintsForDiscoveredConstraints();
         if (state == ConstraintSolvingState::Blocked)
             return ConstraintSolvingState::Blocked;
-        return ConstraintSolvingState::Solved;
+        return ConstraintSolvingState::MadeProgress;
     }
 
     // Return true if a constraint solves an ordinary type/value argument.
@@ -1336,6 +1373,21 @@ private:
     {
         return constraint.ordinaryArgMergeMode == SolverConstraint::OrdinaryArgMergeMode::Exact;
     }
+
+    enum class WitnessConstraintInferenceResult
+    {
+        NotApplicable,
+        NoNewOrdinaryConstraint,
+        AddedOrdinaryConstraint,
+        FailedToAddOrdinaryConstraint,
+    };
+
+    enum class JoinedSubtypeInferenceResult
+    {
+        NoConstraintNeeded,
+        AddedConstraint,
+        FailedToAddConstraint,
+    };
 
     // Install a generic-application-provided ordinary argument.
     ConstraintSolvingState solveProvidedArgConstraint(SolverConstraint const& constraint)
@@ -1368,9 +1420,9 @@ private:
         // in `m_args`. A conservative retry only counts as progress if the
         // visible argument or its readiness state changed.
         if (oldState != argState)
-            return ConstraintSolvingState::Solved;
+            return ConstraintSolvingState::MadeProgress;
         if (!oldArg || !oldArg->equals(constraint.val))
-            return ConstraintSolvingState::Solved;
+            return ConstraintSolvingState::MadeProgress;
         return ConstraintSolvingState::Done;
     }
 
@@ -1453,17 +1505,19 @@ private:
         // A default constraint can be woken multiple times. If it recomputes the
         // same argument, report `Done` so dependents are not needlessly woken.
         auto& argInfo = m_argInfo[constraint.decl];
-        if (argInfo.substitutedDefaultArg && argInfo.substitutedDefaultArg->equals(substArg))
-            return ConstraintSolvingState::Done;
+        if (auto previousDefaultArg = argInfo.getSubstitutedDefaultArg())
+        {
+            if (previousDefaultArg->equals(substArg))
+                return ConstraintSolvingState::Done;
+        }
 
         // Set both the argument and the state. The value goes into `m_args`
         // because substitutions read only that array; the state remains
         // replaceable so later ordinary inference can still override a default.
-        argInfo.substitutedDefaultArg = substArg;
         if (!setCurrentArg(constraint.decl, substArg))
             return ConstraintSolvingState::Failed;
-        argInfo.state = ArgState::DefaultGenericArg;
-        return ConstraintSolvingState::Solved;
+        argInfo.setDefaultGenericArg(substArg);
+        return ConstraintSolvingState::MadeProgress;
     }
 
     // Solve one source generic constraint into a witness argument.
@@ -1474,8 +1528,21 @@ private:
         // known, comparing its actual conformance shape against `IFoo<U>` can
         // discover `U = X`; the witness still waits until that new ordinary
         // constraint has solved `U`.
-        if (tryInferOrdinaryArgsFromWitnessConstraint(constraint))
+        auto inferenceResult = tryInferOrdinaryArgsFromWitnessConstraint(constraint);
+        switch (inferenceResult)
+        {
+        case WitnessConstraintInferenceResult::AddedOrdinaryConstraint:
             return ConstraintSolvingState::Blocked;
+        case WitnessConstraintInferenceResult::FailedToAddOrdinaryConstraint:
+            // Shape inference is only a source of additional ordinary-argument
+            // hints. If adding such a hint fails, keep going to the normal
+            // witness proof below; that proof remains the authoritative
+            // accept/reject step for this source generic constraint.
+            break;
+        case WitnessConstraintInferenceResult::NotApplicable:
+        case WitnessConstraintInferenceResult::NoNewOrdinaryConstraint:
+            break;
+        }
 
         // A witness can only be proved after the ordinary and witness arguments
         // it mentions are ready. For example, `T : IFoo<U>` waits for both `T`
@@ -1510,11 +1577,12 @@ private:
         if (oldWitnessArg && oldWitnessArg->equals(solvedWitness))
             return ConstraintSolvingState::Done;
 
-        return ConstraintSolvingState::Solved;
+        return ConstraintSolvingState::MadeProgress;
     }
 
     // Try to discover ordinary-argument constraints from one witness constraint.
-    bool tryInferOrdinaryArgsFromWitnessConstraint(SolverConstraint const& constraint)
+    WitnessConstraintInferenceResult tryInferOrdinaryArgsFromWitnessConstraint(
+        SolverConstraint const& constraint)
     {
         // Only subtype/equality constraints have a conformance shape that can
         // expose more ordinary arguments. Coercion, pack, and differentiability
@@ -1522,7 +1590,7 @@ private:
         // solved subject type against an interface with generic arguments.
         auto typeConstraintDecl = as<GenericTypeConstraintDecl>(constraint.decl);
         if (!typeConstraintDecl)
-            return false;
+            return WitnessConstraintInferenceResult::NotApplicable;
 
         // The subject side must be ready before the shape comparison is useful.
         // In `T : IFoo<U>`, comparing before `T` is known would only restate the
@@ -1530,7 +1598,7 @@ private:
         // system can find its actual `IFoo<X>` facet and unification can
         // discover `U = X`.
         if (hasUnreadyDependenciesForVal(typeConstraintDecl->sub.type))
-            return false;
+            return WitnessConstraintInferenceResult::NoNewOrdinaryConstraint;
 
         // Substitute the source constraint through the current argument list.
         // The target side may still contain default substitution args, such as
@@ -1555,11 +1623,22 @@ private:
         // interface and selects `float`. That `float` is not a witness yet; it
         // is a better ordinary argument for `T`, so add it to the same
         // work-list loop and let the witness retry after `T` changes.
-        return addSubjectConstraintForJoinedSubtypeIfNeeded(typeConstraintDecl, sub, joinedSub);
+        auto joinedSubjectResult =
+            addSubjectConstraintForJoinedSubtypeIfNeeded(typeConstraintDecl, sub, joinedSub);
+        switch (joinedSubjectResult)
+        {
+        case JoinedSubtypeInferenceResult::NoConstraintNeeded:
+            return WitnessConstraintInferenceResult::NoNewOrdinaryConstraint;
+        case JoinedSubtypeInferenceResult::AddedConstraint:
+            return WitnessConstraintInferenceResult::AddedOrdinaryConstraint;
+        case JoinedSubtypeInferenceResult::FailedToAddConstraint:
+            return WitnessConstraintInferenceResult::FailedToAddOrdinaryConstraint;
+        }
+        return WitnessConstraintInferenceResult::NoNewOrdinaryConstraint;
     }
 
     // Add an ordinary constraint when subtype joining improves the subject type.
-    bool addSubjectConstraintForJoinedSubtypeIfNeeded(
+    JoinedSubtypeInferenceResult addSubjectConstraintForJoinedSubtypeIfNeeded(
         GenericTypeConstraintDecl* constraintDecl,
         Type* currentSub,
         Type* joinedSub)
@@ -1568,7 +1647,7 @@ private:
         // argument list, there is no new ordinary argument to solve before the
         // witness is attempted.
         if (!joinedSub || currentSub->equals(joinedSub))
-            return false;
+            return JoinedSubtypeInferenceResult::NoConstraintNeeded;
 
         // Re-unify the declaration-time subject with the joined type rather
         // than writing to one parameter directly. This keeps the general
@@ -1579,11 +1658,15 @@ private:
         unificationOptions.optionalConstraint =
             constraintDecl->hasModifier<OptionalConstraintModifier>();
         unificationOptions.equalityConstraint = constraintDecl->isEqualityConstraint;
-        return m_visitor->TryUnifyTypes(
-            m_context,
-            unificationOptions,
-            QualType(constraintDecl->sub.type),
-            QualType(joinedSub));
+        if (m_visitor->TryUnifyTypes(
+                m_context,
+                unificationOptions,
+                QualType(constraintDecl->sub.type),
+                QualType(joinedSub)))
+        {
+            return JoinedSubtypeInferenceResult::AddedConstraint;
+        }
+        return JoinedSubtypeInferenceResult::FailedToAddConstraint;
     }
 
     // Substitute a dependent ordinary constraint through current arguments.
@@ -1627,9 +1710,9 @@ private:
         // `T[2]` grows the list to at least three entries.
         bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
         auto& argInfo = m_argInfo[typeParam];
-        auto oldState = argInfo.state;
+        auto oldState = argInfo.getState();
         auto oldArg = getCurrentArg(typeParam);
-        auto& types = argInfo.types;
+        auto& types = argInfo.getTypeConstraints();
         if (!isPack)
             types.setCount(1);
 
@@ -1658,20 +1741,20 @@ private:
         if (!type)
         {
             type = cType;
-            argInfo.priority = c.priority;
+            argInfo.setPriority(c.priority);
         }
         // Later constraints are merged according to their merge mode. Equality
         // constraints must agree with the current answer. Ordinary type
         // constraints use the existing join behavior for call inference.
-        else if (!mergeTypeConstraint(type, argInfo.priority, c, cType))
+        else if (!mergeTypeConstraint(type, argInfo.getPriority(), c, cType))
         {
             return ConstraintSolvingState::Failed;
         }
 
         // Preserve the strongest priority seen so later merges know whether a
         // default, optional hint, or required constraint owns the current type.
-        if (c.priority < argInfo.priority)
-            argInfo.priority = c.priority;
+        if (c.priority < argInfo.getPriority())
+            argInfo.setPriority(c.priority);
 
         // Publish the current argument to `m_args` immediately. Dependent
         // defaults and witnesses read from `m_args`, so type-pack progress must
@@ -1681,7 +1764,7 @@ private:
         {
             if (!setCurrentArg(typeParam, arg))
                 return ConstraintSolvingState::Failed;
-            argInfo.state = ArgState::SolvedOrdinaryArg;
+            argInfo.setState(ArgState::SolvedOrdinaryArg);
         }
 
         // Report progress only when this constraint produced a new published
@@ -1690,9 +1773,9 @@ private:
         if (!arg)
             return ConstraintSolvingState::Done;
         if (oldState != ArgState::SolvedOrdinaryArg)
-            return ConstraintSolvingState::Solved;
+            return ConstraintSolvingState::MadeProgress;
         if (!oldArg || !oldArg->equals(arg))
-            return ConstraintSolvingState::Solved;
+            return ConstraintSolvingState::MadeProgress;
         return ConstraintSolvingState::Done;
     }
 
@@ -1764,10 +1847,10 @@ private:
         // Keep the old published value so the work-list result can distinguish
         // real progress from a retry that rediscovered the same pack.
         auto& argInfo = m_argInfo[valPackParam];
-        auto oldState = argInfo.state;
+        auto oldState = argInfo.getState();
         auto oldArg = getCurrentArg(valPackParam);
-        Val* val =
-            argInfo.state == ArgState::SolvedOrdinaryArg ? getCurrentArg(valPackParam) : nullptr;
+        Val* val = argInfo.getState() == ArgState::SolvedOrdinaryArg ? getCurrentArg(valPackParam)
+                                                                     : nullptr;
 
         // A value pack can be solved either by a concrete pack, such as
         // `[1, 2, 3]`, or by forwarding another pack parameter. Other shapes are
@@ -1789,7 +1872,7 @@ private:
         {
             if (!setCurrentArg(valPackParam, val))
                 return ConstraintSolvingState::Failed;
-            argInfo.state = ArgState::SolvedOrdinaryArg;
+            argInfo.setState(ArgState::SolvedOrdinaryArg);
         }
 
         // Only a newly published or changed pack wakes dependents. If the
@@ -1799,9 +1882,9 @@ private:
         if (!val)
             return ConstraintSolvingState::Done;
         if (oldState != ArgState::SolvedOrdinaryArg)
-            return ConstraintSolvingState::Solved;
+            return ConstraintSolvingState::MadeProgress;
         if (!oldArg || !oldArg->equals(val))
-            return ConstraintSolvingState::Solved;
+            return ConstraintSolvingState::MadeProgress;
         return ConstraintSolvingState::Done;
     }
 
@@ -1823,11 +1906,12 @@ private:
         // Keep the old value and priority so the work-list result can tell
         // whether this constraint actually changed the current argument.
         auto& argInfo = m_argInfo[valParam];
-        auto oldState = argInfo.state;
+        auto oldState = argInfo.getState();
         auto oldArg = getCurrentArg(valParam);
-        auto oldPriority = argInfo.priority;
-        Val* val = argInfo.state == ArgState::SolvedOrdinaryArg ? getCurrentArg(valParam) : nullptr;
-        ConstraintPriority& valPriority = argInfo.priority;
+        auto oldPriority = argInfo.getPriority();
+        Val* val =
+            argInfo.getState() == ArgState::SolvedOrdinaryArg ? getCurrentArg(valParam) : nullptr;
+        ConstraintPriority valPriority = argInfo.getPriority();
 
         auto cVal = as<IntVal>(c.val);
         SLANG_RELEASE_ASSERT(cVal);
@@ -1851,15 +1935,16 @@ private:
         // `where N : INonZero`.
         if (val && !setCurrentArg(valParam, val))
             return ConstraintSolvingState::Failed;
-        argInfo.state = ArgState::SolvedOrdinaryArg;
+        argInfo.setPriority(valPriority);
+        argInfo.setState(ArgState::SolvedOrdinaryArg);
 
         // Waking dependents is only necessary if the published value or the
         // priority that selected it changed.
         c.satisfied = true;
         if (oldState != ArgState::SolvedOrdinaryArg || oldPriority != valPriority)
-            return ConstraintSolvingState::Solved;
+            return ConstraintSolvingState::MadeProgress;
         if (!oldArg || !oldArg->equals(val))
-            return ConstraintSolvingState::Solved;
+            return ConstraintSolvingState::MadeProgress;
         return ConstraintSolvingState::Done;
     }
 
@@ -1918,7 +2003,7 @@ private:
         // before every dependent substitution. The optional subject parameter
         // lets `T : IFoo<T>` inspect its own conformance shape without treating
         // the constraint on `T` as an unready dependency.
-        auto dependencies = getValDependencies(val);
+        auto dependencies = getDependentDeclsForVal(val);
         for (auto dependencyDecl : dependencies)
         {
             if (!isDependencyReady(dependencyDecl, subjectParamDecl))
@@ -1939,7 +2024,7 @@ private:
         // Use the same cached dependency list as readiness checks. Here the
         // question is whether a previously satisfied constraint should be
         // retried after this specific argument changed.
-        auto dependencies = getValDependencies(val);
+        auto dependencies = getDependentDeclsForVal(val);
         for (auto dependencyDecl : dependencies)
         {
             if (dependencyDecl == changedArgDecl)
@@ -2023,7 +2108,7 @@ private:
     }
 
     // Return the ordinary or witness argument declarations mentioned by a value.
-    ArrayView<Decl*> getValDependencies(Val* val)
+    ArrayView<Decl*> getDependentDeclsForVal(Val* val)
     {
         auto shared = m_visitor->getShared();
         if (!val)
@@ -2032,13 +2117,14 @@ private:
         // Dependency collection is on the hot path. Values with no dependencies
         // are common, so a negative cache avoids repeatedly walking concrete
         // types like `float` or integer values like `4`.
-        if (shared->m_genericSolverValsWithNoDependencies.contains(val))
+        if (shared->m_genericSolverValsWithNoDependentDecls.contains(val))
             return ArrayView<Decl*>();
 
         // The positive cache stores only syntax-level dependencies. A value like
         // `T.A` has the same dependency list before and after `T` is solved, so
         // the entry can be reused across specializations.
-        if (auto cachedDependencies = shared->m_genericSolverValDependencyCache.tryGetValue(val))
+        if (auto cachedDependencies =
+                shared->m_genericSolverValToDependentDeclsCache.tryGetValue(val))
             return cachedDependencies->getArrayView();
 
         // Walk once on a cache miss. The recursive walk collects declarations,
@@ -2046,13 +2132,13 @@ private:
         // generic application is currently being solved.
         ShortList<Decl*> dependencies;
         HashSet<Val*> visitedVals;
-        collectValDependencies(val, visitedVals, dependencies);
+        collectDependentDeclsInVal(val, visitedVals, dependencies);
         if (dependencies.getCount() == 0)
         {
             // Cache no-dependency values separately so the dictionary of
             // dependency lists remains smaller and callers get a stable empty
             // view without borrowing dictionary storage.
-            shared->m_genericSolverValsWithNoDependencies.add(val);
+            shared->m_genericSolverValsWithNoDependentDecls.add(val);
             return ArrayView<Decl*>();
         }
 
@@ -2061,12 +2147,12 @@ private:
         // may mutate the shared dependency cache.
         List<Decl*> cachedDependencies;
         cachedDependencies.addRange(dependencies.getArrayView().arrayView);
-        shared->m_genericSolverValDependencyCache.add(val, _Move(cachedDependencies));
-        return shared->m_genericSolverValDependencyCache.tryGetValue(val)->getArrayView();
+        shared->m_genericSolverValToDependentDeclsCache.add(val, _Move(cachedDependencies));
+        return shared->m_genericSolverValToDependentDeclsCache.tryGetValue(val)->getArrayView();
     }
 
     // Collect argument declarations mentioned by a value tree.
-    void collectValDependencies(
+    void collectDependentDeclsInVal(
         Val* val,
         HashSet<Val*>& ioVisitedVals,
         ShortList<Decl*>& ioDependencies)
@@ -2086,11 +2172,11 @@ private:
         {
             auto decl = declRef->getDecl();
             if (as<GenericTypeParamDeclBase>(decl))
-                addValDependency(ioDependencies, decl);
+                addDependentDecl(ioDependencies, decl);
             else if (isGenericValueParam(decl))
-                addValDependency(ioDependencies, decl);
+                addDependentDecl(ioDependencies, decl);
             else if (isGenericConstraintDecl(decl))
-                addValDependency(ioDependencies, decl);
+                addDependentDecl(ioDependencies, decl);
         }
 
         // Associated-type lookups and other dependent values can hide the
@@ -2100,12 +2186,12 @@ private:
         for (auto operand : val->m_operands)
         {
             if (operand.kind == ValNodeOperandKind::ValNode)
-                collectValDependencies(operand.getVal(), ioVisitedVals, ioDependencies);
+                collectDependentDeclsInVal(operand.getVal(), ioVisitedVals, ioDependencies);
         }
     }
 
     // Add one declaration to a dependency list.
-    void addValDependency(ShortList<Decl*>& ioDependencies, Decl* dependencyDecl)
+    void addDependentDecl(ShortList<Decl*>& ioDependencies, Decl* dependencyDecl)
     {
         // A value can mention the same argument through several operands, but
         // one entry is enough for readiness and wakeup checks. Keeping the list
@@ -2224,7 +2310,7 @@ private:
         // exists yet, the current value in `m_args` is still the initial default
         // substitution arg from `getDefaultSubstitutionArgs()`.
         auto solvedInfo = m_argInfo.tryGetValue(argDecl);
-        return solvedInfo ? solvedInfo->state : ArgState::DefaultSubstitutionArg;
+        return solvedInfo ? solvedInfo->getState() : ArgState::DefaultSubstitutionArg;
     }
 
     // Set only the state metadata for an argument.
@@ -2234,7 +2320,7 @@ private:
         // interpret that value. Keeping the two separate lets `m_args` stay the
         // single source used by substitution while `ArgInfo` tracks readiness,
         // replaceability, and overload-ranking metadata.
-        m_argInfo[argDecl].state = state;
+        m_argInfo[argDecl].setState(state);
     }
 
     // Return true if an argument state can be used for substitution.
@@ -2434,8 +2520,9 @@ private:
 
             // Witness arguments are compiler-formed proofs for source generic
             // constraints. A remaining default substitution arg here would mean
-            // the final generic application contains a declaration-shaped stand
-            // in rather than a real proof for `T : IFoo` or a similar constraint.
+            // the final generic application still carries the declaration's
+            // initial witness value rather than a proof built for this
+            // specialization.
             for (auto member : genericDecl->getDirectMemberDecls())
             {
                 if (!isGenericConstraintDecl(member))
@@ -2460,7 +2547,7 @@ private:
         // Type-pack constraints can arrive by element. Until every element up
         // to the highest constrained index is known, the pack cannot be
         // serialized without inventing missing types.
-        auto& types = argInfo->types;
+        auto& types = argInfo->getTypeConstraints();
         for (auto t : types)
         {
             if (!t)
@@ -2694,7 +2781,7 @@ private:
         // cached dependency walk used by readiness checks already sees through
         // these shapes, so reuse it instead of recognizing only direct
         // parameter references.
-        for (auto dependencyDecl : getValDependencies(typeVal))
+        for (auto dependencyDecl : getDependentDeclsForVal(typeVal))
         {
             // Witness dependencies can also appear in values such as `T.A`, but
             // this overload-ranking bit is for ordinary generic arguments. The
@@ -2740,7 +2827,7 @@ private:
 
         // This is metadata about an ordinary argument rather than the argument
         // value itself, so it lives beside the state in `m_argInfo`.
-        m_argInfo[ordinaryParamDecl].isConstrainedForOverloadRanking = true;
+        m_argsConstrainedForOverloadRanking.add(ordinaryParamDecl);
     }
 
     // Return true if the argument corresponding to `ordinaryParamDecl` is marked
@@ -2749,8 +2836,7 @@ private:
     {
         // Missing metadata means no source generic constraint marked the
         // argument, so the old unconstrained-parameter penalty still applies.
-        auto solvedInfo = m_argInfo.tryGetValue(ordinaryParamDecl);
-        return solvedInfo && solvedInfo->isConstrainedForOverloadRanking;
+        return m_argsConstrainedForOverloadRanking.contains(ordinaryParamDecl);
     }
 
     // Try to solve the witness for a type-coercion constraint.
@@ -2964,6 +3050,11 @@ private:
     // used by substitution.
     Dictionary<Decl*, ArgInfo> m_argInfo;
 
+    // Ordinary arguments mentioned by source generic constraints. This is kept
+    // separate from `ArgInfo` because it affects only overload ranking, not
+    // argument readiness or replacement.
+    HashSet<Decl*> m_argsConstrainedForOverloadRanking;
+
     // Stable storage for all collected solver constraints: ordinary constraints,
     // default generic arguments, and witness constraints. The queue stores
     // indices into this table.
@@ -3073,9 +3164,11 @@ bool SemanticsVisitor::TryUnifyVals(
     {
         if (auto sndWit = as<TypeCoercionWitness>(snd); sndWit)
         {
-            // Ignore unification for coercion constraints for now,
-            // they will be checked later anyway.
-            //
+            // Coercion-witness comparison is an inference hint only. The
+            // generic solver later substitutes the final source/destination
+            // types and asks the coercion checker to build the real witness, so
+            // this path must not reject a candidate just because the provisional
+            // witness values do not expose useful ordinary-argument facts.
             return true;
         }
     }
@@ -3084,12 +3177,12 @@ bool SemanticsVisitor::TryUnifyVals(
     {
         if (as<DeclaredSubtypeWitness>(snd)->isEquality())
         {
-            // Try to unify both the sub and sup types of equality witnesses,
-            // but a failure doesn't mean the unification fails, since
-            // we could have associated type lookups taht aren't used for
-            // inference, but will still be checked for validity in
-            // trySolveGenericArguments.
-            //
+            // Equality-witness comparison can discover ordinary-argument hints
+            // from the two sides of the equality proof. Failure is ignored here
+            // because this is not the proof step: associated-type projections
+            // may be too dependent to unify as hints, while the final
+            // substituted equality witness is still validated by the generic
+            // solver.
             TryUnifyTypes(
                 constraints,
                 unificationOptions,
@@ -3108,12 +3201,12 @@ bool SemanticsVisitor::TryUnifyVals(
     {
         if (as<DeclaredSubtypeWitness>(fst)->isEquality())
         {
-            // Try to unify both the sub and sup types of equality witnesses,
-            // but a failure doesn't mean the unification fails, since
-            // we could have associated type lookups taht aren't used for
-            // inference, but will still be checked for validity in
-            // trySolveGenericArguments.
-            //
+            // Equality-witness comparison can discover ordinary-argument hints
+            // from the two sides of the equality proof. Failure is ignored here
+            // because this is not the proof step: associated-type projections
+            // may be too dependent to unify as hints, while the final
+            // substituted equality witness is still validated by the generic
+            // solver.
             TryUnifyTypes(
                 constraints,
                 unificationOptions,
@@ -3230,8 +3323,9 @@ bool SemanticsVisitor::TryUnifyTypeParam(
     GenericTypeParamDeclBase* typeParamDecl,
     QualType type)
 {
-    // We want to constrain the given type parameter
-    // to equal the given type.
+    // Record one ordinary type-argument fact discovered by unification. Equality
+    // unification records an exact answer; ordinary call inference records a
+    // type-join fact that may merge with other argument/parameter facts later.
     auto priority = unificationOptions.optionalConstraint ? ConstraintPriority::Optional
                                                           : ConstraintPriority::Required;
     constraints.discoveredConstraints.add(SolverConstraint::makeOrdinaryArg(
@@ -3251,12 +3345,10 @@ bool SemanticsVisitor::TryUnifyIntParam(
     GenericValueParamDecl* paramDecl,
     IntVal* val)
 {
-    // We only want to accumulate constraints on
-    // the parameters of the declarations being
-    // specialized (don't accidentially constrain
-    // parameters of a generic function based on
-    // calls in its body).
-    // if (paramDecl->parentDecl != constraints.genericDecl)
+    // Only value parameters from the generic application currently being solved
+    // should receive solver constraints. `isRelevantGeneric()` accepts the whole
+    // nested generic chain, so an inner generic can still infer an outer
+    // parameter when both declarations participate in the same application.
     if (!isRelevantGeneric(constraints, paramDecl->parentDecl))
         return false;
 
@@ -3525,14 +3617,11 @@ bool SemanticsVisitor::TryUnifyConjunctionType(
     QualType fst,
     QualType snd)
 {
-    // Unifying a type `A & B` with `T` amounts to unifying
-    // `A` with `T` and also `B` with `T` while
-    // unifying a type `T` with `A & B` amounts to either
-    // unifying `T` with `A` or `T` with `B`
-    //
-    // If either unification is impossible, then the full
-    // case is also impossible.
-    //
+    // When the conjunction is on the left, every conjunct must satisfy the
+    // right-hand type: `(A & B)` against `T` records facts from both `A` and `B`.
+    // When the conjunction is on the right, either conjunct can provide a viable
+    // match for `T`; the later conversion/checking path validates the selected
+    // candidate as usual.
     if (auto fstAndType = as<AndType>(fst))
     {
         return TryUnifyTypes(
@@ -3563,7 +3652,7 @@ bool SemanticsVisitor::TryUnifyConjunctionType(
         return false;
 }
 
-void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
+bool SemanticsVisitor::tryAddOptionalIntParamConstraintIfUnconstrained(
     GenericInferenceContext& constraints,
     UnificationOptions unificationOptions,
     IntVal* param,
@@ -3572,16 +3661,17 @@ void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
 {
     SLANG_UNUSED(unificationOptions);
 
-    // If `param` is an unconstrained integer val param, and `arg` is a const int val,
-    // we add a constraint to the system that `param` must be equal to `arg`.
-    // If `param` is already constrained, ignore and do nothing.
+    // Scalar/vector unification uses this as a non-binding hint: when a vector
+    // element count is an unconstrained generic integer parameter, comparing the
+    // vector to a scalar suggests `N = 1`. Existing constraints win, and failure
+    // to add the hint must not reject the later scalar-to-vector conversion.
     if (auto typeCastParam = as<TypeCastIntVal>(param))
     {
         param = as<IntVal>(typeCastParam->getBase());
     }
     auto intParam = as<DeclRefIntVal>(param);
     if (!intParam)
-        return;
+        return false;
     auto intParamDecl = intParam->getDeclRef().getDecl();
 
     // Unification can compare a generic being inferred against a type or value
@@ -3593,11 +3683,11 @@ void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
     if (!isGenericValueParam(intParamDecl) ||
         !isRelevantGeneric(constraints, intParamDecl->parentDecl))
     {
-        return;
+        return false;
     }
     for (auto c : constraints.discoveredConstraints)
         if (c.decl == intParamDecl)
-            return;
+            return false;
     constraints.discoveredConstraints.add(SolverConstraint::makeOrdinaryArg(
         intParamDecl,
         arg,
@@ -3605,30 +3695,34 @@ void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
         SolverConstraint::OrdinaryArgMergeMode::Exact,
         0,
         paramIsLVal));
+    return true;
 }
 
-struct IndexSpan
+// A contiguous range in one flattened type-pack sequence.
+struct FlattenedTypeRange
 {
     Index index;
     Index count;
 
-    IndexSpan()
+    FlattenedTypeRange()
         : index(0), count(0)
     {
     }
-    IndexSpan(Index idx, Index cnt)
+    FlattenedTypeRange(Index idx, Index cnt)
         : index(idx), count(cnt)
     {
     }
 };
 
-struct IndexSpanPair
+// A pair of ranges that should be unified recursively after both sides of a
+// pack-shaped type have been flattened.
+struct FlattenedTypeRangePair
 {
-    IndexSpan first;
-    IndexSpan second;
+    FlattenedTypeRange first;
+    FlattenedTypeRange second;
 
-    IndexSpanPair() {}
-    IndexSpanPair(IndexSpan f, IndexSpan s)
+    FlattenedTypeRangePair() {}
+    FlattenedTypeRangePair(FlattenedTypeRange f, FlattenedTypeRange s)
         : first(f), second(s)
     {
     }
@@ -3638,9 +3732,9 @@ struct IndexSpanPair
 // by recursive unification. If the opposite side is pack-shaped, a span like
 // `[A, B]` must stay bundled as a type pack; otherwise the span represents one
 // ordinary type.
-QualType getMappedQualTypeForConstraint(
+QualType makeQualTypeForFlattenedTypeRange(
     ASTBuilder* astBuilder,
-    const IndexSpan& span,
+    const FlattenedTypeRange& range,
     ShortList<Type*>& typeList,
     bool isLeftValue,
     Type* otherType)
@@ -3649,15 +3743,15 @@ QualType getMappedQualTypeForConstraint(
     // stays bundled so recursive unification sees a pack-shaped value.
     if (isDeclRefTypeOf<GenericTypePackParamDecl>(otherType) || as<ExpandType>(otherType))
     {
-        auto typesView = makeArrayView(&typeList[span.index], span.count);
+        auto typesView = makeArrayView(&typeList[range.index], range.count);
         auto typePack = astBuilder->getTypePack(typesView);
         return QualType(typePack, isLeftValue);
     }
 
     // Non-pack mappings are valid only for a single element; the caller already
     // asserted the mapping cardinality before asking for a `QualType`.
-    SLANG_ASSERT(span.count == 1);
-    return QualType(typeList[span.index], isLeftValue);
+    SLANG_ASSERT(range.count == 1);
+    return QualType(typeList[range.index], isLeftValue);
 }
 
 // Flatten a type-pack-shaped value into the sequence used by recursive type
@@ -3688,7 +3782,7 @@ static void flattenTypePackForUnification(
 // Compute how two flattened pack-shaped values should be paired for recursive
 // unification.
 //
-// Each `IndexSpanPair` in `outMapping` says that a contiguous span from
+// Each `FlattenedTypeRangePair` in `outMapping` says that a contiguous span from
 // `outFlattenedFirst` should be unified with a contiguous span from
 // `outFlattenedSecond`. Most mappings are one element to one element. A span can
 // contain several elements when the opposite side has an expandable pack element
@@ -3699,7 +3793,7 @@ static bool computeTypePackUnificationMapping(
     Type* secondType,
     ShortList<Type*>& outFlattenedFirst,
     ShortList<Type*>& outFlattenedSecond,
-    ShortList<IndexSpanPair>& outMapping)
+    ShortList<FlattenedTypeRangePair>& outMapping)
 {
     // The flattened arrays are owned by the caller because later recursive
     // unification needs to turn each mapping span back into a `QualType`.
@@ -3786,20 +3880,20 @@ static bool computeTypePackUnificationMapping(
 
     while (firstIndex < firstCount && secondIndex < secondCount)
     {
-        IndexSpanPair mapping;
+        FlattenedTypeRangePair mapping;
 
         if (shouldExpandFirst)
         {
             if (isAbstractTypePack(firstTypes[firstIndex]))
             {
-                mapping.first = IndexSpan(firstIndex, 1);
-                mapping.second = IndexSpan(secondIndex, typesPerExpand);
+                mapping.first = FlattenedTypeRange(firstIndex, 1);
+                mapping.second = FlattenedTypeRange(secondIndex, typesPerExpand);
                 secondIndex += typesPerExpand;
             }
             else
             {
-                mapping.first = IndexSpan(firstIndex, 1);
-                mapping.second = IndexSpan(secondIndex, 1);
+                mapping.first = FlattenedTypeRange(firstIndex, 1);
+                mapping.second = FlattenedTypeRange(secondIndex, 1);
                 secondIndex++;
             }
             firstIndex++;
@@ -3808,22 +3902,22 @@ static bool computeTypePackUnificationMapping(
         {
             if (isAbstractTypePack(secondTypes[secondIndex]))
             {
-                mapping.first = IndexSpan(firstIndex, typesPerExpand);
-                mapping.second = IndexSpan(secondIndex, 1);
+                mapping.first = FlattenedTypeRange(firstIndex, typesPerExpand);
+                mapping.second = FlattenedTypeRange(secondIndex, 1);
                 firstIndex += typesPerExpand;
             }
             else
             {
-                mapping.first = IndexSpan(firstIndex, 1);
-                mapping.second = IndexSpan(secondIndex, 1);
+                mapping.first = FlattenedTypeRange(firstIndex, 1);
+                mapping.second = FlattenedTypeRange(secondIndex, 1);
                 firstIndex++;
             }
             secondIndex++;
         }
         else
         {
-            mapping.first = IndexSpan(firstIndex, 1);
-            mapping.second = IndexSpan(secondIndex, 1);
+            mapping.first = FlattenedTypeRange(firstIndex, 1);
+            mapping.second = FlattenedTypeRange(secondIndex, 1);
             firstIndex++;
             secondIndex++;
         }
@@ -3874,7 +3968,7 @@ bool SemanticsVisitor::TryUnifyTypes(
     // unification. For example, a single expansion can correspond to several
     // concrete elements on the other side, so compute spans first and then
     // convert each span back into the `QualType` shape expected by recursion.
-    ShortList<IndexSpanPair> typeMapping;
+    ShortList<FlattenedTypeRangePair> typeMapping;
     ShortList<Type*> flattenedFirst;
     ShortList<Type*> flattenedSecond;
     if (computeTypePackUnificationMapping(fst, snd, flattenedFirst, flattenedSecond, typeMapping) &&
@@ -3891,13 +3985,13 @@ bool SemanticsVisitor::TryUnifyTypes(
 
             // Rebuild each span into the `QualType` shape that preserves whether
             // the opposite side expects a scalar type or a pack-shaped value.
-            QualType firstArg = getMappedQualTypeForConstraint(
+            QualType firstArg = makeQualTypeForFlattenedTypeRange(
                 m_astBuilder,
                 mapping.first,
                 flattenedFirst,
                 fst.isLeftValue,
                 flattenedSecond[mapping.second.index]);
-            QualType secondArg = getMappedQualTypeForConstraint(
+            QualType secondArg = makeQualTypeForFlattenedTypeRange(
                 m_astBuilder,
                 mapping.second,
                 flattenedSecond,
@@ -4006,14 +4100,16 @@ bool SemanticsVisitor::TryUnifyTypes(
         }
     }
 
-    // If we can unify the types structurally, then we are golden
+    // Structural matching handles identical generic applications, functor
+    // signatures, expansions, and concrete type packs. It may append ordinary
+    // solver constraints for generic parameters it finds in those structures.
     if (TryUnifyTypesByStructuralMatch(constraints, unificationOptions, fst, snd))
         return true;
 
-    // Now we need to consider cases where coercion might
-    // need to be applied. For now we can try to do this
-    // in a completely ad hoc fashion, but eventually we'd
-    // want to do it more formally.
+    // The remaining cases are inference hints for conversions that the normal
+    // post-inference type checker will validate later. A scalar can convert to a
+    // vector, so `vector<T, N>` compared with `float` can still usefully infer
+    // `T = float` and, when `N` is unconstrained, the optional hint `N = 1`.
 
     if (auto fstVectorType = as<VectorExpressionType>(fst))
     {
@@ -4024,7 +4120,7 @@ bool SemanticsVisitor::TryUnifyTypes(
             // don't want a failed unification to fail the entire generic argument inference,
             // because a scalar can still be casted into a vector of any length.
 
-            maybeUnifyUnconstraintIntParam(
+            tryAddOptionalIntParamConstraintIfUnconstrained(
                 constraints,
                 unificationOptions,
                 fstVectorType->getElementCount(),
@@ -4042,7 +4138,7 @@ bool SemanticsVisitor::TryUnifyTypes(
     {
         if (auto sndVectorType = as<VectorExpressionType>(snd))
         {
-            maybeUnifyUnconstraintIntParam(
+            tryAddOptionalIntParamConstraintIfUnconstrained(
                 constraints,
                 unificationOptions,
                 sndVectorType->getElementCount(),

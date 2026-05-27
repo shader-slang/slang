@@ -16763,7 +16763,11 @@ OrderedDictionary<Type*, List<Type*>> getCanonicalGenericConstraints2(
     return result;
 }
 
-bool areTypesCompatibile(SemanticsVisitor* visitor, Type* fst, Type* snd)
+// Return true when generic inference can solve a specialization that makes the
+// two `this` types compatible for derivative checking. This is intentionally a
+// solver query rather than a pure predicate: it may collect unification
+// constraints and run the generic argument solver to validate them.
+bool canSolveGenericThisTypeCompatibility(SemanticsVisitor* visitor, Type* fst, Type* snd)
 {
     if (fst->equals(snd))
         return true;
@@ -16791,7 +16795,7 @@ bool areTypesCompatibile(SemanticsVisitor* visitor, Type* fst, Type* snd)
                     baseCost))
                 return false;
 
-            // If we reach here, it means we have a valid unification.
+            // If we reach here, the solver found a valid substitution.
             return true;
         }
     }
@@ -17057,8 +17061,10 @@ void checkDerivativeAttributeImpl(
                 // `this` type matches the expected type. This will ensure that after lowering
                 // to IR, the two functions are compatible.
                 //
-                if (funcThisType &&
-                    !areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
+                if (funcThisType && !canSolveGenericThisTypeCompatibility(
+                                        visitor,
+                                        funcThisType,
+                                        derivativeFuncThisType))
                 {
                     visitor->getSink()->diagnose(
                         Diagnostics::CustomDerivativeSignatureThisParamMismatch{.attr = attr->loc});

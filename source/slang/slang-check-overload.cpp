@@ -396,11 +396,12 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             {
                 if (allowPartialGenericApp)
                 {
-                    // If we have run out of arguments, and the referenced decl
-                    // allows partially applied specialization (i.e. a callable
-                    // decl) then we don't apply any more checks at this step.
-                    // We will instead attempt to *infer* an argument at this
-                    // position at a later stage.
+                    // If we have run out of ordinary arguments and the
+                    // referenced decl allows partial specialization, preserve
+                    // the provided ordinary prefix for a later call-site
+                    // inference pass. Witness arguments are not present in this
+                    // prefix; the generic solver forms them after ordinary
+                    // inference completes.
                     //
                     candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
                     break;
@@ -472,11 +473,12 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             {
                 if (allowPartialGenericApp)
                 {
-                    // If we have run out of arguments and the decl allows
-                    // partial specialization, then we don't apply any more
-                    // checks at this step. We will instead attempt to
-                    // *infer* an argument at this position at a later
-                    // stage.
+                    // If we have run out of ordinary arguments and the decl
+                    // allows partial specialization, preserve the provided
+                    // ordinary prefix for a later call-site inference pass.
+                    // Witness arguments are not present in this prefix; the
+                    // generic solver forms them after ordinary inference
+                    // completes.
                     //
                     candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
                     break;
@@ -559,11 +561,12 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             {
                 if (allowPartialGenericApp)
                 {
-                    // If we have run out of arguments and the decl allows
-                    // partial specialization, then we don't apply any more
-                    // checks at this step. We will instead attempt to
-                    // *infer* an argument at this position at a later
-                    // stage.
+                    // If we have run out of ordinary arguments and the decl
+                    // allows partial specialization, preserve the provided
+                    // ordinary prefix for a later call-site inference pass.
+                    // Witness arguments are not present in this prefix; the
+                    // generic solver forms them after ordinary inference
+                    // completes.
                     //
                     candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
                     break;
@@ -648,6 +651,10 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             {
                 if (allowPartialGenericApp)
                 {
+                    // Preserve the ordinary argument prefix for a later
+                    // call-site inference pass. The value-pack argument and any
+                    // witness arguments will be solved together by the generic
+                    // solver once more information is available.
                     candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
                     break;
                 }
@@ -1081,9 +1088,11 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
     if (candidate.flags & OverloadCandidate::Flag::IsPartiallyAppliedGeneric)
         return true;
 
-    // The candidate substitution already contains the ordinary arguments.
-    // Rebuilding the argument list lets this validation append witness arguments
-    // in the serialized order expected by a generic application.
+    // The candidate substitution already contains the ordinary arguments chosen
+    // by explicit generic application. Rebuilding the argument list here appends
+    // the compiler-formed witness arguments in the serialized order expected by
+    // a generic application; witness arguments are never supplied by source
+    // syntax.
     auto genericDeclRef = candidate.item.declRef.as<GenericDecl>();
     SLANG_ASSERT(genericDeclRef); // otherwise we wouldn't be a generic candidate...
 
@@ -1463,6 +1472,9 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 expr->baseGenericDeclRef = as<DeclRefExpr>(baseExpr)->declRef.as<GenericDecl>();
                 auto args =
                     tryGetGenericArguments(candidate.subst, expr->baseGenericDeclRef.getDecl());
+                // Store only the ordinary argument prefix. The later call-site
+                // inference pass will solve the remaining ordinary arguments
+                // and append witness arguments.
                 for (auto arg : args)
                     expr->providedOrdinaryArgs.add(arg);
                 return expr;
@@ -2893,9 +2905,10 @@ void SemanticsVisitor::AddOverloadCandidates(Expr* funcExpr, OverloadResolveCont
     }
     else if (auto partiallyAppliedGenericExpr = as<PartiallyAppliedGenericExpr>(funcExpr))
     {
-        // A partially-applied generic is allowed as an overload candidate,
-        // and carries along an (incomplete) substitution that can be used
-        // to carry the arguments known so far.
+        // A partially-applied generic is allowed as an overload candidate. It
+        // carries the ordinary argument prefix already provided by `<>`; this
+        // call-site inference pass solves the remaining ordinary arguments and
+        // all witness arguments together.
         //
         addOverloadCandidatesForCallToGeneric(
             LookupResultItem(partiallyAppliedGenericExpr->baseGenericDeclRef),

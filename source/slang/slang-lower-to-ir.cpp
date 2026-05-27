@@ -1728,9 +1728,9 @@ static bool _isTrivialLookupFromInterfaceThis(IRGenContext* context, DeclRefBase
     return context->thisTypeWitness == nullptr;
 }
 
-static IRInst* maybeCloneThisTypeWitness(
+static IRInst* ensureAbstractThisWitnessVisibleFromCurrentScope(
     IRGenContext* context,
-    IRInst* thisTypeWitness,
+    IRInst* abstractThisWitness,
     Type* thisType);
 
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
@@ -1859,8 +1859,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             // hoistable IR type. Cloning the abstract witness into the current lowering
             // scope keeps those operands visible from one IR parent without replacing the
             // dependent lookup with a concrete value.
-            witnessVal.val =
-                maybeCloneThisTypeWitness(context, thisTypeWitness, val->getWitness()->getSub());
+            witnessVal.val = ensureAbstractThisWitnessVisibleFromCurrentScope(
+                context,
+                thisTypeWitness,
+                val->getWitness()->getSub());
         }
         auto key = getInterfaceRequirementKey(context, val->getKey());
         auto type = lowerType(context, val->getType());
@@ -14002,20 +14004,23 @@ bool isAbstractWitnessTable(IRInst* inst)
     return false;
 }
 
-static IRInst* maybeCloneThisTypeWitness(
+static IRInst* ensureAbstractThisWitnessVisibleFromCurrentScope(
     IRGenContext* context,
-    IRInst* thisTypeWitness,
+    IRInst* abstractThisWitness,
     Type* thisType)
 {
+    SLANG_ASSERT(isAbstractWitnessTable(abstractThisWitness));
+
     auto currentInsertLoc = context->irBuilder->getInsertLoc().getParent();
-    auto parentOfThisTypeWitness = thisTypeWitness->parent;
+    auto parentOfAbstractWitness = abstractThisWitness->parent;
 
     while (currentInsertLoc != nullptr)
     {
-        // If current insert location is same as scope of ThisTypeWitness, don't copy it.
-        if (parentOfThisTypeWitness == currentInsertLoc)
+        // If the abstract witness is already visible from the current insert
+        // location, keep using the existing IR value.
+        if (parentOfAbstractWitness == currentInsertLoc)
         {
-            return thisTypeWitness;
+            return abstractThisWitness;
         }
 
         currentInsertLoc = currentInsertLoc->parent;
@@ -14184,8 +14189,10 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
 
             if (isAbstractWitnessTable(irWitnessTable))
             {
-                // Copy ThisTypeWitness locally if necessary
-                irWitnessTable = maybeCloneThisTypeWitness(
+                // Abstract interface-self witnesses may be defined outside the
+                // current IR scope. Recreate the `This` witness locally when the
+                // existing proof is not visible from this use site.
+                irWitnessTable = ensureAbstractThisWitnessVisibleFromCurrentScope(
                     context,
                     irWitnessTable,
                     thisTypeSubst->getLookupSource());

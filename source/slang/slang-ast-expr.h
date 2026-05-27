@@ -927,6 +927,8 @@ public:
     DeclRef<GenericDecl> baseGenericDeclRef;
 
     /// Ordinary arguments already provided by the partial generic application.
+    /// Witness arguments are deliberately not stored here; they are formed only
+    /// after the remaining ordinary arguments are inferred.
     List<Val*> providedOrdinaryArgs;
 };
 

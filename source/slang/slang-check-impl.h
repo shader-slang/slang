@@ -760,19 +760,20 @@ struct SharedSemanticsContext : public RefObject
 
     Dictionary<Val*, VariadicPackCardinality> m_packCardinalityCache;
 
-    // Cache the ordinary argument and witness argument declarations structurally
-    // mentioned by a value. Generic default solving asks this question
-    // repeatedly across specializations of the same generic, and the answer does
-    // not depend on a particular solver instance; the solver later filters these
-    // declarations through its current relevance/readiness rules.
-    // Cached dependencies live in heap-backed lists so the solver can return
-    // array views instead of references into the dictionary's value storage.
-    Dictionary<Val*, List<Decl*>> m_genericSolverValDependencyCache;
+    // Cache from a semantic value to the ordinary-argument and witness-argument
+    // declarations structurally mentioned by that value. Generic default solving
+    // asks this Val* -> dependent Decl* question repeatedly across
+    // specializations of the same generic, and the answer does not depend on a
+    // particular solver instance; the solver later filters these declarations
+    // through its current relevance/readiness rules.
+    // Cached dependency declarations live in heap-backed lists so the solver can
+    // return array views instead of references into the dictionary's value storage.
+    Dictionary<Val*, List<Decl*>> m_genericSolverValToDependentDeclsCache;
 
     // Values that have already been walked and found to mention no generic
-    // solver arguments. Keeping this as a set avoids allocating empty lists while
-    // still remembering the common no-dependency case.
-    HashSet<Val*> m_genericSolverValsWithNoDependencies;
+    // solver argument or witness declarations. Keeping this as a set avoids
+    // allocating empty lists while still remembering the common no-dependency case.
+    HashSet<Val*> m_genericSolverValsWithNoDependentDecls;
 
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
@@ -3327,7 +3328,7 @@ public:
         QualType fst,
         QualType snd);
 
-    void maybeUnifyUnconstraintIntParam(
+    bool tryAddOptionalIntParamConstraintIfUnconstrained(
         GenericInferenceContext& constraints,
         UnificationOptions unificationOptions,
         IntVal* param,
