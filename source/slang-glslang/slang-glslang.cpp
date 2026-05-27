@@ -327,6 +327,8 @@ static int glslang_optimizeSPIRV(
 
 #if 0
             // This is the previous 'default optimization' passes setting for glslang
+            // Keep the temporary MergeReturn/Inline gate here as well in case this reference
+            // pass list is re-enabled before the upstream SPIRV-Tools issue is fixed.
 #if SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
