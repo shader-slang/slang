@@ -4,14 +4,6 @@
 ```
 slangc [options...] [--] <input files>
 
-Pass '-' as an input file to read source from standard input.
--lang <language> is required when reading from stdin.
-With pass-through compilation (-pass-through glslang/dxc/fxc), -stage <stage> is required.
-Stdin input is capped at 256 MiB.
-
-# Read source from stdin (-lang is required)
-slangc -lang slang -target spirv-asm -entry main -- -
-
 # For help
 slangc -h
 
@@ -285,7 +277,7 @@ Dump to output list of warning diagnostic numeric and name ids.
 
 <a id="id"></a>
 ### --
-Treat the rest of the command line as input files. Use '-' as a filename to read source from standard input; [-lang](#lang) [&lt;language&gt;](#language) is required in that case because the source language cannot be deduced from a file extension. When stdin is used with pass-through compilation ([-pass-through](#pass-through) glslang/dxc/fxc), [-stage](#stage-1) [&lt;stage&gt;](#stage) is required because the shader stage cannot be inferred from a file extension; slangc emits a clean CLI diagnostic (error 35) when it is omitted. Stdin input is capped at 256 MiB. Example: slangc [-lang](#lang) slang [-target](#target-2) spirv-asm [-entry](#entry) main [--](#id) - 
+Treat the rest of the command line as input files; use '-' to read from standard input.
 
 
 <a id="report-downstream-time"></a>
@@ -1856,4 +1848,3 @@ Available help categories for the [-h](#h) option
 * `capability` : A capability describes an optional feature that a target may or may not support. When a [-capability](#capability-1) is specified, the compiler may assume that the target supports that capability, and generate code accordingly. 
 * `file-extension` : A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) may be inferred from the extension of an input or [-o](#o) path 
 * `help-category` : Available help categories for the [-h](#h) option 
-
