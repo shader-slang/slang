@@ -24,7 +24,7 @@
 #define UNLIMITED 9999
 
 #ifndef SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
-#define SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN 0
+#define SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN 1
 #endif
 
 static TBuiltInResource _calcBuiltinResources()
@@ -295,10 +295,9 @@ static int glslang_optimizeSPIRV(
     // information when instructions are deleted or moved. Later, remove
     // redundant information to minimize final SPRIR-V size.
     //
-    // Note: kept unconditionally — the SPIRV-Tools UAF tracked at
-    // https://github.com/KhronosGroup/SPIRV-Tools/issues/6711 only affects
-    // MergeReturnPass, which is gated below. PropagateLineInfoPass remains
-    // paired with the RedundantLineInfoElimPass call later in this function.
+    // PropagateLineInfoPass is independent of the MergeReturnPass/InlineExhaustivePass
+    // workaround below. Keep it paired with the RedundantLineInfoElimPass call later in
+    // this function.
     if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
     {
         optimizer.RegisterPass(spvtools::CreatePropagateLineInfoPass());

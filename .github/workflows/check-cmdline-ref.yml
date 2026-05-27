@@ -36,6 +36,7 @@ jobs:
             -DSLANG_ENABLE_EXAMPLES=OFF \
             -DSLANG_ENABLE_GFX=OFF \
             -DSLANG_ENABLE_SLANGD=OFF \
+            -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=OFF \
             -DSLANG_EXCLUDE_DAWN=ON \
             -DSLANG_EXCLUDE_TINT=ON
           cmake --workflow --preset release

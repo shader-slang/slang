@@ -227,7 +227,7 @@ advanced_option(
 advanced_option(
     SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
     "Enable SPIRV-Tools MergeReturnPass + InlineExhaustivePass in SPIR-V optimization (workaround for upstream UAF)"
-    OFF
+    ON
 )
 
 option(

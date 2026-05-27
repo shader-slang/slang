@@ -151,6 +151,7 @@ jobs:
             -DSLANG_ENABLE_ASAN=ON \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
             -DSLANG_ENABLE_EXAMPLES=OFF \
+            -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=OFF \
             "${cmake_launcher_defines[@]}"
 
           cmake --build --preset releaseWithDebugInfo -j$(nproc) --verbose

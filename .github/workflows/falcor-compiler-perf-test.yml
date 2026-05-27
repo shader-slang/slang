@@ -60,7 +60,7 @@ jobs:
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
             -DSLANG_ENABLE_CUDA=1 \
-            -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON
+            -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=OFF
           cmake --workflow --preset "${{matrix.config}}"
 
       - uses: robinraju/release-downloader@v1.12

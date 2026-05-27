@@ -46,7 +46,13 @@ jobs:
           build-llvm: true
       - name: Build Slang
         run: |
-          cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          # TODO(#11146): Keep CI artifacts on the SPIRV-Tools UAF workaround
+          # path for now. Remove this override together with
+          # SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN when the workaround is retired.
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=false \
+            -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=OFF
           cmake --workflow --preset release
       - uses: actions/checkout@v4
         with:
