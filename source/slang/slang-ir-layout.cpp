@@ -341,6 +341,14 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             auto matType = cast<IRMatrixType>(type);
             IRBuilder builder(type->getModule());
             auto layout = matType->getLayout();
+            // The layout operand is normally a literal `SLANG_MATRIX_LAYOUT_*`
+            // constant produced by the front-end, so reaching this guard from
+            // ordinary user code is not expected. The check mirrors the
+            // sibling guard on the vector branch above as defense-in-depth:
+            // if a non-literal ever shows up here (e.g. via a future IR
+            // construction path that retains it as a generic), avoid the
+            // release-build null deref that motivated #11289 and return a
+            // clean `SLANG_FAIL` with an indeterminate size.
             if (!layout || layout->getOp() != kIROp_IntLit)
             {
                 *outSizeAndAlignment =

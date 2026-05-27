@@ -37,5 +37,15 @@ void computeMain()
 }
 
 // CHECK_HLSL: RWStructuredBuffer<float > outputBuffer
+// CHECK_HLSL: float Impl_run
+// CHECK_HLSL: value_{{[0-9]+}}[int(0)] * {{.*}}scale_
+// CHECK_HLSL-NOT: error
+
 // CHECK_DXIL: define void @computeMain()
+// CHECK_DXIL: float 1.000000e+00
+// CHECK_DXIL-NOT: error
+
 // CHECK_CUDA: struct Impl
+// CHECK_CUDA: Impl_run
+// CHECK_CUDA: value_{{[0-9]+}}{{.*}} * {{.*}}scale_
+// CHECK_CUDA-NOT: error
