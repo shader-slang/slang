@@ -678,7 +678,8 @@ enum class ArgState
 
 // `ArgInfo` stores the solver-local metadata for one argument position. The
 // argument value itself lives in `m_args`; this type only tracks how that value
-// may be used or replaced, plus payloads used by ordinary-argument solving.
+// may be used or replaced, plus payloads used by ordinary-argument solving and
+// overload ranking.
 struct ArgInfo
 {
     using ConstraintPriority = SemanticsVisitor::ConstraintPriority;
@@ -708,6 +709,9 @@ struct ArgInfo
     ConstraintPriority getPriority() const { return m_priority; }
     void setPriority(ConstraintPriority priority) { m_priority = priority; }
 
+    bool isConstrainedForOverloadRanking() const { return m_constrainedForOverloadRanking; }
+    void markConstrainedForOverloadRanking() { m_constrainedForOverloadRanking = true; }
+
     ShortList<QualType, 8>& getTypeConstraints()
     {
         SLANG_ASSERT(
@@ -722,6 +726,7 @@ private:
     Val* m_substitutedDefaultArg = nullptr;
     ConstraintPriority m_priority = ConstraintPriority::Default;
     ShortList<QualType, 8> m_typeConstraints;
+    bool m_constrainedForOverloadRanking = false;
 };
 
 // Return the default generic argument for one ordinary parameter.
@@ -2114,15 +2119,10 @@ private:
         if (!val)
             return ArrayView<Decl*>();
 
-        // Dependency collection is on the hot path. Values with no dependencies
-        // are common, so a negative cache avoids repeatedly walking concrete
-        // types like `float` or integer values like `4`.
-        if (shared->m_genericSolverValsWithNoDependentDecls.contains(val))
-            return ArrayView<Decl*>();
-
-        // The positive cache stores only syntax-level dependencies. A value like
-        // `T.A` has the same dependency list before and after `T` is solved, so
-        // the entry can be reused across specializations.
+        // The cache stores only syntax-level dependencies. A value like `T.A`
+        // has the same dependency list before and after `T` is solved, so the
+        // entry can be reused across specializations. Empty dependency lists
+        // are cached too; an empty `List` does not allocate its element buffer.
         if (auto cachedDependencies =
                 shared->m_genericSolverValToDependentDeclsCache.tryGetValue(val))
             return cachedDependencies->getArrayView();
@@ -2133,18 +2133,12 @@ private:
         ShortList<Decl*> dependencies;
         HashSet<Val*> visitedVals;
         collectDependentDeclsInVal(val, visitedVals, dependencies);
-        if (dependencies.getCount() == 0)
-        {
-            // Cache no-dependency values separately so the dictionary of
-            // dependency lists remains smaller and callers get a stable empty
-            // view without borrowing dictionary storage.
-            shared->m_genericSolverValsWithNoDependentDecls.add(val);
-            return ArrayView<Decl*>();
-        }
 
         // Cache dependencies in a heap-backed `List` and return a by-value
-        // `ArrayView`. Callers should not keep the view across operations that
-        // may mutate the shared dependency cache.
+        // `ArrayView`. The list may be empty, which records the common
+        // no-dependency case without a second dictionary. Callers should not
+        // keep the view across operations that may mutate the shared dependency
+        // cache.
         List<Decl*> cachedDependencies;
         cachedDependencies.addRange(dependencies.getArrayView().arrayView);
         shared->m_genericSolverValToDependentDeclsCache.add(val, _Move(cachedDependencies));
@@ -2827,7 +2821,7 @@ private:
 
         // This is metadata about an ordinary argument rather than the argument
         // value itself, so it lives beside the state in `m_argInfo`.
-        m_argsConstrainedForOverloadRanking.add(ordinaryParamDecl);
+        m_argInfo[ordinaryParamDecl].markConstrainedForOverloadRanking();
     }
 
     // Return true if the argument corresponding to `ordinaryParamDecl` is marked
@@ -2836,7 +2830,8 @@ private:
     {
         // Missing metadata means no source generic constraint marked the
         // argument, so the old unconstrained-parameter penalty still applies.
-        return m_argsConstrainedForOverloadRanking.contains(ordinaryParamDecl);
+        auto argInfo = m_argInfo.tryGetValue(ordinaryParamDecl);
+        return argInfo && argInfo->isConstrainedForOverloadRanking();
     }
 
     // Try to solve the witness for a type-coercion constraint.
@@ -3049,11 +3044,6 @@ private:
     // ordinary or witness argument. `m_args` stores the current argument values
     // used by substitution.
     Dictionary<Decl*, ArgInfo> m_argInfo;
-
-    // Ordinary arguments mentioned by source generic constraints. This is kept
-    // separate from `ArgInfo` because it affects only overload ranking, not
-    // argument readiness or replacement.
-    HashSet<Decl*> m_argsConstrainedForOverloadRanking;
 
     // Stable storage for all collected solver constraints: ordinary constraints,
     // default generic arguments, and witness constraints. The queue stores
