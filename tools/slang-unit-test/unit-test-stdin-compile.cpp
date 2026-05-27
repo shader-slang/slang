@@ -270,6 +270,25 @@ static SlangResult _createTempSlangFile(
     return File::writeAllText(out.slangPath, contents);
 }
 
+struct TempHlslFile
+{
+    String basePath;
+    String hlslPath;
+
+    ~TempHlslFile()
+    {
+        File::remove(basePath);
+        File::remove(hlslPath);
+    }
+};
+
+static SlangResult _createTempHlslFile(const char* prefix, const char* contents, TempHlslFile& out)
+{
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice(prefix), out.basePath));
+    out.hlslPath = out.basePath + ".hlsl";
+    return File::writeAllText(out.hlslPath, contents);
+}
+
 struct ScopedFile
 {
     FILE* file = nullptr;
@@ -321,6 +340,50 @@ static SlangResult _testStdinAndFileShareSlangTranslationUnit(
     }
 
     return _expectSlangcSuccess(context, args, "[shader(\"compute\")] void main() { helper(); }\n");
+}
+
+static SlangResult _testStdinAndFileSeparateHlslTranslationUnit(
+    UnitTestContext* context,
+    bool stdinFirst)
+{
+    TempHlslFile helper;
+    SLANG_RETURN_ON_FAIL(
+        _createTempHlslFile("slangc-stdin-hlsl-helper", "void helper() {}\n", helper));
+
+    List<String> args;
+    args.add("-lang");
+    args.add("hlsl");
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("--");
+    if (stdinFirst)
+    {
+        args.add("-");
+        args.add(helper.hlslPath);
+    }
+    else
+    {
+        args.add(helper.hlslPath);
+        args.add("-");
+    }
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangcWithStdin(
+        context,
+        args,
+        "[numthreads(1, 1, 1)] void main() { helper(); }\n",
+        result));
+
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "undefined identifier 'helper'"))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
 }
 
 static SlangResult _testCtrlZIsNotEndOfFile(UnitTestContext* context)
@@ -503,6 +566,10 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testStdinAndFileShareSlangTranslationUnit(unitTestContext, false)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinAndFileShareSlangTranslationUnit(unitTestContext, true)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testStdinAndFileSeparateHlslTranslationUnit(unitTestContext, false)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testStdinAndFileSeparateHlslTranslationUnit(unitTestContext, true)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCtrlZIsNotEndOfFile(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargerThanReadBuffer(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputExactFitReadResult()));
