@@ -3412,11 +3412,9 @@ bool SemanticsVisitor::TryUnifyFunctorByStructuralMatch(
     StructDecl* fstStructDecl,
     FuncType* sndFuncType)
 {
-    // Here we just need to find an invocation method for our functor
-    // to perform unification with.
-    // We do not validate the validity of the functor at this step,
-    // we only need to perform a reasonable unification so that constraints
-    // can correctly solve.
+    // Use the functor's invocation signature as an inference hint. This helper
+    // does not validate that the functor is callable in the final program; later
+    // constraint and overload checks still have to prove that.
     FuncDecl* functorInvokeMethod =
         as<FuncDecl>(fstStructDecl->findLastDirectMemberDeclOfName(getName("()")));
     if (!functorInvokeMethod)
