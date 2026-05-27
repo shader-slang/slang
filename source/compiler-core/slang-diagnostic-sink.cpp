@@ -775,9 +775,11 @@ bool DiagnosticSink::diagnoseRichImpl(
     // The source manager must be passed because the parent may have a different source manager
     // that cannot resolve the locations in this diagnostic (e.g., command line source locations
     // are in a separate source manager from the main compilation source manager).
+    // Pass the original (un-decorated) diagnostic so the parent applies its own severity mapping
+    // and appends its own expansion notes, avoiding duplicate "expanded from macro" notes.
     if (m_parentSink)
     {
-        m_parentSink->diagnoseRichImpl(effectiveDiagnostic, info, sourceManager);
+        m_parentSink->diagnoseRichImpl(diagnostic, info, sourceManager);
     }
 
     if (effectiveSeverity >= Severity::Fatal)

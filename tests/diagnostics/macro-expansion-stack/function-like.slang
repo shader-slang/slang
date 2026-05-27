@@ -23,13 +23,14 @@ void test()
 void test2()
 {
     PASS_THRU(UndefinedArgType z)
-//diag:      ^ undefined identifier
-//diag:      ^ undefined identifier 'UndefinedArgType'.
 }
+
+// CHECK: undefined identifier 'UndefinedArgType'
+// CHECK-NOT: expanded from macro 'PASS_THRU'
 
 // Case 3: a macro invoked as an argument to another macro, with the error
 // inside the inner macro's body.  The chain should still show
-// "expanded from macro 'INNER'" pointing back to the call site.
+// "expanded from macro 'INNER_MACRO'" pointing back to the call site.
 #define INNER_MACRO(x) UndefinedInnerType q
 #define OUTER_MACRO(x) x
 
@@ -41,4 +42,4 @@ void test3()
 // CHECK: UndefinedInnerType
 // CHECK: undefined identifier
 // CHECK: expanded from macro 'INNER_MACRO'
-// CHECK: function-like.slang:38
+// CHECK: function-like.slang:39
