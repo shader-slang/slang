@@ -28,8 +28,9 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           sparse-checkout: .github/cmake-options-matrix.json
           sparse-checkout-cone-mode: false
       - id: set-matrix
@@ -62,8 +63,9 @@ jobs:
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           submodules: "recursive"
           fetch-depth: "2"
 
