@@ -474,6 +474,46 @@ static SlangResult _testInputTooLargeReadResult()
     return SLANG_OK;
 }
 
+static SlangResult _testInputLargeBoundaryReadResult()
+{
+    const Index boundaryByteCount = 1024 * 1024;
+
+    StringBuilder exactSourceText;
+    for (Index i = 0; i < boundaryByteCount; ++i)
+        exactSourceText.appendChar('a');
+    const String exactSourceString = exactSourceText.produceString();
+
+    List<Byte> source;
+    StdinSourceReadResult result;
+    SLANG_RETURN_ON_FAIL(
+        _readStdinSourceForTest(exactSourceString.getBuffer(), boundaryByteCount, source, result));
+
+    if (result != StdinSourceReadResult::Success)
+        return SLANG_FAIL;
+    if (source.getCount() != boundaryByteCount)
+        return SLANG_FAIL;
+    if (memcmp(source.getBuffer(), exactSourceString.getBuffer(), size_t(boundaryByteCount)) != 0)
+        return SLANG_FAIL;
+
+    StringBuilder tooLargeSourceText;
+    for (Index i = 0; i < boundaryByteCount + 1; ++i)
+        tooLargeSourceText.appendChar('a');
+    const String tooLargeSourceString = tooLargeSourceText.produceString();
+
+    SLANG_RETURN_ON_FAIL(_readStdinSourceForTest(
+        tooLargeSourceString.getBuffer(),
+        boundaryByteCount,
+        source,
+        result));
+
+    if (result != StdinSourceReadResult::TooLarge)
+        return SLANG_FAIL;
+    if (source.getCount() != 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
 {
     ScopedEnvVar enableStdinTestHook("SLANG_TEST_STDIN_ENABLE", "1");
@@ -574,6 +614,7 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargerThanReadBuffer(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputExactFitReadResult()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeReadResult()));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargeBoundaryReadResult()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeDiagnostic(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinReadResult()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinDiagnostic(unitTestContext)));

@@ -200,6 +200,14 @@ If multiple source files are passed to `slangc`, they will be grouped into trans
 
 * Each `.slang-module` file forms its own translation unit.
 
+To read source from standard input, pass `-` as an input after `--` and specify the source language with `-lang`, because the language cannot be inferred from a file extension:
+
+```bat
+type hello-world.slang | slangc -lang slang -target spirv -entry computeMain -- -
+```
+
+Standard input can be used once per invocation and is limited to 256 MiB. Diagnostics for source read from standard input use `<stdin>` as the source path. When `-lang slang` is used, standard input is grouped into the same translation unit as `.slang` files. Other source languages, such as `-lang hlsl`, are grouped into their own translation unit, matching the file-based rules above.
+
 ### `slangc` Entry Points
 
 When using `slangc`, you will typically want to identify which entry point(s) you intend to compile.
