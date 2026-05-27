@@ -458,24 +458,6 @@ public:
             }
         };
 
-        auto isAddressCarryingNonTrivialDiff = [&](IRInst* addr) -> bool
-        {
-            if (carryNonTrivialDiffSet.contains(addr))
-                return true;
-            if (!canAddressHoldDerivative(diffTypeContext, addr))
-                return false;
-
-            for (auto use = addr->firstUse; use; use = use->nextUse)
-            {
-                if (auto store = as<IRStore>(use->getUser()))
-                {
-                    if (store->getPtr() == addr && carryNonTrivialDiffSet.contains(store->getVal()))
-                        return true;
-                }
-            }
-            return false;
-        };
-
         auto isInstCarryingOverDiff = [&](IRInst* inst) -> bool
         {
             switch (inst->getOp())
@@ -519,10 +501,7 @@ public:
                             if (!diffTypeContext.isDifferentiableType(paramBaseType))
                                 continue;
                         }
-                        auto arg = callInst->getArg(i);
-                        if (carryNonTrivialDiffSet.contains(arg))
-                            return true;
-                        if (isAddressCarryingNonTrivialDiff(arg))
+                        if (carryNonTrivialDiffSet.contains(callInst->getArg(i)))
                             return true;
                     }
                     return false;

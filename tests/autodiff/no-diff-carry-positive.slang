@@ -7,6 +7,7 @@
 
 // CHECK: error[E41031]
 // CHECK: derivative is lost
+// CHECK: sample.distance = sqrt(x);
 
 public struct DirSample
 {
