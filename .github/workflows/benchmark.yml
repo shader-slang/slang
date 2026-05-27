@@ -23,9 +23,6 @@ jobs:
       contents: read
     env:
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
-    defaults:
-      run:
-        shell: bash
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,6 +45,7 @@ jobs:
           config: release
           build-llvm: true
       - name: Build Slang
+        shell: bash
         run: |
           # TODO(#11146): Keep CI artifacts on the SPIRV-Tools UAF workaround
           # path for now. Remove this override together with
