@@ -605,52 +605,56 @@ bool ByteCodeInterpreter::validatePointerOffset(
     *outPtr = elementOffset < 0 ? (uint8_t*)basePtr - byteOffset : (uint8_t*)basePtr + byteOffset;
     return true;
 #else
+    auto base = reinterpret_cast<uintptr_t>(basePtr);
+    uintptr_t result = base;
     if (stride == 0)
     {
         *outPtr = const_cast<void*>(basePtr);
-        return validatePointerAccess(*outPtr, accessSize, false);
-    }
-    if (elementOffset == INT64_MIN)
-        return failExecution("VM pointer offset overflow.");
-
-    int64_t byteOffset = 0;
-    if (elementOffset > 0 && uint64_t(elementOffset) > UINT64_MAX / stride)
-        return failExecution("VM pointer offset overflow.");
-    if (elementOffset < 0 && uint64_t(-elementOffset) > UINT64_MAX / stride)
-        return failExecution("VM pointer offset overflow.");
-
-    if (elementOffset >= 0)
-    {
-        auto unsignedOffset = uint64_t(elementOffset) * uint64_t(stride);
-        if (unsignedOffset > uint64_t(INT64_MAX))
-            return failExecution("VM pointer offset overflow.");
-        byteOffset = int64_t(unsignedOffset);
+        if (!validatePointerAccess(*outPtr, accessSize, false))
+            return false;
     }
     else
     {
-        auto unsignedOffset = uint64_t(-elementOffset) * uint64_t(stride);
-        if (unsignedOffset > uint64_t(INT64_MAX))
+        if (elementOffset == INT64_MIN)
             return failExecution("VM pointer offset overflow.");
-        byteOffset = -int64_t(unsignedOffset);
-    }
 
-    auto base = reinterpret_cast<uintptr_t>(basePtr);
-    uintptr_t result = 0;
-    if (byteOffset >= 0)
-    {
-        if (uint64_t(byteOffset) > UINTPTR_MAX - base)
+        int64_t byteOffset = 0;
+        if (elementOffset > 0 && uint64_t(elementOffset) > UINT64_MAX / stride)
             return failExecution("VM pointer offset overflow.");
-        result = base + uintptr_t(byteOffset);
-    }
-    else
-    {
-        auto negativeOffset = uintptr_t(-byteOffset);
-        if (negativeOffset > base)
+        if (elementOffset < 0 && uint64_t(-elementOffset) > UINT64_MAX / stride)
             return failExecution("VM pointer offset overflow.");
-        result = base - negativeOffset;
-    }
 
-    *outPtr = reinterpret_cast<void*>(result);
+        if (elementOffset >= 0)
+        {
+            auto unsignedOffset = uint64_t(elementOffset) * uint64_t(stride);
+            if (unsignedOffset > uint64_t(INT64_MAX))
+                return failExecution("VM pointer offset overflow.");
+            byteOffset = int64_t(unsignedOffset);
+        }
+        else
+        {
+            auto unsignedOffset = uint64_t(-elementOffset) * uint64_t(stride);
+            if (unsignedOffset > uint64_t(INT64_MAX))
+                return failExecution("VM pointer offset overflow.");
+            byteOffset = -int64_t(unsignedOffset);
+        }
+
+        if (byteOffset >= 0)
+        {
+            if (uint64_t(byteOffset) > UINTPTR_MAX - base)
+                return failExecution("VM pointer offset overflow.");
+            result = base + uintptr_t(byteOffset);
+        }
+        else
+        {
+            auto negativeOffset = uintptr_t(-byteOffset);
+            if (negativeOffset > base)
+                return failExecution("VM pointer offset overflow.");
+            result = base - negativeOffset;
+        }
+
+        *outPtr = reinterpret_cast<void*>(result);
+    }
 
     uintptr_t workingSetStart = reinterpret_cast<uintptr_t>(m_currentWorkingSet);
     uintptr_t workingSetEnd = workingSetStart + m_currentWorkingSetSizeInBytes;
@@ -662,13 +666,15 @@ bool ByteCodeInterpreter::validatePointerOffset(
     accessEnd = result + accessSize;
 
     if (isPointerInRangeOrAtEnd(base, workingSetStart, workingSetEnd) &&
-        !isPointerRangeInRange(result, accessEnd, workingSetStart, workingSetEnd))
+        ((accessSize == 0 && result == workingSetEnd) ||
+         !isPointerRangeInRange(result, accessEnd, workingSetStart, workingSetEnd)))
     {
         return failExecution("VM working-set pointer arithmetic went out of bounds.");
     }
 
     if (isPointerInRangeOrAtEnd(base, constantsStart, constantsEnd) &&
-        !isPointerRangeInRange(result, accessEnd, constantsStart, constantsEnd))
+        ((accessSize == 0 && result == constantsEnd) ||
+         !isPointerRangeInRange(result, accessEnd, constantsStart, constantsEnd)))
     {
         return failExecution("VM constants pointer arithmetic went out of bounds.");
     }
@@ -1008,6 +1014,7 @@ ByteCodeInterpreter::selectFunctionByIndex(uint32_t functionIndex)
             m_moduleView.functionCount);
         return SLANG_FAIL;
     }
+    m_stack.clear();
     auto func = m_moduleView.getFunction(functionIndex);
     m_currentFuncCode = m_functions[functionIndex].m_codeBuffer.getBuffer();
     m_currentInst = reinterpret_cast<VMExecInstHeader*>(m_currentFuncCode);
