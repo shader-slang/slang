@@ -29,15 +29,14 @@ inline StdinSourceReadResult readStdinSource(FILE* input, Index maxBytes, List<B
 
 #ifdef _WIN32
     const int previousMode = _setmode(_fileno(input), _O_BINARY);
+    if (previousMode == -1)
+        return StdinSourceReadResult::CannotRead;
+
     struct StdinModeGuard
     {
         FILE* input;
         int mode;
-        ~StdinModeGuard()
-        {
-            if (mode != -1)
-                _setmode(_fileno(input), mode);
-        }
+        ~StdinModeGuard() { _setmode(_fileno(input), mode); }
     } stdinModeGuard{input, previousMode};
 #endif
 
