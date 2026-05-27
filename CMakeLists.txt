@@ -225,10 +225,10 @@ advanced_option(
 # https://github.com/KhronosGroup/SPIRV-Tools/issues/6711
 # Slang tracking issue: https://github.com/shader-slang/slang/issues/11146
 # Keep the source-build default ON to preserve existing SPIR-V output. Selected PR CI workflows
-# set this OFF to exercise the workaround path, but full slang-test lanes keep the default ON.
+# set this OFF for focused workaround coverage, but full slang-test lanes keep the default ON.
 advanced_option(
     SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
-    "Enable MergeReturnPass + InlineExhaustivePass in the SPIRV-Tools optimizer pipeline"
+    "Enable the paired SPIRV-Tools MergeReturnPass + InlineExhaustivePass sequence; disabling drops both"
     ON
 )
 

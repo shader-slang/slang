@@ -324,8 +324,10 @@ static int glslang_optimizeSPIRV(
     default:
     case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
         {
-            // Use a minimal set of performance settings
-            // If we run CreateInlineExhaustivePass, We need to run CreateMergeReturnPass first.
+            // Use a minimal set of performance settings. InlineExhaustivePass is paired with
+            // MergeReturnPass because it needs single-return form first. Disabling this pair
+            // avoids the upstream MergeReturnPass UAF, but also skips inlining and can make
+            // following local/SROA/DCE passes less effective.
 
 #if 0
             // This is the previous 'default optimization' passes setting for glslang
