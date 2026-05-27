@@ -89,14 +89,40 @@ struct ScopedEnvVar
     }
 };
 
+struct TestEnvVar
+{
+    const char* key;
+    const char* value;
+};
+
 static SlangResult _runSlangcWithStdin(
     UnitTestContext* context,
     const List<String>& args,
     const char* stdinSource,
-    ExecuteResult& outResult)
+    ExecuteResult& outResult,
+    const TestEnvVar* envVars = nullptr,
+    Index envVarCount = 0,
+    bool allowStdinWriteFailure = false)
 {
     CommandLine cmdLine;
-    cmdLine.setExecutableLocation(ExecutableLocation(context->executableDirectory, "slangc"));
+    ExecutableLocation slangcLocation(context->executableDirectory, "slangc");
+#ifdef _WIN32
+    SLANG_UNUSED(envVars);
+    SLANG_UNUSED(envVarCount);
+    cmdLine.setExecutableLocation(slangcLocation);
+#else
+    if (envVarCount != 0)
+    {
+        cmdLine.setExecutableLocation(ExecutableLocation(ExecutableLocation::Type::Name, "env"));
+        for (Index i = 0; i < envVarCount; ++i)
+            cmdLine.addArg(String(envVars[i].key) + "=" + envVars[i].value);
+        cmdLine.addArg(slangcLocation.m_pathOrName);
+    }
+    else
+    {
+        cmdLine.setExecutableLocation(slangcLocation);
+    }
+#endif
     for (const auto& arg : args)
         cmdLine.addArg(arg);
 
@@ -108,7 +134,11 @@ static SlangResult _runSlangcWithStdin(
     {
         const Index length = Index(strlen(stdinSource));
         if (length != 0)
-            SLANG_RETURN_ON_FAIL(stdinStream->write(stdinSource, length));
+        {
+            const SlangResult writeResult = stdinStream->write(stdinSource, length);
+            if (SLANG_FAILED(writeResult) && !allowStdinWriteFailure)
+                return writeResult;
+        }
     }
     stdinStream->close();
 
@@ -386,6 +416,39 @@ static SlangResult _testStdinAndFileSeparateHlslTranslationUnit(
     return SLANG_OK;
 }
 
+static SlangResult _testLanguageSwitchAppliesToStdinAfterSlangInput(UnitTestContext* context)
+{
+    TempSlangFile helper;
+    SLANG_RETURN_ON_FAIL(_createTempSlangFile("slangc-stdin-helper", "void helper() {}\n", helper));
+
+    List<String> args;
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add(helper.slangPath);
+    args.add("-lang");
+    args.add("hlsl");
+    args.add("--");
+    args.add("-");
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangcWithStdin(
+        context,
+        args,
+        "[numthreads(1, 1, 1)] void main() { helper(); }\n",
+        result));
+
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "undefined identifier 'helper'"))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 static SlangResult _testCtrlZIsNotEndOfFile(UnitTestContext* context)
 {
     List<String> args;
@@ -516,16 +579,23 @@ static SlangResult _testInputLargeBoundaryReadResult()
 
 static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
 {
+#ifdef _WIN32
     ScopedEnvVar enableStdinTestHook("SLANG_TEST_STDIN_ENABLE", "1");
     ScopedEnvVar maxBytes("SLANG_TEST_STDIN_MAX_BYTES", "4");
     if (!enableStdinTestHook.isSet || !maxBytes.isSet)
         return SLANG_FAIL;
+#endif
+    const TestEnvVar envVars[] = {
+        {"SLANG_TEST_STDIN_ENABLE", "1"},
+        {"SLANG_TEST_STDIN_MAX_BYTES", "4"},
+    };
 
     List<String> args;
     _addStdinCompileArgs(args, "slang");
 
     ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(_runSlangcWithStdin(context, args, "abcde", result));
+    SLANG_RETURN_ON_FAIL(
+        _runSlangcWithStdin(context, args, "abcde", result, envVars, SLANG_COUNT_OF(envVars)));
 
     if (result.resultCode == 0)
         return SLANG_FAIL;
@@ -557,17 +627,29 @@ static SlangResult _testCannotReadFromStdinReadResult()
 
 static SlangResult _testCannotReadFromStdinDiagnostic(UnitTestContext* context)
 {
+#ifdef _WIN32
     ScopedEnvVar enableStdinTestHook("SLANG_TEST_STDIN_ENABLE", "1");
     ScopedEnvVar forceCannotRead("SLANG_TEST_STDIN_FORCE_CANNOT_READ", "1");
     if (!enableStdinTestHook.isSet || !forceCannotRead.isSet)
         return SLANG_FAIL;
+#endif
+    const TestEnvVar envVars[] = {
+        {"SLANG_TEST_STDIN_ENABLE", "1"},
+        {"SLANG_TEST_STDIN_FORCE_CANNOT_READ", "1"},
+    };
 
     List<String> args;
     _addStdinCompileArgs(args, "slang");
 
     ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(
-        _runSlangcWithStdin(context, args, "[shader(\"compute\")] void main() {}\n", result));
+    SLANG_RETURN_ON_FAIL(_runSlangcWithStdin(
+        context,
+        args,
+        "[shader(\"compute\")] void main() {}\n",
+        result,
+        envVars,
+        SLANG_COUNT_OF(envVars),
+        true));
 
     if (result.resultCode == 0)
         return SLANG_FAIL;
@@ -610,6 +692,7 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
         SLANG_SUCCEEDED(_testStdinAndFileSeparateHlslTranslationUnit(unitTestContext, false)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testStdinAndFileSeparateHlslTranslationUnit(unitTestContext, true)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testLanguageSwitchAppliesToStdinAfterSlangInput(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCtrlZIsNotEndOfFile(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargerThanReadBuffer(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputExactFitReadResult()));
