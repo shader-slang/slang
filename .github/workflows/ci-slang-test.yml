@@ -104,7 +104,6 @@ jobs:
           slang_test_args=(
             "-category" "${{ inputs.test-category }}"
             "-expected-failure-list" "tests/expected-failure-github.txt"
-            "-expected-failure-list" "tests/expected-failure-spirv-opt-merge-return-off.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
             "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
@@ -179,7 +178,6 @@ jobs:
             -emit-spirv-via-glsl
             -api vk
             -expected-failure-list tests/expected-failure-via-glsl.txt
-            -expected-failure-list tests/expected-failure-spirv-opt-merge-return-off.txt
             -skip-reference-image-generation
           )
           if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
