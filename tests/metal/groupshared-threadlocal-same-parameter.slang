@@ -3,8 +3,10 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -emit-spirv-directly -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -mtl
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -llvm
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-via-glsl
 
-// This shader is the reduced input from #11146. CI artifact builds exercise it with
+// This shader is the reduced input from #11146. The SPIR-V assembly test exercises
+// it in non-GPU PR lanes, and CI artifact builds also run it with
 // SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=OFF until the SPIRV-Tools UAF is fixed.
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -30,6 +32,9 @@ uint[2] maybeGroupSharedReturn(uint id)
 [numthreads(2, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+    // SPIRV: OpEntryPoint GLCompute {{.*}} "computeMain"
+    // SPIRV: OpExecutionMode {{.*}} LocalSize 2 1 1
+
     g_values = { 1, 0 };
     AllMemoryBarrierWithGroupSync();
     uint tid = dispatchThreadID.x;
