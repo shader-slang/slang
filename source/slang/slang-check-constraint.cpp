@@ -26,15 +26,16 @@
 // starts from those default substitution arguments and is updated in place as
 // ordinary arguments and witness arguments become known.
 //
-// The solver has two phases. The collection phase gathers solver constraints
-// from all sources that can affect the live argument list: caller-provided
-// ordinary arguments, ordinary constraints discovered by unification, default
-// generic arguments, and source generic constraints that require witness
-// arguments. The resolution phase runs one iterative work-list loop over that
-// single collected set. Keeping ordinary and witness work in the same loop is
-// the important property: an ordinary argument can unblock a witness, a witness
-// can unblock a dependent default, and solving a witness can discover more
-// ordinary constraints through unification.
+// The solver has two phases. The setup phase initializes the live argument list
+// and gathers solver constraints from ordinary constraints discovered by
+// unification, default generic arguments, and source generic constraints that
+// require witness arguments. Caller-provided ordinary arguments are installed
+// into the initialized live argument list before solving starts. The resolution
+// phase runs one iterative work-list loop over the collected constraints.
+// Keeping ordinary and witness work in the same loop is the important property:
+// an ordinary argument can unblock a witness, a witness can unblock a dependent
+// default, and solving a witness can discover more ordinary constraints through
+// unification.
 //
 // Work-list states and invariants
 // -------------------------------
@@ -812,6 +813,28 @@ Index getGenericParamIndex(Decl* genericParamDecl)
     return -1;
 }
 
+// Return true if a generic declaration is directly nested in another generic
+// declaration.
+bool isGenericDeclDirectlyNestedInGenericDecl(GenericDecl* genericDecl)
+{
+    return genericDecl && as<GenericDecl>(genericDecl->parentDecl) != nullptr;
+}
+
+// Return the outermost generic declaration in a nested generic declaration
+// chain.
+GenericDecl* getOutermostGenericDecl(GenericDecl* genericDecl)
+{
+    if (!genericDecl)
+        return nullptr;
+
+    for (auto parentGenericDecl = as<GenericDecl>(genericDecl->parentDecl); parentGenericDecl;
+         parentGenericDecl = as<GenericDecl>(parentGenericDecl->parentDecl))
+    {
+        genericDecl = parentGenericDecl;
+    }
+    return genericDecl;
+}
+
 // Owns one generic-application solve. The class collects ordinary constraints,
 // default generic arguments, and witness constraints into solver constraints,
 // runs the work-list loop, and stores the current argument arrays used to build
@@ -860,10 +883,38 @@ public:
         , m_outBaseCost(outBaseCost)
     {
         // Build the fixed work table and initial argument arrays up front. The
-        // caller can then install known ordinary arguments with `setProvidedArg`
-        // before starting the work-list solve.
+        // caller can then install known ordinary arguments with
+        // `setProvidedArgs` before starting the work-list solve.
         collectSolverConstraints();
         m_isInitialized = initializeArgs();
+    }
+
+    // Install caller-provided ordinary arguments for one non-nested generic.
+    // Call this during solver setup, before `solve()`, when the use site
+    // supplied ordinary generic arguments.
+    bool setProvidedArgs(GenericDecl* genericDecl, ArrayView<Val*> providedOrdinaryArgs)
+    {
+        if (providedOrdinaryArgs.getCount() == 0)
+            return true;
+
+        SLANG_ASSERT(!isGenericDeclDirectlyNestedInGenericDecl(genericDecl));
+        SLANG_ASSERT(!m_hasStartedSolving);
+
+        if (!m_isInitialized || m_hasStartedSolving)
+            return false;
+        if (!genericDecl)
+            return false;
+
+        for (auto member : genericDecl->getDirectMemberDecls())
+        {
+            Index argIndex = getGenericParamIndex(member);
+            if (argIndex < 0 || argIndex >= providedOrdinaryArgs.getCount())
+                continue;
+
+            if (!setProvidedArg(member, providedOrdinaryArgs[argIndex]))
+                return false;
+        }
+        return true;
     }
 
     // Install one caller-provided ordinary argument into the live argument list.
@@ -3006,23 +3057,10 @@ DeclRef<Decl> SemanticsVisitor::trySolveGenericArguments(
     // solver: it applies to the outermost generic declaration in the chain. For
     // `Outer<T>.Inner<U>`, that means the provided array is matched against
     // `Outer`'s ordinary parameters.
-    auto genericDeclForProvidedArgs = genericDeclRef.getDecl();
-    for (auto parentGenericDecl = as<GenericDecl>(genericDeclForProvidedArgs->parentDecl);
-         parentGenericDecl;
-         parentGenericDecl = as<GenericDecl>(parentGenericDecl->parentDecl))
-    {
-        genericDeclForProvidedArgs = parentGenericDecl;
-    }
-
-    for (auto member : genericDeclForProvidedArgs->getDirectMemberDecls())
-    {
-        Index argIndex = getGenericParamIndex(member);
-        if (argIndex < 0 || argIndex >= providedOrdinaryArgs.getCount())
-            continue;
-
-        if (!solver.setProvidedArg(member, providedOrdinaryArgs[argIndex]))
-            return DeclRef<Decl>();
-    }
+    auto genericDeclForProvidedArgs = getOutermostGenericDecl(genericDeclRef.getDecl());
+    SLANG_ASSERT(!isGenericDeclDirectlyNestedInGenericDecl(genericDeclForProvidedArgs));
+    if (!solver.setProvidedArgs(genericDeclForProvidedArgs, providedOrdinaryArgs))
+        return DeclRef<Decl>();
 
     // The caller only needs the final substituted inner decl-ref and the output
     // cost. All work-list state, current arguments, and witness arguments remain
