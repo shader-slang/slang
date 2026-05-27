@@ -23,6 +23,8 @@
 
 #define UNLIMITED 9999
 
+// Temporary workaround for the SPIRV-Tools MergeReturnPass issue tracked by
+// https://github.com/KhronosGroup/SPIRV-Tools/issues/6711 and Slang issue #11146.
 #ifndef SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
 #define SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN 1
 #endif
