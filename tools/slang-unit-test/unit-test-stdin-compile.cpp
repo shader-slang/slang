@@ -9,10 +9,6 @@
 
 using namespace Slang;
 
-#ifndef SLANG_BUILD_STDIN_TEST_HOOKS
-#define SLANG_BUILD_STDIN_TEST_HOOKS 0
-#endif
-
 static bool _contains(const String& text, const char* expected)
 {
     return text.getUnownedSlice().indexOf(UnownedStringSlice(expected)) >= 0;
@@ -58,6 +54,39 @@ static SlangResult _runSlangcWithStdin(
             if (SLANG_FAILED(writeResult) && !allowStdinWriteFailure)
                 return writeResult;
         }
+    }
+    stdinStream->close();
+
+    return ProcessUtil::readUntilTermination(process, outResult);
+}
+
+static SlangResult _runSlangcWithRepeatedStdin(
+    UnitTestContext* context,
+    const List<String>& args,
+    size_t byteCount,
+    ExecuteResult& outResult)
+{
+    CommandLine cmdLine;
+    ExecutableLocation slangcLocation(context->executableDirectory, "slangc");
+    cmdLine.setExecutableLocation(slangcLocation);
+    for (const auto& arg : args)
+        cmdLine.addArg(arg);
+
+    RefPtr<Process> process;
+    SLANG_RETURN_ON_FAIL(Process::create(cmdLine, 0, process));
+
+    char chunk[16 * 1024];
+    memset(chunk, ' ', sizeof(chunk));
+
+    Stream* stdinStream = process->getStream(StdStreamType::In);
+    size_t bytesRemaining = byteCount;
+    while (bytesRemaining != 0)
+    {
+        const size_t writeSize = bytesRemaining < sizeof(chunk) ? bytesRemaining : sizeof(chunk);
+        const SlangResult writeResult = stdinStream->write(chunk, writeSize);
+        if (SLANG_FAILED(writeResult))
+            break;
+        bytesRemaining -= writeSize;
     }
     stdinStream->close();
 
@@ -373,33 +402,14 @@ static SlangResult _testInputLargerThanReadBuffer(UnitTestContext* context)
     return _expectSlangcSuccess(context, args, sourceString.getBuffer());
 }
 
-#if SLANG_BUILD_STDIN_TEST_HOOKS
-static void _addTestStdinMaxBytesArgs(List<String>& args, size_t maxBytes)
-{
-    args.add("-test-stdin-max-bytes");
-    StringBuilder maxBytesText;
-    maxBytesText << UInt64(maxBytes);
-    args.add(maxBytesText.produceString());
-}
-
-static SlangResult _testInputExactFitDiagnosticPath(UnitTestContext* context)
-{
-    const char* source = "[shader(\"compute\")] void main() {}\n";
-    List<String> args;
-    _addTestStdinMaxBytesArgs(args, strlen(source));
-    _addStdinCompileArgs(args, "slang");
-
-    return _expectSlangcSuccess(context, args, source);
-}
-
 static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
 {
     List<String> args;
-    _addTestStdinMaxBytesArgs(args, 4);
     _addStdinCompileArgs(args, "slang");
 
+    const size_t maxStdinBytes = size_t(256) << 20;
     ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(_runSlangcWithStdin(context, args, "abcde", result));
+    SLANG_RETURN_ON_FAIL(_runSlangcWithRepeatedStdin(context, args, maxStdinBytes + 1, result));
 
     if (result.resultCode == 0)
         return SLANG_FAIL;
@@ -408,25 +418,6 @@ static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
 
     return SLANG_OK;
 }
-
-static SlangResult _testCannotReadFromStdinDiagnostic(UnitTestContext* context)
-{
-    List<String> args;
-    args.add("-test-stdin-force-cannot-read");
-    _addStdinCompileArgs(args, "slang");
-
-    ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(
-        _runSlangcWithStdin(context, args, "[shader(\"compute\")] void main() {}\n", result, true));
-
-    if (result.resultCode == 0)
-        return SLANG_FAIL;
-    if (!_contains(result.standardError, "failed to read source from stdin"))
-        return SLANG_FAIL;
-
-    return SLANG_OK;
-}
-#endif
 
 static SlangResult _testHelpMentionsStdin(UnitTestContext* context)
 {
@@ -464,10 +455,6 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testLanguageSwitchAppliesToStdinAfterSlangInput(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCtrlZIsNotEndOfFile(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargerThanReadBuffer(unitTestContext)));
-#if SLANG_BUILD_STDIN_TEST_HOOKS
-    SLANG_CHECK(SLANG_SUCCEEDED(_testInputExactFitDiagnosticPath(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeDiagnostic(unitTestContext)));
-    SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinDiagnostic(unitTestContext)));
-#endif
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
 }

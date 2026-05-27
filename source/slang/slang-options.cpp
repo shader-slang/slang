@@ -48,15 +48,6 @@ static const char* const kStdinDisplayPath = "<stdin>";
 static const char* const kStdinCommandLinePath = "-";
 static const Index kMaxStdinBytes = Index(256) << 20;
 
-#ifndef SLANG_BUILD_STDIN_TEST_HOOKS
-#define SLANG_BUILD_STDIN_TEST_HOOKS 0
-#endif
-
-#if SLANG_BUILD_STDIN_TEST_HOOKS
-static const char* const kTestStdinMaxBytesOption = "-test-stdin-max-bytes";
-static const char* const kTestStdinForceCannotReadOption = "-test-stdin-force-cannot-read";
-#endif
-
 namespace
 { // anonymous
 
@@ -1471,10 +1462,6 @@ struct OptionsParser
     int m_currentTranslationUnitIndex = -1;
 
     bool m_stdinConsumed = false;
-#if SLANG_BUILD_STDIN_TEST_HOOKS
-    Index m_testMaxStdinBytes = kMaxStdinBytes;
-    bool m_testForceStdinCannotRead = false;
-#endif
     bool m_hasLoadedRepro = false;
     bool m_compileCoreModule = false;
     slang::CompileCoreModuleFlags m_compileCoreModuleFlags;
@@ -1636,13 +1623,7 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
 
 SlangResult OptionsParser::_readStdin(List<Byte>& outSource)
 {
-#if SLANG_BUILD_STDIN_TEST_HOOKS
-    const StdinSourceReadResult readResult =
-        m_testForceStdinCannotRead ? StdinSourceReadResult::CannotRead
-                                   : _readStdinSource(stdin, m_testMaxStdinBytes, outSource);
-#else
     const StdinSourceReadResult readResult = _readStdinSource(stdin, kMaxStdinBytes, outSource);
-#endif
 
     if (readResult == StdinSourceReadResult::CannotRead)
         outSource.clear();
@@ -2555,26 +2536,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             SLANG_RETURN_ON_FAIL(addInputPath(argValue.getBuffer()));
             continue;
         }
-
-#if SLANG_BUILD_STDIN_TEST_HOOKS
-        if (argValue == kTestStdinMaxBytesOption)
-        {
-            m_currentOptionName = kTestStdinMaxBytesOption;
-
-            Int maxBytes = 0;
-            SLANG_RETURN_ON_FAIL(_expectUInt(arg, maxBytes));
-            if (maxBytes > kMaxStdinBytes)
-                maxBytes = kMaxStdinBytes;
-            m_testMaxStdinBytes = Index(maxBytes);
-            continue;
-        }
-
-        if (argValue == kTestStdinForceCannotReadOption)
-        {
-            m_testForceStdinCannotRead = true;
-            continue;
-        }
-#endif
 
         const Index optionIndex = m_cmdOptions->findOptionByName(argValue.getUnownedSlice());
 
