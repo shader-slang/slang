@@ -378,7 +378,7 @@ static void _addTestStdinMaxBytesArgs(List<String>& args, size_t maxBytes)
 {
     args.add("-test-stdin-max-bytes");
     StringBuilder maxBytesText;
-    maxBytesText << maxBytes;
+    maxBytesText << UInt64(maxBytes);
     args.add(maxBytesText.produceString());
 }
 
