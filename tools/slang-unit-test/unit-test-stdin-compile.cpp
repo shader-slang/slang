@@ -413,8 +413,9 @@ static SlangResult _testInputTooLargeReadResult()
 
 static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
 {
+    ScopedEnvVar enableStdinTestHook("SLANG_TEST_STDIN_ENABLE", "1");
     ScopedEnvVar maxBytes("SLANG_TEST_STDIN_MAX_BYTES", "4");
-    if (!maxBytes.isSet)
+    if (!enableStdinTestHook.isSet || !maxBytes.isSet)
         return SLANG_FAIL;
 
     List<String> args;
@@ -453,8 +454,9 @@ static SlangResult _testCannotReadFromStdinReadResult()
 
 static SlangResult _testCannotReadFromStdinDiagnostic(UnitTestContext* context)
 {
+    ScopedEnvVar enableStdinTestHook("SLANG_TEST_STDIN_ENABLE", "1");
     ScopedEnvVar forceCannotRead("SLANG_TEST_STDIN_FORCE_CANNOT_READ", "1");
-    if (!forceCannotRead.isSet)
+    if (!enableStdinTestHook.isSet || !forceCannotRead.isSet)
         return SLANG_FAIL;
 
     List<String> args;

@@ -46,6 +46,7 @@ static const char* const kStdinCommandLinePath = "-";
 static const Index kMaxStdinBytes = Index(256) << 20;
 // Test-only hooks let spawned slangc tests exercise stdin diagnostics without a huge pipe or
 // platform-specific invalid handle setup.
+static const char* const kTestStdinEnableEnvVar = "SLANG_TEST_STDIN_ENABLE";
 static const char* const kTestStdinMaxBytesEnvVar = "SLANG_TEST_STDIN_MAX_BYTES";
 static const char* const kTestStdinForceCannotReadEnvVar = "SLANG_TEST_STDIN_FORCE_CANNOT_READ";
 
@@ -1514,8 +1515,20 @@ void OptionsParser::addInputForeignShaderPath(
     return Profile::Unknown;
 }
 
+static bool _isStdinTestHookEnabled()
+{
+    StringBuilder envValue;
+    return SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+               UnownedStringSlice(kTestStdinEnableEnvVar),
+               envValue)) &&
+           envValue.getUnownedSlice() == "1";
+}
+
 static Index _getMaxStdinBytes()
 {
+    if (!_isStdinTestHookEnabled())
+        return kMaxStdinBytes;
+
     StringBuilder envValue;
     if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
             UnownedStringSlice(kTestStdinMaxBytesEnvVar),
@@ -1536,6 +1549,9 @@ static Index _getMaxStdinBytes()
 
 static bool _isStdinCannotReadForcedForTest()
 {
+    if (!_isStdinTestHookEnabled())
+        return false;
+
     StringBuilder envValue;
     return SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
                UnownedStringSlice(kTestStdinForceCannotReadEnvVar),
