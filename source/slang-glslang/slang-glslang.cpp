@@ -325,8 +325,6 @@ static int glslang_optimizeSPIRV(
 
 #if 0
             // This is the previous 'default optimization' passes setting for glslang
-            // Keep the gate here for parity with the live pipelines below if this
-            // reference branch is re-enabled.
 #if SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
