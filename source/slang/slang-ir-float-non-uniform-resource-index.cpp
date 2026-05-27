@@ -171,7 +171,15 @@ void processNonUniformResourceIndex(
         // getElementPtr (and loads of those).
         auto operand = inst->getOperand(0);
         auto type = operand->getDataType();
-        if (isResourceType(type) || isPointerToResourceType(type))
+        // `isPointerToResourceType` recognizes StorageBuffer-class pointers (e.g.
+        // `RWStructuredBuffer[]`), but a `ConstantBuffer<T>[]` element access lowers to a pointer
+        // into the `Uniform` address space whose pointee is a plain layout struct, which is not a
+        // resource type. Treat that as a descriptor access as well so the NonUniform decoration
+        // still reaches the index operand of the access chain.
+        bool isUniformBufferPtr = false;
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+            isUniformBufferPtr = ptrType->getAddressSpace() == AddressSpace::Uniform;
+        if (isResourceType(type) || isPointerToResourceType(type) || isUniformBufferPtr)
         {
             IRBuilder builder(operand);
             auto decorate = [&](IRInst* value)

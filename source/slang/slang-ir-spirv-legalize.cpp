@@ -2131,6 +2131,33 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 for (auto inst : block->getChildren())
                 {
+                     // VUID-RuntimeSpirv-NonUniform-06274 If an instruction loads from or stores to a resource 
+                     // (including atomics and image instructions) and the resource descriptor being accessed is not 
+                     // dynamically uniform, then the operand corresponding to that resource (e.g. the pointer or sampled image operand) 
+                     // must be decorated with NonUniform
+                     if (auto load = as<IRLoad>(inst))
+                     {
+                         auto ptr = load->getPtr();
+                         switch (ptr->getOp())
+                         {
+                         case kIROp_GetElement:
+                         case kIROp_GetElementPtr:
+                         case kIROp_RWStructuredBufferGetElementPtr:
+                             if (isResourceType(load->getDataType()) &&
+                                 ptr->findDecoration<IRSPIRVNonUniformResourceDecoration>() &&
+                                 !load->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                             {
+                                 IRBuilder builder(load);
+                                 builder.setInsertBefore(load);
+                                 builder.addSPIRVNonUniformResourceDecoration(load);
+                             }
+                             break;
+                         default:
+                             break;
+                         }
+                         continue;
+                     }
+
                     IRInst* indexOperand = nullptr;
                     switch (inst->getOp())
                     {

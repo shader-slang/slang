@@ -6287,6 +6287,49 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 ensureExtensionDeclarationBeforeSpv15(toSlice("SPV_EXT_descriptor_indexing"));
 
                 requireSPIRVCapability(SpvCapabilityShaderNonUniform);
+                // In addition to ShaderNonUniform, descriptor-array indexing requires a
+                // resource-class-specific capability (cf. glslang's
+                // TranslateNonUniformDecoration and SPV_EXT_descriptor_indexing).
+                // requireNonUniformIndexingCapability();
+                IRInst* parentInst = decoration->getParent();
+                if (parentInst)
+                {
+                    IRType* type = parentInst->getDataType();
+                    if (auto ptrType = as<IRPtrTypeBase>(type))
+                    {
+                        switch (ptrType->getAddressSpace())
+                        {
+                        case AddressSpace::StorageBuffer:
+                            requireSPIRVCapability(
+                                SpvCapabilityStorageBufferArrayNonUniformIndexing);
+                            return;
+                        case AddressSpace::Uniform:
+                            requireSPIRVCapability(
+                                SpvCapabilityUniformBufferArrayNonUniformIndexing);
+                            return;
+                        default:
+                            // Textures live in UniformConstant; unwrap and classify by texture type
+                            // below.
+                            type = ptrType->getValueType();
+                            break;
+                        }
+                    }
+                    while (auto arrayType = as<IRArrayTypeBase>(type))
+                        type = arrayType->getElementType();
+                    if (auto texType = as<IRTextureTypeBase>(type))
+                    {
+                        bool isReadWrite = texType->getAccess() != SLANG_RESOURCE_ACCESS_READ;
+                        if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER)
+                            requireSPIRVCapability(
+                                isReadWrite
+                                    ? SpvCapabilityStorageTexelBufferArrayNonUniformIndexing
+                                    : SpvCapabilityUniformTexelBufferArrayNonUniformIndexing);
+                        else
+                            requireSPIRVCapability(
+                                isReadWrite ? SpvCapabilityStorageImageArrayNonUniformIndexing
+                                            : SpvCapabilitySampledImageArrayNonUniformIndexing);
+                    }
+                }
                 emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
