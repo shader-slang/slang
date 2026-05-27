@@ -1041,7 +1041,7 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::ExperimentalFeature,
          "-experimental-feature",
          nullptr,
-         "Enable experimental features (loading builtin neural module)"},
+         "Enable experimental language and module features"},
         {OptionKind::EnableRichDiagnostics,
          "-enable-experimental-rich-diagnostics",
          nullptr,

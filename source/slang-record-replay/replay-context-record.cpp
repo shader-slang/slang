@@ -342,6 +342,17 @@ void ReplayContext::recordBlobByHash(RecordFlag flags, ISlangBlob*& blob)
             return;
         }
 
+        Slang::SHA1::Digest digest;
+        if (!Slang::DigestUtil::stringToDigest(
+                hashCStr,
+                ::strlen(hashCStr),
+                digest.data,
+                sizeof(digest.data)))
+        {
+            blob = nullptr;
+            return;
+        }
+
         // Load content from captured file
         const char* replayPath = getCurrentReplayPath();
         if (!replayPath)
