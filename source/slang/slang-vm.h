@@ -4,6 +4,10 @@
 #include "core/slang-string-util.h"
 #include "slang-vm-bytecode.h"
 
+#ifndef SLANG_ENABLE_VM_BYTECODE_VALIDATION
+#define SLANG_ENABLE_VM_BYTECODE_VALIDATION 1
+#endif
+
 using namespace slang;
 
 namespace Slang
