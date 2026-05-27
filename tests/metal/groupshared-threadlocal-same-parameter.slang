@@ -4,6 +4,8 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -mtl
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -shaderobj -llvm
 
+// This shader is the reduced input from #11146. CI artifact builds exercise it with
+// SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=OFF until the SPIRV-Tools UAF is fixed.
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
