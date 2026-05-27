@@ -2,9 +2,11 @@
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-process-util.h"
+#include "../../source/slang/slang-stdin-source.h"
 #include "slang-com-ptr.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <stdio.h>
 #include <string.h>
 
 using namespace Slang;
@@ -193,6 +195,28 @@ static SlangResult _createTempSlangFile(
     return File::writeAllText(out.slangPath, contents);
 }
 
+struct ScopedFile
+{
+    FILE* file = nullptr;
+
+    ~ScopedFile()
+    {
+        if (file)
+            fclose(file);
+    }
+};
+
+struct TempFile
+{
+    String path;
+
+    ~TempFile()
+    {
+        if (path.getLength())
+            File::remove(path);
+    }
+};
+
 static SlangResult _testStdinAndFileShareSlangTranslationUnit(
     UnitTestContext* context,
     bool stdinFirst)
@@ -251,6 +275,64 @@ static SlangResult _testInputLargerThanReadBuffer(UnitTestContext* context)
     return _expectSlangcSuccess(context, args, sourceString.getBuffer());
 }
 
+static SlangResult _readStdinSourceForTest(
+    const char* sourceText,
+    Index maxBytes,
+    List<Byte>& outSource,
+    StdinSourceReadResult& outResult)
+{
+    outResult = StdinSourceReadResult::CannotRead;
+
+    ScopedFile stream;
+    stream.file = tmpfile();
+    if (!stream.file)
+        return SLANG_FAIL;
+
+    const size_t sourceLength = strlen(sourceText);
+    if (fwrite(sourceText, 1, sourceLength, stream.file) != sourceLength)
+        return SLANG_FAIL;
+    if (fseek(stream.file, 0, SEEK_SET) != 0)
+        return SLANG_FAIL;
+
+    outResult = readStdinSource(stream.file, maxBytes, outSource);
+    return SLANG_OK;
+}
+
+static SlangResult _testInputTooLargeReadResult()
+{
+    List<Byte> source;
+    StdinSourceReadResult result;
+
+    SLANG_RETURN_ON_FAIL(_readStdinSourceForTest("abcde", 4, source, result));
+
+    if (result != StdinSourceReadResult::TooLarge)
+        return SLANG_FAIL;
+    if (source.getCount() != 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+static SlangResult _testCannotReadFromStdinReadResult()
+{
+    TempFile temp;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slangc-stdin-error"), temp.path));
+
+    ScopedFile stream;
+    stream.file = fopen(temp.path.getBuffer(), "w");
+    if (!stream.file)
+        return SLANG_FAIL;
+
+    List<Byte> source;
+    const StdinSourceReadResult result = readStdinSource(stream.file, 64, source);
+    if (result != StdinSourceReadResult::CannotRead)
+        return SLANG_FAIL;
+    if (source.getCount() != 0)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 static SlangResult _testHelpMentionsStdin(UnitTestContext* context)
 {
     CommandLine cmdLine;
@@ -281,5 +363,7 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testStdinAndFileShareSlangTranslationUnit(unitTestContext, true)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCtrlZIsNotEndOfFile(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargerThanReadBuffer(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeReadResult()));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinReadResult()));
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
 }

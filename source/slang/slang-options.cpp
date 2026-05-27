@@ -28,16 +28,13 @@
 #include "slang-repro.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-serialize-ir.h"
+#include "slang-stdin-source.h"
 #include "slang.h"
 
 #include <assert.h>
 #include <limits>
 #include <stdio.h>
 #include <string.h>
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
-#endif
 
 namespace Slang
 {
@@ -1563,49 +1560,19 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
 
 SlangResult OptionsParser::_readStdin(List<Byte>& outSource)
 {
-    outSource.clear();
-
-#ifdef _WIN32
-    const int previousMode = _setmode(_fileno(stdin), _O_BINARY);
-    struct StdinModeGuard
+    switch (readStdinSource(stdin, kMaxStdinBytes, outSource))
     {
-        int mode;
-        ~StdinModeGuard()
-        {
-            if (mode != -1)
-                _setmode(_fileno(stdin), mode);
-        }
-    } stdinModeGuard{previousMode};
-#endif
-
-    clearerr(stdin);
-
-    // Use blocking stdio here. The process PipeStream path is optimized for polling child
-    // process output and can spin while waiting for piped stdin.
-    char buffer[16 * 1024];
-    for (;;)
-    {
-        const size_t readByteCount = fread(buffer, 1, sizeof(buffer), stdin);
-        if (readByteCount != 0)
-        {
-            const Index readCount = Index(readByteCount);
-            if (readCount > kMaxStdinBytes - outSource.getCount())
-            {
-                m_sink->diagnose(Diagnostics::StdinInputTooLarge{});
-                return SLANG_FAIL;
-            }
-            outSource.addRange(reinterpret_cast<const Byte*>(buffer), readCount);
-            continue;
-        }
-
-        if (ferror(stdin))
-        {
-            m_sink->diagnose(Diagnostics::CannotReadFromStdin{});
-            return SLANG_FAIL;
-        }
-
+    case StdinSourceReadResult::Success:
         return SLANG_OK;
+    case StdinSourceReadResult::TooLarge:
+        m_sink->diagnose(Diagnostics::StdinInputTooLarge{});
+        return SLANG_FAIL;
+    case StdinSourceReadResult::CannotRead:
+        m_sink->diagnose(Diagnostics::CannotReadFromStdin{});
+        return SLANG_FAIL;
     }
+
+    SLANG_UNREACHABLE("unexpected stdin read result");
 }
 
 SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
