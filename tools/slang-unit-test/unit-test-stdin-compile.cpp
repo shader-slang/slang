@@ -300,10 +300,16 @@ static SlangResult _readStdinSourceForTest(
 
 static SlangResult _testInputTooLargeReadResult()
 {
+    StringBuilder sourceText;
+    for (Index i = 0; i < 16 * 1024 + 5; ++i)
+        sourceText.appendChar('a');
+
     List<Byte> source;
     StdinSourceReadResult result;
+    const String sourceString = sourceText.produceString();
 
-    SLANG_RETURN_ON_FAIL(_readStdinSourceForTest("abcde", 4, source, result));
+    SLANG_RETURN_ON_FAIL(
+        _readStdinSourceForTest(sourceString.getBuffer(), 16 * 1024 + 4, source, result));
 
     if (result != StdinSourceReadResult::TooLarge)
         return SLANG_FAIL;

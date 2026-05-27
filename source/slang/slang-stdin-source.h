@@ -53,13 +53,19 @@ inline StdinSourceReadResult readStdinSource(FILE* input, Index maxBytes, List<B
         {
             const Index readCount = Index(readByteCount);
             if (outSource.getCount() > maxBytes || readCount > maxBytes - outSource.getCount())
+            {
+                outSource.clear();
                 return StdinSourceReadResult::TooLarge;
+            }
             outSource.addRange(reinterpret_cast<const Byte*>(buffer), readCount);
             continue;
         }
 
         if (ferror(input))
+        {
+            outSource.clear();
             return StdinSourceReadResult::CannotRead;
+        }
 
         return StdinSourceReadResult::Success;
     }
