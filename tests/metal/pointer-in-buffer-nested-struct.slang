@@ -1,10 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
-// Multi-level pointer field inside a nested struct. Metal's pointer-to-pointer
-// restriction is transitive: if Inner contains int**, then Outer (which contains
-// Inner) cannot be used as a buffer pointee type either. The pass must
-// recursively walk nested struct fields to find and lower these.
+// Transitive struct lowering through various nesting patterns. Metal's
+// pointer-to-pointer restriction applies transitively through:
+// - Direct struct fields (Inner inner)
+// - Multi-dimensional arrays of struct (Inner arr[2][3])
+// - Arrays of pointer-to-struct (Inner* ptrArr[2])
 //
 // See: https://github.com/shader-slang/slang/issues/10841
 
@@ -15,14 +16,17 @@ struct Inner
 
 struct Outer
 {
-    Inner inner;
+    Inner direct;
+    Inner grid[2][3];
+    Inner* ptrArr[2];
     int value;
 };
 
 ConstantBuffer<Outer> cb;
 RWStructuredBuffer<int> output;
 
-// The nested struct's pointer field should be lowered to ulong.
+// The nested struct's pointer field should be lowered to ulong regardless
+// of how it's reached (direct, array-of-array, array-of-pointer).
 // CHECK-LABEL: struct Inner
 // CHECK: ulong
 // CHECK: };
@@ -36,7 +40,14 @@ RWStructuredBuffer<int> output;
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
-    int** pp = cb.inner.ptr;
-    int* p = *pp;
-    output[tid.x] = *p + cb.value;
+    // Access through direct struct field
+    int** pp1 = cb.direct.ptr;
+
+    // Access through multi-dim array of struct
+    int** pp2 = cb.grid[0][1].ptr;
+
+    // Access through array of pointer-to-struct
+    int** pp3 = cb.ptrArr[0]->ptr;
+
+    output[tid.x] = **pp1 + **pp2 + **pp3 + cb.value;
 }

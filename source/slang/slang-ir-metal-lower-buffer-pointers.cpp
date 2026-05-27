@@ -145,17 +145,31 @@ struct MetalBufferPointerLoweringContext
                     info.originalPtrType = field->getFieldType();
                     fieldsToLower.add(info);
                 }
-                if (auto nestedStruct = as<IRStructType>(field->getFieldType()))
-                    worklist.add(nestedStruct);
-                else if (auto arrayType = as<IRArrayTypeBase>(field->getFieldType()))
+                // Drill through arbitrary chains of arrays and pointers to
+                // find nested structs. Metal's restriction is transitive
+                // through all of: Struct, Array(Struct), Ptr(Struct),
+                // Array(Array(Struct)), Array(Ptr(Struct)), etc.
                 {
-                    if (auto elemStruct = as<IRStructType>(arrayType->getElementType()))
-                        worklist.add(elemStruct);
-                }
-                else if (auto ptrType = as<IRPtrType>(field->getFieldType()))
-                {
-                    if (auto pointeeStruct = as<IRStructType>(ptrType->getValueType()))
-                        worklist.add(pointeeStruct);
+                    auto t = (IRType*)field->getFieldType();
+                    for (;;)
+                    {
+                        if (auto s = as<IRStructType>(t))
+                        {
+                            worklist.add(s);
+                            break;
+                        }
+                        if (auto a = as<IRArrayTypeBase>(t))
+                        {
+                            t = (IRType*)a->getElementType();
+                            continue;
+                        }
+                        if (auto p = as<IRPtrType>(t))
+                        {
+                            t = (IRType*)p->getValueType();
+                            continue;
+                        }
+                        break;
+                    }
                 }
             }
 
