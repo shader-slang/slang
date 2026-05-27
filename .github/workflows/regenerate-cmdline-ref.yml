@@ -1,28 +1,39 @@
 name: Regenerate Command Line Reference
+# Security note:
+# PRs can come from forks.
+# A runner that executes untrusted PR code must not have bot secrets.
+# The generate job runs PR code without bot secrets.
+# The apply job runs separately and only commits the generated markdown file.
 on:
   repository_dispatch:
     types: [regenerate-cmdline-ref-command]
+permissions:
+  contents: read
 jobs:
-  regenerate-cmdline-ref:
+  generate_cmdline_ref:
+    if: >-
+      github.repository == 'shader-slang/slang' &&
+      github.event.client_payload.github.payload.repository.full_name == 'shader-slang/slang' &&
+      github.event.client_payload.pull_request.base.repo.full_name == 'shader-slang/slang'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.SLANGBOT_PAT }}
           repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
           ref: ${{ github.event.client_payload.pull_request.head.ref }}
           path: pr-branch
           submodules: "recursive"
+          persist-credentials: false
 
       - name: Checkout target branch
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.SLANGBOT_PAT }}
-          repository: ${{ github.event.client_payload.pull_request.base.repo.full_name }}
+          repository: shader-slang/slang
           ref: ${{ github.event.client_payload.pull_request.base.ref }}
           path: target-branch
           submodules: "recursive"
+          persist-credentials: false
 
       - name: Install dependencies
         run: |
@@ -59,8 +70,63 @@ jobs:
           mkdir -p docs
           ./build/${{ env.cmake_config }}/bin/slangc -help-style markdown -h > docs/command-line-slangc-reference.md 2>&1
 
+      - name: Upload generated reference
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
+        with:
+          name: command-line-reference
+          path: pr-branch/docs/command-line-slangc-reference.md
+          if-no-files-found: error
+          retention-days: 1
+
+  apply_cmdline_ref:
+    needs: generate_cmdline_ref
+    if: >-
+      always() &&
+      github.repository == 'shader-slang/slang' &&
+      github.event.client_payload.github.payload.repository.full_name == 'shader-slang/slang' &&
+      github.event.client_payload.pull_request.base.repo.full_name == 'shader-slang/slang'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        id: checkout-pr
+        if: needs.generate_cmdline_ref.result == 'success'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.client_payload.pull_request.head.ref }}
+          path: pr-branch
+          persist-credentials: false
+
+      - name: Download generated reference
+        id: download-doc
+        if: needs.generate_cmdline_ref.result == 'success'
+        uses: actions/download-artifact@81eafdc926c95ab3a46553696557fe28c599a41a # v4
+        with:
+          name: command-line-reference
+          path: generated-docs
+
+      - name: Apply generated reference
+        id: apply-doc
+        if: needs.generate_cmdline_ref.result == 'success'
+        run: |
+          set -euo pipefail
+          generated_doc="generated-docs/command-line-slangc-reference.md"
+          if [[ ! -f "$generated_doc" || -L "$generated_doc" ]]; then
+            echo "Generated reference artifact is missing or invalid" >&2
+            exit 1
+          fi
+          max_size=$((10 * 1024 * 1024))
+          actual_size=$(wc -c < "$generated_doc")
+          if [[ "$actual_size" -gt "$max_size" ]]; then
+            echo "Generated reference artifact is too large" >&2
+            exit 1
+          fi
+          mkdir -p pr-branch/docs
+          cp "$generated_doc" pr-branch/docs/command-line-slangc-reference.md
+
       - name: Configure Git commit signing
         id: git-info
+        if: needs.generate_cmdline_ref.result == 'success'
         run: |
           echo "${{ secrets.SLANGBOT_SIGNING_KEY }}" > "${{runner.temp}}"/signing_key
           chmod 600 "${{runner.temp}}"/signing_key
@@ -74,6 +140,7 @@ jobs:
 
       - name: Create Pull Request
         id: create-pr
+        if: needs.generate_cmdline_ref.result == 'success'
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
@@ -88,29 +155,32 @@ jobs:
           push-to-fork: ${{ steps.git-info.outputs.bot_name }}/slang
           delete-branch: true
 
+      - name: Remove signing key
+        if: always()
+        run: rm -f "${{ runner.temp }}/signing_key"
+
       - name: Comment on PR
         uses: peter-evans/create-or-update-comment@v4
         if: always()
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
-          repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
+          repository: shader-slang/slang
           issue-number: ${{ github.event.client_payload.pull_request.number }}
           body: |
-            ${{ 
-              steps.build.conclusion == 'failure'
-              && format('❌ Slang build failed. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
-              || (steps.regen.conclusion == 'failure' 
-                  && format('❌ Command line reference generation failed. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
-                  || (steps.create-pr.conclusion == 'failure' 
-                      && format('❌ Failed to create regenerate command line reference pull request. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
-                      || format('🌈 Regenerated command line reference, please merge the changes from [this PR]({0})', steps.create-pr.outputs.pull-request-url)))
+            ${{
+              needs.generate_cmdline_ref.result != 'success'
+              && format('❌ Command line reference generation failed. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
+              || (steps.create-pr.conclusion != 'success'
+                  && format('❌ Failed to create regenerate command line reference pull request. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
+                  || format('🌈 Regenerated command line reference, please merge the changes from [this PR]({0})', steps.create-pr.outputs.pull-request-url))
             }}
 
       - name: Add reaction
+        if: needs.generate_cmdline_ref.result == 'success' && steps.create-pr.conclusion == 'success'
         uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
-          repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
+          repository: shader-slang/slang
           comment-id: ${{ github.event.client_payload.github.payload.comment.id }}
           reactions-edit-mode: replace
           reactions: hooray

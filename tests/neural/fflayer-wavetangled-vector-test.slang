@@ -71,8 +71,14 @@ static const int SubgroupSize = 32;
 static const int WarpCount = WARP_COUNT;
 static const int BatchSize = WarpCount * SubgroupSize;
 
-typealias ShMemSize = SharedMemorySize<ElementType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, WarpCount>;
-typealias ShMemSizeLayer1 = ShMemSize.OfLayer1<InputSize, OutputSize>;
+typealias ShMemSizeLayer1 = SharedMemorySize<
+    ElementType,
+    TargetEnum.CUDA,
+    ExecutionMode.Training,
+    SubgroupSize,
+    WarpCount,
+    InputSize,
+    OutputSize>;
 typealias InVec = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, SubgroupSize, WarpCount>;
 typealias OutVec = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize, WarpCount>;
 

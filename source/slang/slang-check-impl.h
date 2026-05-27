@@ -881,7 +881,7 @@ private:
     /// Used to detect when loadedModulesList has changed and the cache needs updating.
     Index m_candidateExtensionListsBuiltForModuleCount = 0;
 
-    /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`
+    /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`.
     void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
 
     /// Mapping from a decl to additional declarations of the same decl.
@@ -1812,7 +1812,7 @@ public:
 
     // Convert a function's original type to it's forward/backward diff'd type.
     Type* getForwardDiffFuncType(FuncType* originalType, QualType thisType);
-    Type* getBackwardDiffFuncType(FuncType* originalType);
+    Type* getBackwardDiffFuncType(FuncType* originalType, QualType thisType = QualType());
 
     /// Registers a type as conforming to IDifferentiable, along with a witness
     /// describing the relationship.
@@ -3231,6 +3231,10 @@ public:
 
 
     void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
+    void _checkAliasedOutArguments(
+        InvokeExpr* invoke,
+        FuncType* funcType,
+        FunctionDeclBase* funcDeclBase);
     Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr* expr);
     // Get the type to use when referencing a declaration
     QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
@@ -3469,6 +3473,7 @@ public:
 
     Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
     Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
+    Expr* visitApplyForBwdExpr(ApplyForBwdExpr* expr);
     Expr* visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr);
     Expr* visitDispatchKernelExpr(DispatchKernelExpr* expr);
 

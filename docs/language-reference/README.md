@@ -13,7 +13,6 @@ Contents
 * [Types](types.md)
 * [Generics](generics.md)
 * [Expressions](expressions.md)
-  * [Evaluation of expressions](expressions-evaluation-classes.md)
 * [Statements](statements.md)
 * [Declarations](declarations.md)
 * [Attributes](attributes.md)

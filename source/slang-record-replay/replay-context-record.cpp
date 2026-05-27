@@ -22,7 +22,6 @@ namespace SlangRecord
 using Slang::File;
 using Slang::Path;
 
-
 void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
 {
     switch (m_mode)
@@ -67,6 +66,7 @@ void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
 
             // Read the recorded value from stream
             size_t offset = m_stream.getPosition();
+            requireReplayStreamBytes(m_stream, offset, size);
             m_stream.read(data, size);
 
             // Compare: recorded value (now in data) vs expected value (in buffer)
@@ -78,6 +78,8 @@ void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
         else
         {
             // For inputs, just read from stream
+            size_t offset = m_stream.getPosition();
+            requireReplayStreamBytes(m_stream, offset, size);
             m_stream.read(data, size);
         }
         break;
@@ -234,22 +236,37 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
     }
     else
     {
+        const char* expectedStr = str;
         TypeId typeId = readTypeId();
         if (typeId == TypeId::Null)
         {
+            if (hasFlag(flags, RecordFlag::Output) && expectedStr != nullptr)
+            {
+                throw DataMismatchException(m_stream.getPosition() - sizeof(uint8_t), 0);
+            }
             str = nullptr;
         }
         else if (typeId == TypeId::String)
         {
             uint32_t length;
             recordRaw(RecordFlag::None, &length, sizeof(length));
-            char* buf = m_arena.allocateArray<char>(length + 1);
+            if (length > kMaxReplayStringLength)
+            {
+                throw DataMismatchException(m_stream.getPosition() - sizeof(length), length);
+            }
+
+            size_t stringSize = size_t(length);
+            size_t streamPosition = m_stream.getPosition();
+            requireReplayStreamBytes(m_stream, streamPosition, stringSize);
+            requireReplayArenaAllocation(streamPosition, stringSize + 1);
+
+            char* buf = m_arena.allocateArray<char>(stringSize + 1);
             if (length > 0)
-                recordRaw(RecordFlag::None, buf, length);
-            buf[length] = '\0';
+                recordRaw(RecordFlag::None, buf, stringSize);
+            buf[stringSize] = '\0';
             if (hasFlag(flags, RecordFlag::Output))
             {
-                if (strcmp(str, buf) != 0)
+                if (expectedStr == nullptr || strcmp(expectedStr, buf) != 0)
                 {
                     throw DataMismatchException(m_stream.getPosition() - length, length);
                 }
@@ -320,6 +337,17 @@ void ReplayContext::recordBlobByHash(RecordFlag flags, ISlangBlob*& blob)
         record(RecordFlag::None, hashCStr);
 
         if (!hashCStr || hashCStr[0] == '\0')
+        {
+            blob = nullptr;
+            return;
+        }
+
+        Slang::SHA1::Digest digest;
+        if (!Slang::DigestUtil::stringToDigest(
+                hashCStr,
+                ::strlen(hashCStr),
+                digest.data,
+                sizeof(digest.data)))
         {
             blob = nullptr;
             return;
