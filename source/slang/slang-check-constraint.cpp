@@ -405,14 +405,13 @@ Type* SemanticsVisitor::TryJoinTypes(
     return nullptr;
 }
 
-// Find the witness value for a type-coercion generic constraint.
-TypeCoercionWitness* findTypeCoercionWitnessForConstraint(
+// Find the witness value for an already-substituted type-coercion generic constraint.
+static TypeCoercionWitness* findTypeCoercionWitnessForSubstitutedConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
-    TypeCoercionConstraintDecl* constraintDecl,
-    DeclRef<GenericDecl> genericDeclRef,
+    DeclRef<TypeCoercionConstraintDecl> constraintDeclRef,
+    Decl* genericInnerDeclForDiagnostics,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
-    ArrayView<Val*> args,
     bool shouldEmitError)
 {
     // Diagnostic emission needs the overload context location. The solver often
@@ -420,13 +419,7 @@ TypeCoercionWitness* findTypeCoercionWitnessForConstraint(
     // unless this helper is being asked to produce user-facing diagnostics.
     SLANG_ASSERT(!shouldEmitError || shouldEmitError && maybeContext);
 
-    // The source constraint is stored on the generic declaration, but the
-    // witness must prove the constraint under the current generic arguments.
-    // For `Foo<T>(...) where T : __ConvertibleTo<U>`, this substitutes the
-    // current `T` and `U` before checking convertibility.
-    DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
-        astBuilder->getGenericAppDeclRef(genericDeclRef, args, constraintDecl)
-            .as<TypeCoercionConstraintDecl>();
+    auto constraintDecl = constraintDeclRef.getDecl();
     auto fromType = getFromType(astBuilder, constraintDeclRef);
     auto toType = getToType(astBuilder, constraintDeclRef);
 
@@ -484,8 +477,9 @@ TypeCoercionWitness* findTypeCoercionWitnessForConstraint(
                 .fromType = fromType,
                 .toType = toType,
                 .location = maybeContext->loc});
-            visitor->getSink()->diagnose(
-                Diagnostics::SeeDefinitionOf{.decl = genericDeclRef.getDecl()->inner});
+            if (genericInnerDeclForDiagnostics)
+                visitor->getSink()->diagnose(
+                    Diagnostics::SeeDefinitionOf{.decl = genericInnerDeclForDiagnostics});
         }
         return nullptr;
     }
@@ -499,26 +493,45 @@ TypeCoercionWitness* findTypeCoercionWitnessForConstraint(
     return typeCoercionWitness;
 }
 
-// Find the witness value for a differentiability-info generic constraint.
-Witness* findDiffTypeInfoWitnessForConstraint(
+// Find the witness value for a type-coercion generic constraint.
+TypeCoercionWitness* findTypeCoercionWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
-    HasDiffTypeInfoConstraintDecl* constraintDecl,
+    TypeCoercionConstraintDecl* constraintDecl,
     DeclRef<GenericDecl> genericDeclRef,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     ArrayView<Val*> args,
+    bool shouldEmitError)
+{
+    // The source constraint is stored on the generic declaration, but the
+    // witness must prove the constraint under the current generic arguments.
+    // For `Foo<T>(...) where T : __ConvertibleTo<U>`, this substitutes the
+    // current `T` and `U` before checking convertibility.
+    DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
+        astBuilder->getGenericAppDeclRef(genericDeclRef, args, constraintDecl)
+            .as<TypeCoercionConstraintDecl>();
+    return findTypeCoercionWitnessForSubstitutedConstraint(
+        astBuilder,
+        visitor,
+        constraintDeclRef,
+        genericDeclRef.getDecl()->inner,
+        maybeContext,
+        shouldEmitError);
+}
+
+// Find the witness value for an already-substituted differentiability-info generic constraint.
+static Witness* findDiffTypeInfoWitnessForSubstitutedConstraint(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    DeclRef<HasDiffTypeInfoConstraintDecl> constraintDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError)
 {
     // Diagnostic emission needs the overload context location, while the solver
     // often probes this helper silently during overload candidate checking.
     SLANG_ASSERT(!shouldEmitError || maybeContext);
 
-    // The constraint declaration is substituted through the candidate's current
-    // generic arguments before asking for diff-type info. For
-    // `Foo<T>() where T : IDifferentiable`, this is what turns the declaration
-    // type `T` into the concrete or inferred type currently stored for `T`.
-    auto constraintDeclRef = astBuilder->getGenericAppDeclRef(genericDeclRef, args, constraintDecl)
-                                 .as<HasDiffTypeInfoConstraintDecl>();
+    auto constraintDecl = constraintDeclRef.getDecl();
     auto constrainedType = getBaseType(astBuilder, constraintDeclRef);
     if (!constrainedType)
     {
@@ -555,6 +568,30 @@ Witness* findDiffTypeInfoWitnessForConstraint(
     }
 
     return nullptr;
+}
+
+// Find the witness value for a differentiability-info generic constraint.
+Witness* findDiffTypeInfoWitnessForConstraint(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    HasDiffTypeInfoConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    ArrayView<Val*> args,
+    bool shouldEmitError)
+{
+    // The constraint declaration is substituted through the candidate's current
+    // generic arguments before asking for diff-type info. For
+    // `Foo<T>() where T : IDifferentiable`, this is what turns the declaration
+    // type `T` into the concrete or inferred type currently stored for `T`.
+    auto constraintDeclRef = astBuilder->getGenericAppDeclRef(genericDeclRef, args, constraintDecl)
+                                 .as<HasDiffTypeInfoConstraintDecl>();
+    return findDiffTypeInfoWitnessForSubstitutedConstraint(
+        astBuilder,
+        visitor,
+        constraintDeclRef,
+        maybeContext,
+        shouldEmitError);
 }
 
 // An `ArgState` classifies the current argument stored in `m_args` for one
@@ -956,6 +993,8 @@ private:
     {
         for (auto genericDecl : m_genericDecls)
         {
+            auto& args = m_args[genericDecl];
+            args.clear();
             // `getDefaultSubstitutionArgs()` already builds the exact argument
             // layout consumed by `getGenericAppDeclRef`: ordinary arguments
             // first, then witness arguments. These default substitution args are
@@ -963,8 +1002,6 @@ private:
             // declared witness that keep dependent values like `T.A` well formed
             // until a solver constraint replaces them.
             auto defaultArgs = getDefaultSubstitutionArgs(m_astBuilder, m_visitor, genericDecl);
-            auto& args = m_args[genericDecl];
-            args.clear();
             for (auto arg : defaultArgs)
             {
                 if (!arg)
@@ -1528,10 +1565,8 @@ private:
         // already ensured that any ordinary or witness argument mentioned by
         // `c.val` is ready, so this substitution can turn projections like
         // `T.A` into the value that should constrain the target argument.
-        auto genSubst = m_astBuilder->getGenericAppDeclRef(
-            m_genericDeclRef,
-            m_args[c.decl->parentDecl].getArrayView().arrayView);
-        auto newVal = c.val->substitute(m_astBuilder, SubstitutionSet(genSubst));
+        auto fullSubst = SubstitutionSet(buildSubstDeclRef(m_genericDeclRef.getDecl()->inner));
+        auto newVal = c.val->substitute(m_astBuilder, fullSubst);
         if (newVal)
             c.val = newVal;
         return true;
@@ -2432,8 +2467,19 @@ private:
         // based on the already-specialized decl-ref for `Outer`.
         for (auto genericDecl : m_genericDecls)
         {
-            DeclRef<GenericDecl> genericDeclRef =
-                substDeclRef ? substDeclRef.as<GenericDecl>() : getRootGenericDeclRef(genericDecl);
+            DeclRef<GenericDecl> genericDeclRef;
+            if (substDeclRef)
+            {
+                genericDeclRef = substDeclRef.as<GenericDecl>();
+                if (!genericDeclRef)
+                    genericDeclRef = m_astBuilder->getMemberDeclRef(substDeclRef, genericDecl);
+            }
+            else
+            {
+                genericDeclRef = getRootGenericDeclRef(genericDecl);
+            }
+            if (!genericDeclRef)
+                return DeclRef<Decl>();
 
             // `m_args` is the live argument list. Because solver constraints update it
             // immediately, this substitution always reflects the current state
@@ -2458,9 +2504,19 @@ private:
         // Direct references can be rebuilt directly for each generic in the
         // chain. Non-direct references, such as lookup/member references, carry
         // access-path information that must be preserved when specializing.
-        if (as<DirectDeclRef>(m_genericDeclRef.declRefBase))
-            return makeDeclRef(genericDecl);
-        return m_genericDeclRef;
+        if (genericDecl == m_genericDeclRef.getDecl())
+            return m_genericDeclRef;
+        for (auto declRef = DeclRef<Decl>(m_genericDeclRef); declRef; declRef = declRef.getParent())
+        {
+            if (auto genericAppDeclRef = as<GenericAppDeclRef>(declRef.declRefBase))
+            {
+                if (genericAppDeclRef->getGenericDecl() == genericDecl)
+                    return DeclRef<GenericDecl>(genericAppDeclRef->getGenericDeclRef());
+            }
+            if (declRef.getDecl() == genericDecl)
+                return declRef.as<GenericDecl>();
+        }
+        return makeDeclRef(genericDecl);
     }
 
     // -------------------------------------------------------------------------
@@ -2667,6 +2723,8 @@ private:
         GenericDecl* genericDecl,
         TypeCoercionConstraintDecl* constraintDecl)
     {
+        SLANG_UNUSED(genericDecl);
+
         // Mark source-level constrained arguments before substitution changes
         // them. A constraint such as `T -> float` should still make the
         // argument for `T` count as constrained for overload ranking.
@@ -2676,14 +2734,13 @@ private:
         // Reuse the shared coercion helper so the solver does not duplicate
         // conversion logic. It receives the current full argument list, so the
         // witness is proved for the same specialization that will be returned.
-        auto& genericArgs = m_args[genericDecl];
-        auto witness = Slang::findTypeCoercionWitnessForConstraint(
+        auto constraintDeclRef = buildSubstDeclRef(constraintDecl).as<TypeCoercionConstraintDecl>();
+        auto witness = findTypeCoercionWitnessForSubstitutedConstraint(
             m_astBuilder,
             m_visitor,
-            constraintDecl,
-            m_genericDeclRef,
+            constraintDeclRef,
             nullptr,
-            genericArgs.getArrayView().arrayView,
+            nullptr,
             false);
         return witness;
     }
@@ -2693,6 +2750,8 @@ private:
         GenericDecl* genericDecl,
         NonEmptyPackConstraintDecl* constraintDecl)
     {
+        SLANG_UNUSED(genericDecl);
+
         // The constraint stores its subject pack as syntax, so first recover
         // the decl-ref referenced by that expression. Keeping a `DeclRef` here
         // preserves any useful substitution context while deciding whether this
@@ -2706,15 +2765,11 @@ private:
         Val* constrainedArg = nullptr;
         if (auto typePackDeclRef = constrainedPackDeclRef.as<GenericTypePackParamDecl>())
         {
-            auto typePackDecl = typePackDeclRef.getDecl();
-            if (typePackDecl->parameterIndex < m_args[genericDecl].getCount())
-                constrainedArg = m_args[genericDecl][typePackDecl->parameterIndex];
+            constrainedArg = getCurrentArg(typePackDeclRef.getDecl());
         }
         else if (auto valuePackDeclRef = constrainedPackDeclRef.as<GenericValuePackParamDecl>())
         {
-            auto valuePackDecl = valuePackDeclRef.getDecl();
-            if (valuePackDecl->parameterIndex < m_args[genericDecl].getCount())
-                constrainedArg = m_args[genericDecl][valuePackDecl->parameterIndex];
+            constrainedArg = getCurrentArg(valuePackDeclRef.getDecl());
         }
 
         // Omitted packs are represented as empty packs, which fail this check.
@@ -2734,6 +2789,8 @@ private:
         GenericDecl* genericDecl,
         HasDiffTypeInfoConstraintDecl* constraintDecl)
     {
+        SLANG_UNUSED(genericDecl);
+
         // Mark the declaration-time subject argument for overload ranking
         // before the witness helper substitutes it to a concrete type.
         if (!markArgConstrainedByDiffTypeInfoConstraint(constraintDecl))
@@ -2742,14 +2799,13 @@ private:
         // Use the shared diff-type-info lookup so the solver does not duplicate
         // differentiability rules. The current argument list provides the
         // specialization under which the witness must be valid.
-        auto& genericArgs = m_args[genericDecl];
-        auto witness = Slang::findDiffTypeInfoWitnessForConstraint(
+        auto constraintDeclRef =
+            buildSubstDeclRef(constraintDecl).as<HasDiffTypeInfoConstraintDecl>();
+        auto witness = findDiffTypeInfoWitnessForSubstitutedConstraint(
             m_astBuilder,
             m_visitor,
-            constraintDecl,
-            m_genericDeclRef,
+            constraintDeclRef,
             nullptr,
-            genericArgs.getArrayView().arrayView,
             false);
         return witness;
     }

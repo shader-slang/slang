@@ -26,6 +26,14 @@ struct FloatElement : IElement
     typealias DataType = FloatData;
 }
 
+struct ManualData : IData
+{
+    int getValue()
+    {
+        return 31;
+    }
+}
+
 __generic<T : IElement, U : IData = T.DataType>
 U getDefaultAssociatedType()
 {
@@ -75,6 +83,14 @@ W getChainedDefaultAssociatedType()
 
 ConcreteBaz gChainedFunctionValue = getChainedDefaultAssociatedType<ConcreteFoo>();
 
+struct NestedAssociatedDefault<T : IElement>
+{
+    U load<U : IData = T.DataType>()
+    {
+        return U();
+    }
+}
+
 void main()
 {
     printf("%d\n", getDefaultAssociatedType<FloatElement>().getValue());
@@ -82,4 +98,11 @@ void main()
 
     printf("%d\n", getChainedDefaultAssociatedType<ConcreteFoo>().getValue());
     // CHECK: 23
+
+    NestedAssociatedDefault<FloatElement> nested;
+    printf("%d\n", nested.load().getValue());
+    // CHECK: 17
+
+    printf("%d\n", nested.load<ManualData>().getValue());
+    // CHECK: 31
 }
