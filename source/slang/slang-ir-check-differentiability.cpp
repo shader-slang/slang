@@ -1,7 +1,6 @@
 #include "slang-ir-check-differentiability.h"
 
 #include "slang-ir-autodiff.h"
-#include "slang-ir-dominators.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-sccp.h"
 #include "slang-rich-diagnostics.h"
@@ -404,7 +403,6 @@ public:
         InstHashSet produceDiffSet(funcInst->getModule());
         InstHashSet expectDiffSet(funcInst->getModule());
         InstHashSet carryNonTrivialDiffSet(funcInst->getModule());
-        RefPtr<IRDominatorTree> domTree = computeDominatorTree(funcInst);
 
         bool isDifferentiableReturnType = false;
         for (auto param : funcInst->getFirstBlock()->getParams())
@@ -460,47 +458,7 @@ public:
             }
         };
 
-        auto canStoreReachUse = [&](IRStore* store, IRInst* useSite) -> bool
-        {
-            auto storeBlock = as<IRBlock>(store->getParent());
-            auto useBlock = as<IRBlock>(useSite->getParent());
-            if (!storeBlock || !useBlock)
-                return false;
-
-            // Same-block ordering is instruction order, not just CFG reachability.
-            // A store that appears after the call cannot taint that call.
-            if (storeBlock == useBlock)
-                return domTree->dominates(store, useSite);
-
-            // If the store's block dominates the use's block it must reach the use.
-            // Otherwise do a small may-reach walk so branch-local stores that can flow
-            // into the call are still treated conservatively.
-            if (domTree->dominates(storeBlock, useBlock))
-                return true;
-
-            HashSet<IRBlock*> seen;
-            List<IRBlock*> workList;
-            workList.add(storeBlock);
-
-            while (workList.getCount() != 0)
-            {
-                auto block = workList.getLast();
-                workList.removeLast();
-                if (!block || seen.contains(block))
-                    continue;
-                seen.add(block);
-
-                for (auto successor : block->getSuccessors())
-                {
-                    if (successor == useBlock)
-                        return true;
-                    workList.add(successor);
-                }
-            }
-            return false;
-        };
-
-        auto isAddressCarryingNonTrivialDiff = [&](IRInst* addr, IRInst* useSite) -> bool
+        auto isAddressCarryingNonTrivialDiff = [&](IRInst* addr) -> bool
         {
             if (carryNonTrivialDiffSet.contains(addr))
                 return true;
@@ -511,9 +469,7 @@ public:
             {
                 if (auto store = as<IRStore>(use->getUser()))
                 {
-                    if (store->getPtr() == addr &&
-                        carryNonTrivialDiffSet.contains(store->getVal()) &&
-                        canStoreReachUse(store, useSite))
+                    if (store->getPtr() == addr && carryNonTrivialDiffSet.contains(store->getVal()))
                         return true;
                 }
             }
@@ -566,7 +522,7 @@ public:
                         auto arg = callInst->getArg(i);
                         if (carryNonTrivialDiffSet.contains(arg))
                             return true;
-                        if (isAddressCarryingNonTrivialDiff(arg, inst))
+                        if (isAddressCarryingNonTrivialDiff(arg))
                             return true;
                     }
                     return false;

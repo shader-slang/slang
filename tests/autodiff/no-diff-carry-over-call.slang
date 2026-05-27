@@ -48,28 +48,6 @@ public bool sample_dir(
     return true;
 }
 
-[Differentiable]
-public float pass_inout(inout float x)
-{
-    return x;
-}
-
-[Differentiable]
-public void store_after_inout_call(
-    float x,
-    no_diff out DirSample sample)
-{
-    sample = {};
-
-    float v = 0.0f;
-    float r = pass_inout(v);
-
-    // The later carrying store to `v` must not make the earlier inout call
-    // result look carrying. This pins the use-site-aware address scan.
-    v = x;
-    sample.distance = r;
-}
-
 // Falcor2-style: loop with a `no_diff` block-param reassigned from a
 // differentiable constructor call. Phi propagation must not copy carry-set
 // membership into the `no_diff`-typed loop param, and the fixed-point loop
@@ -117,7 +95,6 @@ void main()
     DirSample s;
     float3 w;
     sample_dir(float3(0), s, w);
-    store_after_inout_call(1.0, s);
 
     Ray r = { float3(1, 0, 0), float3(0) };
     float3 c;
