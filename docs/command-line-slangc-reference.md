@@ -277,7 +277,7 @@ Dump to output list of warning diagnostic numeric and name ids.
 
 <a id="id"></a>
 ### --
-Treat the rest of the command line as input files; use '-' to read from standard input.
+Treat the rest of the command line as input files; use '-' to read from standard input with [-lang](#lang). 
 
 
 <a id="report-downstream-time"></a>
@@ -1848,3 +1848,4 @@ Available help categories for the [-h](#h) option
 * `capability` : A capability describes an optional feature that a target may or may not support. When a [-capability](#capability-1) is specified, the compiler may assume that the target supports that capability, and generate code accordingly. 
 * `file-extension` : A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) may be inferred from the extension of an input or [-o](#o) path 
 * `help-category` : Available help categories for the [-h](#h) option 
+

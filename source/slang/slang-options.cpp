@@ -532,7 +532,7 @@ void initCommandOptions(CommandOptions& options)
          "--",
          nullptr,
          "Treat the rest of the command line as input files; use '-' to read from standard "
-         "input."},
+         "input with -lang."},
         {OptionKind::ReportDownstreamTime,
          "-report-downstream-time",
          nullptr,
