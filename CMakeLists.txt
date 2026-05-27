@@ -228,7 +228,7 @@ advanced_option(
 # set this OFF for focused workaround coverage, but full slang-test lanes keep the default ON.
 advanced_option(
     SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
-    "Enable the paired SPIRV-Tools MergeReturnPass + InlineExhaustivePass sequence; disabling drops both"
+    "Enable the paired SPIRV-Tools MergeReturnPass + InlineExhaustivePass sequence, disabling drops both"
     ON
 )
 
