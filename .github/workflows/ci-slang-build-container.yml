@@ -21,9 +21,9 @@ jobs:
       packages: read # Required to pull container from ghcr.io
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
-      # Current callers use GitHub-hosted Ubuntu, where the mounted workspace is
-      # writable by UID/GID 1001. The published image has no named non-root user.
-      options: --user 1001:1001
+      # The disk cleanup step below removes host runner directories, so this job
+      # keeps the host-root bind mount and root user intentionally.
+      options: --user root -v /:/host_root
 
     env:
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
@@ -33,8 +33,38 @@ jobs:
         shell: bash
 
     steps:
+      - name: Free disk space on host
+        run: |
+          echo "=== Disk space before cleanup ==="
+          df -h /host_root || true
+          # Remove large pre-installed software from the GitHub runner host.
+          # NOTE: Do NOT remove /opt/hostedtoolcache - it is used by GitHub
+          # Actions (e.g. setup-gcloud) for tool caching and removal breaks steps.
+          for dir in \
+            /host_root/usr/share/dotnet \
+            /host_root/usr/local/lib/android \
+            /host_root/opt/ghc \
+            /host_root/usr/local/.ghcup \
+            /host_root/usr/share/swift \
+            /host_root/usr/local/share/powershell \
+            /host_root/usr/local/share/chromium \
+            /host_root/usr/local/share/boost \
+            /host_root/opt/microsoft/msedge \
+            /host_root/opt/google/chrome \
+            /host_root/usr/local/lib/heroku \
+          ; do
+            if [ -d "$dir" ]; then
+              size=$(du -sh "$dir" 2>/dev/null | cut -f1 || echo "unknown")
+              echo "Removing $dir ($size)..."
+              rm -rf "$dir" || true
+            fi
+          done
+          echo "=== Disk space after cleanup ==="
+          df -h /host_root || true
+
       - name: Configure Git safe directory
         run: |
+          # RUNNER_TEMP is GitHub Actions' job-local temporary directory.
           if [[ -n "${RUNNER_TEMP:-}" && -d "$RUNNER_TEMP" && -w "$RUNNER_TEMP" ]]; then
             git_config_dir="$RUNNER_TEMP"
           else

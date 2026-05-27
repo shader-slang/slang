@@ -64,6 +64,7 @@ jobs:
     steps:
       - name: Configure Git safe directory
         run: |
+          # RUNNER_TEMP is GitHub Actions' job-local temporary directory.
           if [[ -n "${RUNNER_TEMP:-}" && -d "$RUNNER_TEMP" && -w "$RUNNER_TEMP" ]]; then
             git_config_dir="$RUNNER_TEMP"
           else
