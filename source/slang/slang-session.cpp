@@ -1140,7 +1140,13 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
 
     auto modulePathInfo = PathInfo::makePath(firstFileDependencyChunk->getValue());
     if (mapPathToLoadedModule.tryGetValue(modulePathInfo.getMostUniqueIdentity(), resultModule))
+    {
+        // Register the existing module under this `moduleName` so the next
+        // load using the same spelling resolves via the name cache and
+        // returns the same `IModule` instance (issue #11307).
+        mapNameToLoadedModules.set(moduleName, resultModule);
         return resultModule;
+    }
 
     // If we failed to find a previously-loaded module, then we
     // will go ahead and load the module from the serialized form.
@@ -1658,11 +1664,13 @@ RefPtr<Module> Linkage::findOrImportModule(
                     filePathInfo.getMostUniqueIdentity(),
                     previouslyLoadedModule))
             {
-                // TODO: If we find a previously-loaded module at this step,
-                // then we should probably register that module under the
-                // given `moduleName` in the map of loaded modules, so
-                // that subsequent `import`s using the same form will find it.
-                //
+                // Register the existing module under this `moduleName` so a
+                // subsequent `import` / `loadModule` with the same spelling
+                // resolves via the name cache and returns the same `IModule`
+                // instance, rather than re-running the file search and
+                // producing another wrapper for the same underlying module
+                // (issue #11307).
+                mapNameToLoadedModules.set(moduleName, previouslyLoadedModule);
                 return previouslyLoadedModule;
             }
 
