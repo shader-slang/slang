@@ -37,28 +37,35 @@ static inline SlangReflectionUserAttribute* convert(Attribute* attrib)
 
 static inline Type* convert(SlangReflectionType* type)
 {
-    // Defensive symmetry with convert(Type*): pointers produced by that
-    // helper are already modifier-unwrapped, but callers may pass
-    // SlangReflectionType* values that originated elsewhere. Peel any
-    // remaining ModifiedType wrappers so structural queries never see them.
-    return unwrapModifiedType((Type*)type);
+    // `SlangReflectionType*` is opaque to callers, so every value reaching
+    // this helper originated from `convert(Type*)` below, which already
+    // peels `ModifiedType` / `AtomicType`. No additional unwrap is needed.
+    return (Type*)type;
 }
 
 static inline SlangReflectionType* convert(Type* type)
 {
+    // Peel off any modifier wrappers (e.g. `no_diff`, `unorm`, `snorm`).
+    // These can appear on function return/parameter types after generic
+    // specialization (see issue #11277) and on `no_diff`-qualified struct
+    // fields. Without this, every structural query (`getKind`,
+    // `getElementType`, layout, `getFullName`) falls through to its
+    // `UNEXPECTED` path and reports NONE / zero, which downstream consumers
+    // like slangpy treat as an unknown type. Modifier information remains
+    // available via `findModifier()` on the owning variable / function.
+    //
+    // Unwrap up-front so the `AtomicType` check below catches
+    // `ModifiedType(AtomicType(...))`, and re-unwrap the element so it also
+    // catches `AtomicType(ModifiedType(...))`.
+    type = unwrapModifiedType(type);
+
     // Prevent the AtomicType struct from being visible to the user
     // through the reflection API.
     if (auto atomicType = as<AtomicType>(type))
     {
-        return (SlangReflectionType*)atomicType->getElementType();
+        return (SlangReflectionType*)unwrapModifiedType(atomicType->getElementType());
     }
-    // Peel off any modifier wrappers (e.g. `no_diff`). These can appear on
-    // function return/parameter types after generic specialization (see
-    // issue #11277) and on `no_diff`-qualified struct fields. Without this
-    // unwrap, every structural query (`getKind`, `getElementType`, layout,
-    // …) falls through to its `UNEXPECTED` path and reports NONE / zero,
-    // which downstream consumers like slangpy treat as an unknown type.
-    return (SlangReflectionType*)unwrapModifiedType(type);
+    return (SlangReflectionType*)type;
 }
 
 static inline TypeLayout* convert(SlangReflectionTypeLayout* type)

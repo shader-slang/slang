@@ -233,7 +233,12 @@ SLANG_UNIT_TEST(functionReflectionNoDiffSpecializedReturn)
         [Differentiable]
         public T multiply<T : IArithmetic>(T x, T y) { return x * y; }
 
-        public struct S { public no_diff float a; public float b; }
+        public struct S {
+            public no_diff float a;
+            public float b;
+            public unorm float c;
+            public snorm float d;
+        }
         )";
 
     ComPtr<slang::IGlobalSession> globalSession;
@@ -298,14 +303,29 @@ SLANG_UNIT_TEST(functionReflectionNoDiffSpecializedReturn)
 
     // Struct fields hit the same convert path via
     // `spReflectionType_GetFieldByIndex` → `spReflectionVariable_GetType`.
+    // `unorm` / `snorm` use the same `ModifiedType` representation as
+    // `no_diff` (different `TypeModifierVal` subclass, same wrapper), so
+    // pin them too to document the cross-modifier contract.
     auto sType = layout->findTypeByName("S");
     SLANG_CHECK_ABORT(sType != nullptr);
-    SLANG_CHECK_ABORT(sType->getFieldCount() == 2);
+    SLANG_CHECK_ABORT(sType->getFieldCount() == 4);
     auto noDiffField = sType->getFieldByIndex(0)->getType();
     SLANG_CHECK_ABORT(noDiffField != nullptr);
     SLANG_CHECK(noDiffField->getKind() == slang::TypeReflection::Kind::Scalar);
     SLANG_CHECK(noDiffField->getScalarType() == slang::TypeReflection::ScalarType::Float32);
     SLANG_CHECK(getTypeFullName(noDiffField) == "float");
+
+    auto unormField = sType->getFieldByIndex(2)->getType();
+    SLANG_CHECK_ABORT(unormField != nullptr);
+    SLANG_CHECK(unormField->getKind() == slang::TypeReflection::Kind::Scalar);
+    SLANG_CHECK(unormField->getScalarType() == slang::TypeReflection::ScalarType::Float32);
+    SLANG_CHECK(getTypeFullName(unormField) == "float");
+
+    auto snormField = sType->getFieldByIndex(3)->getType();
+    SLANG_CHECK_ABORT(snormField != nullptr);
+    SLANG_CHECK(snormField->getKind() == slang::TypeReflection::Kind::Scalar);
+    SLANG_CHECK(snormField->getScalarType() == slang::TypeReflection::ScalarType::Float32);
+    SLANG_CHECK(getTypeFullName(snormField) == "float");
 }
 
 // Test that findFunctionByNameInType finds all functions with the same name but different
