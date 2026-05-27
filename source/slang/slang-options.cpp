@@ -30,10 +30,13 @@
 #include "slang-repro.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-serialize-ir.h"
-#include "slang-stdin-source.h"
 #include "slang.h"
 
 #include <assert.h>
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
 #include <limits>
 #include <stdio.h>
 #include <string.h>
@@ -44,16 +47,75 @@ namespace Slang
 static const char* const kStdinDisplayPath = "<stdin>";
 static const char* const kStdinCommandLinePath = "-";
 static const Index kMaxStdinBytes = Index(256) << 20;
-#if SLANG_ENABLE_STDIN_TEST_HOOKS
-// Test-only hooks let spawned slangc tests exercise stdin diagnostics without a huge pipe or
-// platform-specific invalid handle setup.
-static const char* const kTestStdinEnableEnvVar = "SLANG_TEST_STDIN_ENABLE";
-static const char* const kTestStdinMaxBytesEnvVar = "SLANG_TEST_STDIN_MAX_BYTES";
-static const char* const kTestStdinForceCannotReadEnvVar = "SLANG_TEST_STDIN_FORCE_CANNOT_READ";
+
+#ifndef SLANG_BUILD_STDIN_TEST_HOOKS
+#define SLANG_BUILD_STDIN_TEST_HOOKS 0
+#endif
+
+#if SLANG_BUILD_STDIN_TEST_HOOKS
+static const char* const kTestStdinMaxBytesOption = "-test-stdin-max-bytes";
+static const char* const kTestStdinForceCannotReadOption = "-test-stdin-force-cannot-read";
 #endif
 
 namespace
 { // anonymous
+
+enum class StdinSourceReadResult
+{
+    Success,
+    CannotRead,
+    TooLarge,
+};
+
+static StdinSourceReadResult _readStdinSource(FILE* input, Index maxBytes, List<Byte>& outSource)
+{
+    outSource.clear();
+
+    if (!input)
+        return StdinSourceReadResult::CannotRead;
+
+#ifdef _WIN32
+    const int previousMode = _setmode(_fileno(input), _O_BINARY);
+    if (previousMode == -1)
+        return StdinSourceReadResult::CannotRead;
+
+    struct StdinModeGuard
+    {
+        FILE* input;
+        int mode;
+        ~StdinModeGuard() { _setmode(_fileno(input), mode); }
+    } stdinModeGuard{input, previousMode};
+#endif
+
+    clearerr(input);
+
+    // Use blocking stdio here. The process PipeStream path is optimized for polling child
+    // process output and can spin while waiting for piped stdin.
+    char buffer[16 * 1024];
+    for (;;)
+    {
+        const size_t readByteCount = fread(buffer, 1, sizeof(buffer), input);
+        if (readByteCount != 0)
+        {
+            const Index readCount = Index(readByteCount);
+            if (outSource.getCount() > maxBytes || readCount > maxBytes - outSource.getCount())
+            {
+                outSource.clear();
+                return StdinSourceReadResult::TooLarge;
+            }
+            outSource.addRange(reinterpret_cast<const Byte*>(buffer), readCount);
+            continue;
+        }
+
+        if (ferror(input))
+        {
+            outSource.clear();
+            return StdinSourceReadResult::CannotRead;
+        }
+
+        return StdinSourceReadResult::Success;
+    }
+}
 
 // All of the options are given an unique enum
 typedef CompilerOptionName OptionKind;
@@ -1409,6 +1471,10 @@ struct OptionsParser
     int m_currentTranslationUnitIndex = -1;
 
     bool m_stdinConsumed = false;
+#if SLANG_BUILD_STDIN_TEST_HOOKS
+    Index m_testMaxStdinBytes = kMaxStdinBytes;
+    bool m_testForceStdinCannotRead = false;
+#endif
     bool m_hasLoadedRepro = false;
     bool m_compileCoreModule = false;
     slang::CompileCoreModuleFlags m_compileCoreModuleFlags;
@@ -1517,74 +1583,6 @@ void OptionsParser::addInputForeignShaderPath(
     return Profile::Unknown;
 }
 
-#if SLANG_ENABLE_STDIN_TEST_HOOKS
-static bool _isStdinTestHookEnabled()
-{
-    StringBuilder envValue;
-    return SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
-               UnownedStringSlice(kTestStdinEnableEnvVar),
-               envValue)) &&
-           envValue.getUnownedSlice() == "1";
-}
-#endif
-
-static Index _getMaxStdinBytes()
-{
-#if SLANG_ENABLE_STDIN_TEST_HOOKS
-    if (!_isStdinTestHookEnabled())
-        return kMaxStdinBytes;
-
-    StringBuilder envValue;
-    if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
-            UnownedStringSlice(kTestStdinMaxBytesEnvVar),
-            envValue)))
-    {
-        return kMaxStdinBytes;
-    }
-
-    int64_t parsedValue = 0;
-    if (SLANG_FAILED(StringUtil::parseInt64(envValue.getUnownedSlice(), parsedValue)))
-        return kMaxStdinBytes;
-
-    if (parsedValue < 0 || parsedValue > kMaxStdinBytes)
-        return kMaxStdinBytes;
-
-    return Index(parsedValue);
-#else
-    return kMaxStdinBytes;
-#endif
-}
-
-static bool _isStdinCannotReadForcedForTest()
-{
-#if SLANG_ENABLE_STDIN_TEST_HOOKS
-    if (!_isStdinTestHookEnabled())
-        return false;
-
-    StringBuilder envValue;
-    return SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
-               UnownedStringSlice(kTestStdinForceCannotReadEnvVar),
-               envValue)) &&
-           envValue.getUnownedSlice() == "1";
-#else
-    return false;
-#endif
-}
-
-static StdinSourceReadResult _readStdinSourceForOptions(
-    FILE* input,
-    Index maxBytes,
-    List<Byte>& outSource)
-{
-    if (_isStdinCannotReadForcedForTest())
-    {
-        outSource.clear();
-        return StdinSourceReadResult::CannotRead;
-    }
-
-    return readStdinSource(input, maxBytes, outSource);
-}
-
 SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImpliedStage)
 {
     struct Entry
@@ -1638,7 +1636,18 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
 
 SlangResult OptionsParser::_readStdin(List<Byte>& outSource)
 {
-    switch (_readStdinSourceForOptions(stdin, _getMaxStdinBytes(), outSource))
+#if SLANG_BUILD_STDIN_TEST_HOOKS
+    const StdinSourceReadResult readResult =
+        m_testForceStdinCannotRead ? StdinSourceReadResult::CannotRead
+                                   : _readStdinSource(stdin, m_testMaxStdinBytes, outSource);
+#else
+    const StdinSourceReadResult readResult = _readStdinSource(stdin, kMaxStdinBytes, outSource);
+#endif
+
+    if (readResult == StdinSourceReadResult::CannotRead)
+        outSource.clear();
+
+    switch (readResult)
     {
     case StdinSourceReadResult::Success:
         return SLANG_OK;
@@ -2546,6 +2555,26 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             SLANG_RETURN_ON_FAIL(addInputPath(argValue.getBuffer()));
             continue;
         }
+
+#if SLANG_BUILD_STDIN_TEST_HOOKS
+        if (argValue == kTestStdinMaxBytesOption)
+        {
+            m_currentOptionName = kTestStdinMaxBytesOption;
+
+            Int maxBytes = 0;
+            SLANG_RETURN_ON_FAIL(_expectUInt(arg, maxBytes));
+            if (maxBytes > kMaxStdinBytes)
+                maxBytes = kMaxStdinBytes;
+            m_testMaxStdinBytes = Index(maxBytes);
+            continue;
+        }
+
+        if (argValue == kTestStdinForceCannotReadOption)
+        {
+            m_testForceStdinCannotRead = true;
+            continue;
+        }
+#endif
 
         const Index optionIndex = m_cmdOptions->findOptionByName(argValue.getUnownedSlice());
 

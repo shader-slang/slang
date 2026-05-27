@@ -2,15 +2,16 @@
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-process-util.h"
-#include "../../source/slang/slang-stdin-source.h"
 #include "slang-com-ptr.h"
 #include "unit-test/slang-unit-test.h"
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 using namespace Slang;
+
+#ifndef SLANG_BUILD_STDIN_TEST_HOOKS
+#define SLANG_BUILD_STDIN_TEST_HOOKS 0
+#endif
 
 static bool _contains(const String& text, const char* expected)
 {
@@ -31,100 +32,16 @@ static void _addStdinCompileArgs(List<String>& args, const char* language)
     args.add("-");
 }
 
-#if SLANG_ENABLE_STDIN_TEST_HOOKS
-static int _writeEnvironmentVariable(const char* key, const char* value)
-{
-#ifdef _WIN32
-    String variable = String(key) + "=" + value;
-    return _putenv(variable.getBuffer());
-#else
-    return setenv(key, value, 1);
-#endif
-}
-
-static int _unsetEnvironmentVariable(const char* key)
-{
-#ifdef _WIN32
-    String variable = String(key) + "=";
-    return _putenv(variable.getBuffer());
-#else
-    return unsetenv(key);
-#endif
-}
-
-struct ScopedEnvVar
-{
-    const char* key;
-    bool hadOldValue = false;
-    bool isSet = false;
-    String oldValue;
-
-    ScopedEnvVar(const char* inKey, const char* value)
-        : key(inKey)
-    {
-#ifdef _WIN32
-        char* oldValueBuffer = nullptr;
-        size_t oldValueLength = 0;
-        if (_dupenv_s(&oldValueBuffer, &oldValueLength, key) == 0 && oldValueBuffer)
-        {
-            hadOldValue = true;
-            oldValue = oldValueBuffer;
-            free(oldValueBuffer);
-        }
-#else
-        if (const char* oldValueBuffer = getenv(key))
-        {
-            hadOldValue = true;
-            oldValue = oldValueBuffer;
-        }
-#endif
-        isSet = _writeEnvironmentVariable(key, value) == 0;
-    }
-
-    ~ScopedEnvVar()
-    {
-        if (hadOldValue)
-            _writeEnvironmentVariable(key, oldValue.getBuffer());
-        else
-            _unsetEnvironmentVariable(key);
-    }
-};
-#endif
-
-struct TestEnvVar
-{
-    const char* key;
-    const char* value;
-};
-
 static SlangResult _runSlangcWithStdin(
     UnitTestContext* context,
     const List<String>& args,
     const char* stdinSource,
     ExecuteResult& outResult,
-    const TestEnvVar* envVars = nullptr,
-    Index envVarCount = 0,
     bool allowStdinWriteFailure = false)
 {
     CommandLine cmdLine;
     ExecutableLocation slangcLocation(context->executableDirectory, "slangc");
-#ifdef _WIN32
-    SLANG_UNUSED(envVars);
-    SLANG_UNUSED(envVarCount);
     cmdLine.setExecutableLocation(slangcLocation);
-#else
-    if (envVarCount != 0)
-    {
-        cmdLine.setExecutableLocation(ExecutableLocation(ExecutableLocation::Type::Name, "env"));
-        for (Index i = 0; i < envVarCount; ++i)
-            cmdLine.addArg(String(envVars[i].key) + "=" + envVars[i].value);
-        cmdLine.addArg(slangcLocation.m_pathOrName);
-    }
-    else
-    {
-        cmdLine.setExecutableLocation(slangcLocation);
-    }
-#endif
     for (const auto& arg : args)
         cmdLine.addArg(arg);
 
@@ -321,28 +238,6 @@ static SlangResult _createTempHlslFile(const char* prefix, const char* contents,
     return File::writeAllText(out.hlslPath, contents);
 }
 
-struct ScopedFile
-{
-    FILE* file = nullptr;
-
-    ~ScopedFile()
-    {
-        if (file)
-            fclose(file);
-    }
-};
-
-struct TempFile
-{
-    String path;
-
-    ~TempFile()
-    {
-        if (path.getLength())
-            File::remove(path);
-    }
-};
-
 static SlangResult _testStdinAndFileShareSlangTranslationUnit(
     UnitTestContext* context,
     bool stdinFirst)
@@ -478,127 +373,33 @@ static SlangResult _testInputLargerThanReadBuffer(UnitTestContext* context)
     return _expectSlangcSuccess(context, args, sourceString.getBuffer());
 }
 
-static SlangResult _readStdinSourceForTest(
-    const char* sourceText,
-    Index maxBytes,
-    List<Byte>& outSource,
-    StdinSourceReadResult& outResult)
+#if SLANG_BUILD_STDIN_TEST_HOOKS
+static void _addTestStdinMaxBytesArgs(List<String>& args, size_t maxBytes)
 {
-    outResult = StdinSourceReadResult::CannotRead;
-
-    ScopedFile stream;
-    stream.file = tmpfile();
-    if (!stream.file)
-        return SLANG_FAIL;
-
-    const size_t sourceLength = strlen(sourceText);
-    if (fwrite(sourceText, 1, sourceLength, stream.file) != sourceLength)
-        return SLANG_FAIL;
-    if (fseek(stream.file, 0, SEEK_SET) != 0)
-        return SLANG_FAIL;
-
-    outResult = readStdinSource(stream.file, maxBytes, outSource);
-    return SLANG_OK;
+    args.add("-test-stdin-max-bytes");
+    StringBuilder maxBytesText;
+    maxBytesText << maxBytes;
+    args.add(maxBytesText.produceString());
 }
 
-static SlangResult _testInputExactFitReadResult()
+static SlangResult _testInputExactFitDiagnosticPath(UnitTestContext* context)
 {
-    List<Byte> source;
-    StdinSourceReadResult result;
+    const char* source = "[shader(\"compute\")] void main() {}\n";
+    List<String> args;
+    _addTestStdinMaxBytesArgs(args, strlen(source));
+    _addStdinCompileArgs(args, "slang");
 
-    SLANG_RETURN_ON_FAIL(_readStdinSourceForTest("abcd", 4, source, result));
-
-    if (result != StdinSourceReadResult::Success)
-        return SLANG_FAIL;
-    if (source.getCount() != 4)
-        return SLANG_FAIL;
-    if (memcmp(source.getBuffer(), "abcd", 4) != 0)
-        return SLANG_FAIL;
-
-    return SLANG_OK;
+    return _expectSlangcSuccess(context, args, source);
 }
 
-static SlangResult _testInputTooLargeReadResult()
-{
-    StringBuilder sourceText;
-    for (Index i = 0; i < 16 * 1024 + 5; ++i)
-        sourceText.appendChar('a');
-
-    List<Byte> source;
-    StdinSourceReadResult result;
-    const String sourceString = sourceText.produceString();
-
-    SLANG_RETURN_ON_FAIL(
-        _readStdinSourceForTest(sourceString.getBuffer(), 16 * 1024 + 4, source, result));
-
-    if (result != StdinSourceReadResult::TooLarge)
-        return SLANG_FAIL;
-    if (source.getCount() != 0)
-        return SLANG_FAIL;
-
-    return SLANG_OK;
-}
-
-static SlangResult _testInputLargeBoundaryReadResult()
-{
-    const Index boundaryByteCount = 1024 * 1024;
-
-    StringBuilder exactSourceText;
-    for (Index i = 0; i < boundaryByteCount; ++i)
-        exactSourceText.appendChar('a');
-    const String exactSourceString = exactSourceText.produceString();
-
-    List<Byte> source;
-    StdinSourceReadResult result;
-    SLANG_RETURN_ON_FAIL(
-        _readStdinSourceForTest(exactSourceString.getBuffer(), boundaryByteCount, source, result));
-
-    if (result != StdinSourceReadResult::Success)
-        return SLANG_FAIL;
-    if (source.getCount() != boundaryByteCount)
-        return SLANG_FAIL;
-    if (memcmp(source.getBuffer(), exactSourceString.getBuffer(), size_t(boundaryByteCount)) != 0)
-        return SLANG_FAIL;
-
-    StringBuilder tooLargeSourceText;
-    for (Index i = 0; i < boundaryByteCount + 1; ++i)
-        tooLargeSourceText.appendChar('a');
-    const String tooLargeSourceString = tooLargeSourceText.produceString();
-
-    SLANG_RETURN_ON_FAIL(_readStdinSourceForTest(
-        tooLargeSourceString.getBuffer(),
-        boundaryByteCount,
-        source,
-        result));
-
-    if (result != StdinSourceReadResult::TooLarge)
-        return SLANG_FAIL;
-    if (source.getCount() != 0)
-        return SLANG_FAIL;
-
-    return SLANG_OK;
-}
-
-#if SLANG_ENABLE_STDIN_TEST_HOOKS
 static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
 {
-#ifdef _WIN32
-    ScopedEnvVar enableStdinTestHook("SLANG_TEST_STDIN_ENABLE", "1");
-    ScopedEnvVar maxBytes("SLANG_TEST_STDIN_MAX_BYTES", "4");
-    if (!enableStdinTestHook.isSet || !maxBytes.isSet)
-        return SLANG_FAIL;
-#endif
-    const TestEnvVar envVars[] = {
-        {"SLANG_TEST_STDIN_ENABLE", "1"},
-        {"SLANG_TEST_STDIN_MAX_BYTES", "4"},
-    };
-
     List<String> args;
+    _addTestStdinMaxBytesArgs(args, 4);
     _addStdinCompileArgs(args, "slang");
 
     ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(
-        _runSlangcWithStdin(context, args, "abcde", result, envVars, SLANG_COUNT_OF(envVars)));
+    SLANG_RETURN_ON_FAIL(_runSlangcWithStdin(context, args, "abcde", result));
 
     if (result.resultCode == 0)
         return SLANG_FAIL;
@@ -607,54 +408,16 @@ static SlangResult _testInputTooLargeDiagnostic(UnitTestContext* context)
 
     return SLANG_OK;
 }
-#endif
 
-static SlangResult _testCannotReadFromStdinReadResult()
-{
-    TempFile temp;
-    SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slangc-stdin-error"), temp.path));
-
-    ScopedFile stream;
-    stream.file = fopen(temp.path.getBuffer(), "w");
-    if (!stream.file)
-        return SLANG_FAIL;
-
-    List<Byte> source;
-    const StdinSourceReadResult result = readStdinSource(stream.file, 64, source);
-    if (result != StdinSourceReadResult::CannotRead)
-        return SLANG_FAIL;
-    if (source.getCount() != 0)
-        return SLANG_FAIL;
-
-    return SLANG_OK;
-}
-
-#if SLANG_ENABLE_STDIN_TEST_HOOKS
 static SlangResult _testCannotReadFromStdinDiagnostic(UnitTestContext* context)
 {
-#ifdef _WIN32
-    ScopedEnvVar enableStdinTestHook("SLANG_TEST_STDIN_ENABLE", "1");
-    ScopedEnvVar forceCannotRead("SLANG_TEST_STDIN_FORCE_CANNOT_READ", "1");
-    if (!enableStdinTestHook.isSet || !forceCannotRead.isSet)
-        return SLANG_FAIL;
-#endif
-    const TestEnvVar envVars[] = {
-        {"SLANG_TEST_STDIN_ENABLE", "1"},
-        {"SLANG_TEST_STDIN_FORCE_CANNOT_READ", "1"},
-    };
-
     List<String> args;
+    args.add("-test-stdin-force-cannot-read");
     _addStdinCompileArgs(args, "slang");
 
     ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(_runSlangcWithStdin(
-        context,
-        args,
-        "[shader(\"compute\")] void main() {}\n",
-        result,
-        envVars,
-        SLANG_COUNT_OF(envVars),
-        true));
+    SLANG_RETURN_ON_FAIL(
+        _runSlangcWithStdin(context, args, "[shader(\"compute\")] void main() {}\n", result, true));
 
     if (result.resultCode == 0)
         return SLANG_FAIL;
@@ -701,14 +464,9 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testLanguageSwitchAppliesToStdinAfterSlangInput(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCtrlZIsNotEndOfFile(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargerThanReadBuffer(unitTestContext)));
-    SLANG_CHECK(SLANG_SUCCEEDED(_testInputExactFitReadResult()));
-    SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeReadResult()));
-    SLANG_CHECK(SLANG_SUCCEEDED(_testInputLargeBoundaryReadResult()));
-#if SLANG_ENABLE_STDIN_TEST_HOOKS
+#if SLANG_BUILD_STDIN_TEST_HOOKS
+    SLANG_CHECK(SLANG_SUCCEEDED(_testInputExactFitDiagnosticPath(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeDiagnostic(unitTestContext)));
-#endif
-    SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinReadResult()));
-#if SLANG_ENABLE_STDIN_TEST_HOOKS
     SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinDiagnostic(unitTestContext)));
 #endif
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));

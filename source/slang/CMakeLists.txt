@@ -242,6 +242,8 @@ set_target_properties(copy_slang_headers PROPERTIES FOLDER "generated")
 
 set(slang_build_args
     USE_EXTRA_WARNINGS
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+    $<$<BOOL:${SLANG_ENABLE_TESTS}>:SLANG_BUILD_STDIN_TEST_HOOKS=1>
     EXTRA_COMPILE_OPTIONS_PRIVATE
     # a warning is disabled for a memset boundary check.
     # everything looked fine and it is unclear why the checking fails
