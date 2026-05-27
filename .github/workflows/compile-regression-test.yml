@@ -96,12 +96,17 @@ jobs:
             exit "$test_status"
           fi
 
-          passed_pattern="passed test: .*merge-return-workaround-off[.]slang"
-          passed_pattern="$passed_pattern|merge-return-workaround-off[.]slang.*passed"
-          if ! grep -Eq "$passed_pattern" <<< "$test_output"; then
-            echo "Expected slang-test to run tests/spirv/merge-return-workaround-off.slang."
+          passed_pattern="^passed test: 'tests/spirv/merge-return-workaround-off[.]slang([.][0-9]+)?'"
+          passed_count="$(grep -Ec "$passed_pattern" <<< "$test_output" || true)"
+          if [ "$passed_count" -ne 2 ]; then
+            echo "Expected slang-test to run both tests/spirv/merge-return-workaround-off.slang variants."
             exit 1
           fi
+
+          # Exercise the broader SPIR-V suite under the workaround too. The ON-shape
+          # merge-return test is invalid in this OFF-configured build.
+          "$bin_dir/slang-test.exe" tests/spirv \
+            -exclude-prefix tests/spirv/merge-return-workaround.slang
       - name: Run compile and validation test
         run: |
           cp -r /c/slang_compile_test_suite_a .
