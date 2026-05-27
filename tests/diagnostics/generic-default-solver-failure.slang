@@ -1,4 +1,13 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//TEST:SIMPLE(filecheck=CHECK):
+
+// CHECK: error[E39999]: could not specialize generic for arguments of type ()
+// CHECK: defaultNeedsUnsatisfiedWitness();
+// CHECK: note: see declaration of func defaultNeedsUnsatisfiedWitness<T, U> -> void
+// CHECK: defaultNeedsUnsatisfiedWitness<T : IElement = NotElement, U : IData = T.DataType>()
+// CHECK: error[E39999]: could not specialize generic for arguments of type ()
+// CHECK: defaultChainFailsAtSecondWitness();
+// CHECK: note: see declaration of func defaultChainFailsAtSecondWitness<T, U, V> -> void
+// CHECK: defaultChainFailsAtSecondWitness<T : IElement = GoodElement, U : IData = T.DataType, V : IStrongData = U>()
 
 interface IData
 {
@@ -27,27 +36,16 @@ interface IStrongData
 }
 
 void defaultNeedsUnsatisfiedWitness<T : IElement = NotElement, U : IData = T.DataType>()
-/*CHECK:
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ see declaration of func defaultNeedsUnsatisfiedWitness<T, U> -> void
-*/
 {
 }
 
-void defaultChainFailsAtSecondWitness<
-/*CHECK:
-     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ see declaration of func defaultChainFailsAtSecondWitness<T, U, V> -> void
-*/
-    T : IElement = GoodElement,
-    U : IData = T.DataType,
-    V : IStrongData = U>()
+void defaultChainFailsAtSecondWitness<T : IElement = GoodElement, U : IData = T.DataType, V : IStrongData = U>()
 {
 }
 
 void useDefaultNeedsUnsatisfiedWitness()
 {
     defaultNeedsUnsatisfiedWitness();
-//CHECK:                          ^ could not specialize generic for arguments of type ()
 
     defaultChainFailsAtSecondWitness();
-//CHECK:                            ^ could not specialize generic for arguments of type ()
 }
