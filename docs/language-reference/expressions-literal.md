@@ -69,7 +69,7 @@ The type of the literal is the first type from the following table that fits the
 
 Suffix        | Decimal base                     | Hex, binary, octal bases
 ------------- | -------------------------------- | ---------------------------------------
-(none)        | `int`, `int64_t`, `uint64_t`(\*) | `int`, `uint`, `int64_t`, `uint64_t`
+(none)/`L`    | `int`, `int64_t`, `uint64_t`(\*) | `int`, `uint`, `int64_t`, `uint64_t`
 `LL`          | `int64_t`, `uint64_t`(\*)        | `int64_t`, `uint64_t`
 `U`/`UL`/`LU` | `uint`, `uint64_t`               | `uint`, `uint64_t`
 `ULL`/`LLU`   | `uint64_t`                       | `uint64_t`
@@ -265,6 +265,7 @@ the literal with unary minus, e.g. `-1#INFf`.
 
 0x123p4       // 32-bit float, value 4656.0  (= 291 * 2^4)
 0xC8p-4       // 32-bit float, value 12.5    (= 200 * 2^-4)
+0xC.8p0       // 32-bit float, value 12.5    (= 12 + 8 * 2^-4)
 
 123.0lf       // 64-bit float, value 123.0
 123.0hf       // 16-bit float, value 123.0
@@ -288,107 +289,147 @@ the literal with unary minus, e.g. `-1#INFf`.
 > *`StringLiteral`* = *`StringLiteralToken`*+
 >
 > *`StringLiteralToken`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DQuotedString`* |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DQuotedString`* \|<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`RawString`*
 >
 > *`DQuotedString`* = **`'"'`** *`DStringChar`*\* **`'"'`**
 >
 > *`DStringChar`* = <br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharUnquoted`* |<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuoted`* |<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedOctal`* |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharUnquoted`* \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuoted`* \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedOctal`* \|<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedHex`*
 >
-> *`DStringCharUnquoted`* = **`<[^\"\n\r]>`**
+> *`DStringCharUnquoted`* = **`<[^\\"[:newline:]]>`**
 >
-> *`DStringCharQuoted`* = **`<\['"\?abfnrtv]>`**
+> Note: [:newline:] consists of characters `\r` and `\n`. (See the escape sequence table below.)
 >
-> *`DStringCharQuotedOctal`* = **`<\[0-7]{1,3}>`**
+> *`DStringCharQuoted`* = **`<\\[\\'"?abfnrtv]>`**
 >
-> *`DStringCharQuotedHex`* = **`<\x[0-9A-Fa-f]{1,2}>`**
+> *`DStringCharQuotedOctal`* = **`<\\[0-7]{1,3}>`**
+>
+> *`DStringCharQuotedHex`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`<\\x[0-9A-Fa-f]+>`** \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`<\\x\{[0-9A-Fa-f]+\}>`**
 >
 > *`RawString`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'R"'`** *`RawStringDelim`* **`'('`**<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`RawStringContent`*<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`')'`** *`RawStringDelim`* **`'"'`**
 >
-> *`RawStringContent`* = **`<.*>`**
+> *`RawStringDelim`* = *`RawStringDelimChar`*\*
+>
+> *`RawStringDelimChar`* = **`<[^"()[:space:]]>`**
+>
+> Note: [:space:] consists of characters ` `, `\t`, `\r`, `\n`, `\v`, and `\f`. (See the escape
+> sequence table below.)
+>
+> *`RawStringContent`* is the longest sequence of characters that does not contain
+> **`')'`** *`RawStringDelim`* **`'"'`**, where *`RawStringDelim`* is the same delimiter
+> token that opened the raw string.
 
-A string literal expression consists of one or more consecutive string literal tokens. The value of the string
-literal is the concatenation of the string-token values, followed by a terminating null character (`'\0'`).
+A string literal represents a sequence of 8-bit characters. Its type is
+[String](../../../core-module-reference/types/string-0/index.html). The underlying data format is unspecified.
 
-Consecutive string tokens may be separated by any amount of whitespace, including none. Unlike most other
-grammar productions, whitespace within a string token is significant and forms part of the string value.
+A string literal expression consists of one or more consecutive string tokens. The value of the string
+literal is the concatenation of the string token values. Consecutive string tokens may be separated by
+whitespace. Unlike most other grammar productions, whitespace within a string token is significant and
+forms part of the string value.
 
 A string token has two forms:
 
 1. Double-quoted string (*`DQuotedString`*)
 2. Raw string (*`RawString`*)
 
-The double-quoted string starts with a double-quote (`"`), followed by any number of string characters
-(*`DStringChar`*), and ends with a double-quote.
+The double-quoted string token starts with a double-quote (`"`), followed by any number of *`DStringChar`*
+elements, and ends with a double-quote.
 
-A string character is a sequence that encodes a single character. The following table describes the sequences
-and their respective character values:
+A *`DStringChar`* element encodes a single character within a double-quoted string token. For most characters,
+the character is encoded as is. The exceptions are the newline character (ASCII character 10), the carriage
+return character (ASCII character 13), the backslash (`\`), and the double-quote character (`"`). These
+characters are always encoded using an escape sequence.
 
-Sequence                                 | Encoded character value
----------------------------------------- | --------------------------------------
-**`<[^\"\n\r]>`**                        | Character as is, excluding backslash (`\`), double quote (`"`), newline (ASCII 10), and carriage return (ASCII 13).
-**`<\'>`**                               | Character `'`
-**`<\">`**                               | Character `"`
-**`<\\>`**                               | Character `\`
-**`<\?>`**                               | Character `?`
-**`<\a>`**                               | ASCII character 7 (bell)
-**`<\b>`**                               | ASCII character 8 (backspace)
-**`<\f>`**                               | ASCII character 12 (form feed)
-**`<\n>`**                               | ASCII character 10 (newline)
-**`<\r>`**                               | ASCII character 13 (carriage return)
-**`<\t>`**                               | ASCII character 9 (horizontal tab)
-**`<\v>`**                               | ASCII character 11 (vertical tab)
-**`<\[0-7]{1,3}>`**                      | Octal number specifying an 8-bit character code (1-3 digits)
-**`<\x[0-9A-Fa-f]{1,2}>`**               | Hexadecimal number specifying an 8-bit character code (1-2 digits)
+An escape sequence begins with a backslash (`\`). The following table describes the escape sequences and their
+respective character values:
+
+Escape sequence                    | Encoded character value
+---------------------------------- | --------------------------------------
+`\'`                               | Character `'`
+`\"`                               | Character `"`
+`\\`                               | Character `\`
+`\?`                               | Character `?`
+`\a`                               | ASCII character 7 (bell)
+`\b`                               | ASCII character 8 (backspace)
+`\f`                               | ASCII character 12 (form feed)
+`\n`                               | ASCII character 10 (newline)
+`\r`                               | ASCII character 13 (carriage return)
+`\t`                               | ASCII character 9 (horizontal tab)
+`\v`                               | ASCII character 11 (vertical tab)
+`\`<em>nnn</em>                    | Octal number specifying an 8-bit character code (1-3 digits)
+`\x`<em>nnn</em>                   | Character code in hexadecimal format (one or more digits)
+`\x{`<em>nnn</em>`}`               | Character code in hexadecimal format (one or more digits)
+
+The octal and hexadecimal numbers in escape sequences must be in the range 0–255.
 
 A raw string starts with **`'R"'`**, followed by a user-defined delimiter *`RawStringDelim`* and **`'('`**.
-The character sequence *`RawStringContent`* that follows is taken verbatim — no escape processing is
-performed — and may contain any sequence of characters that does not include the termination sequence. The
-raw string terminates with **`')'`** followed by the same *`RawStringDelim`* and the closing double quote
-**`'"'`**.
+The character sequence *`RawStringContent`* that follows is taken verbatim — no escape processing is performed
+— and may contain any sequence of characters that does not include the termination sequence. The raw string
+terminates with **`')'`** followed by the same *`RawStringDelim`* and the closing double quote **`'"'`**.
 
 **Examples:**
 
 ```hlsl
-""                      // empty string (only the terminating '\0')
-"123"                   // string "123" (and the terminating '\0')
+""                      // empty string
+"123"                   // string "123"
 "some\nstring"          // "some" and ASCII 10 (newline) and "string"
 "a \"quoted\" string"   // a "quoted" string
 "contains a ' quote"    // single quote needs no escape in a double-quoted string
 "\110\145\154\154\157"  // "Hello"
 "\x48\x65\x6C\x6C\x6F"  // "Hello"
-R"(Raw " string)"       // "Raw \" string"
-R"xz(Raw " string)xz"   // "Raw \" string"
-R"a(Raw )a" string)a"   // Raw string ends after "Raw "; the leftover
-                        // ` string)a"' is a syntax error (unterminated
-                        // string after `a`).
+"\x{41}BC"              // "ABC"
+"\0"                    // String containing only the null character.
+R"(Raw " string)"       // value: Raw " string
+R"xz(Raw " string)xz"   // value: Raw " string
+
+R"a(Raw )a" string)a"   // The raw string parses as R"a(Raw )a"; its content is
+                        // "Raw " (note the trailing space). The leftover
+                        // ' string)a"' is a syntax error.
+
+R"(ABC
+DEF)"                   // value: ABC, a newline, then DEF
+
 "123" "456"             // "123456"
 ```
+
+> 📝 **Remark 1:** The recommended encoding of a string literal is UTF-8. This is not enforced.
+
+> 📝 **Remark 2:** The current implementation does not fully conform to the language manual.
+> This is tracked by GitHub issues [#11291](https://github.com/shader-slang/slang/issues/11291)
+> and [#11306](https://github.com/shader-slang/slang/issues/11306).
+
 
 ## Character Literal Expressions
 
 > *`CharLiteral`* = **`<'>`** *`SChar`* **`<'>`**
 >
 > *`SChar`* = <br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`SCharUnquoted`* |<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuoted`* |<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedOctal`* |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`SCharUnquoted`* \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuoted`* \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedOctal`* \|<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedHex`*
 >
-> *`SCharUnquoted`* = **`<[^\'\n\r]>`**
+> *`SCharUnquoted`* = **`<[^\'[:newline:]]>`**
+>
+> Note: [:newline:] consists of characters `\r` and `\n`. (See the escape sequence table below.)
 
-A character literal expression evaluates to a single character value. The character expression is a single
-encoded character (*`SChar`*) enclosed within single quotes (`'`). *`SChar`* follows the same rules as
-*`DStringChar`* in a double-quoted string, except that an unquoted character may be a double quote (`"`) but
-may not be a single quote (`'`). Conversely, a single quote must be escaped as `\'`, while a double quote
-needs no escape.
+A character literal expression evaluates to a single character value. The type of the value is
+[uint](types-fundamental.md#integer). The character literal consists of an *`SChar`* enclosed in single quotes
+(`'`). *`SChar`* follows the same rules as *`DStringChar`* in a double-quoted string, except that an unquoted
+character may be a double quote (`"`) but may not be a single quote (`'`). A single quote must be escaped as
+`\'`.
+
+The hexadecimal numbers in escape sequences must be in the range 0–4294967295 (i.e.,
+representable as `uint`). The octal escapes are limited to 0–255.
 
 ```hlsl
 '\0'                    // Character 0 (null character)
@@ -399,4 +440,9 @@ needs no escape.
 '\''                    // Character 39 (') -- single quote must be escaped
 '\\'                    // Character 92 (\)
 '\110'                  // Character 72 (H) via octal escape
+'\x{75bcd15}'           // Character 123456789 via hexadecimal escape
 ```
+
+> 📝 **Remark 1:** The current implementation does not fully conform to the language manual.
+> This is tracked by GitHub issues [#11291](https://github.com/shader-slang/slang/issues/11291)
+> and [#11306](https://github.com/shader-slang/slang/issues/11306).
