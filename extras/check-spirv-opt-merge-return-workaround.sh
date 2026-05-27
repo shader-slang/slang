@@ -4,11 +4,11 @@ set -euo pipefail
 option="SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN"
 
 require_reference() {
-    local path="$1"
-    if ! grep -q "$option" "$path"; then
-        echo "Missing $option reference in $path"
-        exit 1
-    fi
+  local path="$1"
+  if ! grep -q "$option" "$path"; then
+    echo "Missing $option reference in $path"
+    exit 1
+  fi
 }
 
 require_reference CMakeLists.txt
@@ -36,21 +36,21 @@ if values != {"ON", "OFF"}:
 PY
 
 override_files=$(
-    grep -rl -- "-D${option}=OFF" .github/workflows \
-        | sort \
-        || true
+  grep -rl -- "-D${option}=OFF" .github/workflows |
+    sort ||
+    true
 )
 
 if [ -z "$override_files" ]; then
-    echo "No PR CI workflow overrides found for $option"
-    exit 1
+  echo "No PR CI workflow overrides found for $option"
+  exit 1
 fi
 
 while IFS= read -r path; do
-    if ! grep -q "TODO(#11146)" "$path"; then
-        echo "Missing TODO(#11146) near $option override in $path"
-        exit 1
-    fi
-done <<< "$override_files"
+  if ! grep -q "TODO(#11146)" "$path"; then
+    echo "Missing TODO(#11146) near $option override in $path"
+    exit 1
+  fi
+done <<<"$override_files"
 
 echo "$option workaround references are consistent."
