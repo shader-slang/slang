@@ -9,7 +9,7 @@
 // pointers since MSL accepts `device int*` in buffer-bound structs.
 // Only multi-level pointers (int**, int***) need lowering to ulong.
 //
-// See also: pointer-in-buffer-double.slang, pointer-in-buffer-triple.slang
+// See also: pointer-in-paramblock-multilevel.slang, pointer-deep-deref-chain.slang
 // See: https://github.com/shader-slang/slang/issues/10841
 
 struct CopyParams

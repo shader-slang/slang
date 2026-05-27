@@ -35,9 +35,11 @@ namespace Slang
 // ## Type translation consistency
 //
 // The pass rewrites struct fields in-place and updates result types for
-// FieldAddress, StructuredBufferLoad/Store, and GetElementPtr instructions.
-// Buffer types are mutated via IRBuilder::replaceOperand to respect the
-// global deduplication map for hoistable type nodes.
+// FieldAddress, FieldExtract (by-value access), GetElementPtr (arrays),
+// and StructuredBufferLoad/Store instructions. GetElement (by-value array
+// indexing) is not expected at this stage but would need similar handling
+// if encountered. Buffer types are mutated via IRBuilder::replaceOperand
+// to respect the global deduplication map for hoistable type nodes.
 //
 // Struct collection recursively walks nested struct fields — Metal's
 // pointer-to-pointer restriction is transitive through nested types.

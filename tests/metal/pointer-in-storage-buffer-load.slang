@@ -10,7 +10,8 @@
 StructuredBuffer<int*> ptrs;
 RWStructuredBuffer<int> output;
 
-// CHECK: ulong
+// The buffer parameter type should be ulong device* (pointer elements lowered).
+// CHECK: ulong device*
 // CHECK-NOT: device{{.*}}device
 // CHECK-LABEL: computeMain
 // CHECK: int device*

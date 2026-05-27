@@ -24,8 +24,9 @@ RWStructuredBuffer<int> output;
 // CHECK: ulong device* ptrs
 // CHECK: };
 
-// The ptrs access must cast through a pointer type; addrs must not.
+// The ptrs access must cast through a pointer type.
 // CHECK-LABEL: computeMain
+// CHECK: int device* device*
 
 // METALLIB: computeMain
 
