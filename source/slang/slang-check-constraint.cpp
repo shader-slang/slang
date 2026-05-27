@@ -673,6 +673,85 @@ SemanticsVisitor::SolverConstraint::OrdinaryArgMergeMode getOrdinaryArgMergeMode
     return SemanticsVisitor::SolverConstraint::OrdinaryArgMergeMode::TypeJoin;
 }
 
+// Return the argument index for an ordinary generic parameter.
+Index getGenericParamIndex(Decl* genericParamDecl)
+{
+    // Type parameters, type-pack parameters, value parameters, and value-pack
+    // parameters all share the ordinary-argument index space assigned by their
+    // declarations.
+    if (auto typeParamDecl = as<GenericTypeParamDeclBase>(genericParamDecl))
+        return typeParamDecl->parameterIndex;
+    if (auto valuePackParamDecl = as<GenericValuePackParamDecl>(genericParamDecl))
+        return valuePackParamDecl->parameterIndex;
+    if (auto valueParamDecl = as<GenericValueParamDecl>(genericParamDecl))
+        return valueParamDecl->parameterIndex;
+
+    // Witness arguments deliberately have no index here; they are serialized
+    // after ordinary arguments and are found by scanning source generic
+    // constraint declarations.
+    return -1;
+}
+
+// Return the outermost generic declaration in a nested generic chain.
+GenericDecl* getOutermostGenericDecl(GenericDecl* genericDecl)
+{
+    // `providedOrdinaryArgs` follows the historical convention used by this
+    // solver: it applies to the outermost generic declaration in the chain.
+    // For `Outer<T>.Inner<U>`, that means the provided array is matched against
+    // `Outer`'s ordinary parameters.
+    auto outermostGenericDecl = genericDecl;
+    for (auto parentGenericDecl = as<GenericDecl>(genericDecl->parentDecl); parentGenericDecl;
+         parentGenericDecl = as<GenericDecl>(parentGenericDecl->parentDecl))
+    {
+        outermostGenericDecl = parentGenericDecl;
+    }
+    return outermostGenericDecl;
+}
+
+// Add solver constraints for ordinary arguments supplied by a generic application.
+void addProvidedOrdinaryArgConstraints(
+    SemanticsVisitor::GenericInferenceContext& inferenceContext,
+    DeclRef<GenericDecl> genericDeclRef,
+    ArrayView<Val*> providedOrdinaryArgs)
+{
+    // Most generic applications do not provide any ordinary generic arguments,
+    // so leave the existing unification-discovered constraint list untouched.
+    if (providedOrdinaryArgs.getCount() == 0)
+        return;
+
+    // Provided arguments must run before ordinary inference constraints. If the
+    // program wrote `foo<int>(1.0)`, `T = int` is fixed input and the later
+    // call-argument constraint from `1.0` may validate against it, but must not
+    // first solve `T` as `float`. Rebuild the short inbox with provided
+    // constraints first, then append the constraints already discovered by
+    // unification.
+    auto discoveredConstraints = _Move(inferenceContext.discoveredConstraints);
+    inferenceContext.discoveredConstraints.clear();
+
+    auto genericDecl = getOutermostGenericDecl(genericDeclRef.getDecl());
+    for (auto member : genericDecl->getDirectMemberDecls())
+    {
+        Index argIndex = getGenericParamIndex(member);
+        if (argIndex < 0 || argIndex >= providedOrdinaryArgs.getCount())
+            continue;
+
+        // The provided value is installed by the work-list loop as a
+        // `ProvidedArgConstraint`. This keeps the solver's state changes in one
+        // place: initialization only creates default-substitution values, while
+        // every caller-provided or inferred update is represented as a solver
+        // constraint.
+        SemanticsVisitor::SolverConstraint constraint;
+        constraint.kind = SemanticsVisitor::SolverConstraint::Kind::ProvidedArgConstraint;
+        constraint.genericDecl = genericDecl;
+        constraint.decl = member;
+        constraint.val = providedOrdinaryArgs[argIndex];
+        inferenceContext.discoveredConstraints.add(constraint);
+    }
+
+    for (auto constraint : discoveredConstraints)
+        inferenceContext.discoveredConstraints.add(constraint);
+}
+
 // Owns one generic-application solve. The class collects ordinary constraints,
 // default generic arguments, and witness constraints into solver constraints,
 // runs the work-list loop, and stores the current argument arrays used to build
@@ -713,13 +792,11 @@ public:
         SemanticsVisitor* visitor,
         GenericInferenceContext&& inferenceContext,
         DeclRef<GenericDecl> genericDeclRef,
-        ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost)
         : m_visitor(visitor)
         , m_astBuilder(visitor->getASTBuilder())
         , m_context(_Move(inferenceContext))
         , m_genericDeclRef(genericDeclRef)
-        , m_providedOrdinaryArgs(providedOrdinaryArgs)
         , m_outBaseCost(outBaseCost)
     {
     }
@@ -889,29 +966,14 @@ private:
                 args.add(arg);
             }
 
-            // Ordinary parameters may have an initial value that is more
-            // specific than the default substitution arg. A partially applied
-            // generic can provide an ordinary argument, as in `foo<int>(x)`,
-            // and an omitted pack starts as the empty pack. Witness arguments
-            // stay in their default-substitution form until witness constraints
-            // solve them.
+            // Omitted packs use empty pack values rather than their default
+            // substitution args. A later non-empty-pack witness constraint
+            // decides whether that empty value is legal for this candidate.
+            // Provided ordinary arguments are not handled here; the public
+            // entry point folds them into `ProvidedArgConstraint`s so the
+            // work-list loop owns every non-default update to `m_args`.
             for (auto member : genericDecl->getDirectMemberDecls())
             {
-                Val* providedArg = nullptr;
-                if (tryGetProvidedOrdinaryArg(member, providedArg))
-                {
-                    if (!setCurrentArg(member, providedArg))
-                        return false;
-                    auto argState = isDefaultSubstitutionArgForParam(member, providedArg)
-                                        ? ArgState::DependentOrdinaryArg
-                                        : ArgState::CallerProvidedOrdinaryArg;
-                    setArgState(member, argState);
-                    continue;
-                }
-
-                // Omitted packs use empty pack values rather than their default
-                // substitution args. A later non-empty-pack witness constraint
-                // decides whether that empty value is legal for this candidate.
                 if (as<GenericTypePackParamDecl>(member))
                 {
                     if (!setCurrentArg(member, m_astBuilder->getTypePack(ArrayView<Type*>())))
@@ -1115,6 +1177,9 @@ private:
         ConstraintSolvingState state = ConstraintSolvingState::Failed;
         switch (constraint.kind)
         {
+        case SolverConstraint::Kind::ProvidedArgConstraint:
+            state = solveProvidedArgConstraint(constraint);
+            break;
         case SolverConstraint::Kind::OrdinaryArgConstraint:
             state = solveOrdinaryConstraint(constraint);
             break;
@@ -1165,17 +1230,55 @@ private:
     // Return true if a constraint solves an ordinary type/value argument.
     bool isOrdinarySolverConstraint(SolverConstraint const& constraint)
     {
-        // Ordinary constraints are the only constraints that directly merge
-        // values into type/value parameters. Defaults and witnesses may
-        // produce ordinary arguments too, but they do it through their own
+        // Provided arguments and ordinary constraints both directly affect the
+        // type/value argument prefix. Defaults and witnesses may produce
+        // ordinary arguments too, but they do it through their own
         // source-specific solver routines.
-        return constraint.kind == SolverConstraint::Kind::OrdinaryArgConstraint;
+        return constraint.kind == SolverConstraint::Kind::ProvidedArgConstraint ||
+               constraint.kind == SolverConstraint::Kind::OrdinaryArgConstraint;
     }
 
     // Return true if an ordinary constraint requires an exact argument answer.
     bool isExactOrdinaryArgConstraint(SolverConstraint const& constraint)
     {
         return constraint.ordinaryArgMergeMode == SolverConstraint::OrdinaryArgMergeMode::Exact;
+    }
+
+    // Install a generic-application-provided ordinary argument.
+    ConstraintSolvingState solveProvidedArgConstraint(SolverConstraint const& constraint)
+    {
+        // A provided ordinary argument is input to the solver, not a conclusion
+        // inferred by the solver. `foo<int>(x)` fixes `T` as `int`; later
+        // defaults and call-argument inference may validate against that value,
+        // but they must not replace it.
+        auto oldState = getArgState(constraint.decl);
+        auto oldArg = getCurrentArg(constraint.decl);
+
+        // Some internal callers provide the parameter's own default
+        // substitution arg, such as `T` for the `T` parameter, only to preserve
+        // a dependent declaration shape. That value is ready for substitution,
+        // but it is not fixed user input, so later inference may still replace it.
+        auto argState = isDefaultSubstitutionArgForParam(constraint.decl, constraint.val)
+                            ? ArgState::DependentOrdinaryArg
+                            : ArgState::CallerProvidedOrdinaryArg;
+
+        // Publish the provided value through the same `m_args` array used by
+        // every other solver constraint. This keeps dependent defaults and
+        // witness constraints from needing a side channel for explicit generic
+        // arguments.
+        if (!setCurrentArg(constraint.decl, constraint.val))
+            return ConstraintSolvingState::Failed;
+        setArgState(constraint.decl, argState);
+
+        // The first successful install makes the argument ready, even when the
+        // value equals the default substitution arg that initialization placed
+        // in `m_args`. A conservative retry only counts as progress if the
+        // visible argument or its readiness state changed.
+        if (oldState != argState)
+            return ConstraintSolvingState::Solved;
+        if (!oldArg || !oldArg->equals(constraint.val))
+            return ConstraintSolvingState::Solved;
+        return ConstraintSolvingState::Done;
     }
 
     // Solve a unification-derived constraint for an ordinary argument.
@@ -1752,6 +1855,12 @@ private:
     {
         switch (constraint.kind)
         {
+        case SolverConstraint::Kind::ProvidedArgConstraint:
+            // Provided arguments are fixed inputs to the generic application.
+            // Once installed, they should not be re-run and overwrite an
+            // ordinary argument that later inference intentionally refined.
+            return false;
+
         case SolverConstraint::Kind::OrdinaryArgConstraint:
             // Ordinary constraints depend on the value they will merge.
             // A constraint like `U = T.A` should rerun when `T` or the witness
@@ -1981,48 +2090,6 @@ private:
         }
 
         return true;
-    }
-
-    // Return a provided ordinary argument for one parameter.
-    bool tryGetProvidedOrdinaryArg(Decl* paramDecl, Val*& outArg)
-    {
-        // Some callers seed inference with default substitution args such as
-        // `<T, N, T : IFoo>`. Those self-reference values keep decl-ref shapes
-        // well formed, but the work list must still be allowed to replace them.
-        auto genericDecl = as<GenericDecl>(paramDecl->parentDecl);
-        if (!genericDecl || genericDecl != m_genericDecls[0])
-            return false;
-
-        // Provided ordinary arguments use the same index space as generic type,
-        // value, and pack parameters. Witness arguments are compiler-formed and
-        // are never provided by this array.
-        Index argIndex = getGenericParamIndex(paramDecl);
-        if (argIndex < 0 || argIndex >= m_providedOrdinaryArgs.getCount())
-            return false;
-
-        // The caller owns the array view; the solver only copies the value into
-        // `m_args` during ordinary-argument initialization.
-        outArg = m_providedOrdinaryArgs[argIndex];
-        return true;
-    }
-
-    // Return the argument index for an ordinary generic parameter.
-    Index getGenericParamIndex(Decl* genericParamDecl)
-    {
-        // Type parameters, type-pack parameters, value parameters, and
-        // value-pack parameters all share the ordinary-argument index space
-        // assigned by their declarations.
-        if (auto typeParamDecl = as<GenericTypeParamDeclBase>(genericParamDecl))
-            return typeParamDecl->parameterIndex;
-        if (auto valuePackParamDecl = as<GenericValuePackParamDecl>(genericParamDecl))
-            return valuePackParamDecl->parameterIndex;
-        if (auto valueParamDecl = as<GenericValueParamDecl>(genericParamDecl))
-            return valueParamDecl->parameterIndex;
-
-        // Witness arguments deliberately have no index here; they are serialized
-        // after ordinary arguments and are found by scanning source generic
-        // constraint declarations.
-        return -1;
     }
 
     // Return true if an argument is the default substitution arg for a parameter.
@@ -2711,11 +2778,6 @@ private:
     // for source generic constraint declarations.
     DeclRef<GenericDecl> m_genericDeclRef;
 
-    // Ordinary generic arguments already provided at the call site. These are
-    // stored as an array view because the caller owns the backing list for the
-    // duration of solving.
-    ArrayView<Val*> m_providedOrdinaryArgs;
-
     // Output overload cost owned by the caller. The solver writes the final
     // accumulated cost after all ordinary arguments and witnesses are solved.
     ConversionCost& m_outBaseCost;
@@ -2763,12 +2825,13 @@ DeclRef<Decl> SemanticsVisitor::trySolveGenericArguments(
     // walking direct members like `T`, `U = T.A`, and `T : IFoo`.
     ensureDecl(genericDeclRef.getDecl(), DeclCheckState::ReadyForLookup);
 
+    addProvidedOrdinaryArgConstraints(inferenceContext, genericDeclRef, providedOrdinaryArgs);
+
     // Move the accumulated inference context into the solver. Solving mutates
     // ordinary constraints, discovers follow-up constraints through unification,
     // and updates overload cost, so ownership is intentionally transferred at
     // the call boundary.
-    GenericArgumentSolver
-        solver(this, _Move(inferenceContext), genericDeclRef, providedOrdinaryArgs, outBaseCost);
+    GenericArgumentSolver solver(this, _Move(inferenceContext), genericDeclRef, outBaseCost);
 
     // The caller only needs the final substituted inner decl-ref and the output
     // cost. All work-list state, current arguments, and witness arguments remain

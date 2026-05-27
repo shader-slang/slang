@@ -2680,6 +2680,15 @@ public:
     {
         enum class Kind
         {
+            // An ordinary argument supplied by the generic application itself,
+            // such as `int` in `foo<int>(x)`. The target ordinary argument is
+            // named by `decl`, and `val` stores the supplied argument. This is
+            // separate from `OrdinaryArgConstraint` because an explicit
+            // ordinary argument is fixed input: defaults and inference may use
+            // it, but must not replace it unless the supplied value is just the
+            // parameter's own default substitution arg.
+            ProvidedArgConstraint,
+
             // A constraint that solves an ordinary type/value argument. The
             // target argument is named by `decl`, the constraint value is
             // stored in `val`, and `ordinaryArgMergeMode` decides how that
@@ -2720,16 +2729,19 @@ public:
 
         // The generic declaration whose argument list contains the ordinary
         // argument or witness argument affected by this constraint. This field
-        // is required for `DefaultArgConstraint` and `WitnessConstraint`; it is
-        // usually not needed for `OrdinaryArgConstraint`, whose target
-        // declaration already carries its parent generic.
+        // is required for `ProvidedArgConstraint`, `DefaultArgConstraint`, and
+        // `WitnessConstraint`; it is usually not needed for
+        // `OrdinaryArgConstraint`, whose target declaration already carries
+        // its parent generic.
         GenericDecl* genericDecl = nullptr;
 
-        // For `OrdinaryArgConstraint`, the ordinary generic parameter being
-        // solved. For `DefaultArgConstraint`, the ordinary generic parameter
-        // whose default value is being substituted. For `WitnessConstraint`,
-        // the source generic constraint declaration whose proof should be
-        // written as a witness argument.
+        // For `ProvidedArgConstraint`, the ordinary generic parameter whose
+        // supplied argument should be installed. For `OrdinaryArgConstraint`,
+        // the ordinary generic parameter being solved. For
+        // `DefaultArgConstraint`, the ordinary generic parameter whose default
+        // value is being substituted. For `WitnessConstraint`, the source
+        // generic constraint declaration whose proof should be written as a
+        // witness argument.
         Decl* decl = nullptr;
 
         // Only used by `OrdinaryArgConstraint` when `decl` names a type
@@ -2737,11 +2749,12 @@ public:
         // `val` constrains.
         Index indexInPack = 0;
 
-        // For `OrdinaryArgConstraint`, the type or value to merge into the
-        // ordinary argument named by `decl`. For `DefaultArgConstraint`, the
-        // unevaluated declaration-time default generic argument. Unused by
-        // `WitnessConstraint`, which reads the source constraint declaration
-        // from `decl`.
+        // For `ProvidedArgConstraint`, the ordinary argument supplied by the
+        // generic application. For `OrdinaryArgConstraint`, the type or value
+        // to merge into the ordinary argument named by `decl`. For
+        // `DefaultArgConstraint`, the unevaluated declaration-time default
+        // generic argument. Unused by `WitnessConstraint`, which reads the
+        // source constraint declaration from `decl`.
         Val* val = nullptr;
 
         // Only used by `OrdinaryArgConstraint` when `decl` names a type
@@ -2750,10 +2763,10 @@ public:
         bool isUsedAsLValue = false;
 
         // True when the solver has no more work for this constraint. Ordinary
-        // constraints stay satisfied once their value has been applied;
-        // default generic arguments and witness constraints can be marked
-        // unsatisfied again when a dependency changes and they need to
-        // substitute through the current argument list again.
+        // constraints and provided arguments stay satisfied once their value
+        // has been applied; default generic arguments and witness constraints
+        // can be marked unsatisfied again when a dependency changes and they
+        // need to substitute through the current argument list again.
         bool satisfied = false;
 
         // Only used by `OrdinaryArgConstraint`. There are multiple levels of
@@ -2773,8 +2786,9 @@ public:
         // argument list before it is used. This is used by
         // `OrdinaryArgConstraint` for dependent constraint values such as
         // `U = T.A`, and by `DefaultArgConstraint` for declaration-time
-        // defaults. It is unused by `WitnessConstraint`, whose source
-        // declaration is substituted by building a specialized decl-ref.
+        // defaults. It is unused by `ProvidedArgConstraint`, whose value is
+        // already the supplied argument, and by `WitnessConstraint`, whose
+        // source declaration is substituted by building a specialized decl-ref.
         bool potentiallyDependent = false;
 
         // True while this constraint's index is already present in the work-list
