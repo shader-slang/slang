@@ -2964,8 +2964,13 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         auto checkedExpr = visitor.CheckTerm(genAppExpr);
         if (auto partiallyAppliedExpr = as<PartiallyAppliedGenericExpr>(checkedExpr))
         {
-            // If checked generic is partially applied generic, we try to force conversion into
-            // a fully defined declref by calling `trySolveGenericArguments`.
+            // Entry-point specialization can leave a generic partially applied
+            // after parsing the explicit specialization arguments. The generic
+            // solver completes that decl-ref from the provided ordinary
+            // arguments, declaration-time defaults, and witness constraints. An
+            // otherwise empty inference context is enough here because there are
+            // no value-level call arguments to unify against entry-point
+            // parameters.
             SemanticsVisitor::GenericInferenceContext inferenceContext;
             inferenceContext.genericDecl = genericDeclRef.getDecl();
             ConversionCost outCost;

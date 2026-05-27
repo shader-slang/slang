@@ -7,9 +7,51 @@
 // argument list for a generic application and forms a valid `DeclRef` to the
 // generic declaration with solved type, value, and witness arguments.
 //
-// To understand how generic constraint solving works, consider the following
-// code. The interesting part is that the default for `U` depends on the
-// associated type selected by the `T : IFoo` constraint.
+// Generic argument model
+// ----------------------
+//
+// A generic application's serialized argument list is made of ordinary arguments
+// followed by witness arguments. Ordinary arguments correspond to source
+// type/value parameters that user code can name in a generic application, such
+// as `T`, `U`, `let N`, or `each Ts`. Witness arguments correspond to source
+// generic constraints, such as `T : IFoo` or `U : IData`; they are
+// compiler-formed proof values that the final decl-ref carries beside the
+// ordinary arguments.
+//
+// Before solving, `getDefaultSubstitutionArgs()` provides default substitution
+// arguments for the whole list. These are declaration-shaped stand-ins such as
+// `T`, `N`, or the declared witness for `T : IFoo`. They keep dependent values
+// like `T.Value` structurally valid while the solver is still finding real
+// answers. The solver's live argument list is the current `m_args` array: it
+// starts from those default substitution arguments and is updated in place as
+// ordinary arguments and witness arguments become known.
+//
+// The solver has two phases. The collection phase gathers solver constraints
+// from all sources that can affect the live argument list: caller-provided
+// ordinary arguments, ordinary constraints discovered by unification, default
+// generic arguments, and source generic constraints that require witness
+// arguments. The resolution phase runs one iterative work-list loop over that
+// single collected set. Keeping ordinary and witness work in the same loop is
+// the important property: an ordinary argument can unblock a witness, a witness
+// can unblock a dependent default, and solving a witness can discover more
+// ordinary constraints through unification.
+//
+// Work-list states and invariants
+// -------------------------------
+//
+// A solver constraint is `Done` when it is satisfied under the current live
+// argument list, `Solved` when it just changed that list, `Blocked` when it is
+// waiting for another ordinary or witness argument, and `Failed` when the
+// generic application is not viable. A solved constraint wakes dependent work
+// conservatively; exact wake-up precision is an optimization, not part of the
+// semantic contract. A blocked constraint remains unsatisfied, so if the queue
+// becomes empty while blocked work remains, the solver rejects the candidate
+// instead of looping. Repeated retries do not count as progress by themselves:
+// a handler that computes the same answer reports `Done`, and newly discovered
+// unification facts are drained into the same work table instead of reusing a
+// separate "types first, witnesses later" pass.
+//
+// To understand how the pieces fit together, consider this code:
 //
 //      interface IData {}
 //      struct IntData : IData {}
@@ -24,88 +66,43 @@
 //          typealias Value = IntData;
 //      }
 //
-//      __generic<T : IFoo, U : IData = T.Value>
-//      U load(T value);
+//      U load<T : IFoo, U : IData = T.Value>(T value);
 //
 //      void check(ConcreteFoo foo)
 //      {
 //          load(foo);
 //      }
 //
-// Now let's walk through what needs to happen to check `load(foo)`. The checker
-// must form a decl-ref for `load` as if the program had written the full generic
-// argument list. That full list has ordinary arguments and witness arguments.
-// Ordinary arguments correspond to source type/value parameters such as `T`,
-// `U`, `let N`, or `each Ts`; in this example they will become `ConcreteFoo` and
-// `IntData`. Witness arguments correspond to source generic constraints such as
-// `T : IFoo` and `U : IData`; they are compiler-made proof values that the final
-// decl-ref carries beside the ordinary arguments.
+// To check `load(foo)`, the compiler must form a decl-ref for `load` as if the
+// program had written the full generic argument list. The value-level call first
+// compares the actual argument type `ConcreteFoo` with the parameter type `T`.
+// That comparison is unification: it asks what must be true for two semantic
+// values to agree. Here unification discovers the ordinary solver constraint
+// `T = ConcreteFoo`. In more structured cases, such as comparing `vector<T, 3>`
+// with a scalar argument, unification may look through promotions and nested
+// types before it discovers the ordinary constraints.
 //
-// The solver gets there in two phases. In the collection phase, it gathers every
-// piece of work that can affect the argument list: facts already discovered by
-// semantic checking, default generic arguments such as `U = T.Value`, and source
-// generic constraints that need witness proofs. In the resolution phase, it runs
-// one iterative work-list loop over those collected constraints. This single
-// loop is important: solving an ordinary argument can unblock a witness,
-// solving a witness can unblock a dependent default, and either kind of
-// progress can discover more ordinary constraints that must be solved before
-// the final decl-ref is valid.
+// Collection for this call produces four pieces of work: `T = ConcreteFoo`, the
+// declaration-time default `U = T.Value`, the witness constraint for `T : IFoo`,
+// and the witness constraint for `U : IData`. The default for `U` cannot be
+// substituted yet because the associated-type lookup needs both the ordinary
+// argument `T` and the witness that proves `T : IFoo`.
 //
-// The first piece of work comes from the call argument. The actual argument
-// `foo` has type `ConcreteFoo`, while the formal parameter has type `T`. The
-// checker asks, "what would have to be true for these two semantic values to
-// agree?" That comparison is called unification. Here the answer is simple:
-// unification discovers the solver constraint `T = ConcreteFoo`. In other calls
-// the comparison can look through more structure. If the parameter were
-// `vector<T, 3>` and the argument had scalar type `int`, unification could
-// account for Slang's scalar-to-vector promotion, compare `int` with the vector
-// element type, and discover a constraint for `T` from that path.
+// The work list can solve `T = ConcreteFoo` immediately, then ask the subtype
+// system for the witness proving `ConcreteFoo : IFoo`. With that proof stored in
+// the same live argument list, substituting the default `U = T.Value` can reduce
+// the lookup to `ConcreteFoo.Value`, which is `IntData`. The solver stores
+// `IntData` as the ordinary argument for `U`, and the witness constraint for
+// `U : IData` can then prove `IntData : IData`.
 //
-// At this point collection has three kinds of work for `load(foo)`: the
-// ordinary solver constraint `T = ConcreteFoo`, the default generic argument
-// `U = T.Value`, and witness constraints for the source generic constraints
-// `T : IFoo` and `U : IData`. The word "constraint" is overloaded here. A source
-// generic constraint is part of the generic signature and asks for a witness
-// argument. A solver constraint is a fact that restricts an ordinary argument.
-//
-// The work-list starts with default substitution arguments in the live argument
-// list. The `U = T.Value` default cannot run yet, because substituting the
-// associated-type lookup is not meaningful until both `T` and the witness for
-// `T : IFoo` are known. The ordinary constraint `T = ConcreteFoo` can run
-// immediately, so the solver writes `ConcreteFoo` as the current ordinary
-// argument for `T` and wakes dependent work.
-//
-// With `T` known, the witness constraint for `T : IFoo` can ask the subtype
-// system for a proof that `ConcreteFoo` conforms to `IFoo`. The solver stores
-// that proof in the witness-argument part of the same live argument list. Now
-// the default `U = T.Value` can be substituted through the current full
-// substitution. The associated-type lookup uses the solved `ConcreteFoo : IFoo`
-// witness to select `ConcreteFoo.Value`, so the default reduces to `IntData`;
-// the solver writes `IntData` as the ordinary argument for `U`. That, in turn,
-// unblocks the witness constraint for `U : IData`, which proves
-// `IntData : IData`.
-//
-// Unification can also happen while the work list is running. Suppose a source
-// constraint requires `T : IBox<U>` and the solved `T` is known to conform to
-// `IBox<IntData>`. Processing that conformance-shaped work compares the known
-// shape `IBox<IntData>` with the required shape `IBox<U>`. This is another
-// unification step, and it discovers the new ordinary solver constraint
-// `U = IntData`. The new fact is appended to the inference context, converted
-// into a solver constraint, and resolved in the same loop rather than in a separate
-// "types first, witnesses later" pass.
-//
-// Finally, remember that several solver constraints can target the same
-// ordinary argument. Ordinary type constraints, such as `T` being inferred from
-// call arguments, keep the existing join behavior so several argument types can
-// choose a common answer. Exact ordinary constraints such as `N = 4` or
-// `U = T.A` directly solve ordinary arguments and must agree with any previous
-// answer of the same priority. Witness constraints are responsible for source
-// generic constraints such as `T : IFoo<U>`; while solving the witness, they may
-// compare the solved subject against the interface shape and discover more
-// ordinary constraints for arguments such as `U`. Once the work list is quiet,
-// the final decl-ref is built from the live argument list: ordinary arguments
-// first, followed by the witness arguments that prove the source generic
-// constraints.
+// Unification can also occur while solving witness constraints. If a source
+// constraint requires `T : IBox<U>` and the solved subject is known to conform to
+// `IBox<IntData>`, solving that witness compares the required interface shape
+// with the actual conformance shape. That comparison discovers `U = IntData` as
+// a new ordinary solver constraint. The solver drains that discovered constraint
+// into the same work list so the final decl-ref is built from one coherent live
+// argument list: ordinary arguments first, followed by the witness arguments
+// that prove the source generic constraints.
 
 namespace Slang
 {
@@ -779,8 +776,8 @@ public:
         // new argument list.
         Solved,
 
-        // The constraint cannot run yet because it refers to an argument that still
-        // contains a default substitution arg.
+        // The constraint cannot be attempted yet because it refers to an
+        // argument that still contains a default substitution arg.
         Blocked,
 
         // The constraint proved that this generic application cannot be solved.
@@ -848,6 +845,15 @@ public:
     }
 
 private:
+    // -------------------------------------------------------------------------
+    // Constraint collection
+    //
+    // These routines build the solver's complete work table before resolution
+    // begins. They do not try to prove anything. Their job is to put caller
+    // arguments, unification facts, defaults, and witness-producing source
+    // constraints into one representation so the work-list loop can solve them
+    // together.
+
     // Collect solver constraints before the work-list phase starts.
     bool collectConstraints()
     {
@@ -1055,6 +1061,13 @@ private:
         addSolverConstraint(constraint);
     }
 
+    // -------------------------------------------------------------------------
+    // Work-list scheduling
+    //
+    // These routines own the queue discipline. Work-list entries are indices
+    // into `m_solverConstraints`, so each logical constraint has one stable
+    // state even if conservative wakeups enqueue it multiple times.
+
     // Add a solver constraint to the stable table and queue it.
     void addSolverConstraint(SolverConstraint const& constraint)
     {
@@ -1164,6 +1177,14 @@ private:
         }
         return true;
     }
+
+    // -------------------------------------------------------------------------
+    // Constraint solving
+    //
+    // These routines implement the state transitions for one queued solver
+    // constraint. A handler either installs an ordinary or witness argument,
+    // reports that it is waiting for dependencies, or rejects the generic
+    // application.
 
     // Try to solve one queued solver constraint.
     ConstraintSolvingState trySolveSolverConstraint(Index constraintIndex)
@@ -1772,6 +1793,13 @@ private:
         return ConstraintSolvingState::Done;
     }
 
+    // -------------------------------------------------------------------------
+    // Dependency analysis
+    //
+    // These routines answer two questions for scheduling: whether a value can be
+    // substituted through the current live argument list, and whether a solved
+    // argument should wake another solver constraint.
+
     // Return true if a witness constraint still depends on unready arguments.
     bool hasUnreadyDependenciesForWitnessConstraint(Decl* constraintDecl)
     {
@@ -2056,6 +2084,14 @@ private:
         auto subDeclRef = isDeclRefTypeOf<Decl>(typeConstraintDecl->sub.type);
         return subDeclRef && subDeclRef.getDecl() == paramDecl;
     }
+
+    // -------------------------------------------------------------------------
+    // Argument access and state
+    //
+    // These routines centralize the serialized argument layout. Ordinary
+    // arguments use their parameter index, witness arguments follow in source
+    // generic-constraint order, and `ArgState` records whether the current value
+    // in `m_args` is a real answer or still a default substitution argument.
 
     // Return the pack decl-ref named by a non-empty-pack constraint.
     DeclRef<Decl> getPackDeclRefForNonEmptyConstraint(NonEmptyPackConstraintDecl* constraintDecl)
@@ -2369,6 +2405,14 @@ private:
         return m_astBuilder->getTypePack(typeList.getArrayView().arrayView);
     }
 
+    // -------------------------------------------------------------------------
+    // Decl-ref construction
+    //
+    // These routines rebuild specialized decl-refs from the live argument list.
+    // Defaults and witness checks use them to substitute source declarations
+    // through exactly the same arguments that the final generic application will
+    // serialize.
+
     // Build a substituted decl-ref using the current argument arrays.
     DeclRef<Decl> buildSubstDeclRef(Decl* memberDecl)
     {
@@ -2415,6 +2459,13 @@ private:
         return m_genericDeclRef;
     }
 
+    // -------------------------------------------------------------------------
+    // Witness construction
+    //
+    // These routines delegate the actual proof search to the existing semantic
+    // services. The solver decides when a proof is ready to be requested and
+    // where the resulting witness argument is stored.
+
     // Try to solve the witness for one source generic constraint.
     Val* trySolveWitnessForConstraint(GenericDecl* genericDecl, Decl* constraintDecl)
     {
@@ -2456,9 +2507,15 @@ private:
         if (!markArgConstrainedBySubtypeConstraint(constraintDecl))
             return nullptr;
 
-        // A self-proof of an interface against itself is not a valid witness for
-        // a requirement declared inside that same interface. Leaving it unsolved
-        // avoids capturing a witness from the interface's own generic scope.
+        // Requirements declared inside an interface are checked while the
+        // interface's abstract self type is still in scope. For example,
+        // `interface INode { associatedtype Next : INode; }` can ask the solver
+        // about a conformance whose substituted source and target both denote
+        // `INode` before any concrete implementation exists. That equality
+        // means the requirement is still abstract; it is not a witness-table
+        // proof that a concrete type conforms to the interface, so the solver
+        // must leave the witness unsolved here instead of capturing one from the
+        // interface declaration's own generic context.
         if (sub->equals(sup) && isDeclRefTypeOf<InterfaceDecl>(sup))
             return nullptr;
 
@@ -2693,6 +2750,13 @@ private:
         return witness;
     }
 
+    // -------------------------------------------------------------------------
+    // Final validation and cost
+    //
+    // These routines run after the work list is quiet. They reject any remaining
+    // unsatisfied work and compute overload cost once from the final argument
+    // list, avoiding double-counting from retried constraints.
+
     // Return true if all ordinary solver constraints were consumed.
     bool areOrdinaryConstraintsSatisfied()
     {
@@ -2758,6 +2822,14 @@ private:
     }
 
 private:
+    // -------------------------------------------------------------------------
+    // Stored solver state
+    //
+    // The members below mirror the problem model above: shared semantic context,
+    // the generic declaration chain being specialized, one live argument list per
+    // generic, side metadata for those arguments, and the durable work table plus
+    // queue used by the iterative solver.
+
     // Semantic visitor used for all checker operations that need broader
     // context: unification, subtype checks, default lookup, diagnostics, and
     // access to shared semantic caches.
@@ -2769,8 +2841,8 @@ private:
     ASTBuilder* m_astBuilder = nullptr;
 
     // Shared unification context owned by the solver while it runs. Its
-    // `constraints` list is only a transient inbox for helpers that discover
-    // ordinary constraints before or during the work-list loop.
+    // `discoveredConstraints` list is only a transient inbox for helpers that
+    // discover ordinary constraints before or during the work-list loop.
     GenericInferenceContext m_context;
 
     // Decl-ref for the generic being specialized. The solver preserves this
@@ -3485,8 +3557,11 @@ QualType getMappedQualTypeForConstraint(
     return QualType(typeList[span.index], isLeftValue);
 }
 
-// Helper function to unwrap a type and count expandable types
-static void unwrapTypeAndCountExpandable(
+// Flatten a type-pack-shaped value into the sequence used by recursive type
+// unification. Concrete packs contribute each element. Abstract packs, including
+// pack parameters and expansions, contribute one expandable element whose final
+// span is chosen by `computeTypePackUnificationMapping()`.
+static void flattenTypePackForUnification(
     Type* type,
     ShortList<Type*>& outTypes,
     int& outExpandableCount)
@@ -3507,44 +3582,63 @@ static void unwrapTypeAndCountExpandable(
     }
 }
 
-// Helper function to map type arguments between two types, handling expandable types
-static bool matchTypeArgMapping(
+// Compute how two flattened pack-shaped values should be paired for recursive
+// unification.
+//
+// Each `IndexSpanPair` in `outMapping` says that a contiguous span from
+// `outFlattenedFirst` should be unified with a contiguous span from
+// `outFlattenedSecond`. Most mappings are one element to one element. A span can
+// contain several elements when the opposite side has an expandable pack element
+// that must absorb those elements. The function returns false when the concrete
+// element counts cannot be distributed evenly across the expandable elements.
+static bool computeTypePackUnificationMapping(
     Type* firstType,
     Type* secondType,
     ShortList<Type*>& outFlattenedFirst,
     ShortList<Type*>& outFlattenedSecond,
     ShortList<IndexSpanPair>& outMapping)
 {
-    // Unwrap and flatten the types
+    // The flattened arrays are owned by the caller because later recursive
+    // unification needs to turn each mapping span back into a `QualType`.
     ShortList<Type*>& firstTypes = outFlattenedFirst;
     ShortList<Type*>& secondTypes = outFlattenedSecond;
 
-    // Count expandable types as we unwrap
+    // Count expandable elements while flattening so the mapping step can decide
+    // which side has to absorb extra concrete elements.
     int firstExpandableCount = 0;
     int secondExpandableCount = 0;
 
-    // Unwrap both types using the helper function
-    unwrapTypeAndCountExpandable(firstType, firstTypes, firstExpandableCount);
-    unwrapTypeAndCountExpandable(secondType, secondTypes, secondExpandableCount);
+    flattenTypePackForUnification(firstType, firstTypes, firstExpandableCount);
+    flattenTypePackForUnification(secondType, secondTypes, secondExpandableCount);
 
-    // We need to figure out which side should be expanding.
-    // Consider the following cases,
+    // Decide which side, if any, must expand. The side with fewer
+    // non-expandable elements absorbs concrete elements from the other side.
+    // When both sides have the same number of non-expandable elements, the side
+    // with fewer expandable elements expands so mappings stay as specific as
+    // possible.
+    //
+    // Consider the following cases:
     //
     //   left = [ expand, expand ]
     //   right = [ int, float, expand ]
-    // when one side has more non-expandable types, the other side should expand to match it.
-    // in this case, "left" should expand to cover "int" and "float".
+    //
+    // The left side has fewer non-expandable elements, so its first expansion
+    // absorbs `int` and `float`.
     //
     //   left = [ int, float, expand, expand ]
     //   right = [ int, float, expand ]
-    // when the number of the non-expandable types are same, we want to expand side that has
-    // fewer expandable types. In this case, "right" should expand to cover the first "expand".
+    //
+    // The non-expandable counts match, so the side with fewer expandable
+    // elements expands. Here the right-side expansion absorbs the first
+    // left-side expansion.
     //
     //   left = ConcreteTypePack(ExpandType, ExpandType)
     //   right = ConcreteTypePack(int, bool, float, double).
-    // In this case, we shouldn't be mapping the first ExpandType to int and the second
-    // ExpandType to bool, float, double. Instead, they should evenly divide the second type
-    // pack, so we map first ExpandType with int, bool, and second ExpandType to float, double.
+    //
+    // Both left expansions share the concrete right-side elements evenly:
+    // `[int, bool]` for the first expansion and `[float, double]` for the
+    // second. If the elements cannot be divided evenly, there is no valid
+    // structural pack mapping.
     //
     int firstCount = (int)firstTypes.getCount();
     int secondCount = (int)secondTypes.getCount();
@@ -3561,11 +3655,12 @@ static bool matchTypeArgMapping(
         ((countDifference > 0) ||
          (countDifference == 0 && firstExpandableCount > secondExpandableCount));
 
-    // We need to figure out how much types should match per each expandable type.
+    // Once the expanding side is known, every expandable element on that side
+    // must absorb the same number of elements from the opposite side. Uneven
+    // division would make the mapping order-dependent, so report failure.
     int typesPerExpand = 0;
     if (shouldExpandSecond)
     {
-        // More types on first, need to expand second
         int countToMatch = countDifference + firstExpandableCount;
         SLANG_ASSERT(secondExpandableCount != 0);
         if (countToMatch % secondExpandableCount != 0)
@@ -3574,16 +3669,15 @@ static bool matchTypeArgMapping(
     }
     else if (shouldExpandFirst)
     {
-        // More types on second, need to expand first
         int countToMatch = -countDifference + secondExpandableCount;
         SLANG_ASSERT(firstExpandableCount != 0);
         if (countToMatch % firstExpandableCount != 0)
             return false;
         typesPerExpand = countToMatch / firstExpandableCount;
     }
-    // If countDifference == 0, no expansion needed
-
-    // Generate the mapping
+    // Walk both flattened arrays and emit the span pairs. A non-expandable
+    // element maps one-to-one. An expandable element maps one-to-many only when
+    // this pass selected its side to absorb extra elements.
     Index firstIndex = 0;
     Index secondIndex = 0;
 
@@ -3591,10 +3685,8 @@ static bool matchTypeArgMapping(
     {
         IndexSpanPair mapping;
 
-        // Determine spans based on expandable types and count difference
         if (shouldExpandFirst)
         {
-            // Expanding first to match second
             if (isAbstractTypePack(firstTypes[firstIndex]))
             {
                 mapping.first = IndexSpan(firstIndex, 1);
@@ -3611,7 +3703,6 @@ static bool matchTypeArgMapping(
         }
         else if (shouldExpandSecond)
         {
-            // Expanding second to match first
             if (isAbstractTypePack(secondTypes[secondIndex]))
             {
                 mapping.first = IndexSpan(firstIndex, typesPerExpand);
@@ -3628,7 +3719,6 @@ static bool matchTypeArgMapping(
         }
         else
         {
-            // No expansion needed
             mapping.first = IndexSpan(firstIndex, 1);
             mapping.second = IndexSpan(secondIndex, 1);
             firstIndex++;
@@ -3677,21 +3767,27 @@ bool SemanticsVisitor::TryUnifyTypes(
         return TryUnifyConjunctionType(constraints, unificationOptions, fst, snd);
     }
 
-    // Unwrap ConcreteTypePack and call TryUnifyTypes recursively.
+    // Pack-shaped values may need a structural mapping before recursive
+    // unification. For example, a single expansion can correspond to several
+    // concrete elements on the other side, so compute spans first and then
+    // convert each span back into the `QualType` shape expected by recursion.
     ShortList<IndexSpanPair> typeMapping;
     ShortList<Type*> flattenedFirst;
     ShortList<Type*> flattenedSecond;
-    if (matchTypeArgMapping(fst, snd, flattenedFirst, flattenedSecond, typeMapping) &&
+    if (computeTypePackUnificationMapping(fst, snd, flattenedFirst, flattenedSecond, typeMapping) &&
         typeMapping.getCount() > 1)
     {
-        // Apply unification based on the mapping
+        // Each mapping span is a smaller unification problem that preserves the
+        // pack structure selected above.
         for (const auto& mapping : typeMapping)
         {
-            // Make sure it is one of three cases: 1:1, 1:N or N:1
+            // The mapper only emits the three shapes recursive unification
+            // understands: one-to-one, one-to-many, or many-to-one.
             SLANG_ASSERT(mapping.first.count > 0 && mapping.second.count > 0);
             SLANG_ASSERT(mapping.first.count == 1 || mapping.second.count == 1);
 
-            // Get the types directly from the mapping
+            // Rebuild each span into the `QualType` shape that preserves whether
+            // the opposite side expects a scalar type or a pack-shaped value.
             QualType firstArg = getMappedQualTypeForConstraint(
                 m_astBuilder,
                 mapping.first,
@@ -3705,7 +3801,8 @@ bool SemanticsVisitor::TryUnifyTypes(
                 snd.isLeftValue,
                 flattenedFirst[mapping.first.index]);
 
-            // Perform the unification
+            // Recursive unification may discover ordinary solver constraints
+            // from the mapped pair, just as it would for a non-pack type.
             if (!TryUnifyTypes(constraints, unificationOptions, firstArg, secondArg))
                 return false;
         }
