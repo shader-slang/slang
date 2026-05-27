@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/conventional-features
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/02-conventional-features.html
 ---
 
 Conventional Language Features

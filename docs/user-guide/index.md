@@ -1,5 +1,6 @@
 ---
 layout: user-guide
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/index.html
 ---
 
 Slang User's Guide

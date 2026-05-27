@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/reflection
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/09-reflection.html
 ---
 
 Using the Reflection API

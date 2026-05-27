@@ -1,5 +1,6 @@
 ---
 layout: user-guide
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/a1-01-matrix-layout.html
 ---
 
 Handling Matrix Layout Differences on Different Platforms

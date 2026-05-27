@@ -34,6 +34,11 @@ jobs:
                 "command": "regenerate-cmdline-ref",
                 "permission": "write",
                 "issue_type": "pull-request"
+              },
+              {
+                "command": "fix-redirects",
+                "permission": "none",
+                "issue_type": "pull-request"
               }
             ]
 

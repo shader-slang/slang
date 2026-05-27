@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/introduction
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/00-introduction.html
 ---
 
 Introduction

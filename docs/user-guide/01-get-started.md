@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/get-started
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/01-get-started.html
 ---
 
 # Getting Started with Slang
