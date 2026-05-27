@@ -1,7 +1,10 @@
 // unit-test-offset-container.cpp
 
-#include "../../source/core/slang-offset-container.h"
+#include "core/slang-exception.h"
+#include "core/slang-offset-container.h"
 #include "unit-test/slang-unit-test.h"
+
+#include <stdlib.h>
 
 using namespace Slang;
 
@@ -45,6 +48,70 @@ struct Root
     Offset32Array<Offset32Ptr<OffsetString>> dirs;
     Offset32Ptr<OffsetString> name;
     float value;
+};
+
+static int _writeEnvironmentVariable(const char* key, const char* val)
+{
+#ifdef _WIN32
+    String var = String(key) + "=" + val;
+    return _putenv(var.getBuffer());
+#else
+    return setenv(key, val, 1);
+#endif
+}
+
+static int _unsetEnvironmentVariable(const char* key)
+{
+#ifdef _WIN32
+    String var = String(key) + "=";
+    return _putenv(var.getBuffer());
+#else
+    return unsetenv(key);
+#endif
+}
+
+struct ScopedEnvVar
+{
+    const char* key;
+    bool hadOldValue = false;
+    String oldValue;
+
+    ScopedEnvVar(const char* inKey, const char* inVal)
+        : key(inKey)
+    {
+#ifdef _WIN32
+        char* value = nullptr;
+        size_t valueLength = 0;
+        if (_dupenv_s(&value, &valueLength, key) == 0 && value)
+        {
+            hadOldValue = true;
+            oldValue = value;
+            free(value);
+        }
+#else
+        if (const char* value = getenv(key))
+        {
+            hadOldValue = true;
+            oldValue = value;
+        }
+#endif
+        _writeEnvironmentVariable(key, inVal);
+    }
+
+    ScopedEnvVar(const ScopedEnvVar&) = delete;
+    ScopedEnvVar& operator=(const ScopedEnvVar&) = delete;
+
+    ~ScopedEnvVar()
+    {
+        if (hadOldValue)
+        {
+            _writeEnvironmentVariable(key, oldValue.getBuffer());
+        }
+        else
+        {
+            _unsetEnvironmentVariable(key);
+        }
+    }
 };
 
 } // namespace
@@ -214,4 +281,146 @@ SLANG_UNIT_TEST(offsetContainer)
             }
         }
     }
+
+    {
+        uint8_t data[16] = {};
+
+        MemoryOffsetBase base;
+        base.set(data, sizeof(data));
+
+        Offset32Ptr<uint32_t> nullPtr;
+        SLANG_CHECK(base.asRaw(nullPtr) == nullptr);
+
+        Offset32Ptr<uint32_t> validPtr(kStartOffset);
+        SLANG_CHECK(base.asRaw(validPtr) == (uint32_t*)(data + kStartOffset));
+
+        Offset32Ptr<uint8_t> lastBytePtr(uint32_t(sizeof(data) - 1));
+        SLANG_CHECK(base.asRaw(lastBytePtr) == data + sizeof(data) - 1);
+
+        Offset32Ptr<uint32_t> partialPtr(uint32_t(sizeof(data) - sizeof(uint32_t) + 1));
+        SLANG_CHECK(base.asRaw(partialPtr) == nullptr);
+
+        Offset32Ptr<uint8_t> pastEndPtr(uint32_t(sizeof(data)));
+        SLANG_CHECK(base.asRaw(pastEndPtr) == nullptr);
+
+        // offset > m_dataSize: exercises the first disjunct of the bounds
+        // check in _getRaw, which guards `m_dataSize - offset` from
+        // underflow. `pastEndPtr` above only hits the second disjunct.
+        Offset32Ptr<uint8_t> wayPastEndPtr(uint32_t(sizeof(data) + 1));
+        SLANG_CHECK(base.asRaw(wayPastEndPtr) == nullptr);
+    }
+
+    // _getRaw early-return on null m_data: a default-constructed MemoryOffsetBase
+    // has m_data == nullptr; asRaw on any non-null offset must return nullptr
+    // without dereferencing.
+    {
+        MemoryOffsetBase emptyBase;
+        Offset32Ptr<uint32_t> ptr(kStartOffset);
+        SLANG_CHECK(emptyBase.asRaw(ptr) == nullptr);
+    }
+
+    // _getRaw overflow safety: with m_dataSize close to UINT32_MAX and an
+    // offset near UINT32_MAX, the disjunctive check
+    // `offset > m_dataSize || size > m_dataSize - offset`
+    // must reject. A future "simplification" to `offset + size > m_dataSize`
+    // computed in uint32_t would wrap silently and yield a false negative.
+    //
+    // We never dereference the spoofed range — _getRaw returns nullptr before
+    // touching m_data — so a 1-byte stack buffer is safe to spoof.
+    {
+        uint8_t dummy = 0;
+        MemoryOffsetBase base;
+        // Spoof a very large dataSize without actually allocating it.
+        base.set(&dummy, size_t(0xFFFFFFFDu));
+
+        // offset (0xFFFFFFFCu) > m_dataSize? false.
+        // size (4) > m_dataSize - offset (1)? true → reject.
+        Offset32Ptr<uint32_t> hugeOffsetPtr(0xFFFFFFFCu);
+        SLANG_CHECK(base.asRaw(hugeOffsetPtr) == nullptr);
+    }
+
+    // Offset32Array::operator[] positive coverage at 0 and count-1.
+    // The bounds check is a SLANG_RELEASE_ASSERT; this test would trip the
+    // assert if the check were ever inverted (e.g. `<=` instead of `<`).
+    {
+        OffsetContainer container;
+        auto& base = container.asBase();
+        auto arr = container.newArray<uint32_t>(3);
+
+        base[arr[0]] = 100u;
+        base[arr[1]] = 200u;
+        base[arr[2]] = 300u;
+
+        SLANG_CHECK(base[arr[0]] == 100u);
+        SLANG_CHECK(base[arr[2]] == 300u);
+    }
+
+#if SLANG_HAS_EXCEPTIONS
+    // Offset32Array::operator[] must remain a release assert. With
+    // release-assert-only enabled, a debug-only SLANG_ASSERT would be ignored
+    // in debug builds, but SLANG_RELEASE_ASSERT still raises InternalError.
+    {
+        ScopedEnvVar assertMode("SLANG_ASSERT", "release-assert-only");
+
+        OffsetContainer container;
+        auto arr = container.newArray<uint32_t>(1);
+
+        bool nonConstCaught = false;
+        try
+        {
+            (void)arr[Index(5)];
+        }
+        catch (const InternalError&)
+        {
+            nonConstCaught = true;
+        }
+        SLANG_CHECK(nonConstCaught);
+
+        const Offset32Array<uint32_t>& constArr = arr;
+        bool constCaught = false;
+        try
+        {
+            (void)constArr[Index(5)];
+        }
+        catch (const InternalError&)
+        {
+            constCaught = true;
+        }
+        SLANG_CHECK(constCaught);
+    }
+
+    // Offset32Ref access must also remain a release assert when the serialized
+    // offset is outside the backing buffer.
+    {
+        ScopedEnvVar assertMode("SLANG_ASSERT", "release-assert-only");
+
+        uint8_t data[16] = {};
+        MemoryOffsetBase base;
+        base.set(data, sizeof(data));
+
+        Offset32Ref<uint32_t> badRef(uint32_t(sizeof(data)));
+
+        bool asRawCaught = false;
+        try
+        {
+            (void)base.asRaw(badRef);
+        }
+        catch (const InternalError&)
+        {
+            asRawCaught = true;
+        }
+        SLANG_CHECK(asRawCaught);
+
+        bool operatorCaught = false;
+        try
+        {
+            (void)base[badRef];
+        }
+        catch (const InternalError&)
+        {
+            operatorCaught = true;
+        }
+        SLANG_CHECK(operatorCaught);
+    }
+#endif
 }
