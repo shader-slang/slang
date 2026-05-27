@@ -1187,35 +1187,18 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                     constrainedArg = newArgs[valuePackDecl->parameterIndex];
             }
 
-            auto packCardinality = constrainedArg ? getPackCardinality(constrainedArg)
-                                                  : VariadicPackCardinality::Unknown;
-            if (packCardinality != VariadicPackCardinality::NonEmpty)
-            {
-                // A known empty pack is a hard constraint failure. An unknown
-                // pack is also not sufficient to produce the witness needed by
-                // the final generic application.
-                if (context.mode != OverloadResolveContext::Mode::JustTrying)
-                {
-                    if (packCardinality == VariadicPackCardinality::Empty)
-                    {
-                        getSink()->diagnose(Diagnostics::EmptyPackDoesNotSatisfyNonEmptyConstraint{
-                            .location = context.loc});
-                    }
-                    else
-                    {
-                        auto diagExpr =
-                            context.originalExpr ? context.originalExpr : context.baseExpr;
-                        getSink()->diagnose(Diagnostics::PackQueryRequiresNonEmptyPack{
-                            .queryName = "nonempty(...)",
-                            .expr = diagExpr});
-                    }
-                }
+            // Non-empty-pack proof and diagnostics are shared with the
+            // work-list solver so overload validation and final generic
+            // argument solving agree on what witness gets serialized.
+            auto nonEmptyPackWitness = findNonEmptyPackWitnessForConstraint(
+                m_astBuilder,
+                this,
+                constrainedArg,
+                &context,
+                context.mode != OverloadResolveContext::Mode::JustTrying);
+            if (!nonEmptyPackWitness)
                 return false;
-            }
-
-            // The pack value itself is stored in the witness so later stages can
-            // rely on it as proof that the pack is non-empty.
-            newArgs.add(m_astBuilder->getNonEmptyPackWitness(constrainedArg));
+            newArgs.add(nonEmptyPackWitness);
         }
         else if (
             auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))

@@ -3883,6 +3883,17 @@ Witness* findDiffTypeInfoWitnessForConstraint(
     ArrayView<Val*> args,
     bool shouldEmitError);
 
+// Return the witness that proves `constrainedArg` is a non-empty pack, or
+// `nullptr` if the pack is empty or not known to be non-empty. `maybeContext` is
+// required when `shouldEmitError` is true so diagnostics can point at the
+// operation that requested the constraint.
+Witness* findNonEmptyPackWitnessForConstraint(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    Val* constrainedArg,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    bool shouldEmitError);
+
 SourceLoc _getTypeNestingDiagnosticPosForDecl(Decl* decl);
 
 } // namespace Slang

@@ -594,6 +594,51 @@ Witness* findDiffTypeInfoWitnessForConstraint(
         shouldEmitError);
 }
 
+// Find the witness value for a non-empty-pack generic constraint.
+Witness* findNonEmptyPackWitnessForConstraint(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    Val* constrainedArg,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    bool shouldEmitError)
+{
+    // Diagnostics need the call/application context. The solver uses this
+    // helper speculatively, so diagnostic context is only required when the
+    // caller explicitly asks for user-facing errors.
+    SLANG_ASSERT(!shouldEmitError || maybeContext);
+
+    // A non-empty-pack witness is valid only when the pack shape is already
+    // known to contain at least one element. Unknown packs cannot produce a
+    // proof, and known empty packs reject required constraints.
+    auto packCardinality = constrainedArg ? visitor->getPackCardinality(constrainedArg)
+                                          : VariadicPackCardinality::Unknown;
+    if (packCardinality != VariadicPackCardinality::NonEmpty)
+    {
+        if (shouldEmitError)
+        {
+            if (packCardinality == VariadicPackCardinality::Empty)
+            {
+                visitor->getSink()->diagnose(Diagnostics::EmptyPackDoesNotSatisfyNonEmptyConstraint{
+                    .location = maybeContext->loc});
+            }
+            else
+            {
+                auto diagExpr = maybeContext->originalExpr ? maybeContext->originalExpr
+                                                           : maybeContext->baseExpr;
+                visitor->getSink()->diagnose(Diagnostics::PackQueryRequiresNonEmptyPack{
+                    .queryName = "nonempty(...)",
+                    .expr = diagExpr});
+            }
+        }
+        return nullptr;
+    }
+
+    // The pack value itself is stored in the witness so later stages can rely on
+    // it as proof that the source generic constraint was satisfied for this
+    // exact pack argument.
+    return astBuilder->getNonEmptyPackWitness(constrainedArg);
+}
+
 // An `ArgState` classifies the current argument stored in `m_args` for one
 // ordinary argument or witness argument position. The state decides whether that
 // current argument is ready for substitution, and whether later solver
@@ -2762,16 +2807,15 @@ private:
             constrainedArg = getCurrentArg(valuePackDeclRef.getDecl());
         }
 
-        // Omitted packs are represented as empty packs, which fail this check.
-        // A concrete non-empty pack produces a witness that later lowering can
-        // treat as proof of the source generic constraint.
-        if (!constrainedArg || !m_visitor->isKnownNonEmptyPack(constrainedArg))
-            return nullptr;
-
-        // The witness references the current pack argument; the caller stores
-        // the solved witness into the same argument list used by substitutions
-        // and final decl-ref creation.
-        return m_astBuilder->getNonEmptyPackWitness(constrainedArg);
+        // Reuse the same proof helper as overload validation. The solver passes
+        // no diagnostic context because a failed witness simply rejects this
+        // candidate during speculative solving.
+        return findNonEmptyPackWitnessForConstraint(
+            m_astBuilder,
+            m_visitor,
+            constrainedArg,
+            nullptr,
+            false);
     }
 
     // Try to solve the witness for a differentiability constraint.
