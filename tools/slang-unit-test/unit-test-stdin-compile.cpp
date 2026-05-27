@@ -255,12 +255,12 @@ static SlangResult _testStdinDiagnosticLocation(UnitTestContext* context)
     if (result.resultCode == 0)
         return SLANG_FAIL;
 
-    // Diagnostic format is: <stdin>(line): error N: message
+    // Diagnostic format is: error[E...]: ...\n --> <stdin>:line:col
     // Assert the exact line number so a BOM or off-by-one regression in SourceLoc
     // tracking surfaces here rather than silently passing.
     // undeclared_identifier; is on line 2 of the stdin source.
     UnownedStringSlice err = result.standardError.getUnownedSlice();
-    if (err.indexOf(toSlice("<stdin>(2):")) < 0)
+    if (err.indexOf(toSlice("<stdin>:2:")) < 0)
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -296,7 +296,7 @@ static SlangResult _testStdinWithBom(UnitTestContext* context)
     return SLANG_OK;
 }
 
-// Case 7b: BOM + deliberate error on line 2 should report <stdin>(2): so a
+// Case 7b: BOM + deliberate error on line 2 should report <stdin>:2: so a
 // BOM-handling regression that treats the BOM as a newline would shift line
 // numbers and fail this assertion.
 static SlangResult _testStdinBomDiagnosticLocation(UnitTestContext* context)
@@ -326,7 +326,7 @@ static SlangResult _testStdinBomDiagnosticLocation(UnitTestContext* context)
         return SLANG_FAIL;
 
     // If the BOM were consumed as a newline, the error would appear on line 3.
-    if (result.standardError.getUnownedSlice().indexOf(toSlice("<stdin>(2):")) < 0)
+    if (result.standardError.getUnownedSlice().indexOf(toSlice("<stdin>:2:")) < 0)
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -339,7 +339,7 @@ static SlangResult _testStdinBomDiagnosticLocation(UnitTestContext* context)
 // More critically, text mode treats 0x1A (Ctrl-Z) as EOF, silently truncating source.
 // The fix is _setmode(_fileno(stdin), _O_BINARY) before fread.
 // This test sends \r\n-terminated source with a deliberate error on line 2 and asserts
-// that <stdin>(2): appears — ensuring \r\n is not treated as two newlines (which would
+// that <stdin>:2: appears — ensuring \r\n is not treated as two newlines (which would
 // report line 3 instead).
 static SlangResult _testStdinCrlfLineNumbers(UnitTestContext* context)
 {
@@ -368,7 +368,7 @@ static SlangResult _testStdinCrlfLineNumbers(UnitTestContext* context)
         return SLANG_FAIL;
 
     // If \r\n were treated as two newlines the error would appear on line 3.
-    if (result.standardError.getUnownedSlice().indexOf(toSlice("<stdin>(2):")) < 0)
+    if (result.standardError.getUnownedSlice().indexOf(toSlice("<stdin>:2:")) < 0)
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -440,6 +440,8 @@ static SlangResult _testStdinMixedWithFile(UnitTestContext* context)
     SLANG_RETURN_ON_FAIL(File::writeAllText(helperPath, "void foo() {}\n"));
 
     List<String> args;
+    args.add("-lang");
+    args.add("slang");
     args.add("-target");
     args.add("spirv-asm");
     args.add("-entry");
@@ -488,6 +490,8 @@ static SlangResult _testStdinThenFile(UnitTestContext* context)
     SLANG_RETURN_ON_FAIL(File::writeAllText(helperPath, "void foo() {}\n"));
 
     List<String> args;
+    args.add("-lang");
+    args.add("slang");
     args.add("-target");
     args.add("spirv-asm");
     args.add("-entry");
@@ -536,6 +540,8 @@ static SlangResult _testFileBetweenStdins(UnitTestContext* context)
     SLANG_RETURN_ON_FAIL(File::writeAllText(helperPath, "void foo() {}\n"));
 
     List<String> args;
+    args.add("-lang");
+    args.add("slang");
     args.add("-target");
     args.add("spirv-asm");
     args.add("-entry");
@@ -975,6 +981,8 @@ static SlangResult _testStdinPassThroughMissingStage(UnitTestContext* context)
     args.add("dxc");
     args.add("-entry");
     args.add("main");
+    args.add("-lang");
+    args.add("hlsl");
     // Deliberately no -stage.
     args.add("--");
     args.add("-");
