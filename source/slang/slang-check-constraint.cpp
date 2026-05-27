@@ -2265,13 +2265,17 @@ private:
         if (argIndex < 0)
             return false;
 
-        // The array is normally initialized to the full default-substitution
-        // length, but growing defensively keeps the setter robust for nested
-        // generic cases where a list is created before all entries are copied.
-        auto& args = m_args[genericDecl];
-        if (args.getCount() <= argIndex)
-            args.setCount(argIndex + 1);
-        args[argIndex] = arg;
+        // Initialization creates the complete serialized argument list before
+        // solving starts. If the index is out of range here, the solver has lost
+        // the generic application's argument layout, and growing the list would
+        // hide that bug while leaving earlier entries with meaningless values.
+        auto args = m_args.tryGetValue(genericDecl);
+        if (!args)
+            return false;
+        SLANG_ASSERT(argIndex < args->getCount());
+        if (argIndex >= args->getCount())
+            return false;
+        (*args)[argIndex] = arg;
         return true;
     }
 
@@ -3158,8 +3162,6 @@ bool SemanticsVisitor::TryUnifyIntParam(
     GenericValueParamDecl* paramDecl,
     IntVal* val)
 {
-    SLANG_UNUSED(unificationOptions);
-
     // We only want to accumulate constraints on
     // the parameters of the declarations being
     // specialized (don't accidentially constrain
@@ -3176,6 +3178,8 @@ bool SemanticsVisitor::TryUnifyIntParam(
     constraint.kind = SolverConstraint::Kind::OrdinaryArgConstraint;
     constraint.decl = paramDecl;
     constraint.ordinaryArgMergeMode = SolverConstraint::OrdinaryArgMergeMode::Exact;
+    constraint.priority = unificationOptions.optionalConstraint ? ConstraintPriority::Optional
+                                                                : ConstraintPriority::Required;
     // If `val` is of different type than `paramDecl`, we want to insert a type cast.
     if (val->getType() != paramDecl->getType())
     {
@@ -3205,7 +3209,7 @@ bool SemanticsVisitor::TryUnifyIntParam(
     }
     else if (auto genericValuePackParamRef = varRef.as<GenericValuePackParamDecl>())
     {
-        if (genericValuePackParamRef.getDecl()->parentDecl != constraints.genericDecl)
+        if (!isRelevantGeneric(constraints, genericValuePackParamRef.getDecl()->parentDecl))
             return false;
         SolverConstraint constraint;
         constraint.kind = SolverConstraint::Kind::OrdinaryArgConstraint;
