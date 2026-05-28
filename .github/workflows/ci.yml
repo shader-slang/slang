@@ -53,6 +53,46 @@ jobs:
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-matrix.yml
 
+  # Top-level check-ci preserves the "CI / check-ci" check name that branch
+  # protection requires, AND ensures docs-only PRs (matrix skipped via filter)
+  # still report a green check rather than leaving "Expected — Waiting for
+  # status" forever. Succeeds when matrix succeeded or was skipped; fails when
+  # matrix failed or was cancelled.
+  check-ci:
+    needs: [filter, matrix]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize matrix result
+        env:
+          MATRIX_RESULT: ${{ needs.matrix.result }}
+          FILTER_SHOULD_RUN: ${{ needs.filter.outputs.should-run }}
+        run: |
+          echo "filter should-run: $FILTER_SHOULD_RUN"
+          echo "matrix result:     $MATRIX_RESULT"
+          case "$MATRIX_RESULT" in
+            success)
+              echo "All CI matrix jobs passed."
+              exit 0
+              ;;
+            skipped)
+              if [[ "$FILTER_SHOULD_RUN" == "false" ]]; then
+                echo "Docs-only PR — matrix correctly skipped."
+                exit 0
+              fi
+              echo "::error::Matrix was skipped but filter expected it to run."
+              exit 1
+              ;;
+            failure|cancelled)
+              echo "::error::CI matrix $MATRIX_RESULT"
+              exit 1
+              ;;
+            *)
+              echo "::error::Unexpected matrix result: $MATRIX_RESULT"
+              exit 1
+              ;;
+          esac
+
   # Automatically retry GPU health check failures by dispatching ci-retry.yml,
   # which watches this run until it completes, then reruns only failed jobs.
   # Capped at 2 automatic retries via run_attempt check.

@@ -307,7 +307,10 @@ jobs:
       ref: ${{ inputs.ref }}
       repository: ${{ inputs.repository }}
 
-  check-ci:
+  # Nested gate inside the matrix; ci.yml's top-level check-ci summarizes
+  # this job's result (or the skipped state when filter says docs-only) and
+  # is the name branch protection should require.
+  check-matrix:
     needs:
       [
         test-windows-release-cl-x86_64-gpu,
