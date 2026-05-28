@@ -12,6 +12,71 @@ struct GlobalVarTranslationContext
 {
     CodeGenContext* context;
 
+    bool tryGetSystemValueSemantic(IRInst* inst, UnownedStringSlice* outSemantic)
+    {
+        if (auto targetSystemValue = inst->findDecoration<IRTargetSystemValueDecoration>())
+        {
+            *outSemantic = targetSystemValue->getSemantic();
+            return true;
+        }
+
+        if (auto semantic = inst->findDecoration<IRSemanticDecoration>())
+        {
+            auto semanticName = semantic->getSemanticName();
+            if (semanticName.startsWithCaseInsensitive(toSlice("sv_")))
+            {
+                *outSemantic = semanticName;
+                return true;
+            }
+        }
+
+        if (auto layoutDecor = inst->findDecoration<IRLayoutDecoration>())
+        {
+            if (auto varLayout = as<IRVarLayout>(layoutDecor->getLayout()))
+            {
+                if (auto systemValue = varLayout->findAttr<IRSystemValueSemanticAttr>())
+                {
+                    *outSemantic = systemValue->getName();
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    IRParam* findEquivalentEntryPointParam(
+        IRFunc* entryPointFunc,
+        IRInst* globalInput,
+        IRType* inputType)
+    {
+        UnownedStringSlice inputSemantic;
+        if (!tryGetSystemValueSemantic(globalInput, &inputSemantic))
+            return nullptr;
+
+        auto firstBlock = entryPointFunc->getFirstBlock();
+        if (!firstBlock)
+            return nullptr;
+
+        for (auto param : firstBlock->getParams())
+        {
+            UnownedStringSlice paramSemantic;
+            if (!tryGetSystemValueSemantic(param, &paramSemantic))
+                continue;
+
+            if (!paramSemantic.caseInsensitiveEquals(inputSemantic))
+                continue;
+
+            auto paramValueType = std::get<1>(splitParameterDirectionAndType(param->getFullType()));
+            if (!isTypeEqual(paramValueType, inputType))
+                continue;
+
+            return param;
+        }
+
+        return nullptr;
+    }
+
     void processModule(IRModule* module)
     {
         Dictionary<IRInst*, HashSet<IRFunc*>> referencingEntryPoints;
@@ -218,20 +283,33 @@ struct GlobalVarTranslationContext
                 }
                 auto varLayout = varLayoutBuilder.build();
                 inputStructTypeLayoutBuilder.addField(key, varLayout);
+
+                // If the entry point already declares the same system value, reuse that
+                // parameter for the builtin global instead of adding a duplicate parameter
+                // with the same target semantic.
+                auto inputParam = findEquivalentEntryPointParam(entryPointFunc, input, inputType);
+
                 input->transferDecorationsTo(key);
 
-                // Emit a new param here to represent the global input var.
-                auto inputParam =
-                    builder.emitParam(builder.getBorrowInParamType(inputType, AddressSpace::Input));
+                if (!inputParam)
+                {
+                    // Emit a new param here to represent the global input var.
+                    inputParam = builder.emitParam(
+                        builder.getBorrowInParamType(inputType, AddressSpace::Input));
 
-                // Copy the global input vars original decorations onto the new param.
-                // We need to do this to ensure that we can do things like get system
-                // value info in later passes like when we legalize entry points for WGSL.
-                IRCloneEnv cloneEnv;
-                cloneInstDecorationsAndChildren(&cloneEnv, builder.getModule(), key, inputParam);
+                    // Copy the global input var's original decorations onto the new param.
+                    // We need this so later passes, such as WGSL entry-point legalization, can
+                    // still recognize system-value information.
+                    IRCloneEnv cloneEnv;
+                    cloneInstDecorationsAndChildren(
+                        &cloneEnv,
+                        builder.getModule(),
+                        key,
+                        inputParam);
 
-                // Add the layout to the new param
-                builder.addLayoutDecoration(inputParam, varLayout);
+                    // Add the layout to the new param.
+                    builder.addLayoutDecoration(inputParam, varLayout);
+                }
 
                 // Add the param to our list of new params. This will allow us
                 // to connect the old "global variable" to a "global parameter"

@@ -1097,6 +1097,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     IRGlobalParam* threadIdxGlobalParam = nullptr;
     IRGlobalParam* blockIdxGlobalParam = nullptr;
     IRGlobalParam* blockDimGlobalParam = nullptr;
+    IRGlobalParam* gridDimGlobalParam = nullptr;
 
     // All of our system values will be exposed with the
     // `uint3` type, and we'll cache a pointer to that
@@ -1911,7 +1912,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         auto varLayout = varLayoutBuilder.build();
 
         // Finaly, we construct global parameters to represent
-        // `threadIdx`, `blockIdx`, and `blockDim`.
+        // `threadIdx`, `blockIdx`, `blockDim`, and `gridDim`.
         //
         // Each of these parameters is given a target-intrinsic
         // decoration that ensures that (1) it will not get a declaration
@@ -1939,6 +1940,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             CapabilitySet::makeEmpty(),
             UnownedTerminatedStringSlice("blockDim"));
         builder.addLayoutDecoration(blockDimGlobalParam, varLayout);
+
+        gridDimGlobalParam = builder.createGlobalParam(uint3Type);
+        builder.addTargetIntrinsicDecoration(
+            gridDimGlobalParam,
+            CapabilitySet::makeEmpty(),
+            UnownedTerminatedStringSlice("gridDim"));
+        builder.addLayoutDecoration(gridDimGlobalParam, varLayout);
     }
 
     // While CUDA provides many useful system values
@@ -2021,6 +2029,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             return createLegalizedSystemVaryingValInst(info, groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
             return createLegalizedSystemVaryingValInst(info, dispatchThreadID);
+        case SystemValueSemanticName::WorkgroupCount:
+            return createLegalizedSystemVaryingValInst(info, gridDimGlobalParam);
         default:
             return diagnoseUnsupportedSystemVal(info);
         }
@@ -2276,6 +2286,8 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
             return createLegalizedSystemVaryingValInst(info, groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
             return createLegalizedSystemVaryingValInst(info, dispatchThreadID);
+        case SystemValueSemanticName::WorkgroupCount:
+            return diagnoseUnsupportedSystemVal(info);
         default:
             return diagnoseUnsupportedSystemVal(info);
         }
@@ -4603,6 +4615,12 @@ protected:
                 result.permittedTypes.add(builder.getVectorType(
                     builder.getBasicType(BaseType::UInt),
                     builder.getIntValue(builder.getIntType(), 3)));
+            }
+            break;
+
+        case SystemValueSemanticName::WorkgroupCount:
+            {
+                result.isUnsupported = true;
             }
             break;
 

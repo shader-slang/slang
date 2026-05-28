@@ -3339,6 +3339,9 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
 SLANG_API SlangResult
 spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t* rs)
 {
+    if (!inVar || !rs)
+        return SLANG_E_INVALID_ARG;
+
     auto var = convert(inVar);
     auto decl = var.getDecl();
     if (auto varDecl = as<VarDeclBase>(decl))

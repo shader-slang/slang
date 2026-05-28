@@ -9,9 +9,9 @@ uint3 getDispatchThreadID()
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint3 tid : SV_DispatchThreadID)
 {
-    resultBuffer[0] = getDispatchThreadID().x + tid;
+    resultBuffer[0] = getDispatchThreadID().x + tid.x;
 }
 
 // METAL: {{\[\[}}kernel{{\]\]}} void computeMain(

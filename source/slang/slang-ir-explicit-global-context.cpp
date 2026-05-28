@@ -585,26 +585,65 @@ struct IntroduceExplicitGlobalContextPass
         fixUpFuncType(entryPointFunc);
     }
 
+    bool tryGetSystemValueSemantic(IRInst* inst, UnownedStringSlice* outSemantic)
+    {
+        if (auto targetSystemValue = inst->findDecoration<IRTargetSystemValueDecoration>())
+        {
+            *outSemantic = targetSystemValue->getSemantic();
+            return true;
+        }
+
+        // Builtin global params such as `__builtinDispatchThreadID` enter this pass with
+        // their source-level `SV_*` semantic. Entry-point params have usually already been
+        // legalized to target system-value decorations, so the matcher below must accept both
+        // forms.
+        if (auto semantic = inst->findDecoration<IRSemanticDecoration>())
+        {
+            auto semanticName = semantic->getSemanticName();
+            if (semanticName.startsWithCaseInsensitive(toSlice("sv_")))
+            {
+                *outSemantic = semanticName;
+                return true;
+            }
+        }
+
+        if (auto layoutDecor = inst->findDecoration<IRLayoutDecoration>())
+        {
+            if (auto varLayout = as<IRVarLayout>(layoutDecor->getLayout()))
+            {
+                if (auto systemValue = varLayout->findAttr<IRSystemValueSemanticAttr>())
+                {
+                    *outSemantic = systemValue->getName();
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     // Find an existing entry-point parameter that can provide the same system value as
     // `globalParam`. Matching on both semantic and type lets builtin global params share
     // user-declared system-value parameters without changing the context initialization path.
     IRParam* findEquivalentEntryPointParam(IRFunc* entryPointFunc, IRGlobalParam* globalParam)
     {
-        auto globalSystemValue = globalParam->findDecoration<IRTargetSystemValueDecoration>();
-        if (!globalSystemValue)
+        UnownedStringSlice globalSemantic;
+        if (!tryGetSystemValueSemantic(globalParam, &globalSemantic))
             return nullptr;
 
         for (auto param : entryPointFunc->getParams())
         {
-            auto paramSystemValue = param->findDecoration<IRTargetSystemValueDecoration>();
-            if (!paramSystemValue)
+            UnownedStringSlice paramSemantic;
+            if (!tryGetSystemValueSemantic(param, &paramSemantic))
                 continue;
 
-            if (!paramSystemValue->getSemantic().caseInsensitiveEquals(
-                    globalSystemValue->getSemantic()))
+            if (!paramSemantic.caseInsensitiveEquals(globalSemantic))
                 continue;
 
-            if (!isTypeEqual(param->getFullType(), globalParam->getFullType()))
+            auto paramValueType = std::get<1>(splitParameterDirectionAndType(param->getFullType()));
+            auto globalValueType =
+                std::get<1>(splitParameterDirectionAndType(globalParam->getFullType()));
+            if (!isTypeEqual(paramValueType, globalValueType))
                 continue;
 
             return param;
