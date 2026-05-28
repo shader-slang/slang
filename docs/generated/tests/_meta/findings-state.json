@@ -53,6 +53,91 @@
       "title": "[spirv] enum-to-int cast unhandled by spirv-emit on -target spirv-asm path",
       "url": "https://github.com/shader-slang/slang/issues/11315"
     },
+    "constrained-type-param-segv": {
+      "issue": 11316,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszguCG-g",
+      "title": "[spirv] SIGSEGV lowering constrained module-scope type_param (cf #5627)",
+      "url": "https://github.com/shader-slang/slang/issues/11316"
+    },
+    "countof-local-array-returns-bytewidth": {
+      "issue": 11317,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszguCHHA",
+      "title": "[slangi] countof(fixed-size local array) returns byte width, not element count",
+      "url": "https://github.com/shader-slang/slang/issues/11317"
+    },
+    "dead-diagnostic-codes-umbrella": {
+      "issue": 11320,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszguCHgM",
+      "title": "A bootstrap sweep against the diagnostic catalog identified ~16 codes declared\u2026",
+      "url": "https://github.com/shader-slang/slang/issues/11320"
+    },
+    "diag-code-29104-double-defined": {
+      "issue": 11318,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszguCHPY",
+      "title": "Diagnostic code 29104 is defined twice in the source \u2014 as `spirv-instruction-wi\u2026",
+      "url": "https://github.com/shader-slang/slang/issues/11318"
+    },
+    "diag-code-30900-retired": {
+      "issue": 11319,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszguCHYY",
+      "title": "Diagnostic code 30900 (`multi-dimensional-array-not-supported`) is still presen\u2026",
+      "url": "https://github.com/shader-slang/slang/issues/11319"
+    },
     "fragment-stage-on-cuda-segv": {
       "dup_of": 10241,
       "note": "Exact match: CUDA target ICEs on vertex/fragment shaders instead of clear diagnostic",
