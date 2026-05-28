@@ -3468,8 +3468,8 @@ warning(
 err(
     "default-value-on-extension-generic-param",
     30857,
-    "default value on generic parameter '~paramName:Name' of extension is meaningless: extension generic parameters are always inferred from the target type's type arguments",
-    span { loc = "decl:Decl", message = "default value on generic parameter '~paramName' of extension is meaningless" }
+    "default value on generic parameter '~paramName:Name' of extension has no effect: extension generic parameters are inferred when the extension is applied, never supplied as arguments",
+    span { loc = "decl:Decl", message = "default value on generic parameter '~paramName' of extension has no effect" }
 )
 
 --
