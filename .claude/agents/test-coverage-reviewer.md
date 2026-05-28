@@ -7,11 +7,11 @@ model: opus
 
 ## Mandatory startup check — SUBAGENT_DIFF_GATE_v1
 
-BEFORE doing anything else: `Read tmp/pr-diff.patch`. If the file is missing or empty, output exactly:
+BEFORE doing anything else: `Read tmp/pr-diff.patch` and `tmp/pr-files.txt`. If either file is missing or empty, output exactly:
 
 > ERROR: PR diff not pre-staged — aborting; see REVIEW.md Step 1
 
-and STOP. Do NOT review files in the working directory — those reflect the base branch (master), not the PR. The diff is staged by the workflow before you run; if it is absent the contract is broken and any review you produce would be speculation against the wrong tree.
+and STOP. Do NOT review files in the working directory — those reflect the base branch (master), not the PR. Both files are staged by the workflow before you run; if either is absent the contract is broken and any review you produce would be speculation against the wrong tree.
 
 ---
 
