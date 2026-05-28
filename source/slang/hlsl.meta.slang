@@ -6556,8 +6556,7 @@ $}
     /// @return The 2 16-bit floating point values packed into a 32-bit unsigned integer.
     [__requiresNVAPI]
     [ForceInline]
-    [require(hlsl, sm_5_0)]
-    [require(cuda, cuda_sm_7_0)]
+    [require(cuda_hlsl, sm_5_0)]
     [require(spirv, spvAtomicFloat16VectorNV)]
     uint _NvInterlockedAddFp16x2(uint byteAddress, uint fp16x2Value)
     {
@@ -6578,16 +6577,16 @@ $}
     /// @param originalValue The original value at `byteAddress` before the add operation.
     /// @remarks For SPIR-V, this function maps to `OpAtomicFAdd` on a `half` when
     /// `SPV_EXT_shader_atomic_float16_add` is available. When only
-    /// `SPV_NV_shader_atomic_fp16_vector` is selected, it uses a 32-bit compare-exchange
-    /// loop so the neighboring half lane is preserved.
+    /// `SPV_NV_shader_atomic_fp16_vector` is selected, it maps to `OpAtomicFAdd` on a
+    /// `half2` vector with the correct part set to `value` and the remaining part set
+    /// to 0.
     ///
     /// For HLSL, this function translates to an NVAPI call
     /// due to lack of native HLSL intrinsic for floating point atomic add. For CUDA, this function
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
-    [require(hlsl, sm_5_0)]
-    [require(cuda, cuda_sm_7_0)]
+    [require(cuda_hlsl, sm_5_0)]
     [require(spirv, spvAtomicFloat16VectorNV)]
     [require(spirv, spvAtomicFloat16AddEXT)]
     void InterlockedAddF16(uint byteAddress, half value, out half originalValue)
@@ -6607,8 +6606,6 @@ $}
                 originalValue = asfloat16((uint16_t)(_NvInterlockedAddFp16x2(byteAddress, packedInput) >> 16));
             }
             return;
-        // Order matters for SPIR-V: when both fp16 atomic capabilities are enabled,
-        // keep the scalar OpAtomicFAdd path before the vector-capability CAS fallback.
         case spvAtomicFloat16AddEXT:
         default:
             {
@@ -6618,29 +6615,16 @@ $}
             }
         case spvAtomicFloat16VectorNV:
             {
-                // A half2 atomic add with zero in the other lane is not bit-preserving
-                // for all IEEE half values, so use CAS on the containing 32-bit word.
-                let buf = __getEquivalentStructuredBuffer<uint>(this);
-                uint wordIndex = byteAddress / 4;
-                uint laneShift = (byteAddress & 2) == 0 ? 0U : 16U;
-                uint oldPacked = __atomic_add(buf[wordIndex], 0U);
-
-                for (;;)
+                let buf = __getEquivalentStructuredBuffer<half2>(this);
+                if ((byteAddress & 2) == 0)
                 {
-                    half oldHalf;
-                    uint newPacked =
-                        __packInterlockedAddF16Result(oldPacked, laneShift, value, oldHalf);
-                    uint actualPacked =
-                        __atomic_compare_exchange(buf[wordIndex], oldPacked, newPacked);
-                    if (__commitInterlockedAddF16Result(
-                            actualPacked,
-                            oldPacked,
-                            oldHalf,
-                            originalValue))
-                    {
-                        return;
-                    }
+                    originalValue = __atomic_add(buf[byteAddress/4], half2(value, half(0.0))).x;
                 }
+                else
+                {
+                    originalValue = __atomic_add(buf[byteAddress/4], half2(half(0.0), value)).y;
+                }
+                return;
             }
         }
     }
@@ -10231,34 +10215,6 @@ __generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<
 // Given a RWByteAddressBuffer allow it to be interpreted as a RWStructuredBuffer
 __intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
 RWStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(RWByteAddressBuffer b);
-
-[__NoSideEffect]
-[ForceInline]
-uint __packInterlockedAddF16Result(uint oldPacked, uint laneShift, half value, out half oldHalf)
-{
-    uint laneMask = 0xFFFFU << laneShift;
-    uint oldHalfBits = (oldPacked >> laneShift) & 0xFFFFU;
-    oldHalf = asfloat16(uint16_t(oldHalfBits));
-    uint newHalfBits = uint(asuint16(oldHalf + value));
-    return (oldPacked & ~laneMask) | (newHalfBits << laneShift);
-}
-
-[ForceInline]
-bool __commitInterlockedAddF16Result(
-    uint actualPacked,
-    inout uint oldPacked,
-    half oldHalf,
-    out half originalValue)
-{
-    originalValue = oldHalf;
-    if (actualPacked == oldPacked)
-    {
-        return true;
-    }
-
-    oldPacked = actualPacked;
-    return false;
-}
 
 __intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
 StructuredBuffer<T> __getEquivalentStructuredBuffer<T>(ByteAddressBuffer b);
