@@ -3,10 +3,12 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=VECTOR_ONLY,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16VectorNV
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_ATOMIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_MIN_MAX
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_EXCHANGE_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_EXCHANGE
 //DIAGNOSTIC_TEST:SIMPLE(diag=EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_EMULATED
 //TEST:SIMPLE(filecheck=BOTH): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT -capability spvAtomicFloat16VectorNV
 //TEST:SIMPLE(filecheck=VECTOR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_ATOMIC
 //TEST:SIMPLE(filecheck=VECTOR_MIN_MAX): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_MIN_MAX
+//TEST:SIMPLE(filecheck=VECTOR_EXCHANGE): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_EXCHANGE
 //TEST:SIMPLE(filecheck=EMULATED): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_EMULATED
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -capability cuda_sm_7_0
 
@@ -26,6 +28,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // DIRECT_MIN_MAX_NO_VECTOR: entry point uses capabilities not in specified profile
 // DIRECT_MIN_MAX_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
     __atomic_max(vectorBuffer[1], half2(3.0h, 4.0h));
+#elif defined(TEST_DIRECT_VECTOR_EXCHANGE)
+    half2 originalValue = __atomic_exchange(vectorBuffer[0], half2(1.0h, 2.0h));
+// DIRECT_EXCHANGE_NO_VECTOR: entry point uses capabilities not in specified profile
+// DIRECT_EXCHANGE_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
+    outputBuffer[0] = float(originalValue.x + originalValue.y);
 #elif defined(TEST_EMULATED)
     half originalValue;
     tmpBuffer.InterlockedAddF16Emulated(0, 1.0h, originalValue);
@@ -89,6 +96,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // VECTOR_MIN_MAX: OpAtomicFMaxEXT %v2half
 // VECTOR_MIN_MAX-NOT: OpCapability AtomicFloat16AddEXT
 // VECTOR_MIN_MAX-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
+
+// VECTOR_EXCHANGE-NOT: OpCapability AtomicFloat16AddEXT
+// VECTOR_EXCHANGE-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
+// VECTOR_EXCHANGE: OpCapability AtomicFloat16VectorNV
+// VECTOR_EXCHANGE: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// VECTOR_EXCHANGE: OpAtomicExchange %v2half
+// VECTOR_EXCHANGE-NOT: OpCapability AtomicFloat16AddEXT
+// VECTOR_EXCHANGE-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
 
 // EMULATED-NOT: OpCapability AtomicFloat16AddEXT
 // EMULATED-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
