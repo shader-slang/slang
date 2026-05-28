@@ -54,7 +54,7 @@ jobs:
 
       - name: Build Slang
         run: |
-          # TODO(#11146): Exercise the temporary MergeReturnPass workaround in this workflow.
+          # TODO(#11146): Build with the temporary MergeReturnPass workaround in this workflow.
           # Remove this override with SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN when retired.
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
