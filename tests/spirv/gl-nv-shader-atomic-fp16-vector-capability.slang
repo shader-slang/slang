@@ -6,4 +6,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 }
 
+// CHECK-NOT: OpCapability AtomicFloat16VectorNV
+// CHECK-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 // CHECK: OpMemoryModel
