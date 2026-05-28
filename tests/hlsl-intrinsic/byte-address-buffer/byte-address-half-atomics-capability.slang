@@ -4,6 +4,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_ATOMIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_MIN_MAX
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_EXCHANGE_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_EXCHANGE
+//DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED_VECTOR_WIDTH,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_UNSUPPORTED_VECTOR_WIDTH
 //DIAGNOSTIC_TEST:SIMPLE(diag=EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_EMULATED
 //TEST:SIMPLE(filecheck=BOTH): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT -capability spvAtomicFloat16VectorNV
 //TEST:SIMPLE(filecheck=VECTOR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_ATOMIC
@@ -15,6 +16,7 @@
 RWByteAddressBuffer tmpBuffer;
 RWStructuredBuffer<float> outputBuffer;
 RWStructuredBuffer<half2> vectorBuffer;
+RWStructuredBuffer<half3> unsupportedVectorBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -33,6 +35,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // DIRECT_EXCHANGE_NO_VECTOR: entry point uses capabilities not in specified profile
 // DIRECT_EXCHANGE_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
     outputBuffer[0] = float(originalValue.x + originalValue.y);
+#elif defined(TEST_UNSUPPORTED_VECTOR_WIDTH)
+    __atomic_add(unsupportedVectorBuffer[0], half3(1.0h, 2.0h, 3.0h));
+// UNSUPPORTED_VECTOR_WIDTH: SPIR-V fp16 vector atomics only support half2 and half4.
 #elif defined(TEST_EMULATED)
     half originalValue;
     tmpBuffer.InterlockedAddF16Emulated(0, 1.0h, originalValue);
