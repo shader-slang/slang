@@ -2607,7 +2607,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     getStorageBufferAddressSpace(),
                     structuredBufferType->getDataLayout()));
             }
-            else if (auto constantBufferType = as<IRUniformParameterGroupType>(t))
+            else if (auto constantBufferType = as<IRConstantBufferType>(t))
             {
                 auto elementType = constantBufferType->getElementType();
                 SLANG_ASSERT(as<IRStructType>(elementType));
