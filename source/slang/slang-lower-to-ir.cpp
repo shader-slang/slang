@@ -4424,7 +4424,7 @@ void _lowerInfoFromFuncType(
         ParamPassingMode innerThisParamDirection = getActualParamPassingModeForImplicitThisParam(
             declRef.getDecl(),
             thisType,
-            getCurrentASTBuilder());
+            context->astBuilder);
 
         // Hack for how this-types work for looked up function for AD 2.0..
         if (auto lookup = as<LookupDeclRef>((declRef.declRefBase)))
@@ -4435,14 +4435,14 @@ void _lowerInfoFromFuncType(
                 innerThisParamDirection = getActualParamPassingModeForImplicitThisParam(
                     as<DeclRefType>(lookupSource)->getDeclRef().getDecl(),
                     thisType,
-                    getCurrentASTBuilder());
+                    context->astBuilder);
             }
         }
 
         if (thisType)
         {
             thisType =
-                as<Type>(thisType->substitute(getCurrentASTBuilder(), SubstitutionSet(declRef)));
+                as<Type>(thisType->substitute(context->astBuilder, SubstitutionSet(declRef)));
         }
 
         // If we're looking something up on a callable, the this-type determination will
