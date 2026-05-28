@@ -69,6 +69,52 @@ jobs:
         run: git clone --depth 1 https://github.com/shader-slang/spec.git external/spec
         continue-on-error: true
 
+      # Pre-stage the PR diff and changed-file list so the parent reviewer and
+      # all 6 specialist subagents read a consistent, CI-guaranteed snapshot.
+      # Subagents have no Bash/gh access (see .claude/agents/*-reviewer.md tools)
+      # and depend on these files; without this step the contract is enforced
+      # only by REVIEW.md prose. Fail loud (no continue-on-error) so a missing
+      # diff aborts the workflow before any subagent burns tokens reviewing
+      # master content.
+      - name: Pre-stage PR diff for subagents
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p tmp
+          gh pr diff "$PR_NUMBER" -R "$REPO" >tmp/pr-diff.patch
+          gh pr view "$PR_NUMBER" -R "$REPO" --json files -q '.files[].path' >tmp/pr-files.txt
+          test -s tmp/pr-diff.patch
+          test -s tmp/pr-files.txt
+          echo "Pre-staged $(wc -l <tmp/pr-diff.patch) diff lines, $(wc -l <tmp/pr-files.txt) changed files."
+
+      # Verify all 6 specialist subagents carry the SUBAGENT_DIFF_GATE_v1 directive.
+      # The directive is duplicated across .claude/agents/*-reviewer.md (no shared
+      # prelude mechanism in claude-code-runner). Drift here lets a regression in
+      # one agent silently revert to pre-#11333 behavior. Fail the job if any
+      # reviewer is missing the sentinel.
+      - name: Verify subagent diff-gate sentinel
+        run: |
+          set -euo pipefail
+          missing=0
+          for f in .claude/agents/code-quality-reviewer.md \
+                   .claude/agents/ir-correctness-reviewer.md \
+                   .claude/agents/security-code-reviewer.md \
+                   .claude/agents/test-coverage-reviewer.md \
+                   .claude/agents/cross-backend-reviewer.md \
+                   .claude/agents/documentation-accuracy-reviewer.md; do
+            if ! grep -q 'SUBAGENT_DIFF_GATE_v1' "$f"; then
+              echo "::error file=$f::Missing SUBAGENT_DIFF_GATE_v1 sentinel — fail-fast directive required (see REVIEW.md Step 1)."
+              missing=$((missing + 1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then
+            exit 1
+          fi
+          echo "All 6 reviewers carry SUBAGENT_DIFF_GATE_v1."
+
       # Minimize previous Claude reviews/comments and resolve threads.
       # Targets both 'claude' (OIDC) and 'github-actions' (fallback) logins.
       - name: Clean up previous Claude reviews
@@ -210,8 +256,10 @@ jobs:
 
             IMPORTANT: The BASE branch (master) is checked out locally. You can read CLAUDE.md and any
             existing source files locally to understand repo structure and surrounding code context.
-            However, the PR branch is NOT checked out — to see what the PR actually changes, you MUST
-            use `gh pr diff` or GitHub MCP tools. Do NOT assume local files reflect the PR's changes.
+            However, the PR branch is NOT checked out — the PR diff and changed-file list have been
+            pre-staged for you at `tmp/pr-diff.patch` and `tmp/pr-files.txt`. Read those files for
+            the PR's changes. `gh pr diff` and GitHub MCP tools remain available as a fallback. Do
+            NOT assume local files reflect the PR's changes.
 
             NOTE: Any previous Claude reviews on this PR have been automatically minimized
             and their threads resolved. You are posting a fresh, self-contained review.
