@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-12T09:40:55+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 0da77494c7202daa683caa86dd59c3c52ee670047c4ae4266818e2cd8b88bf99
+generated_at: 2026-05-28T08:21:36+00:00
+source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+watched_paths_digest: b73ab2763cf90e18015e6beb407b431f76d9344148801d3a27089be1611f45e2
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -324,7 +324,8 @@ Abstract intermediates: `VisibilityModifier`,
 | `FlattenAttribute` | `Attribute` | (no additional state) | (none) | `[flatten]`. |
 | `ForceCaseAttribute` | `Attribute` | (no additional state) | (none) | `[forcecase]`. |
 | `CallAttribute` | `Attribute` | (no additional state) | (none) | `[call]`. |
-| `UnscopedEnumAttribute` | `Attribute` | (no additional state) | (none) | `[UnscopedEnum]`. |
+| `UnscopedEnumAttribute` | `Attribute` | (no additional state) | (none) | `[UnscopedEnum]`; added by the parser from the user-written attribute or implicitly when a non-generic plain `enum` is compiled with `-unscoped-enum`. |
+| `EnumClassModifier` | `Modifier` | (no additional state) | (none) | Marker for `enum class` declarations; used to detect conflicting explicit scoped/unscoped enum declarations (no further semantics). |
 | `FlagsAttribute` | `Attribute` | (no additional state) | (none) | `[Flags]`. |
 | `NonDynamicUniformAttribute` | `Attribute` | (no additional state) | (none) | `[NonDynamicUniform]`. |
 | `UnsafeForceInlineEarlyAttribute` | `Attribute` | (no additional state) | (none) | `[UnsafeForceInlineEarly]`. |

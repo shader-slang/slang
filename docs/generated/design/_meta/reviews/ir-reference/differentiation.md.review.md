@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-05-28T09:03:07+00:00
 target_doc: ir-reference/differentiation.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+target_doc_watched_paths_digest: 901d192b17338b4a7dc882dff1bea2cd6f2750dad1694a5f0787288344552a33
+source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: fail
+  completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 2
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 2
+  major: 0
   minor: 0
   nit: 0
 ---
@@ -24,14 +24,17 @@ severity_breakdown:
 # Review report for ir-reference/differentiation.md
 
 ## Summary
-The page is structurally lint-clean, but review found 2 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+No findings were identified in this follow-up review. The prior front-matter / freshness-ledger findings have been remediated, and the sampled source claims checked in this pass are supported by the source tree.
 
 ## Items checked
-- Checked differential-pair groups, `TranslateBase` children, checkpoint rows, misc overlap, autodiff source clusters, links, and front matter.
+- Checked `IdentityRemat` coverage against `source/slang/slang-ir-insts.lua`, translation handling, and autodiff source references.
+- Verified the target document front matter against `docs/generated/design/_meta/freshness.json` and the current `regenerate.py digest` result.
+- Ran the generated-doc linter before and after updating the review records.
 
 ## Findings
 
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | major | lines 79-173 | Backward-autodiff temporary opcodes are omitted. | `source/slang/slang-ir-insts.lua:1110-1121` defines `LoadReverseGradient`, `ReverseGradientDiffPairRef`, `PrimalParamRef`, and `DiffParamRef`. | Add an “Autodiff temporaries” sub-table. |
-| F-002 | major | lines 79-173 | `DiffTypeInfo` is not listed here even though it is differential metadata and the prompt calls it out. | `source/slang/slang-ir-insts.lua:1006-1010` says it holds witness tables for differential type info; it is currently listed in `misc.md`. | Move `DiffTypeInfo` to this page or make a clear ownership decision and update prompt/index. |
+(no findings)
+
+## No-issues notes
+- `IdentityRemat` is defined with the documented minimum operand count.
+- The front matter timestamp, source commit, and watched digest are aligned with the freshness ledger.

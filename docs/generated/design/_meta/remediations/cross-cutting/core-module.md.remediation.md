@@ -1,11 +1,11 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T17:05:00+00:00
+remediated_at: 2026-05-28T09:03:07+00:00
 target_doc: cross-cutting/core-module.md
 review_report: ../../reviews/cross-cutting/core-module.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: e75b9a3d03659cefb39882da3adecb2eb8751e0d
+target_doc_source_commit_before: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+target_doc_source_commit_after: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
 actions:
   fixed: 0
   rejected_bogus: 0
@@ -18,8 +18,7 @@ actions:
 
 ## Summary
 
-Review reported zero findings. No actions taken; the target document is
-unchanged and no entries are required in the Actions table.
+The follow-up review reported zero findings. No remediation actions are required for this review cycle.
 
 ## Actions
 

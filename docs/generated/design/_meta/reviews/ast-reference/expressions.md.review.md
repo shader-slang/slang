@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-05-28T09:03:07+00:00
 target_doc: ast-reference/expressions.md
-target_doc_source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-target_doc_watched_paths_digest: 095ac036e831eb7631a84f942f39c0461e59910aefb1c4c6522c17f442f3bf95
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+target_doc_watched_paths_digest: 2c95fac86190d3096ef9459a727d2536a788f979789ce16c457446379c7e499f
+source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
 checklist:
   factual_accuracy: pass
   cross_references: pass
@@ -24,11 +24,17 @@ severity_breakdown:
 # Review report for ast-reference/expressions.md
 
 ## Summary
-No findings were identified in this pass. The page matched its prompt contract and the sampled source claims checked during review.
+No findings were identified in this follow-up review. The prior front-matter / freshness-ledger findings have been remediated, and the sampled source claims checked in this pass are supported by the source tree.
 
 ## Items checked
-- Checked all 90 concrete expression classes, 9 abstract expression classes, helper structs excluded from node coverage, notable-node coverage, and all links/anchors.
+- Checked `ApplyForBwdExpr` hierarchy/table coverage against AST/parser/checker/lower-to-IR source and verified affected links.
+- Verified the target document front matter against `docs/generated/design/_meta/freshness.json` and the current `regenerate.py digest` result.
+- Ran the generated-doc linter before and after updating the review records.
 
 ## Findings
 
 (no findings)
+
+## No-issues notes
+- `ApplyForBwdExpr` is present in the documented hierarchy and source-backed parser/checker paths.
+- The front matter timestamp, source commit, and watched digest are aligned with the freshness ledger.

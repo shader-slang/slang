@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-07T14:35:56+00:00
-source_commit: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-watched_paths_digest: 40df0e0f2fba874f2bb1d1a886aacac0f20100fdb9c27817c150f2b7ecea2322
+generated_at: 2026-05-28T08:23:43+00:00
+source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+watched_paths_digest: efb8ab286d2af640625fcafb908ce136336ff108b6497606b860e7586cad9f95
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -159,6 +159,15 @@ ConstructorDecl ::= '__init' GenericParams? '(' ParamList? ')'
 SubscriptDecl   ::= '__subscript' GenericParams? '(' ParamList? ')' '->' Type
                     AccessorBlock                              -- parseSubscriptDecl
 PropertyDecl    ::= 'property' IDENT ':' Type AccessorBlock    -- parsePropertyDecl
+
+FuncExtensionDecl
+                ::= '__func_extension' GenericParams? KeywordExprHead
+                    '(' ParamList? ')' ('throws' Type)? ('->' Type)?
+                    WhereClause? FuncBody                      -- parseFuncExtensionDecl
+                                                              -- KeywordExprHead is a higher-order
+                                                              -- form such as `fwd_diff(foo)`,
+                                                              -- `bwd_diff(foo)`, or `__apply(foo)`;
+                                                              -- gated behind -experimental-feature
 
 ParamList       ::= Param (',' Param)*
 Param           ::= ModifierList? Type IDENT ('=' Expr)?       -- context-sensitive (modifiers vs type)
@@ -388,6 +397,7 @@ KeywordExpr     ::= 'this' | 'true' | 'false' | 'nullptr' | 'none'
                   | 'no_diff' Expr
                   | ('fwd_diff'|'__fwd_diff') '(' Expr ')'
                   | ('bwd_diff'|'__bwd_diff') '(' Expr ')'
+                  | '__apply' '(' Expr ')'                     -- apply-for-backward (experimental)
                   | 'sizeof' '(' Type ')'
                   | 'alignof' '(' Type ')'
                   | 'countof' '(' Expr ')'

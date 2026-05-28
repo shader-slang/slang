@@ -1,13 +1,13 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T20:00:00+00:00
+remediated_at: 2026-05-28T09:03:07+00:00
 target_doc: syntax-reference/grammar.md
 review_report: ../../reviews/syntax-reference/grammar.md.review.md
-target_doc_source_commit_before: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+target_doc_source_commit_after: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
 actions:
-  fixed: 3
+  fixed: 0
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,15 +18,9 @@ actions:
 
 ## Summary
 
-All three findings addressed: missing top-level sections added,
-`TryStmt` replaced with the real `do ... catch` statement, and the
-`IDENT` / `INT_LIT` / ... terminal names cross-referenced to the
-`TokenType` enumerators.
+The follow-up review reported zero findings. No remediation actions are required for this review cycle.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | The prompt requires `## Attributes and decorations` and `## Generics and where-clauses` as top-level sections; the doc folded both into other headings. | Split `## Modifiers and attributes` into `## Modifiers` and `## Attributes and decorations`. Moved the `### Generic declarations` block out of `## Declarations` and promoted it to `## Generics and where-clauses`, with the `WhereClause` / `WhereTerm` productions hoisted up from `## Declarations` and a paragraph explaining the body-deferred interaction. |
-| F-002 | fixed | The parser does not accept `try Block CatchClause+`; `try` is an expression, and the statement-level handler is `do ... catch`. | Removed the bogus `TryStmt ::= 'try' Block CatchClause+` and `CatchClause` productions. Added `DoCatchStmt ::= 'do' Stmt 'catch' '(' Param ')' Block` (citing `slang-parser.cpp` lines 6919-6967). Added a paragraph at the top of `## Statements` explaining that `try` is an expression keyword and `do ... catch` is the statement form. |
-| F-003 | fixed | The `IDENT` / `INT_LIT` / `FLOAT_LIT` / `STRING_LIT` / `CHAR_LIT` names are not the source-level token-kind names; the reviewer wants explicit aliases. | Rewrote the second paragraph of `## Notation` to list the alias-to-`TokenType` mapping in a small table and explain that the aliases are used purely for table readability. |

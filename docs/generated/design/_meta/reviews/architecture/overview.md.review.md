@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-05-28T09:03:07+00:00
 target_doc: architecture/overview.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: b8094ce28ac4d9fed31fee128b7117224bddb926fd28de5b97c671b733e37c3a
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+target_doc_watched_paths_digest: 523d4a2878184499b9f5e8fce9e6f73b1da8dbb5fe081b2ecc44b29ae8e980e3
+source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 2
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 2
+  major: 0
   minor: 0
   nit: 0
 ---
@@ -24,14 +24,17 @@ severity_breakdown:
 # Review report for architecture/overview.md
 
 ## Summary
-The page is structurally lint-clean, but review found 2 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+No findings were identified in this follow-up review. The prior front-matter / freshness-ledger findings have been remediated, and the sampled source claims checked in this pass are supported by the source tree.
 
 ## Items checked
-- Checked front matter, overview required headings, representative links, `Session` / `Linkage` declarations, and reading-guide links.
+- Checked front matter against `_meta/freshness.json` and current digest after remediation of the stale/fresh ledger mismatch.
+- Verified the target document front matter against `docs/generated/design/_meta/freshness.json` and the current `regenerate.py digest` result.
+- Ran the generated-doc linter before and after updating the review records.
 
 ## Findings
 
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Compilation request lifecycle` | The page says `Session` exposes `slang::ISession`, but source shows `Session` implements `slang::IGlobalSession`; `Linkage` implements `slang::ISession`. | `source/slang/slang-global-session.h` declares `class Session ... public slang::IGlobalSession`; `source/slang/slang-session.h` declares `class Linkage ... public slang::ISession`. | Change the `Session` bullet to reference `IGlobalSession`, and describe `ISession` under `Linkage`. |
-| F-002 | major | `## Top-level decomposition` | The prompt requires `tools/`, `tests/`, `extras/`, and `external/`; the page only mentions `tools/`. | `docs/generated/design/_meta/prompts/architecture-overview.md` requires the auxiliary trees. | Add concise bullets for `tests/`, `extras/`, and `external`. |
+(no findings)
+
+## No-issues notes
+- The document front matter now matches the freshness ledger entry.
+- The current digest computed by `regenerate.py digest` matches the document front matter.

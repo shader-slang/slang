@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-15T15:35:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 7c08ee7c93092bc7dcc5be6e8153e273cf76ec6cb3a26e66d2d446fff843d5a0
+generated_at: 2026-05-28T08:29:27+00:00
+source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+watched_paths_digest: 5945bacf4c9d96f2589a494589832a219c29d05fac941ffa13504c7d08cf982a
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -148,9 +148,12 @@ The single standard module shipping today is the **neural** module:
   `mma-linear-layout-help.slang`,
   `mma-tiled-cuda.slang`,
   `mma-tiled-layout-helper.slang`,
+  `mma-tiled-metal.slang`,
   `mma-tiled-vulkan.slang`,
   `permuto-encoder.slang`,
-  `shared-memory-pool.slang`.
+  `shared-memory-pool.slang`,
+  `vectorized-reader.slang`,
+  `WaveMatrix.slang`.
 - Configuration template:
   [slang-standard-module-config.h.in](../../../../source/standard-modules/slang-standard-module-config.h.in)
   is processed by CMake into the internal header

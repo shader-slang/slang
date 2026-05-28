@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-15T15:48:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 325e3645f320ff678d4d445cf5017aaf2bafd4200abafa1607fb50209f598653
+generated_at: 2026-05-28T08:25:09+00:00
+source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+watched_paths_digest: c14a0f34a0411eb654010a94f1366a4724d201d82e68f7e9547e3782269541fd
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -102,6 +102,7 @@ non-stable.
 | `__generic` | Generic-parameter list head (`parseGenericDecl`) |
 | `__generic_value_param` | Module-level generic value parameter (`parseGlobalGenericValueParamDecl`) |
 | `extension`, `__extension` | Type extension (`parseExtensionDecl`) |
+| `__func_extension` | Function extension shorthand for custom derivatives (`parseFuncExtensionDecl`); experimental (gated by `-experimental-feature`) |
 | `interface` | Interface (`parseInterfaceDecl`) |
 | `__init` | Constructor (`parseConstructorDecl`) |
 | `__subscript` | Subscript (`parseSubscriptDecl`) |
@@ -219,6 +220,7 @@ Registered through `_makeParseExpr` in
 | `no_diff` | Non-differentiable wrapper (`parseTreatAsDifferentiableExpr`) |
 | `__fwd_diff`, `fwd_diff` | Forward-mode differentiation (`parseForwardDifferentiate`) |
 | `__bwd_diff`, `bwd_diff` | Reverse-mode differentiation (`parseBackwardDifferentiate`) |
+| `__apply` | Apply-for-backward higher-order expression (`parseApplyForBwd`); used inside `__func_extension` to expose the primal-with-context companion to a custom `bwd_diff`; experimental |
 | `new` | Heap-style allocation expression; parsed specially by `parsePrefixExpr` at [slang-parser.cpp lines 9206-9209](../../../../source/slang/slang-parser.cpp) (not via `_makeParseExpr`) |
 | `__return_val` | Compiler-internal return-value reference |
 | `__func_as_type` | Function-as-type reflection |
@@ -242,7 +244,9 @@ behave like keywords. Process notes:
   `Result`, `Tuple` types, ranges, iterators, and core intrinsics.
 - [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) layers in
   HLSL-compatibility names (`Texture2D`, `RWTexture2D`,
-  `StructuredBuffer`, intrinsics like `mul`, `dot`, `length`, ...).
+  `StructuredBuffer`, intrinsics like `mul`, `dot`, `length`, and
+  wave intrinsics including the recently added `WaveGetWaveIndex` /
+  `SV_WaveIndex` / `SV_GroupIndex` builtins).
 - [glsl.meta.slang](../../../../source/slang/glsl.meta.slang) provides
   GLSL-flavored names (`vec3`, `mat4`, `gl_Position`, ...).
 - [diff.meta.slang](../../../../source/slang/diff.meta.slang)

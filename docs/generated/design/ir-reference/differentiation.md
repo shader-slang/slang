@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
+generated_at: 2026-05-28T08:22:13+00:00
+source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+watched_paths_digest: 901d192b17338b4a7dc882dff1bea2cd6f2750dad1694a5f0787288344552a33
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -156,6 +156,7 @@ counterparts.
 | `SynthesizedBackwardDerivativeWitnessTable` | — | (variadic, `min=1`) | H | (synthesized) | Witness table for a synthesized reverse-mode derivative. |
 | `MakeIDifferentiableWitness` | — | (variadic, `min=1`) | H | (synthesized) | Builds an `IDifferentiable` witness for a type that does not declare one. |
 | `SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc` | — | (variadic, `min=2`) | H | (synthesized) | Bridges legacy combined reverse functions into the modern witness form. |
+| `IdentityRemat` | — | (variadic, `min=1`) | H | (synthesized) | Identity remat marker used by user-provided `__func_extension __apply` when `MinimalContext == BwdCallable`, so the backward-pass machinery treats the user's apply result as the recomputable context. |
 
 ### Autodiff temporaries
 
