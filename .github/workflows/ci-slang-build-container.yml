@@ -21,9 +21,10 @@ jobs:
       packages: read # Required to pull container from ghcr.io
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
-      # The disk cleanup step below removes host runner directories, so this job
-      # keeps the host-root bind mount and root user intentionally.
-      options: --user root -v /:/host_root
+      # Current callers use GitHub-hosted Ubuntu, where the mounted workspace is
+      # writable by UID/GID 1001. Do not bind-mount the runner host root here;
+      # runner disk provisioning belongs outside PR-controlled workflow code.
+      options: --user 1001:1001
 
     env:
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
