@@ -37,8 +37,16 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // FALLBACK-NOT: OpCapability AtomicFloat16VectorNV
 // FALLBACK-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 // FALLBACK-NOT: OpAtomicFAddEXT
-// FALLBACK-COUNT-5: OpAtomicIAdd
-// FALLBACK-COUNT-5: OpAtomicCompareExchange
+// FALLBACK: OpAtomicIAdd
+// FALLBACK: OpAtomicCompareExchange
+// FALLBACK: OpAtomicIAdd
+// FALLBACK: OpAtomicCompareExchange
+// FALLBACK: OpAtomicIAdd
+// FALLBACK: OpAtomicCompareExchange
+// FALLBACK: OpAtomicIAdd
+// FALLBACK: OpAtomicCompareExchange
+// FALLBACK: OpAtomicIAdd
+// FALLBACK: OpAtomicCompareExchange
 // FALLBACK-NOT: OpAtomicFAddEXT
 
 // BOTH-NOT: OpCapability AtomicFloat16VectorNV
