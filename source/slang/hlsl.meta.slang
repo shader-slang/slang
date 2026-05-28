@@ -23771,6 +23771,7 @@ struct HitObject
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     int GetClusterID()
     {
         __target_switch
@@ -23778,19 +23779,28 @@ struct HitObject
         case hlsl_nvapi: __intrinsic_asm ".GetClusterID";
         case glsl: __intrinsic_asm "hitObjectGetClusterIdNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetClusterId";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_cluster_acceleration_structure";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingClusterAccelerationStructureNV;
                 result:$$int = OpHitObjectGetClusterIdNV &this;
             };
+        case spvShaderInvocationReorderEXT:
+        case spirv:
+            static_assert(
+                false,
+                "HitObject.GetClusterID() requires -capability spvShaderInvocationReorderNV for SPIR-V.");
+            return 0;
         }
     }
 
     [__requiresNVAPI]
     [NonUniformReturn]
     [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     float4 GetSpherePositionAndRadius()
     {
         __target_switch
@@ -23800,22 +23810,31 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 OpCapability RayTracingSpheresGeometryNV;
                 %position:$$float3 = OpHitObjectGetSpherePositionNV &this;
                 %radius:$$float = OpHitObjectGetSphereRadiusNV &this;
                 result:$$float4 = OpCompositeConstruct %position %radius;
             };
+        case spvShaderInvocationReorderEXT:
+        case spirv:
+            static_assert(
+                false,
+                "HitObject.GetSpherePositionAndRadius() requires -capability spvShaderInvocationReorderNV for SPIR-V.");
+            return float4(0.0);
         }
     }
 
     [__requiresNVAPI]
     [NonUniformReturn]
     [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     float2x4 GetLssPositionsAndRadii()
     {
         __target_switch
@@ -23825,10 +23844,12 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 OpCapability RayTracingSpheresGeometryNV;
                 %positions:$$float3[2] = OpHitObjectGetLSSPositionsNV &this;
@@ -23841,12 +23862,19 @@ struct HitObject
                 %b:$$float4 = OpCompositeConstruct %p1 %r1;
                 result:$$float2x4 = OpCompositeConstruct %a %b;
             };
+        case spvShaderInvocationReorderEXT:
+        case spirv:
+            static_assert(
+                false,
+                "HitObject.GetLssPositionsAndRadii() requires -capability spvShaderInvocationReorderNV for SPIR-V.");
+            return float2x4(0.0);
         }
     }
 
     [__requiresNVAPI]
     [NonUniformReturn]
     [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     bool IsSphereHit()
     {
         __target_switch
@@ -23856,19 +23884,28 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectIsSphereHit";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 result:$$bool = OpHitObjectIsSphereHitNV &this;
             };
+        case spvShaderInvocationReorderEXT:
+        case spirv:
+            static_assert(
+                false,
+                "HitObject.IsSphereHit() requires -capability spvShaderInvocationReorderNV for SPIR-V.");
+            return false;
         }
     }
 
     [__requiresNVAPI]
     [NonUniformReturn]
     [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     bool IsLssHit()
     {
         __target_switch
@@ -23878,13 +23915,21 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectIsLSSHit";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 result:$$bool = OpHitObjectIsLSSHitNV &this;
             };
+        case spvShaderInvocationReorderEXT:
+        case spirv:
+            static_assert(
+                false,
+                "HitObject.IsLssHit() requires -capability spvShaderInvocationReorderNV for SPIR-V.");
+            return false;
         }
     }
 

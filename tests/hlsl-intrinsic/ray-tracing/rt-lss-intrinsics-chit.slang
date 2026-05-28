@@ -1,10 +1,13 @@
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -capability hlsl_nvapi
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -capability spvShaderInvocationReorderNV
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=NO_NV): -target spirv-asm
 //HLSL: NvRtSphereObjectPositionAndRadius
 //HLSL: NvRtLssObjectPositionsAndRadii
 //HLSL: NvRtIsSphereHit
 //HLSL: NvRtIsLssHit
 
+//NO_NV: error[E41400]: static assertion failed
+//NO_NV: HitObject.GetSpherePositionAndRadius() requires -capability spvShaderInvocationReorderNV
 //SPIRV: HitSpherePositionNV
 //SPIRV: HitSphereRadiusNV
 //SPIRV: HitLSSPositionsNV
