@@ -490,6 +490,8 @@ struct IntroduceExplicitGlobalContextPass
                 continue;
             }
 
+            // If the entry point already declares the same system value, reuse that parameter so
+            // builtin uses do not add a duplicate target system-value parameter.
             globalParam.entryPointParam =
                 findEquivalentEntryPointParam(entryPointFunc, globalParam.globalParam);
             if (!globalParam.entryPointParam)
