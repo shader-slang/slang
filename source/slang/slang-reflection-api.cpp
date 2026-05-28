@@ -3366,6 +3366,8 @@ spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t*
                 }
             }
         }
+        // This is intentionally not an `else`: the old code also fell back to the
+        // initializer when `varDecl->val` existed but was not an integer constant.
         if (auto cexpr = as<IntegerLiteralExpr>(varDecl->initExpr))
         {
             *rs = cexpr->value;
