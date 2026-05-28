@@ -3506,12 +3506,20 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* col,
         IRInst* argIndex = nullptr);
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
-    // Emit an IncrementCoverageCounter op. The coverage instrumentation
-    // IR pass later rewrites each occurrence into an atomic add on a
-    // synthesized counter buffer. Source position is carried on the
-    // standard per-instruction `sourceLoc` field (no operands), so the
-    // op is independent of debug-info state.
+    // Emit coverage marker ops. The coverage instrumentation IR pass
+    // later rewrites each occurrence into an atomic add on a synthesized
+    // counter buffer and records the marker-specific source-entry
+    // metadata. Source position is carried on the standard per-
+    // instruction `sourceLoc` field, so the ops are independent of
+    // debug-info state.
     IRInst* emitIncrementCoverageCounter();
+    IRInst* emitIncrementFunctionCoverageCounter(
+        UnownedStringSlice functionName,
+        UnownedStringSlice functionMangledName);
+    IRInst* emitIncrementBranchCoverageCounter(
+        IRIntegerValue branchSiteID,
+        IRIntegerValue branchArmID,
+        IRIntegerValue branchArmKind);
     IRInst* emitDebugInlinedAt(
         IRInst* line,
         IRInst* col,
