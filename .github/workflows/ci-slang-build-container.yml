@@ -9,6 +9,21 @@ on:
       runs-on:
         required: true
         type: string
+      ref:
+        description: "Git ref to check out. Empty = use github.sha (default)."
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository to check out. Empty = use github.repository (default)."
+        required: false
+        type: string
+        default: ""
+      is-fork-pr:
+        description: "Force fork-PR secret gating. Set true by /ci when the PR is from a fork."
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   # Uses nvidia/cuda container for CUDA support.
@@ -26,7 +41,9 @@ jobs:
       options: --user root -v /:/host_root
 
     env:
-      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+      IS_FORK_PR: >-
+        ${{ inputs.is-fork-pr
+            || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true) }}
 
     defaults:
       run:
@@ -64,6 +81,8 @@ jobs:
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
           persist-credentials: false
           submodules: "recursive"
           fetch-depth: "2"

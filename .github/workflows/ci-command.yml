@@ -1,0 +1,139 @@
+name: /ci command
+
+# Triggered when a maintainer comments "/ci" on a PR.
+#
+# Dispatched by slash-command-dispatch.yml (permission: write) so the trust
+# gate has already filtered out non-maintainers before this workflow runs.
+#
+# Runs the same matrix as ci.yml, but checks out the PR head SHA from the
+# fork repository (SHA-pinned to what the maintainer saw when they commented)
+# and forces fork-PR secret gating regardless of base repo.
+#
+# Will refuse to start if a CI run is already in progress for the PR's head
+# SHA — see in-flight check in trust-check job.
+
+on:
+  repository_dispatch:
+    types: [ci-command]
+
+# Prevent two simultaneous /ci comments on the same PR from racing.
+# cancel-in-progress: false ⇒ second invocation queues instead of cancelling.
+concurrency:
+  group: ci-command-${{ github.event.client_payload.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  statuses: write # post pending / final PR check
+  pull-requests: write # comment refusal when CI already in-flight
+
+jobs:
+  trust-check:
+    # Triple-if pattern from format.yml: dispatching repo + comment repo +
+    # PR base repo must all be shader-slang/slang. Forks dispatching at us
+    # would fail the first clause.
+    if: >-
+      github.repository == 'shader-slang/slang' &&
+      github.event.client_payload.github.payload.repository.full_name == 'shader-slang/slang' &&
+      github.event.client_payload.pull_request.base.repo.full_name == 'shader-slang/slang'
+    runs-on: ubuntu-latest
+    outputs:
+      head-sha: ${{ steps.pin.outputs.head-sha }}
+      head-repo: ${{ steps.pin.outputs.head-repo }}
+      is-fork: ${{ steps.pin.outputs.is-fork }}
+      skip: ${{ steps.inflight.outputs.skip }}
+    steps:
+      - id: pin
+        name: Pin PR head SHA and fork status
+        env:
+          HEAD_SHA: ${{ github.event.client_payload.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
+          IS_FORK: ${{ github.event.client_payload.pull_request.head.repo.fork }}
+        run: |
+          {
+            echo "head-sha=$HEAD_SHA"
+            echo "head-repo=$HEAD_REPO"
+            echo "is-fork=$IS_FORK"
+          } >> "$GITHUB_OUTPUT"
+          echo "PR #${{ github.event.client_payload.pull_request.number }} head: $HEAD_REPO@$HEAD_SHA (fork=$IS_FORK)"
+
+      - id: inflight
+        name: Check for in-flight CI runs on this PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.pin.outputs.head-sha }}
+        run: |
+          # Don't cancel a CI run that's already running for this SHA.
+          # If a normal pull_request CI run or a previous /ci is mid-flight,
+          # refuse politely instead of duplicating work.
+          in_flight=$(gh api -X GET "repos/${{ github.repository }}/actions/runs" \
+            -f head_sha="$HEAD_SHA" \
+            -f status=in_progress \
+            --jq '[.workflow_runs[] | select(.name == "CI" or .name == "/ci command")] | length' \
+            || echo "0")
+          in_flight=${in_flight:-0}
+          if ! [[ "$in_flight" =~ ^[0-9]+$ ]]; then
+            in_flight=0
+          fi
+          if [ "$in_flight" -gt 0 ]; then
+            echo "::notice::CI already in progress for $HEAD_SHA ($in_flight run(s)), refusing /ci"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment on PR (refusal)
+        if: steps.inflight.outputs.skip == 'true'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          repository: shader-slang/slang
+          issue-number: ${{ github.event.client_payload.pull_request.number }}
+          body: |
+            ⏭️ `/ci` skipped: a CI run is already in progress for `${{ steps.pin.outputs.head-sha }}`.
+
+      - name: Post pending status
+        if: steps.inflight.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.pin.outputs.head-sha }}
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/statuses/$HEAD_SHA" \
+            -f state=pending \
+            -f context="/ci" \
+            -f description="Running full CI matrix" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  matrix:
+    needs: [trust-check]
+    if: needs.trust-check.outputs.skip == 'false'
+    uses: ./.github/workflows/ci-matrix.yml
+    with:
+      ref: ${{ needs.trust-check.outputs.head-sha }}
+      repository: ${{ needs.trust-check.outputs.head-repo }}
+      is-fork-pr: ${{ needs.trust-check.outputs.is-fork == 'true' }}
+
+  final-status:
+    needs: [trust-check, matrix]
+    if: always() && needs.trust-check.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
+    steps:
+      - name: Post final status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ needs.trust-check.outputs.head-sha }}
+          MATRIX_RESULT: ${{ needs.matrix.result }}
+        run: |
+          case "$MATRIX_RESULT" in
+            success) state=success; desc="Full CI matrix passed" ;;
+            failure) state=failure; desc="Full CI matrix failed" ;;
+            cancelled) state=error; desc="Full CI matrix cancelled" ;;
+            *) state=error; desc="Full CI matrix: $MATRIX_RESULT" ;;
+          esac
+          gh api -X POST "repos/${{ github.repository }}/statuses/$HEAD_SHA" \
+            -f state="$state" \
+            -f context="/ci" \
+            -f description="$desc" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

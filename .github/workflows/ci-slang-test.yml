@@ -54,6 +54,16 @@ on:
         type: string
         default: ""
         description: "GPU tier label (e.g., 't4', 'sm80plus'). Used to apply tier-specific skip lists."
+      ref:
+        description: "Git ref to check out. Empty = use github.sha (default)."
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository to check out. Empty = use github.repository (default)."
+        required: false
+        type: string
+        default: ""
 
 jobs:
   test-slang:
@@ -65,6 +75,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+          persist-credentials: ${{ inputs.repository == '' }}
 
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
@@ -201,6 +215,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+          persist-credentials: ${{ inputs.repository == '' }}
           submodules: "recursive"
           fetch-depth: "1"
 

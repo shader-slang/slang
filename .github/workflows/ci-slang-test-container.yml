@@ -26,6 +26,16 @@ on:
         required: false
         type: boolean
         default: true
+      ref:
+        description: "Git ref to check out. Empty = use github.sha (default)."
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository to check out. Empty = use github.repository (default)."
+        required: false
+        type: string
+        default: ""
 
 jobs:
   # Run GPU tests in container with Vulkan and CUDA support.
@@ -79,6 +89,9 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+          persist-credentials: ${{ inputs.repository == '' }}
           submodules: "recursive"
           fetch-depth: "1"
 
@@ -321,6 +334,9 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+          persist-credentials: ${{ inputs.repository == '' }}
           submodules: "recursive"
           fetch-depth: "1"
 
