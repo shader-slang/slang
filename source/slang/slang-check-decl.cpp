@@ -14820,6 +14820,22 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
         {
             if (isGenericParam(member))
             {
+                // Default values on extension generic parameters are meaningless:
+                // those parameters are always inferred from the target type's type
+                // arguments, never from the default. Reject them so the user is not
+                // misled by a silently-dropped default.
+                bool hasDefault = false;
+                if (auto typeParam = as<GenericTypeParamDecl>(member))
+                    hasDefault = typeParam->initType.exp != nullptr;
+                else if (auto valueParam = as<GenericValueParamDecl>(member))
+                    hasDefault = valueParam->initExpr != nullptr;
+                if (hasDefault)
+                {
+                    getSink()->diagnose(Diagnostics::DefaultValueOnExtensionGenericParam{
+                        .paramName = member->getName(),
+                        .decl = member});
+                }
+
                 bool referencedByTargetType = genericParamsReferencedByTargetType.contains(member);
                 bool referencedByConstraint = genericParamsReferencedByConstraints.contains(member);
                 if (!referencedByTargetType && !referencedByConstraint)

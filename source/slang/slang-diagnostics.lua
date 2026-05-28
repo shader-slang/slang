@@ -3465,6 +3465,13 @@ warning(
     span { loc = "decl:Decl", message = "the extension is non-standard and may not work as intended because the generic parameter '~paramName' is not referenced by extension target type '~targetType'" }
 )
 
+err(
+    "default-value-on-extension-generic-param",
+    30857,
+    "default value on generic parameter '~paramName:Name' of extension is meaningless: extension generic parameters are always inferred from the target type's type arguments",
+    span { loc = "decl:Decl", message = "default value on generic parameter '~paramName' of extension is meaningless" }
+)
+
 --
 -- 309xx: subscripts
 --
