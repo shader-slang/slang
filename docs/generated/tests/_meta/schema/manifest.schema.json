@@ -4,19 +4,20 @@
   "title": "docs/generated/tests manifest",
   "description": "Schema for docs/generated/tests/_meta/manifest.yaml. One bundle per file in docs/generated/design/. Tests in each bundle derive their claims from the bundle's source_doc and are never written against source-line gaps.",
   "type": "object",
-  "required": ["version", "bundles"],
+  "required": [
+    "version",
+    "bundles"
+  ],
   "additionalProperties": false,
   "properties": {
-    "version": { "type": "integer", "const": 1 },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
     "default_size_cap_files": {
       "type": "integer",
       "minimum": 1,
       "description": "Soft cap on .slang files per bundle when the bundle entry omits size_cap_files."
-    },
-    "default_runner": {
-      "type": "object",
-      "additionalProperties": true,
-      "description": "Runner defaults inherited by every bundle entry."
     },
     "bundles": {
       "type": "object",
@@ -26,7 +27,11 @@
       },
       "additionalProperties": {
         "type": "object",
-        "required": ["prompt", "source_doc", "watched_paths"],
+        "required": [
+          "prompt",
+          "source_doc",
+          "watched_paths"
+        ],
         "additionalProperties": false,
         "properties": {
           "prompt": {
@@ -41,33 +46,24 @@
           "watched_paths": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "Workspace-relative globs of source files that, when changed, mark this bundle stale. Mirror the docs manifest's watched_paths for the same logical area."
           },
           "depends_on": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "Bundle keys whose README.md is provided as context to the agent (Phase C cross-link pass)."
           },
           "coverage_targets": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "description": "Workspace-relative paths to slangc source files this bundle is responsible for exercising. Used by `expansion-candidates` to rank bundles by under-coverage. Never fed line-by-line into a test-writing prompt."
-          },
-          "runner": {
-            "type": "object",
-            "additionalProperties": true,
-            "properties": {
-              "tool": {
-                "type": "string",
-                "description": "Defaults to default_runner.tool."
-              },
-              "category": {
-                "type": "string",
-                "pattern": "^agentic-[a-z0-9-]+$",
-                "description": "slang-test category. Must begin with `agentic-` so the nightly job's category filter selects only agentic tests."
-              }
-            }
           },
           "size_cap_files": {
             "type": "integer",

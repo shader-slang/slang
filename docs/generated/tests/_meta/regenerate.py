@@ -393,7 +393,6 @@ class BundleSpec:
     watched_paths: list[str]
     depends_on: list[str] = field(default_factory=list)
     coverage_targets: list[str] = field(default_factory=list)
-    runner: dict = field(default_factory=dict)
     size_cap_files: int = 30
 
     @property
@@ -406,7 +405,6 @@ class BundleSpec:
 class Manifest:
     version: int
     default_size_cap_files: int
-    default_runner: dict
     bundles: dict[str, BundleSpec]
 
 
@@ -418,7 +416,6 @@ def load_manifest() -> Manifest:
         raise SystemExit("manifest must be a mapping")
     version = int(raw.get("version", 1))
     default_cap = int(raw.get("default_size_cap_files", 30))
-    default_runner = raw.get("default_runner") or {}
     bundles_in = raw.get("bundles") or {}
     bundles: dict[str, BundleSpec] = {}
     for key, entry in bundles_in.items():
@@ -430,8 +427,6 @@ def load_manifest() -> Manifest:
         source_doc = entry.get("source_doc")
         if not source_doc:
             raise SystemExit(f"bundle {key!r} has no source_doc")
-        runner = dict(default_runner)
-        runner.update(entry.get("runner") or {})
         spec = BundleSpec(
             key=key,
             prompt=str(entry["prompt"]),
@@ -441,14 +436,12 @@ def load_manifest() -> Manifest:
             coverage_targets=[
                 str(p) for p in entry.get("coverage_targets") or []
             ],
-            runner=runner,
             size_cap_files=int(entry.get("size_cap_files", default_cap)),
         )
         bundles[key] = spec
     return Manifest(
         version=version,
         default_size_cap_files=default_cap,
-        default_runner=default_runner,
         bundles=bundles,
     )
 
@@ -1478,7 +1471,6 @@ def cmd_show(args: argparse.Namespace) -> int:
     print(
         f"source_doc on disk: {'present' if doc_path.exists() else 'MISSING'}"
     )
-    print(f"runner.category: {spec.runner.get('category', '(none)')}")
     print(f"size_cap_files:  {spec.size_cap_files}")
     print(f"depends_on:")
     for d in spec.depends_on:

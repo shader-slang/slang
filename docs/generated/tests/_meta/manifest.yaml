@@ -1,6 +1,6 @@
 # Manifest mapping each agentic test bundle to its prompt, source doc,
-# watched source paths, dependencies, coverage targets, and runner
-# configuration. Consumed by _meta/regenerate.py.
+# watched source paths, dependencies, and coverage targets. Consumed
+# by _meta/regenerate.py.
 #
 # Schema: _meta/schema/manifest.schema.json
 #
@@ -22,17 +22,11 @@
 #     responsible for exercising. Used by `expansion-candidates` to
 #     rank bundles by under-coverage. NEVER fed to a test-writing prompt
 #     as line-level detail; expansion stays doc-anchored.
-#   - runner.category drives the slang-test filter that selects this
-#     bundle in the nightly job. All categories begin with `agentic-`.
 #   - size_cap_files is a soft cap on the number of .slang files in the
 #     bundle; the lint pass warns above it.
 
 version: 1
 default_size_cap_files: 30
-default_runner:
-  tool: slang-test
-  category_prefix: agentic-
-
 bundles:
   # Architectural / descriptive docs (architecture/, glossary/, navigation
   # bundles) are intentionally exempt from the 1-to-1 mirror rule — they
@@ -53,8 +47,6 @@ bundles:
     coverage_targets:
       - source/slang/slang-compile-request.cpp
       - source/slang/slang-emit.cpp
-    runner:
-      category: agentic-pipeline
     size_cap_files: 20
 
   pipeline/01-lex-preprocess:
@@ -73,8 +65,6 @@ bundles:
     coverage_targets:
       - source/compiler-core/slang-lexer.cpp
       - source/slang/slang-preprocessor.cpp
-    runner:
-      category: agentic-pipeline
     size_cap_files: 75
 
   pipeline/02-parse-ast:
@@ -93,8 +83,6 @@ bundles:
       - pipeline/01-lex-preprocess
     coverage_targets:
       - source/slang/slang-parser.cpp
-    runner:
-      category: agentic-pipeline
     size_cap_files: 60
 
   pipeline/03-semantic-check:
@@ -123,8 +111,6 @@ bundles:
       - source/slang/slang-check-stmt.cpp
       - source/slang/slang-check-type.cpp
       - source/slang/slang-check-overload.cpp
-    runner:
-      category: agentic-pipeline
     size_cap_files: 80
 
   pipeline/04-ast-to-ir:
@@ -143,8 +129,6 @@ bundles:
       - source/slang/slang-ast-builder.cpp
       - source/slang/slang-ast-type.cpp
       - source/slang/slang-ast-val.cpp
-    runner:
-      category: agentic-pipeline
     size_cap_files: 150
 
   pipeline/04b-pre-link-passes:
@@ -161,8 +145,6 @@ bundles:
     coverage_targets:
       - source/slang/slang-ir-link.cpp
       - source/slang/slang-ir-legalize-types.cpp
-    runner:
-      category: agentic-pipeline
     size_cap_files: 75
 
   pipeline/04c-layout-ir:
@@ -180,8 +162,6 @@ bundles:
     coverage_targets:
       - source/slang/slang-parameter-binding.cpp
       - source/slang/slang-type-layout.cpp
-    runner:
-      category: agentic-pipeline
     size_cap_files: 50
 
   pipeline/05-ir-passes:
@@ -207,8 +187,6 @@ bundles:
       - source/slang/slang-ir-specialize-resources.cpp
       - source/slang/slang-ir-byte-address-legalize.cpp
       - source/slang/slang-ir-lower-cuda-builtin-types.cpp
-    runner:
-      category: agentic-pipeline
     size_cap_files: 150
 
   pipeline/06-emit:
@@ -222,8 +200,6 @@ bundles:
       - pipeline/05-ir-passes
     coverage_targets:
       - source/slang/slang-emit.cpp
-    runner:
-      category: agentic-pipeline
     size_cap_files: 40
 
   # --- syntax-reference/ ------------------------------------------------
@@ -240,8 +216,6 @@ bundles:
     depends_on: []
     coverage_targets:
       - source/compiler-core/slang-lexer.cpp
-    runner:
-      category: agentic-syntax
     size_cap_files: 50
 
   syntax-reference/keywords-and-builtins:
@@ -256,8 +230,6 @@ bundles:
     coverage_targets:
       - source/slang/slang-parser.cpp
       - source/slang/slang-syntax.cpp
-    runner:
-      category: agentic-syntax
     size_cap_files: 60
 
   syntax-reference/grammar:
@@ -272,8 +244,6 @@ bundles:
       - syntax-reference/keywords-and-builtins
     coverage_targets:
       - source/slang/slang-parser.cpp
-    runner:
-      category: agentic-syntax
     size_cap_files: 80
 
   # --- cross-cutting/ ---------------------------------------------------
@@ -294,8 +264,6 @@ bundles:
     coverage_targets:
       - source/compiler-core/slang-diagnostic-sink.cpp
       - source/slang/slang-diagnostics.cpp
-    runner:
-      category: agentic-cross-cutting
     size_cap_files: 60
 
   cross-cutting/ir-instructions:
@@ -310,8 +278,6 @@ bundles:
       - source/slang/slang-ir.cpp
       - source/slang/slang-ir-util.cpp
       - source/slang/slang-ir-insts.h
-    runner:
-      category: agentic-cross-cutting
     size_cap_files: 150
 
   cross-cutting/targets:
@@ -329,8 +295,6 @@ bundles:
     coverage_targets:
       - source/slang/slang-capability.cpp
       - source/slang/slang-profile.cpp
-    runner:
-      category: agentic-cross-cutting
     size_cap_files: 40
 
   cross-cutting/core-module:
@@ -343,8 +307,6 @@ bundles:
       - source/slang/glsl.meta.slang
       - source/slang/diff.meta.slang
     coverage_targets: []
-    runner:
-      category: agentic-cross-cutting
     size_cap_files: 100
 
   cross-cutting/serialization:
@@ -361,8 +323,6 @@ bundles:
       - source/slang/slang-serialize.cpp
       - source/slang/slang-serialize-ir.cpp
       - source/slang/slang-serialize-ast.cpp
-    runner:
-      category: agentic-cross-cutting
     size_cap_files: 30
 
   cross-cutting/diagnostics-catalog:
@@ -378,8 +338,6 @@ bundles:
     coverage_targets:
       - source/slang/slang-diagnostics.cpp
       - source/compiler-core/slang-diagnostic-sink.cpp
-    runner:
-      category: agentic-cross-cutting
     size_cap_files: 800
 
   # --- ast-reference/ ----------------------------------------------------
@@ -393,8 +351,6 @@ bundles:
     depends_on:
       - pipeline/02-parse-ast
     coverage_targets: []
-    runner:
-      category: agentic-ast
     size_cap_files: 30
 
   ast-reference/declarations:
@@ -409,8 +365,6 @@ bundles:
       - syntax-reference/grammar
     coverage_targets:
       - source/slang/slang-parser.cpp
-    runner:
-      category: agentic-ast
     size_cap_files: 80
 
   ast-reference/expressions:
@@ -425,8 +379,6 @@ bundles:
       - syntax-reference/grammar
     coverage_targets:
       - source/slang/slang-parser.cpp
-    runner:
-      category: agentic-ast
     size_cap_files: 150
 
   ast-reference/statements:
@@ -441,8 +393,6 @@ bundles:
       - syntax-reference/grammar
     coverage_targets:
       - source/slang/slang-parser.cpp
-    runner:
-      category: agentic-ast
     size_cap_files: 80
 
   ast-reference/types:
@@ -456,8 +406,6 @@ bundles:
       - ast-reference/base
       - ast-reference/values
     coverage_targets: []
-    runner:
-      category: agentic-ast
     size_cap_files: 120
 
   ast-reference/modifiers:
@@ -472,8 +420,6 @@ bundles:
       - syntax-reference/grammar
     coverage_targets:
       - source/slang/slang-parser.cpp
-    runner:
-      category: agentic-ast
     size_cap_files: 60
 
   ast-reference/values:
@@ -485,8 +431,6 @@ bundles:
     depends_on:
       - ast-reference/base
     coverage_targets: []
-    runner:
-      category: agentic-ast
     size_cap_files: 40
 
   # --- name-resolution/ --------------------------------------------------
@@ -506,8 +450,6 @@ bundles:
       - ast-reference/statements
     coverage_targets:
       - source/slang/slang-lookup.cpp
-    runner:
-      category: agentic-name-resolution
     size_cap_files: 50
 
   name-resolution/lookup:
@@ -526,8 +468,6 @@ bundles:
     coverage_targets:
       - source/slang/slang-lookup.cpp
       - source/slang/slang-check-inheritance.cpp
-    runner:
-      category: agentic-name-resolution
     size_cap_files: 70
 
   name-resolution/visibility:
@@ -545,8 +485,6 @@ bundles:
       - name-resolution/scopes
     coverage_targets:
       - source/slang/slang-check-modifier.cpp
-    runner:
-      category: agentic-name-resolution
     size_cap_files: 40
 
   name-resolution/overload-resolution:
@@ -565,8 +503,6 @@ bundles:
     coverage_targets:
       - source/slang/slang-check-overload.cpp
       - source/slang/slang-check-conversion.cpp
-    runner:
-      category: agentic-name-resolution
     size_cap_files: 70
 
   # --- ir-reference/ -----------------------------------------------------
@@ -586,8 +522,6 @@ bundles:
       - ast-reference/types
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    runner:
-      category: agentic-ir
     size_cap_files: 150
 
   ir-reference/values:
@@ -606,8 +540,6 @@ bundles:
       - ir-reference/types
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    runner:
-      category: agentic-ir
     size_cap_files: 150
 
   ir-reference/control-flow:
@@ -625,8 +557,6 @@ bundles:
       - ast-reference/statements
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    runner:
-      category: agentic-ir
     size_cap_files: 60
 
   ir-reference/structure:
@@ -644,8 +574,6 @@ bundles:
       - ast-reference/declarations
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    runner:
-      category: agentic-ir
     size_cap_files: 60
 
   ir-reference/generics-and-existentials:
@@ -665,8 +593,6 @@ bundles:
       - ir-reference/structure
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    runner:
-      category: agentic-ir
     size_cap_files: 60
 
   ir-reference/resources-and-atomics:
@@ -685,8 +611,6 @@ bundles:
       - ir-reference/types
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    runner:
-      category: agentic-ir
     size_cap_files: 100
 
   ir-reference/differentiation:
@@ -705,8 +629,6 @@ bundles:
       - ir-reference/values
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    runner:
-      category: agentic-ir
     size_cap_files: 60
 
   ir-reference/decorations:
@@ -725,8 +647,6 @@ bundles:
       - ast-reference/modifiers
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    runner:
-      category: agentic-ir
     size_cap_files: 80
 
   ir-reference/metadata:
@@ -744,8 +664,6 @@ bundles:
       - pipeline/04-ast-to-ir
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    runner:
-      category: agentic-ir
     size_cap_files: 50
 
   ir-reference/misc:
@@ -762,8 +680,6 @@ bundles:
       - pipeline/04-ast-to-ir
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    runner:
-      category: agentic-ir
     size_cap_files: 30
 
   # --- target-pipelines/ -------------------------------------------------
@@ -787,8 +703,6 @@ bundles:
       - source/slang/slang-ir-spirv-legalize.cpp
       - source/slang/slang-ir-glsl-legalize.cpp
       - source/slang/slang-emit-c-like.cpp
-    runner:
-      category: agentic-target-pipelines
     size_cap_files: 150
 
   target-pipelines/hlsl:
@@ -809,8 +723,6 @@ bundles:
       - source/slang/slang-emit-hlsl.cpp
       - source/slang/slang-ir-hlsl-legalize.cpp
       - source/slang/slang-emit-c-like.cpp
-    runner:
-      category: agentic-target-pipelines
     size_cap_files: 150
 
   target-pipelines/metal:
@@ -831,8 +743,6 @@ bundles:
       - source/slang/slang-emit-metal.cpp
       - source/slang/slang-ir-metal-legalize.cpp
       - source/slang/slang-emit-c-like.cpp
-    runner:
-      category: agentic-target-pipelines
     size_cap_files: 100
 
   target-pipelines/wgsl:
@@ -853,8 +763,6 @@ bundles:
       - source/slang/slang-emit-wgsl.cpp
       - source/slang/slang-ir-wgsl-legalize.cpp
       - source/slang/slang-emit-c-like.cpp
-    runner:
-      category: agentic-target-pipelines
     size_cap_files: 100
 
   target-pipelines/cuda:
@@ -877,8 +785,6 @@ bundles:
       - source/slang/slang-ir-cuda-immutable-load.cpp
       - source/slang/slang-emit-cpp.cpp
       - source/slang/slang-emit-c-like.cpp
-    runner:
-      category: agentic-target-pipelines
     size_cap_files: 100
 
   # --- top-level reference -----------------------------------------------

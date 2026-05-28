@@ -38,25 +38,38 @@ python3 docs/generated/tests/_meta/regenerate.py <subcommand> [args...]
 | `show <bundle>`                                     | Manifest entry + resolved source files + source doc                                                 |
 | `mark-fresh <bundle> [--commit SHA] [--model NAME]` | Record a fresh entry                                                                                |
 | `lint [<bundle>...]`                                | Structural linter (README.md front-matter, every `.slang` has a `//META` block, `doc_ref` resolves) |
+| `index [--write]`                                   | (Re)generate the suite `INDEX.md` navigation table                                                  |
+| `doc-gaps [--source-doc <path>] [--format md\|json]` | Aggregate doc-gap rows across bundles, grouped by source doc                                       |
+| `coverage-gaps <bundle> [--from <report.txt>]`      | (Phase E support) per-bundle uncovered-target rollup; bundle-level only                             |
 | `expansion-candidates [--from <report.json>]`       | (Phase E) rank bundles by under-coverage; outputs bundle keys + scores only                         |
 | `review-status / mark-reviewed / mark-remediated`   | (Phase D) two-stage review/remediation. Stubs currently.                                            |
+| `findings list [--include-filed]`                   | (Phase F) list pending compiler-bug findings                                                        |
+| `findings show <id>`                                | (Phase F) render the issue body markdown for a finding                                              |
+| `findings file <id> [--dry-run]`                    | (Phase F) `gh issue create` + set project fields; moves YAML to `findings/filed/`                   |
+| `findings dup <id> --of <issue-number>`             | (Phase F) record a finding as duplicate of an existing issue; no filing                             |
 
 `<bundle>` is the manifest key (e.g. `pipeline/03-semantic-check`),
 which equals the bundle directory under `docs/generated/tests/`.
 
-## Phase A — Foundation (the current phase)
+## Phase status
 
-The scaffold is in place: `_meta/regenerate.py`, `_meta/manifest.yaml`,
-schemas under `_meta/schema/`, base prompts under `_meta/prompts/`, and
-one representative per-section prompt
-(`prompts/pipeline-03-semantic-check.md`). No bundles exist yet.
+| Phase | Description | Status |
+| --- | --- | --- |
+| A | Framework scaffold (driver, schemas, base prompts, manifest) | implemented |
+| B1 | Bootstrap generation across 44 behaviorally-normative bundles | implemented |
+| B1.5 / B1.6 / B1.7 / B1.8 | Boundary expansion, coverage-driven metadata refinement, catalog sweep, GPU-target expansion | implemented |
+| B2 | `slang-test` nightly job runs the suite via `-test-dir docs/generated/tests/` | planned |
+| C | Cross-link pass — bundles consume each other's READMEs | planned |
+| D | Review + remediation against a non-Claude model | scaffolded (schemas + prompts + state file in place) |
+| E | Coverage-driven expansion loop | scaffolded (`coverage-gaps`, `expansion-candidates` stubs the data flow) |
+| F | Structured compiler-bug findings + operator-driven filing | implemented |
 
-To verify the scaffold:
+To check the suite's current state:
 
 ```bash
-python3 docs/generated/tests/_meta/regenerate.py list           # 51 bundle keys
-python3 docs/generated/tests/_meta/regenerate.py list-stale     # all "missing"
-python3 docs/generated/tests/_meta/regenerate.py lint           # 0 errors, 0 warnings
+python3 docs/generated/tests/_meta/regenerate.py list           # 44 bundle keys
+python3 docs/generated/tests/_meta/regenerate.py list-stale     # should report 0 stale on a clean checkout
+python3 docs/generated/tests/_meta/regenerate.py lint           # 0 errors, modest pre-existing warnings
 python3 docs/generated/tests/_meta/regenerate.py show pipeline/01-lex-preprocess
 ```
 
@@ -90,8 +103,9 @@ files as additional context):
 
 ## Phase B2 — Slang-test wiring
 
-A separate PR. Confirm or extend `slang-test` to walk
-`docs/generated/tests/` under `agentic-*` categories, and add
+A separate PR. The nightly job invokes `slang-test` with
+`-test-dir docs/generated/tests/`, which selects exactly this suite
+without any category filter on the `.slang` files themselves. Add
 `.github/workflows/agentic-tests-nightly.yml` modeled on
 `coverage-nightly.yml`. The nightly is advisory: it does not gate
 PR merges.
@@ -172,8 +186,9 @@ Then `regenerate.py mark-fresh <bundle>`.
 The intended attachment points:
 
 - **Nightly run.** `agentic-tests-nightly.yml`, scheduled
-  ~`0 4 * * *` (after `coverage-nightly`), runs `slang-test` against
-  the `agentic-*` categories. Advisory only; never blocks PRs.
+  ~`0 4 * * *` (after `coverage-nightly`), runs
+  `slang-test -test-dir docs/generated/tests`. Advisory only; never
+  blocks PRs.
 - **Lint on PR.** A check workflow that runs
   `regenerate.py lint` and `regenerate.py list-stale` on any PR
   touching `docs/generated/tests/` or `docs/generated/design/`. Soft warning;
