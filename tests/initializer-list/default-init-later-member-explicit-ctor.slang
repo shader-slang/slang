@@ -1,4 +1,5 @@
-//TEST:SIMPLE: -stage compute -entry main
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj -vk
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj
 
 struct ExplicitDefault
 {
@@ -25,6 +26,9 @@ struct Outer
     UsesLaterType data;
 }
 
+//TEST_INPUT:ubuffer(data=[1], stride=4):out,name=outputBuffer
+RWStructuredBuffer<int> outputBuffer;
+
 void init(inout Outer o)
 {
     o = {};
@@ -32,8 +36,11 @@ void init(inout Outer o)
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main()
+void computeMain()
 {
     Outer o;
     init(o);
+
+    // BUFFER: 0
+    outputBuffer[0] = o.data.later.leaf.value;
 }
