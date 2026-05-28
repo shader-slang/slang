@@ -29,7 +29,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CHECK-NOT: OpCapability AtomicFloat16AddEXT
 // CHECK: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 // CHECK-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
-// CHECK-COUNT-1: OpAtomicFAddEXT
-// CHECK-COUNT-1: OpAtomicFMinEXT
-// CHECK-COUNT-1: OpAtomicFMaxEXT
+// CHECK-COUNT-1: OpAtomicFAddEXT %v2half
+// CHECK-COUNT-1: OpAtomicFMinEXT %v2half
+// CHECK-COUNT-1: OpAtomicFMaxEXT %v2half
 // CHECK-COUNT-1: OpAtomicExchange %v2half
