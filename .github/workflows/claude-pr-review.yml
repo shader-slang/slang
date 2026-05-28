@@ -92,31 +92,52 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          # set -u catches unset, not empty: an unexpected event type can resolve
+          # both fallback expressions to "" and silently call gh with no PR.
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::error::PR_NUMBER is empty — workflow event mismatch (neither inputs.pr_number nor pull_request.number resolved)."
+            exit 1
+          fi
           mkdir -p tmp
+          # Defensive: GitHub-hosted runners give a fresh workspace, but a self-hosted
+          # runner could carry stale tmp/ from a prior job. Re-staging from scratch is cheap.
+          rm -f tmp/pr-diff.patch tmp/pr-files.txt
           gh pr diff "$PR_NUMBER" -R "$REPO" >tmp/pr-diff.patch
           gh pr view "$PR_NUMBER" -R "$REPO" --json files -q '.files[].path' >tmp/pr-files.txt
           test -s tmp/pr-diff.patch
           test -s tmp/pr-files.txt
           echo "Pre-staged $(wc -l <tmp/pr-diff.patch) diff lines, $(wc -l <tmp/pr-files.txt) changed files."
 
-      # Verify all 6 specialist subagents carry the SUBAGENT_DIFF_GATE_v1 directive.
+      # Verify all reviewer subagents carry the SUBAGENT_DIFF_GATE_v1 directive.
       # The directive is duplicated across .claude/agents/*-reviewer.md (no shared
       # prelude mechanism in claude-code-runner). Drift here lets a regression in
-      # one agent silently revert to pre-#11333 behavior. Fail the job if any
-      # reviewer is missing the sentinel.
+      # one agent silently revert to pre-#11333 behavior.
+      #
+      # The gate has three layers, each catching a different drift mode:
+      #   1. presence — every reviewer carries the SUBAGENT_DIFF_GATE_v1 marker
+      #      (catches: marker entirely removed from a reviewer);
+      #   2. content — the canonical block contains every required phrase
+      #      (catches: marker preserved but body silently weakened across all
+      #       reviewers — e.g. tmp/pr-files.txt or "STOP" deleted in lockstep);
+      #   3. equality — every reviewer's extracted block hashes identically
+      #      (catches: marker + body preserved on N-1 reviewers but mutated on
+      #       the Nth, or text drift like trailing whitespace).
+      #
+      # Reviewer set is globbed (.claude/agents/*-reviewer.md, ≥6 expected) so
+      # adding a 7th reviewer auto-extends coverage; deleting below the floor
+      # fails the job.
       - name: Verify subagent diff-gate sentinel
         run: |
           set -euo pipefail
-          REVIEWERS=(
-            .claude/agents/code-quality-reviewer.md
-            .claude/agents/ir-correctness-reviewer.md
-            .claude/agents/security-code-reviewer.md
-            .claude/agents/test-coverage-reviewer.md
-            .claude/agents/cross-backend-reviewer.md
-            .claude/agents/documentation-accuracy-reviewer.md
-          )
+          shopt -s nullglob
+          REVIEWERS=(.claude/agents/*-reviewer.md)
+          MIN_REVIEWERS=6
+          if [ "${#REVIEWERS[@]}" -lt "$MIN_REVIEWERS" ]; then
+            echo "::error::Found ${#REVIEWERS[@]} reviewer files matching .claude/agents/*-reviewer.md, expected at least $MIN_REVIEWERS."
+            exit 1
+          fi
 
-          # Step 1: precondition — every reviewer carries the SUBAGENT_DIFF_GATE_v1 marker.
+          # Layer 1: presence — every reviewer carries the SUBAGENT_DIFF_GATE_v1 marker.
           missing=0
           for f in "${REVIEWERS[@]}"; do
             if ! grep -q 'SUBAGENT_DIFF_GATE_v1' "$f"; then
@@ -128,11 +149,9 @@ jobs:
             exit 1
           fi
 
-          # Step 2: drift check — extract the marked block (from the SUBAGENT_DIFF_GATE_v1
-          # heading through the next bare `---` terminator) and assert all 6 hashes match.
-          # Catches the case where a reviewer keeps the marker but mutates the contract
-          # (e.g. drops the `tmp/pr-files.txt` requirement, weakens the abort message,
-          # or removes the "STOP" instruction). Presence-only grep would miss this.
+          # Layer 2 + 3 prep: extract the marked block (from the SUBAGENT_DIFF_GATE_v1
+          # heading through the next bare `---` terminator) for each reviewer.
+          declare -A blocks
           declare -A hashes
           for f in "${REVIEWERS[@]}"; do
             block=$(awk '
@@ -144,10 +163,35 @@ jobs:
               echo "::error file=$f::SUBAGENT_DIFF_GATE_v1 block extraction returned empty — heading or trailing '---' separator missing."
               exit 1
             fi
+            blocks[$f]=$block
             hashes[$f]=$(printf '%s\n' "$block" | sha256sum | cut -d' ' -f1)
           done
 
+          # Layer 2: content — the canonical block contains every required phrase.
+          # Catches the case where the marker + structure are preserved but the
+          # contract body is silently weakened across all reviewers (e.g. someone
+          # edits all six in lockstep to drop `tmp/pr-files.txt` from the gate).
           ref_file=${REVIEWERS[0]}
+          REQUIRED_PHRASES=(
+            'Read tmp/pr-diff.patch'
+            'tmp/pr-files.txt'
+            'ERROR: PR diff not pre-staged'
+            'and STOP'
+          )
+          contract=0
+          for phrase in "${REQUIRED_PHRASES[@]}"; do
+            if ! grep -qF "$phrase" <<<"${blocks[$ref_file]}"; then
+              echo "::error file=$ref_file::SUBAGENT_DIFF_GATE_v1 canonical block missing required phrase: $phrase"
+              contract=$((contract + 1))
+            fi
+          done
+          if [ "$contract" -gt 0 ]; then
+            exit 1
+          fi
+
+          # Layer 3: equality — every reviewer's block hashes identically to the
+          # canonical. Layer 2 only checks the canonical; this layer ensures all
+          # other reviewers carry the same canonical contract, byte for byte.
           ref_hash=${hashes[$ref_file]}
           drift=0
           for f in "${REVIEWERS[@]}"; do
@@ -159,7 +203,7 @@ jobs:
           if [ "$drift" -gt 0 ]; then
             exit 1
           fi
-          echo "All 6 reviewers carry identical SUBAGENT_DIFF_GATE_v1 directive (sha256: ${ref_hash:0:12}...)."
+          echo "All ${#REVIEWERS[@]} reviewers carry identical SUBAGENT_DIFF_GATE_v1 directive (sha256: ${ref_hash:0:12}..., ${#REQUIRED_PHRASES[@]} required phrases verified on canonical)."
 
       # Minimize previous Claude reviews/comments and resolve threads.
       # Targets both 'claude' (OIDC) and 'github-actions' (fallback) logins.

@@ -10,12 +10,15 @@ The workflow pre-stages the diff and changed-file list at `tmp/pr-diff.patch` an
 test -s tmp/pr-diff.patch && test -s tmp/pr-files.txt
 ```
 
-If either file is missing or empty, the workflow's pre-stage step did not run successfully — re-stage by hand using the same commands the workflow runs, otherwise subagents will abort with `ERROR: PR diff not pre-staged` (see the `SUBAGENT_DIFF_GATE_v1` check in each `.claude/agents/*-reviewer.md`):
+If either file is missing or empty, the workflow's pre-stage step did not run successfully — re-stage by hand using the same commands the workflow runs (including the empty-file assertions, otherwise a transient `gh` failure produces a 0-byte file and subagents will abort with `ERROR: PR diff not pre-staged` — see the `SUBAGENT_DIFF_GATE_v1` check in each `.claude/agents/*-reviewer.md`):
 
 ```bash
+set -euo pipefail
 mkdir -p tmp
 gh pr diff <number> -R <repo> > tmp/pr-diff.patch
 gh pr view <number> -R <repo> --json files -q '.files[].path' > tmp/pr-files.txt
+test -s tmp/pr-diff.patch
+test -s tmp/pr-files.txt
 ```
 
 Agents read these files directly — do NOT embed the full diff in agent prompts.
