@@ -87,9 +87,6 @@ struct TestToolUtil
     /// -load-core-module).
     static bool hasDeferredCoreModule(Index numArgs, const char* const* args);
 
-    /// Suppresses modal MSVC CRT assertion/abort dialogs for unattended test/build tools.
-    static void disableAssertMessageBoxes();
-
     static SlangResult getDllDirectoryPath(const char* exePath, String& outDllDirectoryPath);
 };
 

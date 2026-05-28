@@ -14,7 +14,6 @@
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-string-escape-util.h"
 #include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-test-tool-util.h"
 #include "../../source/core/slang-token-reader.h"
 #include "../../source/core/slang-type-text-util.h"
 #include "slang-com-helper.h"
@@ -6121,7 +6120,8 @@ int main(int argc, char** argv)
 #endif
 
 #if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
-    TestToolUtil::disableAssertMessageBoxes();
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
 #endif
 
     // Fallback: run without cleanup if context initialization fails

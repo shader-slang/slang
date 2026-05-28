@@ -5,12 +5,6 @@
 #include "slang-io.h"
 #include "slang-string-util.h"
 
-#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
-#include <crtdbg.h>
-#include <stdlib.h>
-#include <windows.h>
-#endif
-
 namespace Slang
 {
 
@@ -57,26 +51,6 @@ namespace Slang
         }
     }
     return false;
-}
-
-/* static */ void TestToolUtil::disableAssertMessageBoxes()
-{
-#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
-    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
-
-    // Prevent abort() and invalid-parameter handling from raising Windows Error Reporting UI.
-    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
-
-    // Debug CRT asserts normally open an Abort/Retry/Ignore dialog even when abort() itself is
-    // silenced. Route CRT warnings/errors/asserts to stderr so third-party debug builds, such as
-    // glslang, fail the command without blocking unattended test runs.
-    _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
-    _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDERR);
-    _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
-    _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
-    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
-    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
-#endif
 }
 
 /* static */ SlangResult TestToolUtil::getIncludePath(
