@@ -477,4 +477,30 @@ void simplifyForEmit(IRModule* module, TargetRequest* targetRequest)
     context.processModule();
 }
 
+// Drop `kIROp_CastToVoid` instructions before emit. The op is produced by
+// `(void)expr` casts in source (see `core.meta.slang` and `IRBuilder::emitCast`),
+// but no backend has a handler for it. Semantically the result is void and
+// carries no data, so removing the inst is safe: if `expr` has side effects
+// or other uses it is preserved on its own merits, otherwise it is freed
+// by ordinary DCE.
+void eliminateCastToVoid(IRModule* module)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto func = as<IRGlobalValueWithCode>(inst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto bodyInst = block->getFirstInst(); bodyInst;)
+            {
+                auto next = bodyInst->getNextInst();
+                if (bodyInst->getOp() == kIROp_CastToVoid)
+                    bodyInst->removeAndDeallocate();
+                bodyInst = next;
+            }
+        }
+    }
+}
+
 } // namespace Slang
