@@ -1,7 +1,7 @@
 // Test for issue #11082: implicit SER capability upgrades should consistently use EXT.
 
-//TEST:SIMPLE(filecheck=IMPLICIT): -target spirv-asm -emit-spirv-directly -profile spirv_1_6 -entry main -stage raygeneration -line-directive-mode none
-//TEST:SIMPLE(filecheck=EXT_RESTRICTIVE): -target spirv-asm -emit-spirv-directly -profile spirv_1_6 -capability spvShaderInvocationReorderEXT -restrictive-capability-check -entry main -stage raygeneration -line-directive-mode none
+//TEST:SIMPLE(filecheck=IMPLICIT): -target spirv-asm -emit-spirv-directly -profile spirv_1_6 -entry main -stage raygeneration
+//TEST:SIMPLE(filecheck=EXT_RESTRICTIVE): -target spirv-asm -emit-spirv-directly -profile spirv_1_6 -capability spvShaderInvocationReorderEXT -restrictive-capability-check -entry main -stage raygeneration
 
 // IMPLICIT: warning[E41012]
 // IMPLICIT: spvShaderInvocationReorderEXT
