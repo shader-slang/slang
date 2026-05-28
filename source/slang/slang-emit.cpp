@@ -2403,6 +2403,12 @@ Result linkAndOptimizeIR(
         SLANG_PASS(unexportNonEmbeddableIR, target);
     }
 
+    // Drop no-op `kIROp_CastToVoid` insts produced by `(void)expr` source
+    // casts. No backend handles the op, so leaving it in causes an internal
+    // error during emit. Runs after all transformation passes but before
+    // metadata collection and the unsupported-inst check.
+    SLANG_PASS(eliminateCastToVoid);
+
     SLANG_PASS(collectMetadata, *metadata);
 
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
