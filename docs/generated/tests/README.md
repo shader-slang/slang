@@ -15,26 +15,26 @@ The suite is **additive** — it does not replace the hand-written
 - [`_meta/regenerate.md`](_meta/regenerate.md) — operator workflow.
 - [`_meta/prompts/_common.md`](_meta/prompts/_common.md) — universal rules every generation agent inherits.
 
-## What lives here
+## Layout
 
-| Subtree             | Purpose                                                                      |
-| ------------------- | ---------------------------------------------------------------------------- |
-| `architecture/`     | Tests anchored to `docs/generated/design/architecture/*.md`                     |
-| `pipeline/`         | Tests anchored to the compilation-pipeline docs (lex → emit)                 |
-| `syntax-reference/` | Tests anchored to the syntax / grammar / keywords docs                       |
-| `ast-reference/`    | Tests anchored to the AST node reference                                     |
-| `ir-reference/`     | Tests anchored to the IR opcode reference                                    |
-| `name-resolution/`  | Tests anchored to scoping / lookup / overload-resolution docs                |
-| `cross-cutting/`    | Tests anchored to diagnostics, IR instruction set, targets, etc.             |
-| `target-pipelines/` | Tests anchored to per-target (SPIR-V/HLSL/Metal/WGSL/CUDA) end-to-end docs   |
-| `_meta/`            | Pipeline infrastructure: manifest, prompts, schemas, freshness state, driver |
+| Subtree             | Purpose                                                                                |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `architecture/`     | Tests anchored to `docs/generated/design/architecture/*.md`                            |
+| `pipeline/`         | Tests anchored to the compilation-pipeline docs (lex → emit)                           |
+| `syntax-reference/` | Tests anchored to the syntax / grammar / keywords docs                                 |
+| `ast-reference/`    | Tests anchored to the AST node reference                                               |
+| `ir-reference/`     | Tests anchored to the IR opcode reference                                              |
+| `name-resolution/`  | Tests anchored to scoping / lookup / overload-resolution docs                          |
+| `cross-cutting/`    | Tests anchored to diagnostics, IR instruction set, targets, etc.                       |
+| `target-pipelines/` | Tests anchored to per-target (SPIR-V/HLSL/Metal/WGSL/CUDA) end-to-end docs             |
+| `_meta/`            | Pipeline infrastructure: manifest, prompts, schemas, freshness + findings state, driver |
 
 The directory structure mirrors `docs/generated/design/` exactly: for
 every `docs/generated/design/<section>/<doc>.md`, there is one bundle at
 `docs/generated/tests/<section>/<doc>/` (no `.md` suffix on the directory).
 This is a hard rule enforced by the manifest.
 
-## How a bundle is shaped
+## Bundle shape
 
 Each bundle directory contains:
 
@@ -62,13 +62,29 @@ The single load-bearing rule for this suite:
 > signal of where to focus doc-driven expansion, never a target to
 > chase line-by-line.**
 
-When the expansion loop (Phase E) is triggered, the agent receives the
-bundle's source doc and the instruction "this area is under-tested" —
-it does **not** receive uncovered source-line numbers. If documented
-behavior cannot reach uncovered code, the agent writes that down as a
-doc gap, not as a synthesized test. See
+When the expansion loop runs (Phase E; planned, not yet implemented),
+the agent receives the bundle's source doc and the instruction "this
+area is under-tested" — it does **not** receive uncovered source-line
+numbers. If documented behavior cannot reach uncovered code, the agent
+writes that down as a doc gap, not as a synthesized test. See
 [`_meta/prompts/_expand.md`](_meta/prompts/_expand.md) for the
 expansion contract.
+
+## Phase status
+
+The framework rolls out across several phases. The list below records
+what is implemented today versus what is scaffolded or planned:
+
+| Phase                  | Description                                                              | Status                                              |
+| ---------------------- | ------------------------------------------------------------------------ | --------------------------------------------------- |
+| A                      | Framework scaffold (driver, schemas, prompts, manifest)                  | implemented                                         |
+| B1                     | Bootstrap generation across 47 bundles                                   | implemented                                         |
+| B1.5 / B1.6 / B1.7     | Boundary expansion, coverage-driven refinement, diagnostics-catalog sweep | implemented                                         |
+| B2                     | `slang-test -test-dir docs/generated/tests` wired into a nightly job     | planned                                             |
+| C                      | Cross-link pass — bundles consume each other's READMEs                   | planned                                             |
+| D                      | Review + remediation against a non-Claude model                          | scaffolded (schemas, prompts, state file in place)  |
+| E                      | Coverage-driven expansion loop                                           | scaffolded (driver subcommands stub the data flow)  |
+| F                      | Structured compiler-bug findings + operator-driven filing                | implemented                                         |
 
 ## Trust model
 
@@ -85,27 +101,44 @@ expansion contract.
 
 ## Running the suite
 
-The full suite is run by `slang-test`:
+Two complementary checks gate the suite.
+
+**Lint is the primary contract.** It validates that each `.slang` file
+has a matching `//META` block and a `//TEST` directive with at least
+one `CHECK` line, that every finding YAML conforms to the finding
+schema, and that bundle READMEs carry the required front-matter and
+section structure. Lint runs without `slangc`; agents commit
+lint-clean bundles.
+
+```bash
+python3 docs/generated/tests/_meta/regenerate.py lint
+```
+
+**`slang-test` is the runtime check.** It compiles every `.slang` file
+against the targets each test declares. CI nightly runs this once
+Phase B2 lands; locally it is optional.
 
 ```bash
 ./build/Release/bin/slang-test -use-test-server -server-count 4 -test-dir docs/generated/tests
 ```
 
-This runs every `.slang` file in the tree. Backends that the runner
-doesn't have (GPU runtimes, `dxc.exe`, Apple toolchain, nvrtc, etc.)
-are ignored, not failed. CI nightly is expected to lift the ignored
-set by providing the missing toolchains.
+Backends the runner doesn't have (GPU runtimes, `dxc.exe`, Apple
+toolchain, nvrtc, etc.) are ignored, not failed.
 
 ## Driving the framework
 
 ```bash
-python3 docs/generated/tests/_meta/regenerate.py list           # bundle keys
-python3 docs/generated/tests/_meta/regenerate.py list-stale     # bundles whose source doc / watched paths drifted
-python3 docs/generated/tests/_meta/regenerate.py lint           # structural lint
-python3 docs/generated/tests/_meta/regenerate.py show <bundle>  # manifest entry + resolved files
-python3 docs/generated/tests/_meta/regenerate.py index --write  # regenerate INDEX.md
-python3 docs/generated/tests/_meta/regenerate.py doc-gaps       # aggregated doc-gap rows, grouped by source doc
+python3 docs/generated/tests/_meta/regenerate.py list             # bundle keys
+python3 docs/generated/tests/_meta/regenerate.py list-stale       # bundles whose source doc / watched paths drifted
+python3 docs/generated/tests/_meta/regenerate.py lint             # structural lint
+python3 docs/generated/tests/_meta/regenerate.py show <bundle>    # manifest entry + resolved files
+python3 docs/generated/tests/_meta/regenerate.py index --write    # regenerate INDEX.md
+python3 docs/generated/tests/_meta/regenerate.py doc-gaps         # aggregated doc-gap rows, grouped by source doc
 python3 docs/generated/tests/_meta/regenerate.py coverage-gaps <bundle> --from <report>.txt
+python3 docs/generated/tests/_meta/regenerate.py findings list             # Phase F: pending compiler-bug findings
+python3 docs/generated/tests/_meta/regenerate.py findings show <id>        # render finding as issue body
+python3 docs/generated/tests/_meta/regenerate.py findings file <id>        # gh issue create + set project fields
+python3 docs/generated/tests/_meta/regenerate.py findings dup <id> --of N  # mark finding as dup-of existing issue
 ```
 
 See [`_meta/regenerate.md`](_meta/regenerate.md) for the full
@@ -139,6 +172,38 @@ specific sections (e.g., `## Sibling-bundle overlap`,
 `## Catalog coverage`, `## Codes dropped`) may appear after the four
 canonical headings.
 
+## Compiler bug findings
+
+When generation surfaces what looks like a compiler defect (SIGSEGV,
+missing diagnostic, wrong codegen, regression, catalog drift), the
+generation agent writes a structured **finding** to
+`_meta/findings/<id>.yaml`. Findings are committed alongside the
+tests — they are the audit trail from "agent saw this" to "issue
+filed."
+
+Filing is operator-driven and explicit. The agent never calls `gh`;
+that boundary is enforced by the
+[`_meta/prompts/_common.md`](_meta/prompts/_common.md) contract.
+
+```bash
+python3 docs/generated/tests/_meta/regenerate.py findings list             # what's pending
+python3 docs/generated/tests/_meta/regenerate.py findings show <id>        # render the issue body
+python3 docs/generated/tests/_meta/regenerate.py findings file <id>        # gh issue create + set project fields
+python3 docs/generated/tests/_meta/regenerate.py findings dup <id> --of N  # mark dup-of existing issue
+```
+
+Filed issues carry the `Test Agent Finding` label and land in the
+`Slang-All` project (#10) with `Status=Todo`, `Priority=P2`,
+`Release=Unplanned`, `Size=XS (~1d)`, `Estimate=1`. The live queue:
+
+[Open `Test Agent Finding` issues on shader-slang/slang](https://github.com/shader-slang/slang/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22Test%20Agent%20Finding%22)
+
+`findings show` is the dedup gate: the operator inspects the rendered
+issue body and searches the tracker before invoking `findings file`.
+A finding whose citation does not resolve on disk is rejected by lint
+and refuses to render — this prevents the rendered issue from
+referencing files that don't exist.
+
 ## Reporting an issue
 
 A failing test should not be hand-edited. Instead:
@@ -149,5 +214,8 @@ A failing test should not be hand-edited. Instead:
   against `docs/generated/tests/_meta/prompts/<bundle>.md`.
 - If the **manifest** is wrong (missing a watched path, wrong source
   doc), edit `docs/generated/tests/_meta/manifest.yaml`.
-- If the **compiler** is wrong, file it against the source as usual.
+- If the **compiler** is wrong, write a finding YAML to
+  `_meta/findings/<id>.yaml` per the schema, then have the operator
+  triage and file via `regenerate.py findings file <id>`. See
+  "Compiler bug findings" above.
 - Then re-run `regenerate.py mark-fresh <bundle>` after regeneration.
