@@ -6576,10 +6576,8 @@ $}
     /// @param value The value to add to the value at `byteAddress`.
     /// @param originalValue The original value at `byteAddress` before the add operation.
     /// @remarks For SPIR-V, this function maps to `OpAtomicFAdd` on a `half` when
-    /// `SPV_EXT_shader_atomic_float16_add` is available. When only
-    /// `SPV_NV_shader_atomic_fp16_vector` is selected, it maps to `OpAtomicFAdd` on a
-    /// `half2` vector with the correct part set to `value` and the remaining part set
-    /// to 0.
+    /// `SPV_EXT_shader_atomic_float16_add` is available. Use `InterlockedAddF16Emulated`
+    /// for targets that only support `SPV_NV_shader_atomic_fp16_vector`.
     ///
     /// For HLSL, this function translates to an NVAPI call
     /// due to lack of native HLSL intrinsic for floating point atomic add. For CUDA, this function
@@ -6587,7 +6585,6 @@ $}
     [__requiresNVAPI]
     [ForceInline]
     [require(cuda_hlsl, sm_5_0)]
-    [require(spirv, spvAtomicFloat16VectorNV)]
     [require(spirv, spvAtomicFloat16AddEXT)]
     void InterlockedAddF16(uint byteAddress, half value, out half originalValue)
     {
@@ -6606,26 +6603,11 @@ $}
                 originalValue = asfloat16((uint16_t)(_NvInterlockedAddFp16x2(byteAddress, packedInput) >> 16));
             }
             return;
-        // With both SPIR-V fp16 atomic capabilities enabled, capability ranking selects
-        // this scalar add case over the vector fallback below.
         case spvAtomicFloat16AddEXT:
         default:
             {
                 let buf = __getEquivalentStructuredBuffer<half>(this);
                 originalValue = __atomic_add(buf[byteAddress/2], value);
-                return;
-            }
-        case spvAtomicFloat16VectorNV:
-            {
-                let buf = __getEquivalentStructuredBuffer<half2>(this);
-                if ((byteAddress & 2) == 0)
-                {
-                    originalValue = __atomic_add(buf[byteAddress/4], half2(value, half(0.0))).x;
-                }
-                else
-                {
-                    originalValue = __atomic_add(buf[byteAddress/4], half2(half(0.0), value)).y;
-                }
                 return;
             }
         }

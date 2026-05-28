@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=SCALAR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT
-//TEST:SIMPLE(filecheck=FALLBACK): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV
-//TEST:SIMPLE(filecheck=FALLBACK_LANES): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV
+//DIAGNOSTIC_TEST:SIMPLE(diag=NO_FP16_ATOMIC,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spirv_1_5
+//DIAGNOSTIC_TEST:SIMPLE(diag=VECTOR_ONLY,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16VectorNV
 //TEST:SIMPLE(filecheck=BOTH): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT -capability spvAtomicFloat16VectorNV
 //TEST:SIMPLE(filecheck=VECTOR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_ATOMIC
 //TEST:SIMPLE(filecheck=EMULATED): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_EMULATED
@@ -24,6 +24,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 #else
     half originalValue;
     tmpBuffer.InterlockedAddF16(0, 1.0h, originalValue);
+// NO_FP16_ATOMIC: entry point uses capabilities not in specified profile
+// NO_FP16_ATOMIC: Missing capabilities are: 'spvAtomicFloat16AddEXT'
+// VECTOR_ONLY: entry point uses capabilities not in specified profile
+// VECTOR_ONLY: Missing capabilities are: 'spvAtomicFloat16AddEXT'
     outputBuffer[0] = float(originalValue);
     tmpBuffer.InterlockedAddF16(2, 1.0h, originalValue);
     outputBuffer[1] = float(originalValue);
@@ -42,29 +46,19 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // SCALAR-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 // SCALAR: OpCapability AtomicFloat16AddEXT
 // SCALAR: OpExtension "SPV_EXT_shader_atomic_float16_add"
-// SCALAR-COUNT-5: OpAtomicFAddEXT
+// SCALAR-NOT: OpAtomicFAddEXT %v2half
+// SCALAR-COUNT-5: OpAtomicFAddEXT %half
+// SCALAR-NOT: OpAtomicFAddEXT %v2half
 // SCALAR-NOT: OpCapability AtomicFloat16VectorNV
 // SCALAR-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
-
-// FALLBACK-NOT: OpCapability AtomicFloat16AddEXT
-// FALLBACK-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
-// FALLBACK: OpCapability AtomicFloat16VectorNV
-// FALLBACK: OpExtension "SPV_NV_shader_atomic_fp16_vector"
-// FALLBACK-COUNT-6: OpAtomicFAddEXT
-// FALLBACK-NOT: OpAtomicCompareExchange
-
-// FALLBACK_LANES-DAG: [[LOW:%[0-9]+]] = OpConstantComposite %v2half %half_0x1p_0 %half_0x0p_0
-// FALLBACK_LANES-DAG: [[HIGH:%[0-9]+]] = OpConstantComposite %v2half %half_0x0p_0 %half_0x1p_0
-// FALLBACK_LANES: [[LOW_ATOMIC:%[0-9]+]] = OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[LOW]]
-// FALLBACK_LANES: OpCompositeExtract %half [[LOW_ATOMIC]] 0
-// FALLBACK_LANES: [[HIGH_ATOMIC:%[0-9]+]] = OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[HIGH]]
-// FALLBACK_LANES: OpCompositeExtract %half [[HIGH_ATOMIC]] 1
 
 // BOTH-NOT: OpCapability AtomicFloat16VectorNV
 // BOTH-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 // BOTH: OpCapability AtomicFloat16AddEXT
 // BOTH: OpExtension "SPV_EXT_shader_atomic_float16_add"
-// BOTH-COUNT-5: OpAtomicFAddEXT
+// BOTH-NOT: OpAtomicFAddEXT %v2half
+// BOTH-COUNT-5: OpAtomicFAddEXT %half
+// BOTH-NOT: OpAtomicFAddEXT %v2half
 // BOTH-NOT: OpAtomicCompareExchange
 // BOTH-NOT: OpCapability AtomicFloat16VectorNV
 // BOTH-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
@@ -79,5 +73,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // EMULATED: OpCapability AtomicFloat16VectorNV
 // EMULATED: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 // EMULATED-COUNT-2: OpAtomicFAddEXT
+// EMULATED-DAG: [[LOW:%[0-9]+]] = OpConstantComposite %v2half %half_0x1p_0 %half_0x0p_0
+// EMULATED-DAG: [[HIGH:%[0-9]+]] = OpConstantComposite %v2half %half_0x0p_0 %half_0x1p_0
+// EMULATED: [[LOW_ATOMIC:%[0-9]+]] = OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[LOW]]
+// EMULATED: OpCompositeExtract %half [[LOW_ATOMIC]] 0
+// EMULATED: [[HIGH_ATOMIC:%[0-9]+]] = OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[HIGH]]
+// EMULATED: OpCompositeExtract %half [[HIGH_ATOMIC]] 1
 
 // CUDA-COUNT-5: atomicAdd(
