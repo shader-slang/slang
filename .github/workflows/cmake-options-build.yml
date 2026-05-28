@@ -182,6 +182,5 @@ jobs:
         if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64') && inputs.arch == '' && matrix.post_build_slang_test != ''
         env:
           SLANG_RUN_SPIRV_VALIDATION: ${{ matrix.post_build_spirv_validation || '' }}
-          SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN: ${{ matrix.post_build_spirv_validation || '' }}
         run: |
           "$bin_dir/slang-test" ${{ matrix.post_build_slang_test }}
