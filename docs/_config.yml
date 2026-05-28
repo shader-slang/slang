@@ -2,8 +2,8 @@ theme: jekyll-theme-tactile
 
 defaults:
   - scope:
-      path: "llm-generated"
+      path: "generated/design"
     values:
-      layout: "llm-generated"
+      layout: "generated-design"
 include:
   - _meta

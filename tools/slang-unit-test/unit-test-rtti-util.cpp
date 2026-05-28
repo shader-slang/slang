@@ -252,3 +252,36 @@ SLANG_UNIT_TEST(rttiUtilCopyArrayPodIsBitwiseCopy)
         SLANG_CHECK(dst[i] == src[i]);
     }
 }
+
+// Regression test for the ListFuncs::copyArray grow path: when srcCount >
+// dstList.getCount(), the new buffer must be sized by srcCount (the inner
+// element count), not by the outer loop variable.  The pre-fix code used the
+// outer count, which under-allocates whenever the inner list is larger.
+SLANG_UNIT_TEST(rttiUtilListCopyArrayGrowPath)
+{
+    // typeMap only needs int32_t funcs — ListFuncs::copyArray for List<int32_t>
+    // looks up int32_t element funcs when growing a list's buffer.
+    RttiTypeFuncsMap typeMap;
+    typeMap.add(rtti<int32_t>(), GetRttiTypeFuncs<int32_t>::getFuncs());
+
+    // Outer array: one List<int32_t> in src (populated) and dst (empty).
+    // ListFuncs::copyArray(rttiInfo=List<int32_t>, count=1) processes this
+    // outer array; for each slot it checks srcCount > dstCount and grows.
+    List<int32_t> srcOuter[1];
+    List<int32_t> dstOuter[1];
+
+    for (int32_t v = 1; v <= 5; ++v)
+        srcOuter[0].add(v);
+
+    // Pre-fix: _mallocArray(count=1, sizeof(int32_t)) allocated 4 bytes for 5
+    // elements — heap overflow on subsequent ctorArray/copyArray.
+    // Post-fix: _mallocArray(srcCount=5, sizeof(int32_t)) allocates 20 bytes.
+    auto funcs = RttiUtil::getDefaultTypeFuncs(rtti<List<int32_t>>());
+    SLANG_CHECK(funcs.isValid());
+    funcs.copyArray(&typeMap, rtti<List<int32_t>>(), dstOuter, srcOuter, 1);
+
+    SLANG_CHECK(dstOuter[0].getCount() == 5);
+    for (Index i = 0; i < 5; ++i)
+        SLANG_CHECK(dstOuter[0][i] == srcOuter[0][i]);
+    // Local List<int32_t> destructors free the heap buffers on scope exit.
+}
