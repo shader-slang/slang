@@ -78,7 +78,7 @@ jobs:
       compiler: cl
       platform: aarch64
       config: debug
-      runs-on: '["windows-2025-vs2026"]'
+      runs-on: '["windows-2025"]'
       arch: "amd64_arm64"
 
   windows-aarch64-release:
@@ -88,7 +88,7 @@ jobs:
       compiler: cl
       platform: aarch64
       config: release
-      runs-on: '["windows-2025-vs2026"]'
+      runs-on: '["windows-2025"]'
       arch: "amd64_arm64"
 
   # windows-vs2019-debug: disabled — windows-2019 runner is being retired (June 2025)
