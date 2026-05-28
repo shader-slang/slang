@@ -23,11 +23,12 @@ on:
       - "CMakeLists.txt"
       - "cmake/**"
       # Self-policing: also trigger on changes to the review automation itself,
-      # so PRs that mutate reviewer prompts, REVIEW.md protocol, or this very
-      # workflow are reviewed by the workflow they would otherwise bypass.
-      # Without these, a drift PR that breaks SUBAGENT_DIFF_GATE_v1 (or removes
-      # the pre-stage step) wouldn't trigger any review at all — see #11333.
-      - ".github/workflows/claude-pr-review.yml"
+      # so PRs that mutate reviewer prompts, REVIEW.md protocol, or any workflow
+      # that interacts with PR review are reviewed by the workflow they would
+      # otherwise bypass. Without these, a drift PR that breaks
+      # SUBAGENT_DIFF_GATE_v1 (or removes the pre-stage step) wouldn't trigger
+      # any review at all — see #11333.
+      - ".github/workflows/**"
       - ".claude/agents/**"
       - "REVIEW.md"
 
