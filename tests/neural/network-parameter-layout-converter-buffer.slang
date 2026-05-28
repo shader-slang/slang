@@ -31,7 +31,7 @@ void toOptimalLayout()
 
 [shader("compute")]
 [numthreads(32, 1, 1)]
-void computeMain()
+void computeMain(uint tid : SV_DispatchThreadID)
 {
     toOptimalLayout();
     AllMemoryBarrierWithGroupSync();

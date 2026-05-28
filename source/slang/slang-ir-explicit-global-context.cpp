@@ -491,19 +491,24 @@ struct IntroduceExplicitGlobalContextPass
             }
 
             globalParam.entryPointParam =
-                builder.createParam(globalParam.globalParam->getFullType());
-            IRCloneEnv cloneEnv;
-            cloneInstDecorationsAndChildren(
-                &cloneEnv,
-                m_module,
-                globalParam.globalParam,
-                globalParam.entryPointParam);
-            entryPointParamsToAdd.add(globalParam);
+                findEquivalentEntryPointParam(entryPointFunc, globalParam.globalParam);
+            if (!globalParam.entryPointParam)
+            {
+                globalParam.entryPointParam =
+                    builder.createParam(globalParam.globalParam->getFullType());
+                IRCloneEnv cloneEnv;
+                cloneInstDecorationsAndChildren(
+                    &cloneEnv,
+                    m_module,
+                    globalParam.globalParam,
+                    globalParam.entryPointParam);
 
-            // The new parameter will be the last one in the
-            // parameter list of the entry point.
-            //
-            globalParam.entryPointParam->insertBefore(firstOrdinary);
+                // The new parameter will be the last one in the
+                // parameter list of the entry point.
+                //
+                globalParam.entryPointParam->insertBefore(firstOrdinary);
+            }
+            entryPointParamsToAdd.add(globalParam);
         }
 
         if (isCPUTarget(m_target) && m_globalParams.getCount() == 0)
@@ -576,6 +581,31 @@ struct IntroduceExplicitGlobalContextPass
 
         // Update entry point function type after potentially adding parameters.
         fixUpFuncType(entryPointFunc);
+    }
+
+    IRParam* findEquivalentEntryPointParam(IRFunc* entryPointFunc, IRGlobalParam* globalParam)
+    {
+        auto globalSystemValue = globalParam->findDecoration<IRTargetSystemValueDecoration>();
+        if (!globalSystemValue)
+            return nullptr;
+
+        for (auto param : entryPointFunc->getParams())
+        {
+            auto paramSystemValue = param->findDecoration<IRTargetSystemValueDecoration>();
+            if (!paramSystemValue)
+                continue;
+
+            if (!paramSystemValue->getSemantic().caseInsensitiveEquals(
+                    globalSystemValue->getSemantic()))
+                continue;
+
+            if (!isTypeEqual(param->getFullType(), globalParam->getFullType()))
+                continue;
+
+            return param;
+        }
+
+        return nullptr;
     }
 
     void replaceUsesOfGlobalParam(IRGlobalParam* globalParam)
