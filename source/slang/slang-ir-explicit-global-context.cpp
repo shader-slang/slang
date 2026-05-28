@@ -585,6 +585,9 @@ struct IntroduceExplicitGlobalContextPass
         fixUpFuncType(entryPointFunc);
     }
 
+    // Find an existing entry-point parameter that can provide the same system value as
+    // `globalParam`. Matching on both semantic and type lets builtin global params share
+    // user-declared system-value parameters without changing the context initialization path.
     IRParam* findEquivalentEntryPointParam(IRFunc* entryPointFunc, IRGlobalParam* globalParam)
     {
         auto globalSystemValue = globalParam->findDecoration<IRTargetSystemValueDecoration>();
