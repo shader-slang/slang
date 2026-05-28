@@ -1,6 +1,7 @@
 #include "slang-ir-metal-lower-buffer-pointers.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -24,9 +25,10 @@ namespace Slang
 //
 // This pass runs very late (after simplifyNonSSAIR, see slang-emit.cpp) so
 // that all intermediate passes see real pointer types.  At this point:
-//   - Address spaces are finalized (specializeAddressSpaceForMetal ran).
-//   - All force-inlined functions have been expanded.
-//   - Phi nodes are eliminated; the IR is in non-SSA form.
+//   - Address spaces are propagated (specializeAddressSpaceForMetal ran).
+//   - Functions marked [ForceInline] have been expanded; other helpers may
+//     survive but are handled correctly via module-wide use-chain traversal.
+//   - Phi nodes are eliminated (eliminatePhis ran); the IR is in non-SSA form.
 //   - Final simplification has removed dead code.
 // After this pass: applyVariableScopeCorrection, collectCooperativeMetadata
 // (conditional), and validateIRModuleIfEnabled. None create new pointer
@@ -36,10 +38,11 @@ namespace Slang
 //
 // The pass rewrites struct fields in-place and updates result types for
 // FieldAddress, FieldExtract (by-value access), GetElementPtr (arrays),
-// and StructuredBufferLoad/Store instructions. GetElement (by-value array
-// indexing) is not expected at this stage but would need similar handling
-// if encountered. Buffer types are mutated via IRBuilder::replaceOperand
-// to respect the global deduplication map for hoistable type nodes.
+// GetOffsetPtr (pointer arithmetic on array element addresses),
+// GetElement (by-value array indexing after FieldExtract on array fields),
+// and StructuredBufferLoad/Store instructions. Buffer types are mutated
+// via IRBuilder::replaceOperand to respect the global deduplication map
+// for hoistable type nodes.
 //
 // Struct collection recursively walks nested struct fields — Metal's
 // pointer-to-pointer restriction is transitive through nested types.
@@ -48,8 +51,10 @@ namespace Slang
 //
 // For struct fields: load and store on rewritten field addresses get casts.
 // For storage buffer elements: Load, Store, and GetElementPtr are actively
-// lowered; LoadStatus, Consume, and Append assert as unreachable (desugared
-// by lowerAppendConsumeStructuredBuffers before this pass).
+// lowered; Consume and Append assert as unreachable (desugared by
+// lowerAppendConsumeStructuredBuffers before this pass). LoadStatus asserts
+// unreachable because it is HLSL-only ([require(hlsl)] in hlsl.meta.slang)
+// and cannot appear in Metal shaders.
 //
 // ## Relationship to the early ParameterBlock pass
 //
@@ -111,6 +116,17 @@ struct MetalBufferPointerLoweringContext
     // This is safe because CastIntToPtr/CastPtrToInt are inserted at ALL
     // access sites (reached via the field key's use chain), so the round-trip
     // is consistent regardless of which address space the struct lives in.
+    //
+    // No layout-rule-aware type synthesis is needed:
+    // - Pointer values are bit-exact device addresses (always 8 bytes).
+    // - No padding/alignment variance across std140/std430/argument buffers.
+    // - A single UIntPtr representation suffices for all buffer layouts.
+    //
+    // No multi-address-space scanning is needed:
+    // - By this stage, only buffer bindings produce pointer-to-pointer in
+    //   their pointee type.
+    // - Address spaces are propagated (specializeAddressSpaceForMetal ran);
+    //   buffer pointee types are the only source of the restriction.
     Dictionary<IRStructType*, List<FieldLoweringInfo>> collectStructsToLower()
     {
         Dictionary<IRStructType*, List<FieldLoweringInfo>> result;
@@ -209,17 +225,27 @@ struct MetalBufferPointerLoweringContext
     //    FieldExtract instruction in the module that references this field.
     //    insertCastsForStructFields walks that chain and patches all sites.
     //
-    // 2. At this late pipeline stage (post-performForceInlining, post-SSA
-    //    elimination), struct fields are accessed only via FieldAddress
-    //    (→ Load/Store/GEP) or FieldExtract (by-value). No function calls
-    //    carry struct values across boundaries — all non-entry-point
-    //    functions have been inlined.
+    // 2. At this late pipeline stage (post-eliminatePhis, non-SSA form),
+    //    struct fields are accessed only via FieldAddress (→ Load/Store/GEP)
+    //    or FieldExtract (by-value). The key's use chain is module-wide —
+    //    it reaches FieldAddress/FieldExtract in all functions (entry points
+    //    and any surviving non-inlined helpers alike).
     //
-    // 3. Varying inputs are lowered to flat parameters before this pass;
-    //    they don't carry struct types with multi-level pointers.
+    // 3. Varying inputs (stage IO) are legalized by legalizeIRForMetal
+    //    before this pass. They don't carry buffer-bound struct types —
+    //    stage IO uses different binding mechanisms than [[buffer(N)]].
     //
     // 4. Global variables with these struct types appear as buffer bindings
     //    (caught by the seed set in collectStructsToLower).
+    //
+    // 5. No function specialization or cloning is needed:
+    //    - The struct key use chain is module-wide, so FieldAddress/FieldExtract
+    //      instructions inside any surviving helper functions are also patched.
+    //    - No call sites to propagate rewritten types across — in-place type
+    //      mutation is visible to all code referencing the struct type.
+    //    - No linkage decorations to reconcile between clones.
+    //    - No need for deferred pseudo-ops (CastStorageToLogical-style) —
+    //      we insert final casts directly at each use site.
     void rewriteStructFields(Dictionary<IRStructType*, List<FieldLoweringInfo>>& structsToLower)
     {
         for (auto& [_, fields] : structsToLower)
@@ -229,6 +255,16 @@ struct MetalBufferPointerLoweringContext
         }
     }
 
+    // Only FieldAddress and FieldExtract reference struct keys in the IR.
+    // Other ops that might be expected here:
+    // - Call: does not reference struct keys; struct values passed by value
+    //   are accessed via FieldAddress/FieldExtract inside the callee, which
+    //   are already on the key's module-wide use chain.
+    // - GetOffsetPtr: operates on pointer values, not struct field keys.
+    //   (It CAN appear as a user of a GEP/FieldAddress result via pointer
+    //   arithmetic — handled in insertCastsForPointerUses alongside GEP.)
+    // - Return: struct return values are accessed via FieldExtract at the
+    //   call site (already handled above).
     void insertCastsForStructFields(
         Dictionary<IRStructType*, List<FieldLoweringInfo>>& structsToLower)
     {
@@ -389,8 +425,12 @@ struct MetalBufferPointerLoweringContext
                         inst->setOperand(2, castInst);
                         break;
                     }
-                // These ops are desugared by lowerAppendConsumeStructuredBuffers
-                // before this pass runs. Assert rather than silently lowering.
+                // Consume/Append are desugared by lowerAppendConsumeStructuredBuffers.
+                // LoadStatus is HLSL-only ([require(hlsl)]) and cannot reach Metal.
+                // No synthesized conversion functions are needed for the active cases:
+                // - pointer↔ulong is a single CastIntToPtr/CastPtrToInt instruction.
+                // - No field-by-field pack/unpack routines required (unlike struct/matrix/
+                //   bool conversions that need multi-step pack/unpack).
                 case kIROp_StructuredBufferLoadStatus:
                 case kIROp_RWStructuredBufferLoadStatus:
                 case kIROp_StructuredBufferConsume:
@@ -415,70 +455,97 @@ struct MetalBufferPointerLoweringContext
     // - Store (as value): field address used as a pointer value, e.g. via
     //   __getAddress. The address of a ulong field IS a valid device pointer;
     //   stored as-is without casting.
-    // - GetElementPtr: array indexing through the field address. For multi-dim
-    //   arrays, intermediate GEP result types collapse to Ptr(ulong) rather than
-    //   Ptr(Array(ulong,N)) — this is correct because the C-like emitter folds
-    //   GEP chains into subscript expressions (struct->field[i][j]) without
-    //   inspecting intermediate pointer types.
-    // - else (fallthrough): any other user is a pointer-value use (e.g. passed
-    //   as an argument). At this stage no function calls exist (all inlined)
-    //   and no phi nodes exist (SSA eliminated). Atomics on pointer fields are
-    //   excluded by the type system (IAtomicable doesn't include pointer types).
+    // - GetElementPtr / GetOffsetPtr: array indexing or pointer arithmetic
+    //   through the field address. For multi-dim arrays, intermediate result
+    //   types collapse to Ptr(ulong) — correct because the C-like emitter
+    //   folds chains into subscript expressions without inspecting
+    //   intermediate pointer types.
+    // - else (fallthrough): any other user is a pointer-value use (e.g. the
+    //   address passed to a surviving helper function). This is safe because
+    //   the address type (Ptr(ulong)) is a valid device pointer in Metal.
+    //   Atomics on pointer fields are excluded by the type system (IAtomicable
+    //   doesn't include pointer types). Debug assert guards against future
+    //   address-deriving ops falling through unhandled.
+    //
+    // Ops that do not appear as users of a rewritten field address:
+    // - Phi / block parameters: eliminated by eliminatePhis before this pass.
+    // - CopyLogical: SPIR-V-specific workaround; irrelevant for Metal.
+    // - Matrix element addressing: lowered before this pass; unrelated to
+    //   pointer-to-pointer.
     void insertCastsForPointerUses(
-        IRInst* addressInst,
+        IRInst* startAddress,
         IRType* originalPtrType,
         IRType* uintPtrType)
     {
-        List<IRInst*> usesToProcess;
-        for (auto use = addressInst->firstUse; use; use = use->nextUse)
-            usesToProcess.add(use->getUser());
+        List<IRInst*> worklist;
+        worklist.add(startAddress);
 
-        for (auto user : usesToProcess)
+        while (worklist.getCount() > 0)
         {
-            if (user->getOp() == kIROp_Load)
+            auto addressInst = worklist.getLast();
+            worklist.removeLast();
+
+            List<IRInst*> usesToProcess;
+            for (auto use = addressInst->firstUse; use; use = use->nextUse)
+                usesToProcess.add(use->getUser());
+
+            for (auto user : usesToProcess)
             {
-                user->setFullType(uintPtrType);
-                builder.setInsertAfter(user);
-                auto castInst = builder.emitCastIntToPtr(originalPtrType, user);
-                user->replaceUsesWith(castInst);
-                castInst->setOperand(0, user);
-            }
-            else if (user->getOp() == kIROp_Store)
-            {
-                auto storeInst = cast<IRStore>(user);
-                if (storeInst->getPtr() == addressInst)
+                if (user->getOp() == kIROp_Load)
                 {
-                    // addressInst is the DESTINATION — cast the stored value
-                    // from pointer to ulong.
-                    auto val = storeInst->getVal();
-                    builder.setInsertBefore(storeInst);
-                    IRInst* args[] = {val};
-                    auto castInst =
-                        builder.emitIntrinsicInst(uintPtrType, kIROp_CastPtrToInt, 1, args);
-                    storeInst->setOperand(1, castInst);
+                    user->setFullType(uintPtrType);
+                    builder.setInsertAfter(user);
+                    auto castInst = builder.emitCastIntToPtr(originalPtrType, user);
+                    user->replaceUsesWith(castInst);
+                    castInst->setOperand(0, user);
                 }
-                // else: addressInst is the VALUE being stored (e.g. via
-                // __getAddress). The address of a ulong field is a valid
-                // device pointer and can be stored as-is.
-            }
-            else if (user->getOp() == kIROp_GetElementPtr)
-            {
-                // Array indexing through the field address — update the GEP
-                // result type and recurse into its uses.
-                auto ptrToElem = as<IRPtrTypeBase>(user->getFullType());
-                if (ptrToElem)
-                    user->setFullType(builder.getPtrType(uintPtrType, ptrToElem));
-                insertCastsForPointerUses(user, originalPtrType, uintPtrType);
-            }
-            else
-            {
-                // The field address may be used as a pointer value (e.g. via
-                // __getAddress storing the address elsewhere). The address of
-                // a ulong field is a valid device pointer — leave it as-is.
+                else if (user->getOp() == kIROp_Store)
+                {
+                    auto storeInst = cast<IRStore>(user);
+                    if (storeInst->getPtr() == addressInst)
+                    {
+                        // addressInst is the DESTINATION — cast the stored value
+                        // from pointer to ulong.
+                        auto val = storeInst->getVal();
+                        builder.setInsertBefore(storeInst);
+                        IRInst* args[] = {val};
+                        auto castInst =
+                            builder.emitIntrinsicInst(uintPtrType, kIROp_CastPtrToInt, 1, args);
+                        storeInst->setOperand(1, castInst);
+                    }
+                    // else: addressInst is the VALUE being stored (e.g. via
+                    // __getAddress). The address of a ulong field is a valid
+                    // device pointer and can be stored as-is.
+                }
+                else if (user->getOp() == kIROp_GetElementPtr ||
+                         user->getOp() == kIROp_GetOffsetPtr)
+                {
+                    // Array indexing or pointer arithmetic derives a new
+                    // address from this one. Update its result type to
+                    // Ptr(ulong) and add to worklist so its uses get patched.
+                    auto ptrToElem = as<IRPtrTypeBase>(user->getFullType());
+                    if (ptrToElem)
+                        user->setFullType(builder.getPtrType(uintPtrType, ptrToElem));
+                    worklist.add(user);
+                }
+                else
+                {
+                    // Any remaining user treats the address as an opaque
+                    // pointer value (e.g. passed to a helper function).
+                    // This is safe because Ptr(ulong) is a valid device
+                    // pointer type in Metal — no cast needed on the address
+                    // itself, only on values loaded from it.
+                    SLANG_ASSERT(!isAddressInst(user));
+                }
             }
         }
     }
 
+    // A single collect-rewrite-cast traversal suffices:
+    // - No fixpoint iteration needed.
+    // - In-place type mutation is visible module-wide; no need to propagate
+    //   rewritten types through call boundaries.
+    // - All access sites directly reachable via key use-chains.
     void processModule()
     {
         auto structsToLower = collectStructsToLower();
