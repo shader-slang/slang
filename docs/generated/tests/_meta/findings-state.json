@@ -16,11 +16,17 @@
         "cuda": [
           "cuda"
         ],
+        "diagnostics": [
+          "Diagnostics"
+        ],
         "metal": [
           "Metal"
         ]
       },
       "by_suspected_kind": {
+        "catalog-drift": [
+          "Diagnostics"
+        ],
         "regression": [
           "regression"
         ],
