@@ -42,8 +42,6 @@ jobs:
       contains(github.event.comment.body || github.event.review.body || github.event.issue.body || '', '@claude')
 
     # Defaults to the self-hosted Windows GPU runner used by Claude automation.
-    # Repositories can override the exact label set with CLAUDE_RUNNER; Windows
-    # runners selected here must provide VS 2026 for the setup commands below.
     runs-on: ${{ fromJSON(vars.CLAUDE_RUNNER || '["Windows", "self-hosted", "GCP-T4"]') }}
     timeout-minutes: 360
 
@@ -193,8 +191,8 @@ jobs:
               echo "Claude can build on-demand if needed via cmake commands."
             elif [ "${RUNNER_OS}" = "Windows" ]; then
               echo "Setting up Windows environment..."
-              cmake.exe --preset vs2026 --fresh -DSLANG_IGNORE_ABORT_MSG=ON
-              cmake.exe --build --preset vs2026-debug >/dev/null 2>&1 || cmake.exe --build --preset vs2026-debug
+              cmake.exe --preset vs2022 --fresh -DSLANG_IGNORE_ABORT_MSG=ON
+              cmake.exe --build --preset vs2022-debug >/dev/null 2>&1 || cmake.exe --build --preset vs2022-debug
             else
               echo "Setting up Linux environment..."
               cmake --preset default -DSLANG_SLANG_LLVM_BINARY_URL=https://github.com/shader-slang/slang/releases/download/v2025.6.1/slang-2026.1.2-linux-x86_64.zip --fresh
