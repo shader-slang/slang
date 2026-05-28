@@ -8,6 +8,9 @@
 
 //NO_NV: error[E41400]: static assertion failed
 //NO_NV: HitObject.GetSpherePositionAndRadius() requires -capability spvShaderInvocationReorderNV
+//NO_NV: HitObject.GetLssPositionsAndRadii() requires -capability spvShaderInvocationReorderNV
+//NO_NV: HitObject.IsSphereHit() requires -capability spvShaderInvocationReorderNV
+//NO_NV: HitObject.IsLssHit() requires -capability spvShaderInvocationReorderNV
 //SPIRV: HitSpherePositionNV
 //SPIRV: HitSphereRadiusNV
 //SPIRV: HitLSSPositionsNV
