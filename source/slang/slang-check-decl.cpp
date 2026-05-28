@@ -3144,6 +3144,8 @@ static Expr* constructDefaultConstructorForType(
     {
         if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
         {
+            if (!structDecl->checkState.isBeingChecked())
+                visitor->ensureDecl(structDecl, DeclCheckState::AttributesChecked);
             defaultCtor = _getDefaultCtor(structDecl);
         }
     }
