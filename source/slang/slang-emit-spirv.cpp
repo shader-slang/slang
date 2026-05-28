@@ -4529,7 +4529,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 return true;
             }
 
-            maybeDiagnoseRestrictiveCapabilityUse(atomicInst, CapabilityName::spvAtomicFloat16VectorNV);
+            maybeDiagnoseRestrictiveCapabilityUse(
+                atomicInst,
+                CapabilityName::spvAtomicFloat16VectorNV);
             ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
             requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
             return true;
