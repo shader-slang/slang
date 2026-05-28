@@ -1467,17 +1467,33 @@ IRInst* mergeCandidateParentsForHoistableInst(IRInst* left, IRInst* right)
     //
     if (!parentNonBlock)
     {
-        HashSet<IRInst*> leftAncestors;
+        Int leftDepth = 0;
         for (auto ll = leftNonBlock; ll; ll = ll->getParent())
-            leftAncestors.add(ll);
+            leftDepth++;
+
+        Int rightDepth = 0;
         for (auto rr = rightNonBlock; rr; rr = rr->getParent())
+            rightDepth++;
+
+        auto ll = leftNonBlock;
+        auto rr = rightNonBlock;
+        while (leftDepth > rightDepth)
         {
-            if (leftAncestors.contains(rr))
-            {
-                parentNonBlock = rr;
-                break;
-            }
+            ll = ll->getParent();
+            leftDepth--;
         }
+        while (rightDepth > leftDepth)
+        {
+            rr = rr->getParent();
+            rightDepth--;
+        }
+        while (ll != rr)
+        {
+            ll = ll->getParent();
+            rr = rr->getParent();
+        }
+
+        parentNonBlock = ll;
     }
     SLANG_ASSERT(parentNonBlock);
     if (!parentNonBlock)
