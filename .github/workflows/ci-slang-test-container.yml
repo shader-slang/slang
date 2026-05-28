@@ -187,7 +187,8 @@ jobs:
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
 
       - name: Test Slang via glsl
-        if: inputs.gpu-tier == 't4' && inputs.config == 'release' && github.event_name == 'pull_request'
+        # Run on pull_request and /ci dispatches; skip on merge_group to reduce CI load.
+        if: inputs.gpu-tier == 't4' && inputs.config == 'release' && (github.event_name == 'pull_request' || github.event_name == 'repository_dispatch')
         run: |
           ulimit -c unlimited
           export SLANG_RUN_SPIRV_VALIDATION=1
