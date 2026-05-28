@@ -6607,6 +6607,8 @@ $}
                 originalValue = asfloat16((uint16_t)(_NvInterlockedAddFp16x2(byteAddress, packedInput) >> 16));
             }
             return;
+        // Order matters for SPIR-V: when both fp16 atomic capabilities are enabled,
+        // keep the scalar OpAtomicFAdd path before the vector-capability CAS fallback.
         case spvAtomicFloat16AddEXT:
         default:
             {
@@ -6630,12 +6632,14 @@ $}
                         __packInterlockedAddF16Result(oldPacked, laneShift, value, oldHalf);
                     uint actualPacked =
                         __atomic_compare_exchange(buf[wordIndex], oldPacked, newPacked);
-                    if (actualPacked == oldPacked)
+                    if (__commitInterlockedAddF16Result(
+                            actualPacked,
+                            oldPacked,
+                            oldHalf,
+                            originalValue))
                     {
-                        originalValue = oldHalf;
                         return;
                     }
-                    oldPacked = actualPacked;
                 }
             }
         }
@@ -10237,6 +10241,23 @@ uint __packInterlockedAddF16Result(uint oldPacked, uint laneShift, half value, o
     oldHalf = asfloat16(uint16_t(oldHalfBits));
     uint newHalfBits = uint(asuint16(oldHalf + value));
     return (oldPacked & ~laneMask) | (newHalfBits << laneShift);
+}
+
+[ForceInline]
+bool __commitInterlockedAddF16Result(
+    uint actualPacked,
+    inout uint oldPacked,
+    half oldHalf,
+    out half originalValue)
+{
+    originalValue = oldHalf;
+    if (actualPacked == oldPacked)
+    {
+        return true;
+    }
+
+    oldPacked = actualPacked;
+    return false;
 }
 
 __intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
