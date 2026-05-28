@@ -183,6 +183,10 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
 {
     for (auto& kv : options)
     {
+        // This is a slangc output-side path; it does not affect generated shader code.
+        if (kv.key == CompilerOptionName::CoverageMappingOutput)
+            continue;
+
         builder.append(kv.key);
         builder.append(kv.value.getCount());
         for (auto& v : kv.value)

@@ -1176,6 +1176,10 @@ typedef uint32_t SlangSizeT;
                  //   a repeatable hint consumed only when any coverage mode is enabled.
         TraceFunctionCoverage = 148, // bool: insert per-function-entry coverage counters
         TraceBranchCoverage = 149,   // bool: insert per-branch-arm coverage counters
+        CoverageMappingOutput =
+            150, // stringValue0: explicit path for the slangc coverage mapping sidecar.
+                 //   When unset, slangc writes <output>.coverage-mapping.json next to
+                 //   file outputs that carry coverage metadata.
 
         CountOf,
     };

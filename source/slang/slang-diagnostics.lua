@@ -4796,6 +4796,18 @@ warning(
     "`-trace-coverage-reserved-space` does not apply to this target; ignoring reserved spaces"
 )
 
+err(
+    "coverage-mapping-output-without-coverage",
+    45108,
+    "`-coverage-mapping-output` requires a coverage tracing option; use `-trace-coverage`, `-trace-function-coverage`, or `-trace-branch-coverage`"
+)
+
+err(
+    "coverage-mapping-output-multiple-artifacts",
+    45109,
+    "`-coverage-mapping-output` path '~path' would be written by multiple coverage-instrumented artifacts; use per-artifact `<output>.coverage-mapping.json` sidecars instead"
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(

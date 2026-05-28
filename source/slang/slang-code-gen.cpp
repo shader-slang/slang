@@ -1108,6 +1108,15 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
                 getSink(),
                 disassemblyArtifact.writeRef()));
 
+            for (auto associated : intermediateArtifact->getAssociated())
+            {
+                if (associated->getDesc().payload == ArtifactPayload::Metadata ||
+                    associated->getDesc().payload == ArtifactPayload::PostEmitMetadata)
+                {
+                    disassemblyArtifact->addAssociated(associated);
+                }
+            }
+
             // Also disassemble the debug artifact if one exists.
             auto debugArtifact = getSeparateDbgArtifact(intermediateArtifact);
             ComPtr<IArtifact> disassemblyDebugArtifact;
@@ -1122,15 +1131,6 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
 
                 // The disassembly needs both the metadata for the debug build identifier
                 // and the debug spirv to be associated with is.
-                for (auto associated : intermediateArtifact->getAssociated())
-                {
-                    if (associated->getDesc().payload == ArtifactPayload::Metadata ||
-                        associated->getDesc().payload == ArtifactPayload::PostEmitMetadata)
-                    {
-                        disassemblyArtifact->addAssociated(associated);
-                        break;
-                    }
-                }
                 disassemblyArtifact->addAssociated(disassemblyDebugArtifact);
             }
 

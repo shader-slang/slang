@@ -416,6 +416,7 @@ private:
     // For output
 
     RefPtr<StdWriters> m_writers;
+    bool m_didWriteExplicitCoverageMapping = false;
 };
 
 } // namespace Slang

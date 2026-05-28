@@ -245,6 +245,20 @@ slangc shader.slang -target spirv -stage compute -entry main \
 # -> shader.spv.coverage-mapping.json
 ```
 
+Use `-coverage-mapping-output <path>` when the compiled artifact is
+written to stdout, or when the build needs a stable manifest path
+instead of the default path derived from `-o`. The flag only controls
+where the coverage mapping is written; it does not enable
+instrumentation by itself, so use it with `-trace-coverage`,
+`-trace-function-coverage`, or `-trace-branch-coverage`.
+
+```bash
+slangc shader.slang -target spirv -stage compute -entry main \
+    -trace-coverage -coverage-mapping-output shader.coverage.json
+# -> SPIR-V binary on stdout
+# -> shader.coverage.json
+```
+
 Hosts that aren't linked against Slang still get the data: the
 sidecar contains both the hidden binding and the source-entry
 attribution.
@@ -269,13 +283,14 @@ contract.
 
 ## CLI reference
 
-| Flag                                      | Effect                                                                                                                                                                                                                                                                |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `-trace-coverage`                         | Enables per-statement line coverage. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites marker ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file. |
-| `-trace-function-coverage`                | Adds per-function-entry source entries and counters. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                                                                               |
-| `-trace-branch-coverage`                  | Adds per-branch-arm source entries and counters for `if`/`else`, loop-condition true/false, and source `switch` case/default dispatch arms, including the implicit no-match default path when no `default` label exists. Expression-level short-circuit and ternary branches are not instrumented yet. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object. |
-| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                    |
-| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                 |
+| Flag                                      | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-trace-coverage`                         | Enables per-statement line coverage. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites marker ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file.                                                                                                                                                                         |
+| `-trace-function-coverage`                | Adds per-function-entry source entries and counters. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                                                                                                                                                                                                                                                                        |
+| `-trace-branch-coverage`                  | Adds per-branch-arm source entries and counters for `if`/`else`, loop-condition true/false, and source `switch` case/default dispatch arms, including the implicit no-match default path when no `default` label exists. Expression-level short-circuit and ternary branches are not instrumented yet. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                          |
+| `-coverage-mapping-output <path>`         | Writes the coverage mapping JSON sidecar to an explicit path instead of the default `<output>.coverage-mapping.json`. Use this when the compiled artifact is written to stdout or the build needs a stable manifest path. Requires at least one coverage tracing mode.                                                                                                                                                                                          |
+| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                                                                                                                                                                                                            |
+| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                                                                                                                                                                                                          |
 
 ---
 

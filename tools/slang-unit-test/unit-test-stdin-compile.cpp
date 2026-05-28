@@ -548,6 +548,217 @@ static SlangResult _testHelpMentionsStdin(UnitTestContext* context)
     return SLANG_OK;
 }
 
+static const char* kCoverageCliShader = R"(
+RWStructuredBuffer<uint> outputBuffer;
+
+void helper(inout uint value)
+{
+    value += 1;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    uint value = tid.x;
+    helper(value);
+    if ((value & 1u) == 0u)
+        value += 2;
+    else
+        value += 3;
+    outputBuffer[0] = value;
+}
+)";
+
+struct TempCoverageCliFiles
+{
+    String basePath;
+    String sourcePath;
+    String outputPath;
+    String autoManifestPath;
+    String disassemblyOutputPath;
+    String disassemblyManifestPath;
+    String explicitManifestPath;
+
+    ~TempCoverageCliFiles()
+    {
+        File::remove(basePath);
+        File::remove(sourcePath);
+        File::remove(outputPath);
+        File::remove(autoManifestPath);
+        File::remove(disassemblyOutputPath);
+        File::remove(disassemblyManifestPath);
+        File::remove(explicitManifestPath);
+    }
+};
+
+static SlangResult _createTempCoverageCliFiles(TempCoverageCliFiles& out)
+{
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slangc-coverage-cli"), out.basePath));
+    out.sourcePath = out.basePath + ".slang";
+    out.outputPath = out.basePath + ".spv";
+    out.autoManifestPath = out.outputPath + ".coverage-mapping.json";
+    out.disassemblyOutputPath = out.basePath + ".spvasm";
+    out.disassemblyManifestPath = out.disassemblyOutputPath + ".coverage-mapping.json";
+    out.explicitManifestPath = out.basePath + ".coverage-mapping.json";
+    return File::writeAllText(out.sourcePath, kCoverageCliShader);
+}
+
+static void _addCoverageCliCompileArgs(
+    List<String>& args,
+    const String& sourcePath,
+    bool enableCoverage,
+    const char* target = "spirv")
+{
+    args.add(sourcePath);
+    args.add("-target");
+    args.add(target);
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    if (enableCoverage)
+    {
+        args.add("-trace-coverage");
+        args.add("-trace-function-coverage");
+        args.add("-trace-branch-coverage");
+    }
+}
+
+static SlangResult _runSlangc(
+    UnitTestContext* context,
+    const List<String>& args,
+    ExecuteResult& out)
+{
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(ExecutableLocation(context->executableDirectory, "slangc"));
+    for (const auto& arg : args)
+        cmdLine.addArg(arg);
+
+    return ProcessUtil::execute(cmdLine, out);
+}
+
+static SlangResult _checkCoverageManifest(const String& path)
+{
+    if (!File::exists(path))
+        return SLANG_FAIL;
+
+    String manifest;
+    SLANG_RETURN_ON_FAIL(File::readAllText(path, manifest));
+    if (!_contains(manifest, "\"version\"") || !_contains(manifest, "\"counter_count\"") ||
+        !_contains(manifest, "\"entries\"") || !_contains(manifest, "\"buffer\""))
+        return SLANG_FAIL;
+    if (!_contains(manifest, "\"line\"") || !_contains(manifest, "\"function\"") ||
+        !_contains(manifest, "\"branch\""))
+        return SLANG_FAIL;
+    if (!_contains(manifest, "__slang_coverage"))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+static SlangResult _testCoverageAutoSidecar(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (!File::exists(files.outputPath))
+        return SLANG_FAIL;
+    return _checkCoverageManifest(files.autoManifestPath);
+}
+
+static SlangResult _testCoverageAutoSidecarForDisassembly(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true, "spirv-asm");
+    args.add("-o");
+    args.add(files.disassemblyOutputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (!File::exists(files.disassemblyOutputPath))
+        return SLANG_FAIL;
+    return _checkCoverageManifest(files.disassemblyManifestPath);
+}
+
+static SlangResult _testCoverageExplicitSidecar(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-coverage-mapping-output");
+    args.add(files.explicitManifestPath);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (!File::exists(files.outputPath))
+        return SLANG_FAIL;
+    if (File::exists(files.autoManifestPath))
+        return SLANG_FAIL;
+    return _checkCoverageManifest(files.explicitManifestPath);
+}
+
+static SlangResult _testCoverageExplicitSidecarWithStdoutArtifact(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-coverage-mapping-output");
+    args.add(files.explicitManifestPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (result.standardOutput.getLength() == 0)
+        return SLANG_FAIL;
+    return _checkCoverageManifest(files.explicitManifestPath);
+}
+
+static SlangResult _testCoverageExplicitSidecarRequiresCoverage(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-coverage-mapping-output");
+    args.add(files.explicitManifestPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "`-coverage-mapping-output` requires"))
+        return SLANG_FAIL;
+    if (File::exists(files.explicitManifestPath))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testSlangStdin(unitTestContext)));
@@ -570,4 +781,13 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeDiagnostic(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinDiagnostic(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
+}
+
+SLANG_UNIT_TEST(SlangcCoverageMappingOutput)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecar(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForDisassembly(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecar(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarWithStdoutArtifact(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarRequiresCoverage(unitTestContext)));
 }

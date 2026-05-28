@@ -25,6 +25,13 @@
 namespace Slang
 {
 
+static bool _isCoverageTracingEnabled(CompilerOptionSet& optionSet)
+{
+    return optionSet.getBoolOption(CompilerOptionName::TraceCoverage) ||
+           optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage) ||
+           optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
+}
+
 EndToEndCompileRequest::EndToEndCompileRequest(Session* session)
     : m_session(session), m_sink(nullptr, Lexer::sourceLocationLexer)
 {
@@ -148,12 +155,19 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // The check lives here (not in `OptionsParser::_parse`) so that
     // C++ API callers using `setPassThrough()` are also covered —
     // OptionsParser only runs for the slangc CLI path.
-    if (m_passThrough != PassThroughMode::None &&
-        (getOptionSet().getBoolOption(CompilerOptionName::TraceCoverage) ||
-         getOptionSet().getBoolOption(CompilerOptionName::TraceFunctionCoverage) ||
-         getOptionSet().getBoolOption(CompilerOptionName::TraceBranchCoverage)))
+    auto& optionSet = getOptionSet();
+    const bool coverageTracingEnabled = _isCoverageTracingEnabled(optionSet);
+
+    if (m_passThrough != PassThroughMode::None && coverageTracingEnabled)
     {
         getSink()->diagnose(Diagnostics::CoveragePassThroughIncompatible{});
+        return SLANG_FAIL;
+    }
+
+    if (optionSet.getStringOption(CompilerOptionName::CoverageMappingOutput).getLength() != 0 &&
+        !coverageTracingEnabled)
+    {
+        getSink()->diagnose(Diagnostics::CoverageMappingOutputWithoutCoverage{});
         return SLANG_FAIL;
     }
 
@@ -395,19 +409,20 @@ SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact
     return SLANG_OK;
 }
 
-// If the artifact carries coverage tracing metadata, write it to
-// `<path>.coverage-mapping.json` alongside the compiled code. Hosts
-// can read this sidecar to attribute runtime counter values back to
-// source entries. The JSON content is produced by the
-// public `slang_writeCoverageManifestJson` API; both that API and
-// this sidecar writer emit byte-identical output, so customers
-// working in-process can pipe the API output through the same
-// downstream tooling that consumes the sidecar.
+// If the artifact carries coverage tracing metadata, write its JSON
+// mapping sidecar. By default slangc writes `<path>.coverage-mapping.json`
+// alongside file outputs. `-coverage-mapping-output <path>` overrides
+// that location and also works for stdout artifact output. Hosts can
+// read this sidecar to attribute runtime counter values back to source
+// entries. The JSON content is produced by the public
+// `slang_writeCoverageManifestJson` API; both that API and this sidecar
+// writer emit byte-identical output, so customers working in-process can
+// pipe the API output through the same downstream tooling.
 SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
     const String& path,
     IArtifact* artifact)
 {
-    if (!artifact || path.getLength() == 0)
+    if (!artifact)
         return SLANG_OK;
     auto coverage = findAssociatedRepresentation<slang::ICoverageTracingMetadata>(artifact);
     // Emit the sidecar if either dimension has data. Future coverage
@@ -416,13 +431,37 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
     // populated; the sidecar is the persisted handoff for both.
     if (!coverage || (coverage->getCounterCount() == 0 && coverage->getEntryCount() == 0))
         return SLANG_OK;
+
+    const String explicitSidecarPath =
+        getOptionSet().getStringOption(CompilerOptionName::CoverageMappingOutput);
+    String sidecarPath;
+    if (explicitSidecarPath.getLength() != 0)
+    {
+        if (m_didWriteExplicitCoverageMapping)
+        {
+            getSink()->diagnose(
+                Diagnostics::CoverageMappingOutputMultipleArtifacts{.path = explicitSidecarPath});
+            return SLANG_FAIL;
+        }
+        sidecarPath = explicitSidecarPath;
+        m_didWriteExplicitCoverageMapping = true;
+    }
+    else
+    {
+        if (path.getLength() == 0)
+            return SLANG_OK;
+        sidecarPath = path + ".coverage-mapping.json";
+    }
+
     ComPtr<ISlangBlob> jsonBlob;
     SLANG_RETURN_ON_FAIL(slang_writeCoverageManifestJson(coverage, jsonBlob.writeRef()));
-    String sidecarPath = path + ".coverage-mapping.json";
-    return File::writeAllBytes(
-        sidecarPath,
-        jsonBlob->getBufferPointer(),
-        jsonBlob->getBufferSize());
+    const SlangResult writeResult =
+        File::writeAllBytes(sidecarPath, jsonBlob->getBufferPointer(), jsonBlob->getBufferSize());
+    if (SLANG_FAILED(writeResult))
+    {
+        getSink()->diagnose(Diagnostics::UnableToWriteFile{.path = sidecarPath});
+    }
+    return writeResult;
 }
 
 SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArtifact* artifact)

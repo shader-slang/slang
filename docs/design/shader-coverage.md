@@ -264,10 +264,11 @@ hosts that consume the typed accessors don't need it.
 Today the in-tree consumer is:
 
 - **`slangc` itself** — its `_maybeWriteCoverageMapping` calls
-  `slang_writeCoverageManifestJson` and writes the bytes to disk.
-  This is what makes the metadata API + manifest shape *one*
-  contract, not two: `slangc` is its own first consumer of the
-  public serializer.
+  `slang_writeCoverageManifestJson` and writes the bytes to disk,
+  either as `<output>.coverage-mapping.json` for normal file outputs
+  or at the explicit `-coverage-mapping-output <path>`. This is what
+  makes the metadata API + manifest shape *one* contract, not two:
+  `slangc` is its own first consumer of the public serializer.
 
 A reference end-to-end host integration that uses both the typed
 metadata path and `slang_writeCoverageManifestJson` is planned as a

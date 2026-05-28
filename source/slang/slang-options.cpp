@@ -647,6 +647,13 @@ void initCommandOptions(CommandOptions& options)
          "pipeline layout owns descriptor sets that are "
          "not visible in the compiled shader IR. Repeat for multiple spaces; "
          "duplicates are idempotent. Applies to Khronos descriptor-set targets."},
+        {OptionKind::CoverageMappingOutput,
+         "-coverage-mapping-output",
+         "-coverage-mapping-output <path>",
+         "Write shader coverage mapping metadata to an explicit JSON sidecar path. "
+         "Use this when compiled output is written to stdout or when the build needs "
+         "a stable manifest path instead of the default "
+         "`<output>.coverage-mapping.json` sidecar."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -3046,6 +3053,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.add(OptionKind::TraceCoverageReservedSpace, (int)bindingSpace);
+                break;
+            }
+        case OptionKind::CoverageMappingOutput:
+            {
+                CommandLineArg outputPath;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(outputPath));
+                linkage->m_optionSet.set(OptionKind::CoverageMappingOutput, outputPath.value);
                 break;
             }
         case OptionKind::Profile:

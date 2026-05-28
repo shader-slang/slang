@@ -335,6 +335,14 @@ Bind the synthesized `__slang_coverage` buffer at an explicit (register index, s
 Reserve a descriptor set when auto-allocating the synthesized `__slang_coverage` buffer. Use this when the host pipeline layout owns descriptor sets that are not visible in the compiled shader IR. Repeat for multiple spaces; duplicates are idempotent. Applies to Khronos descriptor-set targets. 
 
 
+<a id="coverage-mapping-output"></a>
+### -coverage-mapping-output
+
+**-coverage-mapping-output &lt;path&gt;**
+
+Write shader coverage mapping metadata to an explicit JSON sidecar path. Use this when compiled output is written to stdout or when the build needs a stable manifest path instead of the default `&lt;output&gt;.coverage-mapping.json` sidecar.
+
+
 <a id="report-dynamic-dispatch-sites"></a>
 ### -report-dynamic-dispatch-sites
 Reports information about dynamic dispatch sites for interface calls. 
@@ -1864,4 +1872,3 @@ Available help categories for the [-h](#h) option
 * `capability` : A capability describes an optional feature that a target may or may not support. When a [-capability](#capability-1) is specified, the compiler may assume that the target supports that capability, and generate code accordingly. 
 * `file-extension` : A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) may be inferred from the extension of an input or [-o](#o) path 
 * `help-category` : Available help categories for the [-h](#h) option 
-
