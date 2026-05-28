@@ -77,7 +77,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
-          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
           persist-credentials: ${{ inputs.repository == '' }}
 
       - name: Common Test Setup
@@ -216,7 +216,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
-          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
           persist-credentials: ${{ inputs.repository == '' }}
           submodules: "recursive"
           fetch-depth: "1"
