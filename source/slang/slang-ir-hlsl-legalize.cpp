@@ -109,9 +109,7 @@ static IRFunc* getHLSLPrimitiveIndexFunc(IRModule* module, IRFunc*& primitiveInd
     builder.setInsertInto(module->getModuleInst());
 
     primitiveIndexFunc = builder.createFunc();
-    builder.setDataType(
-        primitiveIndexFunc,
-        builder.getFuncType(0, nullptr, builder.getUIntType()));
+    builder.setDataType(primitiveIndexFunc, builder.getFuncType(0, nullptr, builder.getUIntType()));
     builder.addTargetIntrinsicDecoration(
         primitiveIndexFunc,
         CapabilitySet(CapabilityName::hlsl),
