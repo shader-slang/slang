@@ -3345,14 +3345,25 @@ spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t*
     {
         if (varDecl->val)
         {
-            auto astBuilder = getModule(varDecl)->getLinkage()->getASTBuilder();
-            SLANG_AST_BUILDER_RAII(astBuilder);
-
-            auto val = varDecl->val->substitute(astBuilder, SubstitutionSet(var))->resolve();
-            if (auto constantVal = as<ConstantIntVal>(val))
+            // Prefer the semantic `Val` when available. If it cannot be resolved as an integer
+            // value, fall back to the initializer path below to preserve the old literal handling.
+            if (auto module = getModule(varDecl))
             {
-                *rs = constantVal->getValue();
-                return 0;
+                if (auto linkage = module->getLinkage())
+                {
+                    auto astBuilder = linkage->getASTBuilder();
+                    SLANG_AST_BUILDER_RAII(astBuilder);
+
+                    if (auto val = varDecl->val->substitute(astBuilder, SubstitutionSet(var)))
+                    {
+                        val = val->resolve();
+                        if (auto constantVal = as<ConstantIntVal>(val))
+                        {
+                            *rs = constantVal->getValue();
+                            return 0;
+                        }
+                    }
+                }
             }
         }
         if (auto cexpr = as<IntegerLiteralExpr>(varDecl->initExpr))

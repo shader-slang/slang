@@ -72,6 +72,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_GroupID`                   | `BuiltIn WorkgroupId`                            |
 | `SV_GroupIndex`                | `BuiltIn LocalInvocationIndex`                   |
 | `SV_GroupThreadID`             | `BuiltIn LocalInvocationId`                      |
+| `SV_WorkgroupCount`            | `BuiltIn NumWorkgroups`                          |
 | `SV_InnerCoverage`             | `BuiltIn FullyCoveredEXT`                        |
 | `SV_InsideTessFactor`          | `BuiltIn TessLevelInner`                         |
 | `SV_InstanceID`<sup>\*\*</sup> | `BuiltIn InstanceIndex` - `BuiltIn BaseInstance` |

@@ -40,6 +40,7 @@ The system-value semantics are translated to the following Metal attributes:
 | `SV_GroupID`                | `[[threadgroup_position_in_grid]]`                   |
 | `SV_GroupThreadID`          | `[[thread_position_in_threadgroup]]`                 |
 | `SV_GroupIndex`             | Calculated from `SV_GroupThreadID` and group extents |
+| `SV_WorkgroupCount`         | `[[threadgroups_per_grid]]`                         |
 | `SV_InstanceID`             | `[[instance_id]]`                                    |
 | `SV_IsFrontFace`            | `[[front_facing]]`                                   |
 | `SV_PointSize`              | `[[point_size]]`                                     |

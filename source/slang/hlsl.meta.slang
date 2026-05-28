@@ -7759,7 +7759,9 @@ __intrinsic_op($(kIROp_GetWorkGroupSize))
 int3 WorkgroupSize();
 
 // Returns number of workgroups dispatched to the current compute shader.
-[require(cuda_glsl_metal_spirv, compute)]
+[require(cuda, compute)]
+[require(metal, compute)]
+[require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
 [require(glsl_spirv, meshshading)]
 uint3 WorkgroupCount()
 {

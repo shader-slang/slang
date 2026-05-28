@@ -489,6 +489,9 @@ public struct NetworkParameterLayoutConverter<
 
     // Each dispatch invocation owns a flattened physical-output element stream:
     // elementIndex = dispatchThreadId.x + k * totalDispatchThreadCount.
+    [require(cuda, compute)]
+    [require(metal, compute)]
+    [require(spirv, spirv_1_0, compute)]
     public static void toOptimalLayout<PortableAddress, OptimalAddress>(
         PortableAddress portableLayoutStorage,
         OptimalAddress optimalLayoutStorage)
@@ -515,6 +518,9 @@ public struct NetworkParameterLayoutConverter<
 
     // Each dispatch invocation owns a flattened logical-output element stream:
     // elementIndex = dispatchThreadId.x + k * totalDispatchThreadCount.
+    [require(cuda, compute)]
+    [require(metal, compute)]
+    [require(spirv, spirv_1_0, compute)]
     public static void toPortableLayout<OptimalAddress, PortableAddress>(
         OptimalAddress optimalLayoutStorage,
         PortableAddress portableLayoutStorage)
