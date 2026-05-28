@@ -172,7 +172,7 @@ Set the module name to use when compiling multiple .slang source files into a si
 
 **-o &lt;path&gt;**
 
-Specify a path where generated output should be written. 
+Specify test a path where generated output should be written. 
 
 If no [-target](#target-2) or [-stage](#stage-1) is specified, one may be inferred from file extension (see [&lt;file-extension&gt;](#file-extension)). If multiple [-target](#target-2) options and a single [-entry](#entry) are present, each [-o](#o) associates with the first [-target](#target-2) to its left. Otherwise, if multiple [-entry](#entry) options are present, each [-o](#o) associates with the first [-entry](#entry) to its left, and with the [-target](#target-2) that matches the one inferred from &lt;path&gt;. 
 
