@@ -2725,7 +2725,8 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
             auto foundInst = *found;
             auto foundGeneric = findOuterGeneric(foundInst);
             auto insertGeneric = findOuterGeneric(getInsertLoc().getParent());
-            if (foundGeneric && foundGeneric != insertGeneric)
+            if (foundGeneric && foundGeneric != insertGeneric &&
+                !(insertGeneric && hasDescendent(foundGeneric, insertGeneric)))
             {
                 // The global value-numbering map is keyed only by operands. A matching
                 // instruction in a different generic scope is not visible here, so keep the
@@ -2742,6 +2743,12 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
                     getInsertLoc().getMode() == IRInsertLoc::Mode::Before)
                 {
                     auto insertLoc = getInsertLoc().getInst();
+                    while (insertLoc && insertLoc->getOp() == kIROp_Param)
+                        insertLoc = insertLoc->getNextInst();
+
+                    if (!insertLoc)
+                        return *found;
+
                     bool isAfter = false;
                     for (auto cur = insertLoc->next; cur; cur = cur->next)
                     {
