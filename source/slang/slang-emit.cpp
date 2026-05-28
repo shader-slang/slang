@@ -2366,10 +2366,26 @@ Result linkAndOptimizeIR(
     // Run a final round of simplifications to clean up unused things after phi-elimination.
     SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
 
-    // Metal rejects pointer-to-pointer types in buffer-bound structs.
-    // Lower multi-level pointer fields to UIntPtr very late so that all
-    // intermediate passes see real pointer types. Uses the buffer-element-type
-    // framework's systematic cast deferral and function specialization.
+    // Metal rejects pointer-to-pointer types in buffer pointee types (e.g.
+    // `device int* device*` as a struct field in a [[buffer(N)]] binding).
+    //
+    // This runs very late so that specializeAddressSpaceForMetal (which needs
+    // to see real pointer types to assign device/constant qualifiers) and all
+    // intermediate optimization passes operate on the original typed IR.
+    //
+    // Uses the buffer-element-type framework rather than a custom pass because
+    // the framework systematically handles all IR use patterns (Load, Store,
+    // GEP, FieldExtract, GetElement, function call boundaries) via cast
+    // deferral and function specialization — avoiding the class of bugs that
+    // arise from hand-rolling case-by-case IR rewriting.
+    //
+    // The follow-up performForceInlining + simplifyNonSSAIR cleans up the
+    // [ForceInline] pack/unpack functions the framework creates during
+    // materialization.
+    //
+    // This does not conflict with the earlier MetalParameterBlock run
+    // because they lower orthogonal type sets: that pass converts resources
+    // to DescriptorHandle; this one converts pointers to UIntPtr.
     if (isMetalTarget(targetRequest))
     {
         BufferElementTypeLoweringOptions metalPtrOptions;

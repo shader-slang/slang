@@ -2893,11 +2893,18 @@ struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
 };
 
 // Metal rejects pointer-to-pointer in buffer pointee types. This policy
-// lowers pointer fields to UIntPtr, using the framework's systematic cast
-// deferral and function specialization for complete coverage. The address
-// space distinguishes two rules:
-//   - StorageBuffer: lower ALL pointers (buffer binding adds a pointer level)
-//   - Other (Uniform/Constant): lower only multi-level pointers (T**)
+// lowers pointer fields to UIntPtr (emits as `ulong` — a pointer-sized
+// integer that communicates the value holds an address, unlike UInt64
+// which could be confused with plain data by future optimization passes).
+//
+// Two address-space rules:
+//   - StorageBuffer (RWStructuredBuffer<T*>): lower ALL pointers, because
+//     the buffer binding itself is a device*, making any T* element into
+//     device T* device* — which Metal rejects.
+//   - Uniform/Constant (ConstantBuffer<S>): lower only multi-level (T**)
+//     fields. Single-level T* is valid as `device int*` inside a
+//     `constant MyStruct*` binding — Metal accepts one level of pointer
+//     indirection in buffer-bound structs.
 struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
 {
     TargetProgram* target;
@@ -2910,6 +2917,15 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
     {
     }
 
+    // Conservative over-approximation: returns true if the element type
+    // contains ANY pointer (including single-level). The actual lowering
+    // decision is narrower (lowerLeafLogicalType uses the address-space
+    // rule). False positives are harmless — the framework skips buffers
+    // where the lowered type equals the original (no fields changed).
+    //
+    // Recursion through arrays/structs is needed because processModule asks
+    // about the TOP-LEVEL element type (e.g. the struct), not individual
+    // fields. We must drill in to detect nested pointer fields.
     bool needsElementLowering(IRType* elementType) override
     {
         if (as<IRPtrType>(elementType))
@@ -2925,6 +2941,11 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
         return false;
     }
 
+    // The early MetalParameterBlock policy already processed ParameterBlock
+    // structs, converting resource fields to DescriptorHandle and decorating
+    // the storage type with [PhysicalType]. Pointer fields were left
+    // untouched. We must re-process these types to lower their pointer
+    // fields — hence overriding to false.
     bool shouldSkipPhysicalTypes() override { return false; }
 
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
@@ -2947,6 +2968,10 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
                 return info;
             }
         }
+        // Not a pointer (or a single-level pointer in non-StorageBuffer context).
+        // Return identity — framework will skip this field. This is the common
+        // case for non-pointer fields (int, float, etc.) that share the struct
+        // with pointer fields; only the pointers get lowered.
         LoweredElementTypeInfo info;
         info.originalType = type;
         info.loweredType = type;
