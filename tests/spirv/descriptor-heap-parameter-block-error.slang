@@ -10,7 +10,9 @@ struct Uniforms { uint x; }
 [shader("compute")]
 [NumThreads(1, 1, 1)]
 void main(
-    // CHECK: error[E38029]
+    // CHECK: error[E38029]: type argument doesn't conform to interface
+    // CHECK: type argument 'ParameterBlock<Uniforms>' does not conform
+    // CHECK: required interface 'IOpaqueDescriptor'
     uniform DescriptorHandle<ParameterBlock<Uniforms>> input,
     uniform DescriptorHandle<RWStructuredBuffer<uint>> output)
 {

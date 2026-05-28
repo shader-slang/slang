@@ -212,6 +212,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
     }
 
+    // Creates the wrapper struct and matching parameter-group type for a non-struct constant
+    // buffer element, preserving layout operands and caching the wrapper layout decorations.
     WrappedCBufferElementInfo createWrappedConstantBufferElementType(
         IRParameterGroupType* parameterGroupType)
     {
@@ -244,6 +246,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return WrappedCBufferElementInfo{structType, key, newCbType};
     }
 
+    // Rewrites value users of a constant-buffer value to read through the single field of the
+    // synthesized wrapper struct.
     void replaceUsesWithWrappedConstantBufferElement(
         IRInst* cbParamInst,
         IRStructKey* key,
@@ -270,8 +274,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             });
     }
 
-    // Wraps the element type of a constant buffer or parameter block in a struct if it is not
-    // already a struct, returns the newly created struct type.
+    // Wraps the element type of a constant buffer or parameter block in a struct. This mutates
+    // cbParamInst in place by changing its full type to the wrapped parameter-group type and
+    // rewriting existing value uses to field addresses. Returns the wrapper struct type.
     IRType* wrapConstantBufferElement(IRInst* cbParamInst)
     {
         auto parameterGroupType = as<IRParameterGroupType>(cbParamInst->getDataType());
@@ -282,6 +287,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return wrapped.structType;
     }
 
+    // Wraps used non-struct IRConstantBufferType globals before SPIR-V type translation. This
+    // handles descriptor-handle operands that refer to the type directly rather than going
+    // through processGlobalParam.
     void wrapRemainingConstantBufferElementTypes()
     {
         List<IRConstantBufferType*> constantBufferTypes;

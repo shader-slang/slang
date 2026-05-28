@@ -16,8 +16,12 @@ void main(
     output[0] = getDescriptorFromHandle(input).value;
 }
 
-// CHECK: OpDecorate {{.*}}MyConstants{{.*}} Block
-// CHECK: OpTypePointer Uniform
-// CHECK: OpBufferPointerEXT
-// CHECK-NOT: OpAccessChain %_ptr_Function
-// CHECK: OpAccessChain %_ptr_Uniform
+// CHECK: OpName %[[CB:MyConstants_std140]] "MyConstants_std140"
+// CHECK-NOT: %_ptr_Function_[[CB]]
+// CHECK: OpDecorate %[[CB]] Block
+// CHECK-NOT: %_ptr_Function_[[CB]]
+// CHECK: %[[CB_PTR:_ptr_Uniform_MyConstants_std140]] = OpTypePointer Uniform %[[CB]]
+// CHECK-NOT: %_ptr_Function_[[CB]]
+// CHECK: OpBufferPointerEXT %[[CB_PTR]]
+// CHECK: OpAccessChain %_ptr_Uniform_v2float
+// CHECK-NOT: %_ptr_Function_[[CB]]
