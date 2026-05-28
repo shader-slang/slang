@@ -1460,20 +1460,28 @@ IRInst* mergeCandidateParentsForHoistableInst(IRInst* left, IRInst* right)
         }
     }
 
-    // As a matter of validity in the IR, we expect one
-    // of the two to be an ancestor (in the non-block case),
-    // because otherwise we'd be violating the basic dominance
-    // assumptions.
-    //
-    SLANG_ASSERT(parentNonBlock);
-
-    // As a fallback, try to use the left parent as a default
-    // in case things go badly.
+    // If neither side is an ancestor of the other, the operands live in
+    // sibling regions of the IR (for example, two generic interface bodies
+    // under the module). Place the hoistable instruction at their lowest
+    // common ancestor so it is in a scope that dominates both operands.
     //
     if (!parentNonBlock)
     {
-        parentNonBlock = leftNonBlock;
+        HashSet<IRInst*> leftAncestors;
+        for (auto ll = leftNonBlock; ll; ll = ll->getParent())
+            leftAncestors.add(ll);
+        for (auto rr = rightNonBlock; rr; rr = rr->getParent())
+        {
+            if (leftAncestors.contains(rr))
+            {
+                parentNonBlock = rr;
+                break;
+            }
+        }
     }
+    SLANG_ASSERT(parentNonBlock);
+    if (!parentNonBlock)
+        parentNonBlock = leftNonBlock;
 
     IRInst* parent = parentNonBlock;
 
