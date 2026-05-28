@@ -19,12 +19,18 @@ include(FetchContent)
 if(NOT DEFINED SLANG_DXC_BINARY_URL)
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         set(SLANG_DXC_BINARY_URL
-            "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/dxc_2026_02_20.zip"
+            "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.10.2605.24/dxc_preview_2026_05_22.zip"
+        )
+        set(_dxc_url_hash
+            "SHA256=045e2cfd900135f640954553038febbc98692599c5606376726d00541dae69b6"
         )
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
             set(SLANG_DXC_BINARY_URL
-                "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2602/linux_dxc_2026_02_20.x86_64.tar.gz"
+                "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.10.2605.24/linux_dxc_preview_2026_05_22.x86_64.tar.gz"
+            )
+            set(_dxc_url_hash
+                "SHA256=6119f59c4f758973cadc170607ba83e657dd2c6fb7ca3dfb7362717a4ece8d9e"
             )
         endif()
     endif()
@@ -42,6 +48,11 @@ set(_dxc_fetch_args
     SOURCE_SUBDIR
     _does_not_exist_
 )
+# URL_HASH only applies to the default URLs we ship; if the caller overrides
+# SLANG_DXC_BINARY_URL we have no way to know its digest.
+if(DEFINED _dxc_url_hash)
+    list(APPEND _dxc_fetch_args URL_HASH "${_dxc_url_hash}")
+endif()
 if(SLANG_GITHUB_TOKEN)
     list(
         APPEND
@@ -57,6 +68,34 @@ FetchContent_GetProperties(dxc)
 if(NOT dxc_POPULATED)
     FetchContent_MakeAvailable(dxc)
 endif()
+
+# Stage public DXC HLSL headers (e.g. dx/linalg.h) at a stable path so test
+# directives like `-Xdxc -Ibuild/dxc/include` can resolve them. Done as a
+# build-graph custom command, matching the DLL/.so copy pattern below.
+if(EXISTS "${dxc_SOURCE_DIR}/include/hlsl/dx/linalg.h")
+    set(_dxc_hlsl_include_dir "${dxc_SOURCE_DIR}/include/hlsl")
+elseif(EXISTS "${dxc_SOURCE_DIR}/inc/hlsl/dx/linalg.h")
+    set(_dxc_hlsl_include_dir "${dxc_SOURCE_DIR}/inc/hlsl")
+else()
+    message(
+        FATAL_ERROR
+        "DXC archive at ${SLANG_DXC_BINARY_URL} is missing dx/linalg.h. "
+        "The cooperative-{vector,matrix} tests rely on this header. "
+        "If Microsoft has reorganized the archive layout, update FetchDXC.cmake."
+    )
+endif()
+set(_dxc_inc_src "${_dxc_hlsl_include_dir}/dx/linalg.h")
+set(_dxc_inc_dst "${CMAKE_BINARY_DIR}/dxc/include/dx/linalg.h")
+add_custom_command(
+    OUTPUT "${_dxc_inc_dst}"
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_directory "${_dxc_hlsl_include_dir}"
+        "${CMAKE_BINARY_DIR}/dxc/include"
+    DEPENDS "${_dxc_inc_src}"
+    VERBATIM
+)
+add_custom_target(stage-dxc-headers DEPENDS "${_dxc_inc_dst}")
+set_target_properties(stage-dxc-headers PROPERTIES FOLDER generated)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
