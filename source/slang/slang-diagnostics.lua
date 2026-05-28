@@ -971,9 +971,15 @@ standalone_note(
     span { loc = "location" }
 )
 
+-- Renumbered from E29104 (#11318) to resolve an integer-code collision
+-- with `MiscDiagnostics::spirvCoreGrammarJSONParseFailure` defined in
+-- `source/compiler-core/slang-misc-diagnostic-defs.h`. Both diagnostics
+-- are alive (~8 emit sites in spirv-core-grammar.cpp for the misc one,
+-- and slang-parser.cpp emits this one), so renumbering is the right
+-- fix; renaming either would break callers.
 err(
     "spirv-instruction-without-result-id",
-    29104,
+    29117,
     "instruction has no result-id operand",
     span { loc = "location", message = "cannot use this 'x = ~opcode ...' syntax because ~opcode does not have a <result-id> operand" }
 )
