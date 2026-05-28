@@ -22,6 +22,10 @@
 ///   `ParameterBlock<Foo>`, then we should translate it to
 ///   `struct Foo_pb { Texture2D.Handle member; }` and `ParameterBlock<Foo_pb>`, so that
 ///    the resource legalization pass won't hoist the texture out of the parameter block.
+/// - In Metal, pointer-to-pointer types (e.g. `int**`) cannot appear in buffer
+///   pointee types, so multi-level pointer fields are lowered to UIntPtr. This
+///   runs as a separate late invocation so that address-space specialization
+///   sees real pointer types.
 ///
 /// We use the terms "physical", "storage", or "lowered" types to refer to types that
 /// are legal to use as buffer elements. In contrast, the terms "original" or "logical"

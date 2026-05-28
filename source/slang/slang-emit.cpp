@@ -2368,20 +2368,8 @@ Result linkAndOptimizeIR(
 
     // Metal rejects pointer-to-pointer types in buffer pointee types (e.g.
     // `device int* device*` as a struct field in a [[buffer(N)]] binding).
-    //
-    // This runs very late so that specializeAddressSpaceForMetal (which needs
-    // to see real pointer types to assign device/constant qualifiers) and all
-    // intermediate optimization passes operate on the original typed IR.
-    //
-    // Uses the buffer-element-type framework rather than a custom pass because
-    // the framework systematically handles all IR use patterns (Load, Store,
-    // GEP, FieldExtract, GetElement, function call boundaries) via cast
-    // deferral and function specialization — avoiding the class of bugs that
-    // arise from hand-rolling case-by-case IR rewriting.
-    //
-    // The follow-up performForceInlining + simplifyNonSSAIR cleans up the
-    // [ForceInline] pack/unpack functions the framework creates during
-    // materialization.
+    // This runs after the main pipeline so that specializeAddressSpaceForMetal
+    // sees real pointer types for device/constant qualification.
     //
     // This does not conflict with the earlier MetalParameterBlock run
     // because they lower orthogonal type sets: that pass converts resources
@@ -2392,7 +2380,25 @@ Result linkAndOptimizeIR(
         metalPtrOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::MetalPointerLowering;
         SLANG_PASS(lowerBufferElementTypeToStorageType, targetProgram, metalPtrOptions);
+
+        // Materialize the [ForceInline] pack/unpack helpers the pass creates.
         SLANG_PASS(performForceInlining);
+
+        // lowerBufferElementTypeToStorageType's loop-based pack/unpack
+        // for large arrays (>kMaxArraySizeToUnroll) introduces block
+        // parameters via emitLoopBlocks. Since the main eliminatePhis
+        // already ran, these new phis must be eliminated before emission.
+        // Liveness is disabled: markers were already finalized before
+        // the main eliminatePhis and should not be duplicated.
+        PhiEliminationOptions phiEliminationOptions;
+        SLANG_PASS(eliminatePhis, LivenessMode::Disabled, phiEliminationOptions);
+
+        // Address-space specialization is not re-run here -- it already
+        // executed against the original typed IR and must not see the
+        // lowered UIntPtr types. eliminateMultiLevelBreak is unnecessary
+        // because the generated loops are single-level. Full simplifyIR
+        // (which includes constructSSA) is counterproductive since
+        // eliminatePhis just took the IR out of SSA form.
         SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
     }
 
