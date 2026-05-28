@@ -45,11 +45,8 @@ jobs:
           config: release
           build-llvm: true
       - name: Build Slang
-        shell: bash
         run: |
-          cmake --preset default --fresh \
-            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-            -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
           cmake --workflow --preset release
       - uses: actions/checkout@v4
         with:

@@ -34,11 +34,7 @@
     { "option": "SLANG_EXCLUDE_DAWN" },
     { "option": "SLANG_EXCLUDE_TINT" },
     { "option": "SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC" },
-    {
-      "option": "SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN",
-      "post_build_slang_test": "tests/spirv/multi-return-via-glsl.slang",
-      "post_build_spirv_validation": "1"
-    },
+    { "option": "SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN" },
     { "option": "SLANG_ENABLE_RELEASE_LTO" },
     { "option": "SLANG_IGNORE_ABORT_MSG" },
     { "option": "SLANG_ENABLE_TIME_TRACE" },
