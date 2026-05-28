@@ -721,42 +721,17 @@ enum class TexelImageFormat
 #include "slang-image-format-defs.h"
 };
 
-auto strEqual = [](const char* left, const char* right)
+auto getTexelFormatElementType = [](const char* name) -> const char*
 {
-    for (; *left || *right; left++, right++)
-    {
-        if (*left != *right)
-            return false;
-    }
-    return true;
-};
+    UnownedStringSlice nameSlice(name);
 
-auto strEndsWith = [](const char* text, const char* suffix)
-{
-    const char* textEnd = text;
-    const char* suffixEnd = suffix;
-    while (*textEnd)
-        textEnd++;
-    while (*suffixEnd)
-        suffixEnd++;
-
-    for (; suffixEnd != suffix; textEnd--, suffixEnd--)
-    {
-        if (textEnd == text || textEnd[-1] != suffixEnd[-1])
-            return false;
-    }
-    return true;
-};
-
-auto getTexelFormatElementType = [&](const char* name) -> const char*
-{
-    if (strEqual(name, "r64ui"))
+    if (nameSlice == toSlice("r64ui"))
         return "uint64_t";
-    if (strEqual(name, "r64i"))
+    if (nameSlice == toSlice("r64i"))
         return "int64_t";
-    if (strEqual(name, "rgb10_a2ui") || strEndsWith(name, "ui"))
+    if (nameSlice == toSlice("rgb10_a2ui") || nameSlice.endsWith(toSlice("ui")))
         return "uint";
-    if (strEndsWith(name, "i"))
+    if (nameSlice.endsWith(toSlice("i")))
         return "int";
     return "float";
 };
