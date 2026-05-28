@@ -91,6 +91,9 @@ jobs:
       runs-on: '["windows-latest"]'
       arch: "amd64_arm64"
 
+  # windows-vs2019-debug: disabled — windows-2019 runner is being retired (June 2025)
+  # windows-vs2019-release: disabled — windows-2019 runner is being retired (June 2025)
+
   windows-vs2022-debug:
     uses: ./.github/workflows/cmake-options-build.yml
     with:

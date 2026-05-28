@@ -41,7 +41,6 @@ jobs:
       (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude') ||
       contains(github.event.comment.body || github.event.review.body || github.event.issue.body || '', '@claude')
 
-    # Defaults to the self-hosted Windows GPU runner used by Claude automation.
     runs-on: ${{ fromJSON(vars.CLAUDE_RUNNER || '["Windows", "self-hosted", "GCP-T4"]') }}
     timeout-minutes: 360
 
