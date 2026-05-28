@@ -11,7 +11,7 @@ anchored to
 
 Audience: nightly CI. The bundle exercises the **pre-link IR-pass
 sequence** that runs inside `generateIRForTranslationUnit` in
-[slang-lower-to-ir.cpp](../../../source/slang/slang-lower-to-ir.cpp)
+[slang-lower-to-ir.cpp](../../../../../source/slang/slang-lower-to-ir.cpp)
 **before** the per-translation-unit IR module is cached and pulled
 into `linkAndOptimizeIR` by `linkIR`. The doc organises the sequence
 into four phases:

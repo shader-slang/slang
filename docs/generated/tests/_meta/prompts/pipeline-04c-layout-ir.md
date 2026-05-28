@@ -11,9 +11,9 @@ anchored to
 
 Audience: nightly CI. The bundle exercises the **per-target layout IR
 module** built by `TargetProgram::createIRModuleForLayout` in
-[slang-lower-to-ir.cpp](../../../source/slang/slang-lower-to-ir.cpp).
+[slang-lower-to-ir.cpp](../../../../../source/slang/slang-lower-to-ir.cpp).
 The layout-IR module is a sibling of the executable IR module
-documented in [04b-pre-link-passes.md](04b-pre-link-passes.md); its
+documented in [pipeline-04b-pre-link-passes.md](pipeline-04b-pre-link-passes.md); its
 only job is to carry `IRLayoutDecoration`s on stub globals and
 entry-point functions for one specific target's chosen layout rules.
 
