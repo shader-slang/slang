@@ -238,6 +238,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             parameterGroupType->getOp(),
             (UInt)bufferTypeOperands.getCount(),
             bufferTypeOperands.getArrayView().getBuffer()));
+        auto rules = getTypeLayoutRuleForBuffer(m_sharedContext->m_targetProgram, newCbType);
+        IRSizeAndAlignment sizeAlignment;
+        getSizeAndAlignment(m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment);
         return WrappedCBufferElementInfo{structType, key, newCbType};
     }
 
@@ -276,15 +279,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         auto wrapped = createWrappedConstantBufferElementType(parameterGroupType);
         cbParamInst->setFullType(wrapped.parameterGroupType);
         replaceUsesWithWrappedConstantBufferElement(cbParamInst, wrapped.key, innerType);
-        auto rules = getTypeLayoutRuleForBuffer(
-            m_sharedContext->m_targetProgram,
-            cbParamInst->getDataType());
-        IRSizeAndAlignment sizeAlignment;
-        getSizeAndAlignment(
-            m_sharedContext->m_targetRequest,
-            rules,
-            wrapped.structType,
-            &sizeAlignment);
         return wrapped.structType;
     }
 
@@ -314,9 +308,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     if (user->getFullType() == constantBufferType)
                         instsToUnwrap.add(user);
                 });
-
-            if (!instsToUnwrap.getCount())
-                continue;
 
             auto innerType = constantBufferType->getElementType();
             auto wrapped = createWrappedConstantBufferElementType(constantBufferType);
