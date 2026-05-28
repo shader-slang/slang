@@ -11,6 +11,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 #ifdef POSITIVE_VECTOR_ATOMIC
     __atomic_add(vectorBuffer[0], half2(1.0h, 2.0h));
+#else
+    vectorBuffer[0] = half2(1.0h, 2.0h);
 #endif
 }
 
