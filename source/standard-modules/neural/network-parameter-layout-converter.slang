@@ -205,6 +205,9 @@ internal int physicalWeightOffset(
     case metal:
         return physicalWeightOffsetForTarget<TargetEnum.Metal>(
             inputSize, outputSize, outputIndex, inputIndex);
+    default:
+        static_assert(false, "NetworkParameterLayoutConverter supports CUDA, SPIR-V, and Metal targets only");
+        return 0;
     }
 }
 
@@ -293,6 +296,12 @@ internal int2 physicalWeightIndexToLogicalCoord(
     case metal:
         return physicalWeightIndexToLogicalCoordForTarget<TargetEnum.Metal>(
             inputSize, outputSize, physicalWeightIndex);
+    default:
+        static_assert(false, "NetworkParameterLayoutConverter supports CUDA, SPIR-V, and Metal targets only");
+        int2 coord;
+        coord.x = 0;
+        coord.y = 0;
+        return coord;
     }
 }
 

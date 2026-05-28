@@ -32,6 +32,7 @@ The system-value semantics are translated to the following WGSL code.
 | SV_GroupID | `@builtin(workgroup_id)` |
 | SV_GroupIndex | `@builtin(local_invocation_index)` |
 | SV_GroupThreadID | `@builtin(local_invocation_id)` |
+| SV_WorkgroupCount | *Not supported* |
 | SV_InnerCoverage | *Not supported* |
 | SV_InsideTessFactor | *Not supported* |
 | SV_InstanceID | `@builtin(instance_index)` |

@@ -3343,10 +3343,15 @@ spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t*
     auto decl = var.getDecl();
     if (auto varDecl = as<VarDeclBase>(decl))
     {
+        if (auto constantVal = as<ConstantIntVal>(varDecl->val))
+        {
+            *rs = constantVal->getValue();
+            return 0;
+        }
         if (varDecl->val)
         {
-            // Prefer the semantic `Val` when available. If it cannot be resolved as an integer
-            // value, fall back to the initializer path below to preserve the old literal handling.
+            // Substitute specialized generic arguments before resolving semantic values that are
+            // not already concrete integer constants.
             if (auto module = getModule(varDecl))
             {
                 if (auto linkage = module->getLinkage())
