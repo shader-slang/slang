@@ -2,9 +2,11 @@
 // lowering this module used to crash while hoisting a cloned Func type.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -profile spirv_1_6 -emit-spirv-directly -stage compute -entry cs_main
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_RUN):-cpu -shaderobj -output-using-type -entry cs_main
 
 import generic_vector_ctor_link_import;
 
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [Differentiable]
@@ -31,3 +33,5 @@ void cs_main()
 // CHECK: OpTypeVector
 // CHECK: OpStore
 // CHECK: OpReturn
+
+// CHECK_RUN: 3.0
