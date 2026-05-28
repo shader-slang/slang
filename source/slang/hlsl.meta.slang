@@ -6576,15 +6576,17 @@ $}
     /// @param value The value to add to the value at `byteAddress`.
     /// @param originalValue The original value at `byteAddress` before the add operation.
     /// @remarks For SPIR-V, this function maps to `OpAtomicFAdd` on a `half` when
-    /// `SPV_EXT_shader_atomic_float16_add` is available, and falls back to a `half2`
-    /// atomic when `SPV_NV_shader_atomic_fp16_vector` is available.
+    /// `SPV_EXT_shader_atomic_float16_add` is available. When only
+    /// `SPV_NV_shader_atomic_fp16_vector` is selected, it uses a 32-bit compare-exchange
+    /// loop so the neighboring half lane is preserved.
     ///
     /// For HLSL, this function translates to an NVAPI call
     /// due to lack of native HLSL intrinsic for floating point atomic add. For CUDA, this function
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_hlsl, sm_5_0)]
+    [require(hlsl, sm_5_0)]
+    [require(cuda, cuda_sm_7_0)]
     [require(spirv, spvAtomicFloat16VectorNV)]
     [require(spirv, spvAtomicFloat16AddEXT)]
     void InterlockedAddF16(uint byteAddress, half value, out half originalValue)
@@ -6615,16 +6617,29 @@ $}
             }
         case spvAtomicFloat16VectorNV:
             {
-                let buf = __getEquivalentStructuredBuffer<half2>(this);
-                if ((byteAddress & 2) == 0)
+                // A half2 atomic add with zero in the other lane is not bit-preserving
+                // for all IEEE half values, so use CAS on the containing 32-bit word.
+                let buf = __getEquivalentStructuredBuffer<uint>(this);
+                uint wordIndex = byteAddress / 4;
+                uint laneShift = (byteAddress & 2) == 0 ? 0U : 16U;
+                uint laneMask = 0xFFFFU << laneShift;
+                uint oldPacked = __atomic_add(buf[wordIndex], 0U);
+
+                for (;;)
                 {
-                    originalValue = __atomic_add(buf[byteAddress/4], half2(value, half(0.0))).x;
+                    uint oldHalfBits = (oldPacked >> laneShift) & 0xFFFFU;
+                    half oldHalf = asfloat16(uint16_t(oldHalfBits));
+                    uint newHalfBits = uint(asuint16(oldHalf + value));
+                    uint newPacked = (oldPacked & ~laneMask) | (newHalfBits << laneShift);
+                    uint actualPacked =
+                        __atomic_compare_exchange(buf[wordIndex], oldPacked, newPacked);
+                    if (actualPacked == oldPacked)
+                    {
+                        originalValue = oldHalf;
+                        return;
+                    }
+                    oldPacked = actualPacked;
                 }
-                else
-                {
-                    originalValue = __atomic_add(buf[byteAddress/4], half2(half(0.0), value)).y;
-                }
-                return;
             }
         }
     }

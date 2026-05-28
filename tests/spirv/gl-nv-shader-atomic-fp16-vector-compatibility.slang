@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute -emit-spirv-directly
 
+// Requiring the GLSL extension should preserve the old SPIR-V 1.0 compatibility path and
+// should not declare the NV vector capability until a vector atomic operation needs it.
 [require(GL_NV_shader_atomic_fp16_vector)]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
