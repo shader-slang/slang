@@ -152,6 +152,8 @@ bool TEST_texture<T : ITexelElement>(
     // METAL-LABEL: TEST_texture
     typealias Tvn = T.DataType;
     typealias Tv4 = vector<T.DataType.Element,4>;
+    Tvn zero = {};
+    Tv4 zero4 = {};
 
     float u = 0;
     float u2 = 0.5;
@@ -371,31 +373,31 @@ bool TEST_texture<T : ITexelElement>(
 
         // METAL: t1D{{.*}}.sample(
         // METALLIB: call {{.*}}.sample_texture_1d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t1D.Sample(samplerState, u))
+        && all(zero == t1D.Sample(samplerState, u))
 
         // METAL: t2D{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_2d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2D.Sample(samplerState, float2(u, u)))
+        && all(zero == t2D.Sample(samplerState, float2(u, u)))
 
         // METAL: t3D{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_3d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t3D.Sample(samplerState, float3(u, u, u)))
+        && all(zero == t3D.Sample(samplerState, float3(u, u, u)))
 
         // METAL: tCube{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_cube.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == tCube.Sample(samplerState, normalize(float3(u, 1 - u, u))))
+        && all(zero == tCube.Sample(samplerState, normalize(float3(u, 1 - u, u))))
 
         // METAL: t1DArray{{.*}}.sample(
         // METALLIB: call {{.*}}.sample_texture_1d_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t1DArray.Sample(samplerState, float2(u, 0)))
+        && all(zero == t1DArray.Sample(samplerState, float2(u, 0)))
 
         // METAL: t2DArray{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_2d_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.Sample(samplerState, float3(u, u, 0)))
+        && all(zero == t2DArray.Sample(samplerState, float3(u, u, 0)))
 
         // METAL: tCubeArray{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_cube_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == tCubeArray.Sample(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
+        && all(zero == tCubeArray.Sample(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
         // Offset variant
 
@@ -403,15 +405,15 @@ bool TEST_texture<T : ITexelElement>(
 
         // METAL: t2D{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_2d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2D.Sample(samplerState, float2(u, u), int2(1, 1)))
+        && all(zero == t2D.Sample(samplerState, float2(u, u), int2(1, 1)))
 
         // METAL: t3D{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_3d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t3D.Sample(samplerState, float3(u, u, u), int3(1, 1, 1)))
+        && all(zero == t3D.Sample(samplerState, float3(u, u, u), int3(1, 1, 1)))
 
         // METAL: t2DArray{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_2d_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.Sample(samplerState, float3(u, u, 0), int2(1, 1)))
+        && all(zero == t2DArray.Sample(samplerState, float3(u, u, 0), int2(1, 1)))
 
         // Clamp variant
 
@@ -419,15 +421,15 @@ bool TEST_texture<T : ITexelElement>(
 
         // METAL: t2D{{.*}}.sample({{.*}} min_lod_clamp(
         // METALLIB: call {{.*}}.sample_texture_2d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2D.Sample(samplerState, float2(u, u), int2(1, 1), float(1)))
+        && all(zero == t2D.Sample(samplerState, float2(u, u), int2(1, 1), float(1)))
 
         // METAL: t3D{{.*}}.sample({{.*}} min_lod_clamp(
         // METALLIB: call {{.*}}.sample_texture_3d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t3D.Sample(samplerState, float3(u, u, u), int3(1, 1, 1), float(1)))
+        && all(zero == t3D.Sample(samplerState, float3(u, u, u), int3(1, 1, 1), float(1)))
 
         // METAL: t2DArray{{.*}}.sample({{.*}} min_lod_clamp(
         // METALLIB: call {{.*}}.sample_texture_2d_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.Sample(samplerState, float3(u, u, 0), int2(1, 1), float(1)))
+        && all(zero == t2DArray.Sample(samplerState, float3(u, u, 0), int2(1, 1), float(1)))
 
         // ===============
         // T SampleBias()
@@ -437,23 +439,23 @@ bool TEST_texture<T : ITexelElement>(
 
         // METAL: t2D{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_2d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2D.SampleBias(samplerState, float2(u, u), float(-1)))
+        && all(zero == t2D.SampleBias(samplerState, float2(u, u), float(-1)))
 
         // METAL: t3D{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_3d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t3D.SampleBias(samplerState, float3(u, u, u), float(-1)))
+        && all(zero == t3D.SampleBias(samplerState, float3(u, u, u), float(-1)))
 
         // METAL: tCube{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_cube.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == tCube.SampleBias(samplerState, normalize(float3(u, 1 - u, u)), float(-1)))
+        && all(zero == tCube.SampleBias(samplerState, normalize(float3(u, 1 - u, u)), float(-1)))
 
         // METAL: t2DArray{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_2d_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.SampleBias(samplerState, float3(u, u, 0), float(-1)))
+        && all(zero == t2DArray.SampleBias(samplerState, float3(u, u, 0), float(-1)))
 
         // METAL: tCubeArray{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_cube_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == tCubeArray.SampleBias(samplerState, float4(normalize(float3(u, 1 - u, u)), 0), float(-1)))
+        && all(zero == tCubeArray.SampleBias(samplerState, float4(normalize(float3(u, 1 - u, u)), 0), float(-1)))
 
         // Offset variant
 
@@ -461,15 +463,15 @@ bool TEST_texture<T : ITexelElement>(
 
         // METAL: t2D{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_2d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2D.SampleBias(samplerState, float2(u, u), float(-1), int2(1, 1)))
+        && all(zero == t2D.SampleBias(samplerState, float2(u, u), float(-1), int2(1, 1)))
 
         // METAL: t3D{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_3d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t3D.SampleBias(samplerState, float3(u, u, u), float(-1), int3(1, 1, 1)))
+        && all(zero == t3D.SampleBias(samplerState, float3(u, u, u), float(-1), int3(1, 1, 1)))
 
         // METAL: t2DArray{{.*}}.sample({{.*}}
         // METALLIB: call {{.*}}.sample_texture_2d_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.SampleBias(samplerState, float3(u, u, 0), float(-1), int2(1, 1)))
+        && all(zero == t2DArray.SampleBias(samplerState, float3(u, u, 0), float(-1), int2(1, 1)))
 
         // ===================================
         //  T SampleLevel()
@@ -479,23 +481,23 @@ bool TEST_texture<T : ITexelElement>(
 
         // METAL: t2D{{.*}}.sample({{.*}} level(
         // METALLIB: call {{.*}}.sample_texture_2d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2D.SampleLevel(samplerState, float2(u, u), 0))
+        && all(zero == t2D.SampleLevel(samplerState, float2(u, u), 0))
 
         // METAL: t3D{{.*}}.sample({{.*}} level(
         // METALLIB: call {{.*}}.sample_texture_3d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t3D.SampleLevel(samplerState, float3(u, u, u), 0))
+        && all(zero == t3D.SampleLevel(samplerState, float3(u, u, u), 0))
 
         // METAL: tCube{{.*}}.sample({{.*}} level(
         // METALLIB: call {{.*}}.sample_texture_cube.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == tCube.SampleLevel(samplerState, normalize(float3(u, 1 - u, u)), 0))
+        && all(zero == tCube.SampleLevel(samplerState, normalize(float3(u, 1 - u, u)), 0))
 
         // METAL: t2DArray{{.*}}.sample({{.*}} level(
         // METALLIB: call {{.*}}.sample_texture_2d_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0))
+        && all(zero == t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0))
 
         // METAL: tCubeArray{{.*}}.sample({{.*}} level(
         // METALLIB: call {{.*}}.sample_texture_cube_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == tCubeArray.SampleLevel(samplerState, float4(normalize(float3(u, 1 - u, u)), 0), 0))
+        && all(zero == tCubeArray.SampleLevel(samplerState, float4(normalize(float3(u, 1 - u, u)), 0), 0))
 
         // Offset variant
 
@@ -503,15 +505,15 @@ bool TEST_texture<T : ITexelElement>(
 
         // METAL: t2D{{.*}}.sample({{.*}} level(
         // METALLIB: call {{.*}}.sample_texture_2d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2D.SampleLevel(samplerState, float2(u, u), 0, int2(1, 1)))
+        && all(zero == t2D.SampleLevel(samplerState, float2(u, u), 0, int2(1, 1)))
 
         // METAL: t3D{{.*}}.sample({{.*}} level(
         // METALLIB: call {{.*}}.sample_texture_3d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t3D.SampleLevel(samplerState, float3(u, u, u), 0, int3(1, 1, 1)))
+        && all(zero == t3D.SampleLevel(samplerState, float3(u, u, u), 0, int3(1, 1, 1)))
 
         // METAL: t2DArray{{.*}}.sample({{.*}} level(
         // METALLIB: call {{.*}}.sample_texture_2d_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0, int2(1, 1)))
+        && all(zero == t2DArray.SampleLevel(samplerState, float3(u, u, 0), 0, int2(1, 1)))
 
         // ==================
         // float SampleCmp()
@@ -600,29 +602,29 @@ bool TEST_texture<T : ITexelElement>(
 
         // METAL: t2D{{.*}}.gather(
         // METALLIB: call {{.*}}.gather_texture_2d.v4f32(
-        && all(Tv4(T.DataType.Element(0)) == t2D.Gather(samplerState, float2(u, u)))
+        && all(zero4 == t2D.Gather(samplerState, float2(u, u)))
 
         // METAL: tCube{{.*}}.gather(
         // METALLIB: call {{.*}}.gather_texture_cube.v4f32(
-        && all(Tv4(T.DataType.Element(0)) == tCube.Gather(samplerState, normalize(float3(u, 1 - u, u))))
+        && all(zero4 == tCube.Gather(samplerState, normalize(float3(u, 1 - u, u))))
 
         // METAL: t2DArray{{.*}}.gather(
         // METALLIB: call {{.*}}.gather_texture_2d_array.v4f32(
-        && all(Tv4(T.DataType.Element(0)) == t2DArray.Gather(samplerState, float3(u, u, 0)))
+        && all(zero4 == t2DArray.Gather(samplerState, float3(u, u, 0)))
 
         // METAL: tCubeArray{{.*}}.gather(
         // METALLIB: call {{.*}}.gather_texture_cube_array.v4f32(
-        && all(Tv4(T.DataType.Element(0)) == tCubeArray.Gather(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
+        && all(zero4 == tCubeArray.Gather(samplerState, float4(normalize(float3(u, 1 - u, u)), 0)))
 
         // Offset variant
 
         // METAL: t2D{{.*}}.gather(
         // METALLIB: call {{.*}}.gather_texture_2d.v4f32(
-        && all(Tv4(T.DataType.Element(0)) == t2D.Gather(samplerState, float2(u2, u), int2(0, 0)))
+        && all(zero4 == t2D.Gather(samplerState, float2(u2, u), int2(0, 0)))
 
         // METAL: t2DArray{{.*}}.gather(
         // METALLIB: call {{.*}}.gather_texture_2d_array.v4f32(
-        && all(Tv4(T.DataType.Element(0)) == t2DArray.Gather(samplerState, float3(u2, u, 0), int2(0, 0)))
+        && all(zero4 == t2DArray.Gather(samplerState, float3(u2, u, 0), int2(0, 0)))
 
         // =====================================
         //  T SampleGrad()
@@ -632,33 +634,33 @@ bool TEST_texture<T : ITexelElement>(
 
         // METAL: t2D{{.*}}.sample(
         // METALLIB: call {{.*}}.sample_texture_2d_grad.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2D.SampleGrad(samplerState, float2(u, u), float2(ddx, ddx), float2(ddy, ddy)))
+        && all(zero == t2D.SampleGrad(samplerState, float2(u, u), float2(ddx, ddx), float2(ddy, ddy)))
 
         // METAL: t3D{{.*}}.sample(
         // METALLIB: call {{.*}}.sample_texture_3d_grad.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t3D.SampleGrad(samplerState, float3(u, u, u), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
+        && all(zero == t3D.SampleGrad(samplerState, float3(u, u, u), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
 
         // METAL: tCube{{.*}}.sample(
         // METALLIB: call {{.*}}.sample_texture_cube_grad.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == tCube.SampleGrad(samplerState, normalize(float3(u, 1 - u, u)), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
+        && all(zero == tCube.SampleGrad(samplerState, normalize(float3(u, 1 - u, u)), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
 
         // METAL: t2DArray{{.*}}.sample(
         // METALLIB: call {{.*}}.sample_texture_2d_array_grad.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(ddx, ddx), float2(ddy, ddy)))
+        && all(zero == t2DArray.SampleGrad(samplerState, float3(u, u, 0.0f), float2(ddx, ddx), float2(ddy, ddy)))
 
         // Offset variant
 
         // METAL: t2D{{.*}}.sample(
         // METALLIB: call {{.*}}.sample_texture_2d_grad.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2D.SampleGrad(samplerState, float2(u2, u), float2(ddx, ddx), float2(ddy, ddy), int2(0, 0)))
+        && all(zero == t2D.SampleGrad(samplerState, float2(u2, u), float2(ddx, ddx), float2(ddy, ddy), int2(0, 0)))
 
         // METAL: t3D{{.*}}.sample(
         // METALLIB: call {{.*}}.sample_texture_3d_grad.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t3D.SampleGrad(samplerState, float3(u2, u, u), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy), int3(0, 0, 0)))
+        && all(zero == t3D.SampleGrad(samplerState, float3(u2, u, u), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy), int3(0, 0, 0)))
 
         // METAL: t2DArray{{.*}}.sample(
         // METALLIB: call {{.*}}.sample_texture_2d_array_grad.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.SampleGrad(samplerState, float3(u2, u, 0.0f), float2(ddx, ddx), float2(ddy, ddy), int2(0, 0)))
+        && all(zero == t2DArray.SampleGrad(samplerState, float3(u2, u, 0.0f), float2(ddx, ddx), float2(ddy, ddy), int2(0, 0)))
 
         // ===================
         //  T Load()
@@ -666,23 +668,23 @@ bool TEST_texture<T : ITexelElement>(
 
         // METAL: t1D{{.*}}.read(
         // METALLIB: call {{.*}}.read_texture_1d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t1D.Load(int2(0, 0)))
+        && all(zero == t1D.Load(int2(0, 0)))
 
         // METAL: t2D{{.*}}.read(
         // METALLIB: call {{.*}}.read_texture_2d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2D.Load(int3(0, 0, 0)))
+        && all(zero == t2D.Load(int3(0, 0, 0)))
 
         // METAL: t3D{{.*}}.read(
         // METALLIB: call {{.*}}.read_texture_3d.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t3D.Load(int4(0, 0, 0, 0)))
+        && all(zero == t3D.Load(int4(0, 0, 0, 0)))
 
         // METAL: t1DArray{{.*}}.read(
         // METALLIB: call {{.*}}.read_texture_1d_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t1DArray.Load(int3(0, 0, 0)))
+        && all(zero == t1DArray.Load(int3(0, 0, 0)))
 
         // METAL: t2DArray{{.*}}.read(
         // METALLIB: call {{.*}}.read_texture_2d_array.v4f32(
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.Load(int4(0, 0, 0, 0)))
+        && all(zero == t2DArray.Load(int4(0, 0, 0, 0)))
 
         // Offset variant
 

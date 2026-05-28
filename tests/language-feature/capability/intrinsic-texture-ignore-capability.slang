@@ -50,7 +50,7 @@ uniform usampler2DArray uniform_usampler2DArray;
 uniform usamplerCubeArray uniform_usamplerCubeArray;
 uniform usamplerBuffer uniform_usamplerBuffer;
 
-__generic<T : ITexelElement, let sampleCount:int, let format:int>
+__generic<T : ITexelData, let sampleCount:int, let format:int>
 bool textureFuncs( _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gsampler1D
     , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2D
     , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2DRect
@@ -359,7 +359,7 @@ bool textureFuncs( _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gs
         ;
 }
 
-__generic<T : ITexelElement, let sampleCount:int, let format:int>
+__generic<T : ITexelData, let sampleCount:int, let format:int>
 bool itextureFuncs(_Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gsampler1D
     , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2D
     , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2DRect

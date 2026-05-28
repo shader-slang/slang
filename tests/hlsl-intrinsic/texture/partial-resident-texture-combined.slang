@@ -60,6 +60,12 @@ uint getNotMapped()
 #endif
 }
 
+__generic<T : IArithmetic>
+T makeTestOneValue()
+{
+    return T(1);
+}
+
 bool TEST_combinedDepth()
 {
     float u = 0.0;
@@ -101,6 +107,7 @@ bool TEST_sampler<T : ITexelElement>(
 ) where T.DataType : IArithmetic
 {
     typealias TN = T.DataType;
+    TN one = makeTestOneValue<TN>();
 
     float u = 0.0;
     int offset = 0;
@@ -118,38 +125,38 @@ bool TEST_sampler<T : ITexelElement>(
         // ==========
         // T Sample()
         // ==========
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t1D.Sample(u, offset, clamp, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t2D.Sample(float2(u), int2(offset), clamp, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t3D.Sample(float3(u), int3(offset), clamp, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t1DArray.Sample(float2(u, slice), offset, clamp, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t2DArray.Sample(float3(u, u, slice), offset, clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t1D.Sample(u, offset, clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t2D.Sample(float2(u), int2(offset), clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t3D.Sample(float3(u), int3(offset), clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t1DArray.Sample(float2(u, slice), offset, clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t2DArray.Sample(float3(u, u, slice), offset, clamp, status))) && CheckAccessFullyMapped(status)
 
         // ==============
         // T SampleBias()
         // ==============
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t1D.SampleBias(u, bias, offset, clamp, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t2D.SampleBias(float2(u), bias, int2(offset), clamp, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t3D.SampleBias(float3(u), bias, int3(offset), clamp, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t1DArray.SampleBias(float2(u, slice), bias, offset, clamp, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t2DArray.SampleBias(float3(u, u, slice), bias, offset, clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t1D.SampleBias(u, bias, offset, clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t2D.SampleBias(float2(u), bias, int2(offset), clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t3D.SampleBias(float3(u), bias, int3(offset), clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t1DArray.SampleBias(float2(u, slice), bias, offset, clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t2DArray.SampleBias(float3(u, u, slice), bias, offset, clamp, status))) && CheckAccessFullyMapped(status)
 
         // ==============
         // T SampleGrad()
         // ==============
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t1D.SampleGrad(u, ddx, ddy, offset, clamp, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t2D.SampleGrad(float2(u), ddx, ddy, int2(offset), clamp, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t3D.SampleGrad(float3(u), ddx, ddy, int3(offset), clamp, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t1DArray.SampleGrad(float2(u, slice), ddx, ddy, offset, clamp, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t2DArray.SampleGrad(float3(u, u, slice), ddx, ddy, offset, clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t1D.SampleGrad(u, ddx, ddy, offset, clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t2D.SampleGrad(float2(u), ddx, ddy, int2(offset), clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t3D.SampleGrad(float3(u), ddx, ddy, int3(offset), clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t1DArray.SampleGrad(float2(u, slice), ddx, ddy, offset, clamp, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t2DArray.SampleGrad(float3(u, u, slice), ddx, ddy, offset, clamp, status))) && CheckAccessFullyMapped(status)
 
         // ==============
         // T SampleLevel()
         // ==============
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t1D.SampleLevel(u, level, offset, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t2D.SampleLevel(float2(u), level, int2(offset), status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t3D.SampleLevel(float3(u), level, int3(offset), status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t1DArray.SampleLevel(float2(u, slice), level, offset, status))) && CheckAccessFullyMapped(status)
-        && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == t2DArray.SampleLevel(float3(u, u, slice), level, offset, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t1D.SampleLevel(u, level, offset, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t2D.SampleLevel(float2(u), level, int2(offset), status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t3D.SampleLevel(float3(u), level, int3(offset), status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t1DArray.SampleLevel(float2(u, slice), level, offset, status))) && CheckAccessFullyMapped(status)
+        && (status = getNotMapped(), all(one == t2DArray.SampleLevel(float3(u, u, slice), level, offset, status))) && CheckAccessFullyMapped(status)
         ;
 }
 
@@ -159,6 +166,7 @@ bool TEST_sparse<T : ITexelElement>(
      where T.DataType : IArithmetic
  {
      typealias TN = T.DataType;
+     TN one = makeTestOneValue<TN>();
      constexpr const int2 offset = int2(0, 0);
      uint status;
 
@@ -167,8 +175,8 @@ bool TEST_sparse<T : ITexelElement>(
      int3 iuvs = int3(iuv, sampleIndex);
 
      return true
-         && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == s2D.Load(iuvs, offset, status))) && CheckAccessFullyMapped(status)
-         && (status = getNotMapped(), all(TN(T.DataType.Element(1)) == s2DMS.Load(iuv, sampleIndex, offset, status))) && CheckAccessFullyMapped(status)
+         && (status = getNotMapped(), all(one == s2D.Load(iuvs, offset, status))) && CheckAccessFullyMapped(status)
+         && (status = getNotMapped(), all(one == s2DMS.Load(iuv, sampleIndex, offset, status))) && CheckAccessFullyMapped(status)
          ;
  }
 

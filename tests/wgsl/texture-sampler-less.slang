@@ -69,6 +69,8 @@ bool TEST_texture<T:ITexelElement>(
     // WGSL-LABEL: TEST_texture
     typealias Tvn = T.DataType;
     typealias Tv4 = vector<T.DataType.Element,4>;
+    Tvn zero = {};
+    Tv4 zero4 = {};
 
     float u = 0;
     float u2 = 0.5;
@@ -92,41 +94,41 @@ bool TEST_texture<T:ITexelElement>(
         // ===========
 
         // WGSL: textureSample({{\(*}}t1D
-        && all(Tvn(T.DataType.Element(0)) == t1D.Sample(u))
+        && all(zero == t1D.Sample(u))
 
         // WGSL: textureSample({{\(*}}t2D
-        && all(Tvn(T.DataType.Element(0)) == t2D.Sample(float2(u, u)))
+        && all(zero == t2D.Sample(float2(u, u)))
 
         // WGSL: textureSample({{\(*}}t3D
-        && all(Tvn(T.DataType.Element(0)) == t3D.Sample(float3(u, u, u)))
+        && all(zero == t3D.Sample(float3(u, u, u)))
 
         // WGSL: textureSample({{\(*}}tCube
-        && all(Tvn(T.DataType.Element(0)) == tCube.Sample(normalize(float3(u, 1 - u, u))))
+        && all(zero == tCube.Sample(normalize(float3(u, 1 - u, u))))
 
         // WGSL doesn't support textureSample for 1d_array and 3d_array; only 2d and cube
 
         // WGSL: textureSample({{\(*}}t2DArray
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.Sample(float3(u, u, 0)))
+        && all(zero == t2DArray.Sample(float3(u, u, 0)))
 
         // WGSL: textureSample({{\(*}}tCubeArray
-        && all(Tvn(T.DataType.Element(0)) == tCubeArray.Sample(float4(normalize(float3(u, 1 - u, u)), 0)))
+        && all(zero == tCubeArray.Sample(float4(normalize(float3(u, 1 - u, u)), 0)))
 
 #if TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET
         // Offset variant
 
         // WGSL: textureSample({{\(*}}t1D
-        && all(Tvn(T.DataType.Element(0)) == t1D.Sample(u, 1))
+        && all(zero == t1D.Sample(u, 1))
 
         // WGSL: textureSample({{\(*}}t2D
-        && all(Tvn(T.DataType.Element(0)) == t2D.Sample(float2(u, u), int2(1, 1)))
+        && all(zero == t2D.Sample(float2(u, u), int2(1, 1)))
 
         // WGSL: textureSample({{\(*}}t3D
-        && all(Tvn(T.DataType.Element(0)) == t3D.Sample(float3(u, u, u), int3(1, 1, 1)))
+        && all(zero == t3D.Sample(float3(u, u, u), int3(1, 1, 1)))
 
         // WGSL doesn't support offset variant for cube and cube_array
 
         // WGSL: textureSample({{\(*}}t2DArray
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.Sample(float3(u, u, 0), int2(1, 1)))
+        && all(zero == t2DArray.Sample(float3(u, u, 0), int2(1, 1)))
 #endif // #if TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET
 
         // ===============
@@ -137,31 +139,31 @@ bool TEST_texture<T:ITexelElement>(
         // WGSL doesn't support Bias for 1D texture
 
         // WGSL: textureSampleBias({{\(*}}t2D
-        && all(Tvn(T.DataType.Element(0)) == t2D.SampleBias(float2(u, u), float(-1)))
+        && all(zero == t2D.SampleBias(float2(u, u), float(-1)))
 
         // WGSL: textureSampleBias({{\(*}}t3D
-        && all(Tvn(T.DataType.Element(0)) == t3D.SampleBias(float3(u, u, u), float(-1)))
+        && all(zero == t3D.SampleBias(float3(u, u, u), float(-1)))
 
         // WGSL: textureSampleBias({{\(*}}tCube
-        && all(Tvn(T.DataType.Element(0)) == tCube.SampleBias(normalize(float3(u, 1 - u, u)), float(-1)))
+        && all(zero == tCube.SampleBias(normalize(float3(u, 1 - u, u)), float(-1)))
 
         // WGSL: textureSampleBias({{\(*}}t2DArray
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.SampleBias(float3(u, u, 0), float(-1)))
+        && all(zero == t2DArray.SampleBias(float3(u, u, 0), float(-1)))
 
         // WGSL: textureSampleBias({{\(*}}tCubeArray
-        && all(Tvn(T.DataType.Element(0)) == tCubeArray.SampleBias(float4(normalize(float3(u, 1 - u, u)), 0), float(-1)))
+        && all(zero == tCubeArray.SampleBias(float4(normalize(float3(u, 1 - u, u)), 0), float(-1)))
 
 #if TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET
         // Offset variant
 
         // W-GSL: textureSampleBias({{\(*}}t2D
-        && all(Tvn(T.DataType.Element(0)) == t2D.SampleBias(float2(u, u), float(-1), int2(1, 1)))
+        && all(zero == t2D.SampleBias(float2(u, u), float(-1), int2(1, 1)))
 
         // W-GSL: textureSampleBias({{\(*}}t3D
-        && all(Tvn(T.DataType.Element(0)) == t3D.SampleBias(float3(u, u, u), float(-1), int3(1, 1, 1)))
+        && all(zero == t3D.SampleBias(float3(u, u, u), float(-1), int3(1, 1, 1)))
 
         // W-GSL: textureSampleBias({{\(*}}t2DArray
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.SampleBias(float3(u, u, 0), float(-1), int2(1, 1)))
+        && all(zero == t2DArray.SampleBias(float3(u, u, 0), float(-1), int2(1, 1)))
 #endif // #if TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET
 
         // ===================================
@@ -172,31 +174,31 @@ bool TEST_texture<T:ITexelElement>(
         // WGSL doesn't support textureSampleLevel for 1D texture
 
         // WGSL: textureSampleLevel({{\(*}}t2D
-        && all(Tvn(T.DataType.Element(0)) == t2D.SampleLevel(float2(u, u), 0))
+        && all(zero == t2D.SampleLevel(float2(u, u), 0))
 
         // WGSL: textureSampleLevel({{\(*}}t3D
-        && all(Tvn(T.DataType.Element(0)) == t3D.SampleLevel(float3(u, u, u), 0))
+        && all(zero == t3D.SampleLevel(float3(u, u, u), 0))
 
         // WGSL: textureSampleLevel({{\(*}}tCube
-        && all(Tvn(T.DataType.Element(0)) == tCube.SampleLevel(normalize(float3(u, 1 - u, u)), 0))
+        && all(zero == tCube.SampleLevel(normalize(float3(u, 1 - u, u)), 0))
 
         // WGSL: textureSampleLevel({{\(*}}t2DArray
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.SampleLevel(float3(u, u, 0), 0))
+        && all(zero == t2DArray.SampleLevel(float3(u, u, 0), 0))
 
         // WGSL: textureSampleLevel({{\(*}}tCubeArray
-        && all(Tvn(T.DataType.Element(0)) == tCubeArray.SampleLevel(float4(normalize(float3(u, 1 - u, u)), 0), 0))
+        && all(zero == tCubeArray.SampleLevel(float4(normalize(float3(u, 1 - u, u)), 0), 0))
 
 #if TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET
         // Offset variant
 
         // W-GSL: textureSampleLevel({{\(*}}t2D
-        && all(Tvn(T.DataType.Element(0)) == t2D.SampleLevel(float2(u, u), 0, int2(1, 1)))
+        && all(zero == t2D.SampleLevel(float2(u, u), 0, int2(1, 1)))
 
         // W-GSL: textureSampleLevel({{\(*}}t3D
-        && all(Tvn(T.DataType.Element(0)) == t3D.SampleLevel(float3(u, u, u), 0, int3(1, 1, 1)))
+        && all(zero == t3D.SampleLevel(float3(u, u, u), 0, int3(1, 1, 1)))
 
         // W-GSL: textureSampleLevel({{\(*}}t2DArray
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.SampleLevel(float3(u, u, 0), 0, int2(1, 1)))
+        && all(zero == t2DArray.SampleLevel(float3(u, u, 0), 0, int2(1, 1)))
 #endif // #if TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET
 
         // ==================
@@ -259,25 +261,25 @@ bool TEST_texture<T:ITexelElement>(
         // ==================================
 
         // WGSL: textureGather({{.*}}t2D
-        && all(Tv4(T.DataType.Element(0)) == t2D.Gather(float2(u, u)))
+        && all(zero4 == t2D.Gather(float2(u, u)))
 
         // WGSL: textureGather({{.*}}tCube
-        && all(Tv4(T.DataType.Element(0)) == tCube.Gather(normalize(float3(u, 1 - u, u))))
+        && all(zero4 == tCube.Gather(normalize(float3(u, 1 - u, u))))
 
         // WGSL: textureGather({{.*}}t2DArray
-        && all(Tv4(T.DataType.Element(0)) == t2DArray.Gather(float3(u, u, 0)))
+        && all(zero4 == t2DArray.Gather(float3(u, u, 0)))
 
         // WGSL: textureGather({{.*}}tCubeArray
-        && all(Tv4(T.DataType.Element(0)) == tCubeArray.Gather(float4(normalize(float3(u, 1 - u, u)), 0)))
+        && all(zero4 == tCubeArray.Gather(float4(normalize(float3(u, 1 - u, u)), 0)))
 
 #if TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET
         // Offset variant
 
         // W-GSL: textureGather({{.*}}t2D
-        && all(Tv4(T.DataType.Element(0)) == t2D.Gather(float2(u2, u), int2(0, 0)))
+        && all(zero4 == t2D.Gather(float2(u2, u), int2(0, 0)))
 
         // W-GSL: textureGather({{.*}}t2DArray
-        && all(Tv4(T.DataType.Element(0)) == t2DArray.Gather(float3(u2, u, 0), int2(0, 0)))
+        && all(zero4 == t2DArray.Gather(float3(u2, u, 0), int2(0, 0)))
 #endif // #if TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET
 
         // =====================================
@@ -288,31 +290,31 @@ bool TEST_texture<T:ITexelElement>(
         // WGSL doesn't support textureSampleGrad for 1D textures
 
         // WGSL: textureSampleGrad({{\(*}}t2D
-        && all(Tvn(T.DataType.Element(0)) == t2D.SampleGrad(float2(u, u), float2(ddx, ddx), float2(ddy, ddy)))
+        && all(zero == t2D.SampleGrad(float2(u, u), float2(ddx, ddx), float2(ddy, ddy)))
 
         // WGSL: textureSampleGrad({{\(*}}t3D
-        && all(Tvn(T.DataType.Element(0)) == t3D.SampleGrad(float3(u, u, u), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
+        && all(zero == t3D.SampleGrad(float3(u, u, u), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
 
         // WGSL: textureSampleGrad({{\(*}}tCube
-        && all(Tvn(T.DataType.Element(0)) == tCube.SampleGrad(normalize(float3(u, 1 - u, u)), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
+        && all(zero == tCube.SampleGrad(normalize(float3(u, 1 - u, u)), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
 
         // WGSL: textureSampleGrad({{\(*}}t2DArray
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.SampleGrad(float3(u, u, 0.0f), float2(ddx, ddx), float2(ddy, ddy)))
+        && all(zero == t2DArray.SampleGrad(float3(u, u, 0.0f), float2(ddx, ddx), float2(ddy, ddy)))
 
         // WGSL: textureSampleGrad({{\(*}}tCubeArray
-        && all(Tvn(T.DataType.Element(0)) == tCubeArray.SampleGrad(float4(normalize(float3(u, 1 - u, u)), 0), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
+        && all(zero == tCubeArray.SampleGrad(float4(normalize(float3(u, 1 - u, u)), 0), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy)))
 
 #if TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET
         // Offset variant
 
         // W-GSL: textureSampleGrad({{\(*}}t2D
-        && all(Tvn(T.DataType.Element(0)) == t2D.SampleGrad(float2(u2, u), float2(ddx, ddx), float2(ddy, ddy), int2(0, 0)))
+        && all(zero == t2D.SampleGrad(float2(u2, u), float2(ddx, ddx), float2(ddy, ddy), int2(0, 0)))
 
         // W-GSL: textureSampleGrad({{\(*}}t3D
-        && all(Tvn(T.DataType.Element(0)) == t3D.SampleGrad(float3(u2, u, u), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy), int3(0, 0, 0)))
+        && all(zero == t3D.SampleGrad(float3(u2, u, u), float3(ddx, ddx, ddx), float3(ddy, ddy, ddy), int3(0, 0, 0)))
 
         // W-GSL: textureSampleGrad({{\(*}}t2DArray
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.SampleGrad(float3(u2, u, 0.0f), float2(ddx, ddx), float2(ddy, ddy), int2(0, 0)))
+        && all(zero == t2DArray.SampleGrad(float3(u2, u, 0.0f), float2(ddx, ddx), float2(ddy, ddy), int2(0, 0)))
 #endif // #if TEST_WHEN_CONSTEXPR_WORKS_FOR_OFFSET
         ;
 

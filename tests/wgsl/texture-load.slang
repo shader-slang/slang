@@ -98,6 +98,7 @@ bool TEST_textureLoad<T : ITexelElement>(
 {
     // WGSL-LABEL: TEST_textureLoad
     typealias Tvn = T.DataType;
+    Tvn zero = {};
 
     return true
         // ===================
@@ -106,19 +107,19 @@ bool TEST_textureLoad<T : ITexelElement>(
         // ===================
 
         // WGSL: textureLoad({{\(*}}t1D
-        && all(Tvn(T.DataType.Element(0)) == t1D.Load(int2(0, 0)))
+        && all(zero == t1D.Load(int2(0, 0)))
 
         // WGSL: textureLoad({{\(*}}t2D
-        && all(Tvn(T.DataType.Element(0)) == t2D.Load(int3(0, 0, 0)))
+        && all(zero == t2D.Load(int3(0, 0, 0)))
 
         // WGSL: textureLoad({{\(*}}t3D
-        && all(Tvn(T.DataType.Element(0)) == t3D.Load(int4(0, 0, 0, 0)))
+        && all(zero == t3D.Load(int4(0, 0, 0, 0)))
 
         // WGSL: textureLoad({{\(*}}t2DMS
-        && all(Tvn(T.DataType.Element(0)) == t2DMS.Load(int3(0, 0, 0)))
+        && all(zero == t2DMS.Load(int3(0, 0, 0)))
 
         // WGSL: textureLoad({{\(*}}t2DArray
-        && all(Tvn(T.DataType.Element(0)) == t2DArray.Load(int4(0, 0, 0, 0)))
+        && all(zero == t2DArray.Load(int4(0, 0, 0, 0)))
         ;
 }
 

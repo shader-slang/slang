@@ -157,7 +157,7 @@ uniform usampler2DMS uniform_usampler2DMS;
 //TEST_INPUT: Texture2D(size=4, content = zero, arrayLength = 2):name uniform_usampler2DMSArray
 uniform usampler2DMSArray uniform_usampler2DMSArray;
 
-__generic<T : ITexelElement, let sampleCount:int, let format:int>
+__generic<T : ITexelData, let sampleCount:int, let format:int>
 bool textureFuncs( _Texture<T, __Shape1D, 0, 0, sampleCount, 0, 0, 1, format> gsampler1D
     , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2D
     , _Texture<T, __Shape2D, 0, 0, sampleCount, 0, 0, 1, format> gsampler2DRect

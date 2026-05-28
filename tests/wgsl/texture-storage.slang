@@ -82,6 +82,11 @@ RWTexture2D<rgba16ui>      w2D_u32v4;
 RWTexture3D<rgba16ui>      w3D_u32v4;
 RWTexture2DArray<rgba16ui> w2DArray_u32v4;
 
+__generic<T : IArithmetic>
+T makeTestOneValue()
+{
+    return T(1);
+}
 
 __generic<T : ITexelElement>
 [ForceInline] // Workaround for a WGSL requirement that `texture_storage_Xd` must always be a global variable
@@ -93,6 +98,8 @@ bool TEST_textureStorage_StoreLoad(
     where T.DataType : IArithmetic
 {
     typealias Tvn = T.DataType;
+    Tvn zero = {};
+    Tvn one = makeTestOneValue<Tvn>();
 
     // ===================
     // o[i] = v;
@@ -101,16 +108,16 @@ bool TEST_textureStorage_StoreLoad(
 
     // TODO: store before load
     // WGSL: textureStore({{\(*}}w1D
-    w1D[0] = Tvn(T.DataType.Element(1));
+    w1D[0] = one;
 
     // WGSL: textureStore({{\(*}}w2D
-    w2D[0] = Tvn(T.DataType.Element(1));
+    w2D[0] = one;
 
     // WGSL: textureStore({{\(*}}w3D
-    w3D[0] = Tvn(T.DataType.Element(1));
+    w3D[0] = one;
 
     // WGSL: textureStore({{\(*}}w2DArray
-    w2DArray[0] = Tvn(T.DataType.Element(1));
+    w2DArray[0] = one;
 
     return true
         // ===================
@@ -119,16 +126,16 @@ bool TEST_textureStorage_StoreLoad(
         // ===================
 
         // WGSL: textureLoad({{\(*}}w1D
-        && all(Tvn(T.DataType.Element(0)) == w1D.Load(0))
+        && all(zero == w1D.Load(0))
 
         // WGSL: textureLoad({{\(*}}w2D
-        && all(Tvn(T.DataType.Element(0)) == w2D.Load(int2(0, 0)))
+        && all(zero == w2D.Load(int2(0, 0)))
 
         // WGSL: textureLoad({{\(*}}w3D
-        && all(Tvn(T.DataType.Element(0)) == w3D.Load(int3(0, 0, 0)))
+        && all(zero == w3D.Load(int3(0, 0, 0)))
 
         // WGSL: textureLoad({{\(*}}w2DArray
-        && all(Tvn(T.DataType.Element(0)) == w2DArray.Load(int3(0, 0, 0)))
+        && all(zero == w2DArray.Load(int3(0, 0, 0)))
         ;
 }
 
