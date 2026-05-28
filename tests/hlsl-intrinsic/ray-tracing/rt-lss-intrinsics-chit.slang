@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -capability hlsl_nvapi
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -capability spvShaderInvocationReorderNV
 //HLSL: NvRtSphereObjectPositionAndRadius
 //HLSL: NvRtLssObjectPositionsAndRadii
 //HLSL: NvRtIsSphereHit
@@ -35,7 +35,7 @@ void closestHitShaderLss(inout RayPayload payload, in BuiltInTriangleIntersectio
     payload.lssData = GetLssPositionsAndRadii();
     payload.isSphere = IsSphereHit();
     payload.isLss = IsLssHit();
-    
+
     // Test HitObject API functions
     HitObject hitObj;
     float4 sphereData = hitObj.GetSpherePositionAndRadius();
