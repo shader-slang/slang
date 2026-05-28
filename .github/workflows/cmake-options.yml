@@ -91,8 +91,25 @@ jobs:
       runs-on: '["windows-latest"]'
       arch: "amd64_arm64"
 
-  # windows-vs2019-debug: disabled — windows-2019 runner is being retired (June 2025)
-  # windows-vs2019-release: disabled — windows-2019 runner is being retired (June 2025)
+  windows-vs2022-debug:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["windows-2025"]'
+      buildtool: "Visual Studio 17 2022"
+
+  windows-vs2022-release:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["windows-2025"]'
+      buildtool: "Visual Studio 17 2022"
 
   windows-vs2026-debug:
     uses: ./.github/workflows/cmake-options-build.yml
@@ -125,6 +142,8 @@ jobs:
         macos-release,
         windows-aarch64-debug,
         windows-aarch64-release,
+        windows-vs2022-debug,
+        windows-vs2022-release,
         windows-vs2026-debug,
         windows-vs2026-release,
       ]
