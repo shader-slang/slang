@@ -15,7 +15,7 @@ namespace Slang
 // This pass rewrites pointer-typed struct fields to UIntPtr (which emits as
 // `ulong` on Metal) and inserts CastIntToPtr/CastPtrToInt at access sites.
 // It covers structs used in ConstantBuffer, ParameterBlock, and
-// RWStructuredBuffer element types.
+// StructuredBuffer-family (including RW/Append/Consume) element types.
 //
 // For storage buffers (RWStructuredBuffer<T*>), the buffer's element type
 // itself is a pointer, so the pass also rewrites the element type of the
@@ -390,7 +390,10 @@ struct MetalBufferPointerLoweringContext
                     elemAccessInsts.add(varUse->getUser());
             }
 
-            // Use replaceOperand to safely mutate the hoistable buffer type.
+            // replaceOperand may return a different inst if dedup merges this
+            // buffer type with an existing one. This is safe — we collected
+            // uses BEFORE mutating, so elemAccessInsts refers to the original
+            // users regardless of what happens to the type node.
             builder.replaceOperand(bufType->getOperands() + 0, uintPtrType);
 
             for (auto inst : elemAccessInsts)
