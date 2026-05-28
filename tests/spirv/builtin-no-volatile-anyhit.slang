@@ -29,9 +29,13 @@ struct Attribs { float2 b; };
 // Each of the three builtin variables must appear with its `BuiltIn`
 // decoration, but no `Volatile` token may appear anywhere in the
 // disassembly (neither variable-level decoration nor per-access
-// mask): the shader is single-entry-point so a blanket
-// `CHECK-NOT: Volatile` is the strongest form, and it scans the
-// whole disassembly.
+// mask). FileCheck's `CHECK-NOT` only excludes matches in unsearched
+// regions of input, so the `CHECK-DAG` block is bracketed by a
+// leading `CHECK-NOT` (scans file start → first DAG match) and a
+// trailing `CHECK-NOT` (scans unmatched lines between DAG anchors,
+// plus the last DAG match → EOF). Together they cover the whole
+// input.
+// CHECK-NOT: Volatile
 // CHECK-DAG: OpDecorate %{{[A-Za-z0-9_]+}} BuiltIn SubgroupLocalInvocationId
 // CHECK-DAG: OpDecorate %{{[A-Za-z0-9_]+}} BuiltIn SubgroupSize
 // CHECK-DAG: OpDecorate %{{[A-Za-z0-9_]+}} BuiltIn SubgroupEqMask

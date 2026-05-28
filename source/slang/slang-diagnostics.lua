@@ -1062,6 +1062,13 @@ warning(
     span { loc = "location", message = "layout-sensitive SPIR-V type declaration '~opcode' in spirv_asm may not preserve Slang data-layout information; form layout-sensitive pointers/values with Slang types or expressions and pass them into spirv_asm instead" }
 )
 
+warning(
+    "spirv-asm-volatile-builtin-non-literal-mask",
+    29117,
+    "memory-access mask on `OpLoad` of a Volatile-required builtin in `spirv_asm` must be a literal integer or a named-keyword form (e.g. `Aligned 4`); runtime / SSA-id values are not representable in `OpLoad`'s memory-access slot per SPIR-V grammar. The emitted load will use `Volatile` only; user-supplied mask bits are dropped.",
+    span { loc = "location" }
+)
+
 
 -- Load semantic checking diagnostics (part 1)
 -- (inlined from slang-diagnostics-semantic-checking-1.lua)

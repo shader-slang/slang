@@ -28,19 +28,54 @@
 //   their `OpEntryPoint` interface list.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry cs -entry rg -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK_VK): -target spirv-asm -entry cs -entry rg -emit-spirv-directly -capability vk_mem_model
 
 RWStructuredBuffer<uint> output;
 
+// === GLSL450 path ===
 // Both entry points are emitted and each lists `SubgroupLocalInvocationId`
 // in its `OpEntryPoint` interface.
 // CHECK: OpEntryPoint GLCompute %{{[A-Za-z0-9_]+}} "cs" {{.*}}SubgroupLocalInvocationId
 // CHECK: OpEntryPoint RayGenerationKHR %{{[A-Za-z0-9_]+}} "rg" {{.*}}SubgroupLocalInvocationId
 
-// The builtin variable is decorated `BuiltIn` and `Volatile`. The
-// raygen path requires the `Volatile` decoration; if the cache axis
-// or stage-set logic were to drop it, this would fail.
-// CHECK-DAG: OpDecorate %[[V:[A-Za-z0-9_]+]] BuiltIn SubgroupLocalInvocationId
-// CHECK-DAG: OpDecorate %[[V]] Volatile
+// Exactly one `OpVariable` for `SubgroupLocalInvocationId` is emitted,
+// and that one variable is decorated `Volatile`. The raygen path
+// requires the `Volatile` decoration; if the cache axis or stage-set
+// logic were to drop it, this would fail.
+//
+// The PR drops `isVolatile` from the cache key on the assumption that
+// all references to a given builtin share one IR-side
+// `IRSPIRVAsmOperandBuiltinVar`; if a future IR change splits per
+// call-site operands, the cache would emit two variables and the
+// volatile decoration could land on only the second one (silent
+// regression on the compute-side load). The exact-1 count + the
+// trailing not-clause pins this single-variable invariant. The
+// captured `[[V]]` is then reused for the `Volatile` decoration so
+// all assertions tie back to the same one variable.
+// CHECK-COUNT-1: OpDecorate %[[V:[A-Za-z0-9_]+]] BuiltIn SubgroupLocalInvocationId
+// CHECK-NOT: OpDecorate %{{[A-Za-z0-9_]+}} BuiltIn SubgroupLocalInvocationId
+// CHECK: OpDecorate %[[V]] Volatile
+
+// === vk_mem_model path ===
+// Same shared `OpVariable` for both stages, but the `Volatile` semantic
+// surfaces as the per-`OpLoad` memory-access mask rather than a variable
+// decoration. Since the IR-side flagging is keyed on the union of
+// referencing entry points (raygen pulls the operand into the volatile
+// set; compute side then shares it), BOTH `OpLoad`s carry the mask —
+// overconservative on the compute side but spec-correct, mirroring the
+// GLSL450 inheritance. The exact-2 count plus the trailing not-clause
+// pins the upper bound so a regression that flips the disambiguation in
+// either direction (no loads, or three loads) is caught.
+// CHECK_VK: OpEntryPoint GLCompute %{{[A-Za-z0-9_]+}} "cs" {{.*}}SubgroupLocalInvocationId
+// CHECK_VK: OpEntryPoint RayGenerationKHR %{{[A-Za-z0-9_]+}} "rg" {{.*}}SubgroupLocalInvocationId
+// Exactly one BuiltIn SubgroupLocalInvocationId decoration (single-
+// OpVariable invariant under vk_mem_model too); no variable-level
+// Volatile on it; both OpLoads of it carry the per-access mask.
+// CHECK_VK-COUNT-1: OpDecorate %[[V_VK:[A-Za-z0-9_]+]] BuiltIn SubgroupLocalInvocationId
+// CHECK_VK-NOT: OpDecorate %{{[A-Za-z0-9_]+}} BuiltIn SubgroupLocalInvocationId
+// CHECK_VK-NOT: OpDecorate %[[V_VK]] Volatile
+// CHECK_VK-COUNT-2: OpLoad {{.*}} %[[V_VK]] Volatile
+// CHECK_VK-NOT: OpLoad {{.*}} %[[V_VK]] Volatile
 
 [numthreads(64, 1, 1)]
 [shader("compute")]

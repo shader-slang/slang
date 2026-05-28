@@ -6883,13 +6883,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
-    // IR-side builtin globals that require Volatile semantics. Under
-    // the Vulkan memory model the variable cannot carry an
-    // `OpDecorate Volatile`; instead each load/store must OR the
-    // `Volatile` mask into its memory access operand. This set is
-    // populated in `getBuiltinGlobalVar` and consulted by
-    // `getMemoryAccessOperandsOfLoadStore`.
+    // IR-side builtin operands that require `Volatile` semantics.
+    // Keyed on the `IRSPIRVAsmOperandBuiltinVar` inst (or any other
+    // IR inst that flows into `getBuiltinGlobalVar`). Consulted by
+    // `emitSPIRVAsm`'s `case SpvOpLoad:` branch — that's the only
+    // path through which a volatile-required builtin reaches the
+    // emitter today.
     HashSet<IRInst*> m_volatileBuiltinGlobalVars;
+    // SPIR-V-side mirror of `m_volatileBuiltinGlobalVars`: the
+    // `SpvInst*`s for variables materialized by `getBuiltinGlobalVar`
+    // for a flagged builtin. Lives at the SPIR-V abstraction so the
+    // regular-IR `emitLoad` / `emitStore` path
+    // (`getMemoryAccessOperandsOfLoadStore`) can also discover that
+    // its `ptr` resolves to a flagged builtin and inject the per-
+    // access mask. Today no Slang surface lowers these builtins to
+    // a regular `IRLoad`, so this set is effectively forward-compat
+    // scaffolding — but the assert it replaces was vacuous (the IR
+    // and SPIR-V abstractions are disjoint by type), and a future
+    // IR-pipeline change that surfaces a builtin-decorated global
+    // would now correctly receive the mask without needing further
+    // emitter changes.
+    HashSet<SpvInst*> m_volatileSpvVars;
     SpvInst* m_descriptorHeapUntypedPointerType = nullptr;
     Dictionary<SpvStorageClass, SpvInst*> m_descriptorHeapBufferDescriptorTypes;
     Dictionary<SpvInst*, SpvInst*> m_descriptorHeapRuntimeArrayTypes;
@@ -7005,6 +7019,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             m_volatileBuiltinGlobalVars.add(irInst);
         if (m_builtinGlobalVars.tryGetValue(key, result))
         {
+            // Cache hit: the SPIR-V variable already exists. Mirror
+            // it into the SpvInst*-keyed set so the regular-IR load
+            // path in `getMemoryAccessOperandsOfLoadStore` can also
+            // reach it (the IR-side set is keyed on asm-operand insts
+            // and won't match an `IRGlobalVar` ptr).
+            if (isVolatile)
+                m_volatileSpvVars.add(result);
             return result;
         }
         IRBuilder builder(m_irModule);
@@ -7031,6 +7052,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         }
         m_builtinGlobalVars[key] = varInst;
+        // Mirror the new SPIR-V variable into the SpvInst*-keyed set
+        // so the regular-IR load path can detect it as flagged.
+        if (isVolatile)
+            m_volatileSpvVars.add(varInst);
 
         if (isFlat)
         {
@@ -8467,12 +8492,29 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         }
 
-        // Volatile builtins flagged in `getBuiltinGlobalVar` are reached
-        // only via `spirv_asm` `OpLoad` today (see `emitSPIRVAsm`'s
-        // `SpvOpLoad` branch). A regular-IR load/store landing on one
-        // would silently miss the `Volatile` mask under vk_mem_model;
-        // assert so a future IR-pipeline change is caught here.
-        SLANG_ASSERT(!m_volatileBuiltinGlobalVars.contains(ptr));
+        // Volatile-flagged builtin reached via the regular-IR load
+        // path: today no Slang surface lowers a volatile-required
+        // builtin to an `IRLoad` (they all flow through `spirv_asm`,
+        // which has its own injection branch in `emitSPIRVAsm`), so
+        // this branch is unreachable in current code. It is kept
+        // functional rather than as an assertion because the IR-side
+        // set (`m_volatileBuiltinGlobalVars`, keyed on asm-operand
+        // insts) is the wrong abstraction to check against an
+        // `IRGlobalVar`/`IRGlobalParam` `ptr` — they are disjoint by
+        // type. Instead we look up `ptr`'s already-emitted
+        // `SpvInst*` and consult `m_volatileSpvVars` (populated in
+        // `getBuiltinGlobalVar`). A future regression that lowers a
+        // flagged builtin to a regular IR load will receive the
+        // `Volatile` mask transparently.
+        if (m_memoryModel == SpvMemoryModelVulkan && m_volatileSpvVars.getCount() != 0)
+        {
+            SpvInst* ptrSpv = nullptr;
+            if (m_mapIRInstToSpvInst.tryGetValue(ptr, ptrSpv) &&
+                m_volatileSpvVars.contains(ptrSpv))
+            {
+                memoryAccessMaskOut |= SpvMemoryAccessVolatileMask;
+            }
+        }
     }
 
     SpvInst* emitLoad(SpvInstParent* parent, IRInst* inst, IRInst* ptr)
@@ -11372,12 +11414,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                     // an Enum (named keyword like
                                     // `Aligned`); both store the resolved
                                     // SPIR-V mask value as an IRIntLit
-                                    // accessible via `getValue()`.
+                                    // accessible via `getValue()`. Other
+                                    // operand kinds (e.g. `Id`-form for
+                                    // a let-bound runtime value) are not
+                                    // representable in `OpLoad`'s
+                                    // memory-access slot per SPIR-V
+                                    // grammar — the spec mandates a
+                                    // literal integer there. Diagnose
+                                    // and fall through to the
+                                    // Volatile-only emit; the user's
+                                    // intent to use a runtime mask was
+                                    // not encodable to begin with.
                                     if (userMaskOp->getOp() == kIROp_SPIRVAsmOperandLiteral ||
                                         userMaskOp->getOp() == kIROp_SPIRVAsmOperandEnum)
                                     {
                                         if (auto val = as<IRIntLit>(userMaskOp->getValue()))
                                             mergedMask |= uint32_t(val->getValue());
+                                    }
+                                    else
+                                    {
+                                        m_sink->diagnose(
+                                            Diagnostics::SpirvAsmVolatileBuiltinNonLiteralMask{
+                                                .location = userMaskOp->sourceLoc});
                                     }
                                     ++i;
                                 }
