@@ -5211,7 +5211,9 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
 
             if (!requiredParamType->equals(satisfyingParamType))
+            {
                 return false;
+            }
         }
 
         auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
@@ -15854,13 +15856,12 @@ DeclRef<ExtensionDecl> SemanticsVisitor::applyExtensionToType(
     //
     if (auto extGenericDecl = GetOuterGeneric(extDecl))
     {
-        ConstraintSystem constraints;
-        constraints.loc = extDecl->loc;
-        constraints.genericDecl = extGenericDecl;
+        GenericInferenceContext inferenceContext;
+        inferenceContext.genericDecl = extGenericDecl;
         if (additionalSubtypeWitnessesForType)
         {
-            constraints.subTypeForAdditionalWitnesses = type;
-            constraints.additionalSubtypeWitnesses = additionalSubtypeWitnessesForType;
+            inferenceContext.subTypeForAdditionalWitnesses = type;
+            inferenceContext.additionalSubtypeWitnesses = additionalSubtypeWitnessesForType;
         }
 
         // Inside the body of an extension declaration, we may end up trying to apply that
@@ -15873,12 +15874,12 @@ DeclRef<ExtensionDecl> SemanticsVisitor::applyExtensionToType(
                 .as<ExtensionDecl>();
         }
 
-        if (!TryUnifyTypes(constraints, ValUnificationContext(), extDecl->targetType.Ptr(), type))
+        if (!TryUnifyTypes(inferenceContext, UnificationOptions(), extDecl->targetType.Ptr(), type))
             return DeclRef<ExtensionDecl>();
 
         ConversionCost baseCost;
-        auto solvedDeclRef = trySolveConstraintSystem(
-            &constraints,
+        auto solvedDeclRef = trySolveGenericArguments(
+            _Move(inferenceContext),
             makeDeclRef(extGenericDecl),
             ArrayView<Val*>(),
             baseCost);
@@ -15887,8 +15888,8 @@ DeclRef<ExtensionDecl> SemanticsVisitor::applyExtensionToType(
             return DeclRef<ExtensionDecl>();
         }
 
-        // Construct a reference to the extension with our constraint variables
-        // set as they were found by solving the constraint system.
+        // Construct a reference to the extension with our inference variables
+        // set as they were found by solving the generic arguments.
         extDeclRef = solvedDeclRef.as<ExtensionDecl>();
     }
 
@@ -17240,7 +17241,11 @@ OrderedDictionary<Type*, List<Type*>> getCanonicalGenericConstraints2(
     return result;
 }
 
-bool areTypesCompatibile(SemanticsVisitor* visitor, Type* fst, Type* snd)
+// Return true when generic inference can solve a specialization that makes the
+// two `this` types compatible for derivative checking. This is intentionally a
+// solver query rather than a pure predicate: it may collect unification
+// constraints and run the generic argument solver to validate them.
+bool canSolveGenericThisTypeCompatibility(SemanticsVisitor* visitor, Type* fst, Type* snd)
 {
     if (fst->equals(snd))
         return true;
@@ -17250,26 +17255,25 @@ bool areTypesCompatibile(SemanticsVisitor* visitor, Type* fst, Type* snd)
         auto decl = declRefType->getDeclRef().getDecl();
         if (auto extGenericDecl = visitor->GetOuterGeneric(decl))
         {
-            SemanticsVisitor::ConstraintSystem constraints;
-            constraints.loc = decl->loc;
-            constraints.genericDecl = extGenericDecl;
+            SemanticsVisitor::GenericInferenceContext inferenceContext;
+            inferenceContext.genericDecl = extGenericDecl;
 
             if (!visitor->TryUnifyTypes(
-                    constraints,
-                    SemanticsVisitor::ValUnificationContext(),
+                    inferenceContext,
+                    SemanticsVisitor::UnificationOptions(),
                     fst,
                     snd))
                 return false;
 
             ConversionCost baseCost;
-            if (!visitor->trySolveConstraintSystem(
-                    &constraints,
+            if (!visitor->trySolveGenericArguments(
+                    _Move(inferenceContext),
                     makeDeclRef(extGenericDecl),
                     ArrayView<Val*>(),
                     baseCost))
                 return false;
 
-            // If we reach here, it means we have a valid unification.
+            // If we reach here, the solver found a valid substitution.
             return true;
         }
     }
@@ -17535,8 +17539,10 @@ void checkDerivativeAttributeImpl(
                 // `this` type matches the expected type. This will ensure that after lowering
                 // to IR, the two functions are compatible.
                 //
-                if (funcThisType &&
-                    !areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
+                if (funcThisType && !canSolveGenericThisTypeCompatibility(
+                                        visitor,
+                                        funcThisType,
+                                        derivativeFuncThisType))
                 {
                     visitor->getSink()->diagnose(
                         Diagnostics::CustomDerivativeSignatureThisParamMismatch{.attr = attr->loc});
