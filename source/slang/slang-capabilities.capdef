@@ -547,7 +547,7 @@ def SPV_EXT_shader_atomic_float_add : _spirv_1_0;
 /// [EXT]
 def SPV_EXT_shader_atomic_float16_add : SPV_EXT_shader_atomic_float_add;
 
-/// Represents the SPIR-V extension for vector atomic float16 operations.
+/// Represents the SPIR-V extension for vector atomic float 16 add/min/max operations.
 /// [EXT]
 def SPV_NV_shader_atomic_fp16_vector : _spirv_1_0;
 
@@ -708,7 +708,7 @@ def spvAtomicFloat32AddEXT : SPV_EXT_shader_atomic_float_add;
 /// [EXT]
 def spvAtomicFloat16AddEXT : SPV_EXT_shader_atomic_float16_add;
 
-/// Represents the SPIR-V capability for vector atomic float16 operations.
+/// Represents the SPIR-V capability for vector atomic float 16 add/min/max operations.
 /// [EXT]
 def spvAtomicFloat16VectorNV : SPV_NV_shader_atomic_fp16_vector;
 
@@ -1272,6 +1272,9 @@ alias GL_NV_ray_tracing = GL_EXT_ray_tracing;
 alias GL_NV_ray_tracing_motion_blur = _GL_NV_ray_tracing_motion_blur | spvRayTracingMotionBlurNV;
 
 /// Represents the GL_NV_shader_atomic_fp16_vector extension.
+/// The SPIR-V 1.0 fallback preserves compatibility for shaders that only require the
+/// GLSL extension; emitted fp16 vector atomic operations still require
+/// spvAtomicFloat16VectorNV.
 /// [EXT]
 alias GL_NV_shader_atomic_fp16_vector = _GL_NV_shader_atomic_fp16_vector + _GL_NV_gpu_shader5 | spvAtomicFloat16VectorNV | _spirv_1_0;
 

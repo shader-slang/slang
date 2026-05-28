@@ -576,6 +576,9 @@ Extensions
 
 `GL_NV_shader_atomic_fp16_vector`
 > Represents the GL_NV_shader_atomic_fp16_vector extension.
+> The SPIR-V 1.0 fallback preserves compatibility for shaders that only require the
+> GLSL extension; emitted fp16 vector atomic operations still require
+> spvAtomicFloat16VectorNV.
 
 `GL_NV_shader_invocation_reorder`
 > Represents the GL_NV_shader_invocation_reorder extension (NVIDIA-specific).
@@ -702,7 +705,7 @@ Extensions
 > Represents the SPIR-V extension for ray tracing motion blur.
 
 `SPV_NV_shader_atomic_fp16_vector`
-> Represents the SPIR-V extension for vector atomic float16 operations.
+> Represents the SPIR-V extension for vector atomic float 16 add/min/max operations.
 
 `SPV_NV_shader_image_footprint`
 > Represents the SPIR-V extension for shader image footprint.
@@ -727,7 +730,7 @@ Extensions
 > Represents the SPIR-V capability for atomic float 16 min/max operations.
 
 `spvAtomicFloat16VectorNV`
-> Represents the SPIR-V capability for vector atomic float16 operations.
+> Represents the SPIR-V capability for vector atomic float 16 add/min/max operations.
 
 `spvAtomicFloat32AddEXT`
 > Represents the SPIR-V capability for atomic float 32 add operations.

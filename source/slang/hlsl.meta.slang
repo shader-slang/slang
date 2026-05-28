@@ -6556,7 +6556,8 @@ $}
     /// @return The 2 16-bit floating point values packed into a 32-bit unsigned integer.
     [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_hlsl, sm_5_0)]
+    [require(hlsl, sm_5_0)]
+    [require(cuda, cuda_sm_7_0)]
     [require(spirv, spvAtomicFloat16VectorNV)]
     uint _NvInterlockedAddFp16x2(uint byteAddress, uint fp16x2Value)
     {
@@ -6620,15 +6621,13 @@ $}
                 let buf = __getEquivalentStructuredBuffer<uint>(this);
                 uint wordIndex = byteAddress / 4;
                 uint laneShift = (byteAddress & 2) == 0 ? 0U : 16U;
-                uint laneMask = 0xFFFFU << laneShift;
                 uint oldPacked = __atomic_add(buf[wordIndex], 0U);
 
                 for (;;)
                 {
-                    uint oldHalfBits = (oldPacked >> laneShift) & 0xFFFFU;
-                    half oldHalf = asfloat16(uint16_t(oldHalfBits));
-                    uint newHalfBits = uint(asuint16(oldHalf + value));
-                    uint newPacked = (oldPacked & ~laneMask) | (newHalfBits << laneShift);
+                    half oldHalf;
+                    uint newPacked =
+                        __packInterlockedAddF16Result(oldPacked, laneShift, value, oldHalf);
                     uint actualPacked =
                         __atomic_compare_exchange(buf[wordIndex], oldPacked, newPacked);
                     if (actualPacked == oldPacked)
@@ -10228,6 +10227,17 @@ __generic<T : __BuiltinFloatingPointType> vector<T,4> dst(vector<T,4> x, vector<
 // Given a RWByteAddressBuffer allow it to be interpreted as a RWStructuredBuffer
 __intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
 RWStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(RWByteAddressBuffer b);
+
+[__NoSideEffect]
+[ForceInline]
+uint __packInterlockedAddF16Result(uint oldPacked, uint laneShift, half value, out half oldHalf)
+{
+    uint laneMask = 0xFFFFU << laneShift;
+    uint oldHalfBits = (oldPacked >> laneShift) & 0xFFFFU;
+    oldHalf = asfloat16(uint16_t(oldHalfBits));
+    uint newHalfBits = uint(asuint16(oldHalf + value));
+    return (oldPacked & ~laneMask) | (newHalfBits << laneShift);
+}
 
 __intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
 StructuredBuffer<T> __getEquivalentStructuredBuffer<T>(ByteAddressBuffer b);
