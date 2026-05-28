@@ -2717,6 +2717,51 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
     {
         IRInstKey key = {inst};
 
+        auto findVisibleScopedInst = [&](IRInst* insertGeneric) -> IRInst*
+        {
+            IRInst* scopedInst = nullptr;
+            auto& scopedMap = m_dedupContext->getScopedGlobalValueNumberingMap();
+            for (auto generic = insertGeneric; generic; generic = findOuterGeneric(generic->parent))
+            {
+                if (scopedMap.tryGetValue(IRScopedInstKey{key, generic}, scopedInst))
+                    return scopedInst;
+            }
+            if (scopedMap.tryGetValue(IRScopedInstKey{key, nullptr}, scopedInst))
+                return scopedInst;
+            return nullptr;
+        };
+
+        auto useFoundInst = [&](IRInst* foundInst) -> IRInst*
+        {
+            memoryArena.rewindToCursor(cursor);
+
+            // If the found inst is defined in the same parent as current insert location but
+            // is located after the insert location, we need to move it to the insert location.
+            if (foundInst->getParent() && foundInst->getParent() == getInsertLoc().getParent() &&
+                getInsertLoc().getMode() == IRInsertLoc::Mode::Before)
+            {
+                auto insertLoc = getInsertLoc().getInst();
+                while (insertLoc && insertLoc->getOp() == kIROp_Param)
+                    insertLoc = insertLoc->getNextInst();
+
+                if (!insertLoc)
+                    return foundInst;
+
+                bool isAfter = false;
+                for (auto cur = insertLoc->next; cur; cur = cur->next)
+                {
+                    if (cur == foundInst)
+                    {
+                        isAfter = true;
+                        break;
+                    }
+                }
+                if (isAfter)
+                    foundInst->insertBefore(insertLoc);
+            }
+            return foundInst;
+        };
+
         IRInst** found = m_dedupContext->getGlobalValueNumberingMap().tryGetValueOrAdd(key, inst);
         SLANG_ASSERT(endCursor == memoryArena.getCursor());
         // If it's found, just return, and throw away the instruction
@@ -2731,37 +2776,12 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
                 // The global value-numbering map is keyed only by operands. A matching
                 // instruction in a different generic scope is not visible here, so keep the
                 // newly allocated instruction and let it be hoisted in the current scope.
+                if (auto scopedInst = findVisibleScopedInst(insertGeneric))
+                    return useFoundInst(scopedInst);
             }
             else
             {
-                memoryArena.rewindToCursor(cursor);
-
-                // If the found inst is defined in the same parent as current insert location but
-                // is located after the insert location, we need to move it to the insert location.
-                if (foundInst->getParent() &&
-                    foundInst->getParent() == getInsertLoc().getParent() &&
-                    getInsertLoc().getMode() == IRInsertLoc::Mode::Before)
-                {
-                    auto insertLoc = getInsertLoc().getInst();
-                    while (insertLoc && insertLoc->getOp() == kIROp_Param)
-                        insertLoc = insertLoc->getNextInst();
-
-                    if (!insertLoc)
-                        return *found;
-
-                    bool isAfter = false;
-                    for (auto cur = insertLoc->next; cur; cur = cur->next)
-                    {
-                        if (cur == foundInst)
-                        {
-                            isAfter = true;
-                            break;
-                        }
-                    }
-                    if (isAfter)
-                        foundInst->insertBefore(insertLoc);
-                }
-                return *found;
+                return useFoundInst(foundInst);
             }
         }
     }
@@ -2799,6 +2819,9 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
         else
             addHoistableInst(this, inst);
     }
+    m_dedupContext->getScopedGlobalValueNumberingMap()[IRScopedInstKey{
+        IRInstKey{inst},
+        findOuterGeneric(inst)}] = inst;
 
     return inst;
 }

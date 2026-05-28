@@ -1969,6 +1969,28 @@ public:
     }
 };
 
+struct IRScopedInstKey
+{
+    IRInstKey instKey;
+    IRInst* genericScope = nullptr;
+
+    IRScopedInstKey() = default;
+    IRScopedInstKey(IRInstKey const& key, IRInst* scope)
+        : instKey(key), genericScope(scope)
+    {
+    }
+
+    HashCode getHashCode() const
+    {
+        return combineHash(instKey.getHashCode(), Slang::getHashCode(genericScope));
+    }
+
+    bool operator==(IRScopedInstKey const& right) const
+    {
+        return genericScope == right.genericScope && instKey == right.instKey;
+    }
+};
+
 struct IRConstantKey
 {
     IRConstant* inst;
@@ -2015,9 +2037,14 @@ public:
     void tryHoistInst(IRInst* inst);
 
     typedef Dictionary<IRInstKey, IRInst*> GlobalValueNumberingMap;
+    typedef Dictionary<IRScopedInstKey, IRInst*> ScopedGlobalValueNumberingMap;
     typedef Dictionary<IRConstantKey, IRConstant*> ConstantMap;
 
     GlobalValueNumberingMap& getGlobalValueNumberingMap() { return m_globalValueNumberingMap; }
+    ScopedGlobalValueNumberingMap& getScopedGlobalValueNumberingMap()
+    {
+        return m_scopedGlobalValueNumberingMap;
+    }
     Dictionary<IRInst*, IRInst*>& getInstReplacementMap() { return m_instReplacementMap; }
 
     void _addGlobalNumberingEntry(IRInst* inst)
@@ -2025,6 +2052,8 @@ public:
         m_globalValueNumberingMap.add(IRInstKey{inst}, inst);
         m_instReplacementMap.remove(inst);
         tryHoistInst(inst);
+        m_scopedGlobalValueNumberingMap[IRScopedInstKey{IRInstKey{inst}, findOuterGeneric(inst)}] =
+            inst;
     }
     void _removeGlobalNumberingEntry(IRInst* inst)
     {
@@ -2034,6 +2063,14 @@ public:
             if (value == inst)
             {
                 m_globalValueNumberingMap.remove(IRInstKey{inst});
+            }
+        }
+        IRScopedInstKey scopedKey{IRInstKey{inst}, findOuterGeneric(inst)};
+        if (m_scopedGlobalValueNumberingMap.tryGetValue(scopedKey, value))
+        {
+            if (value == inst)
+            {
+                m_scopedGlobalValueNumberingMap.remove(scopedKey);
             }
         }
     }
@@ -2048,6 +2085,7 @@ private:
     Session* m_session;
 
     GlobalValueNumberingMap m_globalValueNumberingMap;
+    ScopedGlobalValueNumberingMap m_scopedGlobalValueNumberingMap;
 
     // Duplicate insts that are still alive and needs to be replaced in m_globalValueNumberMap
     // when used as an operand to create another inst.

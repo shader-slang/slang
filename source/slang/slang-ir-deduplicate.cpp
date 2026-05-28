@@ -8,6 +8,7 @@ void IRDeduplicationContext::init(IRModule* module)
     m_session = module->getSession();
 
     m_globalValueNumberingMap.clear();
+    m_scopedGlobalValueNumberingMap.clear();
     m_constantMap.clear();
 }
 
