@@ -335,9 +335,9 @@ where:
 Not all combinations of these options are supported, and some combinations may be unsupported on some targets.
 
 When the storage format of a texture is known, prefer using an explicit texture format type as the element type.
-For example, `RWTexture2D<rgba16f>` declares a read-write 2D texture whose storage format is `rgba16f`, and whose loads and stores use `float4` values.
-Similarly, `RWTexture2D<rgba8ui>` uses `uint4` values.
-The available format type names match the supported texture format strings, with names such as `rgba32f`, `rg16f`, `r32ui`, `rgba8_snorm`, and `bgra8`.
+For example, `RWTexture2D<RGBA16F>` declares a read-write 2D texture whose storage format is `rgba16f`, and whose loads and stores use `float4` values.
+Similarly, `RWTexture2D<RGBA8UI>` uses `uint4` values.
+The available format type names follow Slang's type naming convention, with names such as `RGBA32F`, `RG16F`, `R32UI`, `RGBA8Snorm`, and `BGRA8Unorm`.
 
 The plain scalar and vector element types, such as `float4`, `int4`, and `uint4`, are still supported for compatibility and for cases where the storage format is provided externally.
 They do not encode a specific storage format in the texture type.

@@ -2276,7 +2276,7 @@ public:                                                              \
     typedef SlangUInt32 SlangImageFormatIntegral;
     enum SlangImageFormat : SlangImageFormatIntegral
     {
-#define SLANG_FORMAT(NAME, DESC) SLANG_IMAGE_FORMAT_##NAME,
+#define SLANG_FORMAT(NAME, CODE_NAME, DESC) SLANG_IMAGE_FORMAT_##NAME,
 #include "slang-image-format-defs.h"
 #undef SLANG_FORMAT
     };

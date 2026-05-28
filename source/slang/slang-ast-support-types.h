@@ -200,7 +200,7 @@ FIDDLE() namespace Slang
 
     enum class ImageFormat
     {
-#define SLANG_FORMAT(NAME, OTHER) NAME,
+#define SLANG_FORMAT(NAME, CODE_NAME, OTHER) NAME,
 #include "slang-image-format-defs.h"
 #undef SLANG_FORMAT
     };

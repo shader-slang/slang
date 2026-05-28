@@ -5,8 +5,8 @@
 // Explicit texel format descriptor types should provide both the storage
 // image format and the data type used by texture operations.
 
-RWTexture2D<rgba16f> floatImage;
-RWTexture2D<rgba8ui> uintImage;
+RWTexture2D<RGBA16F> floatImage;
+RWTexture2D<RGBA8UI> uintImage;
 
 // GLSL: layout(rgba16f)
 // GLSL: uniform image2D floatImage

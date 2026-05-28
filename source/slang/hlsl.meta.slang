@@ -590,7 +590,7 @@ vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 /// `_Texture` operates on this payload contract: it needs to know the scalar
 /// element type and element count of the value returned by texture operations.
 /// Public texture aliases accept `ITexelElement` instead, so format descriptors
-/// such as `rgba16f` can map to a payload `DataType` while carrying a non-zero
+/// such as `RGBA16F` can map to a payload `DataType` while carrying a non-zero
 /// storage `format`.
 [sealed]
 interface ITexelData
@@ -602,7 +602,7 @@ interface ITexelData
 /// Represents types that can be used as public texture type arguments.
 ///
 /// A texel element can be a concrete data type such as `float4`, or a storage
-/// format descriptor such as `rgba16f`. `DataType` names the value type that
+/// format descriptor such as `RGBA16F`. `DataType` names the value type that
 /// texture operations read or write, while `format` names the storage format.
 ///
 /// `ITexelElement` intentionally does not inherit from `ITexelData`: the public
@@ -710,13 +710,14 @@ ${
 struct TexelFormatTypeInfo
 {
     const char* name;
+    const char* codeName;
     int elementCount;
     int format;
 };
 
 enum class TexelImageFormat
 {
-#define SLANG_FORMAT(NAME, DESC) NAME,
+#define SLANG_FORMAT(NAME, CODE_NAME, DESC) NAME,
 #include "slang-image-format-defs.h"
 };
 
@@ -771,8 +772,8 @@ auto getTexelFormatDataType = [](const char* elementType, int elementCount) -> S
 };
 
 #define SLANG_TEXEL_FORMAT_ELEMENT_COUNT(TYPE, COUNT, SIZE) COUNT
-#define SLANG_FORMAT(NAME, DESC) \
-    {#NAME, SLANG_TEXEL_FORMAT_ELEMENT_COUNT DESC, int(TexelImageFormat::NAME)},
+#define SLANG_FORMAT(NAME, CODE_NAME, DESC) \
+    {#NAME, #CODE_NAME, SLANG_TEXEL_FORMAT_ELEMENT_COUNT DESC, int(TexelImageFormat::NAME)},
 TexelFormatTypeInfo texelFormatTypes[] =
 {
 #include "slang-image-format-defs.h"
@@ -787,10 +788,10 @@ for (auto texelFormatType : texelFormatTypes)
     const char* elementType = getTexelFormatElementType(texelFormatType.name);
     String dataType = getTexelFormatDataType(elementType, texelFormatType.elementCount);
 $}
-/// Represents the `$(texelFormatType.name)` storage format for texture type parameters.
+/// Represents the `$(texelFormatType.name)` storage format as the `$(texelFormatType.codeName)` texture type argument.
 /// @category texture_types
 [sealed]
-struct $(texelFormatType.name) : ITexelElement
+struct $(texelFormatType.codeName) : ITexelElement
 {
     typealias DataType = $(dataType);
     static const int format = $(texelFormatType.format);
@@ -814,7 +815,7 @@ $}
 /// @param access The access mode of the texture. 0 for read-only, 1 for read-write, 2 for write-only, 3 for rasterizer-ordered, 4 for feedback.
 /// @param isShadow Indicates whether the texture is a depth texture (`isCombined==0`) or a shadow texture (`isCombined==1`).
 /// @param isCombined Indicates whether the texture is a combined texture-sampler.
-/// @param format The storage format of the texture. Users should use public texture format types such as `rgba16f` instead.
+/// @param format The storage format of the texture. Users should use public texture format types such as `RGBA16F` instead.
 /// @see `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`, `Texture1DArray`,
 /// `Texture2DArray`, `TextureCubeArray`, `Sampler1D`, `Sampler2D`, `Sampler3D`, `SamplerCube`, `Sampler1DArray`, `Sampler2DArray`, `SamplerCubeArray`,
 /// `Texture2DMS`, `Texture2DMSArray`, `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `RWTexture1DArray`, `RWTexture2DArray`,
@@ -823,7 +824,7 @@ $}
 /// HLSL texture types are implemented as typealiases to the builtin `_Texture` type. Users
 /// are advised to use the HLSL-specific texture types instead of `_Texture` directly.
 ///
-/// For public texture aliases, Slang infers `format` from explicit texture format types such as `rgba16f`.
+/// For public texture aliases, Slang infers `format` from explicit texture format types such as `RGBA16F`.
 /// Plain scalar and vector types use an unknown format. The `[format("formatString")]` attribute remains supported
 /// for compatibility with existing declarations.
 /// Allowed `formatString` values are:

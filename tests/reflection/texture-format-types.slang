@@ -4,9 +4,9 @@
 //TEST:REFLECTION(filecheck=REFLECT):-stage compute -entry main -target spirv -no-codegen
 //TEST:REFLECTION(filecheck=REFLECT):-stage compute -entry main -target metal -no-codegen
 
-RWTexture2D<rgba16f> explicitRGBA16F;
-RWTexture2D<rg32f> explicitRG32F;
-RWTexture2D<rgba8ui> explicitRGBA8UI;
+RWTexture2D<RGBA16F> explicitRGBA16F;
+RWTexture2D<RG32F> explicitRG32F;
+RWTexture2D<RGBA8UI> explicitRGBA8UI;
 
 RWTexture2D<float4> autoFloat4;
 RWTexture2D<int4> autoInt4;

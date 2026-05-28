@@ -3,10 +3,10 @@
 // Textures with explicit storage formats must not coerce to or from the
 // default unknown-format texture type, even when their data types match.
 
-RWTexture2D<rgba16f> formattedTexture;
+RWTexture2D<RGBA16F> formattedTexture;
 RWTexture2D plainTexture;
 
-void takesFormatted(RWTexture2D<rgba16f> texture)
+void takesFormatted(RWTexture2D<RGBA16F> texture)
 {
 }
 
