@@ -5860,7 +5860,7 @@ public void hitObjectRecordHitMotionNV(
     {
     case _GL_NV_shader_invocation_reorder_motion:
     {
-        HitObject::__glslMakeMotionHit(
+        HitObject::__glslMakeMotionHitNV(
             hitObject,
             topLevel,
             instanceid,
@@ -5990,7 +5990,7 @@ public void hitObjectRecordHitWithIndexMotionNV(
     {
     case _GL_NV_shader_invocation_reorder_motion:
     {
-        HitObject::__glslMakeMotionHitWithIndex(
+        HitObject::__glslMakeMotionHitWithIndexNV(
             hitObject,
             topLevel,
             instanceid,

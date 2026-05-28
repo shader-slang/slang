@@ -24780,12 +24780,38 @@ struct HitObject
         }
     }
 
-    //  "void hitObjectRecordHitWithIndexMotionNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,float,int);"
+    // Unsuffixed helper retained for existing HitObject::MakeMotionHit call sites.
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionHitWithIndex(
+        out HitObject hitObj,
+        RaytracingAccelerationStructure accelerationStructure,
+        int instanceid,
+        int primitiveid,
+        int geometryindex,
+        uint hitKind,
+        uint sbtRecordIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float CurrentTime,
+        int attributeLocation)
+    {
+        __target_switch
+        {
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitWithIndexMotionNV";
+        }
+    }
+
+    // NV-specific helper used by public hitObjectRecordHitWithIndexMotionNV.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_NV_ray_tracing_motion_blur)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
+    static void __glslMakeMotionHitWithIndexNV(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
@@ -24832,12 +24858,39 @@ struct HitObject
         }
     }
 
-        // "void hitObjectRecordHitMotionNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,float,int);"
+    // Unsuffixed helper retained for existing HitObject::MakeMotionHit call sites.
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionHit(
+        out HitObject hitObj,
+        RaytracingAccelerationStructure accelerationStructure,
+        int instanceid,
+        int primitiveid,
+        int geometryindex,
+        uint hitKind,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float CurrentTime,
+        int attributeLocation)
+    {
+        __target_switch
+        {
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitMotionNV";
+        }
+    }
+
+    // NV-specific helper used by public hitObjectRecordHitMotionNV.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_NV_ray_tracing_motion_blur)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
+    static void __glslMakeMotionHitNV(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
