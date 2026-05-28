@@ -13,7 +13,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // SCALAR: OpCapability AtomicFloat16AddEXT
 // SCALAR: OpExtension "SPV_EXT_shader_atomic_float16_add"
 // SCALAR-NOT: OpCapability AtomicFloat16VectorNV
+// SCALAR-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 
 // VECTOR: OpCapability AtomicFloat16VectorNV
 // VECTOR: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 // VECTOR-NOT: OpCapability AtomicFloat16AddEXT
+// VECTOR-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
