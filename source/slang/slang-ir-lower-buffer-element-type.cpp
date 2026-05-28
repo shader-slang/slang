@@ -1585,17 +1585,34 @@ struct LoweredElementTypeContext
         auto clonedFunc = as<IRFunc>(cloneInst(&cloneEnv, &builder, call->getCallee()));
         List<IRUse*> uses;
 
-        // If our cloned function has uses already, that means it's calling
-        // itself (= is recursive). Such uses are problematic, as the
-        // `specializedFunc` cache won't contain the newly cloned function,
-        // causing an infinite loop of specialization. The original has already
-        // been handled though, so we can just swap the calls back to calling
-        // the original function and avoid such loops.
+        // If our cloned function has uses already, that means it may be calling
+        // itself (is recursive). There are also other potential causes, such as
+        // decorations, but this condition is basically only here to skip
+        // unnecessary extra work on the vast majority of non-recursive cases.
+        // Running the code inside is harmless but useless when the function is
+        // not calling itself.
+        //
+        // In this context, it is actually more correct for the recursive calls
+        // in a cloned function to call the original function instead of the new
+        // clone. First, the cloned function has a different type signature, but
+        // the `cloneInst` retains the old arguments for recursive calls, which
+        // already can cause type mismatches in the IR.
+        //
+        // Second, the CastStorageToLogical insts in the arguments of the
+        // cloned call get recorded in outNewCasts, causing the function call to
+        // the clone to get handled as if it had not been specialized in
+        // `deferStorageToLogicalCasts`. As the cloned function won't be
+        // recorded in `specializedFuncs` yet, it leads to
+        // `createSpecializedFuncThatUseStorageType` being called again for the
+        // clone. This sets up an infinite loop of cloning and specializing.
+        //
+        // By swapping the callees from the cloned function to the original
+        // function, we can fix both issues: we won't get type signature issues
+        // and the function is found in `specializedFuncs` during the next
+        // iteration in `deferStorageToLogicalCasts`.
         if (clonedFunc->hasUses())
         {
-            // Replace all self-calls with the original function. This cuts
-            // the loop, as `specializedFunc` cache contains the original
-            // function now.
+            // Replace all self-calls with the original function.
             cloneEnv.mapOldValToNew.remove(clonedFunc);
             cloneEnv.mapOldValToNew.add(clonedFunc, call->getCallee());
             traverseUsers<IRCall>(
