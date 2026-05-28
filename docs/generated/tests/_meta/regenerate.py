@@ -202,8 +202,10 @@ class _MiniYaml:
     _NUM_RE = re.compile(r"^-?\d+$")
 
     def __init__(self, text: str):
+        # Preserve raw lines so block scalars (|) can grab unfiltered content.
+        self.raw_lines: list[str] = text.splitlines()
         self.lines: list[tuple[int, int, str]] = []
-        for raw_lineno, raw in enumerate(text.splitlines(), start=1):
+        for raw_lineno, raw in enumerate(self.raw_lines, start=1):
             stripped = raw.split("#", 1)[0].rstrip()
             if not stripped.strip():
                 continue
@@ -253,12 +255,71 @@ class _MiniYaml:
             key = self._scalar(key.strip())
             rest = rest.strip()
             self.pos += 1
-            if rest == "":
+            if rest in ("|", "|-", "|+"):
+                out[key] = self._consume_block_scalar(peek[0], indent, rest)
+            elif rest == "":
                 child = self._parse_block(indent + 1)
                 out[key] = child if child is not None else {}
             else:
                 out[key] = self._scalar(rest)
         return out
+
+    def _consume_block_scalar(
+        self, key_lineno: int, key_indent: int, marker: str
+    ) -> str:
+        """Read a `|`-style literal block scalar.
+
+        Content is every raw line below the key whose indent is strictly
+        greater than `key_indent`. Indentation of the block is determined
+        by the first non-empty content line; that prefix is stripped from
+        every line. Trailing newlines are handled per the chomp marker
+        (`|` keeps one trailing newline, `|-` strips all, `|+` keeps all).
+        """
+        # raw_lines is 0-indexed; key was on raw line (key_lineno - 1).
+        raw_start = key_lineno  # first candidate content line
+        collected: list[str] = []
+        block_indent: int | None = None
+        end_raw_idx = raw_start
+        for idx in range(raw_start, len(self.raw_lines)):
+            raw = self.raw_lines[idx]
+            if raw.strip() == "":
+                collected.append("")
+                end_raw_idx = idx + 1
+                continue
+            stripped_left = raw.lstrip(" ")
+            this_indent = len(raw) - len(stripped_left)
+            if this_indent <= key_indent:
+                break
+            if block_indent is None:
+                block_indent = this_indent
+            if this_indent < block_indent:
+                # Re-dedent line that's less indented than the block prefix
+                # (still > key_indent though): treat as part of the block,
+                # preserve relative indent.
+                collected.append(raw[key_indent + 1 :])
+            else:
+                collected.append(raw[block_indent:])
+            end_raw_idx = idx + 1
+        # Advance the normalized-line cursor past all consumed lines.
+        while self.pos < len(self.lines) and self.lines[self.pos][0] <= end_raw_idx:
+            self.pos += 1
+        # Strip leading blank lines collected before any content
+        while collected and collected[0] == "":
+            collected.pop(0)
+        # Chomp behavior
+        if marker == "|-":
+            while collected and collected[-1] == "":
+                collected.pop()
+            return "\n".join(collected)
+        elif marker == "|+":
+            return "\n".join(collected) + "\n"
+        else:  # plain "|" — keep one final newline, strip extras
+            while len(collected) > 1 and collected[-1] == "" and collected[-2] == "":
+                collected.pop()
+            text = "\n".join(collected)
+            if not text.endswith("\n"):
+                text += "\n"
+            return text
 
     def _parse_sequence(self, indent: int):
         out: list = []
