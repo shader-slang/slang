@@ -1618,8 +1618,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
                 if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
                     return SpvStorageClassHitObjectAttributeNV;
-                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
-                    return SpvStorageClassHitObjectAttributeEXT;
                 return SpvStorageClassHitObjectAttributeEXT;
             }
         case AddressSpace::HitAttribute:
