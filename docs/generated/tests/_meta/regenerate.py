@@ -1904,7 +1904,16 @@ def cmd_findings_file(args: argparse.Namespace) -> int:
                     continue
                 edit_args.extend(["--single-select-option-id", opt_id])
             else:
-                edit_args.extend(["--text", str(fvalue)])
+                # ProjectV2Field can be text OR number-typed; the GraphQL
+                # type isn't distinguished in field-list output, so use the
+                # value's shape to pick: if it parses as a number, send
+                # --number; otherwise --text. (Project #10's Estimate is a
+                # number field and rejects --text.)
+                try:
+                    num = float(str(fvalue))
+                    edit_args.extend(["--number", str(num)])
+                except ValueError:
+                    edit_args.extend(["--text", str(fvalue)])
             _gh(edit_args)
             field_results[fname] = "ok"
         except subprocess.CalledProcessError as exc:
