@@ -520,8 +520,8 @@ struct MetalBufferPointerLoweringContext
                     // __getAddress). The address of a ulong field is a valid
                     // device pointer and can be stored as-is.
                 }
-                else if (user->getOp() == kIROp_GetElementPtr ||
-                         user->getOp() == kIROp_GetOffsetPtr)
+                else if (
+                    user->getOp() == kIROp_GetElementPtr || user->getOp() == kIROp_GetOffsetPtr)
                 {
                     // Array indexing or pointer arithmetic derives a new
                     // address from this one. Update its result type to
