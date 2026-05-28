@@ -2,10 +2,10 @@
 # =========================
 # This file uses slang-test's `-expected-failure-list` semantics: tests
 # listed here are expected to FAIL (not skipped). slang-test still runs
-# them and just reclassifies a failing exit as expected. That works for
-# the macOS entries below (cross-dylib exception RTTI mismatch returns a
-# clean failure), but it does NOT help when a test crashes the slang-test
-# process itself -- the runner dies before any classification step.
+# them and just reclassifies a failing exit as expected. That only helps
+# when a test returns a clean failing exit code; it does NOT help when a
+# test crashes the slang-test process itself -- the runner dies before
+# any classification step.
 #
 # Crash-mode skips therefore live elsewhere: as `-exclude-prefix`
 # arguments in `.github/workflows/ci-slang-coverage.yml`. As of writing:
@@ -15,9 +15,4 @@
 # Update both this file and the workflow when adding a new coverage-only
 # skip.
 
-# macOS only: tests that throw and catch C++ exceptions across shared library
-# boundaries fail when running in-process (server-count=1) due to cross-dylib
-# exception RTTI mismatch. Coverage CI uses server-count=1 for profiling.
-slang-unit-test-tool/replayContextSyncModeMismatch.internal
-slang-unit-test-tool/replayContextPlaybackOutputMismatch.internal
-slang-unit-test-tool/replayContextTypeMismatch.internal
+# No current coverage expected failures.
