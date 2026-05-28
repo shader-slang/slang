@@ -851,7 +851,6 @@ void cloneGlobalValueWithCodeCommon(
 
     cloneDecorations(context, clonedValue, originalValue);
     cloneExtraDecorations(context, clonedValue, originalValues);
-    clonedValue->setFullType((IRType*)cloneValue(context, originalValue->getFullType()));
 
     // We will walk through the blocks of the function, and clone each of them.
     //
@@ -926,6 +925,10 @@ void cloneGlobalValueWithCodeCommon(
             cb = cb->getNextBlock();
         }
     }
+
+    // The full type can reference params that are registered while cloning the blocks above.
+    // Cloning it earlier can leave hoistable types pointing at sibling generic clones.
+    clonedValue->setFullType((IRType*)cloneValue(context, originalValue->getFullType()));
 }
 
 void checkIRDuplicate(IRInst* inst, IRInst* moduleInst, UnownedStringSlice const& mangledName)

@@ -2722,28 +2722,40 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
         // If it's found, just return, and throw away the instruction
         if (found)
         {
-            memoryArena.rewindToCursor(cursor);
-
-            // If the found inst is defined in the same parent as current insert location but
-            // is located after the insert location, we need to move it to the insert location.
             auto foundInst = *found;
-            if (foundInst->getParent() && foundInst->getParent() == getInsertLoc().getParent() &&
-                getInsertLoc().getMode() == IRInsertLoc::Mode::Before)
+            auto foundGeneric = findOuterGeneric(foundInst);
+            auto insertGeneric = findOuterGeneric(getInsertLoc().getParent());
+            if (foundGeneric && foundGeneric != insertGeneric)
             {
-                auto insertLoc = getInsertLoc().getInst();
-                bool isAfter = false;
-                for (auto cur = insertLoc->next; cur; cur = cur->next)
-                {
-                    if (cur == foundInst)
-                    {
-                        isAfter = true;
-                        break;
-                    }
-                }
-                if (isAfter)
-                    foundInst->insertBefore(insertLoc);
+                // The global value-numbering map is keyed only by operands. A matching
+                // instruction in a different generic scope is not visible here, so keep the
+                // newly allocated instruction and let it be hoisted in the current scope.
             }
-            return *found;
+            else
+            {
+                memoryArena.rewindToCursor(cursor);
+
+                // If the found inst is defined in the same parent as current insert location but
+                // is located after the insert location, we need to move it to the insert location.
+                if (foundInst->getParent() &&
+                    foundInst->getParent() == getInsertLoc().getParent() &&
+                    getInsertLoc().getMode() == IRInsertLoc::Mode::Before)
+                {
+                    auto insertLoc = getInsertLoc().getInst();
+                    bool isAfter = false;
+                    for (auto cur = insertLoc->next; cur; cur = cur->next)
+                    {
+                        if (cur == foundInst)
+                        {
+                            isAfter = true;
+                            break;
+                        }
+                    }
+                    if (isAfter)
+                        foundInst->insertBefore(insertLoc);
+                }
+                return *found;
+            }
         }
     }
 
