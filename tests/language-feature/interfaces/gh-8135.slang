@@ -2,7 +2,7 @@
 // Using an associated type from an inherited generic interface in a child
 // interface method signature previously crashed in hoistable IR placement.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 
 public interface IStorage<T>
 {
@@ -15,16 +15,21 @@ public interface IParameterStorage<T> : IStorage<T>
     public Address getAddress(T value);
 }
 
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<int> outputBuffer;
+
 struct DenseStorage : IParameterStorage<int>
 {
     typedef uint Address;
 
     void add(uint address, int value)
-    {}
+    {
+        outputBuffer[address] = value;
+    }
 
     uint getAddress(int value)
     {
-        return uint(value);
+        return 0;
     }
 }
 
@@ -39,9 +44,6 @@ void testStorage<T, S : IParameterStorage<T>>(S storage, T value)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     DenseStorage storage;
-    testStorage(storage, int(dispatchThreadID.x));
+    // CHECK: 7
+    testStorage(storage, int(dispatchThreadID.x) + 7);
 }
-
-// CHECK: OpEntryPoint GLCompute
-// CHECK: OpExecutionMode {{.*}} LocalSize 1 1 1
-// CHECK: OpReturn
