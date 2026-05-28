@@ -598,7 +598,7 @@ static SlangResult _createTempCoverageCliFiles(TempCoverageCliFiles& out)
     out.sourcePath = out.basePath + ".slang";
     out.outputPath = out.basePath + ".spv";
     out.autoManifestPath = out.outputPath + ".coverage-mapping.json";
-    out.disassemblyOutputPath = out.basePath + ".spvasm";
+    out.disassemblyOutputPath = out.basePath + ".spv-asm";
     out.disassemblyManifestPath = out.disassemblyOutputPath + ".coverage-mapping.json";
     out.explicitManifestPath = out.basePath + ".coverage-mapping.json";
     return File::writeAllText(out.sourcePath, kCoverageCliShader);
@@ -718,6 +718,29 @@ static SlangResult _testCoverageExplicitSidecar(UnitTestContext* context)
     return _checkCoverageManifest(files.explicitManifestPath);
 }
 
+static SlangResult _testCoverageExplicitSidecarForDisassembly(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true, "spirv-asm");
+    args.add("-coverage-mapping-output");
+    args.add(files.explicitManifestPath);
+    args.add("-o");
+    args.add(files.disassemblyOutputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (!File::exists(files.disassemblyOutputPath))
+        return SLANG_FAIL;
+    if (File::exists(files.disassemblyManifestPath))
+        return SLANG_FAIL;
+    return _checkCoverageManifest(files.explicitManifestPath);
+}
+
 static SlangResult _testCoverageExplicitSidecarWithStdoutArtifact(UnitTestContext* context)
 {
     TempCoverageCliFiles files;
@@ -735,6 +758,72 @@ static SlangResult _testCoverageExplicitSidecarWithStdoutArtifact(UnitTestContex
     if (result.standardOutput.getLength() == 0)
         return SLANG_FAIL;
     return _checkCoverageManifest(files.explicitManifestPath);
+}
+
+static SlangResult _testCoverageExplicitSidecarCannotOverwriteArtifact(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-coverage-mapping-output");
+    args.add(files.outputPath);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "must differ from the compiled artifact output path"))
+        return SLANG_FAIL;
+    if (!File::exists(files.outputPath))
+        return SLANG_FAIL;
+
+    String artifactText;
+    SLANG_RETURN_ON_FAIL(File::readAllText(files.outputPath, artifactText));
+    if (_contains(artifactText, "\"coverage_mapping\""))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+static SlangResult _testCoverageExplicitSidecarRejectsMultipleArtifacts(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    args.add(files.sourcePath);
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("-trace-coverage");
+    args.add("-trace-function-coverage");
+    args.add("-trace-branch-coverage");
+    args.add("-target");
+    args.add("spirv");
+    args.add("-o");
+    args.add(files.outputPath);
+    args.add("-target");
+    args.add("spirv-asm");
+    args.add("-o");
+    args.add(files.disassemblyOutputPath);
+    args.add("-coverage-mapping-output");
+    args.add(files.explicitManifestPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(
+            result.standardError,
+            "would be written by multiple coverage-instrumented artifacts"))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
 }
 
 static SlangResult _testCoverageExplicitSidecarRequiresCoverage(UnitTestContext* context)
@@ -788,6 +877,11 @@ SLANG_UNIT_TEST(SlangcCoverageMappingOutput)
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecar(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForDisassembly(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecar(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarForDisassembly(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarWithStdoutArtifact(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteArtifact(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsMultipleArtifacts(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarRequiresCoverage(unitTestContext)));
 }

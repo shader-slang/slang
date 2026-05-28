@@ -4808,6 +4808,12 @@ err(
     "`-coverage-mapping-output` path '~path' would be written by multiple coverage-instrumented artifacts; use per-artifact `<output>.coverage-mapping.json` sidecars instead"
 )
 
+err(
+    "coverage-mapping-output-collides-with-artifact",
+    45110,
+    "`-coverage-mapping-output` path '~path' must differ from the compiled artifact output path"
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(

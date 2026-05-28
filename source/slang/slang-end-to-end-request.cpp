@@ -121,6 +121,8 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 SlangResult EndToEndCompileRequest::executeActionsInner()
 {
     SLANG_PROFILE_SECTION(endToEndActions);
+    m_didWriteExplicitCoverageMapping = false;
+
     // If no code-generation target was specified, then try to infer one from the source language,
     // just to make sure we can do something reasonable when invoked from the command line.
     //
@@ -441,6 +443,12 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
         {
             getSink()->diagnose(
                 Diagnostics::CoverageMappingOutputMultipleArtifacts{.path = explicitSidecarPath});
+            return SLANG_FAIL;
+        }
+        if (path.getLength() != 0 && Path::equals(explicitSidecarPath, path))
+        {
+            getSink()->diagnose(Diagnostics::CoverageMappingOutputCollidesWithArtifact{
+                .path = explicitSidecarPath});
             return SLANG_FAIL;
         }
         sidecarPath = explicitSidecarPath;
