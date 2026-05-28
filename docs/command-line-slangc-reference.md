@@ -121,7 +121,7 @@ Add a path to be used in resolving '#include' and 'import' operations.
 
 **-lang &lt;[language](#language)&gt;**
 
-Set the language for the following input files. 
+Set the language for the following input files. Required when an input is '-' (standard input), because stdin has no file extension. 
 
 
 <a id="matrix-layout-column-major"></a>
@@ -277,7 +277,7 @@ Dump to output list of warning diagnostic numeric and name ids.
 
 <a id="id"></a>
 ### --
-Treat the rest of the command line as input files. 
+Treat the rest of the command line as input files. Use '-' once to read from standard input; [-lang](#lang) is required, stdin is limited to 256 MiB, and diagnostics use `&lt;stdin&gt;`. 
 
 
 <a id="report-downstream-time"></a>
@@ -302,7 +302,17 @@ Reports information about checkpoint contexts used for reverse-mode automatic di
 
 <a id="trace-coverage"></a>
 ### -trace-coverage
-Instrument the shader with per-statement execution counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping source coverage entries to counters. 
+Instrument the shader with per-statement line coverage counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping source coverage entries to counters. 
+
+
+<a id="trace-function-coverage"></a>
+### -trace-function-coverage
+Instrument the shader with per-function-entry coverage counters. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
+
+
+<a id="trace-branch-coverage"></a>
+### -trace-branch-coverage
+Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths. Expression-level short-circuit and ternary branches are not instrumented by this mode yet. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
 
 
 <a id="trace-coverage-binding"></a>
@@ -921,7 +931,7 @@ Embed downstream IR into emitted slang IR
 
 <a id="experimental-feature"></a>
 ### -experimental-feature
-Enable experimental features (loading builtin neural module) 
+Enable experimental language and module features 
 
 
 <a id="enable-experimental-rich-diagnostics"></a>
@@ -1715,6 +1725,7 @@ A capability describes an optional feature that a target may or may not support.
 * `texture_querylod` 
 * `texture_querylevels` 
 * `texture_shadowlod` 
+* `texture_shadowlod_ext` 
 * `texture_shadowgrad` 
 * `atomic_glsl_float1` 
 * `atomic_glsl_float2` 
