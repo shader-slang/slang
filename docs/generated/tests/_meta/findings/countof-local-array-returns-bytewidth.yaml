@@ -2,6 +2,7 @@ schema_version: 1
 id: countof-local-array-returns-bytewidth
 bundle: syntax-reference/keywords-and-builtins
 suspected_kind: wrong-codegen
+title: "[slangi] countof(fixed-size local array) returns byte width, not element count"
 observed_at: 2026-05-28T10:30:00+00:00
 evidence:
   command: slangi repro.slang

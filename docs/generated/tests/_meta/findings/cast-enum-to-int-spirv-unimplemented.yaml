@@ -3,6 +3,7 @@ id: cast-enum-to-int-spirv-unimplemented
 bundle: target-pipelines/spirv
 suspected_kind: wrong-codegen
 scope: spirv
+title: "[spirv] enum-to-int cast unhandled by spirv-emit on -target spirv-asm path"
 observed_at: 2026-05-28T10:30:00+00:00
 evidence:
   command: slangc repro.slang -target spirv-asm -entry main -stage compute -o /dev/null

@@ -206,12 +206,32 @@ class _MiniYaml:
         self.raw_lines: list[str] = text.splitlines()
         self.lines: list[tuple[int, int, str]] = []
         for raw_lineno, raw in enumerate(self.raw_lines, start=1):
-            stripped = raw.split("#", 1)[0].rstrip()
+            stripped = self._strip_comment(raw).rstrip()
             if not stripped.strip():
                 continue
             indent = len(stripped) - len(stripped.lstrip(" "))
             self.lines.append((raw_lineno, indent, stripped))
         self.pos = 0
+
+    @staticmethod
+    def _strip_comment(raw: str) -> str:
+        """Strip YAML comment per spec: `#` is a comment only when at the
+        start of the line or preceded by whitespace, AND not inside a
+        single/double-quoted string. `#` embedded in a token
+        (`issue #5627`) or in a quoted value (`"foo #bar"`) is literal.
+        """
+        in_quote: str | None = None
+        for i, c in enumerate(raw):
+            if in_quote is not None:
+                if c == in_quote:
+                    in_quote = None
+                continue
+            if c in ('"', "'"):
+                in_quote = c
+                continue
+            if c == "#" and (i == 0 or raw[i - 1].isspace()):
+                return raw[:i]
+        return raw
 
     def parse(self):
         if not self.lines:
