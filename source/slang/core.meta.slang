@@ -4973,6 +4973,12 @@ semantic sv_groupid
     get : uint3;
 }
 
+semantic sv_workgroupcount
+{
+    [require(compute)]
+    get : uint3;
+}
+
 semantic sv_groupindex
 {
     [require(compute)]

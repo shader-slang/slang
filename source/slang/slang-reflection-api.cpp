@@ -3339,15 +3339,23 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
 SLANG_API SlangResult
 spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t* rs)
 {
-    auto decl = convert(inVar).getDecl();
+    auto var = convert(inVar);
+    auto decl = var.getDecl();
     if (auto varDecl = as<VarDeclBase>(decl))
     {
-        if (auto constantVal = as<ConstantIntVal>(varDecl->val))
+        if (varDecl->val)
         {
-            *rs = constantVal->getValue();
-            return 0;
+            auto astBuilder = getModule(varDecl)->getLinkage()->getASTBuilder();
+            SLANG_AST_BUILDER_RAII(astBuilder);
+
+            auto val = varDecl->val->substitute(astBuilder, SubstitutionSet(var))->resolve();
+            if (auto constantVal = as<ConstantIntVal>(val))
+            {
+                *rs = constantVal->getValue();
+                return 0;
+            }
         }
-        else if (auto cexpr = as<IntegerLiteralExpr>(varDecl->initExpr))
+        if (auto cexpr = as<IntegerLiteralExpr>(varDecl->initExpr))
         {
             *rs = cexpr->value;
             return 0;

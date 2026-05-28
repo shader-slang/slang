@@ -52,6 +52,7 @@ void depointerizeInputParams(IRFunc* entryPoint);
     M(DispatchThreadID, SV_DispatchThreadID)             \
     M(DomainLocation, SV_DomainLocation)                 \
     M(GroupID, SV_GroupID)                               \
+    M(WorkgroupCount, SV_WorkgroupCount)                 \
     M(GroupIndex, SV_GroupIndex)                         \
     M(GroupThreadID, SV_GroupThreadID)                   \
     M(GSInstanceID, SV_GSInstanceID)                     \

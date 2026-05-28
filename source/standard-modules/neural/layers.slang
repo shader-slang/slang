@@ -53,11 +53,21 @@ public struct FFLayer<
     static const int PaddedOutputSize = ((OutputVector.Size + 15) / 16) * 16;
     static const int PaddedInputSize = ((InputVector.Size + 15) / 16) * 16;
 
-    public static const int StorageSize =
-        ((Layout.Layout == LayoutType.Optimal)
-            ? (PaddedOutputSize / 16) * (PaddedInputSize / 16) * 256
-            : OutputVector.Size * InputVector.Size)
-        + (HasBias ? OutputVector.Size : 0);
+    // OptimalLayout uses a target-independent physical envelope: weights are
+    // padded to 16x16 and bias is padded to the output extent. CUDA, Vulkan,
+    // and Metal may order elements differently inside this envelope, but they
+    // all reserve the same number of elements so layer offsets stay uniform.
+    public static const int WeightStorageSize =
+        (Layout.Layout == LayoutType.Optimal)
+            ? PaddedOutputSize * PaddedInputSize
+            : OutputVector.Size * InputVector.Size;
+
+    public static const int BiasStorageSize =
+        (Layout.Layout == LayoutType.Optimal)
+            ? PaddedOutputSize
+            : (HasBias ? OutputVector.Size : 0);
+
+    public static const int StorageSize = WeightStorageSize + BiasStorageSize;
 
     /// Activation function instance (stores any activation-specific parameters).
     internal Activation activation;
@@ -87,7 +97,7 @@ public struct FFLayer<
         OutputVector y;
         if(HasBias)
         {
-            let biasAddr = parameterAddr.getOffset(StorageSize - OutputVector.Size);
+            let biasAddr = parameterAddr.getOffset(WeightStorageSize);
             y = input.linearTransform<A, Layout, OutputVector>(parameterAddr, biasAddr);
         }
         else

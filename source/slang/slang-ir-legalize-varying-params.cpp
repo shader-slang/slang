@@ -3912,6 +3912,14 @@ protected:
                     builder.getIntValue(builder.getIntType(), 3)));
                 break;
             }
+        case SystemValueSemanticName::WorkgroupCount:
+            {
+                result.systemValueName = toSlice("threadgroups_per_grid");
+                result.permittedTypes.add(builder.getVectorType(
+                    builder.getBasicType(BaseType::UInt),
+                    builder.getIntValue(builder.getIntType(), 3)));
+                break;
+            }
         case SystemValueSemanticName::GroupIndex:
             {
                 result.isSpecial = true;

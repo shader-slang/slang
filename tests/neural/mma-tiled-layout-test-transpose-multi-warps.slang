@@ -20,6 +20,9 @@ typealias DType = half;
 typealias DType = float;
 #endif
 
+// TEST_INPUT: set portableWeightBuffer = ubuffer(stride=4, count=4096)
+uniform RWStructuredBuffer<DType>.Handle portableWeightBuffer;
+
 // TEST_INPUT: set inputBuffer = ubuffer(stride=4, count=4096)
 uniform RWStructuredBuffer<DType>.Handle inputBuffer;
 
@@ -37,9 +40,47 @@ static const uint OffsetB = 256;
 
 void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedInputSize, int PaddedOutputSize, bool Clear>(uint tid)
 {
-    fillTransposeWeightTiled<DType, OutputSize, InputSize, BatchSize, Clear>(tid, inputBuffer);
-}
+    static const int PhysicalCount = PaddedInputSize * PaddedOutputSize + PaddedOutputSize;
 
+    if (Clear)
+    {
+        static const int NumIters = (PhysicalCount + BatchSize - 1) / BatchSize;
+        for (int iter = 0; iter < NumIters; iter++)
+        {
+            int index = iter * BatchSize + tid;
+            if (index < PhysicalCount)
+                inputBuffer[index] = DType(0);
+        }
+        return;
+    }
+
+    static const int LogicalCount = InputSize * OutputSize;
+    static const int NumLogicalIters = (LogicalCount + BatchSize - 1) / BatchSize;
+    for (int iter = 0; iter < NumLogicalIters; iter++)
+    {
+        int index = iter * BatchSize + tid;
+        if (index < LogicalCount)
+        {
+            int row = index / InputSize;
+            int col = index - row * InputSize;
+            int scaleFactor = (row % 3 == 0) ? -1 : ((row % 3 == 1) ? 0 : 1);
+            portableWeightBuffer[index] = DType(scaleFactor * (col + 1));
+        }
+    }
+
+    AllMemoryBarrierWithGroupSync();
+
+    let portable = BindlessAddress<DType>(portableWeightBuffer);
+    let optimal = BindlessAddress<DType>(inputBuffer);
+    __target_switch
+    {
+    case cuda:
+        NetworkParameterLayoutConverter<DType, TargetEnum.CUDA, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal);
+    case spirv:
+        NetworkParameterLayoutConverter<DType, TargetEnum.SPIR_V, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal);
+    }
+    AllMemoryBarrierWithGroupSync();
+}
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
