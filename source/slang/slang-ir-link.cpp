@@ -615,6 +615,8 @@ IRGeneric* cloneGenericImpl(
     // We want to clone extra decorations on the
     // return value from other symbols as well.
     auto clonedInnerVal = findGenericReturnVal(clonedVal);
+    if (!clonedInnerVal)
+        return clonedVal;
     for (auto originalSym = originalValues.sym; originalSym;
          originalSym = originalSym->nextWithSameName.get())
     {
@@ -622,6 +624,8 @@ IRGeneric* cloneGenericImpl(
         if (!originalGeneric)
             continue;
         auto originalInnerVal = findGenericReturnVal(originalGeneric);
+        if (!originalInnerVal)
+            continue;
 
         // Register all generic parameters before cloning the decorations.
         auto clonedParam = clonedVal->getFirstParam();
