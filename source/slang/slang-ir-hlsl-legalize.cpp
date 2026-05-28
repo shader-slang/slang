@@ -59,6 +59,66 @@ static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
         builder.addRayPayloadDecoration(type);
 }
 
+static bool isRayTracingHitStage(Stage stage)
+{
+    switch (stage)
+    {
+    case Stage::Intersection:
+    case Stage::AnyHit:
+    case Stage::ClosestHit:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool isPrimitiveIDSystemValueSemantic(UnownedStringSlice semanticName)
+{
+    return String(semanticName).toLower() == "sv_primitiveid";
+}
+
+static bool isPrimitiveIDSystemValueParam(IRParam* param)
+{
+    if (auto semanticDecor = param->findDecoration<IRSemanticDecoration>())
+    {
+        if (isPrimitiveIDSystemValueSemantic(semanticDecor->getSemanticName()))
+            return true;
+    }
+
+    auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecor)
+        return false;
+
+    auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+    if (!varLayout)
+        return false;
+
+    auto systemValueAttr = varLayout->findSystemValueSemanticAttr();
+    if (!systemValueAttr)
+        return false;
+
+    return isPrimitiveIDSystemValueSemantic(systemValueAttr->getName());
+}
+
+static IRFunc* getHLSLPrimitiveIndexFunc(IRModule* module, IRFunc*& primitiveIndexFunc)
+{
+    if (primitiveIndexFunc)
+        return primitiveIndexFunc;
+
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+
+    primitiveIndexFunc = builder.createFunc();
+    builder.setDataType(
+        primitiveIndexFunc,
+        builder.getFuncType(0, nullptr, builder.getUIntType()));
+    builder.addTargetIntrinsicDecoration(
+        primitiveIndexFunc,
+        CapabilitySet(CapabilityName::hlsl),
+        UnownedTerminatedStringSlice("PrimitiveIndex"));
+    return primitiveIndexFunc;
+}
+
 void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* inst)
 {
     for (auto child : inst->getChildren())
@@ -258,6 +318,75 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
             makeStructInst->replaceUsesWith(newMakeStruct);
             makeStructInst->removeAndDeallocate();
         }
+    }
+}
+
+void legalizeRayTracingPrimitiveIDParamForHLSL(IRModule* module)
+{
+    IRFunc* primitiveIndexFunc = nullptr;
+    List<IRFunc*> entryPointsToProcess;
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+
+        auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
+        if (!entryPointDecor)
+            continue;
+
+        if (!isRayTracingHitStage(entryPointDecor->getProfile().getStage()))
+            continue;
+
+        auto firstBlock = func->getFirstBlock();
+        if (!firstBlock)
+            continue;
+
+        entryPointsToProcess.add(func);
+    }
+
+    for (auto func : entryPointsToProcess)
+    {
+        auto firstBlock = func->getFirstBlock();
+
+        IRBuilder builder(module);
+        builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+
+        bool modifiedFuncType = false;
+        for (auto param = firstBlock->getFirstParam(); param;)
+        {
+            auto nextParam = param->getNextParam();
+
+            if (!isPrimitiveIDSystemValueParam(param))
+            {
+                param = nextParam;
+                continue;
+            }
+
+            if (param->hasUses())
+            {
+                auto primitiveIndexCall = builder.emitCallInst(
+                    builder.getUIntType(),
+                    getHLSLPrimitiveIndexFunc(module, primitiveIndexFunc),
+                    0,
+                    nullptr);
+
+                IRInst* replacement = primitiveIndexCall;
+                auto paramType = param->getFullType();
+                if (paramType != builder.getUIntType())
+                    replacement = builder.emitCast(paramType, primitiveIndexCall);
+
+                param->replaceUsesWith(replacement);
+            }
+
+            param->removeAndDeallocate();
+            modifiedFuncType = true;
+            param = nextParam;
+        }
+
+        if (modifiedFuncType)
+            fixUpFuncType(func);
     }
 }
 

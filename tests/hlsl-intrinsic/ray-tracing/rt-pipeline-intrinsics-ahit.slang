@@ -2,6 +2,8 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage anyhit
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage anyhit -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_SPIRV):-target spirv-assembly -emit-spirv-directly -entry main_sv_primitiveid -stage anyhit
+//TEST:SIMPLE(filecheck=SVPID_DXIL):-target dxil-assembly -entry main_sv_primitiveid -stage anyhit -profile sm_6_5 -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
 // SPIRV-DAG: RayTracingKHR
@@ -28,7 +30,7 @@
 
 // SPIRV-DAG: OpTypePointer HitAttribute{{NV|KHR}}
 // SPIRV-DAG: OpTypePointer IncomingRayPayload{{NV|KHR}}
- 
+
 // SPIRV-DAG: OpTerminateRayKHR
 // SPIRV-DAG: OpIgnoreIntersectionKHR
 
@@ -56,6 +58,11 @@
 
 // DXIL: call void @dx.op.acceptHitAndEndSearch
 // DXIL: call void @dx.op.ignoreHit
+
+// SVPID_SPIRV: OpEntryPoint AnyHitKHR
+// SVPID_SPIRV-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId
+
+// SVPID_DXIL: call i32 @dx.op.primitiveIndex.i32
 
 
 struct RayPayload
@@ -205,4 +212,17 @@ void main( inout RayPayload payload, in BuiltInTriangleIntersectionAttributes at
     }
 
     payload.RayHitT = val;
+}
+
+[shader("anyhit")]
+void main_sv_primitiveid(
+    inout RayPayload payload,
+    in BuiltInTriangleIntersectionAttributes attribs: SV_IntersectionAttributes,
+    uint primitiveID : SV_PrimitiveID)
+{
+    float3 barycentrics = float3(
+        1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
+        attribs.barycentrics.x,
+        attribs.barycentrics.y);
+    payload.RayHitT = float(primitiveID) + barycentrics.x + barycentrics.y + barycentrics.z;
 }

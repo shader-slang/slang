@@ -1642,6 +1642,7 @@ Result linkAndOptimizeIR(
         // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
         if (isD3DTarget(targetRequest))
         {
+            SLANG_PASS(legalizeRayTracingPrimitiveIDParamForHLSL);
             SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
         }
 
