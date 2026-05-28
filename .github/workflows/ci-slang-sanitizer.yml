@@ -180,10 +180,13 @@ jobs:
             sccache --show-stats || true
           fi
 
-      # IS_FORK_PR guard prevents /ci on a fork from writing the trusted cache
-      # when github.ref happens to be master under repository_dispatch.
+      # Three guards: master ref + not-a-fork-PR + default checkout path.
+      # The (inputs.ref == '' && inputs.repository == '') clause prevents a
+      # same-repo /ci on a draft branch from writing the master cache key —
+      # under repository_dispatch github.ref is still the default branch
+      # even though the checked-out code is a PR branch.
       - name: Save sccache cache
-        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && env.IS_FORK_PR != 'true'
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && env.IS_FORK_PR != 'true' && inputs.ref == '' && inputs.repository == ''
         uses: actions/cache/save@v4
         with:
           path: /tmp/.cache/sccache
