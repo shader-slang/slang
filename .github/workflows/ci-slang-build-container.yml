@@ -224,9 +224,11 @@ jobs:
             exit 1
           fi
 
-      # Save sccache cache (master only, for populate-sccache workflow)
+      # Save sccache cache (master only, for populate-sccache workflow).
+      # IS_FORK_PR guard prevents /ci on a fork from writing the trusted cache
+      # when github.ref happens to be master under repository_dispatch.
       - name: Save sccache cache (master only)
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' && env.IS_FORK_PR != 'true'
         uses: actions/cache/save@v4
         with:
           path: /tmp/.cache/sccache

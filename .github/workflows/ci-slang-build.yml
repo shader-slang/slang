@@ -332,9 +332,12 @@ jobs:
           path: artifacts-staging/
           retention-days: 1
 
-      # Save sccache cache (only when explicitly requested, e.g. from populate-sccache on master)
+      # Save sccache cache (only when explicitly requested, e.g. from populate-sccache on master).
+      # IS_FORK_PR guard is belt-and-braces: inputs.save-sccache is only set by
+      # populate-sccache.yml which runs on master, but the guard prevents any
+      # future caller from accidentally enabling fork-driven cache writes.
       - name: Save sccache cache
-        if: inputs.save-sccache && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: inputs.save-sccache && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && env.IS_FORK_PR != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}
