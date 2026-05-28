@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-12T09:31:22+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 095ac036e831eb7631a84f942f39c0461e59910aefb1c4c6522c17f442f3bf95
+generated_at: 2026-05-28T08:21:36+00:00
+source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+watched_paths_digest: 2c95fac86190d3096ef9459a727d2536a788f979789ce16c457446379c7e499f
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -66,6 +66,7 @@ flowchart TD
   HigherOrderInvokeExpr --> DispatchKernelExpr
   DifferentiateExpr --> ForwardDifferentiateExpr
   DifferentiateExpr --> BackwardDifferentiateExpr
+  DifferentiateExpr --> ApplyForBwdExpr
 ```
 
 ## Nodes
@@ -146,6 +147,7 @@ flowchart TD
 | `PrimalSubstituteExpr` | `HigherOrderInvokeExpr` | `baseFunction: Expr*` | [`__primal_subst`](../syntax-reference/grammar.md#expressions) | Selects the primal version of a function. |
 | `ForwardDifferentiateExpr` | `DifferentiateExpr` | (inherits) | [`__fwd_diff`](../syntax-reference/grammar.md#expressions) | Selects the forward-mode derivative. |
 | `BackwardDifferentiateExpr` | `DifferentiateExpr` | (inherits) | [`__bwd_diff`](../syntax-reference/grammar.md#expressions) | Selects the backward-mode derivative. |
+| `ApplyForBwdExpr` | `DifferentiateExpr` | (inherits) | [`__apply`](../syntax-reference/grammar.md#expressions) | Selects the apply-for-backward form of a function, used in `__func_extension __apply` to expose a primal-pass-with-context companion to a custom `bwd_diff`. |
 | `FuncAsTypeExpr` | `Expr` | `base: Expr*` | (none) | Treats a function expression as a type-of-function value. |
 | `FuncTypeOfExpr` | `Expr` | `base: Expr*` | (none) | Yields the function type of a function-typed expression. |
 | `DispatchKernelExpr` | `HigherOrderInvokeExpr` | `threadGroupSize: Expr*`, `dispatchSize: Expr*` | [`__dispatch_kernel`](../syntax-reference/grammar.md#expressions) | Host-side compute-kernel dispatch primitive. |

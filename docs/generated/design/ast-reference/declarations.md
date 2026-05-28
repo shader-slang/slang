@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.7
-generated_at: 2026-05-12T09:29:24+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 328973beec1effabd095eb1784b812673fccfa641b71d28f1e7c83a9228ca518
+generated_at: 2026-05-28T08:21:36+00:00
+source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+watched_paths_digest: a2217d02da7f2680d73efe9d3b894939543b9dd5ba9d5ebd665f3da62641c2f4
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -110,6 +110,7 @@ carry no FIDDLE concrete tag. Concrete leaves below.
 | `SemanticSetterDecl` | `Decl` | `type: TypeExp` | (none) | Typed `set : <type>` accessor inside a `SemanticDecl`. |
 | `FuncDecl` | `FunctionDeclBase` | (inherits) | [function](../syntax-reference/grammar.md#declarations) | Ordinary function declaration. |
 | `SynthesizedFuncDecl` | `FunctionDeclBase` | `operands: List<Val*>`, `irOp: uint32_t` | (none) | Function synthesized during checking; carries the target IR opcode. |
+| `FuncExtensionDecl` | `Decl` | `targetExpr: Expr*`, `innerFunc: FuncDecl*` | [func_extension](../syntax-reference/grammar.md#declarations) | `__func_extension fwd_diff(foo)(...)` shorthand for attaching a custom derivative / `__apply` to an existing function; desugars to an `ExtensionDecl` during checking. |
 | `NamespaceDecl` | `NamespaceDeclBase` | (inherits) | [namespace](../syntax-reference/grammar.md#top-level-structure) | `namespace { ... }`. |
 | `ModuleDecl` | `NamespaceDeclBase` | `module: Module*`, `languageVersion`, `defaultVisibility`, ... | [module](../syntax-reference/grammar.md#top-level-structure) | Top-level declaration of a translation unit / module. |
 | `FileDecl` | `ContainerDecl` | (no additional state) | (none) | Transparent per-source-file scope inside a `ModuleDecl`. |
@@ -153,6 +154,21 @@ semantically attaches members to an existing type
 (`ExtensionDecl::targetType`). The attachment is resolved by name
 lookup during checking, which is why `targetType` is stored as a
 `TypeExp` rather than a resolved `Type*` at parse time.
+
+### FuncExtensionDecl
+
+A lightweight shorthand parsed from `__func_extension` (gated behind
+`-experimental-feature`) that attaches a custom forward derivative
+(`fwd_diff`), backward derivative (`bwd_diff`), or custom forward
+pass (`__apply`) to an existing function without modifying its
+definition. The parser stores the target as a higher-order `Expr*`
+(e.g. a `ForwardDifferentiateExpr` wrapping the function reference)
+and the user-written body as an `innerFunc: FuncDecl*`; semantic
+checking desugars the whole thing into an `ExtensionDecl` so the
+rest of the pipeline never sees the shorthand. The IR lowering
+visitor treats the `FuncExtensionDecl` itself as ignored
+(`IGNORED_CASE` in
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)).
 
 ### AggTypeDecl, StructDecl, ClassDecl, EnumDecl
 
