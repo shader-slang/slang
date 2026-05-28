@@ -5607,8 +5607,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
 
         NaturalSize size{0, NaturalSize::kInvalidAlignment};
-        if (!sizeOfLikeExpr->dataLayoutType ||
-            as<ScalarDataLayoutType>(sizeOfLikeExpr->dataLayoutType))
+        // Only the size-of / align-of variants benefit from an early
+        // `calcSize` constant-fold. `countof(...)` has no data-layout
+        // semantics — feeding it through this path silently produced
+        // `sizeof(scalar component)` (#11317). Always lower count-of as
+        // an IR `kIROp_CountOf` so `maybeSpecializeCountOf` can fold it
+        // against the actual element count.
+        bool isCountOf = !as<SizeOfExpr>(sizeOfLikeExpr) && !as<AlignOfExpr>(sizeOfLikeExpr);
+        if (!isCountOf &&
+            (!sizeOfLikeExpr->dataLayoutType ||
+             as<ScalarDataLayoutType>(sizeOfLikeExpr->dataLayoutType)))
         {
             // The layout should be the scalar data layout, so lets try and
             // lower to a constant already.

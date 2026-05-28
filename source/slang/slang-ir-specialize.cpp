@@ -998,8 +998,37 @@ struct SpecializationContext
         {
         case kIROp_MakeValuePack:
         case kIROp_MakeTuple:
+        case kIROp_MakeArray:
+        case kIROp_MakeArrayFromElement:
             operand = operand->getDataType();
             break;
+        }
+
+        // For an array argument the operand at this point is typically a
+        // local var / load whose data type is the array. Look through the
+        // value to its array type so the array case below can fold to the
+        // element count.
+        if (operand->getOp() != kIROp_ArrayType && operand->getOp() != kIROp_TypePack &&
+            operand->getOp() != kIROp_TupleType)
+        {
+            if (auto valType = operand->getDataType();
+                valType && valType->getOp() == kIROp_ArrayType)
+                operand = valType;
+        }
+
+        // Fixed-size array: fold to the constant element count.
+        if (auto arrType = as<IRArrayType>(operand))
+        {
+            auto count = as<IRIntLit>(arrType->getElementCount());
+            if (!count)
+                return false;
+            IRBuilder builder(module);
+            builder.setInsertBefore(inst);
+            auto newInst = builder.getIntValue(inst->getDataType(), count->getValue());
+            addUsersToWorkList(inst);
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+            return true;
         }
 
         // We can only figure out the count of a type pack or tuple type.
