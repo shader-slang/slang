@@ -2372,8 +2372,10 @@ Result linkAndOptimizeIR(
     // sees real pointer types for device/constant qualification.
     //
     // This does not conflict with the earlier MetalParameterBlock run
-    // because they lower orthogonal type sets: that pass converts resources
-    // to DescriptorHandle; this one converts pointers to UIntPtr.
+    // because they target orthogonal field kinds within the same types:
+    // that pass converts resource fields to DescriptorHandle; this one
+    // converts pointer fields to UIntPtr (shouldSkipPhysicalTypes returns
+    // false to re-process types already decorated by that earlier pass).
     if (isMetalTarget(targetRequest))
     {
         BufferElementTypeLoweringOptions metalPtrOptions;
