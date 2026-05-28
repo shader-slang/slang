@@ -2047,14 +2047,21 @@ public:
     }
     Dictionary<IRInst*, IRInst*>& getInstReplacementMap() { return m_instReplacementMap; }
 
+    bool isInstVisibleFromGenericScope(IRInst* inst, IRInst* genericScope);
+    IRInst* findVisibleScopedGlobalNumberingEntry(IRInstKey const& key, IRInst* genericScope);
+    IRInst* findVisibleGlobalNumberingEntry(IRInstKey const& key, IRInst* genericScope);
+    void _addScopedGlobalNumberingEntry(IRInst* inst);
+    void _removeScopedGlobalNumberingEntry(IRInst* inst);
+
     void _addGlobalNumberingEntry(IRInst* inst)
     {
-        m_globalValueNumberingMap.add(IRInstKey{inst}, inst);
+        auto key = IRInstKey{inst};
+        IRInst* value = nullptr;
+        if (!m_globalValueNumberingMap.tryGetValue(key, value))
+            m_globalValueNumberingMap.add(key, inst);
         m_instReplacementMap.remove(inst);
         tryHoistInst(inst);
-        m_scopedGlobalValueNumberingMap.add(
-            IRScopedInstKey{IRInstKey{inst}, findOuterGeneric(inst)},
-            inst);
+        _addScopedGlobalNumberingEntry(inst);
     }
     void _removeGlobalNumberingEntry(IRInst* inst)
     {
@@ -2066,14 +2073,7 @@ public:
                 m_globalValueNumberingMap.remove(IRInstKey{inst});
             }
         }
-        IRScopedInstKey scopedKey{IRInstKey{inst}, findOuterGeneric(inst)};
-        if (m_scopedGlobalValueNumberingMap.tryGetValue(scopedKey, value))
-        {
-            if (value == inst)
-            {
-                m_scopedGlobalValueNumberingMap.remove(scopedKey);
-            }
-        }
+        _removeScopedGlobalNumberingEntry(inst);
     }
 
     ConstantMap& getConstantMap() { return m_constantMap; }
@@ -2087,6 +2087,7 @@ private:
 
     GlobalValueNumberingMap m_globalValueNumberingMap;
     ScopedGlobalValueNumberingMap m_scopedGlobalValueNumberingMap;
+    Dictionary<IRInst*, IRInst*> m_scopedGlobalValueNumberingScopes;
 
     // Duplicate insts that are still alive and needs to be replaced in m_globalValueNumberMap
     // when used as an operand to create another inst.

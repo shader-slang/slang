@@ -1360,8 +1360,9 @@ IRInst* IRBuilder::replaceOperand(IRUse* use, IRInst* newValue)
     builder->_removeGlobalNumberingEntry(user);
     use->init(user, newValue);
 
-    IRInst* existingVal = nullptr;
-    if (builder->getGlobalValueNumberingMap().tryGetValue(IRInstKey{user}, existingVal))
+    auto genericScope = findOuterGeneric(user);
+    auto existingVal = builder->findVisibleGlobalNumberingEntry(IRInstKey{user}, genericScope);
+    if (existingVal && existingVal != user)
     {
         user->replaceUsesWith(existingVal);
         return existingVal;
@@ -2717,20 +2718,6 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
     {
         IRInstKey key = {inst};
 
-        auto findVisibleScopedInst = [&](IRInst* insertGeneric) -> IRInst*
-        {
-            IRInst* scopedInst = nullptr;
-            auto& scopedMap = m_dedupContext->getScopedGlobalValueNumberingMap();
-            for (auto generic = insertGeneric; generic; generic = findOuterGeneric(generic->parent))
-            {
-                if (scopedMap.tryGetValue(IRScopedInstKey{key, generic}, scopedInst))
-                    return scopedInst;
-            }
-            if (scopedMap.tryGetValue(IRScopedInstKey{key, nullptr}, scopedInst))
-                return scopedInst;
-            return nullptr;
-        };
-
         auto useFoundInst = [&](IRInst* foundInst) -> IRInst*
         {
             memoryArena.rewindToCursor(cursor);
@@ -2745,7 +2732,12 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
                     insertLoc = insertLoc->getNextInst();
 
                 if (!insertLoc)
+                {
+                    // There is no legal non-param insertion point in this suffix of the block.
+                    // If a non-param `foundInst` appeared after the requested insert location,
+                    // the scan above would have stopped at it.
                     return foundInst;
+                }
 
                 bool isAfter = false;
                 for (auto cur = insertLoc->next; cur; cur = cur->next)
@@ -2768,15 +2760,14 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
         if (found)
         {
             auto foundInst = *found;
-            auto foundGeneric = findOuterGeneric(foundInst);
             auto insertGeneric = findOuterGeneric(getInsertLoc().getParent());
-            if (foundGeneric && foundGeneric != insertGeneric &&
-                !(insertGeneric && hasDescendent(foundGeneric, insertGeneric)))
+            if (!m_dedupContext->isInstVisibleFromGenericScope(foundInst, insertGeneric))
             {
                 // The global value-numbering map is keyed only by operands. A matching
                 // instruction in a different generic scope is not visible here, so keep the
                 // newly allocated instruction and let it be hoisted in the current scope.
-                if (auto scopedInst = findVisibleScopedInst(insertGeneric))
+                if (auto scopedInst =
+                        m_dedupContext->findVisibleScopedGlobalNumberingEntry(key, insertGeneric))
                     return useFoundInst(scopedInst);
             }
             else
@@ -2819,9 +2810,7 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
         else
             addHoistableInst(this, inst);
     }
-    m_dedupContext->getScopedGlobalValueNumberingMap()[IRScopedInstKey{
-        IRInstKey{inst},
-        findOuterGeneric(inst)}] = inst;
+    m_dedupContext->_addScopedGlobalNumberingEntry(inst);
 
     return inst;
 }
@@ -8808,10 +8797,11 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                 {
                     // Otherwise, check the global value numbering map for duplication after
                     // replacing the use.
-                    IRInst* existingVal = nullptr;
-                    if (dedupContext->getGlobalValueNumberingMap().tryGetValue(
-                            IRInstKey{user},
-                            existingVal))
+                    auto genericScope = findOuterGeneric(user);
+                    auto existingVal = dedupContext->findVisibleGlobalNumberingEntry(
+                        IRInstKey{user},
+                        genericScope);
+                    if (existingVal && existingVal != user)
                     {
                         // If existingVal has been replaced by something else, use that.
                         dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);

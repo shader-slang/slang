@@ -9,7 +9,65 @@ void IRDeduplicationContext::init(IRModule* module)
 
     m_globalValueNumberingMap.clear();
     m_scopedGlobalValueNumberingMap.clear();
+    m_scopedGlobalValueNumberingScopes.clear();
     m_constantMap.clear();
+}
+
+bool IRDeduplicationContext::isInstVisibleFromGenericScope(IRInst* inst, IRInst* genericScope)
+{
+    auto instGeneric = findOuterGeneric(inst);
+    return !instGeneric || instGeneric == genericScope ||
+           (genericScope && hasDescendent(instGeneric, genericScope));
+}
+
+IRInst* IRDeduplicationContext::findVisibleScopedGlobalNumberingEntry(
+    IRInstKey const& key,
+    IRInst* genericScope)
+{
+    IRInst* scopedInst = nullptr;
+    for (auto generic = genericScope; generic; generic = findOuterGeneric(generic))
+    {
+        if (m_scopedGlobalValueNumberingMap.tryGetValue(IRScopedInstKey{key, generic}, scopedInst))
+            return scopedInst;
+    }
+    if (m_scopedGlobalValueNumberingMap.tryGetValue(IRScopedInstKey{key, nullptr}, scopedInst))
+        return scopedInst;
+    return nullptr;
+}
+
+IRInst* IRDeduplicationContext::findVisibleGlobalNumberingEntry(
+    IRInstKey const& key,
+    IRInst* genericScope)
+{
+    IRInst* existingVal = nullptr;
+    if (!m_globalValueNumberingMap.tryGetValue(key, existingVal))
+        return nullptr;
+
+    if (isInstVisibleFromGenericScope(existingVal, genericScope))
+        return existingVal;
+
+    return findVisibleScopedGlobalNumberingEntry(key, genericScope);
+}
+
+void IRDeduplicationContext::_addScopedGlobalNumberingEntry(IRInst* inst)
+{
+    auto scope = findOuterGeneric(inst);
+    m_scopedGlobalValueNumberingMap[IRScopedInstKey{IRInstKey{inst}, scope}] = inst;
+    m_scopedGlobalValueNumberingScopes[inst] = scope;
+}
+
+void IRDeduplicationContext::_removeScopedGlobalNumberingEntry(IRInst* inst)
+{
+    IRInst* scope = nullptr;
+    if (!m_scopedGlobalValueNumberingScopes.tryGetValue(inst, scope))
+        return;
+
+    IRInst* value = nullptr;
+    IRScopedInstKey scopedKey{IRInstKey{inst}, scope};
+    if (m_scopedGlobalValueNumberingMap.tryGetValue(scopedKey, value) && value == inst)
+        m_scopedGlobalValueNumberingMap.remove(scopedKey);
+
+    m_scopedGlobalValueNumberingScopes.remove(inst);
 }
 
 void IRDeduplicationContext::removeHoistableInstFromGlobalNumberingMap(IRInst* instToRemove)
