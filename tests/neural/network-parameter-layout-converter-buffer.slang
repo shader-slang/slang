@@ -6,7 +6,6 @@ import slang.neural;
 
 typealias LongMaskConverter = NetworkParameterLayoutConverter<
     float,
-    TargetEnum.SPIR_V,
     0x200000001ull,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -26,15 +25,7 @@ void toOptimalLayout()
     let portableAddress = BindlessAddress<float>(portable);
     let optimalAddress = BindlessAddress<float>(optimal);
 
-    __target_switch
-    {
-    case cuda:
-        NetworkParameterLayoutConverter<float, TargetEnum.CUDA, 1, 4, 2>.toOptimalLayout(portableAddress, optimalAddress);
-    case spirv:
-        NetworkParameterLayoutConverter<float, TargetEnum.SPIR_V, 1, 4, 2>.toOptimalLayout(portableAddress, optimalAddress);
-    case metal:
-        NetworkParameterLayoutConverter<float, TargetEnum.Metal, 1, 4, 2>.toOptimalLayout(portableAddress, optimalAddress);
-    }
+    NetworkParameterLayoutConverter<float, 1, 4, 2>.toOptimalLayout(portableAddress, optimalAddress);
     AllMemoryBarrierWithGroupSync();
 }
 
@@ -67,7 +58,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
 
     resultBuffer[0] = commonOk ? 1 : 0;
     resultBuffer[1] = targetOk ? 1 : 0;
-    resultBuffer[2] = (NetworkParameterLayoutConverter<float, TargetEnum.SPIR_V, 1, 4, 2>.ElementCountPhysical == 272) ? 1 : 0;
+    resultBuffer[2] = (NetworkParameterLayoutConverter<float, 1, 4, 2>.ElementCountPhysical == 272) ? 1 : 0;
     resultBuffer[3] = (LongMaskConverter.ElementCountLogical == 36 &&
         LongMaskConverter.ElementCountPhysical == 9248) ? 1 : 0;
 

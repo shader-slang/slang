@@ -11,7 +11,7 @@ implementing neural;
 //   weight[AlignedOutputSize][AlignedInputSize] followed by
 //   bias[AlignedOutputSize], where both aligned sizes are rounded up to 16.
 // The target only decides how logical weight coordinates are ordered inside
-// that envelope:
+// that envelope at runtime:
 //   CUDA: native MatrixB tile layout over (InputSize, OutputSize).
 //   SPIR-V/Vulkan: 16x16 tiled row-major over (OutputSize, InputSize).
 //   Metal/other targets: padded row-major over (OutputSize, InputSize).
@@ -22,7 +22,7 @@ implementing neural;
 // expected per-layer bias choices.
 //
 // BiasMask uses one uint64_t bit per layer: bit 0 for D0 -> D1, bit 1 for D1 -> D2, etc.
-// Example: NetworkParameterLayoutConverter<float, TargetEnum.CUDA, 0b01, 3, 5, 2>
+// Example: NetworkParameterLayoutConverter<float, 0b01, 3, 5, 2>
 // means the 3 -> 5 layer has bias, and the 5 -> 2 layer does not.
 
 
@@ -85,7 +85,6 @@ internal int2 cudaNativeLayoutToRowMajor(int nativeIndex)
 
 internal struct LayerConverter<
     T,
-    TargetEnum Target,
     bool HasBias,
     int InputSize,
     int OutputSize>
@@ -104,66 +103,16 @@ internal struct LayerConverter<
     static const int BytesLogical = ElementCountLogical * sizeof(T);
 
     // Physical counts describe the shared target-facing layer block. The byte
-    // size is intentionally independent of Target; only physicalWeightOffset()
-    // changes the ordering of values inside the block. The bias slot is reserved
-    // even when HasBias is false so the optimal layout does not need a special
-    // case per layer.
+    // size is intentionally independent of the selected backend; only
+    // physicalWeightOffset() changes the ordering of values inside the block.
+    // The bias slot is reserved even when HasBias is false, so the optimal
+    // layout does not need a special case per layer.
     static const int WeightElementCountPhysical = PaddedInputSize * PaddedOutputSize;
     static const int BiasElementCountPhysical = PaddedOutputSize;
     static const int ElementCountPhysical = WeightElementCountPhysical + BiasElementCountPhysical;
     static const int BytesPhysical = ElementCountPhysical * sizeof(T);
 
     __init() {}
-
-    [ForceInline]
-    static int portableWeightOffset(int outputIndex, int inputIndex)
-    {
-        return outputIndex * InputSize + inputIndex;
-    }
-
-    [ForceInline]
-    static int portableBiasOffset(int outputIndex)
-    {
-        return WeightElementCountLogical + outputIndex;
-    }
-
-    [ForceInline]
-    static int physicalBiasOffset(int outputIndex)
-    {
-        return WeightElementCountPhysical + outputIndex;
-    }
-
-    [ForceInline]
-    static int physicalWeightOffset(int outputIndex, int inputIndex)
-    {
-        // Convert the natural weight coordinate W[output][input] to the chosen
-        // target storage order. CUDA stores the same values as MatrixB(K, M),
-        // so input selects the tile row and output selects the tile column.
-        // SPIR-V/Vulkan stores MatrixA(M, K), so output remains the tile row.
-        // Metal keeps a simple padded row-major M x K matrix.
-        static const int TileSize = 16;
-        int outputTile = outputIndex / TileSize;
-        int inputTile = inputIndex / TileSize;
-        int outputInTile = outputIndex - outputTile * TileSize;
-        int inputInTile = inputIndex - inputTile * TileSize;
-
-        if (Target == TargetEnum.CUDA)
-        {
-            static const int TileCols = PaddedOutputSize / TileSize;
-            int tileBase = (inputTile * TileCols + outputTile) * (TileSize * TileSize);
-            return tileBase + rowMajorToCudaNativeLayout(inputInTile, outputInTile);
-        }
-        else if (Target == TargetEnum.SPIR_V)
-        {
-            static const int TileCols = PaddedInputSize / TileSize;
-            int tileBase = (outputTile * TileCols + inputTile) * (TileSize * TileSize);
-            return tileBase + outputInTile * TileSize + inputInTile;
-        }
-        else
-        {
-            return outputIndex * PaddedInputSize + inputIndex;
-        }
-    }
 }
 
 internal struct ConverterEnd<T> : ILayoutSize<T>
@@ -178,7 +127,6 @@ internal struct ConverterEnd<T> : ILayoutSize<T>
 
 internal struct ConverterNode<
     T,
-    TargetEnum Target,
     uint64_t BiasMask,
     int InputSize,
     int OutputSize,
@@ -190,11 +138,11 @@ internal struct ConverterNode<
     static const bool HasBias = (BiasMask & 1ull) != 0ull;
     static const uint64_t RestBiasMask = BiasMask >> 1;
 
-    typealias ThisLayer = LayerConverter<T, Target, HasBias, InputSize, OutputSize>;
+    typealias ThisLayer = LayerConverter<T, HasBias, InputSize, OutputSize>;
     typealias Tail = __packBranch(
         RestDim,
         ConverterEnd<T>,
-        ConverterNode<T, Target, RestBiasMask, OutputSize, __first(RestDim), __trimFirst(RestDim)>);
+        ConverterNode<T, RestBiasMask, OutputSize, __first(RestDim), __trimFirst(RestDim)>);
 
     // A network with dimensions <D0, D1, D2, ...> is encoded as one layer
     // D0 -> D1 followed by the converter for <D1, D2, ...>. These constants
@@ -206,7 +154,7 @@ internal struct ConverterNode<
 }
 
 
-internal int physicalWeightOffset<TargetEnum Target>(
+internal int physicalWeightOffsetForTarget<TargetEnum Target>(
     int inputSize,
     int outputSize,
     int outputIndex,
@@ -240,6 +188,27 @@ internal int physicalWeightOffset<TargetEnum Target>(
 }
 
 
+internal int physicalWeightOffset(
+    int inputSize,
+    int outputSize,
+    int outputIndex,
+    int inputIndex)
+{
+    __target_switch
+    {
+    case cuda:
+        return physicalWeightOffsetForTarget<TargetEnum.CUDA>(
+            inputSize, outputSize, outputIndex, inputIndex);
+    case spirv:
+        return physicalWeightOffsetForTarget<TargetEnum.SPIR_V>(
+            inputSize, outputSize, outputIndex, inputIndex);
+    case metal:
+        return physicalWeightOffsetForTarget<TargetEnum.Metal>(
+            inputSize, outputSize, outputIndex, inputIndex);
+    }
+}
+
+
 internal struct ConverterThreadScope
 {
     uint index;
@@ -263,7 +232,7 @@ internal ConverterThreadScope getConverterThreadScope()
 }
 
 
-internal int2 physicalWeightIndexToLogicalCoord<TargetEnum Target>(
+internal int2 physicalWeightIndexToLogicalCoordForTarget<TargetEnum Target>(
     int inputSize,
     int outputSize,
     int physicalWeightIndex)
@@ -308,9 +277,27 @@ internal int2 physicalWeightIndexToLogicalCoord<TargetEnum Target>(
     return coord;
 }
 
+internal int2 physicalWeightIndexToLogicalCoord(
+    int inputSize,
+    int outputSize,
+    int physicalWeightIndex)
+{
+    __target_switch
+    {
+    case cuda:
+        return physicalWeightIndexToLogicalCoordForTarget<TargetEnum.CUDA>(
+            inputSize, outputSize, physicalWeightIndex);
+    case spirv:
+        return physicalWeightIndexToLogicalCoordForTarget<TargetEnum.SPIR_V>(
+            inputSize, outputSize, physicalWeightIndex);
+    case metal:
+        return physicalWeightIndexToLogicalCoordForTarget<TargetEnum.Metal>(
+            inputSize, outputSize, physicalWeightIndex);
+    }
+}
+
 internal void convertOneLayerToOptimalLayout<
     T,
-    TargetEnum Target,
     PortableAddress,
     OptimalAddress>(
     inout uint64_t biasMask,
@@ -340,7 +327,7 @@ internal void convertOneLayerToOptimalLayout<
 
         if (layerElementIndex < weightElementCountPhysical)
         {
-            int2 coord = physicalWeightIndexToLogicalCoord<Target>(
+            int2 coord = physicalWeightIndexToLogicalCoord(
                 inputSize,
                 outputSize,
                 layerElementIndex);
@@ -370,7 +357,6 @@ internal void convertOneLayerToOptimalLayout<
 
 internal void convertOneLayerToPortableLayout<
     T,
-    TargetEnum Target,
     OptimalAddress,
     PortableAddress>(
     inout uint64_t biasMask,
@@ -403,7 +389,7 @@ internal void convertOneLayerToPortableLayout<
         {
             int outputIndex = layerElementIndex / inputSize;
             int inputIndex = layerElementIndex - outputIndex * inputSize;
-            int srcOffset = physicalWeightOffset<Target>(
+            int srcOffset = physicalWeightOffset(
                 inputSize,
                 outputSize,
                 outputIndex,
@@ -427,7 +413,6 @@ internal void convertOneLayerToPortableLayout<
 
 internal void convertNetworkToOptimalLayout<
     T,
-    TargetEnum Target,
     uint64_t BiasMask,
     int InputSize,
     PortableAddress,
@@ -445,7 +430,7 @@ internal void convertNetworkToOptimalLayout<
     int inputSize = InputSize;
     int logicalOffset = 0;
     int physicalOffset = 0;
-    expand convertOneLayerToOptimalLayout<T, Target, PortableAddress, OptimalAddress>(
+    expand convertOneLayerToOptimalLayout<T, PortableAddress, OptimalAddress>(
         biasMask,
         inputSize,
         logicalOffset,
@@ -458,7 +443,6 @@ internal void convertNetworkToOptimalLayout<
 
 internal void convertNetworkToPortableLayout<
     T,
-    TargetEnum Target,
     uint64_t BiasMask,
     int InputSize,
     OptimalAddress,
@@ -476,7 +460,7 @@ internal void convertNetworkToPortableLayout<
     int inputSize = InputSize;
     int physicalOffset = 0;
     int logicalOffset = 0;
-    expand convertOneLayerToPortableLayout<T, Target, OptimalAddress, PortableAddress>(
+    expand convertOneLayerToPortableLayout<T, OptimalAddress, PortableAddress>(
         biasMask,
         inputSize,
         physicalOffset,
@@ -490,14 +474,13 @@ internal void convertNetworkToPortableLayout<
 
 public struct NetworkParameterLayoutConverter<
     T : __BuiltinFloatingPointType,
-    TargetEnum Target,
     uint64_t BiasMask,
     int InputSize,
     int OutputSize,
     let each RestDim : int>
         where T.Differential == T
 {
-    typealias Impl = ConverterNode<T, Target, BiasMask, InputSize, OutputSize, RestDim>;
+    typealias Impl = ConverterNode<T, BiasMask, InputSize, OutputSize, RestDim>;
 
     public static const int ElementCountLogical = Impl.ElementCountLogical;
     public static const int ElementCountPhysical = Impl.ElementCountPhysical;
@@ -521,7 +504,6 @@ public struct NetworkParameterLayoutConverter<
         {
             convertNetworkToOptimalLayout<
                 T,
-                Target,
                 BiasMask,
                 InputSize,
                 PortableAddress,
@@ -548,7 +530,6 @@ public struct NetworkParameterLayoutConverter<
         {
             convertNetworkToPortableLayout<
                 T,
-                Target,
                 BiasMask,
                 InputSize,
                 OptimalAddress,

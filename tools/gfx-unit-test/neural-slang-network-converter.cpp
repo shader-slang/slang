@@ -49,7 +49,6 @@ enum class ConverterTarget
 struct TargetCase
 {
     const char* name;
-    const char* targetEnumName;
     ConverterTarget converterTarget;
     DeviceType deviceType;
 };
@@ -200,9 +199,8 @@ static std::vector<float> makeExpectedOptimalParameters(
 static Slang::String makeConverterTypeName(const TargetCase& target)
 {
     Slang::StringBuilder builder;
-    builder << "NetworkParameterLayoutConverter<float, TargetEnum.";
-    builder << target.targetEnumName;
-    builder << ", 5, 5, 13, 7, 19>";
+    SLANG_UNUSED(target);
+    builder << "NetworkParameterLayoutConverter<float, 5, 5, 13, 7, 19>";
     return builder.produceString();
 }
 
@@ -222,18 +220,8 @@ static Slang::String makeShaderSource(const TargetCase& target)
             let portable = BindlessAddress<float>(portableBuffer);
             let optimal = BindlessAddress<float>(optimalBuffer);
 
-            __target_switch
-            {
-            case cuda:
-                NetworkParameterLayoutConverter<float, TargetEnum.CUDA, 5, 5, 13, 7, 19>
-                    .toOptimalLayout(portable, optimal);
-            case spirv:
-                NetworkParameterLayoutConverter<float, TargetEnum.SPIR_V, 5, 5, 13, 7, 19>
-                    .toOptimalLayout(portable, optimal);
-            case metal:
-                NetworkParameterLayoutConverter<float, TargetEnum.Metal, 5, 5, 13, 7, 19>
-                    .toOptimalLayout(portable, optimal);
-            }
+            NetworkParameterLayoutConverter<float, 5, 5, 13, 7, 19>
+                .toOptimalLayout(portable, optimal);
         }
 
         void toPortableLayout()
@@ -241,18 +229,8 @@ static Slang::String makeShaderSource(const TargetCase& target)
             let optimal = BindlessAddress<float>(optimalBuffer);
             let roundTrip = BindlessAddress<float>(roundTripBuffer);
 
-            __target_switch
-            {
-            case cuda:
-                NetworkParameterLayoutConverter<float, TargetEnum.CUDA, 5, 5, 13, 7, 19>
-                    .toPortableLayout(optimal, roundTrip);
-            case spirv:
-                NetworkParameterLayoutConverter<float, TargetEnum.SPIR_V, 5, 5, 13, 7, 19>
-                    .toPortableLayout(optimal, roundTrip);
-            case metal:
-                NetworkParameterLayoutConverter<float, TargetEnum.Metal, 5, 5, 13, 7, 19>
-                    .toPortableLayout(optimal, roundTrip);
-            }
+            NetworkParameterLayoutConverter<float, 5, 5, 13, 7, 19>
+                .toPortableLayout(optimal, roundTrip);
         }
 
         [shader("compute")]
@@ -676,19 +654,19 @@ static void runNeuralNetworkConverterTest(UnitTestContext* context, const Target
 
 SLANG_UNIT_TEST(neuralSlangNetworkConverterCUDA)
 {
-    TargetCase target = {"cuda", "CUDA", ConverterTarget::CUDA, DeviceType::CUDA};
+    TargetCase target = {"cuda", ConverterTarget::CUDA, DeviceType::CUDA};
     runNeuralNetworkConverterTest(unitTestContext, target);
 }
 
 SLANG_UNIT_TEST(neuralSlangNetworkConverterVulkan)
 {
-    TargetCase target = {"vulkan", "SPIR_V", ConverterTarget::SPIRV, DeviceType::Vulkan};
+    TargetCase target = {"vulkan", ConverterTarget::SPIRV, DeviceType::Vulkan};
     runNeuralNetworkConverterTest(unitTestContext, target);
 }
 
 SLANG_UNIT_TEST(neuralSlangNetworkConverterMetal)
 {
-    TargetCase target = {"metal", "Metal", ConverterTarget::Metal, DeviceType::Metal};
+    TargetCase target = {"metal", ConverterTarget::Metal, DeviceType::Metal};
     runNeuralNetworkConverterTest(unitTestContext, target);
 }
 

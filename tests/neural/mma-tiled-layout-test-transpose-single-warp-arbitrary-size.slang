@@ -72,15 +72,7 @@ void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedInputSize, i
 
     let portable = BindlessAddress<DType>(portableWeightBuffer);
     let optimal = BindlessAddress<DType>(inputBuffer);
-    __target_switch
-    {
-    case cuda:
-        NetworkParameterLayoutConverter<DType, TargetEnum.CUDA, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal);
-    case spirv:
-        NetworkParameterLayoutConverter<DType, TargetEnum.SPIR_V, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal);
-    case metal:
-        NetworkParameterLayoutConverter<DType, TargetEnum.Metal, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal);
-    }
+    NetworkParameterLayoutConverter<DType, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal);
     AllMemoryBarrierWithGroupSync();
 }
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
