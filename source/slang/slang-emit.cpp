@@ -2366,6 +2366,20 @@ Result linkAndOptimizeIR(
     // Run a final round of simplifications to clean up unused things after phi-elimination.
     SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
 
+    // Metal rejects pointer-to-pointer types in buffer-bound structs.
+    // Lower multi-level pointer fields to UIntPtr very late so that all
+    // intermediate passes see real pointer types. Uses the buffer-element-type
+    // framework's systematic cast deferral and function specialization.
+    if (isMetalTarget(targetRequest))
+    {
+        BufferElementTypeLoweringOptions metalPtrOptions;
+        metalPtrOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::MetalPointerLowering;
+        SLANG_PASS(lowerBufferElementTypeToStorageType, targetProgram, metalPtrOptions);
+        SLANG_PASS(performForceInlining);
+        SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
+    }
+
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
     // reflect the IR that code is generated from as closely as possible.

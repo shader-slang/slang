@@ -328,6 +328,19 @@ struct BufferElementTypeLoweringPolicy : public RefObject
     /// StorageType that may have explicit layout. This is currently true for all targets except
     /// SPIRV.
     virtual bool canUseStorageTypeInLocalVar() { return true; }
+
+    /// Returns true if the given buffer element type needs lowering by this policy.
+    /// Override to control which buffer element types are discovered by processModule.
+    virtual bool needsElementLowering(IRType* elementType)
+    {
+        return as<IRStructType>(elementType) || as<IRMatrixType>(elementType) ||
+               as<IRArrayType>(elementType) || as<IRBoolType>(elementType);
+    }
+
+    /// Returns true if buffer element types with [PhysicalType] decoration should
+    /// be skipped. Override to false when running a late pass that needs to further
+    /// lower fields in types that were already partially processed by an earlier run.
+    virtual bool shouldSkipPhysicalTypes() { return true; }
 };
 
 BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
@@ -1698,8 +1711,7 @@ struct LoweredElementTypeContext
 
             if (as<IRTextureBufferType>(globalInst))
                 continue;
-            if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) &&
-                !as<IRArrayType>(elementType) && !as<IRBoolType>(elementType))
+            if (!leafTypeLoweringPolicy->needsElementLowering(elementType))
                 continue;
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
         }
@@ -1711,7 +1723,8 @@ struct LoweredElementTypeContext
             auto bufferType = bufferTypeInfo.bufferType;
             auto elementType = bufferTypeInfo.elementType;
 
-            if (elementType->findDecoration<IRPhysicalTypeDecoration>())
+            if (elementType->findDecoration<IRPhysicalTypeDecoration>() &&
+                leafTypeLoweringPolicy->shouldSkipPhysicalTypes())
                 continue;
 
             auto config = getTypeLoweringConfigForBuffer(target, bufferType);
@@ -2879,6 +2892,68 @@ struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
     }
 };
 
+// Metal rejects pointer-to-pointer in buffer pointee types. This policy
+// lowers pointer fields to UIntPtr, using the framework's systematic cast
+// deferral and function specialization for complete coverage. The address
+// space distinguishes two rules:
+//   - StorageBuffer: lower ALL pointers (buffer binding adds a pointer level)
+//   - Other (Uniform/Constant): lower only multi-level pointers (T**)
+struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
+{
+    TargetProgram* target;
+    BufferElementTypeLoweringOptions options;
+
+    MetalPointerBufferElementTypeLoweringPolicy(
+        TargetProgram* inTarget,
+        BufferElementTypeLoweringOptions inOptions)
+        : target(inTarget), options(inOptions)
+    {
+    }
+
+    bool needsElementLowering(IRType* elementType) override
+    {
+        if (as<IRPtrType>(elementType))
+            return true;
+        if (auto arrType = as<IRArrayTypeBase>(elementType))
+            return needsElementLowering((IRType*)arrType->getElementType());
+        if (auto structType = as<IRStructType>(elementType))
+        {
+            for (auto field : structType->getFields())
+                if (needsElementLowering(field->getFieldType()))
+                    return true;
+        }
+        return false;
+    }
+
+    bool shouldSkipPhysicalTypes() override { return false; }
+
+    LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
+    {
+        if (auto ptrType = as<IRPtrType>(type))
+        {
+            bool needsLowering = false;
+            if (config.addressSpace == AddressSpace::StorageBuffer)
+                needsLowering = true;
+            if (as<IRPtrType>(ptrType->getValueType()))
+                needsLowering = true;
+            if (needsLowering)
+            {
+                LoweredElementTypeInfo info;
+                info.originalType = type;
+                IRBuilder builder(type);
+                info.loweredType = builder.getType(kIROp_UIntPtrType);
+                info.convertLoweredToOriginal = kIROp_CastIntToPtr;
+                info.convertOriginalToLowered = kIROp_CastPtrToInt;
+                return info;
+            }
+        }
+        LoweredElementTypeInfo info;
+        info.originalType = type;
+        info.loweredType = type;
+        return info;
+    }
+};
+
 BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
     BufferElementTypeLoweringPolicyKind kind,
     TargetProgram* target,
@@ -2892,6 +2967,8 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
         return new KhronosTargetBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::MetalParameterBlock:
         return new MetalParameterBlockElementTypeLoweringPolicy(target, options);
+    case BufferElementTypeLoweringPolicyKind::MetalPointerLowering:
+        return new MetalPointerBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::WGSL:
         return new WGSLBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::LLVM:
