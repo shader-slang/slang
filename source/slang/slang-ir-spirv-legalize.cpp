@@ -274,9 +274,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             });
     }
 
-    // Wraps the element type of a constant buffer or parameter block in a struct. This mutates
-    // cbParamInst in place by changing its full type to the wrapped parameter-group type and
-    // rewriting existing value uses to field addresses. Returns the wrapper struct type.
+    // Wraps the element type of a non-array constant buffer or parameter block in a struct. This
+    // mutates cbParamInst in place by changing its full type to the wrapped parameter-group type
+    // and rewriting existing value uses to field addresses. Returns the wrapper struct type.
     IRType* wrapConstantBufferElement(IRInst* cbParamInst)
     {
         auto parameterGroupType = as<IRParameterGroupType>(cbParamInst->getDataType());
@@ -523,6 +523,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRType* dataLayout = builder.getDefaultBufferLayoutType();
             auto cbufferType = as<IRConstantBufferType>(innerType);
             auto paramBlockType = as<IRParameterBlockType>(innerType);
+            IRStructKey* wrappedArrayElementKey = nullptr;
+            IRType* wrappedArrayElementType = nullptr;
             if (cbufferType || paramBlockType)
             {
                 auto uniformParamGroupType = as<IRUniformParameterGroupType>(innerType);
@@ -541,7 +543,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // a struct.
                 if (!as<IRStructType>(innerType))
                 {
-                    innerType = wrapConstantBufferElement(inst);
+                    if (arrayType)
+                    {
+                        wrappedArrayElementType = innerType;
+                        auto wrapped =
+                            createWrappedConstantBufferElementType(uniformParamGroupType);
+                        innerType = wrapped.structType;
+                        wrappedArrayElementKey = wrapped.key;
+                    }
+                    else
+                    {
+                        innerType = wrapConstantBufferElement(inst);
+                    }
                 }
                 builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBlockDecoration);
 
@@ -663,7 +676,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                     dataLayout),
                                 inst,
                                 getElement->getIndex());
-                            user->replaceUsesWith(newAddr);
+                            IRInst* replacementAddr = newAddr;
+                            if (wrappedArrayElementKey)
+                            {
+                                replacementAddr = builder.emitFieldAddress(
+                                    builder.getPtrType(
+                                        wrappedArrayElementType,
+                                        AccessQualifier::Read,
+                                        addressSpace,
+                                        dataLayout),
+                                    newAddr,
+                                    wrappedArrayElementKey);
+                            }
+                            user->replaceUsesWith(replacementAddr);
                             user->removeAndDeallocate();
                             return;
                         }
