@@ -40,10 +40,8 @@ IRInst* IRDeduplicationContext::findVisibleGlobalNumberingEntry(
     IRInst* genericScope)
 {
     IRInst* existingVal = nullptr;
-    if (!m_globalValueNumberingMap.tryGetValue(key, existingVal))
-        return nullptr;
-
-    if (isInstVisibleFromGenericScope(existingVal, genericScope))
+    if (m_globalValueNumberingMap.tryGetValue(key, existingVal) &&
+        isInstVisibleFromGenericScope(existingVal, genericScope))
         return existingVal;
 
     return findVisibleScopedGlobalNumberingEntry(key, genericScope);
