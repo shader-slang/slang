@@ -1370,7 +1370,8 @@ Compound Capabilities
 
 `ser`
 > Capabilities needed for shader-execution-reordering (all paths)
-> Includes NVIDIA-specific (NV), cross-vendor standard (EXT), DXR 1.3 native, and CUDA paths
+> Defaults SPIR-V/GLSL to the cross-vendor standard EXT path; explicit NV still satisfies this
+> through the NV-to-EXT capability hierarchy. Use ser_nv for APIs that require NV opcodes.
 
 `ser_any_closesthit_intersection_miss`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, intersection, and miss.

@@ -1620,7 +1620,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return SpvStorageClassHitObjectAttributeNV;
                 if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
                     return SpvStorageClassHitObjectAttributeEXT;
-                return SpvStorageClassHitObjectAttributeNV;
+                return SpvStorageClassHitObjectAttributeEXT;
             }
         case AddressSpace::HitAttribute:
             return SpvStorageClassHitAttributeKHR;
@@ -2734,9 +2734,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_HitObjectType:
             {
                 // Check NV first (more specific) since NV derives from EXT in the
-                // capability hierarchy. If we checked EXT first, it would always
-                // match when NV is specified, causing a type/op mismatch
-                // (OpTypeHitObjectEXT=5313 vs OpTypeHitObjectNV=5281).
+                // capability hierarchy. If no SER capability was explicitly requested,
+                // default to EXT to match capability inference and target-switch fallback.
                 auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
                 if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
                 {
@@ -2755,9 +2754,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else
                 {
                     ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
-                    return emitOpTypeHitObject(inst);
+                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
+                    return emitOpTypeHitObjectEXT(inst);
                 }
             }
 
@@ -6383,8 +6382,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else
                 {
                     ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
                 }
                 isRayTracingObject = true;
                 break;
