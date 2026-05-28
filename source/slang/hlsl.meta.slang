@@ -22896,7 +22896,7 @@ struct HitObject
             // Save the attributes
             __hitObjectAttributes<attr_t>() = attributes;
 
-            __glslMakeMotionHit(
+            __glslMakeMotionHitNV(
                 __return_val,
                 AccelerationStructure,
                 InstanceIndex,
@@ -23058,7 +23058,7 @@ struct HitObject
             // Save the attributes
             __hitObjectAttributes<attr_t>() = attributes;
 
-            __glslMakeMotionHitWithIndex(
+            __glslMakeMotionHitWithIndexNV(
                 __return_val,
                 AccelerationStructure,
                 InstanceIndex,              ///? Same as instanceid ?
@@ -24780,32 +24780,6 @@ struct HitObject
         }
     }
 
-    // Unsuffixed helper retained for existing HitObject::MakeMotionHit call sites.
-    __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
-    static void __glslMakeMotionHitWithIndex(
-        out HitObject hitObj,
-        RaytracingAccelerationStructure accelerationStructure,
-        int instanceid,
-        int primitiveid,
-        int geometryindex,
-        uint hitKind,
-        uint sbtRecordIndex,
-        float3 origin,
-        float Tmin,
-        float3 direction,
-        float Tmax,
-        float CurrentTime,
-        int attributeLocation)
-    {
-        __target_switch
-        {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitWithIndexMotionNV";
-        }
-    }
-
     // NV-specific helper used by public hitObjectRecordHitWithIndexMotionNV.
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
@@ -24855,33 +24829,6 @@ struct HitObject
         {
         case glsl: // fallback - outer MakeHit routes glsl to EXT variant
         case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitNV";
-        }
-    }
-
-    // Unsuffixed helper retained for existing HitObject::MakeMotionHit call sites.
-    __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
-    static void __glslMakeMotionHit(
-        out HitObject hitObj,
-        RaytracingAccelerationStructure accelerationStructure,
-        int instanceid,
-        int primitiveid,
-        int geometryindex,
-        uint hitKind,
-        uint sbtRecordOffset,
-        uint sbtRecordStride,
-        float3 origin,
-        float Tmin,
-        float3 direction,
-        float Tmax,
-        float CurrentTime,
-        int attributeLocation)
-    {
-        __target_switch
-        {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitMotionNV";
         }
     }
 
