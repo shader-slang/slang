@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=SCALAR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -skip-spirv-validation -ignore-capabilities -capability spvAtomicFloat16AddEXT
-//TEST:SIMPLE(filecheck=VECTOR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -skip-spirv-validation -ignore-capabilities -capability GL_NV_shader_atomic_fp16_vector
+//TEST:SIMPLE(filecheck=VECTOR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -skip-spirv-validation -ignore-capabilities -capability spvAtomicFloat16VectorNV
 
 RWByteAddressBuffer tmpBuffer;
 

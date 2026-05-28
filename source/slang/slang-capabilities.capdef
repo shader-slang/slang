@@ -2389,15 +2389,9 @@ alias atomic_glsl_float1 = GL_EXT_shader_atomic_float;
 /// (GLSL/SPIRV) Capabilities required to use GLSL-tier-2 float-atomic operations
 /// [Compound]
 alias atomic_glsl_float2 = GL_EXT_shader_atomic_float2;
-/// (SPIRV) Capabilities required to use scalar fp16 float-atomic operations
-/// [Compound]
-alias atomic_glsl_halfscalar = spvAtomicFloat16AddEXT;
 /// (GLSL/SPIRV) Capabilities required to use NVAPI GLSL-fp16 float-atomic operations
 /// [Compound]
 alias atomic_glsl_halfvec = GL_NV_shader_atomic_fp16_vector;
-/// (SPIRV) Capabilities required to use either native or halfvec-emulated fp16 atomic add
-/// [Compound]
-alias atomic_glsl_halfadd = atomic_glsl_halfscalar | atomic_glsl_halfvec;
 /// (GLSL/SPIRV) Capabilities required to use GLSL-400 atomic operations
 /// [Compound]
 alias atomic_glsl = spirv_1_0 | _GLSL_400;

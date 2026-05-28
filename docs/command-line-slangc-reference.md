@@ -1752,9 +1752,7 @@ A capability describes an optional feature that a target may or may not support.
 * `texture_shadowgrad` 
 * `atomic_glsl_float1` 
 * `atomic_glsl_float2` 
-* `atomic_glsl_halfscalar` 
 * `atomic_glsl_halfvec` 
-* `atomic_glsl_halfadd` 
 * `atomic_glsl` 
 * `atomic_glsl_int64` 
 * `GLSL_430_SPIRV_1_0_compute` : enables the GLSL_430_SPIRV_1_0_compute extension 

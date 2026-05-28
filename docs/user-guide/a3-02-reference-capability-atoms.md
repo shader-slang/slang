@@ -964,12 +964,6 @@ Compound Capabilities
 `atomic_glsl_float2`
 > (GLSL/SPIRV) Capabilities required to use GLSL-tier-2 float-atomic operations
 
-`atomic_glsl_halfadd`
-> (SPIRV) Capabilities required to use either native or halfvec-emulated fp16 atomic add
-
-`atomic_glsl_halfscalar`
-> (SPIRV) Capabilities required to use scalar fp16 float-atomic operations
-
 `atomic_glsl_halfvec`
 > (GLSL/SPIRV) Capabilities required to use NVAPI GLSL-fp16 float-atomic operations
 
