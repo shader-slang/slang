@@ -2128,6 +2128,33 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     }
     else
     {
+        // Some system-value semantics are runtime-provided varyings rather than
+        // user-defined `in` parameters, so they should be allowed even in stages
+        // that otherwise reject `in` parameters or route `in` to hit attributes.
+        //
+        // Keep this allowlist matched to the semantic accessor table in
+        // core.meta.slang. Adding to it should be paired with a
+        // [require(<stage>)] entry on the semantic declaration and a regression
+        // test.
+        bool isAllowedRaytracingSystemValueInput = false;
+        if (state.optSemanticName)
+        {
+            auto sn = state.optSemanticName->toLower();
+            if (sn == "sv_primitiveid")
+            {
+                switch (state.stage)
+                {
+                case Stage::Intersection:
+                case Stage::AnyHit:
+                case Stage::ClosestHit:
+                    isAllowedRaytracingSystemValueInput = true;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+
         switch (state.stage)
         {
         default:
@@ -2144,18 +2171,26 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             // an `in` parameter as indicating a payload that the
             // programmer doesn't intend to write to.
             //
-            getSink(context)->diagnose(Diagnostics::DontExpectInParametersForStage{
-                .stage = getStageName(state.stage),
-                .location = state.loc});
+            if (!isAllowedRaytracingSystemValueInput)
+            {
+                getSink(context)->diagnose(Diagnostics::DontExpectInParametersForStage{
+                    .stage = getStageName(state.stage),
+                    .location = state.loc});
+            }
             break;
 
         case Stage::AnyHit:
         case Stage::ClosestHit:
-            // `in` parameter is hit attributes
-            return createTypeLayoutWith(
-                context->layoutContext,
-                context->getRulesFamily()->getHitAttributesParameterRules(),
-                type);
+            // `in` parameter is hit attributes. Allowed system-value inputs fall
+            // through to ordinary varying-input handling below.
+            if (!isAllowedRaytracingSystemValueInput)
+            {
+                return createTypeLayoutWith(
+                    context->layoutContext,
+                    context->getRulesFamily()->getHitAttributesParameterRules(),
+                    type);
+            }
+            break;
         }
     }
 

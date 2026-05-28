@@ -687,11 +687,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         if (systemValueAttr)
         {
-            // TODO: is this needed?
             String semanticName = systemValueAttr->getName();
             semanticName = semanticName.toLower();
             if (semanticName == "sv_pointsize")
+            {
                 result = AddressSpace::BuiltinInput;
+            }
+            else if (semanticName == "sv_primitiveid" && result == AddressSpace::Generic)
+            {
+                switch (getReferencingEntryPointStage(varInst))
+                {
+                case Stage::Intersection:
+                case Stage::AnyHit:
+                case Stage::ClosestHit:
+                    result = AddressSpace::BuiltinInput;
+                    break;
+                default:
+                    break;
+                }
+            }
         }
 
         switch (result)
