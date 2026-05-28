@@ -5,6 +5,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=SPV): -target spirv-asm -stage compute -entry computeMain
+
+// SPV: OpEntryPoint GLCompute
 
 public interface IStorage<T>
 {
@@ -31,7 +34,7 @@ struct DenseStorage : IParameterStorage<int>
 
     uint getAddress(int value)
     {
-        return 0;
+        return uint(value - 7);
     }
 }
 
@@ -42,10 +45,13 @@ void testStorage<T, S : IParameterStorage<T>>(S storage, T value)
 }
 
 [shader("compute")]
-[numthreads(1, 1, 1)]
+[numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     DenseStorage storage;
     // CHECK: 7
+    // CHECK-NEXT: 8
+    // CHECK-NEXT: 9
+    // CHECK-NEXT: 10
     testStorage(storage, int(dispatchThreadID.x) + 7);
 }
