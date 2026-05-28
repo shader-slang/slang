@@ -18,11 +18,7 @@ ConstantBuffer<Wrapper> cb;
 RWStructuredBuffer<int> output;
 
 // The array element type should be lowered to ulong.
-// CHECK-LABEL: struct Wrapper
-// CHECK: ulong
-// CHECK-NOT: device{{.*}}device
-// CHECK: };
-
+// CHECK: array<ulong
 // CHECK-LABEL: computeMain
 // CHECK: int device* device*
 

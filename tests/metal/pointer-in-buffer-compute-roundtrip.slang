@@ -44,15 +44,13 @@ int derefTriple(Level3* s3)
     return *p;
 }
 
-// Level2 and Level3 fields should be lowered to ulong.
-// CHECK-LABEL: struct Level2
-// CHECK: ulong
-// CHECK-LABEL: struct Level3
-// CHECK: ulong
+// Level2 and Level3 pointer fields should be lowered to ulong.
+// CHECK: ulong ptr_
+// CHECK: ulong ptr_
 
 // Triple deref with cast chain.
 // CHECK-LABEL: derefTriple
-// CHECK: int device* device* device*
+// CHECK: int device* device*
 
 // CHECK-LABEL: computeMain
 

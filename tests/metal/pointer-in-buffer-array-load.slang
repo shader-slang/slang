@@ -16,10 +16,7 @@ struct S
 ConstantBuffer<S> cb;
 RWStructuredBuffer<int> output;
 
-// CHECK-LABEL: struct S
-// CHECK: ulong
-// CHECK: };
-
+// CHECK: array<ulong
 // CHECK-LABEL: computeMain
 // CHECK: int device* device*
 

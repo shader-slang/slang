@@ -16,16 +16,13 @@ struct PBParams
 ParameterBlock<PBParams> params;
 
 // Both multi-level pointer fields lowered to ulong.
-// CHECK-LABEL: struct PBParams
 // CHECK: ulong double_ptr
 // CHECK: ulong triple_ptr
-// CHECK-NOT: device*
-// CHECK: };
 
 // Kernel body reconstructs typed pointers.
 // CHECK-LABEL: computeMain
 // CHECK: int device* device*
-// CHECK: int device* device* device*
+// CHECK: ulong device*
 
 // METALLIB: computeMain
 

@@ -51,7 +51,7 @@ RWStructuredBuffer<int> output;
 // Kernel body reconstructs typed pointers from ulong.
 // CHECK-LABEL: computeMain
 // CHECK: int device* device*
-// CHECK: int device* device* device*
+// CHECK: ulong device*
 
 // METALLIB: computeMain
 

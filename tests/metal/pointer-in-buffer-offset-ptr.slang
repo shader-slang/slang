@@ -17,10 +17,7 @@ struct Wrapper
 ConstantBuffer<Wrapper> cb;
 RWStructuredBuffer<int> output;
 
-// CHECK-LABEL: struct Wrapper
-// CHECK: ulong
-// CHECK: };
-
+// CHECK: array<ulong
 // CHECK-LABEL: computeMain
 // CHECK: int device* device*
 

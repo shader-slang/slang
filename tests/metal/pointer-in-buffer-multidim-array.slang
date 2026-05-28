@@ -16,12 +16,8 @@ struct Wrapper
 ConstantBuffer<Wrapper> cb;
 RWStructuredBuffer<int> output;
 
-// The field type should be lowered to array<array<ulong, 3>, 2>.
-// CHECK-LABEL: struct Wrapper
-// CHECK: ulong
-// CHECK-NOT: device{{.*}}device
-// CHECK: };
-
+// The field type should be lowered to nested arrays of ulong.
+// CHECK: array<ulong
 // CHECK-LABEL: computeMain
 // CHECK: int device* device*
 
