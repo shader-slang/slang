@@ -78,12 +78,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // EMULATED-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
 // EMULATED: OpCapability AtomicFloat16VectorNV
 // EMULATED: OpExtension "SPV_NV_shader_atomic_fp16_vector"
-// EMULATED-COUNT-2: OpAtomicFAddEXT
 // EMULATED-DAG: [[LOW:%[0-9]+]] = OpConstantComposite %v2half %half_0x1p_0 %half_0x0p_0
 // EMULATED-DAG: [[HIGH:%[0-9]+]] = OpConstantComposite %v2half %half_0x0p_0 %half_0x1p_0
+// EMULATED-NOT: OpAtomicFAddEXT
 // EMULATED: [[LOW_ATOMIC:%[0-9]+]] = OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[LOW]]
 // EMULATED: OpCompositeExtract %half [[LOW_ATOMIC]] 0
 // EMULATED: [[HIGH_ATOMIC:%[0-9]+]] = OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[HIGH]]
 // EMULATED: OpCompositeExtract %half [[HIGH_ATOMIC]] 1
+// EMULATED-NOT: OpAtomicFAddEXT
 
 // CUDA-COUNT-5: atomicAdd(

@@ -4488,7 +4488,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     void ensureAtomicCapability(IRInst* atomicInst, SpvOp op)
     {
-        auto typeOp = atomicInst->getDataType()->getOp();
+        IRType* atomicValueType = atomicInst->getDataType();
+        auto typeOp = atomicValueType->getOp();
         if (typeOp == kIROp_VoidType)
         {
             auto ptrType = atomicInst->getOperand(0)->getDataType();
@@ -4497,6 +4498,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 if (auto atomicType = as<IRAtomicType>(valType))
                     valType = atomicType->getElementType();
+                atomicValueType = valType;
                 typeOp = valType->getOp();
             }
         }
@@ -4519,14 +4521,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityAtomicFloat16AddEXT);
                     break;
                 case kIROp_VectorType:
-                    if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() ==
-                        kIROp_HalfType)
+                    if (auto vectorType = as<IRVectorType>(atomicValueType))
                     {
-                        maybeDiagnoseRestrictiveCapabilityUse(
-                            atomicInst,
-                            CapabilityName::spvAtomicFloat16VectorNV);
-                        ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
-                        requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
+                        if (vectorType->getElementType()->getOp() == kIROp_HalfType)
+                        {
+                            maybeDiagnoseRestrictiveCapabilityUse(
+                                atomicInst,
+                                CapabilityName::spvAtomicFloat16VectorNV);
+                            ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
+                            requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
+                        }
                     }
                     break;
                 }
@@ -4550,14 +4554,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityAtomicFloat16MinMaxEXT);
                     break;
                 case kIROp_VectorType:
-                    if (as<IRVectorType>(atomicInst->getDataType())->getElementType()->getOp() ==
-                        kIROp_HalfType)
+                    if (auto vectorType = as<IRVectorType>(atomicValueType))
                     {
-                        maybeDiagnoseRestrictiveCapabilityUse(
-                            atomicInst,
-                            CapabilityName::spvAtomicFloat16VectorNV);
-                        ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
-                        requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
+                        if (vectorType->getElementType()->getOp() == kIROp_HalfType)
+                        {
+                            maybeDiagnoseRestrictiveCapabilityUse(
+                                atomicInst,
+                                CapabilityName::spvAtomicFloat16VectorNV);
+                            ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
+                            requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
+                        }
                     }
                     break;
                 }
