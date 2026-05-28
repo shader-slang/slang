@@ -2052,8 +2052,9 @@ public:
         m_globalValueNumberingMap.add(IRInstKey{inst}, inst);
         m_instReplacementMap.remove(inst);
         tryHoistInst(inst);
-        m_scopedGlobalValueNumberingMap[IRScopedInstKey{IRInstKey{inst}, findOuterGeneric(inst)}] =
-            inst;
+        m_scopedGlobalValueNumberingMap.add(
+            IRScopedInstKey{IRInstKey{inst}, findOuterGeneric(inst)},
+            inst);
     }
     void _removeGlobalNumberingEntry(IRInst* inst)
     {
