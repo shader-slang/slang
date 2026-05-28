@@ -3,6 +3,8 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -profile spirv_1_6 -emit-spirv-directly -stage compute -entry computeMain
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK_RUN):-slang -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK_RUN):-cpu -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK_RUN):-vk -compute -shaderobj -output-using-type
 
 import generic_vector_ctor_link_import;
 

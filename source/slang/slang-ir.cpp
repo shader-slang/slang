@@ -2756,7 +2756,9 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
 
         IRInst** found = m_dedupContext->getGlobalValueNumberingMap().tryGetValueOrAdd(key, inst);
         SLANG_ASSERT(endCursor == memoryArena.getCursor());
-        // If it's found, just return, and throw away the instruction
+        // If the value-numbered match is visible from the current generic scope, return it and
+        // discard the freshly allocated instruction. Otherwise, try to substitute a visible scoped
+        // match; if none exists, keep the new instruction and hoist it in this scope.
         if (found)
         {
             auto foundInst = *found;

@@ -2040,6 +2040,9 @@ public:
     typedef Dictionary<IRScopedInstKey, IRInst*> ScopedGlobalValueNumberingMap;
     typedef Dictionary<IRConstantKey, IRConstant*> ConstantMap;
 
+    // Scope-blind map of value-numbered instructions. Entries may belong to any generic scope;
+    // callers that need a visible instruction for a specific scope should use
+    // findVisibleGlobalNumberingEntry instead.
     GlobalValueNumberingMap& getGlobalValueNumberingMap() { return m_globalValueNumberingMap; }
     ScopedGlobalValueNumberingMap& getScopedGlobalValueNumberingMap()
     {
