@@ -66,6 +66,84 @@ local allow_duplicate_diagnostic_codes = false
 -- that are never displayed to users and cannot be referenced by command-line options.
 local allow_severity_conflicts = false
 
+-- Integer diagnostic codes whose multi-binding is intentional, so the
+-- cross-catalog collision check below skips them. Keep each entry paired with a
+-- comment naming why (or the tracking issue).
+local intentional_shared_codes = {
+  [-1] = true, -- sentinel for notes that decorate another diagnostic
+  [10000] = true, -- `illegalCharacter*` printable/hex variants in slang-lexer-diagnostic-defs.h
+  [39999] = true, -- overload-resolution / lookup umbrella; many keyed templates fan in
+  [99999] = true, -- internal-compiler-error catch-all
+  -- TODO: the E20001-E20012 range in slang-json-diagnostic-defs.h collides with
+  -- the lua-side names of the same codes (and 20011 is itself double-bound there
+  -- as `fieldNotDefinedOnType` / `fieldRequiredOnType`). Renumbering the JSON
+  -- side to a free range is a separate follow-up; remove these once it lands.
+  [20001] = true,
+  [20002] = true,
+  [20003] = true,
+  [20004] = true,
+  [20005] = true,
+  [20006] = true,
+  [20007] = true,
+  [20008] = true,
+  [20009] = true,
+  [20010] = true,
+  [20011] = true,
+  [20012] = true,
+}
+
+-- True when an integer code is allowed to be bound to multiple distinct names,
+-- so the uniqueness / cross-catalog collision checks skip it. All negative codes
+-- are internal sentinels (e.g. -1 for decorating notes); named umbrellas are
+-- listed in `intentional_shared_codes`.
+local function is_intentional_shared(code)
+  return code < 0 or intentional_shared_codes[code] == true
+end
+
+-- The C++ diagnostic catalogs that live outside this Lua file. Each uses the
+-- `DIAGNOSTIC(code, severity, name, messageFormat)` multi-include pattern. Paths
+-- are relative to this helper file's directory (source/slang/). New
+-- `*-diagnostic-defs.h` catalogs under source/ should be added here so their
+-- codes participate in the cross-catalog collision check.
+local cpp_diagnostic_defs_files = {
+  "../compiler-core/slang-misc-diagnostic-defs.h",
+  "../compiler-core/slang-lexer-diagnostic-defs.h",
+  "../compiler-core/slang-json-diagnostic-defs.h",
+}
+
+-- Directory containing this helper file, so we can resolve the C++ catalog
+-- paths above regardless of the process working directory.
+local helpers_dir = (debug.getinfo(1, "S").source:match("^@?(.*[/\\])")) or "./"
+
+-- Scan the C++ `*-diagnostic-defs.h` catalogs for `DIAGNOSTIC(code, severity,
+-- name, ...)` entries, returning a `code -> { [name] = "file:line", ... }` map.
+-- This lets `process_diagnostics` detect an integer code that is bound to
+-- different names across the Lua catalog and a C++ catalog (e.g. the E29104
+-- lua/`slang-misc-diagnostic-defs.h` collision, issue #11318). Missing files are
+-- a hard error: silently skipping them would let the invariant rot.
+local function scan_cpp_diagnostic_defs()
+  local codes = {}
+  for _, rel in ipairs(cpp_diagnostic_defs_files) do
+    local path = helpers_dir .. rel
+    local f = io.open(path, "r")
+    if not f then
+      error("diagnostic catalog file not found (update cpp_diagnostic_defs_files): " .. path)
+    end
+    -- A `DIAGNOSTIC(...)` call may wrap across lines, so read the whole file and
+    -- match the `(code, severity, name` prefix wherever it appears.
+    local text = f:read("*a")
+    f:close()
+    for code, name in
+      text:gmatch("DIAGNOSTIC%s*%(%s*(%-?%d+)%s*,%s*[%w_]+%s*,%s*([%w_]+)")
+    do
+      local n = tonumber(code)
+      codes[n] = codes[n] or {}
+      codes[n][name] = path
+    end
+  end
+  return codes
+end
+
 -- Helper function to check if a string is valid kebab-case
 -- Valid kebab-case: lowercase letters, numbers, and hyphens only
 -- Must not start or end with a hyphen, no consecutive hyphens
@@ -630,9 +708,9 @@ local function process_diagnostics(diagnostics_table)
         seen_names[diag.name] = i
       end
 
-      -- Codes that are intentionally shared: negative sentinels (-1) and
-      -- catch-all placeholders (39999, 99999) must be excluded from uniqueness checks.
-      local is_intentional_duplicate = diag.code < 0 or diag.code == 39999 or diag.code == 99999
+      -- Codes that are intentionally shared (negative sentinels, catch-all
+      -- placeholders, umbrellas) are excluded from uniqueness checks.
+      local is_intentional_duplicate = is_intentional_shared(diag.code)
 
       if seen_codes[diag.code] then
         if not allow_duplicate_diagnostic_codes and not is_intentional_duplicate then
@@ -970,6 +1048,33 @@ local function process_diagnostics(diagnostics_table)
         secondary_spans = diag.secondary_spans or {},
         notes = diag.notes or {},
       })
+    end
+  end
+
+  -- Cross-catalog collision check: a single integer code must not be bound to
+  -- different names across the Lua catalog and the C++ `*-diagnostic-defs.h`
+  -- catalogs (the `m_idMap` lookup keeps only one entry per code, so a collision
+  -- makes -warnings-disable / -warnings-as-errors address the wrong diagnostic,
+  -- and reflection reports an ambiguous code). This is what caught the original
+  -- E29104 lua/`slang-misc-diagnostic-defs.h` double-bind, issue #11318.
+  local cpp_codes = scan_cpp_diagnostic_defs()
+  for _, diag in ipairs(diagnostics_table) do
+    if type(diag.code) == "number" and not is_intentional_shared(diag.code) then
+      local cpp_names = cpp_codes[diag.code]
+      if cpp_names then
+        for cpp_name, cpp_path in pairs(cpp_names) do
+          if cpp_name ~= diag.name then
+            table.insert(
+              all_errors,
+              "diagnostic code " .. diag.code .. " is bound to '" .. tostring(diag.name)
+                .. "' here and to '" .. cpp_name .. "' in " .. cpp_path
+                .. "; every integer code must map to a single name across all catalogs"
+                .. " (add the code to intentional_shared_codes if the multi-binding is"
+                .. " deliberate)"
+            )
+          end
+        end
+      end
     end
   end
 
