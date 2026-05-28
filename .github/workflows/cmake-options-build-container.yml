@@ -146,3 +146,11 @@ jobs:
           # don't abort the build when ASAN is enabled. No-op for other options.
           ASAN_OPTIONS: detect_leaks=0
         run: cmake --build build --config "$cmake_config"
+
+      - name: Run post-build Slang test (${{ matrix.option }})
+        if: matrix.windows_only != 'true' && matrix.post_build_slang_test != ''
+        env:
+          SLANG_RUN_SPIRV_VALIDATION: ${{ matrix.post_build_spirv_validation || '' }}
+          SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN: ${{ matrix.post_build_spirv_validation || '' }}
+        run: |
+          "build/$cmake_config/bin/slang-test" ${{ matrix.post_build_slang_test }}
