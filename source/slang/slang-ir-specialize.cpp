@@ -3276,11 +3276,44 @@ struct SpecializationContext
                     break;
 
                 case kIROp_GlobalGenericParam:
+                    // All global generic parameters should have had their
+                    // uses replaced via a `bind_global_generic_param`. If
+                    // any uses remain, the user is referencing the param
+                    // from shader code that needs a concrete witness (e.g.
+                    // interface-method dispatch on a value typed by the
+                    // param). That is not a supported shader-body
+                    // construct (#5627) — emit a clean diagnostic and
+                    // poison the uses so downstream passes don't crash
+                    // on the half-specialized IR.
+                    if (inst->firstUse)
+                    {
+                        // A constrained `type_param T : IFoo` produces
+                        // both a type-kind generic param and an
+                        // associated witness-table generic param. Only
+                        // diagnose the type-kind one to avoid emitting
+                        // the same error twice per declaration.
+                        bool isTypeParam = inst->getDataType()
+                            && inst->getDataType()->getOp() != kIROp_WitnessTableType;
+                        if (sink && isTypeParam)
+                        {
+                            String paramName = "<unnamed>";
+                            if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
+                                paramName = nameHint->getName();
+                            sink->diagnose(
+                                Diagnostics::UnspecializedGlobalGenericParamWithUses{
+                                    .param = paramName,
+                                    .location = inst->sourceLoc});
+                        }
+                        IRBuilder builder(module);
+                        builder.setInsertBefore(inst);
+                        auto poison = builder.emitPoison(inst->getFullType());
+                        inst->replaceUsesWith(poison);
+                    }
+                    inst->removeAndDeallocate();
+                    break;
                 case kIROp_BindGlobalGenericParam:
                     // A `bind_global_generic_param` instruction should
-                    // have no uses in the first place, and all the global
-                    // generic parameters should have had their uses replaced.
-                    //
+                    // have no uses in the first place.
                     SLANG_ASSERT(!inst->firstUse);
                     inst->removeAndDeallocate();
                     break;

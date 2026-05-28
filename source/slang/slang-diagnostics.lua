@@ -4230,6 +4230,13 @@ err(
 )
 
 err(
+    "unspecialized-global-generic-param-with-uses",
+    38207,
+    "module-scope 'type_param' used in code without a concrete binding",
+    span { loc = "location", message = "module-scope 'type_param ~param:String' cannot be used in shader code without a concrete binding; module-scope 'type_param' declarations are intended for reflection and external specialization, not direct use in shader bodies (see issue #5627)" }
+)
+
+err(
     "cannot-use-resource-type-in-structured-buffer",
     38204,
     "resource type in StructuredBuffer",
