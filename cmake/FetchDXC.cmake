@@ -69,33 +69,35 @@ if(NOT dxc_POPULATED)
     FetchContent_MakeAvailable(dxc)
 endif()
 
-# Stage public DXC HLSL headers (e.g. dx/linalg.h) at a stable path so test
-# directives like `-Xdxc -Ibuild/dxc/include` can resolve them. Done as a
-# build-graph custom command, matching the DLL/.so copy pattern below.
-if(EXISTS "${dxc_SOURCE_DIR}/include/hlsl/dx/linalg.h")
-    set(_dxc_hlsl_include_dir "${dxc_SOURCE_DIR}/include/hlsl")
-elseif(EXISTS "${dxc_SOURCE_DIR}/inc/hlsl/dx/linalg.h")
-    set(_dxc_hlsl_include_dir "${dxc_SOURCE_DIR}/inc/hlsl")
-else()
-    message(
-        FATAL_ERROR
-        "DXC archive at ${SLANG_DXC_BINARY_URL} is missing dx/linalg.h. "
-        "The cooperative-{vector,matrix} tests rely on this header. "
-        "If Microsoft has reorganized the archive layout, update FetchDXC.cmake."
+if(SLANG_ENABLE_TESTS)
+    # Stage public DXC HLSL headers (e.g. dx/linalg.h) at a stable path so test
+    # directives like `-Xdxc -Ibuild/dxc/include` can resolve them. Done as a
+    # build-graph custom command, matching the DLL/.so copy pattern below.
+    if(EXISTS "${dxc_SOURCE_DIR}/include/hlsl/dx/linalg.h")
+        set(_dxc_hlsl_include_dir "${dxc_SOURCE_DIR}/include/hlsl")
+    elseif(EXISTS "${dxc_SOURCE_DIR}/inc/hlsl/dx/linalg.h")
+        set(_dxc_hlsl_include_dir "${dxc_SOURCE_DIR}/inc/hlsl")
+    else()
+        message(
+            FATAL_ERROR
+            "DXC archive at ${SLANG_DXC_BINARY_URL} is missing dx/linalg.h. "
+            "The cooperative-{vector,matrix} tests rely on this header. "
+            "If Microsoft has reorganized the archive layout, update FetchDXC.cmake."
+        )
+    endif()
+    set(_dxc_inc_src "${_dxc_hlsl_include_dir}/dx/linalg.h")
+    set(_dxc_inc_dst "${CMAKE_BINARY_DIR}/dxc/include/dx/linalg.h")
+    add_custom_command(
+        OUTPUT "${_dxc_inc_dst}"
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_directory "${_dxc_hlsl_include_dir}"
+            "${CMAKE_BINARY_DIR}/dxc/include"
+        DEPENDS "${_dxc_inc_src}"
+        VERBATIM
     )
+    add_custom_target(stage-dxc-headers DEPENDS "${_dxc_inc_dst}")
+    set_target_properties(stage-dxc-headers PROPERTIES FOLDER generated)
 endif()
-set(_dxc_inc_src "${_dxc_hlsl_include_dir}/dx/linalg.h")
-set(_dxc_inc_dst "${CMAKE_BINARY_DIR}/dxc/include/dx/linalg.h")
-add_custom_command(
-    OUTPUT "${_dxc_inc_dst}"
-    COMMAND
-        ${CMAKE_COMMAND} -E copy_directory "${_dxc_hlsl_include_dir}"
-        "${CMAKE_BINARY_DIR}/dxc/include"
-    DEPENDS "${_dxc_inc_src}"
-    VERBATIM
-)
-add_custom_target(stage-dxc-headers DEPENDS "${_dxc_inc_dst}")
-set_target_properties(stage-dxc-headers PROPERTIES FOLDER generated)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
