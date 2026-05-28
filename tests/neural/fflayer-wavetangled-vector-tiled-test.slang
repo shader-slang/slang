@@ -78,6 +78,7 @@ typealias InVec = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, Sub
 typealias OutVec = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize, WarpCount>;
 
 typealias Layer = FFLayer<ElementType, InVec, OutVec, Layout, IdentityActivation<ElementType>, true>;
+typealias NoBiasLayer = FFLayer<ElementType, InVec, OutVec, Layout, IdentityActivation<ElementType>, false>;
 
 [Differentiable]
 OutVec computeLayerOutput(Address paramAddr, InVec input, Layer layer)
@@ -160,6 +161,14 @@ void testFFLayerParameterCount(int tid, int resIndex)
 
     // OptimalLayout reserves a padded bias block after the physical weight matrix.
     isPassed = isPassed && (Layer.StorageSize == 272);
+    isPassed = isPassed && (Layer.WeightStorageSize == 256);
+    isPassed = isPassed && (Layer.BiasStorageSize == 16);
+
+    // The logical no-bias layer has fewer parameters, but keeps the same physical
+    // optimal-layout envelope so layer offsets are independent of HasBias.
+    isPassed = isPassed && (NoBiasLayer.ParameterCount == 8);
+    isPassed = isPassed && (NoBiasLayer.StorageSize == 272);
+    isPassed = isPassed && (NoBiasLayer.BiasStorageSize == 16);
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)

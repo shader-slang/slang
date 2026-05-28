@@ -26,10 +26,10 @@ suitable for building multi-layer perceptrons (MLPs) and similar architectures.
 
 ## Parameter Layout
 
-Parameters are packed as a contiguous block in storage:
-
-- **weights:** `Out * In` scalars, row-major by output row: `W[row * In + col]`
-- **bias (optional):** `Out` scalars immediately following weights
+`ParameterCount` reports the logical parameter count: row-major weights plus `Out` bias
+scalars when `HasBias` is true. `StorageSize` reports the physical layer extent for the
+selected storage layout. For `OptimalLayout`, weights are padded to a 16x16 envelope and
+an aligned bias slot is reserved after the weights even when the layer has no logical bias.
 */
 public struct FFLayer<
     T,
