@@ -22,8 +22,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[1] = float(originalAdd.y + originalMin.y + originalMax.y);
 }
 
+// CHECK-NOT: OpCapability AtomicFloat16AddEXT
 // CHECK: OpCapability AtomicFloat16VectorNV
+// CHECK-NOT: OpCapability AtomicFloat16AddEXT
 // CHECK: OpExtension "SPV_NV_shader_atomic_fp16_vector"
-// CHECK: OpAtomicFAddEXT
-// CHECK: OpAtomicFMinEXT
-// CHECK: OpAtomicFMaxEXT
+// CHECK-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
+// CHECK-COUNT-1: OpAtomicFAddEXT
+// CHECK-COUNT-1: OpAtomicFMinEXT
+// CHECK-COUNT-1: OpAtomicFMaxEXT
