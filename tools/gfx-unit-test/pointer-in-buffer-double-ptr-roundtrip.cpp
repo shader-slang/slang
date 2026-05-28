@@ -35,12 +35,12 @@ void pointerInBufferDoublePtrRoundtripTestImpl(IDevice* device, UnitTestContext*
     ComPtr<IComputePipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, pipeline.writeRef()));
 
-    auto makeBuffer = [&](size_t size, const void* data, BufferUsage usage,
-                          ResourceState state) -> ComPtr<IBuffer>
+    auto makeBuffer = [&](size_t size, uint32_t elementSize, const void* data,
+                          BufferUsage usage, ResourceState state) -> ComPtr<IBuffer>
     {
         BufferDesc desc = {};
         desc.size = size;
-        desc.elementSize = 0;
+        desc.elementSize = elementSize;
         desc.format = Format::Undefined;
         desc.usage = usage | BufferUsage::CopyDestination;
         desc.defaultState = state;
@@ -54,6 +54,7 @@ void pointerInBufferDoublePtrRoundtripTestImpl(IDevice* device, UnitTestContext*
     int32_t leafData[] = {42};
     auto leafBuffer = makeBuffer(
         sizeof(leafData),
+        sizeof(int32_t),
         leafData,
         BufferUsage::ShaderResource,
         ResourceState::ShaderResource);
@@ -61,6 +62,7 @@ void pointerInBufferDoublePtrRoundtripTestImpl(IDevice* device, UnitTestContext*
     // Level 1: holds the address of leafBuffer (the int* value).
     uint64_t leafAddr = leafBuffer->getDeviceAddress();
     auto midBuffer = makeBuffer(
+        sizeof(uint64_t),
         sizeof(uint64_t),
         &leafAddr,
         BufferUsage::ShaderResource,
@@ -83,6 +85,7 @@ void pointerInBufferDoublePtrRoundtripTestImpl(IDevice* device, UnitTestContext*
     // Output buffer.
     int32_t outputInit[] = {0};
     auto outputBuffer = makeBuffer(
+        sizeof(int32_t),
         sizeof(int32_t),
         outputInit,
         BufferUsage::ShaderResource | BufferUsage::UnorderedAccess | BufferUsage::CopySource,
