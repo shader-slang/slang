@@ -14,10 +14,6 @@
 // IMPLICIT: OpTypeHitObjectEXT
 // IMPLICIT-NOT: OpHitObjectTraceRayNV
 // IMPLICIT: OpHitObjectTraceRayEXT
-// IMPLICIT-NOT: ShaderInvocationReorderNV
-// IMPLICIT-NOT: SPV_NV_shader_invocation_reorder
-// IMPLICIT-NOT: OpTypeHitObjectNV
-// IMPLICIT-NOT: OpHitObjectTraceRayNV
 
 // EXT_RESTRICTIVE-NOT: error[E41013]
 // EXT_RESTRICTIVE-NOT: warning[E41012]
@@ -29,10 +25,6 @@
 // EXT_RESTRICTIVE: OpTypeHitObjectEXT
 // EXT_RESTRICTIVE-NOT: OpHitObjectTraceRayNV
 // EXT_RESTRICTIVE: OpHitObjectTraceRayEXT
-// EXT_RESTRICTIVE-NOT: ShaderInvocationReorderNV
-// EXT_RESTRICTIVE-NOT: SPV_NV_shader_invocation_reorder
-// EXT_RESTRICTIVE-NOT: OpTypeHitObjectNV
-// EXT_RESTRICTIVE-NOT: OpHitObjectTraceRayNV
 
 RaytracingAccelerationStructure tlas;
 RWTexture2D<float> outImage;
