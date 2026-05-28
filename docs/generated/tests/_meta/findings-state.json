@@ -1,29 +1,46 @@
 {
-  "schema_version": 1,
   "filing_defaults": {
-    "project": {
-      "owner": "shader-slang",
-      "number": 10
-    },
     "fields": {
-      "Status": "Todo",
+      "Estimate": "1",
       "Priority": "P2",
       "Release": "Unplanned",
       "Size": "XS  (~1d)",
-      "Estimate": "1"
+      "Status": "Todo"
     },
     "labels": {
-      "always": ["Test Agent Finding", "bug"],
-      "by_suspected_kind": {
-        "regression": ["regression"],
-        "wrong-diagnostic": ["Diagnostics"]
-      },
+      "always": [
+        "Test Agent Finding",
+        "bug"
+      ],
       "by_scope": {
-        "metal": ["Metal"],
-        "cuda": ["cuda"]
+        "cuda": [
+          "cuda"
+        ],
+        "metal": [
+          "Metal"
+        ]
+      },
+      "by_suspected_kind": {
+        "regression": [
+          "regression"
+        ],
+        "wrong-diagnostic": [
+          "Diagnostics"
+        ]
       }
+    },
+    "project": {
+      "number": 10,
+      "owner": "shader-slang"
     },
     "repro_line_cap": 40
   },
-  "findings": {}
+  "findings": {
+    "fragment-stage-on-cuda-segv": {
+      "dup_of": 10241,
+      "note": "Exact match: CUDA target ICEs on vertex/fragment shaders instead of clear diagnostic",
+      "title": "[cuda] slangc SIGSEGVs when a `[shader(\"fragment\")]` entry point is compiled wi\u2026"
+    }
+  },
+  "schema_version": 1
 }

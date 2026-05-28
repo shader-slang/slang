@@ -666,6 +666,16 @@ agent_self_assessment:
   stronger source is available. The design docs are themselves
   LLM-generated; prefer the spec, an existing hand-written test under
   `tests/`, or output from an older `slangc` revision.
+- Whatever you cite, **the citation must resolve**. For
+  `citation_kind: doc`, the path must exist under `docs/`. For
+  `citation_kind: sibling-test`, the path must exist under `tests/`.
+  For `citation_kind: spec`, the path must exist under
+  `external/spec/`. The lint pass rejects findings whose citation
+  path is not present on disk — do not invent paths to support a
+  claim. If you cannot ground the expected behavior in a real path,
+  cite the bundle's `source_doc` (`citation_kind: doc`) and mark
+  `agent_self_assessment.confidence: low`, or skip writing the
+  finding entirely.
 
 ### Ground rule
 

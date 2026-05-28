@@ -7,7 +7,7 @@ observed_at: 2026-05-28T10:30:00+00:00
 evidence:
   command: slangc repro.slang -target spirv-asm -entry main -stage compute -o /dev/null
   source_slang: docs/generated/tests/ir-reference/generics-and-existentials/constrained-type-param-cli.slang
-  observed_summary: slangc SIGSEGVs after LOWER-TO-IR when a module-scope `type_param T : IFoo` is used in an entry point
+  observed_summary: slangc SIGSEGVs after LOWER-TO-IR when a module-scope `type_param T : IFoo` is used in an entry point; related closed issue #5627 covered module-scope type_param tests being broken
   exit_code: 139
   minimized_repro: |
     interface IFoo { int get(); }

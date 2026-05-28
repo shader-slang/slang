@@ -23,9 +23,9 @@ evidence:
     }
   stderr_tail: "error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE unimplemented: Unhandled local inst in spirv-emit: castToVoid(%1)"
 expected:
-  claim: An explicit enum-to-int cast in a SPIR-V-targeted function should lower to OpBitcast (or equivalent) and emit valid SPIR-V, matching the behavior on other text-emit targets.
+  claim: An explicit enum-to-int cast in a SPIR-V-targeted function should emit valid SPIR-V. tests/compute/enum-tag-conversion.slang exercises `int(enumValue)` against `-slang -compute`, `-vk -compute` (SPIR-V via Vulkan) and `-cpu -compute` and passes; the bug is specific to the `-target spirv-asm` direct path.
   citation_kind: sibling-test
-  citation: tests/hlsl-intrinsic/enum-cast.slang
+  citation: tests/compute/enum-tag-conversion.slang
 provenance:
   agent_model: claude-opus-4-7
   source_commit: fa86e5a04

@@ -584,6 +584,23 @@ def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
                     where, "error", f"expected.citation_kind {ck!r} not in vocabulary"
                 )
             )
+        citation = exp.get("citation")
+        # For path-style citations (doc, sibling-test, spec), require the
+        # path to resolve on disk. older-slangc citations are git refs,
+        # not paths, so we don't check them here.
+        if ck in ("doc", "sibling-test", "spec") and isinstance(citation, str):
+            # Strip any optional `#anchor` or `:line` suffix before
+            # checking the file exists.
+            base = citation.split("#", 1)[0].split(":", 1)[0]
+            if base and not (REPO_ROOT / base).exists():
+                issues.append(
+                    LintIssue(
+                        where,
+                        "error",
+                        f"expected.citation does not resolve: {base!r}"
+                        f" (kind={ck})",
+                    )
+                )
     elif "expected" in finding:
         issues.append(LintIssue(where, "error", "expected must be a mapping"))
     prov = finding.get("provenance")
@@ -599,9 +616,15 @@ def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
 
 
 def lint_findings() -> list[LintIssue]:
+    """Validate every pending finding YAML.
+
+    Filed findings (under findings/filed/) are immutable history and are
+    not re-validated — their citations or referenced paths may have
+    rotted since filing, and that is acceptable for a historical record.
+    """
     issues: list[LintIssue] = []
     seen_bundles_in_manifest = set(load_manifest().bundles.keys())
-    for p in list_finding_paths(include_filed=True):
+    for p in list_finding_paths(include_filed=False):
         try:
             finding = load_finding(p)
         except Exception as exc:  # noqa: BLE001
@@ -1676,8 +1699,13 @@ def cmd_findings_list(args: argparse.Namespace) -> int:
             except Exception:
                 continue
             entry = filed_state.get(f.get("id", ""), {})
-            issue = entry.get("issue")
-            print(f"filed     {f.get('id', '?'):42s}  -> #{issue}")
+            if entry.get("issue"):
+                tag = f"filed     {f.get('id', '?'):42s}  -> #{entry['issue']}"
+            elif entry.get("dup_of"):
+                tag = f"dup-of    {f.get('id', '?'):42s}  -> #{entry['dup_of']}"
+            else:
+                tag = f"filed?    {f.get('id', '?'):42s}  (state unknown)"
+            print(tag)
     return 0
 
 
@@ -1867,6 +1895,50 @@ def cmd_findings_file(args: argparse.Namespace) -> int:
     record["project_fields"] = field_results
     save_findings_state(state)
     _move_to_filed(p)
+    print(f"  moved finding to {FINDINGS_FILED_DIR.relative_to(REPO_ROOT)}/")
+    return 0
+
+
+def cmd_findings_dup(args: argparse.Namespace) -> int:
+    """Mark a pending finding as duplicate of an existing GitHub issue.
+
+    Does not file anything; records dup_of in findings-state.json and moves
+    the YAML to findings/filed/. Used when the operator's pre-file search
+    surfaces an existing issue covering the same bug.
+    """
+    state = load_findings_state()
+    p = _resolve_finding_path(args.id)
+    if p is None:
+        print(f"error: no finding with id {args.id!r}", file=sys.stderr)
+        return 1
+    try:
+        finding = load_finding(p)
+    except Exception as exc:  # noqa: BLE001
+        print(f"error: failed to parse {p}: {exc}", file=sys.stderr)
+        return 1
+    findings_map = state.setdefault("findings", {})
+    existing = findings_map.get(args.id, {})
+    if existing.get("issue"):
+        print(
+            f"error: {args.id} already filed as #{existing['issue']}",
+            file=sys.stderr,
+        )
+        return 1
+    if existing.get("dup_of"):
+        print(
+            f"error: {args.id} already marked dup-of #{existing['dup_of']}",
+            file=sys.stderr,
+        )
+        return 1
+    findings_map[args.id] = {
+        "dup_of": args.of,
+        "title": compute_finding_title(finding),
+    }
+    if args.note:
+        findings_map[args.id]["note"] = args.note
+    save_findings_state(state)
+    _move_to_filed(p)
+    print(f"  marked {args.id} as dup-of #{args.of}")
     print(f"  moved finding to {FINDINGS_FILED_DIR.relative_to(REPO_ROOT)}/")
     return 0
 
@@ -2313,6 +2385,24 @@ def _build_parser() -> argparse.ArgumentParser:
         help="don't invoke gh; just show what would be filed",
     )
     p_ff.set_defaults(func=cmd_findings_file)
+
+    p_fd = find_sub.add_parser(
+        "dup",
+        help="mark a pending finding as duplicate of an existing issue"
+        " (no filing; moves YAML to filed/)",
+    )
+    p_fd.add_argument("id")
+    p_fd.add_argument(
+        "--of",
+        type=int,
+        required=True,
+        help="existing issue number this finding duplicates",
+    )
+    p_fd.add_argument(
+        "--note",
+        help="optional one-line note explaining the dedup decision",
+    )
+    p_fd.set_defaults(func=cmd_findings_dup)
 
     return p
 
