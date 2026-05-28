@@ -22,5 +22,5 @@ void main(uint3 tid : SV_DispatchThreadID)
 // CHECK: %[[ARRAY:_arr_cbuffer_float_t_int_4]] = OpTypeArray %[[CB]] %int_4
 // CHECK: %[[ARRAY_PTR:_ptr_Uniform__arr_cbuffer_float_t_int_4]] = OpTypePointer Uniform %[[ARRAY]]
 // CHECK: %[[CB_PTR:_ptr_Uniform_cbuffer_float_t]] = OpTypePointer Uniform %[[CB]]
-// CHECK: OpAccessChain %[[CB_PTR]] %inputs
-// CHECK: OpAccessChain %_ptr_Uniform_float
+// CHECK: %[[ELEM_ADDR:[A-Za-z0-9_]+]] = OpAccessChain %[[CB_PTR]] %inputs %[[INDEX:[A-Za-z0-9_]+]]
+// CHECK: OpAccessChain %_ptr_Uniform_float %[[ELEM_ADDR]] %int_0
