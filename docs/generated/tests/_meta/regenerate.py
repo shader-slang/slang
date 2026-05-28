@@ -102,6 +102,9 @@ FRESHNESS_PATH = META_DIR / "freshness.json"
 REVIEW_STATE_PATH = META_DIR / "review-state.json"
 REVIEWS_DIR = META_DIR / "reviews"
 REMEDIATIONS_DIR = META_DIR / "remediations"
+FINDINGS_DIR = META_DIR / "findings"
+FINDINGS_FILED_DIR = FINDINGS_DIR / "filed"
+FINDINGS_STATE_PATH = META_DIR / "findings-state.json"
 
 # Required META keys on every generated .slang test file. The block lives
 # as `//META: key=value` lines at the top of the file, since .slang has
@@ -390,6 +393,352 @@ def load_review_state() -> dict:
     if not REVIEW_STATE_PATH.exists():
         return {"schema_version": 1, "bundles": {}}
     return json.loads(REVIEW_STATE_PATH.read_text(encoding="utf-8"))
+
+
+# --------------------------------------------------------------------------
+# Findings (Phase F: structured records of suspected compiler bugs that
+# generation agents emit; triaged + filed via `regenerate.py findings`).
+# --------------------------------------------------------------------------
+
+
+_REQUIRED_FINDING_KEYS = (
+    "schema_version",
+    "id",
+    "bundle",
+    "suspected_kind",
+    "observed_at",
+    "evidence",
+    "expected",
+    "provenance",
+)
+_REQUIRED_EVIDENCE_KEYS = ("command", "source_slang", "observed_summary")
+_REQUIRED_EXPECTED_KEYS = ("claim", "citation_kind", "citation")
+_REQUIRED_PROVENANCE_KEYS = ("agent_model", "source_commit", "doc_anchor")
+_SUSPECTED_KINDS = {
+    "sigsegv",
+    "wrong-diagnostic",
+    "wrong-codegen",
+    "regression",
+    "catalog-drift",
+    "doc-claim-overstated",
+}
+_CITATION_KINDS = {"spec", "sibling-test", "older-slangc", "doc"}
+
+
+def load_findings_state() -> dict:
+    if not FINDINGS_STATE_PATH.exists():
+        return {
+            "schema_version": 1,
+            "filing_defaults": {},
+            "findings": {},
+        }
+    return json.loads(FINDINGS_STATE_PATH.read_text(encoding="utf-8"))
+
+
+def save_findings_state(state: dict) -> None:
+    FINDINGS_STATE_PATH.write_text(
+        json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def list_finding_paths(include_filed: bool = False) -> list[Path]:
+    """Return sorted list of finding YAML paths under _meta/findings/.
+
+    Pending findings live directly under findings/; filed ones move to
+    findings/filed/ and are excluded by default.
+    """
+    if not FINDINGS_DIR.exists():
+        return []
+    out: list[Path] = []
+    for p in sorted(FINDINGS_DIR.glob("*.yaml")):
+        out.append(p)
+    if include_filed and FINDINGS_FILED_DIR.exists():
+        for p in sorted(FINDINGS_FILED_DIR.glob("*.yaml")):
+            out.append(p)
+    return out
+
+
+def load_finding(path: Path) -> dict:
+    return _load_yaml(path.read_text(encoding="utf-8")) or {}
+
+
+def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
+    """Structural validation. Mirrors finding.schema.json required fields."""
+    issues: list[LintIssue] = []
+    where = str(path.relative_to(REPO_ROOT))
+    if not isinstance(finding, dict):
+        issues.append(LintIssue(where, "error", "top-level must be a mapping"))
+        return issues
+    for k in _REQUIRED_FINDING_KEYS:
+        if k not in finding:
+            issues.append(LintIssue(where, "error", f"missing key: {k}"))
+    if finding.get("schema_version") != 1:
+        issues.append(
+            LintIssue(where, "error", "schema_version must be 1")
+        )
+    fid = finding.get("id", "")
+    if fid and not re.fullmatch(r"[a-z0-9][a-z0-9-]*", str(fid)):
+        issues.append(
+            LintIssue(where, "error", f"id {fid!r} not a kebab slug")
+        )
+    expected_filename = f"{fid}.yaml" if fid else None
+    if expected_filename and path.name != expected_filename:
+        issues.append(
+            LintIssue(
+                where,
+                "error",
+                f"filename must match id: expected {expected_filename!r}",
+            )
+        )
+    sk = finding.get("suspected_kind")
+    if sk and sk not in _SUSPECTED_KINDS:
+        issues.append(
+            LintIssue(where, "error", f"suspected_kind {sk!r} not in vocabulary")
+        )
+    title = finding.get("title")
+    if title is not None and len(str(title)) > 80:
+        issues.append(
+            LintIssue(where, "error", f"title exceeds 80 chars ({len(title)})")
+        )
+    ev = finding.get("evidence")
+    if isinstance(ev, dict):
+        for k in _REQUIRED_EVIDENCE_KEYS:
+            if k not in ev:
+                issues.append(
+                    LintIssue(where, "error", f"evidence missing key: {k}")
+                )
+    elif "evidence" in finding:
+        issues.append(LintIssue(where, "error", "evidence must be a mapping"))
+    exp = finding.get("expected")
+    if isinstance(exp, dict):
+        for k in _REQUIRED_EXPECTED_KEYS:
+            if k not in exp:
+                issues.append(
+                    LintIssue(where, "error", f"expected missing key: {k}")
+                )
+        ck = exp.get("citation_kind")
+        if ck and ck not in _CITATION_KINDS:
+            issues.append(
+                LintIssue(
+                    where, "error", f"expected.citation_kind {ck!r} not in vocabulary"
+                )
+            )
+    elif "expected" in finding:
+        issues.append(LintIssue(where, "error", "expected must be a mapping"))
+    prov = finding.get("provenance")
+    if isinstance(prov, dict):
+        for k in _REQUIRED_PROVENANCE_KEYS:
+            if k not in prov:
+                issues.append(
+                    LintIssue(where, "error", f"provenance missing key: {k}")
+                )
+    elif "provenance" in finding:
+        issues.append(LintIssue(where, "error", "provenance must be a mapping"))
+    return issues
+
+
+def lint_findings() -> list[LintIssue]:
+    issues: list[LintIssue] = []
+    seen_bundles_in_manifest = set(load_manifest().bundles.keys())
+    for p in list_finding_paths(include_filed=True):
+        try:
+            finding = load_finding(p)
+        except Exception as exc:  # noqa: BLE001
+            issues.append(
+                LintIssue(
+                    str(p.relative_to(REPO_ROOT)),
+                    "error",
+                    f"failed to parse YAML: {exc}",
+                )
+            )
+            continue
+        issues.extend(validate_finding(p, finding))
+        b = finding.get("bundle") if isinstance(finding, dict) else None
+        if b and b not in seen_bundles_in_manifest:
+            issues.append(
+                LintIssue(
+                    str(p.relative_to(REPO_ROOT)),
+                    "error",
+                    f"bundle {b!r} not in manifest",
+                )
+            )
+    return issues
+
+
+def compute_finding_title(finding: dict) -> str:
+    """Return either the explicit title, or derive from scope + summary."""
+    explicit = finding.get("title")
+    if explicit:
+        return str(explicit)
+    scope = finding.get("scope")
+    summary = (finding.get("evidence") or {}).get("observed_summary", "")
+    summary = " ".join(str(summary).split())  # collapse whitespace
+    if scope:
+        prefix = f"[{scope}] "
+        budget = 80 - len(prefix)
+        if len(summary) > budget:
+            summary = summary[: budget - 1].rstrip() + "…"
+        return prefix + summary
+    if len(summary) > 80:
+        summary = summary[:79].rstrip() + "…"
+    return summary
+
+
+def compute_finding_labels(finding: dict, state: dict) -> list[str]:
+    cfg = (state.get("filing_defaults") or {}).get("labels") or {}
+    out: list[str] = list(cfg.get("always") or [])
+    by_kind = cfg.get("by_suspected_kind") or {}
+    out.extend(by_kind.get(finding.get("suspected_kind"), []))
+    by_scope = cfg.get("by_scope") or {}
+    if finding.get("scope"):
+        out.extend(by_scope.get(finding["scope"], []))
+    # Dedup while preserving order
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for lbl in out:
+        if lbl not in seen:
+            seen.add(lbl)
+            deduped.append(lbl)
+    return deduped
+
+
+def _repro_body(finding: dict) -> str:
+    """Return the .slang source block for the issue body.
+
+    Prefers evidence.minimized_repro when present; otherwise reads
+    evidence.source_slang from disk.
+    """
+    ev = finding.get("evidence") or {}
+    if ev.get("minimized_repro"):
+        return str(ev["minimized_repro"]).rstrip() + "\n"
+    src = ev.get("source_slang")
+    if not src:
+        return "(no source_slang on finding)\n"
+    p = REPO_ROOT / src
+    if not p.exists():
+        return f"(source_slang not found on disk: {src})\n"
+    return p.read_text(encoding="utf-8")
+
+
+def render_finding_md(finding: dict) -> str:
+    """Render the finding YAML to the issue body markdown."""
+    ev = finding.get("evidence") or {}
+    exp = finding.get("expected") or {}
+    prov = finding.get("provenance") or {}
+    asa = finding.get("agent_self_assessment") or {}
+    repro = _repro_body(finding)
+    repro_lines = repro.count("\n")
+    cap = (
+        load_findings_state()
+        .get("filing_defaults", {})
+        .get("repro_line_cap", 40)
+    )
+    lines: list[str] = []
+    lines.append("## Summary")
+    lines.append("")
+    lines.append(str(ev.get("observed_summary", "")).strip() or "_(no summary)_")
+    lines.append("")
+    lines.append("## Repro")
+    lines.append("")
+    lines.append("```slang")
+    lines.append(repro.rstrip("\n"))
+    lines.append("```")
+    lines.append("")
+    if repro_lines > cap:
+        lines.append(
+            f"_Note: repro is {repro_lines} lines; cap is {cap}."
+            f" Further minimization recommended before filing._"
+        )
+        lines.append("")
+    lines.append("Command:")
+    lines.append("")
+    lines.append("```")
+    lines.append(str(ev.get("command", "")).strip())
+    lines.append("```")
+    lines.append("")
+    lines.append("## Expected")
+    lines.append("")
+    lines.append(str(exp.get("claim", "")).strip() or "_(no claim)_")
+    lines.append("")
+    ck = exp.get("citation_kind") or "unspecified"
+    citation = str(exp.get("citation", "")).strip() or "_(no citation)_"
+    lines.append(f"**Source of expectation** (`{ck}`):")
+    lines.append("")
+    lines.append(f"`{citation}`")
+    lines.append("")
+    lines.append("## Actual")
+    lines.append("")
+    lines.append(str(ev.get("observed_summary", "")).strip() or "_(no summary)_")
+    if ev.get("exit_code") is not None:
+        lines.append("")
+        lines.append(f"Exit code: `{ev['exit_code']}`")
+    if ev.get("stderr_tail"):
+        lines.append("")
+        lines.append("```")
+        lines.append(str(ev["stderr_tail"]).rstrip("\n"))
+        lines.append("```")
+    lines.append("")
+    lines.append("## Environment")
+    lines.append("")
+    lines.append(f"- slangc commit: `{prov.get('source_commit', '?')}`")
+    if finding.get("scope"):
+        lines.append(f"- Target / subsystem: {finding['scope']}")
+    lines.append("")
+    lines.append("## Provenance")
+    lines.append("")
+    lines.append("Surfaced by agentic test generation.")
+    lines.append("")
+    lines.append(f"- Test: `{ev.get('source_slang', '?')}`")
+    lines.append(f"- Doc anchor: `{prov.get('doc_anchor', '?')}`")
+    lines.append(f"- Generation model: `{prov.get('agent_model', '?')}`")
+    lines.append(f"- Finding ID: `{finding.get('id', '?')}`")
+    if asa.get("confidence"):
+        lines.append(f"- Agent self-confidence: {asa['confidence']}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _gh(args: list[str], capture: bool = True, check: bool = True) -> subprocess.CompletedProcess:
+    """Invoke `gh` and return CompletedProcess."""
+    cmd = ["gh", *args]
+    return subprocess.run(
+        cmd,
+        cwd=str(REPO_ROOT),
+        capture_output=capture,
+        text=True,
+        check=check,
+    )
+
+
+def _fetch_project_field_ids(owner: str, number: int) -> tuple[str, dict[str, dict]]:
+    """Return (project_node_id, {field_name: {id, options:{opt_name: opt_id}}}).
+
+    Resolves the GraphQL node IDs needed by `gh project item-edit`.
+    """
+    proj = _gh(
+        ["project", "view", str(number), "--owner", owner, "--format", "json"]
+    )
+    pdata = json.loads(proj.stdout)
+    project_id = pdata["id"]
+    fields_raw = _gh(
+        [
+            "project",
+            "field-list",
+            str(number),
+            "--owner",
+            owner,
+            "--format",
+            "json",
+        ]
+    )
+    fdata = json.loads(fields_raw.stdout)
+    fields: dict[str, dict] = {}
+    for f in fdata.get("fields", []):
+        entry: dict = {"id": f["id"], "type": f.get("type", ""), "options": {}}
+        for opt in f.get("options", []) or []:
+            entry["options"][opt["name"]] = opt["id"]
+        fields[f["name"]] = entry
+    return project_id, fields
 
 
 # --------------------------------------------------------------------------
@@ -1221,6 +1570,10 @@ def cmd_lint(args: argparse.Namespace) -> int:
     issues: list[LintIssue] = []
     for s in specs:
         issues.extend(lint_bundle(s))
+    # Findings live under _meta/findings/; lint them whenever the bundle
+    # set isn't narrowed to a specific list (i.e. global lint runs).
+    if not args.bundles:
+        issues.extend(lint_findings())
     errors = [i for i in issues if i.severity == "error"]
     warnings = [i for i in issues if i.severity == "warning"]
     for i in issues:
@@ -1230,6 +1583,252 @@ def cmd_lint(args: argparse.Namespace) -> int:
         f" across {len(specs)} bundles"
     )
     return 1 if errors else 0
+
+
+# --------------------------------------------------------------------------
+# Findings subcommands
+# --------------------------------------------------------------------------
+
+
+def cmd_findings_list(args: argparse.Namespace) -> int:
+    state = load_findings_state()
+    filed_state = state.get("findings") or {}
+    pending = list_finding_paths(include_filed=False)
+    filed = list_finding_paths(include_filed=True) if args.include_filed else []
+    filed = [p for p in filed if p.parent.name == "filed"]
+    if not pending and not filed:
+        print("(no findings)")
+        return 0
+    for p in pending:
+        try:
+            f = load_finding(p)
+        except Exception as exc:  # noqa: BLE001
+            print(f"  parse-error  {p.relative_to(REPO_ROOT)}: {exc}")
+            continue
+        kind = f.get("suspected_kind", "?")
+        when = (f.get("observed_at") or "")[:10]
+        print(f"pending   {f.get('id', '?'):42s}  {when}  {kind}")
+    if args.include_filed:
+        for p in filed:
+            try:
+                f = load_finding(p)
+            except Exception:
+                continue
+            entry = filed_state.get(f.get("id", ""), {})
+            issue = entry.get("issue")
+            print(f"filed     {f.get('id', '?'):42s}  -> #{issue}")
+    return 0
+
+
+def cmd_findings_show(args: argparse.Namespace) -> int:
+    state = load_findings_state()
+    p = _resolve_finding_path(args.id)
+    if p is None:
+        print(f"error: no finding with id {args.id!r}", file=sys.stderr)
+        return 1
+    try:
+        finding = load_finding(p)
+    except Exception as exc:  # noqa: BLE001
+        print(f"error: failed to parse {p}: {exc}", file=sys.stderr)
+        return 1
+    issues = validate_finding(p, finding)
+    if issues:
+        for i in issues:
+            print(f"  validation {i.severity}: {i.message}", file=sys.stderr)
+        print("error: finding fails validation; refusing to render", file=sys.stderr)
+        return 1
+    title = compute_finding_title(finding)
+    labels = compute_finding_labels(finding, state)
+    body = render_finding_md(finding)
+    print(f"Title: {title}")
+    print(f"Labels: {', '.join(labels)}")
+    print(f"Project: shader-slang #{(state.get('filing_defaults') or {}).get('project', {}).get('number', '?')}")
+    fields = (state.get("filing_defaults") or {}).get("fields") or {}
+    if fields:
+        kv = ", ".join(f"{k}={v}" for k, v in fields.items())
+        print(f"Fields: {kv}")
+    print()
+    print("---")
+    print()
+    print(body)
+    return 0
+
+
+def cmd_findings_file(args: argparse.Namespace) -> int:
+    state = load_findings_state()
+    p = _resolve_finding_path(args.id)
+    if p is None:
+        print(f"error: no finding with id {args.id!r}", file=sys.stderr)
+        return 1
+    try:
+        finding = load_finding(p)
+    except Exception as exc:  # noqa: BLE001
+        print(f"error: failed to parse {p}: {exc}", file=sys.stderr)
+        return 1
+    issues = validate_finding(p, finding)
+    errors = [i for i in issues if i.severity == "error"]
+    if errors:
+        for i in errors:
+            print(f"  validation error: {i.message}", file=sys.stderr)
+        print("error: finding fails validation; refusing to file", file=sys.stderr)
+        return 1
+    fid = finding["id"]
+    findings_map = state.setdefault("findings", {})
+    if fid in findings_map and findings_map[fid].get("issue"):
+        print(
+            f"error: {fid} already filed as #{findings_map[fid]['issue']}",
+            file=sys.stderr,
+        )
+        return 1
+    defaults = state.get("filing_defaults") or {}
+    proj_cfg = defaults.get("project") or {}
+    proj_owner = proj_cfg.get("owner")
+    proj_number = proj_cfg.get("number")
+    if not proj_owner or not proj_number:
+        print("error: filing_defaults.project not configured", file=sys.stderr)
+        return 1
+    title = compute_finding_title(finding)
+    labels = compute_finding_labels(finding, state)
+    body = render_finding_md(finding)
+    target_repo = args.repo
+    print(f"→ Filing {fid} to {target_repo} as: {title!r}")
+    print(f"  Labels: {', '.join(labels)}")
+    if args.dry_run:
+        print("  --dry-run: not invoking gh")
+        return 0
+    # 1. Create the issue
+    create_args = [
+        "issue",
+        "create",
+        "--repo",
+        target_repo,
+        "--title",
+        title,
+        "--body-file",
+        "-",
+    ]
+    for lbl in labels:
+        create_args.extend(["--label", lbl])
+    try:
+        result = subprocess.run(
+            ["gh", *create_args],
+            cwd=str(REPO_ROOT),
+            input=body,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        print(
+            f"error: gh issue create failed (rc={exc.returncode}): {exc.stderr}",
+            file=sys.stderr,
+        )
+        return 1
+    url = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
+    issue_number = _issue_number_from_url(url)
+    print(f"  filed: {url}")
+    record: dict = {"issue": issue_number, "url": url, "title": title, "labels": labels}
+    findings_map[fid] = record
+    save_findings_state(state)
+    # 2. Add to project + set fields. Any failure here is non-fatal: the
+    #    issue exists; we record what succeeded and let the operator finish
+    #    manually.
+    try:
+        project_id, project_fields = _fetch_project_field_ids(
+            proj_owner, int(proj_number)
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"  warning: could not resolve project field IDs: {exc}",
+            file=sys.stderr,
+        )
+        record["project_warning"] = f"field-id lookup failed: {exc}"
+        save_findings_state(state)
+        _move_to_filed(p)
+        return 0
+    try:
+        item_add = _gh(
+            [
+                "project",
+                "item-add",
+                str(proj_number),
+                "--owner",
+                proj_owner,
+                "--url",
+                url,
+                "--format",
+                "json",
+            ]
+        )
+        item_data = json.loads(item_add.stdout)
+        item_id = item_data["id"]
+    except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError) as exc:
+        print(f"  warning: project item-add failed: {exc}", file=sys.stderr)
+        record["project_warning"] = f"item-add failed: {exc}"
+        save_findings_state(state)
+        _move_to_filed(p)
+        return 0
+    print(f"  added to project: item {item_id}")
+    record["project_item_id"] = item_id
+    field_results: dict[str, str] = {}
+    for fname, fvalue in (defaults.get("fields") or {}).items():
+        finfo = project_fields.get(fname)
+        if not finfo:
+            field_results[fname] = "field not on project"
+            continue
+        try:
+            edit_args = [
+                "project",
+                "item-edit",
+                "--id",
+                item_id,
+                "--project-id",
+                project_id,
+                "--field-id",
+                finfo["id"],
+            ]
+            opts = finfo.get("options") or {}
+            if opts:
+                opt_id = opts.get(fvalue)
+                if not opt_id:
+                    field_results[fname] = f"unknown option {fvalue!r}"
+                    continue
+                edit_args.extend(["--single-select-option-id", opt_id])
+            else:
+                edit_args.extend(["--text", str(fvalue)])
+            _gh(edit_args)
+            field_results[fname] = "ok"
+        except subprocess.CalledProcessError as exc:
+            field_results[fname] = f"failed: {exc}"
+    print("  project fields:")
+    for fname, status in field_results.items():
+        print(f"    {fname:12s} {status}")
+    record["project_fields"] = field_results
+    save_findings_state(state)
+    _move_to_filed(p)
+    print(f"  moved finding to {FINDINGS_FILED_DIR.relative_to(REPO_ROOT)}/")
+    return 0
+
+
+def _resolve_finding_path(fid: str) -> Path | None:
+    candidate = FINDINGS_DIR / f"{fid}.yaml"
+    if candidate.exists():
+        return candidate
+    filed = FINDINGS_FILED_DIR / f"{fid}.yaml"
+    if filed.exists():
+        return filed
+    return None
+
+
+def _issue_number_from_url(url: str) -> int | None:
+    m = re.search(r"/issues/(\d+)$", url)
+    return int(m.group(1)) if m else None
+
+
+def _move_to_filed(p: Path) -> None:
+    FINDINGS_FILED_DIR.mkdir(parents=True, exist_ok=True)
+    dest = FINDINGS_FILED_DIR / p.name
+    p.rename(dest)
 
 
 def cmd_expansion_candidates(args: argparse.Namespace) -> int:
@@ -1616,6 +2215,43 @@ def _build_parser() -> argparse.ArgumentParser:
     p_mre.add_argument("bundle")
     p_mre.add_argument("--report")
     p_mre.set_defaults(func=cmd_mark_remediated)
+
+    p_find = sub.add_parser(
+        "findings",
+        help="(Phase F) list / show / file structured compiler-bug findings",
+    )
+    find_sub = p_find.add_subparsers(dest="findings_cmd", required=True)
+
+    p_fl = find_sub.add_parser("list", help="list pending findings")
+    p_fl.add_argument(
+        "--include-filed",
+        action="store_true",
+        help="also list findings already filed as issues",
+    )
+    p_fl.set_defaults(func=cmd_findings_list)
+
+    p_fs = find_sub.add_parser(
+        "show", help="render the issue body for a finding to stdout"
+    )
+    p_fs.add_argument("id")
+    p_fs.set_defaults(func=cmd_findings_show)
+
+    p_ff = find_sub.add_parser(
+        "file",
+        help="file the finding as an issue (calls gh; updates findings-state.json)",
+    )
+    p_ff.add_argument("id")
+    p_ff.add_argument(
+        "--repo",
+        default="shader-slang/slang",
+        help="target repository (default: shader-slang/slang)",
+    )
+    p_ff.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="don't invoke gh; just show what would be filed",
+    )
+    p_ff.set_defaults(func=cmd_findings_file)
 
     return p
 

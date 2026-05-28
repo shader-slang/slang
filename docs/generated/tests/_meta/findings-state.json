@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "filing_defaults": {
+    "project": {
+      "owner": "shader-slang",
+      "number": 10
+    },
+    "fields": {
+      "Status": "Todo",
+      "Priority": "P2",
+      "Release": "Unplanned",
+      "Size": "XS  (~1d)",
+      "Estimate": "1"
+    },
+    "labels": {
+      "always": ["Test Agent Finding", "bug"],
+      "by_suspected_kind": {
+        "regression": ["regression"],
+        "wrong-diagnostic": ["Diagnostics"]
+      },
+      "by_scope": {
+        "metal": ["Metal"],
+        "cuda": ["cuda"]
+      }
+    },
+    "repro_line_cap": 40
+  },
+  "findings": {}
+}

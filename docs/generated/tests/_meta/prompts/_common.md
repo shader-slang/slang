@@ -569,3 +569,106 @@ test, the right move is to either:
 and then re-run regeneration. Hand-edited tests are an anti-pattern;
 the lint pass flags any file whose `//META: generated=true` is paired
 with a recent commit on the file that the operator cannot justify.
+
+## Reporting suspected compiler bugs (findings)
+
+While writing tests you may observe `slangc` doing something that looks
+wrong: a segfault, a missing diagnostic that the doc claims should
+fire, codegen that contradicts a cited claim, a regression versus an
+older `slangc` revision. **Do not** open GitHub issues, attempt fixes,
+or paste these observations into your scratch notes. Record a
+structured **finding** instead. A separate triage pass (run by the
+operator via `regenerate.py findings file`) reviews findings, edits
+them as needed, and files the actionable ones.
+
+When to write a finding:
+
+- `slangc` crashes (SIGSEGV, internal compiler error, abort)
+- A documented diagnostic does not fire on input that should trigger it
+- A `DIAGNOSTIC_TEST` row in the catalog goes silent
+- Generated code is observably wrong against the cited expectation
+- A `//TEST` previously passing now fails after a `slangc` update
+
+When **not** to write a finding:
+
+- The doc claim itself seems wrong → record a doc gap in the bundle
+  `README.md` under `## Doc gaps observed` instead
+- Your test is malformed and `slangc` correctly rejects it → fix the test
+- You are merely uncertain about expected behavior → re-read the doc;
+  if still uncertain, record a doc gap, not a finding
+
+### Where the finding lives
+
+One YAML file per finding, named after the finding's `id`:
+
+```
+docs/generated/tests/_meta/findings/<id>.yaml
+```
+
+`<id>` is a kebab-case slug; pick something descriptive and unique,
+e.g. `pipeline-04b-defer-lower-sigsegv`. The filename must match the
+`id` field exactly (the lint pass enforces this). After the operator
+files the finding as an issue, the file is moved to
+`docs/generated/tests/_meta/findings/filed/`.
+
+### Required fields
+
+The full schema is at
+`docs/generated/tests/_meta/schema/finding.schema.json`. Required:
+
+```yaml
+schema_version: 1
+id: <kebab-case slug; matches filename>
+bundle: <bundle key that surfaced the finding, e.g. pipeline/04b-pre-link-passes>
+suspected_kind: sigsegv | wrong-diagnostic | wrong-codegen | regression | catalog-drift | doc-claim-overstated
+observed_at: <ISO 8601 timestamp, UTC>
+evidence:
+  command: <exact slangc/slang-test invocation that triggers the failure>
+  source_slang: <workspace-relative path to the .slang you were writing>
+  observed_summary: <single line: what happened>
+expected:
+  claim: <one sentence stating the correct behavior>
+  citation_kind: spec | sibling-test | older-slangc | doc
+  citation: <path / commit ref / spec section pointing to the source of truth>
+provenance:
+  agent_model: <your model identifier>
+  source_commit: <slangc git HEAD when observed>
+  doc_anchor: <docs/generated/design/<file>.md#<section> the test was anchored to>
+```
+
+Optional (use when relevant):
+
+```yaml
+scope: spirv | hlsl | metal | wgsl | cuda | cpp | diagnostics | parser | ir | core-module
+title: <explicit issue title, ≤80 chars; otherwise derived>
+evidence:
+  exit_code: <process exit code, e.g. 139 for SIGSEGV>
+  stderr_tail: <last lines of stderr; single line, may include \n escapes>
+agent_self_assessment:
+  confidence: low | medium | high
+  alternatives_considered:
+    - <something you ruled out>
+```
+
+### What you must NOT do
+
+- Do **not** call `gh` or otherwise file issues yourself.
+- Do **not** attempt to minimize the repro. The operator does this
+  during triage. Your `evidence.source_slang` points at the full
+  `.slang` you were writing; that is enough.
+- Do **not** populate `evidence.minimized_repro` — that field is
+  reserved for the operator.
+- Do **not** speculate about the root cause. Stick to observation:
+  what you ran, what the doc / spec / sibling test says should happen,
+  what actually happened. No "this is probably in the specialization
+  pass" hand-waving.
+- Do **not** cite the design doc (`citation_kind: doc`) when a
+  stronger source is available. The design docs are themselves
+  LLM-generated; prefer the spec, an existing hand-written test under
+  `tests/`, or output from an older `slangc` revision.
+
+### Ground rule
+
+A finding is **evidence**, not a conclusion. If you can't fill the
+required fields honestly, don't write the finding — file a doc gap
+or skip the test.
