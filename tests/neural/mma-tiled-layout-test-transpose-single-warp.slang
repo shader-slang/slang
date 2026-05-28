@@ -79,6 +79,8 @@ void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedInputSize, i
         NetworkParameterLayoutConverter<DType, TargetEnum.CUDA, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal);
     case spirv:
         NetworkParameterLayoutConverter<DType, TargetEnum.SPIR_V, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal);
+    case metal:
+        NetworkParameterLayoutConverter<DType, TargetEnum.Metal, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal);
     }
     AllMemoryBarrierWithGroupSync();
 }
