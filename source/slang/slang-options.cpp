@@ -531,7 +531,7 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::Output,
          "-o",
          "-o <path>",
-         "Specify a path where generated output should be written.\n"
+         "Specify test a path where generated output should be written.\n"
          "If no -target or -stage is specified, one may be inferred "
          "from file extension (see <file-extension>). "
          "If multiple -target options and a single -entry are present, each -o "
