@@ -1,26 +1,5 @@
 {
   "bundles": {
-    "architecture/dependency-graph": {
-      "generated_at": "2026-05-20T18:03:22+00:00",
-      "model": "claude-opus-4-7",
-      "source_commit": "30ae111120515b7406aa6f427a4eaaa28a0903d8",
-      "source_doc_digest": "3cb2e36ed79632f04be823e3e1bb14782a2979342d9ee050543f7702c34d098a",
-      "watched_paths_digest": "30983b1eac237a20bb36b39636936cb7cb3bc5b003a6f2f819545a3ac80fb871"
-    },
-    "architecture/module-map": {
-      "generated_at": "2026-05-20T17:43:21+00:00",
-      "model": "claude-opus-4-7",
-      "source_commit": "330c9a8d807b9f9352e4754f466d1244ae681cff",
-      "source_doc_digest": "5c6d48102b0bb57d8eb4ce69c2e86b33e36cddebf9997d84f579cc559a3b2373",
-      "watched_paths_digest": "1391f257f21ab933b6bb547913982ba82565e5ad8dcdfa4623949fde2837fa52"
-    },
-    "architecture/overview": {
-      "generated_at": "2026-05-20T13:03:34+00:00",
-      "model": "claude-opus-4-7",
-      "source_commit": "74db89b9f77cdced9c4d0c47f377b38fffb9180b",
-      "source_doc_digest": "3895e3132d3762339ddfb3fedad04d48dc40bec19e81e36ba65ac96233bbe55f",
-      "watched_paths_digest": "b5bae7d719ddfca09ffeb7d96497c5c488f8241c98977291cb22b1aef784eac1"
-    },
     "ast-reference/base": {
       "generated_at": "2026-05-20T12:42:37+00:00",
       "model": "claude-opus-4-7",

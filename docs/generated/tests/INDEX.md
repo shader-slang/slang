@@ -8,12 +8,12 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 ## Suite totals
 
-- **Bundles:** 47
-- **Total `.slang` tests:** 2699
+- **Bundles:** 44
+- **Total `.slang` tests:** 2683
 
 | Intent | Count |
 | --- | --- |
-| `functional` | 926 |
+| `functional` | 910 |
 | `boundary` | 632 |
 | `negative` | 590 |
 | `expansion` | 439 |
@@ -21,14 +21,6 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | `regression` | 1 |
 
 ## Bundles by section
-
-### Architecture
-
-| Bundle | Tests | Source doc |
-| --- | ---: | --- |
-| [`architecture/dependency-graph`](architecture/dependency-graph/README.md) | 5 | [`docs/generated/design/architecture/dependency-graph.md`](../design/architecture/dependency-graph.md) |
-| [`architecture/module-map`](architecture/module-map/README.md) | 6 | [`docs/generated/design/architecture/module-map.md`](../design/architecture/module-map.md) |
-| [`architecture/overview`](architecture/overview/README.md) | 5 | [`docs/generated/design/architecture/overview.md`](../design/architecture/overview.md) |
 
 ### Pipeline
 

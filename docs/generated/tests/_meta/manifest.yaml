@@ -34,53 +34,10 @@ default_runner:
   category_prefix: agentic-
 
 bundles:
-  # --- architecture/ -----------------------------------------------------
-
-  architecture/overview:
-    prompt: prompts/architecture-overview.md
-    source_doc: docs/generated/design/architecture/overview.md
-    watched_paths:
-      - source/slang/slang-compile-request.h
-      - source/slang/slang-compile-request.cpp
-      - source/slang/slang-module.h
-      - source/slang/slang-module.cpp
-      - include/slang.h
-    depends_on: []
-    coverage_targets:
-      - source/slang/slang-compile-request.cpp
-      - source/slang/slang-module.cpp
-    runner:
-      category: agentic-architecture
-    size_cap_files: 15
-
-  architecture/module-map:
-    prompt: prompts/architecture-module-map.md
-    source_doc: docs/generated/design/architecture/module-map.md
-    watched_paths:
-      - source/slang/slang-*.h
-      - source/slang/slang-*.cpp
-      - source/compiler-core/slang-*.h
-      - source/compiler-core/slang-*.cpp
-    depends_on:
-      - architecture/overview
-    coverage_targets: []
-    runner:
-      category: agentic-architecture
-    size_cap_files: 20
-
-  architecture/dependency-graph:
-    prompt: prompts/architecture-dependency-graph.md
-    source_doc: docs/generated/design/architecture/dependency-graph.md
-    watched_paths:
-      - source/*/CMakeLists.txt
-    depends_on:
-      - architecture/module-map
-    coverage_targets: []
-    runner:
-      category: agentic-architecture
-    size_cap_files: 10
-
-  # --- pipeline/ ---------------------------------------------------------
+  # Architectural / descriptive docs (architecture/, glossary/, navigation
+  # bundles) are intentionally exempt from the 1-to-1 mirror rule — they
+  # describe the system rather than specify behavior, so their "claims"
+  # are already exercised by behaviorally-anchored bundles below.
 
   pipeline/overview:
     prompt: prompts/pipeline-overview.md
@@ -93,8 +50,6 @@ bundles:
       - source/slang/slang-parser.cpp
       - source/slang/slang-preprocessor.cpp
       - source/compiler-core/slang-lexer.cpp
-    depends_on:
-      - architecture/overview
     coverage_targets:
       - source/slang/slang-compile-request.cpp
       - source/slang/slang-emit.cpp
@@ -336,8 +291,6 @@ bundles:
       - source/slang/slang-diagnostics.lua
       - source/slang/slang-rich-diagnostics.h
       - source/slang/slang-rich-diagnostics.cpp
-    depends_on:
-      - architecture/overview
     coverage_targets:
       - source/compiler-core/slang-diagnostic-sink.cpp
       - source/slang/slang-diagnostics.cpp
@@ -353,8 +306,6 @@ bundles:
       - source/slang/slang-ir-insts.h
       - source/slang/slang-ir.h
       - source/slang/slang-ir.cpp
-    depends_on:
-      - architecture/overview
     coverage_targets:
       - source/slang/slang-ir.cpp
       - source/slang/slang-ir-util.cpp
@@ -374,7 +325,6 @@ bundles:
       - source/slang/slang-profile.h
       - source/slang/slang-profile.cpp
     depends_on:
-      - architecture/overview
       - pipeline/06-emit
     coverage_targets:
       - source/slang/slang-capability.cpp
@@ -392,8 +342,6 @@ bundles:
       - source/slang/hlsl.meta.slang
       - source/slang/glsl.meta.slang
       - source/slang/diff.meta.slang
-    depends_on:
-      - architecture/overview
     coverage_targets: []
     runner:
       category: agentic-cross-cutting
@@ -409,8 +357,6 @@ bundles:
       - source/slang/slang-serialize-ir.cpp
       - source/slang/slang-serialize-ast.h
       - source/slang/slang-serialize-ast.cpp
-    depends_on:
-      - architecture/overview
     coverage_targets:
       - source/slang/slang-serialize.cpp
       - source/slang/slang-serialize-ir.cpp

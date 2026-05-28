@@ -19,7 +19,6 @@ The suite is **additive** — it does not replace the hand-written
 
 | Subtree             | Purpose                                                                                |
 | ------------------- | -------------------------------------------------------------------------------------- |
-| `architecture/`     | Tests anchored to `docs/generated/design/architecture/*.md`                            |
 | `pipeline/`         | Tests anchored to the compilation-pipeline docs (lex → emit)                           |
 | `syntax-reference/` | Tests anchored to the syntax / grammar / keywords docs                                 |
 | `ast-reference/`    | Tests anchored to the AST node reference                                               |
@@ -29,10 +28,18 @@ The suite is **additive** — it does not replace the hand-written
 | `target-pipelines/` | Tests anchored to per-target (SPIR-V/HLSL/Metal/WGSL/CUDA) end-to-end docs             |
 | `_meta/`            | Pipeline infrastructure: manifest, prompts, schemas, freshness + findings state, driver |
 
-The directory structure mirrors `docs/generated/design/` exactly: for
-every `docs/generated/design/<section>/<doc>.md`, there is one bundle at
+The directory structure mirrors `docs/generated/design/` for every
+**behaviorally normative** doc: each `docs/generated/design/<section>/<doc>.md`
+that specifies compiler behavior has a corresponding bundle at
 `docs/generated/tests/<section>/<doc>/` (no `.md` suffix on the directory).
-This is a hard rule enforced by the manifest.
+
+Descriptive / architectural docs are exempt — `docs/generated/design/architecture/*.md`,
+the glossary, and the navigation-only index docs describe the system but
+make no behavioral claims that a test could anchor to. Whatever behavior
+they reference is already exercised by bundles below (e.g., entry-point
+selection by `pipeline/`, target plumbing by `target-pipelines/`,
+prelude inclusion by `cross-cutting/`). The manifest's `bundles:` map is
+the authoritative list of which docs do get a bundle.
 
 ## Bundle shape
 
