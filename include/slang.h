@@ -2510,8 +2510,15 @@ struct TypeReflection
         return spReflectionType_GetResourceAccess((SlangReflectionType*)this);
     }
 
+    /// Returns the type's name without any type-level modifier wrappers
+    /// (`no_diff`, `unorm`, `snorm`, ...). To inspect a modifier on a
+    /// specific declaration, use `findModifier()` on the owning
+    /// `VariableReflection` / `FunctionReflection`.
     char const* getName() { return spReflectionType_GetName((SlangReflectionType*)this); }
 
+    /// Returns the fully-qualified type name without any type-level
+    /// modifier wrappers (`no_diff`, `unorm`, `snorm`, ...). See
+    /// `getName()` for retrieving modifier information.
     SlangResult getFullName(ISlangBlob** outNameBlob)
     {
         return spReflectionType_GetFullName((SlangReflectionType*)this, outNameBlob);
