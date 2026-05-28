@@ -37,7 +37,7 @@ jobs:
               },
               {
                 "command": "ci",
-                "permission": "write",
+                "permission": "none",
                 "issue_type": "pull-request"
               }
             ]

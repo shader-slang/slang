@@ -1,16 +1,20 @@
 name: /ci command
 
-# Triggered when a maintainer comments "/ci" on a PR.
+# Triggered when anyone comments "/ci" on a PR — matches the existing
+# semantics where any contributor can open a non-draft PR and have CI run
+# automatically. Restricting /ci would just push contributors to toggle
+# ready-for-review back and forth, which has the same CI cost.
 #
-# Dispatched by slash-command-dispatch.yml (permission: write) so the trust
-# gate has already filtered out non-maintainers before this workflow runs.
+# Dispatched by slash-command-dispatch.yml (permission: none).
 #
 # Runs the same matrix as ci.yml, but checks out the PR head SHA from the
-# fork repository (SHA-pinned to what the maintainer saw when they commented)
+# fork repository (SHA-pinned to what the commenter saw when they posted)
 # and forces fork-PR secret gating regardless of base repo.
 #
 # Will refuse to start if a CI run is already in progress for the PR's head
-# SHA — see in-flight check in trust-check job.
+# SHA — see in-flight check in trust-check job. That doubles as the rate
+# limit on runaway /ci comments: a troll can't trigger more CI than is
+# already running.
 
 on:
   repository_dispatch:
