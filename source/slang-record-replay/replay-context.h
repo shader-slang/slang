@@ -80,8 +80,19 @@ static_assert(
     sizeof(CallIndexEntry) == CallIndexEntry::kSize,
     "CallIndexEntry must have expected fixed size");
 
+// macOS coverage runs tests in-process, so replay exceptions can be thrown
+// across the slang dylib boundary and caught in the test executable. Export
+// the exception classes on non-Windows platforms so their RTTI has default
+// visibility. MSVC does not need this and rejects some dll-interface patterns
+// used by these internal exception classes.
+#if SLANG_WINDOWS_FAMILY
+#define SLANG_REPLAY_EXCEPTION_API
+#else
+#define SLANG_REPLAY_EXCEPTION_API SLANG_API
+#endif
+
 /// Exception thrown when trying to record an untracked interface.
-class UntrackedInterfaceException : public Slang::Exception
+class SLANG_REPLAY_EXCEPTION_API UntrackedInterfaceException : public Slang::Exception
 {
 public:
     UntrackedInterfaceException(ISlangUnknown* obj)
@@ -95,7 +106,7 @@ private:
 };
 
 /// Exception thrown when a handle is not found during playback.
-class HandleNotFoundException : public Slang::Exception
+class SLANG_REPLAY_EXCEPTION_API HandleNotFoundException : public Slang::Exception
 {
 public:
     HandleNotFoundException(uint64_t handle)
@@ -109,7 +120,7 @@ private:
 };
 
 /// Exception thrown when a handle is not found during playback.
-class UnresolvedTypeException : public Slang::Exception
+class SLANG_REPLAY_EXCEPTION_API UnresolvedTypeException : public Slang::Exception
 {
 public:
     UnresolvedTypeException(slang::TypeReflection* type)
@@ -185,28 +196,30 @@ enum class TypeId : uint8_t
 SLANG_API const char* getTypeIdName(TypeId id);
 
 /// Exception thrown when type mismatch occurs during deserialization.
-class TypeMismatchException : public Slang::Exception
+class SLANG_REPLAY_EXCEPTION_API TypeMismatchException : public Slang::Exception
 {
 public:
-    SLANG_API TypeMismatchException(TypeId expected, TypeId actual);
-    SLANG_API TypeId getExpected() const { return m_expected; }
-    SLANG_API TypeId getActual() const { return m_actual; }
+    TypeMismatchException(TypeId expected, TypeId actual);
+    TypeId getExpected() const { return m_expected; }
+    TypeId getActual() const { return m_actual; }
 
 private:
     TypeId m_expected, m_actual;
 };
 
 /// Exception thrown when data mismatch occurs during sync mode verification.
-class DataMismatchException : public Slang::Exception
+class SLANG_REPLAY_EXCEPTION_API DataMismatchException : public Slang::Exception
 {
 public:
-    SLANG_API DataMismatchException(size_t offset, size_t size);
-    SLANG_API size_t getOffset() const { return m_offset; }
-    SLANG_API size_t getSize() const { return m_size; }
+    DataMismatchException(size_t offset, size_t size);
+    size_t getOffset() const { return m_offset; }
+    size_t getSize() const { return m_size; }
 
 private:
     size_t m_offset, m_size;
 };
+
+#undef SLANG_REPLAY_EXCEPTION_API
 
 /// Require the current playback stream position to contain a byte range.
 inline void requireReplayStreamBytes(const ReplayStream& stream, size_t offset, size_t size)
