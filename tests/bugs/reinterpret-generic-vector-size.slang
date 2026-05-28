@@ -6,6 +6,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -entry computeMain -stage compute -conformance "Impl:IReinterpreter=1"
 //TEST:SIMPLE(filecheck=CHECK_DXIL): -target dxil -profile cs_6_0 -entry computeMain -conformance "Impl:IReinterpreter=1"
+//TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv-asm -entry computeMain -stage compute -conformance "Impl:IReinterpreter=1"
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -target cuda -entry computeMain -stage compute -conformance "Impl:IReinterpreter=1"
 
 RWStructuredBuffer<float> outputBuffer;
@@ -44,6 +45,9 @@ void computeMain()
 // CHECK_DXIL: define void @computeMain()
 // CHECK_DXIL: float 1.000000e+00
 // CHECK_DXIL-NOT: error
+
+// CHECK_SPIRV: OpEntryPoint GLCompute %computeMain
+// CHECK_SPIRV-NOT: error
 
 // CHECK_CUDA: struct Impl
 // CHECK_CUDA: Impl_run
