@@ -58,9 +58,13 @@ jobs:
   # still report a green check rather than leaving "Expected — Waiting for
   # status" forever. Succeeds when matrix succeeded or was skipped; fails when
   # matrix failed or was cancelled.
+  #
+  # The if: clause mirrors the filter job so drafts skip check-ci entirely —
+  # otherwise filter is skipped on drafts, matrix.result becomes "skipped"
+  # with no should-run signal, and the case below would treat that as failure.
   check-ci:
     needs: [filter, matrix]
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
     runs-on: ubuntu-latest
     steps:
       - name: Summarize matrix result
