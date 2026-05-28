@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/ir-reference/decorations/`,
 anchored to
-[`docs/generated/design/ir-reference/decorations.md`](../../../docs/generated/design/ir-reference/decorations.md).
+[`docs/generated/design/ir-reference/decorations.md`](../../../design/ir-reference/decorations.md).
 
 Audience: nightly CI. This bundle is the **per-opcode reference**
 for the `Decoration` family — the largest single family in the IR

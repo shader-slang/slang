@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/pipeline/01-lex-preprocess/`,
 anchored to
-[`docs/generated/design/pipeline/01-lex-preprocess.md`](../../../docs/generated/design/pipeline/01-lex-preprocess.md).
+[`docs/generated/design/pipeline/01-lex-preprocess.md`](../../../design/pipeline/01-lex-preprocess.md).
 
 Audience: nightly CI. The bundle exercises the first compilation
 stage end-to-end — how the source buffer becomes a flat

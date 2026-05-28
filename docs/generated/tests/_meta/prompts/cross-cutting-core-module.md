@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/cross-cutting/core-module/`,
 anchored to
-[`docs/generated/design/cross-cutting/core-module.md`](../../../docs/generated/design/cross-cutting/core-module.md).
+[`docs/generated/design/cross-cutting/core-module.md`](../../../design/cross-cutting/core-module.md).
 
 Audience: nightly CI. The bundle exercises the **core module / GLSL
 module / standard module / prelude** abstraction described in the

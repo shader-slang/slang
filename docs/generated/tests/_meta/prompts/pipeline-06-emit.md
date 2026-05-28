@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/pipeline/06-emit/`, anchored
 to
-[`docs/generated/design/pipeline/06-emit.md`](../../../docs/generated/design/pipeline/06-emit.md).
+[`docs/generated/design/pipeline/06-emit.md`](../../../design/pipeline/06-emit.md).
 
 Audience: nightly CI. The bundle exercises the **code-emission stage**
 of the Slang compiler: how a fully-legalized `IRModule` is turned into

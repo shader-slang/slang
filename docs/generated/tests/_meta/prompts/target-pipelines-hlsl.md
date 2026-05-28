@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/target-pipelines/hlsl/`,
 anchored to
-[`docs/generated/design/target-pipelines/hlsl.md`](../../../docs/generated/design/target-pipelines/hlsl.md).
+[`docs/generated/design/target-pipelines/hlsl.md`](../../../design/target-pipelines/hlsl.md).
 
 Audience: nightly CI. The bundle exercises the **HLSL target
 pipeline**: the ordered IR-pass + emit sequence run by

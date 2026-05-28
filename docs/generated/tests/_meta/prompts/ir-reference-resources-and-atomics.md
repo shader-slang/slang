@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at
 `docs/generated/tests/ir-reference/resources-and-atomics/`, anchored to
-[`docs/generated/design/ir-reference/resources-and-atomics.md`](../../../docs/generated/design/ir-reference/resources-and-atomics.md).
+[`docs/generated/design/ir-reference/resources-and-atomics.md`](../../../design/ir-reference/resources-and-atomics.md).
 
 Audience: nightly CI. The bundle exercises the **per-opcode catalog**
 of the IR resource/atomic family — `RWStructuredBuffer`,

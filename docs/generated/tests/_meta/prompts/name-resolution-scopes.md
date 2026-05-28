@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/name-resolution/scopes/`,
 anchored to
-[`docs/generated/design/name-resolution/scopes.md`](../../../docs/generated/design/name-resolution/scopes.md).
+[`docs/generated/design/name-resolution/scopes.md`](../../../design/name-resolution/scopes.md).
 
 Audience: nightly CI. The bundle exercises the **lexical scoping
 rules** the doc describes — which AST nodes introduce a new `Scope`,

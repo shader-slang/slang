@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/syntax-reference/tokens/`,
 anchored to
-[`docs/generated/design/syntax-reference/tokens.md`](../../../docs/generated/design/syntax-reference/tokens.md).
+[`docs/generated/design/syntax-reference/tokens.md`](../../../design/syntax-reference/tokens.md).
 
 Audience: nightly CI. The bundle exercises lexer-surface behaviors —
 how the source character stream becomes a token stream — without

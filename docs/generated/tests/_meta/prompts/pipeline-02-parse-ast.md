@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/pipeline/02-parse-ast/`,
 anchored to
-[`docs/generated/design/pipeline/02-parse-ast.md`](../../../docs/generated/design/pipeline/02-parse-ast.md).
+[`docs/generated/design/pipeline/02-parse-ast.md`](../../../design/pipeline/02-parse-ast.md).
 
 Audience: nightly CI. The bundle exercises the second compilation
 stage end-to-end — how the flat post-preprocess token list becomes a

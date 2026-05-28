@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/cross-cutting/ir-instructions/`,
 anchored to
-[`docs/generated/design/cross-cutting/ir-instructions.md`](../../../docs/generated/design/cross-cutting/ir-instructions.md).
+[`docs/generated/design/cross-cutting/ir-instructions.md`](../../../design/cross-cutting/ir-instructions.md).
 
 Audience: nightly CI. The bundle exercises the **observable shape of the
 Slang IR** at the `LOWER-TO-IR` stage — that the documented per-family

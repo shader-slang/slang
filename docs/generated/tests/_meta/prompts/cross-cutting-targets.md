@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/cross-cutting/targets/`,
 anchored to
-[`docs/generated/design/cross-cutting/targets.md`](../../../docs/generated/design/cross-cutting/targets.md).
+[`docs/generated/design/cross-cutting/targets.md`](../../../design/cross-cutting/targets.md).
 
 Audience: nightly CI. The bundle exercises the **target abstraction**
 described in the source doc: that the compiler has multiple text-emit

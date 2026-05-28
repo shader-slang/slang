@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/pipeline/overview/`,
 anchored to
-[`docs/generated/design/pipeline/overview.md`](../../../docs/generated/design/pipeline/overview.md).
+[`docs/generated/design/pipeline/overview.md`](../../../design/pipeline/overview.md).
 
 Audience: nightly CI. This is a **meta-bundle**. The source doc is the
 index to the per-stage pipeline documents — most of its content is

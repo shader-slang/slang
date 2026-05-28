@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/ir-reference/structure/`,
 anchored to
-[`docs/generated/design/ir-reference/structure.md`](../../../docs/generated/design/ir-reference/structure.md).
+[`docs/generated/design/ir-reference/structure.md`](../../../design/ir-reference/structure.md).
 
 Audience: nightly CI. This bundle is the **per-opcode reference**
 for the structural / hierarchy opcodes that organize an IR module:

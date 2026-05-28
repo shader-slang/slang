@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/target-pipelines/spirv/`,
 anchored to
-[`docs/generated/design/target-pipelines/spirv.md`](../../../docs/generated/design/target-pipelines/spirv.md).
+[`docs/generated/design/target-pipelines/spirv.md`](../../../design/target-pipelines/spirv.md).
 
 Audience: nightly CI. The bundle exercises the **SPIR-V direct-emit
 target pipeline**: the ordered IR-pass + emit sequence executed when

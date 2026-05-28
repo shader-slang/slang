@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/architecture/overview/`,
 anchored to
-[`docs/generated/design/architecture/overview.md`](../../../docs/generated/design/architecture/overview.md).
+[`docs/generated/design/architecture/overview.md`](../../../design/architecture/overview.md).
 
 Audience: nightly CI. The bundle exercises the architectural
 introduction of Slang — what `slangc` produces, what translation

@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/pipeline/04-ast-to-ir/`,
 anchored to
-[`docs/generated/design/pipeline/04-ast-to-ir.md`](../../../docs/generated/design/pipeline/04-ast-to-ir.md).
+[`docs/generated/design/pipeline/04-ast-to-ir.md`](../../../design/pipeline/04-ast-to-ir.md).
 
 Audience: nightly CI. The bundle exercises the **AST → IR lowering
 stage**: that each documented AST family lowers to the IR construct
@@ -33,7 +33,7 @@ shape; this bundle is anchored at the **AST-side** of the mapping
 ## The translation rule: claims to observations
 
 The source doc's section
-[`#mapping-ast-constructs-to-ir`](../../../docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)
+[`#mapping-ast-constructs-to-ir`](../../../design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)
 is the central table. The testable consequences are:
 
 - **"AST family X lowers to IR construct Y"** — compile to a text

@@ -7,7 +7,7 @@ but bundle generation is an out-of-band agent invocation that the
 operator performs.
 
 The shape mirrors the documentation regeneration workflow at
-[`../../docs/generated/design/_meta/regenerate.md`](../../docs/generated/design/_meta/regenerate.md);
+[`../../design/_meta/regenerate.md`](../../design/_meta/regenerate.md);
 the two systems are siblings.
 
 ## Prerequisites

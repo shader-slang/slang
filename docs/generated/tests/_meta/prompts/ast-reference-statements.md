@@ -10,7 +10,7 @@ rule established there applies here unchanged.
 
 Produce the test bundle at `docs/generated/tests/ast-reference/statements/`,
 anchored to
-[`docs/generated/design/ast-reference/statements.md`](../../../docs/generated/design/ast-reference/statements.md).
+[`docs/generated/design/ast-reference/statements.md`](../../../design/ast-reference/statements.md).
 
 Audience: nightly CI. The bundle exercises the concrete `Stmt`
 subclasses enumerated in the doc — `BlockStmt`, `SeqStmt`, `IfStmt`,

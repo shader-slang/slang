@@ -9,7 +9,7 @@ observations) applies.
 
 Produce the test bundle at `docs/generated/tests/ast-reference/values/`,
 anchored to
-[`docs/generated/design/ast-reference/values.md`](../../../docs/generated/design/ast-reference/values.md).
+[`docs/generated/design/ast-reference/values.md`](../../../design/ast-reference/values.md).
 
 Audience: nightly CI. The bundle exercises the **non-Type** `Val`
 subclasses in the Slang AST — the `IntVal` family (`ConstantIntVal`,
@@ -82,7 +82,7 @@ The doc carries many claims about the **internal shape** of these
 `Val`s. These are unobservable:
 
 - **Hash-cons pointer identity** (the
-  [`### Hash-consing and the ASTBuilder`](../../../docs/generated/design/ast-reference/values.md#hash-consing-and-the-astbuilder)
+  [`### Hash-consing and the ASTBuilder`](../../../design/ast-reference/values.md#hash-consing-and-the-astbuilder)
   invariant). Surface tests see behavioral equivalence, not `Val*`
   equality.
 - **Operand-list layout** described under "Operand semantics" in

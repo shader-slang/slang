@@ -2,7 +2,7 @@
 
 This directory contains an agent-generated, agent-maintained test suite
 that mirrors the LLM-generated architectural documentation in
-[`../docs/generated/design/`](../docs/generated/design/). Each test in this
+[`../design/`](../design/). Each test in this
 tree is anchored to a documentation claim, and the suite is rebuilt
 when the docs change.
 
@@ -75,7 +75,7 @@ expansion contract.
 - The source code is authoritative.
 - The hand-written `tests/` suite is authoritative for the behaviors
   it covers.
-- The docs in [`../docs/generated/design/`](../docs/generated/design/) are
+- The docs in [`../design/`](../design/) are
   the spec this suite checks against. They may drift from source; the
   doc-side regeneration loop closes that drift.
 - Tests under `docs/generated/tests/` are valid only to the extent that their

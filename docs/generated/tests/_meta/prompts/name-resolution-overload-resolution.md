@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/name-resolution/overload-resolution/`,
 anchored to
-[`docs/generated/design/name-resolution/overload-resolution.md`](../../../docs/generated/design/name-resolution/overload-resolution.md).
+[`docs/generated/design/name-resolution/overload-resolution.md`](../../../design/name-resolution/overload-resolution.md).
 
 Audience: nightly CI. The bundle exercises the **overload-resolution
 algorithm** described in the source doc — how Slang narrows a

@@ -10,7 +10,7 @@ applies to this one unchanged.
 
 Produce the test bundle at `docs/generated/tests/ast-reference/types/`,
 anchored to
-[`docs/generated/design/ast-reference/types.md`](../../../docs/generated/design/ast-reference/types.md).
+[`docs/generated/design/ast-reference/types.md`](../../../design/ast-reference/types.md).
 
 Audience: nightly CI. The bundle exercises the concrete `Type`
 subclasses in the AST — `DeclRefType` and its arithmetic descendants

@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/ir-reference/values/`,
 anchored to
-[`docs/generated/design/ir-reference/values.md`](../../../docs/generated/design/ir-reference/values.md).
+[`docs/generated/design/ir-reference/values.md`](../../../design/ir-reference/values.md).
 
 Audience: nightly CI. The bundle exercises the **per-opcode catalog**
 of the IR value-producing family — literals (`integer_constant`,

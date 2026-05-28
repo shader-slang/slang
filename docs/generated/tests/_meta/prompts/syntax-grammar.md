@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/syntax-reference/grammar/`,
 anchored to
-[`docs/generated/design/syntax-reference/grammar.md`](../../../docs/generated/design/syntax-reference/grammar.md).
+[`docs/generated/design/syntax-reference/grammar.md`](../../../design/syntax-reference/grammar.md).
 
 Audience: nightly CI. The bundle exercises the **surface grammar** of
 Slang — the EBNF-style productions reverse-engineered from the parser

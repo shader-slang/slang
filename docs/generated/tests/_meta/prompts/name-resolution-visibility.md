@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/name-resolution/visibility/`,
 anchored to
-[`docs/generated/design/name-resolution/visibility.md`](../../../docs/generated/design/name-resolution/visibility.md).
+[`docs/generated/design/name-resolution/visibility.md`](../../../design/name-resolution/visibility.md).
 
 Audience: nightly CI. The bundle exercises Slang's **declaration
 visibility enforcement** — what is observable when a `private`,

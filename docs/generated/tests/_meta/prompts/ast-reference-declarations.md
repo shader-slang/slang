@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/ast-reference/declarations/`,
 anchored to
-[`docs/generated/design/ast-reference/declarations.md`](../../../docs/generated/design/ast-reference/declarations.md).
+[`docs/generated/design/ast-reference/declarations.md`](../../../design/ast-reference/declarations.md).
 
 Audience: nightly CI. The bundle exercises the **concrete `Decl` and
 `DeclBase` subclasses** in the Slang AST through their **user-observable

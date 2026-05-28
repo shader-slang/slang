@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/ir-reference/types/`,
 anchored to
-[`docs/generated/design/ir-reference/types.md`](../../../docs/generated/design/ir-reference/types.md).
+[`docs/generated/design/ir-reference/types.md`](../../../design/ir-reference/types.md).
 
 Audience: nightly CI. The bundle exercises the **per-opcode catalog**
 of the IR `Type` family — that each documented `Type` opcode (scalars

@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/pipeline/04b-pre-link-passes/`,
 anchored to
-[`docs/generated/design/pipeline/04b-pre-link-passes.md`](../../../docs/generated/design/pipeline/04b-pre-link-passes.md).
+[`docs/generated/design/pipeline/04b-pre-link-passes.md`](../../../design/pipeline/04b-pre-link-passes.md).
 
 Audience: nightly CI. The bundle exercises the **pre-link IR-pass
 sequence** that runs inside `generateIRForTranslationUnit` in

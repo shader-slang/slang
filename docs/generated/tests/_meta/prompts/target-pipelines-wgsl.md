@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/target-pipelines/wgsl/`,
 anchored to
-[`docs/generated/design/target-pipelines/wgsl.md`](../../../docs/generated/design/target-pipelines/wgsl.md).
+[`docs/generated/design/target-pipelines/wgsl.md`](../../../design/target-pipelines/wgsl.md).
 
 Audience: nightly CI. The bundle exercises the **WGSL target
 pipeline**: the ordered IR-pass + emit sequence run by

@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/cross-cutting/diagnostics/`,
 anchored to
-[`docs/generated/design/cross-cutting/diagnostics.md`](../../../docs/generated/design/cross-cutting/diagnostics.md).
+[`docs/generated/design/cross-cutting/diagnostics.md`](../../../design/cross-cutting/diagnostics.md).
 
 Audience: nightly CI. The bundle exercises the **diagnostic surface**
 of the compiler — which severity, which code, and which message text

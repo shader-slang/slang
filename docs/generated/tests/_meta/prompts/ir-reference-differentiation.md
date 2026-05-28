@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at
 `docs/generated/tests/ir-reference/differentiation/`, anchored to
-[`docs/generated/design/ir-reference/differentiation.md`](../../../docs/generated/design/ir-reference/differentiation.md).
+[`docs/generated/design/ir-reference/differentiation.md`](../../../design/ir-reference/differentiation.md).
 
 Audience: nightly CI. This bundle is the **per-opcode reference**
 for the IR opcodes used by the automatic-differentiation passes:

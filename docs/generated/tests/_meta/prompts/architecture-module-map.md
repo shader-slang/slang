@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/architecture/module-map/`,
 anchored to
-[`docs/generated/design/architecture/module-map.md`](../../../docs/generated/design/architecture/module-map.md).
+[`docs/generated/design/architecture/module-map.md`](../../../design/architecture/module-map.md).
 
 Audience: nightly CI. The bundle exercises the source-tree
 **module-map** doc — a lookup table that enumerates subdirectories

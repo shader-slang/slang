@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/cross-cutting/serialization/`,
 anchored to
-[`docs/generated/design/cross-cutting/serialization.md`](../../../docs/generated/design/cross-cutting/serialization.md).
+[`docs/generated/design/cross-cutting/serialization.md`](../../../design/cross-cutting/serialization.md).
 
 Audience: nightly CI. The bundle exercises the **serialization
 machinery** documented in the source doc: AST + IR + container

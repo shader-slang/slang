@@ -9,7 +9,7 @@ observations) — that rule applies here unchanged.
 
 Produce the test bundle at `docs/generated/tests/ast-reference/expressions/`,
 anchored to
-[`docs/generated/design/ast-reference/expressions.md`](../../../docs/generated/design/ast-reference/expressions.md).
+[`docs/generated/design/ast-reference/expressions.md`](../../../design/ast-reference/expressions.md).
 
 Audience: nightly CI. The bundle exercises the concrete `Expr`
 subclasses — `VarExpr`, `MemberExpr`, `IndexExpr`, `InvokeExpr` and its

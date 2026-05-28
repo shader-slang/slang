@@ -7,13 +7,13 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/pipeline/05-ir-passes/`,
 anchored to
-[`docs/generated/design/pipeline/05-ir-passes.md`](../../../docs/generated/design/pipeline/05-ir-passes.md).
+[`docs/generated/design/pipeline/05-ir-passes.md`](../../../design/pipeline/05-ir-passes.md).
 
 Audience: nightly CI. The bundle exercises the **IR-pass catalog** —
 the set of transformations that run between AST → IR lowering
-([04-ast-to-ir](../../../docs/generated/design/pipeline/04-ast-to-ir.md))
+([04-ast-to-ir](../../../design/pipeline/04-ast-to-ir.md))
 and code emission
-([06-emit](../../../docs/generated/design/pipeline/06-emit.md)). The
+([06-emit](../../../design/pipeline/06-emit.md)). The
 source doc groups ~325 `slang-ir-*.cpp` files into nine categories
 (Linking and validation, SSA construction / cleanup, Specialization
 and generics, Differentiation, Type and value legalization, Inlining
@@ -218,7 +218,7 @@ specific surface-observable claim is named.
   `Insts stable names`) — they are not transformations and have
   no observable effect of their own.
 - The pre-link region documented in
-  [04b-pre-link-passes.md](../../../docs/generated/design/pipeline/04b-pre-link-passes.md);
+  [04b-pre-link-passes.md](../../../design/pipeline/04b-pre-link-passes.md);
   if a claim is about an explicitly pre-link pass, it belongs in
   that bundle's prompt, not here.
 - Coverage instrumentation flags (`-trace-coverage-binding`,

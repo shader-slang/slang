@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/ir-reference/control-flow/`,
 anchored to
-[`docs/generated/design/ir-reference/control-flow.md`](../../../docs/generated/design/ir-reference/control-flow.md).
+[`docs/generated/design/ir-reference/control-flow.md`](../../../design/ir-reference/control-flow.md).
 
 Audience: nightly CI. The bundle exercises the **per-opcode catalog**
 of the IR control-flow family — `block` (basic block parent), `param`

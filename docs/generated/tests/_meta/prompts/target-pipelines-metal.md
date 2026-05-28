@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/target-pipelines/metal/`,
 anchored to
-[`docs/generated/design/target-pipelines/metal.md`](../../../docs/generated/design/target-pipelines/metal.md).
+[`docs/generated/design/target-pipelines/metal.md`](../../../design/target-pipelines/metal.md).
 
 Audience: nightly CI. The bundle exercises the **Metal target
 pipeline**: the ordered IR-pass + emit sequence run by

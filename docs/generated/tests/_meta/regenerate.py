@@ -1620,9 +1620,11 @@ def cmd_index(args: argparse.Namespace) -> int:
         out.append("| --- | ---: | --- |")
         for spec in grouped[section]:
             count = bundle_counts.get(spec.key, 0)
-            # Relative link from INDEX.md (at docs/generated/tests/INDEX.md) to source_doc
-            # docs/generated/tests/INDEX.md -> ../docs/generated/design/<...>.md
-            doc_link = f"../{spec.source_doc}"
+            # Relative link from INDEX.md (at docs/generated/tests/INDEX.md)
+            # to source_doc (workspace-relative path under docs/generated/design/).
+            # Strip the shared `docs/generated/` prefix and prepend `../`:
+            #   docs/generated/tests/INDEX.md -> ../design/<...>.md
+            doc_link = "../" + spec.source_doc.removeprefix("docs/generated/")
             out.append(
                 f"| [`{spec.key}`]({spec.key}/README.md) | {count} |"
                 f" [`{spec.source_doc}`]({doc_link}) |"

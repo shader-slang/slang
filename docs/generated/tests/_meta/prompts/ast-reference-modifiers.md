@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/ast-reference/modifiers/`,
 anchored to
-[`docs/generated/design/ast-reference/modifiers.md`](../../../docs/generated/design/ast-reference/modifiers.md).
+[`docs/generated/design/ast-reference/modifiers.md`](../../../design/ast-reference/modifiers.md).
 
 Audience: nightly CI. The bundle exercises the **concrete `Modifier`
 and `Attribute` subclasses** in the Slang AST through their

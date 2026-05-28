@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at
 `docs/generated/tests/syntax-reference/keywords-and-builtins/`, anchored to
-[`docs/generated/design/syntax-reference/keywords-and-builtins.md`](../../../docs/generated/design/syntax-reference/keywords-and-builtins.md).
+[`docs/generated/design/syntax-reference/keywords-and-builtins.md`](../../../design/syntax-reference/keywords-and-builtins.md).
 
 Audience: nightly CI. The bundle exercises the **parser-surface
 behavior of Slang's keywords and core-module vocabulary** — which

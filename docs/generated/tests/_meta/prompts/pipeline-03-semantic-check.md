@@ -13,7 +13,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/pipeline/03-semantic-check/`,
 anchored to
-[`docs/generated/design/pipeline/03-semantic-check.md`](../../../docs/generated/design/pipeline/03-semantic-check.md).
+[`docs/generated/design/pipeline/03-semantic-check.md`](../../../design/pipeline/03-semantic-check.md).
 
 Audience: nightly CI. The bundle exercises semantic checking
 end-to-end: declaration checking, expression checking, statement

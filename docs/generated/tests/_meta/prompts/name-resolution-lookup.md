@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/name-resolution/lookup/`,
 anchored to
-[`docs/generated/design/name-resolution/lookup.md`](../../../docs/generated/design/name-resolution/lookup.md).
+[`docs/generated/design/name-resolution/lookup.md`](../../../design/name-resolution/lookup.md).
 
 Audience: nightly CI. The bundle exercises the **lookup algorithm**
 described in the source doc — how a name resolves once a lookup has

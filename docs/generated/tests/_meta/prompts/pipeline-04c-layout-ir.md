@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/pipeline/04c-layout-ir/`,
 anchored to
-[`docs/generated/design/pipeline/04c-layout-ir.md`](../../../docs/generated/design/pipeline/04c-layout-ir.md).
+[`docs/generated/design/pipeline/04c-layout-ir.md`](../../../design/pipeline/04c-layout-ir.md).
 
 Audience: nightly CI. The bundle exercises the **per-target layout IR
 module** built by `TargetProgram::createIRModuleForLayout` in

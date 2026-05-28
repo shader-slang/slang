@@ -7,7 +7,7 @@ to this bundle and override nothing here unless explicitly noted.
 
 Produce the test bundle at `docs/generated/tests/ast-reference/base/`,
 anchored to
-[`docs/generated/design/ast-reference/base.md`](../../../docs/generated/design/ast-reference/base.md).
+[`docs/generated/design/ast-reference/base.md`](../../../design/ast-reference/base.md).
 
 Audience: nightly CI. The bundle exercises the abstract AST root
 classes — `NodeBase`, `SyntaxNodeBase`, `SyntaxNode`, `Modifier`,
