@@ -5,6 +5,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):name=workBuffer
 RWStructuredBuffer<half2> workBuffer;
+RWStructuredBuffer<half4> workBuffer4;
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -13,15 +14,19 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     half2 originalMin;
     half2 originalMax;
     half2 originalExchange;
+    half4 originalAdd4;
 
     // Direct atomic operation on half2 should trigger the SPV_NV_shader_atomic_fp16_vector extension
     originalAdd = __atomic_add(workBuffer[0], half2(1.0h, 2.0h));
     originalMin = __atomic_min(workBuffer[1], half2(1.0h, 2.0h));
     originalMax = __atomic_max(workBuffer[2], half2(1.0h, 2.0h));
     originalExchange = __atomic_exchange(workBuffer[3], half2(3.0h, 4.0h));
+    originalAdd4 = __atomic_add(workBuffer4[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
 
     outputBuffer[0] = float(originalAdd.x + originalMin.x + originalMax.x + originalExchange.x);
     outputBuffer[1] = float(originalAdd.y + originalMin.y + originalMax.y + originalExchange.y);
+    outputBuffer[2] = float(originalAdd4.x + originalAdd4.y);
+    outputBuffer[3] = float(originalAdd4.z + originalAdd4.w);
 }
 
 // CHECK-NOT: OpCapability AtomicFloat16AddEXT
@@ -33,3 +38,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CHECK-COUNT-1: OpAtomicFMinEXT %v2half
 // CHECK-COUNT-1: OpAtomicFMaxEXT %v2half
 // CHECK-COUNT-1: OpAtomicExchange %v2half
+// CHECK-COUNT-1: OpAtomicFAddEXT %v4half
