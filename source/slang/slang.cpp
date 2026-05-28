@@ -106,11 +106,19 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
     case CodeGenTarget::HLSL:
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::DXBytecodeAssembly:
-    case CodeGenTarget::DXIL:
-    case CodeGenTarget::DXILAssembly:
         if (targetProfile.getFamily() != ProfileFamily::DX)
         {
             targetProfile.setVersion(ProfileVersion::DX_5_1);
+        }
+        break;
+
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
+        // DXIL generation goes through DXC, which requires Shader Model 6.0 or later.
+        if (targetProfile.getFamily() != ProfileFamily::DX ||
+            targetProfile.getVersion() < ProfileVersion::DX_6_0)
+        {
+            targetProfile.setVersion(ProfileVersion::DX_6_0);
         }
         break;
     case CodeGenTarget::Metal:
