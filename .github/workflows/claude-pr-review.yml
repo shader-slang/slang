@@ -22,6 +22,14 @@ on:
       - "tools/**"
       - "CMakeLists.txt"
       - "cmake/**"
+      # Self-policing: also trigger on changes to the review automation itself,
+      # so PRs that mutate reviewer prompts, REVIEW.md protocol, or this very
+      # workflow are reviewed by the workflow they would otherwise bypass.
+      # Without these, a drift PR that breaks SUBAGENT_DIFF_GATE_v1 (or removes
+      # the pre-stage step) wouldn't trigger any review at all — see #11333.
+      - ".github/workflows/claude-pr-review.yml"
+      - ".claude/agents/**"
+      - "REVIEW.md"
 
 permissions:
   contents: read
@@ -98,13 +106,18 @@ jobs:
       - name: Verify subagent diff-gate sentinel
         run: |
           set -euo pipefail
+          REVIEWERS=(
+            .claude/agents/code-quality-reviewer.md
+            .claude/agents/ir-correctness-reviewer.md
+            .claude/agents/security-code-reviewer.md
+            .claude/agents/test-coverage-reviewer.md
+            .claude/agents/cross-backend-reviewer.md
+            .claude/agents/documentation-accuracy-reviewer.md
+          )
+
+          # Step 1: precondition — every reviewer carries the SUBAGENT_DIFF_GATE_v1 marker.
           missing=0
-          for f in .claude/agents/code-quality-reviewer.md \
-                   .claude/agents/ir-correctness-reviewer.md \
-                   .claude/agents/security-code-reviewer.md \
-                   .claude/agents/test-coverage-reviewer.md \
-                   .claude/agents/cross-backend-reviewer.md \
-                   .claude/agents/documentation-accuracy-reviewer.md; do
+          for f in "${REVIEWERS[@]}"; do
             if ! grep -q 'SUBAGENT_DIFF_GATE_v1' "$f"; then
               echo "::error file=$f::Missing SUBAGENT_DIFF_GATE_v1 sentinel — fail-fast directive required (see REVIEW.md Step 1)."
               missing=$((missing + 1))
@@ -113,7 +126,39 @@ jobs:
           if [ "$missing" -gt 0 ]; then
             exit 1
           fi
-          echo "All 6 reviewers carry SUBAGENT_DIFF_GATE_v1."
+
+          # Step 2: drift check — extract the marked block (from the SUBAGENT_DIFF_GATE_v1
+          # heading through the next bare `---` terminator) and assert all 6 hashes match.
+          # Catches the case where a reviewer keeps the marker but mutates the contract
+          # (e.g. drops the `tmp/pr-files.txt` requirement, weakens the abort message,
+          # or removes the "STOP" instruction). Presence-only grep would miss this.
+          declare -A hashes
+          for f in "${REVIEWERS[@]}"; do
+            block=$(awk '
+              /SUBAGENT_DIFF_GATE_v1/ { in_block = 1 }
+              in_block { print }
+              in_block && /^---$/ && !/SUBAGENT_DIFF_GATE_v1/ { exit }
+            ' "$f")
+            if [ -z "$block" ]; then
+              echo "::error file=$f::SUBAGENT_DIFF_GATE_v1 block extraction returned empty — heading or trailing '---' separator missing."
+              exit 1
+            fi
+            hashes[$f]=$(printf '%s\n' "$block" | sha256sum | cut -d' ' -f1)
+          done
+
+          ref_file=${REVIEWERS[0]}
+          ref_hash=${hashes[$ref_file]}
+          drift=0
+          for f in "${REVIEWERS[@]}"; do
+            if [ "${hashes[$f]}" != "$ref_hash" ]; then
+              echo "::error file=$f::SUBAGENT_DIFF_GATE_v1 directive drift — block hash ${hashes[$f]} != canonical $ref_hash (from $ref_file)."
+              drift=$((drift + 1))
+            fi
+          done
+          if [ "$drift" -gt 0 ]; then
+            exit 1
+          fi
+          echo "All 6 reviewers carry identical SUBAGENT_DIFF_GATE_v1 directive (sha256: ${ref_hash:0:12}...)."
 
       # Minimize previous Claude reviews/comments and resolve threads.
       # Targets both 'claude' (OIDC) and 'github-actions' (fallback) logins.
