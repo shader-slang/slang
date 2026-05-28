@@ -1,10 +1,11 @@
 // Regression test: ConstantBuffer<T>.Handle with a non-struct element type and
 // spvDescriptorHeapEXT should compile by wrapping T in a SPIR-V block struct.
-// Tests vector, scalar, and matrix element types.
+// Tests vector, scalar, matrix, and array element types.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main1 -stage compute -capability spvDescriptorHeapEXT
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main2 -stage compute -capability spvDescriptorHeapEXT
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main3 -stage compute -capability spvDescriptorHeapEXT
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main4 -stage compute -capability spvDescriptorHeapEXT
 
 [shader("compute")]
 [NumThreads(1, 1, 1)]
@@ -31,6 +32,15 @@ void main3(
     uniform DescriptorHandle<RWStructuredBuffer<float4x4>> output)
 {
     output[0] = getDescriptorFromHandle(input);
+}
+
+[shader("compute")]
+[NumThreads(1, 1, 1)]
+void main4(
+    uniform DescriptorHandle<ConstantBuffer<float[4]>> input,
+    uniform DescriptorHandle<RWStructuredBuffer<float>> output)
+{
+    output[0] = getDescriptorFromHandle(input)[2];
 }
 
 // The synthesized wrapper must carry Block decoration (required for Uniform storage class).

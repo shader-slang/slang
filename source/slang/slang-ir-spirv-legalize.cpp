@@ -24,7 +24,6 @@
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
-#include "slang-ir-wrap-cbuffer-element.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-rich-diagnostics.h"
@@ -35,8 +34,6 @@ namespace Slang
 //
 // Legalization of IR for direct SPIRV emit.
 //
-
-static void wrapCBufferElementsForSPIRV(IRModule* module);
 
 struct SPIRVLegalizationContext : public SourceEmitterBase
 {
@@ -55,6 +52,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         IRArrayTypeBase* runtimeArrayType;
     };
     Dictionary<IRType*, LoweredStructuredBufferTypeInfo> m_loweredStructuredBufferTypes;
+
+    struct WrappedCBufferElementInfo
+    {
+        IRStructType* structType;
+        IRStructKey* key;
+        IRParameterGroupType* parameterGroupType;
+    };
 
     IRInst* lowerTextureFootprintType(IRInst* footprintType)
     {
@@ -208,13 +212,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
     }
 
-    // Wraps the element type of a constant buffer or parameter block in a struct if it is not
-    // already a struct, returns the newly created struct type.
-    IRType* wrapConstantBufferElement(IRInst* cbParamInst)
+    WrappedCBufferElementInfo createWrappedConstantBufferElementType(
+        IRParameterGroupType* parameterGroupType)
     {
-        auto innerType = as<IRParameterGroupType>(cbParamInst->getDataType())->getElementType();
-        IRBuilder builder(cbParamInst);
-        builder.setInsertBefore(cbParamInst);
+        auto innerType = parameterGroupType->getElementType();
+        IRBuilder builder(parameterGroupType);
+        builder.setInsertBefore(parameterGroupType);
         auto structType = builder.createStructType();
         builder.addPhysicalTypeDecoration(structType);
         addToWorkList(structType);
@@ -225,14 +228,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.addNameHintDecoration(structType, sb.produceString().getUnownedSlice());
         auto key = builder.createStructKey();
         builder.createStructField(structType, key, innerType);
-        builder.setInsertBefore(cbParamInst);
-        auto newCbType = builder.getType(cbParamInst->getDataType()->getOp(), structType);
-        cbParamInst->setFullType(newCbType);
-        auto rules = getTypeLayoutRuleForBuffer(
-            m_sharedContext->m_targetProgram,
-            cbParamInst->getDataType());
-        IRSizeAndAlignment sizeAlignment;
-        getSizeAndAlignment(m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment);
+
+        List<IRInst*> bufferTypeOperands;
+        bufferTypeOperands.add(structType);
+        for (UInt i = 1; i < parameterGroupType->getOperandCount(); i++)
+            bufferTypeOperands.add(parameterGroupType->getOperand(i));
+
+        auto newCbType = as<IRParameterGroupType>(builder.getType(
+            parameterGroupType->getOp(),
+            (UInt)bufferTypeOperands.getCount(),
+            bufferTypeOperands.getArrayView().getBuffer()));
+        return WrappedCBufferElementInfo{structType, key, newCbType};
+    }
+
+    void replaceUsesWithWrappedConstantBufferElement(
+        IRInst* cbParamInst,
+        IRStructKey* key,
+        IRType* innerType)
+    {
+        IRBuilder builder(cbParamInst);
         traverseUses(
             cbParamInst,
             [&](IRUse* use)
@@ -251,7 +265,67 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     key);
                 use->set(addr);
             });
-        return structType;
+    }
+
+    // Wraps the element type of a constant buffer or parameter block in a struct if it is not
+    // already a struct, returns the newly created struct type.
+    IRType* wrapConstantBufferElement(IRInst* cbParamInst)
+    {
+        auto parameterGroupType = as<IRParameterGroupType>(cbParamInst->getDataType());
+        auto innerType = parameterGroupType->getElementType();
+        auto wrapped = createWrappedConstantBufferElementType(parameterGroupType);
+        cbParamInst->setFullType(wrapped.parameterGroupType);
+        replaceUsesWithWrappedConstantBufferElement(cbParamInst, wrapped.key, innerType);
+        auto rules = getTypeLayoutRuleForBuffer(
+            m_sharedContext->m_targetProgram,
+            cbParamInst->getDataType());
+        IRSizeAndAlignment sizeAlignment;
+        getSizeAndAlignment(
+            m_sharedContext->m_targetRequest,
+            rules,
+            wrapped.structType,
+            &sizeAlignment);
+        return wrapped.structType;
+    }
+
+    void wrapRemainingConstantBufferElementTypes()
+    {
+        List<IRConstantBufferType*> constantBufferTypes;
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto constantBufferType = as<IRConstantBufferType>(globalInst);
+            if (!constantBufferType)
+                continue;
+            if (!constantBufferType->hasUses())
+                continue;
+            if (as<IRStructType>(constantBufferType->getElementType()))
+                continue;
+            constantBufferTypes.add(constantBufferType);
+        }
+
+        for (auto constantBufferType : constantBufferTypes)
+        {
+            List<IRInst*> instsToUnwrap;
+            traverseUses(
+                constantBufferType,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    if (user->getFullType() == constantBufferType)
+                        instsToUnwrap.add(user);
+                });
+
+            if (!instsToUnwrap.getCount())
+                continue;
+
+            auto innerType = constantBufferType->getElementType();
+            auto wrapped = createWrappedConstantBufferElementType(constantBufferType);
+            constantBufferType->replaceUsesWith(wrapped.parameterGroupType);
+            for (auto inst : instsToUnwrap)
+            {
+                replaceUsesWithWrappedConstantBufferElement(inst, wrapped.key, innerType);
+            }
+        }
     }
 
     static void insertLoadAtLatestLocation(
@@ -2566,7 +2640,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto inst : m_instsToRemove)
             inst->removeAndDeallocate();
 
-        wrapCBufferElementsForSPIRV(m_module);
+        wrapRemainingConstantBufferElementTypes();
 
         // Translate types.
         List<IRType*> instsToProcess;
@@ -2744,22 +2818,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 };
-
-class SPIRVWrapCBufferElementPolicy : public WrapCBufferElementPolicy
-{
-public:
-    bool shouldWrapBufferElementInStruct(IRParameterGroupType* cbufferType) override
-    {
-        return as<IRConstantBufferType>(cbufferType) &&
-               !as<IRStructType>(cbufferType->getElementType());
-    }
-};
-
-static void wrapCBufferElementsForSPIRV(IRModule* module)
-{
-    SPIRVWrapCBufferElementPolicy policy = {};
-    wrapCBufferElements(module, &policy);
-}
 
 SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecoration* intrinsic)
 {
