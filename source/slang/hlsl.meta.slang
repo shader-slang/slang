@@ -6606,6 +6606,8 @@ $}
                 originalValue = asfloat16((uint16_t)(_NvInterlockedAddFp16x2(byteAddress, packedInput) >> 16));
             }
             return;
+        // With both SPIR-V fp16 atomic capabilities enabled, capability ranking selects
+        // this scalar add case over the vector fallback below.
         case spvAtomicFloat16AddEXT:
         default:
             {
@@ -6642,7 +6644,8 @@ $}
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_hlsl_spirv, sm_5_0)]
+    [require(cuda_hlsl, sm_5_0)]
+    [require(spirv, spvAtomicFloat16VectorNV)]
     void InterlockedAddF16Emulated(uint byteAddress, half value, out half originalValue)
     {
         __target_switch
