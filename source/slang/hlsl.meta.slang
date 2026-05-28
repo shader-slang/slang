@@ -6606,8 +6606,6 @@ $}
                 originalValue = asfloat16((uint16_t)(_NvInterlockedAddFp16x2(byteAddress, packedInput) >> 16));
             }
             return;
-        case cuda:
-            __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<half>($1), $2))";
         case spvAtomicFloat16AddEXT:
         default:
             {

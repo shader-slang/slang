@@ -39,5 +39,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // VECTOR: OpCapability AtomicFloat16VectorNV
 // VECTOR: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 
-// CUDA: atomicAdd(
-// CUDA: _getPtrAt<half>(
+// CUDA-COUNT-2: atomicAdd(
