@@ -542,19 +542,36 @@ if(_dxc_build_from_source)
     file(WRITE "${_dxc_build_dir}/.clang-format" "BasedOnStyle: LLVM\n")
 
     # Step 2: Configure DXC at Slang configure time.
-    # The stamp is keyed on resolved source commit, generator, platform,
+    # The stamp content is keyed on resolved source commit, generator, platform,
     # toolset, and both compilers so that switching any of these invalidates the
-    # cached configure. A SHA256 hash keeps the filename short regardless of
+    # cached configure. A SHA256 hash keeps the content short regardless of
     # lengths.
     string(
         SHA256
         _dxc_config_hash
         "${_dxc_expected_git_commit}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_PLATFORM}_${CMAKE_GENERATOR_TOOLSET}_${CMAKE_C_COMPILER}_${CMAKE_CXX_COMPILER}"
     )
-    set(_dxc_configure_stamp
-        "${_dxc_build_dir}/.slang_dxc_configured_${_dxc_config_hash}"
+    set(_dxc_configure_stamp "${_dxc_build_dir}/.slang_dxc_configured")
+    set(_dxc_configure_is_current OFF)
+    if(EXISTS "${_dxc_configure_stamp}")
+        file(READ "${_dxc_configure_stamp}" _dxc_configure_stamp_content)
+        string(
+            STRIP
+            "${_dxc_configure_stamp_content}"
+            _dxc_configure_stamp_content
+        )
+        if(_dxc_configure_stamp_content STREQUAL _dxc_config_hash)
+            set(_dxc_configure_is_current ON)
+        endif()
+    endif()
+    file(
+        GLOB _dxc_legacy_configure_stamps
+        "${_dxc_build_dir}/.slang_dxc_configured_*"
     )
-    if(NOT EXISTS "${_dxc_configure_stamp}")
+    if(_dxc_legacy_configure_stamps)
+        file(REMOVE ${_dxc_legacy_configure_stamps})
+    endif()
+    if(NOT _dxc_configure_is_current)
         message(STATUS "Configuring DXC from source (${_dxc_version_tag})...")
         execute_process(
             COMMAND
@@ -586,7 +603,7 @@ if(_dxc_build_from_source)
             )
             return()
         endif()
-        file(WRITE "${_dxc_configure_stamp}" "${_dxc_expected_git_commit}")
+        file(WRITE "${_dxc_configure_stamp}" "${_dxc_config_hash}\n")
         message(STATUS "DXC configured successfully")
     endif()
 
