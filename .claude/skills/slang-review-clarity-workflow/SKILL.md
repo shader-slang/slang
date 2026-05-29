@@ -68,9 +68,11 @@ candidate entries.
    lines, every line must start with `>`, blank lines must be written as `>`, and headings
    inside the review body must be quoted, e.g. `> ## Main Concerns`. Do not use lazy
    continuation lines.
-   Unless the initial user prompt explicitly opts out, make the body identify itself as
-   agent-authored; the posting script will prepend `Agent-generated clarity review: ` by
-   default if the extracted body does not already have an agent-authorship label.
+   Unless the workflow is posting through a GitHub account that already identifies the agent,
+   the first line must identify the review as agent-authored. Use the form
+   `<agent name>-authored <optional review type> review:`, such as
+   `Codex-authored clarity review:` or `Agent-authored clarity review:`. The separator before
+   `authored` may be whitespace instead of `-`.
 10. Validate the canonical file before posting.
 
     The posting script enforces the mechanical blocking checks:
@@ -83,7 +85,9 @@ candidate entries.
       diff;
     - every postable candidate has a non-empty strict-blockquote `Proposed comment:`;
     - the `## Review Body` section, if present, uses strict blockquote formatting for every
-      content line.
+      content line;
+    - unless `--acting-as-bot-user` will be used, the review body starts with the required
+      agent-authorship attribution.
 
     The agent must also check the judgment-based posting policy:
 
@@ -121,9 +125,9 @@ because they required extra focused analysis.
 Never post individual PR thread comments for this workflow. Posting must create one proper
 GitHub PR review with comments attached to diff lines/ranges.
 
-Do not omit the agent-authorship label unless the initial user prompt explicitly opts out,
-for example because the workflow is running under GitHub credentials that already identify a
-bot or agent account.
+Do not omit the agent-authorship label unless the workflow is running under GitHub credentials
+that already identify a bot or agent account. In that case, pass `--acting-as-bot-user` to the
+posting script.
 
 ## Evaluation Scenarios
 

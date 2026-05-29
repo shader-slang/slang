@@ -27,7 +27,6 @@ IGNORED_STATUSES = {"Drop"}
 VALID_EVENTS = {"REQUEST_CHANGES", "COMMENT"}
 POSTABLE_SCOPE_DECISIONS = {"Direct", "Contextual"}
 POSTABLE_OVERLAP_DECISIONS = {"Keep", "Needs judgment call", "Needs human judgment"}
-DEFAULT_AGENT_REVIEW_PREFIX = "Agent-generated clarity review: "
 
 
 class FatalError(Exception):
@@ -60,9 +59,20 @@ REVIEW_BODY_BOUNDARY_HEADINGS = {
     "## Dropped",
 }
 CANDIDATE_METADATA_BOUNDARIES = {"Context:", "Proposed comment:", "Notes:"}
-AGENT_REVIEW_LABEL_RE = re.compile(
-    r"^(?:codex-generated|codex|agent-generated|automated)\s+clarity\s+review\s*:",
-    re.IGNORECASE,
+AGENT_REVIEW_ATTRIBUTION_RE = re.compile(
+    r"""
+    ^
+    [A-Za-z][A-Za-z0-9_.]*             # Agent name, first word.
+    (?:[ -][A-Za-z][A-Za-z0-9_.]*)*    # Additional agent-name words.
+    (?:-|\s+)authored                  # Either "Codex-authored" or "Codex authored".
+    (?:
+        \s+
+        [A-Za-z][A-Za-z0-9_.-]*        # Optional review-type phrase.
+        (?:\s+[A-Za-z][A-Za-z0-9_.-]*)*
+    )?
+    \s+review\s*:
+    """,
+    re.IGNORECASE | re.VERBOSE,
 )
 
 
@@ -165,7 +175,8 @@ def parse_proposed_comment(block: List[str], candidate_id: str) -> str:
         if line.strip() == "Proposed comment:":
             body_lines: List[str] = []
             started = False
-            for raw in block[i + 1 :]:
+            comment_lines = block[i + 1 :]
+            for index, raw in enumerate(comment_lines):
                 if not started and raw.strip() == "":
                     continue
                 if raw.startswith(">"):
@@ -177,6 +188,7 @@ def parse_proposed_comment(block: List[str], candidate_id: str) -> str:
                     continue
                 if started:
                     if raw.strip() == "":
+                        validate_proposed_comment_tail(comment_lines[index + 1 :], candidate_id)
                         break
                     fail(
                         "{} Proposed comment must use strict blockquote lines; "
@@ -188,6 +200,20 @@ def parse_proposed_comment(block: List[str], candidate_id: str) -> str:
                 fail("{} has an empty Proposed comment body".format(candidate_id))
             return body
     fail("{} is missing a Proposed comment section".format(candidate_id))
+
+
+def validate_proposed_comment_tail(lines: List[str], candidate_id: str) -> None:
+    """Reject non-note content after a blank line terminates a proposed comment."""
+
+    for raw in lines:
+        if raw.strip() == "":
+            continue
+        if raw.strip() == "Notes:":
+            return
+        fail(
+            "{} Proposed comment has non-note content after its terminating blank line; "
+            "offending line: {}".format(candidate_id, raw)
+        )
 
 
 def extract_review_body(lines: List[str]) -> Optional[str]:
@@ -477,30 +503,62 @@ def validate_locations(
     return commit_id, diff_lines
 
 
+def has_agent_review_attribution(review_body: str) -> bool:
+    """Return true when the review body starts with the required attribution prefix."""
+
+    return AGENT_REVIEW_ATTRIBUTION_RE.match(review_body) is not None
+
+
+def default_review_body(candidates: List[Candidate]) -> str:
+    """Build the fallback review body used when bot-account attribution is external."""
+
+    review_body = "Clarity review."
+    judgment_call_count = sum(
+        1 for candidate in candidates if candidate.status in JUDGMENT_STATUSES
+    )
+    if judgment_call_count:
+        review_body += (
+            "\n\nSome included comments were marked as needing a judgment call in the "
+            "candidate file and are included because the automated review considered them "
+            "credible enough to raise."
+        )
+    return review_body
+
+
+def prepare_review_body(
+    review_body: Optional[str], candidates: List[Candidate], acting_as_bot_user: bool
+) -> str:
+    """Return a review body that satisfies the workflow's attribution policy."""
+
+    if review_body is None:
+        if acting_as_bot_user:
+            return default_review_body(candidates)
+        fail(
+            "review body is missing; add a ## Review Body section or pass --body/--body-file. "
+            "When not using --acting-as-bot-user, the body must start with an attribution "
+            "such as 'Codex-authored clarity review:' or 'Codex authored review:'."
+        )
+
+    if not review_body.strip():
+        fail("review body is empty")
+    review_body = review_body.strip()
+    if not acting_as_bot_user and not has_agent_review_attribution(review_body):
+        fail(
+            "review body must start with '<agent name>-authored <optional review type> "
+            "review:' when posting on behalf of a human user, for example "
+            "'Codex-authored clarity review:' or 'Codex authored review:'. Pass "
+            "--acting-as-bot-user only when the GitHub account already identifies the agent."
+        )
+    return review_body
+
+
 def build_payload(
     commit_id: str,
     event: str,
     candidates: List[Candidate],
-    review_body: Optional[str],
-    agent_review_prefix: Optional[str],
+    review_body: str,
 ) -> dict:
     """Build the GitHub PR review API payload from validated candidates."""
-
-    judgment_call_count = sum(
-        1 for candidate in candidates if candidate.status in JUDGMENT_STATUSES
-    )
-    if review_body is None:
-        review_body = "Clarity review."
-        if judgment_call_count:
-            review_body += (
-                "\n\nSome included comments were marked as needing a judgment call in the "
-                "candidate file and are included because the automated review considered them "
-                "credible enough to raise."
-            )
-
-    if agent_review_prefix:
-        if not AGENT_REVIEW_LABEL_RE.match(review_body):
-            review_body = agent_review_prefix + review_body
 
     comments = []
     for candidate in candidates:
@@ -565,14 +623,12 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("--body", help="Review body text")
     parser.add_argument("--body-file", type=Path, help="Read review body text from this file")
     parser.add_argument(
-        "--agent-review-prefix",
-        default=DEFAULT_AGENT_REVIEW_PREFIX,
-        help="Prefix added to the review body to identify the agent-authored review",
-    )
-    parser.add_argument(
-        "--omit-agent-review-label",
+        "--acting-as-bot-user",
         action="store_true",
-        help="Do not add the default agent-authorship prefix to the review body",
+        help=(
+            "Allow a review body without an agent-authorship prefix because the GitHub "
+            "account already identifies the agent"
+        ),
     )
     parser.add_argument(
         "--exclude-needs-human-judgment",
@@ -619,8 +675,8 @@ def main(argv: Sequence[str]) -> int:
     if review_body is None:
         review_body = candidate_file_body
 
-    agent_review_prefix = None if args.omit_agent_review_label else args.agent_review_prefix
-    payload = build_payload(commit_id, args.event, candidates, review_body, agent_review_prefix)
+    review_body = prepare_review_body(review_body, candidates, args.acting_as_bot_user)
+    payload = build_payload(commit_id, args.event, candidates, review_body)
 
     if args.dry_run:
         print(json.dumps(payload, indent=2))

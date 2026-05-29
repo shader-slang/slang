@@ -208,6 +208,22 @@ class PostGithubReviewTests(unittest.TestCase):
         with self.assertRaisesRegex(post_github_review.FatalError, "strict blockquote"):
             post_github_review.parse_candidates(path, include_judgment_calls=True)
 
+    def test_stray_text_after_proposed_comment_terminator_fails(self) -> None:
+        """Only blank lines or a `Notes:` section may follow a terminated comment."""
+
+        path = self.write_candidate_file(
+            make_candidate_text(
+                proposed_comment_lines=[
+                    "> The invariant needed to trust this line is not clear.",
+                    "",
+                    "This line would otherwise be silently dropped.",
+                ]
+            )
+        )
+
+        with self.assertRaisesRegex(post_github_review.FatalError, "non-note content"):
+            post_github_review.parse_candidates(path, include_judgment_calls=True)
+
     def test_notes_metadata_does_not_override_candidate_metadata(self) -> None:
         """Bullets in `Notes:` cannot override the candidate header metadata."""
 
@@ -227,8 +243,82 @@ class PostGithubReviewTests(unittest.TestCase):
         self.assertEqual(candidates[0].status, "Keep")
         self.assertEqual(candidates[0].scope_decision, "Direct")
 
-    def test_build_payload_labels_agent_review_and_maps_range(self) -> None:
-        """Payload construction labels agent reviews and preserves multi-line ranges."""
+    def test_prepare_review_body_accepts_hyphenated_agent_attribution(self) -> None:
+        """Human-proxied reviews must already carry agent-authorship attribution."""
+
+        body = post_github_review.prepare_review_body(
+            "Codex-authored clarity review: Review summary.",
+            [],
+            acting_as_bot_user=False,
+        )
+
+        self.assertEqual(body, "Codex-authored clarity review: Review summary.")
+
+    def test_prepare_review_body_accepts_whitespace_agent_attribution(self) -> None:
+        """The attribution separator may be whitespace instead of a hyphen."""
+
+        body = post_github_review.prepare_review_body(
+            "Codex authored review: Review summary.",
+            [],
+            acting_as_bot_user=False,
+        )
+
+        self.assertEqual(body, "Codex authored review: Review summary.")
+
+    def test_prepare_review_body_accepts_attribution_without_review_type(self) -> None:
+        """When the review type is omitted, `authored review:` is sufficient."""
+
+        body = post_github_review.prepare_review_body(
+            "Codex-authored review: Review summary.",
+            [],
+            acting_as_bot_user=False,
+        )
+
+        self.assertEqual(body, "Codex-authored review: Review summary.")
+
+    def test_prepare_review_body_rejects_missing_agent_attribution(self) -> None:
+        """Human-proxied reviews without attribution fail before posting."""
+
+        with self.assertRaisesRegex(post_github_review.FatalError, "must start"):
+            post_github_review.prepare_review_body(
+                "Review summary.", [], acting_as_bot_user=False
+            )
+
+    def test_prepare_review_body_allows_missing_attribution_for_bot_user(self) -> None:
+        """Bot-account reviews may omit in-body attribution."""
+
+        body = post_github_review.prepare_review_body(
+            "Review summary.", [], acting_as_bot_user=True
+        )
+
+        self.assertEqual(body, "Review summary.")
+
+    def test_prepare_review_body_uses_fallback_only_for_bot_user(self) -> None:
+        """A missing body gets a fallback only when GitHub provides bot attribution."""
+
+        body = post_github_review.prepare_review_body(
+            None,
+            [
+                post_github_review.Candidate(
+                    "C001",
+                    "Clarify the invariant",
+                    "Needs judgment call",
+                    "Direct",
+                    "Needs judgment call",
+                    "source/file.cpp",
+                    10,
+                    10,
+                    "The invariant is unclear.",
+                )
+            ],
+            acting_as_bot_user=True,
+        )
+
+        self.assertIn("Clarity review.", body)
+        self.assertIn("needing a judgment call", body)
+
+    def test_build_payload_preserves_review_body_and_maps_range(self) -> None:
+        """Payload construction preserves review text and multi-line comment ranges."""
 
         candidate = post_github_review.Candidate(
             "C001",
@@ -246,13 +336,12 @@ class PostGithubReviewTests(unittest.TestCase):
             "abc123",
             "REQUEST_CHANGES",
             [candidate],
-            "Review summary.",
-            post_github_review.DEFAULT_AGENT_REVIEW_PREFIX,
+            "Codex-authored clarity review: Review summary.",
         )
 
         self.assertEqual(payload["commit_id"], "abc123")
         self.assertEqual(payload["event"], "REQUEST_CHANGES")
-        self.assertEqual(payload["body"], "Agent-generated clarity review: Review summary.")
+        self.assertEqual(payload["body"], "Codex-authored clarity review: Review summary.")
         self.assertEqual(
             payload["comments"],
             [
@@ -266,31 +355,6 @@ class PostGithubReviewTests(unittest.TestCase):
                 }
             ],
         )
-
-    def test_build_payload_does_not_duplicate_existing_agent_label(self) -> None:
-        """An existing agent-authorship label is not duplicated in the review body."""
-
-        payload = post_github_review.build_payload(
-            "abc123",
-            "COMMENT",
-            [
-                post_github_review.Candidate(
-                    "C001",
-                    "Clarify the invariant",
-                    "Keep",
-                    "Direct",
-                    "Keep",
-                    "source/file.cpp",
-                    10,
-                    10,
-                    "The invariant is unclear.",
-                )
-            ],
-            "Codex clarity review: Existing label.",
-            post_github_review.DEFAULT_AGENT_REVIEW_PREFIX,
-        )
-
-        self.assertEqual(payload["body"], "Codex clarity review: Existing label.")
 
     def test_validate_locations_accepts_lines_in_patch(self) -> None:
         """Location validation accepts right-side context and added lines from a patch."""
