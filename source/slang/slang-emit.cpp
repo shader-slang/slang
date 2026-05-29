@@ -2376,6 +2376,12 @@ Result linkAndOptimizeIR(
     // that pass converts resource fields to DescriptorHandle; this one
     // converts pointer fields to UIntPtr (shouldSkipPhysicalTypes returns
     // false to re-process types already decorated by that earlier pass).
+    //
+    // Safety: this sequence is safe to run in every Metal compilation,
+    // even when no pointer fields are present. processModule scans all
+    // global buffer types; if needsElementLowering returns false for all
+    // of them, no types are created and no IR is modified, making the
+    // subsequent passes no-ops on unchanged IR.
     if (isMetalTarget(targetRequest))
     {
         BufferElementTypeLoweringOptions metalPtrOptions;
@@ -2383,24 +2389,33 @@ Result linkAndOptimizeIR(
             BufferElementTypeLoweringPolicyKind::MetalPointerLowering;
         SLANG_PASS(lowerBufferElementTypeToStorageType, targetProgram, metalPtrOptions);
 
-        // Materialize the [ForceInline] pack/unpack helpers the pass creates.
+        // Materialize the [ForceInline] pack/unpack helpers the pass
+        // creates. This is a module-wide call, but at this point in the
+        // pipeline all prior [ForceInline] functions have already been
+        // inlined and removed by the earlier performForceInlining call.
+        // The only remaining [ForceInline] functions are the pack/unpack
+        // helpers just created above.
         SLANG_PASS(performForceInlining);
 
-        // lowerBufferElementTypeToStorageType's loop-based pack/unpack
-        // for large arrays (>kMaxArraySizeToUnroll) introduces block
-        // parameters via emitLoopBlocks. Since the main eliminatePhis
-        // already ran, these new phis must be eliminated before emission.
-        // Liveness is disabled: markers were already finalized before
-        // the main eliminatePhis and should not be duplicated.
+        // The loop-based pack/unpack for large arrays (>kMaxArraySizeToUnroll)
+        // introduces block parameters via emitLoopBlocks. Since the main
+        // eliminatePhis already ran, these new phis must be eliminated
+        // before emission.
+        //
+        // Liveness is disabled because liveness markers serve downstream
+        // GLSL targets via applyGLSLLiveness; Metal does not consume them,
+        // and the markers were already finalized before the main
+        // eliminatePhis.
         PhiEliminationOptions phiEliminationOptions;
         SLANG_PASS(eliminatePhis, LivenessMode::Disabled, phiEliminationOptions);
 
-        // Address-space specialization is not re-run here -- it already
+        // Address-space specialization is not re-run here — it already
         // executed against the original typed IR and must not see the
         // lowered UIntPtr types. eliminateMultiLevelBreak is unnecessary
         // because the generated loops are single-level. Full simplifyIR
-        // (which includes constructSSA) is counterproductive since
-        // eliminatePhis just took the IR out of SSA form.
+        // (which includes constructSSA) is counterproductive because
+        // eliminatePhis just took the IR out of SSA form — the emitter
+        // expects non-SSA IR at this point.
         SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
     }
 

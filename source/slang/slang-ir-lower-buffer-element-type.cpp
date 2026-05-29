@@ -334,8 +334,31 @@ struct BufferElementTypeLoweringPolicy : public RefObject
     /// SPIRV.
     virtual bool canUseStorageTypeInLocalVar() { return true; }
 
-    /// Returns true if the given buffer element type needs lowering by this policy.
-    /// Override to control which buffer element types are discovered by processModule.
+    /// Discovery filter: returns true if the given buffer element type
+    /// may contain fields that this policy wants to lower.
+    ///
+    /// This is called by processModule on the top-level element type of
+    /// each buffer or pointer global (ConstantBuffer<T>, StructuredBuffer<T>,
+    /// UserPointer T*, etc.). If it returns false, that buffer is skipped
+    /// entirely — no lowered type is computed and no IR is modified. A false
+    /// negative means the buffer keeps its original element type even if it
+    /// contains fields that should have been lowered.
+    ///
+    /// False positives are harmless: processModule computes the lowered type
+    /// via getLoweredTypeInfo and compares it to the original. If they match
+    /// (no fields were actually changed by lowerLeafLogicalType), the buffer
+    /// is silently skipped with no behavioral effect.
+    ///
+    /// Implementations should look through composite types that can contain
+    /// lowerable leaf types by value — arrays and structs. They do NOT need
+    /// to look through pointer pointees: pointer-to-struct cases (e.g.
+    /// `Inner*` where `Inner` has lowerable fields) are discovered by
+    /// processModule through separate `IRPtrTypeBase` global processing,
+    /// which extracts the pointee struct as its own element type.
+    ///
+    /// The base-class default covers the historical set of lowerable leaf
+    /// types (struct, matrix, array, bool). Override to discover additional
+    /// leaf types.
     virtual bool needsElementLowering(IRType* elementType)
     {
         return as<IRStructType>(elementType) || as<IRMatrixType>(elementType) ||
@@ -1716,6 +1739,14 @@ struct LoweredElementTypeContext
 
             if (as<IRTextureBufferType>(globalInst))
                 continue;
+
+            // Ask the policy whether this element type contains fields
+            // it wants to lower. This is a virtual call so that policies
+            // can define their own discovery criteria (e.g., the Metal
+            // pointer policy recurses through structs/arrays looking for
+            // pointer fields, while the base class checks for the
+            // historical set of struct/matrix/array/bool).
+            //
             if (!leafTypeLoweringPolicy->needsElementLowering(elementType))
                 continue;
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
@@ -1728,6 +1759,14 @@ struct LoweredElementTypeContext
             auto bufferType = bufferTypeInfo.bufferType;
             auto elementType = bufferTypeInfo.elementType;
 
+            // Types already decorated with [PhysicalType] were processed
+            // by an earlier invocation of this pass. Most policies skip
+            // them to avoid double-lowering. The Metal pointer policy
+            // overrides this to false so it can lower pointer fields in
+            // types that MetalParameterBlock already decorated (those
+            // types had their resource fields converted but pointer
+            // fields left untouched).
+            //
             if (elementType->findDecoration<IRPhysicalTypeDecoration>() &&
                 leafTypeLoweringPolicy->shouldSkipPhysicalTypes())
                 continue;
@@ -2912,15 +2951,6 @@ struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
 //     indirection in buffer-bound structs.
 struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
 {
-    TargetProgram* target;
-    BufferElementTypeLoweringOptions options;
-
-    MetalPointerBufferElementTypeLoweringPolicy(
-        TargetProgram* inTarget,
-        BufferElementTypeLoweringOptions inOptions)
-        : target(inTarget), options(inOptions)
-    {
-    }
 
     // Conservative over-approximation: returns true if the element type
     // contains ANY pointer (including single-level). The actual lowering
@@ -2957,11 +2987,28 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
     {
         if (auto ptrType = as<IRPtrType>(type))
         {
+            // Two independent rules determine whether this pointer
+            // field needs lowering. Either one is sufficient.
+            //
             bool needsLowering = false;
+
+            // StorageBuffer rule: the buffer binding itself is a
+            // device*, so any T* element becomes device T* device*
+            // which Metal rejects. Lower all pointers regardless
+            // of depth.
+            //
             if (config.addressSpace == AddressSpace::StorageBuffer)
                 needsLowering = true;
+
+            // Multi-level rule: if the pointee is itself a pointer
+            // (T** or deeper), the type is invalid in any buffer
+            // context. Single-level T* is fine in Uniform/Constant
+            // because Metal accepts one level of indirection in
+            // buffer-bound structs.
+            //
             if (as<IRPtrType>(ptrType->getValueType()))
                 needsLowering = true;
+
             if (needsLowering)
             {
                 LoweredElementTypeInfo info;
@@ -2973,10 +3020,11 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
                 return info;
             }
         }
-        // Not a pointer (or a single-level pointer in non-StorageBuffer context).
-        // Return identity — framework will skip this field. This is the common
-        // case for non-pointer fields (int, float, etc.) that share the struct
-        // with pointer fields; only the pointers get lowered.
+
+        // Not a pointer, or a single-level pointer in a non-StorageBuffer
+        // context (which Metal allows). Return identity so the framework
+        // leaves this field unchanged.
+        //
         LoweredElementTypeInfo info;
         info.originalType = type;
         info.loweredType = type;
@@ -2998,7 +3046,7 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
     case BufferElementTypeLoweringPolicyKind::MetalParameterBlock:
         return new MetalParameterBlockElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::MetalPointerLowering:
-        return new MetalPointerBufferElementTypeLoweringPolicy(target, options);
+        return new MetalPointerBufferElementTypeLoweringPolicy();
     case BufferElementTypeLoweringPolicyKind::WGSL:
         return new WGSLBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::LLVM:
