@@ -90,16 +90,20 @@ def run_command(args: Sequence[str]) -> subprocess.CompletedProcess:
         fail("failed to execute command {}: {}".format(" ".join(args), e))
 
 
+def command_failed_message(args: Sequence[str], result: subprocess.CompletedProcess) -> str:
+    """Format a failed command in the same loud-fail form used by all command helpers."""
+
+    return "command failed: {}\nstdout:\n{}\nstderr:\n{}".format(
+        " ".join(args), result.stdout, result.stderr
+    )
+
+
 def run_json(args: Sequence[str]) -> object:
     """Run a command that must succeed and emit a JSON document."""
 
     result = run_command(args)
     if result.returncode != 0:
-        fail(
-            "command failed: {}\nstdout:\n{}\nstderr:\n{}".format(
-                " ".join(args), result.stdout, result.stderr
-            )
-        )
+        fail(command_failed_message(args, result))
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError as e:
@@ -111,11 +115,7 @@ def run_text(args: Sequence[str]) -> str:
 
     result = run_command(args)
     if result.returncode != 0:
-        fail(
-            "command failed: {}\nstdout:\n{}\nstderr:\n{}".format(
-                " ".join(args), result.stdout, result.stderr
-            )
-        )
+        fail(command_failed_message(args, result))
     return result.stdout
 
 
@@ -438,13 +438,13 @@ def right_lines_from_patch(patch: str) -> Set[int]:
             continue
         if current is None:
             continue
-        if raw.startswith("+") and not raw.startswith("+++"):
+        if raw.startswith("+"):
             lines.add(current)
             current += 1
         elif raw.startswith(" "):
             lines.add(current)
             current += 1
-        elif raw.startswith("-") and not raw.startswith("---"):
+        elif raw.startswith("-"):
             continue
         elif raw == r"\ No newline at end of file":
             continue
@@ -483,16 +483,44 @@ def right_lines_from_full_diff(diff_text: str) -> Dict[str, Set[int]]:
             current_path = None
             current_patch = []
             continue
-        path = path_from_diff_target(raw)
-        if path is not None or raw == "+++ /dev/null":
-            current_path = path
-            current_patch = []
-            continue
+        if current_path is None:
+            path = path_from_diff_target(raw)
+            if path is not None or raw == "+++ /dev/null":
+                current_path = path
+                current_patch = []
+                continue
         if current_path is not None:
             current_patch.append(raw)
 
     finish_file()
     return diff_lines
+
+
+def run_full_pr_diff(gh: str, repo: str, pr: int, missing_patch_paths: Set[str]) -> str:
+    """Fetch the full PR diff, with a targeted diagnostic for GitHub diff size limits."""
+
+    args = [
+        gh,
+        "api",
+        "-H",
+        "Accept: application/vnd.github.v3.diff",
+        "repos/{}/pulls/{}".format(repo, pr),
+    ]
+    result = run_command(args)
+    if result.returncode == 0:
+        return result.stdout
+
+    command_output = "{}\n{}".format(result.stdout, result.stderr)
+    if "406" in command_output and "diff" in command_output.lower():
+        fail(
+            "could not validate candidate locations for files whose per-file patches "
+            "were omitted by GitHub: {}. The full PR diff endpoint also reported that "
+            "the diff is too large. Re-run with a narrower candidate set, split the PR, "
+            "or validate these locations from a local checkout before posting.".format(
+                ", ".join(sorted(missing_patch_paths))
+            )
+        )
+    fail(command_failed_message(args, result))
 
 
 def validate_locations(
@@ -533,15 +561,7 @@ def validate_locations(
             missing_patch_paths.add(filename)
 
     if missing_patch_paths:
-        full_diff = run_text(
-            [
-                gh,
-                "api",
-                "-H",
-                "Accept: application/vnd.github.v3.diff",
-                "repos/{}/pulls/{}".format(repo, pr),
-            ]
-        )
+        full_diff = run_full_pr_diff(gh, repo, pr, missing_patch_paths)
         fallback_lines = right_lines_from_full_diff(full_diff)
         for path in missing_patch_paths:
             if path in fallback_lines:
