@@ -1,4 +1,7 @@
-// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target hlsl -profile cs_6_0 -stage compute -entry computeMain -experimental-feature
+// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target hlsl -profile cs_6_0 -entry computeMain -experimental-feature
+// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target wgsl -stage compute -entry computeMain -experimental-feature
+// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target glsl -stage compute -entry computeMain -experimental-feature
+// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -experimental-feature
 
 import slang.neural;
 
@@ -18,4 +21,5 @@ void computeMain(uint tid : SV_GroupIndex)
         1);
 }
 
-// CHECK: error
+// CHECK: static assertion failed
+// CHECK: NetworkParameterLayoutConverter.toOptimalLayout
