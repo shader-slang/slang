@@ -9176,6 +9176,7 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
         SLANG_UNEXPECTED("unknown builtin requirement kind for diff func synthesis.");
     }
 
+    // Match the synthesized function's visibility to the target function's visibility.
     DeclVisibility targetVis = getDeclVisibility(context->parentDecl);
     if (auto extDecl = as<ExtensionDecl>(context->parentDecl))
     {
