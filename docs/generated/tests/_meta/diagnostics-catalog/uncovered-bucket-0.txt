@@ -1,0 +1,126 @@
+# Uncovered diagnostic codes — bucket 0 of 5
+# 123 codes in this bucket. Range 1..20102.
+# code	severity	name	message
+1	err	cannot-open-file	cannot open file '~path'
+2	err	cannot-find-file	cannot find file '~path'
+3	err	token-type-expected-but-eof	unexpected end of file
+4	err	cannot-write-output-file	cannot write output file '~path'
+5	err	failed-to-load-dynamic-library	failed to load dynamic library '~path'
+6	err	too-many-output-paths-specified	too many output paths specified
+12	err	cannot-deduce-source-language	can't deduce language for input file '~path'
+15	err	unknown-stage	unknown stage '~stageName'
+16	err	unknown-pass-through-target	unknown pass-through target '~target'
+17	err	unknown-command-line-option	unknown command-line option '~option'
+18	warning	separate-debug-info-unsupported-for-target	'-separate-debug-info' is not supported for target '~target'
+19	err	unknown-source-language	unknown source language '~language'
+20	err	entry-points-need-to-be-associated-with-translation-units	when using multiple source files, entry points must be specified after their corresponding source file(s)
+22	err	unknown-downstream-compiler	unknown downstream compiler '~compiler'
+28	err	unable-to-generate-code-for-target	unable to generate code for target '~target'
+30	warning	same-stage-specified-more-than-once	the stage '~stage' was specified more than once for entry point '~entryPoint'
+32	warning	explicit-stage-doesnt-match-implied-stage	the stage specified for entry point '~entryPoint' ('~specifiedStage') does not match the stage implied by the source file name ('~impliedStage')
+33	err	stage-specification-ignored-because-no-entry-points	one or more stages were specified, but no entry points were specified with '-entry'
+34	err	stage-specification-ignored-because-before-all-entry-points	when compiling multiple entry points, any '-stage' options must follow the '-entry' option that they apply to
+35	err	no-stage-specified-in-pass-through-mode	no stage was specified for entry point '~entryPoint'; when using the '-pass-through' option, stages must be fully specified on the command line
+36	err	expecting-an-integer	expecting an integer value
+37	err	expecting-a-unsigned-integer	expecting an unsigned integer value
+40	warning	same-profile-specified-more-than-once	the '~profile' was specified more than once for target '~target'
+41	err	conflicting-profiles-specified-for-target	conflicting profiles have been specified for target '~target'
+42	err	profile-specification-ignored-because-no-targets	a '-profile' option was specified, but no target was specified with '-target'
+43	err	profile-specification-ignored-because-before-all-targets	when using multiple targets, any '-profile' option must follow the '-target' it applies to
+44	err	target-flags-ignored-because-no-targets	target options were specified, but no target was specified with '-target'
+45	err	target-flags-ignored-because-before-all-targets	when using multiple targets, any target options must follow the '-target' they apply to
+50	err	duplicate-targets	the target '~target' has been specified more than once
+51	err	unhandled-language-for-source-embedding	unhandled source language for source embedding
+60	err	cannot-deduce-output-format-from-path	cannot infer an output format from the output path '~path'
+61	err	cannot-match-output-file-to-target	no specified '-target' option matches the output path '~path', which implies the '~format' format
+62	err	unknown-command-line-value	unknown value for option '~option'. Valid values are '~validValues'
+63	err	unknown-help-category	unknown help category
+70	err	cannot-match-output-file-to-entry-point	the output path '~path' is not associated with any entry point; a '-o' option for a compiled kernel must follow the '-entry' option for its corresponding entry point
+71	err	invalid-type-conformance-option-string	syntax error in type conformance option '~option'.
+72	err	invalid-type-conformance-option-no-type	invalid conformance option '~option', type '~typeName' is not found.
+73	err	cannot-create-type-conformance	cannot create type conformance '~conformance'.
+80	err	duplicate-output-paths-for-entry-point-and-target	multiple output paths have been specified entry point '~entryPoint:Name' on target '~target'
+81	err	duplicate-output-paths-for-target	multiple output paths have been specified for target '~target'
+82	err	duplicate-dependency-output-paths	the -dep argument can only be specified once
+83	err	unable-to-write-repro-file	unable to write repro file '~path'
+86	err	unable-to-create-module-container	unable to create module container
+87	err	unable-to-set-default-downstream-compiler	unable to set default downstream compiler for source language '~language' to '~compiler'
+89	err	expecting-slang-riff-container	expecting a slang riff container
+90	err	incompatible-riff-semantic-version	incompatible riff semantic version ~actualVersion expecting ~expectedVersion
+91	err	riff-hash-mismatch	riff hash mismatch - incompatible riff
+92	err	unable-to-create-directory	unable to create directory '~path'
+93	err	unable-to-extract-repro-to-directory	unable to extract repro to directory '~path'
+94	err	unable-to-read-riff	unable to read as 'riff'/not a 'riff' file
+95	err	unknown-library-kind	unknown library kind '~kind'
+96	err	kind-not-linkable	not a known linkable kind '~kind'
+97	err	library-does-not-exist	library '~path' does not exist
+98	err	cannot-access-as-blob	cannot access as a blob
+100	err	failed-to-load-downstream-compiler	failed to load downstream compiler '~compiler'
+101	err	downstream-compiler-doesnt-support-whole-program-compilation	downstream compiler '~compiler' doesn't support whole program compilation
+102	note	downstream-compile-time	downstream compile time: ~time
+103	note	performance-benchmark-result	compiler performance benchmark:\\n~benchmarkOutput
+104	err	need-to-enable-experiment-feature	'~module' is an experimental module, need to enable '-experimental-feature' to load this module
+105	err	null-component-type	componentTypes[~index:Int] is `nullptr`
+10000	error	illegalCharacterHex	illegal character (0x$0)
+10001	error	illegalCharacterLiteral	illegal character literal
+10002	warning	octalLiteral	'0' prefix indicates octal literal
+10003	error	invalidDigitForBase	invalid digit for base-$1 literal: '$0'
+10004	error	endOfFileInLiteral	end of file in literal
+10005	error	newlineInLiteral	newline in literal
+10010	error	quoteCannotBeDelimiter	'\
+10011	error	unexpectedEndOfInput	unexpected end of input
+10012	error	integerLiteralTooLargeForAnyType	integer literal is too large to be represented in any integer type
+15002	err	directive-after-else	'~directive' directive after '#else'
+15100	err	expected-preprocessor-directive-name	expected preprocessor directive name
+15102	err	expected-token-in-preprocessor-directive	preprocessor parse error
+15103	err	unexpected-tokens-after-directive	unexpected tokens after directive
+15104	err	expected-2-tokens-in-preprocessor-directive	preprocessor parse error
+15200	err	expected-token-in-preprocessor-expression	preprocessor parse error
+15201	err	syntax-error-in-preprocessor-expression	preprocessor parse error
+15203	err	expected-token-in-defined-expression	preprocessor parse error
+15204	warning	directive-expects-expression	missing expression
+15206	err	expected-integral-version-number	expected integer version
+15207	err	unknown-language-version	unknown language version
+15208	err	unknown-language	unknown language
+15209	err	language-version-differs-from-including-module	language version mismatch
+15301	err	import-failed	import file not found
+15303	err	cannot-resolve-imported-decl	cannot resolve imported declaration '~declName' from precompiled module '~moduleName'. Make sure module '~moduleName' is up-to-date. If you suspect this to be a compiler bug, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord for assistance
+15304	err	no-unique-identity	no unique file identity
+15403	err	expected-token-in-macro-parameters	preprocessor parse error
+15404	warning	builtin-macro-redefinition	builtin macro redefined
+15405	err	token-paste-at-start	invalid '##' position
+15406	err	token-paste-at-end	invalid '##' position
+15407	err	expected-macro-parameter-after-stringize	invalid '#' usage
+15408	err	duplicate-macro-parameter-name	duplicate parameter
+15409	err	variadic-macro-parameter-must-be-last	variadic parameter must be last
+15500	warning	expected-token-in-macro-arguments	macro invocation syntax error
+15501	err	wrong-number-of-arguments-to-macro	wrong macro argument count
+15502	err	error-parsing-to-macro-invocation-argument	macro argument parse error
+15503	warning	invalid-token-paste-result	token paste failure
+15600	err	expected-pragma-directive-name	expected pragma name
+15601	warning	unknown-pragma-directive-ignored	unknown pragma ignored
+15602	warning	pragma-once-ignored	pragma once ignored
+15614	warning	pragma-warning-suppress-cannot-identify-next-line	cannot identify suppress target
+15615	warning	pragma-warning-cannot-insert-here	cannot insert pragma here
+15616	note	pragma-warning-point-suppress	#pragma warning for id '~id' was suppressed here
+20000	error	unexpectedCharacter	unexpected character '$0'
+20002	error	newlineInLiteral	newline in literal
+20003	error	endOfFileInComment	end of file in comment
+20004	error	expectingAHexDigit	expecting a hex digit
+20005	error	expectingADigit	expecting a digit
+20006	error	expectingValueName	expecting value name [null, true, false]
+20007	error	unexpectedTokenExpectedTokenType	unexpected '$0', expected '$1'
+20008	error	unexpectedToken	unexpected '$0'
+20009	error	unableToConvertField	unable to convert field '$0' in type '$1'
+20010	error	fieldNotFound	field '$0' not found in type '$1'
+20011	error	fieldRequiredOnType	field '$0' required on '$1'
+20012	error	tooManyElementsForArray	too many elements ($0) for array array. Max allowed is $1
+20013	err	invalid-cuda-sm-version	invalid CUDA SM version
+20014	err	type-name-expected-but-eof	expected type name
+20015	err	unexpected-eof	unexpected end of file
+20016	err	missing-layout-binding-modifier	missing 'binding' modifier
+20017	err	const-not-allowed-on-c-style-ptr-decl	'const' not allowed on C-style pointer declaration
+20018	err	const-not-allowed-on-type	invalid 'const' usage
+20019	err	volatile-not-allowed-on-type	invalid 'volatile' usage
+20101	warning	unintended-empty-statement	potentially unintended empty statement
+20102	err	unexpected-body-after-semicolon	unexpected function body after semicolon

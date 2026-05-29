@@ -64,6 +64,26 @@ the directory for the selected configuration:
 
 On Windows-hosted builds, use the `.exe` suffix if that is the generated binary name.
 
+## Include Path Conventions
+
+Prefer direct paths over relative traversal in `#include` directives. The `source/` directory is
+on the compiler include path (exposed by the `core` CMake target), so cross-module headers are
+reachable without `../`:
+
+```cpp
+// Preferred in new code
+#include "core/slang-string.h"
+#include "compiler-core/slang-source-loc.h"
+
+// Existing code still uses the relative form; do not change it purely for style
+#include "../core/slang-string.h"
+#include "../compiler-core/slang-source-loc.h"
+```
+
+New files should use direct paths. Existing files need not be converted purely for style, but may
+be opportunistically updated when the file is already being substantially modified for other
+reasons (e.g., a security fix or feature addition touching many lines).
+
 ## Coding Style & Naming Conventions
 
 Formatting:
