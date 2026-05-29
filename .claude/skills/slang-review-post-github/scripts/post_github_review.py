@@ -53,12 +53,6 @@ HEADING_RE = re.compile(r"^###\s+([A-Z]+[0-9]+):\s+(.+?)\s*$")
 META_RE = re.compile(r"^-\s+([^:]+):\s*(.*?)\s*$")
 LOCATION_RE = re.compile(r"^`?(.+?):([0-9]+)(?:-([0-9]+))?`?$")
 HUNK_RE = re.compile(r"^@@\s+-[0-9]+(?:,[0-9]+)?\s+\+([0-9]+)(?:,([0-9]+))?\s+@@")
-REVIEW_BODY_BOUNDARY_HEADINGS = {
-    "## Kept",
-    "## Needs Judgment Call",
-    "## Needs Judgment Calls",
-    "## Dropped",
-}
 CANDIDATE_METADATA_BOUNDARIES = {"Context:", "Proposed comment:", "Notes:"}
 AGENT_REVIEW_ATTRIBUTION_RE = re.compile(
     r"""
@@ -81,10 +75,19 @@ def fail(message: str) -> NoReturn:
     raise FatalError(message)
 
 
+def run_command(args: Sequence[str]) -> subprocess.CompletedProcess:
+    """Run a command and convert startup failures into fatal validation errors."""
+
+    try:
+        return subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except OSError as e:
+        fail("failed to execute command {}: {}".format(" ".join(args), e))
+
+
 def run_json(args: Sequence[str]) -> object:
     """Run a command that must succeed and emit a JSON document."""
 
-    result = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result = run_command(args)
     if result.returncode != 0:
         fail(
             "command failed: {}\nstdout:\n{}\nstderr:\n{}".format(
@@ -100,7 +103,7 @@ def run_json(args: Sequence[str]) -> object:
 def run_text(args: Sequence[str]) -> str:
     """Run a command that must succeed and return its stdout."""
 
-    result = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result = run_command(args)
     if result.returncode != 0:
         fail(
             "command failed: {}\nstdout:\n{}\nstderr:\n{}".format(
@@ -228,7 +231,11 @@ def extract_review_body(lines: List[str]) -> Optional[str]:
 
     section_lines: List[Tuple[int, str]] = []
     for offset, raw in enumerate(lines[start:], start=start + 1):
-        if HEADING_RE.match(raw) or raw.strip() in REVIEW_BODY_BOUNDARY_HEADINGS:
+        stripped = raw.strip()
+        if (
+            HEADING_RE.match(raw)
+            or (stripped.startswith("## ") and stripped != "## Review Body")
+        ):
             break
         section_lines.append((offset, raw.rstrip()))
 

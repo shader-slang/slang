@@ -65,9 +65,9 @@ candidate entries.
    reviewer: summarize the state of the PR relative to its size and value, call out whether it
    feels rough or close to merge-ready, and name the key areas the author should focus on.
    Write the section content as a strict Markdown blockquote: after leading/trailing blank
-   lines, every line must start with `>`, blank lines must be written as `>`, and headings
-   inside the review body must be quoted, e.g. `> ## Main Concerns`. Do not use lazy
-   continuation lines.
+   lines, every line before the next top-level section or candidate entry must start with `>`,
+   blank lines must be written as `>`, and headings inside the review body must be quoted,
+   e.g. `> ## Main Concerns`. Do not use lazy continuation lines.
    Unless the workflow is posting through a GitHub account that already identifies the agent,
    the first line must identify the review as agent-authored. Use the form
    `<agent name>-authored <optional review type> review:`, such as

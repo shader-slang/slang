@@ -164,18 +164,37 @@ class PostGithubReviewTests(unittest.TestCase):
         with self.assertRaisesRegex(post_github_review.FatalError, "strict blockquote"):
             post_github_review.parse_candidates(path, include_judgment_calls=True)
 
-    def test_unquoted_review_body_heading_fails_instead_of_truncating(self) -> None:
-        """An unquoted heading inside the review body fails instead of ending the section."""
+    def test_review_body_stops_at_later_top_level_heading(self) -> None:
+        """A later top-level heading starts a new section after the review body."""
 
         path = self.write_candidate_file(
             make_candidate_text(
-                review_body="> Review summary.\n## Details\n> More detail.",
+                review_body="> Review summary.\n## Details\nThis is a later section.",
                 quote_review_body=False,
             )
         )
 
-        with self.assertRaisesRegex(post_github_review.FatalError, "strict blockquote"):
-            post_github_review.parse_candidates(path, include_judgment_calls=True)
+        _, review_body = post_github_review.parse_candidates(
+            path, include_judgment_calls=True
+        )
+
+        self.assertEqual(review_body, "Review summary.")
+
+    def test_review_body_stops_at_later_top_level_section(self) -> None:
+        """The review body ends before any later top-level `##` section."""
+
+        text = make_candidate_text(review_body="Review summary.")
+        text = text.replace(
+            "\n## Kept\n",
+            "\n## PR Summary\n\nThis summary is not part of the review body.\n\n## Kept\n",
+        )
+        path = self.write_candidate_file(text)
+
+        _, review_body = post_github_review.parse_candidates(
+            path, include_judgment_calls=True
+        )
+
+        self.assertEqual(review_body, "Review summary.")
 
     def test_missing_required_metadata_fails(self) -> None:
         """Posting fails when a required post-filter metadata field is absent."""
@@ -391,6 +410,38 @@ class PostGithubReviewTests(unittest.TestCase):
                 }
             ],
         )
+
+    def test_run_json_wraps_command_startup_failure(self) -> None:
+        """Command startup errors become `FatalError` instead of tracebacks."""
+
+        old_run = post_github_review.subprocess.run
+
+        def fake_run(*_args: object, **_kwargs: object) -> object:
+            """Pretend the executable exists but cannot be started."""
+
+            raise OSError("bad executable")
+
+        post_github_review.subprocess.run = fake_run
+        self.addCleanup(setattr, post_github_review.subprocess, "run", old_run)
+
+        with self.assertRaisesRegex(post_github_review.FatalError, "failed to execute"):
+            post_github_review.run_json(["gh", "api"])
+
+    def test_run_text_wraps_command_startup_failure(self) -> None:
+        """Text-command startup errors become `FatalError` instead of tracebacks."""
+
+        old_run = post_github_review.subprocess.run
+
+        def fake_run(*_args: object, **_kwargs: object) -> object:
+            """Pretend the executable exists but cannot be started."""
+
+            raise OSError("bad executable")
+
+        post_github_review.subprocess.run = fake_run
+        self.addCleanup(setattr, post_github_review.subprocess, "run", old_run)
+
+        with self.assertRaisesRegex(post_github_review.FatalError, "failed to execute"):
+            post_github_review.run_text(["gh", "api"])
 
     def test_validate_locations_accepts_lines_in_patch(self) -> None:
         """Location validation accepts right-side context and added lines from a patch."""

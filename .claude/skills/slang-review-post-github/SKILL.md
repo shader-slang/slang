@@ -51,9 +51,9 @@ status must cause posting to fail before any GitHub review is created.
 
 If no `--body` or `--body-file` is provided, the script uses a `## Review Body` section from
 the candidate file when present. The section content must be a strict blockquote: after
-trimming leading and trailing blank lines, every line before the next candidate section must
-start with `>`. Use `>` for blank lines, and write any Markdown headings as quoted lines such
-as `> ## Details`. Do not use lazy continuation lines.
+trimming leading and trailing blank lines, every line before the next top-level section or
+candidate section must start with `>`. Use `>` for blank lines, and write any Markdown headings
+as quoted lines such as `> ## Details`. Do not use lazy continuation lines.
 
 Example:
 
@@ -130,7 +130,7 @@ given line.
 
 The script should fail loudly and take no action if it cannot parse the candidate file, cannot
 validate a postable candidate's location against the PR diff, cannot determine the PR head
-commit, or cannot find an appropriate GitHub CLI executable.
+commit, or cannot find or execute an appropriate GitHub CLI executable.
 
 ## Script Tests
 
