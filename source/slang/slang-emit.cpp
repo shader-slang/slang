@@ -1868,7 +1868,6 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HLSL:
             {
-                auto targetProgram = codeGenContext->getTargetProgram();
                 auto profile = getEffectiveTargetProfile(
                     targetProgram->getTargetReq(),
                     targetProgram->getOptionSet());
