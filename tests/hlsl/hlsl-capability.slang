@@ -3,6 +3,7 @@
 //TEST:SIMPLE(filecheck=CHECK_CS_CAP): -target hlsl -stage compute -entry computeMain -profile cs_6_3 -capability hlsl_2018
 //TEST:SIMPLE(filecheck=CHECK_SM_CAP): -target hlsl -stage compute -entry computeMain -profile sm_6_3 -capability hlsl_2018
 //TEST:SIMPLE(filecheck=CHECK_DEFAULT): -target hlsl -stage compute -entry computeMain -warnings-disable 30056
+// Keep -O0 so DXC preserves the SM6 logical-op/select instructions this test checks.
 //TEST:SIMPLE(filecheck=CHECK_DXIL_DEFAULT): -target dxil-assembly -stage compute -entry computeMain -warnings-disable 30056 -O0
 
 // Test IR code generation for the `?:` "select" operator with the hlsl_2018 capability and cs_6_3 profile.

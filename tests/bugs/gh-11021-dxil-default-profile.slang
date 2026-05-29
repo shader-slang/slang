@@ -4,12 +4,16 @@
 //TEST:SIMPLE(filecheck=CS,SM60): -target dxil-assembly -entry computeMain -profile cs_5_1
 //TEST:SIMPLE(filecheck=CS,SM60): -target dxil -entry computeMain -profile cs_5_0
 //TEST:SIMPLE(filecheck=CS,SM60): -target dxil-assembly -entry computeMain -profile cs_5_0
+//TEST:SIMPLE(filecheck=CS,SM60): -target dxil-assembly -entry computeMain -profile sm_5_0
+//TEST:SIMPLE(filecheck=CS,SM60): -target dxil-assembly -entry computeMain -profile sm_5_1
+//TEST:SIMPLE(filecheck=CS,SM60): -target dxil-assembly -entry computeMain -profile cs_6_0
 //TEST:SIMPLE(filecheck=CS,SM65): -target dxil-assembly -entry computeMain -profile cs_6_5
 //TEST:SIMPLE(filecheck=VS,SM60_VS): -target dxil-assembly -entry vsMain -profile vs_5_1
 //TEST:SIMPLE(filecheck=PS,SM60_PS): -target dxil-assembly -entry psMain -profile ps_5_0
 //TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -entry computeMain -profile cs_5_1 -whole-program
 //TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -entry computeMain -profile cs_6_3 -whole-program
 //TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -whole-program
+//TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -profile lib_6_2 -whole-program
 //TEST:SIMPLE(filecheck=LIB68): -target dxil-assembly -profile lib_6_8 -whole-program
 //TEST(windows):COMPILE: tests/bugs/gh-11021-dxil-default-profile.slang -target dxil -o tests/bugs/gh-11021-dxil-default-profile.dxil
 //TEST(windows):COMPILE: tests/bugs/gh-11021-dxil-default-profile.slang -target dxil -entry computeMain -profile cs_5_1 -whole-program -o tests/bugs/gh-11021-dxil-whole-program-profile.dxil
