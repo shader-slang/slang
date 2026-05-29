@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_VK):-vk -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_CUDA):-cuda
 
-//DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include
+//TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include
 //DXIL: result code = 0
 
 // Note the length is NOT row * column.
