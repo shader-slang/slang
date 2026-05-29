@@ -155,6 +155,8 @@ jobs:
             build/Release/bin/slangc /tmp/dxc-smoke.slang \
               -target dxil -profile sm_6_0 -entry main -o /tmp/dxc-smoke.dxil
 
+          test -s /tmp/dxc-smoke.dxil
+
   # Sanitizer build+test (blocking via check-ci, runs on every PR)
   sanitizer-linux-clang-x86_64:
     needs: [filter]
