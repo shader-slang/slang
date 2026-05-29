@@ -58,6 +58,8 @@ set(_dxc_windows_url_hash "SHA256=${_dxc_windows_sha256}")
 set(_dxc_linux_url_hash "SHA256=${_dxc_linux_sha256}")
 
 function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
+    set(_dxc_header_deps "${ARGN}")
+
     # Stage public DXC HLSL headers (e.g. dx/linalg.h) at a stable path so test
     # directives and local `slangc -Xdxc -Ibuild/dxc/include` invocations can
     # resolve them. Done as a build-graph custom command, matching the DLL/.so
@@ -91,12 +93,13 @@ function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
 
     set(_dxc_inc_src "${_dxc_hlsl_include_dir}/dx/linalg.h")
     set(_dxc_inc_dst "${CMAKE_BINARY_DIR}/dxc/include/dx/linalg.h")
+    list(PREPEND _dxc_header_deps "${_dxc_inc_src}")
     add_custom_command(
         OUTPUT "${_dxc_inc_dst}"
         COMMAND
             ${CMAKE_COMMAND} -E copy_directory "${_dxc_hlsl_include_dir}"
             "${CMAKE_BINARY_DIR}/dxc/include"
-        DEPENDS "${_dxc_inc_src}"
+        DEPENDS ${_dxc_header_deps}
         VERBATIM
     )
     add_custom_target(stage-dxc-headers DEPENDS "${_dxc_inc_dst}")
@@ -124,11 +127,41 @@ if(SLANG_DXC_BUILD_FROM_SOURCE)
         )
         return()
     endif()
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CROSSCOMPILING)
+    if(DEFINED SLANG_DXC_BINARY_URL)
+        message(
+            STATUS
+            "Cross-compiling for Linux: GLIBC auto-detection is skipped; "
+            "using custom prebuilt DXC URL."
+        )
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+        # Cross-compiling for Linux x86_64: the host cannot probe the target
+        # system's GLIBC at configure time, so detection is skipped and the
+        # prebuilt binary is used as-is. Inform the user so they can opt in to
+        # a source build if the target GLIBC is older than the prebuilt requires.
+        message(
+            STATUS
+            "Cross-compiling for Linux x86_64: GLIBC auto-detection is skipped "
+            "(cannot probe the target system at configure time). "
+            "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON if the target GLIBC is older "
+            "than the prebuilt DXC binary requires."
+        )
+    else()
+        message(
+            WARNING
+            "Cross-compiling for Linux ${CMAKE_SYSTEM_PROCESSOR}: no default "
+            "prebuilt DXC binary is available. Set "
+            "-DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source, or "
+            "-DSLANG_DXC_BINARY_URL=<url> to use a custom prebuilt binary."
+        )
+        return()
+    endif()
 elseif(
     DEFINED SLANG_DXC_BUILD_FROM_SOURCE
     AND NOT SLANG_DXC_BUILD_FROM_SOURCE
     AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
+    AND NOT DEFINED SLANG_DXC_BINARY_URL
     AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
 )
     # User explicitly disabled the source build on x86_64 Linux; skip
@@ -142,8 +175,7 @@ elseif(
         "if the system GLIBC is older than required."
     )
 elseif(
-    NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
-    AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
+    CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
     AND DEFINED SLANG_DXC_BINARY_URL
 )
@@ -152,24 +184,6 @@ elseif(
         STATUS
         "SLANG_DXC_BINARY_URL set: skipping GLIBC auto-detection, "
         "using custom prebuilt URL."
-    )
-elseif(
-    NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
-    AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
-    AND CMAKE_CROSSCOMPILING
-    AND NOT DEFINED SLANG_DXC_BINARY_URL
-    AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
-)
-    # Cross-compiling for Linux x86_64: the host cannot probe the target
-    # system's GLIBC at configure time, so detection is skipped and the
-    # prebuilt binary is used as-is. Inform the user so they can opt in to
-    # a source build if the target GLIBC is older than the prebuilt requires.
-    message(
-        STATUS
-        "Cross-compiling for Linux x86_64: GLIBC auto-detection is skipped "
-        "(cannot probe the target system at configure time). "
-        "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON if the target GLIBC is older "
-        "than the prebuilt DXC binary requires."
     )
 elseif(
     NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
@@ -725,6 +739,28 @@ if(NOT DEFINED SLANG_DXC_BINARY_URL)
 endif()
 
 message(STATUS "Fetching DXC prebuilt binary from: ${SLANG_DXC_BINARY_URL} ...")
+set(_dxc_prebuilt_stage_stamp "${CMAKE_BINARY_DIR}/dxc/.prebuilt-stage-stamp")
+set(_dxc_prebuilt_stage_stamp_contents "${SLANG_DXC_BINARY_URL}\n")
+if(DEFINED _dxc_url_hash)
+    string(APPEND _dxc_prebuilt_stage_stamp_contents "${_dxc_url_hash}\n")
+endif()
+if(EXISTS "${_dxc_prebuilt_stage_stamp}")
+    file(READ "${_dxc_prebuilt_stage_stamp}" _dxc_existing_prebuilt_stage_stamp)
+else()
+    set(_dxc_existing_prebuilt_stage_stamp "")
+endif()
+if(
+    NOT _dxc_existing_prebuilt_stage_stamp
+        STREQUAL
+        _dxc_prebuilt_stage_stamp_contents
+)
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/dxc")
+    file(
+        WRITE
+        "${_dxc_prebuilt_stage_stamp}"
+        "${_dxc_prebuilt_stage_stamp_contents}"
+    )
+endif()
 set(_dxc_fetch_args
     dxc
     URL
@@ -744,7 +780,7 @@ if(NOT dxc_POPULATED)
     FetchContent_MakeAvailable(dxc)
 endif()
 
-_dxc_stage_hlsl_headers("${dxc_SOURCE_DIR}" "archive")
+_dxc_stage_hlsl_headers("${dxc_SOURCE_DIR}" "archive" "${_dxc_prebuilt_stage_stamp}")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
@@ -758,7 +794,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         add_custom_command(
             OUTPUT "${_dst}"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_src}" "${_dst}"
-            DEPENDS "${_src}"
+            DEPENDS "${_src}" "${_dxc_prebuilt_stage_stamp}"
             VERBATIM
         )
         add_custom_target(copy-${_dll} DEPENDS "${_dst}")
@@ -773,7 +809,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         add_custom_command(
             OUTPUT "${_dst}"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_src}" "${_dst}"
-            DEPENDS "${_src}"
+            DEPENDS "${_src}" "${_dxc_prebuilt_stage_stamp}"
             VERBATIM
         )
         add_custom_target(copy-${_lib} DEPENDS "${_dst}")
