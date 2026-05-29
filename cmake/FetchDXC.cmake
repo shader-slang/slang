@@ -780,7 +780,11 @@ if(NOT dxc_POPULATED)
     FetchContent_MakeAvailable(dxc)
 endif()
 
-_dxc_stage_hlsl_headers("${dxc_SOURCE_DIR}" "archive" "${_dxc_prebuilt_stage_stamp}")
+_dxc_stage_hlsl_headers(
+    "${dxc_SOURCE_DIR}"
+    "archive"
+    "${_dxc_prebuilt_stage_stamp}"
+)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
