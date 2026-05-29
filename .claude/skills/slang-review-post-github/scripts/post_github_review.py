@@ -668,12 +668,14 @@ def main(argv: Sequence[str]) -> int:
     """Validate input, build the review payload, and optionally post it to GitHub."""
 
     args = parse_args(argv)
+    if args.acting_as_bot_user and args.event != "COMMENT":
+        fail("--acting-as-bot-user requires --event COMMENT in this repository")
+    if args.body and args.body_file:
+        fail("use either --body or --body-file, not both")
     if not args.candidates.exists():
         fail("candidate file does not exist: {}".format(args.candidates))
 
     gh = find_gh(args.gh)
-    if args.body and args.body_file:
-        fail("use either --body or --body-file, not both")
 
     candidates, candidate_file_body = parse_candidates(
         args.candidates,

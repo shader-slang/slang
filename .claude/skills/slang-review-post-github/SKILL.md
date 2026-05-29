@@ -103,7 +103,8 @@ Default to `COMMENT`. This repository's automated-review policy treats bot-autho
 non-blocking advisory reviews, and may reject or dismiss automated `REQUEST_CHANGES` reviews.
 
 Use `REQUEST_CHANGES` only when the initial user prompt explicitly asks for a blocking clarity
-review and local project policy for the account being used permits automated blocking reviews.
+review, local project policy for the account being used permits automated blocking reviews, and
+the workflow is not using `--acting-as-bot-user`.
 
 Do not use `APPROVE` for this workflow.
 

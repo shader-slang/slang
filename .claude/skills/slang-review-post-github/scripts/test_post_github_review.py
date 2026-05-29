@@ -427,6 +427,36 @@ class PostGithubReviewTests(unittest.TestCase):
 
         self.assertEqual(args.event, "COMMENT")
 
+    def test_main_rejects_bot_user_request_changes_before_gh_lookup(self) -> None:
+        """Bot-account attribution cannot be combined with a blocking review event."""
+
+        path = self.write_candidate_file(make_candidate_text())
+        old_find_gh = post_github_review.find_gh
+
+        def fake_find_gh(_override: str | None) -> str:
+            """Prove the policy validation happens before GitHub CLI discovery."""
+
+            raise AssertionError("find_gh should not run")
+
+        post_github_review.find_gh = fake_find_gh
+        self.addCleanup(setattr, post_github_review, "find_gh", old_find_gh)
+
+        with self.assertRaisesRegex(post_github_review.FatalError, "requires --event COMMENT"):
+            post_github_review.main(
+                [
+                    "--repo",
+                    "shader-slang/slang",
+                    "--pr",
+                    "123",
+                    "--candidates",
+                    str(path),
+                    "--acting-as-bot-user",
+                    "--event",
+                    "REQUEST_CHANGES",
+                    "--dry-run",
+                ]
+            )
+
     def test_run_command_uses_utf8_text_decoding(self) -> None:
         """GitHub CLI output is decoded as UTF-8 instead of using the process locale."""
 

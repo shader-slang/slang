@@ -115,7 +115,8 @@ bot-authored reviews as non-blocking advisory reviews, and may reject or dismiss
 `REQUEST_CHANGES` reviews.
 
 Use `REQUEST_CHANGES` only when the initial user prompt explicitly asks for a blocking clarity
-review and local project policy for the account being used permits automated blocking reviews.
+review, local project policy for the account being used permits automated blocking reviews, and
+the workflow is not using `--acting-as-bot-user`.
 
 Never use `APPROVE` for this workflow.
 
