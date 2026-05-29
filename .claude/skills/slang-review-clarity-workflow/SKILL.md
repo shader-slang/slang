@@ -71,20 +71,29 @@ candidate entries.
    Unless the initial user prompt explicitly opts out, make the body identify itself as
    agent-authored; the posting script will prepend `Agent-generated clarity review: ` by
    default if the extracted body does not already have an agent-authorship label.
-10. Validate the canonical file before posting:
-   - no duplicate candidate IDs;
-   - no postable candidate remains `Status: Proposed`;
-   - every postable candidate has `Scope decision`, `Scope rationale`, `Overlap decision`,
-     and `Overlap rationale`;
-   - dropped, duplicate, superseded, and merged candidates are preserved later in the file for
-     auditability;
-   - candidates about code outside the diff are attached to the closest or most logical
-     commentable diff line, and their proposed comment clearly names the actual code or
-     contract they concern;
-   - the `## Review Body` section, if present, uses strict blockquote formatting for every
-     content line;
-   - proposed comments do not include candidate IDs, status, confidence, scope, notes, or
-     other process metadata.
+10. Validate the canonical file before posting.
+
+    The posting script enforces the mechanical blocking checks:
+
+    - no duplicate candidate IDs;
+    - no postable candidate remains `Status: Proposed` or another unfiltered status;
+    - every postable candidate has `Scope decision`, `Scope rationale`, `Overlap decision`,
+      and `Overlap rationale`;
+    - every postable candidate has a `Location` that names a line/range present in the GitHub
+      diff;
+    - every postable candidate has a non-empty strict-blockquote `Proposed comment:`;
+    - the `## Review Body` section, if present, uses strict blockquote formatting for every
+      content line.
+
+    The agent must also check the judgment-based posting policy:
+
+    - dropped, duplicate, superseded, and merged candidates are preserved later in the file for
+      auditability;
+    - candidates about code outside the diff are attached to the closest or most logical
+      commentable diff line, and their proposed comment clearly names the actual code or
+      contract they concern;
+    - proposed comments do not include candidate IDs, status, confidence, scope, notes, or
+      other process metadata.
 11. If the user asked to post, run `slang-review-post-github` on the canonical workflow file.
 
 If a harness cannot invoke repository-local skills by name, read and apply the corresponding
@@ -96,7 +105,14 @@ the review skills, but consolidation still needs to run before scope filtering.
 
 ## Posting Defaults
 
-Default posted review result is `REQUEST_CHANGES`.
+Default posted review result is `REQUEST_CHANGES`. Surviving clarity candidates mean the PR
+author should do more work before the change is efficient for a human maintainer to review.
+
+Use `COMMENT` instead only when the initial user prompt explicitly asks for a non-blocking
+review, when a maintainer explicitly asks for an advisory trial run to be posted, or when local
+project policy for the specific run forbids blocking reviews from the account being used.
+
+Never use `APPROVE` for this workflow.
 
 Include `Needs judgment call` candidates by default. The workflow is expected to run mostly
 without a human in the loop, so uncertain-but-credible comments should not disappear just

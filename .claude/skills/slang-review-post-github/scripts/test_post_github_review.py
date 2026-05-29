@@ -27,6 +27,8 @@ def make_candidate_text(
     location: str = "`source/file.cpp:10-11`",
     review_body: str | None = "Review summary.",
     quote_review_body: bool = True,
+    proposed_comment_lines: list[str] | None = None,
+    notes_lines: list[str] | None = None,
 ) -> str:
     lines: list[str] = ["# Scope-Filtered Review Candidates", ""]
     if review_body is not None:
@@ -56,6 +58,13 @@ def make_candidate_text(
         lines.append(f"- Overlap decision: {overlap_decision}")
     if overlap_rationale is not None:
         lines.append(f"- Overlap rationale: {overlap_rationale}")
+    if proposed_comment_lines is None:
+        proposed_comment_lines = [
+            "> The invariant needed to trust this line is not clear.",
+            "> Please make the condition being relied on explicit.",
+        ]
+    if notes_lines is None:
+        notes_lines = []
     lines.extend(
         [
             f"- Location: {location}",
@@ -68,11 +77,14 @@ def make_candidate_text(
             "",
             "Proposed comment:",
             "",
-            "> The invariant needed to trust this line is not clear.",
-            "> Please make the condition being relied on explicit.",
-            "",
         ]
     )
+    lines.extend(proposed_comment_lines)
+    lines.append("")
+    if notes_lines:
+        lines.append("Notes:")
+        lines.extend(notes_lines)
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -159,6 +171,36 @@ class PostGithubReviewTests(unittest.TestCase):
 
         with self.assertRaisesRegex(post_github_review.FatalError, "invalid Location line range"):
             post_github_review.parse_candidates(path, include_judgment_calls=True)
+
+    def test_lazy_proposed_comment_continuation_fails(self) -> None:
+        path = self.write_candidate_file(
+            make_candidate_text(
+                proposed_comment_lines=[
+                    "> The invariant needed to trust this line is not clear.",
+                    "lazy continuation",
+                ]
+            )
+        )
+
+        with self.assertRaisesRegex(post_github_review.FatalError, "strict blockquote"):
+            post_github_review.parse_candidates(path, include_judgment_calls=True)
+
+    def test_notes_metadata_does_not_override_candidate_metadata(self) -> None:
+        path = self.write_candidate_file(
+            make_candidate_text(
+                notes_lines=[
+                    "This note records discarded alternatives.",
+                    "- Status: Drop",
+                    "- Scope decision: Probably out-of-scope",
+                ]
+            )
+        )
+
+        candidates, _ = post_github_review.parse_candidates(path, include_judgment_calls=True)
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].status, "Keep")
+        self.assertEqual(candidates[0].scope_decision, "Direct")
 
     def test_build_payload_labels_agent_review_and_maps_range(self) -> None:
         candidate = post_github_review.Candidate(

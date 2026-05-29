@@ -83,10 +83,14 @@ agent account.
 
 ## Review Result
 
-Default to `REQUEST_CHANGES`.
+Default to `REQUEST_CHANGES`. Surviving clarity candidates mean the PR author should do more
+work before the change is efficient for a human maintainer to review.
 
-Use `COMMENT` only when the user explicitly asks for a non-blocking review. Do not use
-`APPROVE` for this workflow.
+Use `COMMENT` only when the initial user prompt explicitly asks for a non-blocking review,
+when a maintainer explicitly asks for an advisory trial run to be posted, or when local project
+policy for the specific run forbids blocking reviews from the account being used.
+
+Do not use `APPROVE` for this workflow.
 
 By default, include `Needs judgment call` candidates in the review. Exclude them only if the
 user explicitly asks. The intended workflow is automated, so preserving a credible uncertain

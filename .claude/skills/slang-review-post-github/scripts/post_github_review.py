@@ -67,6 +67,7 @@ REVIEW_BODY_BOUNDARY_HEADINGS = {
     "## Needs Judgment Calls",
     "## Dropped",
 }
+CANDIDATE_METADATA_BOUNDARIES = {"Context:", "Proposed comment:", "Notes:"}
 AGENT_REVIEW_LABEL_RE = re.compile(
     r"^(?:codex-generated|codex|agent-generated|automated)\s+clarity\s+review\s*:",
     re.IGNORECASE,
@@ -165,7 +166,13 @@ def parse_proposed_comment(block: List[str], candidate_id: str) -> str:
                     body_lines.append(text.rstrip())
                     continue
                 if started:
-                    break
+                    if raw.strip() == "":
+                        break
+                    fail(
+                        "{} Proposed comment must use strict blockquote lines; offending line: {}".format(
+                            candidate_id, raw
+                        )
+                    )
                 fail("{} has Proposed comment but no blockquote body".format(candidate_id))
             body = "\n".join(body_lines).strip()
             if not body:
@@ -255,6 +262,8 @@ def parse_candidates(path: Path, include_judgment_calls: bool) -> Tuple[List[Can
         block = lines[start_index + 1 : end_index]
         metadata: Dict[str, str] = {}
         for line in block:
+            if line.strip() in CANDIDATE_METADATA_BOUNDARIES:
+                break
             match = META_RE.match(line)
             if match:
                 metadata[match.group(1).strip()] = match.group(2).strip()
