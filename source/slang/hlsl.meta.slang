@@ -19327,10 +19327,10 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 {
     auto access = kBaseBufferAccessLevels[aa].access;
     sb << "/// @category texture_types\n";
-    sb << "__generic<T:ITexelElement>\n";
+    sb << "__generic<T:ITexelData>\n";
     sb << "typealias ";
     sb << kBaseBufferAccessLevels[aa].name;
-    sb << "Buffer = _Texture<T.DataType, __ShapeBuffer, 0, 0, 0, " << aa << ", 0, 0, T.format>;\n";
+    sb << "Buffer = _Texture<T, __ShapeBuffer, 0, 0, 0, " << aa << ", 0, 0, 0>;\n";
 
     bool isReadOnly = aa == 0;
 

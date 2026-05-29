@@ -152,8 +152,8 @@ bool TEST_texture<T : ITexelElement>(
     // METAL-LABEL: TEST_texture
     typealias Tvn = T.DataType;
     typealias Tv4 = vector<T.DataType.Element,4>;
-    Tvn zero = {};
-    Tv4 zero4 = {};
+    Tvn zero = Tvn(0);
+    Tv4 zero4 = Tv4(0);
 
     float u = 0;
     float u2 = 0.5;
