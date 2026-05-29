@@ -3,6 +3,7 @@
 // Test that NonUniform decorations propagate through to storage image writes
 // and that StorageImageArrayNonUniformIndexing capability is emitted.
 
+// CHECK-DAG: OpCapability ShaderNonUniform
 // CHECK-DAG: OpCapability StorageImageArrayNonUniformIndexing
 
 // The index, access chain, and loaded image (consumed by OpImageWrite) must

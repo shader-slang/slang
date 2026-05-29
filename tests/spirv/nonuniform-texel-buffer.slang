@@ -3,6 +3,7 @@
 // Test that NonUniform decorations and texel buffer capabilities are emitted
 // for non-uniformly indexed Buffer<T> and RWBuffer<T> arrays.
 
+// CHECK-DAG: OpCapability ShaderNonUniform
 // CHECK-DAG: OpCapability UniformTexelBufferArrayNonUniformIndexing
 // CHECK-DAG: OpCapability StorageTexelBufferArrayNonUniformIndexing
 

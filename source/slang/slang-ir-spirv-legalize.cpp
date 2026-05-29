@@ -596,8 +596,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                     nullptr ||
                                 user->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
                                     nullptr;
-                            // Unwrap so the access chain indexes with the raw value;
-                            // the decoration (not the index inst) is what SPIR-V needs.
+                            // Unwrap so the access chain indexes with the raw value.
+                            // We decorate the access chain (`newAddr`) below, which
+                            // is the resource-operand precursor the consuming load/
+                            // store will use; per VUID-RuntimeSpirv-None-10148 it is
+                            // that operand, not the raw index, that must carry
+                            // NonUniform, so the unwrapped index is intentionally
+                            // left undecorated here.
                             if (index->getOp() == kIROp_NonUniformResourceIndex)
                                 index = index->getOperand(0);
 
@@ -2180,6 +2185,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // transition enqueues users. With a finite instruction count and `inWorklist`
     // preventing an instruction from being queued twice while pending, the
     // worklist is drained in O(N + E) (instructions + use-def edges visited).
+    //
+    // Direction: propagation is one-directional (operand -> user), which is
+    // sufficient because the Vulkan requirement is on the resource operand
+    // *consumed* by the memory/sampling instruction, and that operand is always a
+    // (transitive) user of the seed decoration. We deliberately do NOT back-
+    // propagate to an access chain's index operand: the index is not a consumed
+    // resource operand, so VUID-RuntimeSpirv-None-10148 does not require it to
+    // carry NonUniform. (The index may still be decorated independently by the
+    // float pass; that is incidental, not required here.)
     void propagateNonUniformAccessChainDecorations()
     {
         List<IRInst*> worklist;

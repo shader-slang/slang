@@ -3,6 +3,7 @@
 // Test that NonUniform decorations propagate to OpSampledImage results
 // and that the SampledImageArrayNonUniformIndexing capability is emitted.
 
+// CHECK-DAG: OpCapability ShaderNonUniform
 // CHECK-DAG: OpCapability SampledImageArrayNonUniformIndexing
 
 // The index, access chain, loaded texture, and sampled image must all be

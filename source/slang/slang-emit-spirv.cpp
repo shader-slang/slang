@@ -11300,10 +11300,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // texture/buffer being sampled), and their capability was already
         // requested by requireNonUniformIndexingCapabilityForInst() when the
         // operand's own IRSPIRVNonUniformResourceDecoration was emitted.
-        for (const auto& [resultOpcode, resultID] : nonUniformResults)
+        //
+        // The extension and base ShaderNonUniform capability are loop-invariant, so
+        // they are required once here rather than per result.
+        if (nonUniformResults.getCount() != 0)
         {
             ensureExtensionDeclarationBeforeSpv15(toSlice("SPV_EXT_descriptor_indexing"));
             requireSPIRVCapability(SpvCapabilityShaderNonUniform);
+        }
+        for (const auto& [resultOpcode, resultID] : nonUniformResults)
+        {
             if (resultOpcode == SpvOpSampledImage)
                 requireSPIRVCapability(SpvCapabilitySampledImageArrayNonUniformIndexing);
             emitOpDecorate(
@@ -11397,6 +11403,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         else if (as<IRGLSLShaderStorageBufferType>(type))
         {
             requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
+        }
+        // By the time NonUniform is emitted, ConstantBuffer/ParameterBlock (UBO) and
+        // structured/storage buffers (SSBO) have been lowered to plain structs, so
+        // the type-based checks above no longer match them. Global-param
+        // legalization tags the lowered struct to record which it is: a UBO gets
+        // SPIRVBlockDecoration, a pre-SPIR-V-1.4 SSBO gets SPIRVBufferBlockDecoration
+        // (a SPIR-V 1.4+ SSBO instead uses the StorageBuffer address space and was
+        // already handled by the early return above). Reading those decorations
+        // here recovers the correct capability after lowering.
+        else if (type->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+        {
+            requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
+        }
+        else if (type->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+        {
+            requireSPIRVCapability(SpvCapabilityUniformBufferArrayNonUniformIndexing);
         }
     }
 

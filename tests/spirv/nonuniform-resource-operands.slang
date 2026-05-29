@@ -18,12 +18,17 @@
 // CHECK-DAG: %[[SBLOAD:[A-Za-z0-9_]+]] = OpLoad %float %[[SBEP]]
 // CHECK-DAG: OpDecorate %[[SBLOAD]] NonUniform
 
-// Texture access chain must be NonUniform.
+// Texture access chain and the load that reads the texture from it must be
+// NonUniform.
 // CHECK-DAG: %[[TEXAC:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_UniformConstant_{{[A-Za-z0-9_]+}} %bindless_storage_buffers_0 %{{[A-Za-z0-9_]+}}
 // CHECK-DAG: OpDecorate %[[TEXAC]] NonUniform
+// CHECK-DAG: %[[TEXLOAD:[A-Za-z0-9_]+]] = OpLoad %{{[A-Za-z0-9_]+}} %[[TEXAC]]
+// CHECK-DAG: OpDecorate %[[TEXLOAD]] NonUniform
 
-// OpSampledImage result must be NonUniform.
-// CHECK-DAG: OpDecorate %sampledImage NonUniform
+// The OpSampledImage result consumed by the sample must be NonUniform; bind it
+// to its defining instruction rather than matching the name alone.
+// CHECK-DAG: %[[SAMPLED:[A-Za-z0-9_]+]] = OpSampledImage %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}}
+// CHECK-DAG: OpDecorate %[[SAMPLED]] NonUniform
 
 // Storage image: access chain and loaded image must be NonUniform.
 // CHECK-DAG: %[[RWAC:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_UniformConstant_{{[A-Za-z0-9_]+}} %bindless_storage_buffers_1 %{{[A-Za-z0-9_]+}}

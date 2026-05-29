@@ -105,19 +105,14 @@ void main(uint3 pixelIndex : SV_DispatchThreadID)
     // CHECK_CUDA: func_{{[0-9]+}}(globalParams_{{[0-9]+}}->globalBuffer_{{[0-9]+}}[{{.*}}])
     MyStruct myStruct2 = func(buffer2);
 
-    // Test case 3: Test the case that we handle the uniformity correctly, the NonUniformResourceIndex will not propagate
-    // to the function, so there should no NonUniform decoration appeared.
+    // Test case 3: a uniform index must NOT propagate NonUniform into the callee,
+    // so the access chain for the uniform bufferIdx3 must NOT be decorated
+    // NonUniform. The slang-test output appends "; NonUniform" to decorated
+    // instructions, so we match the access chain line and verify NonUniform does
+    // NOT appear before the next access chain.
     int bufferIdx3 = pixelIndex.z;
 
-    // Test case 4: Test to make sure we correctly cover the case that intCast or uintCast of a NonUniformResourceIndex
-    // is still a NonUniformResourceIndex.
-
     RWStructuredBuffer<uint> buffer3 = globalBuffer[bufferIdx3];
-
-    // Test case 3: The access chain for uniform bufferIdx3 should NOT be decorated NonUniform.
-    // The slang-test output appends "; NonUniform" to decorated instructions,
-    // so we match the access chain line and verify NonUniform does NOT appear
-    // before the next access chain.
     // CHECK_SPV: OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %globalBuffer %bufferIdx3
     // CHECK_SPV-NOT: NonUniform
     // CHECK_SPV: OpAccessChain
@@ -129,6 +124,8 @@ void main(uint3 pixelIndex : SV_DispatchThreadID)
     // CHECK_GLSL-SPV: %[[VAR17]] = OpAccessChain %_ptr_Uniform_uint %globalBuffer_0 %[[VAR16]] %int_0 %int_0
     // CHECK_GLSL-SPV: %[[VAR18]] = OpLoad %uint %[[VAR17]]
     //
+    // Test case 4: an intCast/uintCast of a NonUniformResourceIndex is still a
+    // NonUniformResourceIndex.
     // Since after the nested cast, the index data type is 'uint' now, make sure it calls the same function as the test case 1.
     // CHECK_GLSL: func_0({{.*}}nonuniformEXT({{.*}}))
     // CHECK_CUDA: func_{{[0-9]+}}(globalParams_{{[0-9]+}}->globalBuffer_{{[0-9]+}}[{{.*}}])
