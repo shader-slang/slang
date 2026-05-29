@@ -8209,7 +8209,8 @@ static BaseType _determineIntegerLiteralType(
     }
 
     // fall-back in case asserts fall through
-    return unsignedSuffix == IntegerLiteralUnsignedSuffix::None ? BaseType::Int64 : BaseType::UInt64;
+    return unsignedSuffix == IntegerLiteralUnsignedSuffix::None ? BaseType::Int64
+                                                                : BaseType::UInt64;
 }
 
 static Expr* parseIntegerLiteralExpr(Parser* parser)
