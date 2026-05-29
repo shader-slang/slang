@@ -282,9 +282,10 @@ When `SLANG_DXC_BUILD_FROM_SOURCE` is unset on native Linux x86_64 (and
 configure time and inspects the GLIBC requirements of both `libdxcompiler.so`
 and `libdxil.so`. If either library requires a newer GLIBC than the system
 provides, or if the requirement or system GLIBC version cannot be detected, DXC
-is built from source instead. Detection results are cached in stamp files so
-subsequent reconfigures are fast. The checked-in `v1.9.2602` Linux prebuilt
-archive currently requires GLIBC 2.38 or newer.
+is built from source instead. Successful detection results are cached in stamp
+files so subsequent reconfigures are fast. For example, if a DXC Linux prebuilt
+requires GLIBC 2.38 and the host provides an older GLIBC, CMake selects the
+source-build path.
 
 - `ON`: build DXC from source on Windows and Linux; on other platforms, DXC is unavailable.
 - `OFF`: use the prebuilt binary when one is available and skip the GLIBC check; on
