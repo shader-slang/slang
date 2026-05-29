@@ -10,6 +10,8 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-vk -compute -entry multiTileMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
 // TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-mtl -compute -entry multiTileMain -shaderobj -xslang -experimental-feature -output-using-type
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-cuda -compute -entry multiTileMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=HALFROUNDTRIP):-vk -compute -entry halfRoundTripMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=HALFROUNDTRIP):-cuda -compute -entry halfRoundTripMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
 
 import slang.neural;
 
@@ -18,6 +20,17 @@ typealias NoBiasConverter = NetworkParameterLayoutConverter<float, 0, 4, 2>;
 
 typealias MultiTileConverter = NetworkParameterLayoutConverter<float, 1, 17, 33>;
 typealias HalfConverter = NetworkParameterLayoutConverter<half, 1, 4, 2>;
+
+typealias ZeroMaskConverter = NetworkParameterLayoutConverter<float, 0ull, 1, 1, 1, 1, 1>;
+typealias AllBiasConverter = NetworkParameterLayoutConverter<float, 0xFull, 1, 1, 1, 1, 1>;
+typealias TopBitMaskConverter = NetworkParameterLayoutConverter<
+    float,
+    0x8000000000000001ull,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1>;
 
 typealias LongMaskConverter = NetworkParameterLayoutConverter<
     float,
@@ -47,7 +60,16 @@ uniform RWStructuredBuffer<float>.Handle multiPortable;
 //TEST_INPUT: set multiOptimal = ubuffer(stride=4, count=1584)
 uniform RWStructuredBuffer<float>.Handle multiOptimal;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=resultBuffer
+//TEST_INPUT: set halfPortable = ubuffer(data=[1.0h 2.0h 3.0h 4.0h 5.0h 6.0h 7.0h 8.0h 9.0h 10.0h], stride=2)
+uniform RWStructuredBuffer<half>.Handle halfPortable;
+
+//TEST_INPUT: set halfOptimal = ubuffer(stride=2, count=272)
+uniform RWStructuredBuffer<half>.Handle halfOptimal;
+
+//TEST_INPUT: set halfRoundTrip = ubuffer(stride=2, count=10)
+uniform RWStructuredBuffer<half>.Handle halfRoundTrip;
+
+//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=resultBuffer
 RWStructuredBuffer<uint> resultBuffer;
 
 void toOptimalLayout(uint threadIndex, uint threadCount)
@@ -95,8 +117,17 @@ void computeMain(uint tid : SV_GroupIndex)
         MultiTileConverter.ElementCountPhysical == 1584) ? 1 : 0;
     resultBuffer[5] = (HalfConverter.BytesLogical == 20 &&
         HalfConverter.BytesPhysical == 544) ? 1 : 0;
+    resultBuffer[6] = (ZeroMaskConverter.ElementCountLogical == 4 &&
+        ZeroMaskConverter.ElementCountPhysical == 1088) ? 1 : 0;
+    resultBuffer[7] = (AllBiasConverter.ElementCountLogical == 8 &&
+        AllBiasConverter.ElementCountPhysical == 1088) ? 1 : 0;
+    resultBuffer[8] = (TopBitMaskConverter.ElementCountLogical == 66 &&
+        TopBitMaskConverter.ElementCountPhysical == 17408) ? 1 : 0;
 
     // BUFFER: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
     // BUFFER-NEXT: 1
     // BUFFER-NEXT: 1
     // BUFFER-NEXT: 1
@@ -265,4 +296,34 @@ void multiTileMain(uint tid : SV_GroupIndex)
 
     // MULTITILE: 1
     // MULTITILE-NEXT: 1
+}
+
+[shader("compute")]
+[numthreads(32, 1, 1)]
+void halfRoundTripMain(uint tid : SV_GroupIndex)
+{
+    for (uint i = tid; i < uint(HalfConverter.ElementCountPhysical); i += 32)
+        halfOptimal[i] = half(0.0);
+    for (uint i = tid; i < uint(HalfConverter.ElementCountLogical); i += 32)
+        halfRoundTrip[i] = half(0.0);
+    AllMemoryBarrierWithGroupSync();
+
+    let portableAddress = BindlessAddress<half>(halfPortable);
+    let optimalAddress = BindlessAddress<half>(halfOptimal);
+    let roundTripAddress = BindlessAddress<half>(halfRoundTrip);
+
+    HalfConverter.toOptimalLayout(portableAddress, optimalAddress, tid, 32);
+    AllMemoryBarrierWithGroupSync();
+    HalfConverter.toPortableLayout(optimalAddress, roundTripAddress, tid, 32);
+    AllMemoryBarrierWithGroupSync();
+
+    if (tid == 0)
+    {
+        bool roundTripOk = true;
+        for (int i = 0; i < HalfConverter.ElementCountLogical; ++i)
+            roundTripOk = roundTripOk && halfRoundTrip[i] == half(i + 1);
+        resultBuffer[0] = roundTripOk ? 1 : 0;
+    }
+
+    // HALFROUNDTRIP: 1
 }

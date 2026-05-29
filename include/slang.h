@@ -3107,6 +3107,9 @@ struct VariableReflection
         return spReflectionVariable_GetDefaultValueInt((SlangReflectionVariable*)this, value);
     }
 
+    /// Gets a floating-point default value from a literal initializer. Unlike
+    /// getDefaultValueInt, this API does not currently resolve specialized
+    /// generic semantic values before checking the initializer.
     SlangResult getDefaultValueFloat(float* value)
     {
         return spReflectionVariable_GetDefaultValueFloat((SlangReflectionVariable*)this, value);

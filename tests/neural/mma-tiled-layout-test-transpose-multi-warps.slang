@@ -2,6 +2,7 @@
 // Tests TiledMMAHelper with TransposeA=true: computes W^T * x where W is in tiled layout.
 
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_USE_CONVERTER=0
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1
 
 // TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
@@ -18,6 +19,10 @@ import common;
 typealias DType = half;
 #else
 typealias DType = float;
+#endif
+
+#ifndef TEST_USE_CONVERTER
+#define TEST_USE_CONVERTER 1
 #endif
 
 // TEST_INPUT: set portableWeightBuffer = ubuffer(stride=4, count=4096)
@@ -41,6 +46,13 @@ static const uint OffsetB = 256;
 void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedInputSize, int PaddedOutputSize, bool Clear>(uint tid)
 {
     static const int PhysicalCount = PaddedInputSize * PaddedOutputSize + PaddedOutputSize;
+
+    // Keep one test mode on the original tiled-fill helper as an independent
+    // oracle for the optimal layout consumed by the transpose MMA path.
+#if !TEST_USE_CONVERTER
+    fillTransposeWeightTiled<DType, OutputSize, InputSize, BatchSize, Clear>(tid, inputBuffer);
+    return;
+#else
 
     if (Clear)
     {
@@ -74,6 +86,7 @@ void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedInputSize, i
     let optimal = BindlessAddress<DType>(inputBuffer);
     NetworkParameterLayoutConverter<DType, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal, tid, BatchSize);
     AllMemoryBarrierWithGroupSync();
+#endif
 }
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {

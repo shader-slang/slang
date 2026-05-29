@@ -163,6 +163,11 @@ SLANG_UNIT_TEST(linkTimeStaticConstIntReflection)
             public static const int Value = StaticConstCarrier<N>.Value + 3;
         }
 
+        public struct TypeCarrier<T, int N>
+        {
+            public static const int Value = StaticConstCarrier<N>.Value + sizeof(T);
+        }
+
         public struct LiteralCarrier
         {
             public static const int Value = 23;
@@ -212,6 +217,7 @@ SLANG_UNIT_TEST(linkTimeStaticConstIntReflection)
 
     SLANG_CHECK(getStaticInt("StaticConstCarrier<5>", "Value") == 6);
     SLANG_CHECK(getStaticInt("NestedCarrier<5>", "Value") == 9);
+    SLANG_CHECK(getStaticInt("TypeCarrier<float,5>", "Value") == 10);
     SLANG_CHECK(getStaticInt("LiteralCarrier", "Value") == 23);
 }
 

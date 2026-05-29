@@ -54,9 +54,10 @@ public struct FFLayer<
     static const int PaddedInputSize = ((InputVector.Size + 15) / 16) * 16;
 
     // OptimalLayout uses a target-independent physical envelope: weights are
-    // padded to 16x16 and bias is padded to the output extent. CUDA, Vulkan,
-    // and Metal may order elements differently inside this envelope, but they
-    // all reserve the same number of elements so layer offsets stay uniform.
+    // padded to 16x16 and the bias slot is padded to the output extent, even
+    // for no-bias layers. CUDA, Vulkan, and Metal may order elements
+    // differently inside this envelope, but they all reserve the same number
+    // of elements so layer offsets stay uniform.
     public static const int WeightStorageSize =
         (Layout.Layout == LayoutType.Optimal)
             ? PaddedOutputSize * PaddedInputSize

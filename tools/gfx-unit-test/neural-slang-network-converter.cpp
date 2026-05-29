@@ -1,11 +1,13 @@
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
+#include "core/slang-math.h"
 #include "core/slang-string.h"
 #include "gfx-test-util.h"
 #include "slang-rhi.h"
 #include "slang-rhi/shader-cursor.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <vector>
 
@@ -18,6 +20,8 @@ static const int kElementCountLogical = 321;
 static const int kElementCountPhysical = 1088;
 static const int kBytesLogical = kElementCountLogical * int(sizeof(float));
 static const int kBytesPhysical = kElementCountPhysical * int(sizeof(float));
+static const int kBytesLogicalHalf = kElementCountLogical * int(sizeof(uint16_t));
+static const int kBytesPhysicalHalf = kElementCountPhysical * int(sizeof(uint16_t));
 static const uint32_t kConverterThreadGroupSizeX = 8;
 static const uint32_t kConverterThreadGroupSizeY = 4;
 static const uint32_t kConverterThreadGroupSizeZ = 2;
@@ -196,11 +200,30 @@ static std::vector<float> makeExpectedOptimalParameters(
     return result;
 }
 
-static Slang::String makeConverterTypeName(const TargetCase& target)
+static std::vector<uint16_t> makeHalfPortableParameters(size_t elementCountLogical)
+{
+    std::vector<uint16_t> result(elementCountLogical);
+    for (size_t i = 0; i < elementCountLogical; ++i)
+        result[i] = Slang::FloatToHalf(makePortableValue(int(i)));
+    return result;
+}
+
+static std::vector<uint16_t> makeExpectedOptimalHalfParameters(
+    ConverterTarget target,
+    size_t elementCountPhysical)
+{
+    std::vector<float> expectedFloat = makeExpectedOptimalParameters(target, elementCountPhysical);
+    std::vector<uint16_t> result(elementCountPhysical);
+    for (size_t i = 0; i < elementCountPhysical; ++i)
+        result[i] = Slang::FloatToHalf(expectedFloat[i]);
+    return result;
+}
+
+static Slang::String makeConverterTypeName(const TargetCase& target, const char* elementTypeName)
 {
     Slang::StringBuilder builder;
     SLANG_UNUSED(target);
-    builder << "NetworkParameterLayoutConverter<float, 5, 5, 13, 7, 19>";
+    builder << "NetworkParameterLayoutConverter<" << elementTypeName << ", 5, 5, 13, 7, 19>";
     return builder.produceString();
 }
 
@@ -222,6 +245,10 @@ static Slang::String makeShaderSource(const TargetCase& target)
         uniform RWStructuredBuffer<float>.Handle portableBuffer;
         uniform RWStructuredBuffer<float>.Handle optimalBuffer;
         uniform RWStructuredBuffer<float>.Handle roundTripBuffer;
+
+        uniform RWStructuredBuffer<half>.Handle halfPortableBuffer;
+        uniform RWStructuredBuffer<half>.Handle halfOptimalBuffer;
+        uniform RWStructuredBuffer<half>.Handle halfRoundTripBuffer;
 
         uint getConverterDispatchGroupX(uint elementCount)
         {
@@ -290,6 +317,50 @@ static Slang::String makeShaderSource(const TargetCase& target)
         void toPortableMain(uint3 dispatchThreadId : SV_DispatchThreadID)
         {
             toPortableLayout(dispatchThreadId);
+        }
+
+        void halfToOptimalLayout(uint3 dispatchThreadId)
+        {
+            let portable = BindlessAddress<half>(halfPortableBuffer);
+            let optimal = BindlessAddress<half>(halfOptimalBuffer);
+            uint elementCount =
+                uint(NetworkParameterLayoutConverter<half, 5, 5, 13, 7, 19>.ElementCountPhysical);
+
+            NetworkParameterLayoutConverter<half, 5, 5, 13, 7, 19>
+                .toOptimalLayout(
+                    portable,
+                    optimal,
+                    getConverterThreadIndex(dispatchThreadId, elementCount),
+                    getConverterThreadCount(elementCount));
+        }
+
+        void halfToPortableLayout(uint3 dispatchThreadId)
+        {
+            let optimal = BindlessAddress<half>(halfOptimalBuffer);
+            let roundTrip = BindlessAddress<half>(halfRoundTripBuffer);
+            uint elementCount =
+                uint(NetworkParameterLayoutConverter<half, 5, 5, 13, 7, 19>.ElementCountLogical);
+
+            NetworkParameterLayoutConverter<half, 5, 5, 13, 7, 19>
+                .toPortableLayout(
+                    optimal,
+                    roundTrip,
+                    getConverterThreadIndex(dispatchThreadId, elementCount),
+                    getConverterThreadCount(elementCount));
+        }
+
+        [shader("compute")]
+        [numthreads(8, 4, 2)]
+        void halfToOptimalMain(uint3 dispatchThreadId : SV_DispatchThreadID)
+        {
+            halfToOptimalLayout(dispatchThreadId);
+        }
+
+        [shader("compute")]
+        [numthreads(8, 4, 2)]
+        void halfToPortableMain(uint3 dispatchThreadId : SV_DispatchThreadID)
+        {
+            halfToPortableLayout(dispatchThreadId);
         }
     )";
 }
@@ -412,9 +483,12 @@ static int64_t getStaticInt(slang::ProgramLayout* layout, const char* typeName, 
 
 static ReflectedNetworkSize queryAndCheckNetworkSize(
     slang::ProgramLayout* layout,
-    const TargetCase& target)
+    const TargetCase& target,
+    const char* elementTypeName,
+    size_t expectedBytesLogical,
+    size_t expectedBytesPhysical)
 {
-    Slang::String converterTypeName = makeConverterTypeName(target);
+    Slang::String converterTypeName = makeConverterTypeName(target, elementTypeName);
     const char* typeName = converterTypeName.getBuffer();
 
     ReflectedNetworkSize result = {};
@@ -425,8 +499,8 @@ static ReflectedNetworkSize queryAndCheckNetworkSize(
 
     SLANG_CHECK_ABORT(result.elementCountLogical == kElementCountLogical);
     SLANG_CHECK_ABORT(result.elementCountPhysical == kElementCountPhysical);
-    SLANG_CHECK_ABORT(result.bytesLogical == kBytesLogical);
-    SLANG_CHECK_ABORT(result.bytesPhysical == kBytesPhysical);
+    SLANG_CHECK_ABORT(result.bytesLogical == expectedBytesLogical);
+    SLANG_CHECK_ABORT(result.bytesPhysical == expectedBytesPhysical);
     return result;
 }
 
@@ -537,6 +611,52 @@ static void checkFloatBuffer(
     }
 }
 
+static Slang::ComPtr<IBuffer> createHalfBuffer(IDevice* device, const uint16_t* data, size_t count)
+{
+    BufferDesc desc = {};
+    desc.size = count * sizeof(uint16_t);
+    desc.elementSize = sizeof(uint16_t);
+    desc.format = Format::Undefined;
+    desc.memoryType = MemoryType::DeviceLocal;
+    desc.usage = BufferUsage::ShaderResource | BufferUsage::UnorderedAccess |
+                 BufferUsage::CopyDestination | BufferUsage::CopySource;
+    desc.defaultState = ResourceState::UnorderedAccess;
+
+    Slang::ComPtr<IBuffer> buffer;
+    GFX_CHECK_CALL_ABORT(device->createBuffer(desc, (void*)data, buffer.writeRef()));
+    return buffer;
+}
+
+static void checkHalfBuffer(
+    IDevice* device,
+    IBuffer* buffer,
+    const char* bufferName,
+    const std::vector<uint16_t>& expected)
+{
+    Slang::ComPtr<ISlangBlob> blob;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        device->readBuffer(buffer, 0, expected.size() * sizeof(uint16_t), blob.writeRef())));
+    SLANG_CHECK_ABORT(blob->getBufferSize() == expected.size() * sizeof(uint16_t));
+
+    const uint16_t* actual = reinterpret_cast<const uint16_t*>(blob->getBufferPointer());
+    int printedMismatchCount = 0;
+    for (size_t i = 0; i < expected.size(); ++i)
+    {
+        if (actual[i] != expected[i] && printedMismatchCount < 8)
+        {
+            fprintf(
+                stderr,
+                "%s[%zu] = 0x%04x, expected 0x%04x\n",
+                bufferName,
+                i,
+                unsigned(actual[i]),
+                unsigned(expected[i]));
+            printedMismatchCount++;
+        }
+        SLANG_CHECK(actual[i] == expected[i]);
+    }
+}
+
 static void bindConverterBuffers(
     IShaderObject* rootObject,
     IBuffer* portableBuffer,
@@ -544,19 +664,22 @@ static void bindConverterBuffers(
     IBuffer* optimalBuffer,
     size_t optimalByteSize,
     IBuffer* roundTripBuffer,
-    size_t roundTripByteSize)
+    size_t roundTripByteSize,
+    const char* portableBufferName = "portableBuffer",
+    const char* optimalBufferName = "optimalBuffer",
+    const char* roundTripBufferName = "roundTripBuffer")
 {
     ShaderCursor rootCursor(rootObject);
     GFX_CHECK_CALL_ABORT(bindRWStructuredBufferHandle(
-        rootCursor.getPath("portableBuffer"),
+        rootCursor.getPath(portableBufferName),
         portableBuffer,
         portableByteSize));
     GFX_CHECK_CALL_ABORT(bindRWStructuredBufferHandle(
-        rootCursor.getPath("optimalBuffer"),
+        rootCursor.getPath(optimalBufferName),
         optimalBuffer,
         optimalByteSize));
     GFX_CHECK_CALL_ABORT(bindRWStructuredBufferHandle(
-        rootCursor.getPath("roundTripBuffer"),
+        rootCursor.getPath(roundTripBufferName),
         roundTripBuffer,
         roundTripByteSize));
 }
@@ -570,7 +693,10 @@ static void dispatchConverter(
     size_t optimalByteSize,
     IBuffer* roundTripBuffer,
     size_t roundTripByteSize,
-    DispatchSize dispatchSize)
+    DispatchSize dispatchSize,
+    const char* portableBufferName = "portableBuffer",
+    const char* optimalBufferName = "optimalBuffer",
+    const char* roundTripBufferName = "roundTripBuffer")
 {
     auto queue = device->getQueue(QueueType::Graphics);
     auto commandEncoder = queue->createCommandEncoder();
@@ -584,7 +710,10 @@ static void dispatchConverter(
         optimalBuffer,
         optimalByteSize,
         roundTripBuffer,
-        roundTripByteSize);
+        roundTripByteSize,
+        portableBufferName,
+        optimalBufferName,
+        roundTripBufferName);
 
     encoder->dispatchCompute(dispatchSize.x, dispatchSize.y, dispatchSize.z);
     encoder->end();
@@ -608,7 +737,8 @@ static void neuralNetworkConverterTestImpl(IDevice* device, const TargetCase& ta
     // 2. Query the public converter type directly through reflection. The
     // allocations below deliberately use these reflected values, which is the
     // same pattern we expect end-user host code to follow.
-    ReflectedNetworkSize reflectedSize = queryAndCheckNetworkSize(slangReflection, target);
+    ReflectedNetworkSize reflectedSize =
+        queryAndCheckNetworkSize(slangReflection, target, "float", kBytesLogical, kBytesPhysical);
 
     Slang::ComPtr<IShaderProgram> toPortableProgram;
     slang::ProgramLayout* unusedReflection = nullptr;
@@ -686,6 +816,104 @@ static void neuralNetworkConverterTestImpl(IDevice* device, const TargetCase& ta
     checkFloatBuffer(device, roundTripBuffer, "roundTrip", portable);
 }
 
+static void neuralNetworkConverterHalfTestImpl(IDevice* device, const TargetCase& target)
+{
+    Slang::ComPtr<IShaderProgram> toOptimalProgram;
+    slang::ProgramLayout* slangReflection = nullptr;
+    GFX_CHECK_CALL_ABORT(loadConverterProgram(
+        device,
+        target,
+        "halfToOptimalMain",
+        toOptimalProgram,
+        slangReflection));
+
+    ReflectedNetworkSize reflectedSize = queryAndCheckNetworkSize(
+        slangReflection,
+        target,
+        "half",
+        kBytesLogicalHalf,
+        kBytesPhysicalHalf);
+
+    Slang::ComPtr<IShaderProgram> toPortableProgram;
+    slang::ProgramLayout* unusedReflection = nullptr;
+    GFX_CHECK_CALL_ABORT(loadConverterProgram(
+        device,
+        target,
+        "halfToPortableMain",
+        toPortableProgram,
+        unusedReflection));
+
+    ComputePipelineDesc toOptimalPipelineDesc = {};
+    toOptimalPipelineDesc.program = toOptimalProgram.get();
+    Slang::ComPtr<IComputePipeline> toOptimalPipeline;
+    GFX_CHECK_CALL_ABORT(
+        device->createComputePipeline(toOptimalPipelineDesc, toOptimalPipeline.writeRef()));
+
+    ComputePipelineDesc toPortablePipelineDesc = {};
+    toPortablePipelineDesc.program = toPortableProgram.get();
+    Slang::ComPtr<IComputePipeline> toPortablePipeline;
+    GFX_CHECK_CALL_ABORT(
+        device->createComputePipeline(toPortablePipelineDesc, toPortablePipeline.writeRef()));
+
+    std::vector<uint16_t> portable = makeHalfPortableParameters(reflectedSize.elementCountLogical);
+    std::vector<uint16_t> optimalInitial(
+        reflectedSize.elementCountPhysical,
+        Slang::FloatToHalf(-123.0f));
+    std::vector<uint16_t> roundTripInitial(
+        reflectedSize.elementCountLogical,
+        Slang::FloatToHalf(77.0f));
+
+    auto portableBuffer = createHalfBuffer(device, portable.data(), portable.size());
+    auto optimalBuffer = createHalfBuffer(device, optimalInitial.data(), optimalInitial.size());
+    auto roundTripBuffer =
+        createHalfBuffer(device, roundTripInitial.data(), roundTripInitial.size());
+
+    size_t portableByteSize = reflectedSize.bytesLogical;
+    size_t optimalByteSize = reflectedSize.bytesPhysical;
+    size_t roundTripByteSize = reflectedSize.bytesLogical;
+    SLANG_CHECK_ABORT(portableByteSize == portable.size() * sizeof(uint16_t));
+    SLANG_CHECK_ABORT(optimalByteSize == optimalInitial.size() * sizeof(uint16_t));
+    SLANG_CHECK_ABORT(roundTripByteSize == roundTripInitial.size() * sizeof(uint16_t));
+
+    dispatchConverter(
+        device,
+        toOptimalPipeline,
+        portableBuffer,
+        portableByteSize,
+        optimalBuffer,
+        optimalByteSize,
+        roundTripBuffer,
+        roundTripByteSize,
+        getConverterDispatchSize(reflectedSize.elementCountPhysical),
+        "halfPortableBuffer",
+        "halfOptimalBuffer",
+        "halfRoundTripBuffer");
+
+    checkHalfBuffer(
+        device,
+        optimalBuffer,
+        "halfOptimal",
+        makeExpectedOptimalHalfParameters(
+            target.converterTarget,
+            reflectedSize.elementCountPhysical));
+
+    dispatchConverter(
+        device,
+        toPortablePipeline,
+        portableBuffer,
+        portableByteSize,
+        optimalBuffer,
+        optimalByteSize,
+        roundTripBuffer,
+        roundTripByteSize,
+        getConverterDispatchSize(reflectedSize.elementCountLogical),
+        "halfPortableBuffer",
+        "halfOptimalBuffer",
+        "halfRoundTripBuffer");
+
+    checkHalfBuffer(device, roundTripBuffer, "halfRoundTrip", portable);
+}
+
 static void runNeuralNetworkConverterTest(UnitTestContext* context, const TargetCase& target)
 {
     auto device = createDeviceWithExperimentalFeature(context, target.deviceType);
@@ -695,6 +923,7 @@ static void runNeuralNetworkConverterTest(UnitTestContext* context, const Target
     }
 
     neuralNetworkConverterTestImpl(device, target);
+    neuralNetworkConverterHalfTestImpl(device, target);
 }
 
 SLANG_UNIT_TEST(neuralSlangNetworkConverterCUDA)

@@ -21,7 +21,10 @@ implementing neural;
 // offsets target-independent. The portable layout stays exact to the user's
 // expected per-layer bias choices.
 //
-// BiasMask uses one uint64_t bit per layer: bit 0 for D0 -> D1, bit 1 for D1 -> D2, etc.
+// BiasMask is a uint64_t bit field supporting up to 64 layers:
+// bit 0 for D0 -> D1, bit 1 for D1 -> D2, etc.
+// Use the ull suffix when setting bits >= 31, e.g. 1ull << 33, so the
+// intermediate mask expression is not truncated through int.
 // Example: NetworkParameterLayoutConverter<float, 0b01, 3, 5, 2>
 // means the 3 -> 5 layer has bias, and the 5 -> 2 layer does not.
 
@@ -478,8 +481,11 @@ public struct NetworkParameterLayoutConverter<
     public static const int BytesLogical = Impl.BytesLogical;
     public static const int BytesPhysical = Impl.BytesPhysical;
 
-    // Each caller-provided thread owns part of the flattened physical-output
-    // element stream: elementIndex = threadIndex + k * threadCount.
+    // The caller provides a flattened global thread id and the total number of
+    // participating threads. Each thread owns part of the physical-output
+    // element stream: elementIndex = threadIndex + k * threadCount. It is valid
+    // for threadCount to exceed ElementCountPhysical; excess threads do no work.
+    // Precondition: threadIndex < threadCount.
     [require(cuda, compute)]
     [require(metal, compute)]
     [require(spirv, spirv_1_0, compute)]
@@ -511,8 +517,11 @@ public struct NetworkParameterLayoutConverter<
         }
     }
 
-    // Each caller-provided thread owns part of the flattened logical-output
-    // element stream: elementIndex = threadIndex + k * threadCount.
+    // The caller provides a flattened global thread id and the total number of
+    // participating threads. Each thread owns part of the logical-output element
+    // stream: elementIndex = threadIndex + k * threadCount. It is valid for
+    // threadCount to exceed ElementCountLogical; excess threads do no work.
+    // Precondition: threadIndex < threadCount.
     [require(cuda, compute)]
     [require(metal, compute)]
     [require(spirv, spirv_1_0, compute)]
