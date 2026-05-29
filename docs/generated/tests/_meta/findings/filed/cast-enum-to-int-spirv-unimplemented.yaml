@@ -1,0 +1,37 @@
+schema_version: 1
+id: cast-enum-to-int-spirv-unimplemented
+bundle: target-pipelines/spirv
+suspected_kind: wrong-codegen
+scope: spirv
+title: "[spirv] enum-to-int cast unhandled by spirv-emit on -target spirv-asm path"
+observed_at: 2026-05-28T10:30:00+00:00
+evidence:
+  command: slangc repro.slang -target spirv-asm -entry main -stage compute -o /dev/null
+  source_slang: docs/generated/tests/target-pipelines/spirv/cast-enum-to-int.slang
+  observed_summary: An explicit enum-to-int cast in a SPIR-V-targeted entry point aborts compilation with an internal "unimplemented" error (`Unhandled local inst in spirv-emit: castToVoid`). Other text-emit targets (HLSL, GLSL, CUDA) handle the same construct.
+  exit_code: 255
+  minimized_repro: |
+    enum Color : int { Red = 1, Green = 2, Blue = 3 }
+
+    uniform Color c;
+
+    [shader("compute")]
+    [numthreads(1, 1, 1)]
+    void main()
+    {
+        int x = int(c);
+        (void)x;
+    }
+  stderr_tail: "error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE unimplemented: Unhandled local inst in spirv-emit: castToVoid(%1)"
+expected:
+  claim: An explicit enum-to-int cast in a SPIR-V-targeted function should emit valid SPIR-V. tests/compute/enum-tag-conversion.slang exercises `int(enumValue)` against `-slang -compute`, `-vk -compute` (SPIR-V via Vulkan) and `-cpu -compute` and passes; the bug is specific to the `-target spirv-asm` direct path.
+  citation_kind: sibling-test
+  citation: tests/compute/enum-tag-conversion.slang
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: fa86e5a04
+  doc_anchor: docs/generated/design/target-pipelines/spirv.md
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Original bootstrap saw `CastEnumToInt`; current slangc emits `castToVoid`. The IR opcode appears to have been renamed/refactored but the spirv-emit case remains unhandled."

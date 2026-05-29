@@ -1731,6 +1731,12 @@ static bool _isTrivialLookupFromInterfaceThis(IRGenContext* context, DeclRefBase
     return context->thisTypeWitness == nullptr;
 }
 
+static IRInst* ensureAbstractThisWitnessVisibleFromCurrentScope(
+    IRGenContext* context,
+    IRInst* abstractThisWitness,
+    Type* thisType);
+bool isAbstractWitnessTable(IRInst* inst);
+
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
 {
     IRGenContext* context;
@@ -1848,6 +1854,20 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitWitnessLookupIntVal(WitnessLookupIntVal* val)
     {
         auto witnessVal = lowerVal(context, val->getWitness());
+        if (isAbstractWitnessTable(witnessVal.val))
+        {
+            // A static-const requirement used inside an interface signature lowers as a
+            // witness lookup through an abstract witness table. In a generic
+            // interface such as `interface I<T> { static const int N; void f(T[N]); }`,
+            // the `T` parameter and the lowered lookup for `N` become operands of the same
+            // hoistable IR type. Cloning the abstract witness into the current lowering
+            // scope keeps those operands visible from one IR parent without replacing the
+            // dependent lookup with a concrete value.
+            witnessVal.val = ensureAbstractThisWitnessVisibleFromCurrentScope(
+                context,
+                witnessVal.val,
+                val->getWitness()->getSub());
+        }
         auto key = getInterfaceRequirementKey(context, val->getKey());
         auto type = lowerType(context, val->getType());
         return LoweredValInfo::simple(
@@ -5966,7 +5986,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->indexExprs[0]));
 
-        return subscriptValue(type, baseVal, indexVal);
+        return subscriptValue(type, baseVal, indexVal, expr->indexExprs[0]->loc);
     }
 
     LoweredValInfo visitThisExpr(ThisExpr* /*expr*/) { return context->thisVal; }
@@ -7030,7 +7050,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return this->dispatch(expr->valueArg);
     }
 
-    LoweredValInfo subscriptValue(IRType* type, LoweredValInfo baseVal, IRInst* indexVal)
+    LoweredValInfo subscriptValue(
+        IRType* type,
+        LoweredValInfo baseVal,
+        IRInst* indexVal,
+        SourceLoc indexLoc)
     {
         auto builder = getBuilder();
 
@@ -7038,6 +7062,67 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // and try to turn it into a single pointer, if possible.
         //
         baseVal = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
+
+        if (auto indexLit = as<IRIntLit>(indexVal))
+        {
+            const auto indexValue = indexLit->getValue();
+            if (indexValue >= 0)
+            {
+                switch (baseVal.flavor)
+                {
+                case LoweredValInfo::Flavor::SwizzledLValue:
+                    {
+                        auto baseSwizzleInfo = baseVal.getSwizzledLValueInfo();
+                        if (indexValue < (IRIntegerValue)baseSwizzleInfo->elementIndices.getCount())
+                        {
+                            const auto index = (Index)indexValue;
+                            RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo();
+                            context->shared->extValues.add(swizzledLValue);
+
+                            swizzledLValue->type = type;
+                            swizzledLValue->base = baseSwizzleInfo->base;
+                            swizzledLValue->elementIndices.add(
+                                baseSwizzleInfo->elementIndices[index]);
+                            return LoweredValInfo::swizzledLValue(swizzledLValue);
+                        }
+                    }
+                    break;
+
+                case LoweredValInfo::Flavor::SwizzledMatrixLValue:
+                    {
+                        auto baseSwizzleInfo = baseVal.getSwizzledMatrixLValueInfo();
+                        if (indexValue < (IRIntegerValue)baseSwizzleInfo->elementCount)
+                        {
+                            const auto index = (Index)indexValue;
+                            RefPtr<SwizzledMatrixLValueInfo> swizzledLValue =
+                                new SwizzledMatrixLValueInfo();
+                            context->shared->extValues.add(swizzledLValue);
+
+                            swizzledLValue->type = type;
+                            swizzledLValue->base = baseSwizzleInfo->base;
+                            swizzledLValue->elementCount = 1;
+                            swizzledLValue->elementCoords[0] =
+                                baseSwizzleInfo->elementCoords[index];
+                            return LoweredValInfo::swizzledMatrixLValue(swizzledLValue);
+                        }
+                    }
+                    break;
+
+                default:
+                    break;
+                }
+            }
+        }
+
+        if (!as<IRIntLit>(indexVal) && isLValueContext() &&
+            (baseVal.flavor == LoweredValInfo::Flavor::SwizzledLValue ||
+             baseVal.flavor == LoweredValInfo::Flavor::SwizzledMatrixLValue))
+        {
+            context->getSink()->diagnose(Diagnostics::NeedCompileTimeConstant{
+                .location = indexLoc,
+            });
+            return LoweredValInfo::ptr(builder->emitVar(type));
+        }
 
         // The `materialize` operation should ensure that we only have to deal
         // with the small number of base cases for lowered value representations.
@@ -7260,7 +7345,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
     LoweredValInfo visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr)
     {
         auto irType = lowerType(context, expr->type);
-        auto loweredBase = lowerRValueExpr(context, expr->base);
+        auto loweredBase = lowerLValueExpr(context, expr->base);
 
         RefPtr<SwizzledMatrixLValueInfo> swizzledLValue = new SwizzledMatrixLValueInfo();
         swizzledLValue->type = irType;
@@ -7408,9 +7493,10 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
             auto index2 =
                 builder->getIntValue(irIntType, (IRIntegerValue)expr->elementCoords[ii].col);
             // First index expression
-            auto irExtract1 = subscriptValue(subscript1, base, index1);
+            auto irExtract1 = subscriptValue(subscript1, base, index1, expr->loc);
             // Second index expression
-            irExtracts[ii] = getSimpleVal(context, subscriptValue(subscript2, irExtract1, index2));
+            irExtracts[ii] =
+                getSimpleVal(context, subscriptValue(subscript2, irExtract1, index2, expr->loc));
         }
 
         if (elementCount > 1)
@@ -9551,6 +9637,14 @@ LoweredValInfo tryGetAddress(
             UInt elementCount = originalSwizzleInfo->elementCount;
 
             auto newBase = tryGetAddress(context, originalBase, TryGetAddressMode::Aggressive);
+            if (newBase.flavor == LoweredValInfo::Flavor::Ptr && elementCount == 1)
+            {
+                auto coord = originalSwizzleInfo->elementCoords[0];
+                auto rowPtr = context->irBuilder->emitElementAddress(newBase.val, coord.row);
+                auto elementPtr = context->irBuilder->emitElementAddress(rowPtr, coord.col);
+                return LoweredValInfo::ptr(elementPtr);
+            }
+
             RefPtr<SwizzledMatrixLValueInfo> newSwizzleInfo = new SwizzledMatrixLValueInfo();
             context->shared->extValues.add(newSwizzleInfo);
 
@@ -14212,20 +14306,23 @@ bool isAbstractWitnessTable(IRInst* inst)
     return false;
 }
 
-static IRInst* maybeCloneThisTypeWitness(
+static IRInst* ensureAbstractThisWitnessVisibleFromCurrentScope(
     IRGenContext* context,
-    IRInst* thisTypeWitness,
+    IRInst* abstractThisWitness,
     Type* thisType)
 {
+    SLANG_ASSERT(isAbstractWitnessTable(abstractThisWitness));
+
     auto currentInsertLoc = context->irBuilder->getInsertLoc().getParent();
-    auto parentOfThisTypeWitness = thisTypeWitness->parent;
+    auto parentOfAbstractWitness = abstractThisWitness->parent;
 
     while (currentInsertLoc != nullptr)
     {
-        // If current insert location is same as scope of ThisTypeWitness, don't copy it.
-        if (parentOfThisTypeWitness == currentInsertLoc)
+        // If the abstract witness is already visible from the current insert
+        // location, keep using the existing IR value.
+        if (parentOfAbstractWitness == currentInsertLoc)
         {
-            return thisTypeWitness;
+            return abstractThisWitness;
         }
 
         currentInsertLoc = currentInsertLoc->parent;
@@ -14394,8 +14491,10 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
 
             if (isAbstractWitnessTable(irWitnessTable))
             {
-                // Copy ThisTypeWitness locally if necessary
-                irWitnessTable = maybeCloneThisTypeWitness(
+                // Abstract interface-self witnesses may be defined outside the
+                // current IR scope. Recreate the `This` witness locally when the
+                // existing proof is not visible from this use site.
+                irWitnessTable = ensureAbstractThisWitnessVisibleFromCurrentScope(
                     context,
                     irWitnessTable,
                     thisTypeSubst->getLookupSource());
