@@ -146,6 +146,76 @@ SLANG_UNIT_TEST(linkTimeTypeReflection)
 }
 
 
+// Test that `getDefaultValueInt` can resolve static const values under a specialized generic type.
+
+SLANG_UNIT_TEST(linkTimeStaticConstIntReflection)
+{
+    const char* userSourceBody = R"(
+        module LinkTimeStaticConstInt;
+
+        public struct StaticConstCarrier<int N>
+        {
+            public static const int Value = N + 1;
+        }
+
+        public struct NestedCarrier<int N>
+        {
+            public static const int Value = StaticConstCarrier<N>.Value + 3;
+        }
+
+        public struct LiteralCarrier
+        {
+            public static const int Value = 23;
+        }
+        )";
+
+    String moduleName = "LinkTimeStaticConstInt";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        moduleName.getBuffer(),
+        (moduleName + ".slang").getBuffer(),
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    module->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+    auto programLayout = linkedProgram->getLayout();
+    SLANG_CHECK_ABORT(programLayout != nullptr);
+
+    auto getStaticInt = [&](const char* typeName, const char* varName) -> int64_t
+    {
+        auto type = programLayout->findTypeByName(typeName);
+        SLANG_CHECK_ABORT(type != nullptr);
+
+        auto valueVar = programLayout->findVarByNameInType(type, varName);
+        SLANG_CHECK_ABORT(valueVar != nullptr);
+
+        int64_t value = 0;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(valueVar->getDefaultValueInt(&value)));
+        return value;
+    };
+
+    SLANG_CHECK(getStaticInt("StaticConstCarrier<5>", "Value") == 6);
+    SLANG_CHECK(getStaticInt("NestedCarrier<5>", "Value") == 9);
+    SLANG_CHECK(getStaticInt("LiteralCarrier", "Value") == 23);
+}
+
+
 // Test that the reflection API provides correct info about modules using link-time constants in a
 // `Conditional` field.
 
