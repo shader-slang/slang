@@ -98,7 +98,10 @@ set(_dxc_build_from_source OFF)
 
 if(SLANG_DXC_BUILD_FROM_SOURCE)
     # User explicitly requested a source build.
-    if(CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if(
+        CMAKE_SYSTEM_NAME STREQUAL "Windows"
+        OR CMAKE_SYSTEM_NAME STREQUAL "Linux"
+    )
         set(_dxc_build_from_source ON)
     else()
         message(
