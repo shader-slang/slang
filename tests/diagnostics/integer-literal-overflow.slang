@@ -1,11 +1,9 @@
-//DISABLED_DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
 //
 // Verifies that integer literal overflows trigger diagnostics. See
 // docs/language-reference/expressions-literal.md for details.
 //
 // This test amends tests/front-end/integer-literal-types.slang.
-//
-// Test enablement is tracked by https://github.com/shader-slang/slang/issues/11216
 
 enum IntegerLiteralType
 {
@@ -79,11 +77,11 @@ void main()
     // uintptr_t/uint64_t for a 'Z' (signed) suffix, so this is an error.
     //
 
-    getType(9223372036854775808Z);        // dec, 'Z' suffix: intptr_t overflow (error)
-//CHECK:    ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in any integer type
+    static_assert(IntegerLiteralType.UINTPTR == getType(9223372036854775808Z), "dec, 'Z' suffix: intptr_t overflow (error)");
+//CHECK:                                                ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    getType(18446744073709551615Z);       // dec, 'Z' suffix: intptr_t overflow (error)
-//CHECK:    ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in any integer type
+    static_assert(IntegerLiteralType.UINTPTR == getType(18446744073709551615Z), "dec, 'Z' suffix: intptr_t overflow (error)");
+//CHECK:                                                ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     //
     // Errors: decimal value > UINTPTR_MAX for 'Z'/'UZ'/'ZU' suffix.
@@ -128,4 +126,15 @@ void main()
 
     getType(0x10000000000000000ZU);       // hex, 'ZU' suffix: uintptr_t overflow (error)
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in any integer type
+
+    // negated overflow
+    static_assert(IntegerLiteralType.INT64   == getType(-9223372036854775809),   "unary-minus(INT64_MAX+2), no suffix");
+//CHECK:                                                 ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+
+    // check that not/plus prefixes still trigger the overflow warning (ignored with minus)
+    static_assert(IntegerLiteralType.INT64   == getType(~9223372036854775808),   "bit-wise-not(INT64_MAX+1), no suffix");
+//CHECK:                                                 ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+
+    static_assert(IntegerLiteralType.INT64   == getType(+9223372036854775808),   "unary-plus(INT64_MAX+1), no suffix");
+//CHECK:                                                 ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 }

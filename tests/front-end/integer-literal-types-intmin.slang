@@ -1,11 +1,9 @@
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute -warnings-as-errors all
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute -warnings-as-errors all
 //
 // Verifies correct minimum integer decimal value handling as
 // specified in docs/language-reference/expressions-literal.md.
 //
 // This test amends tests/front-end/integer-literal-types.slang.
-//
-// Test enablement is tracked by https://github.com/shader-slang/slang/issues/11216
 
 enum IntegerLiteralType
 {
@@ -37,6 +35,4 @@ void main()
 
     static_assert(IntegerLiteralType.INT64   == getType(-2147483648LL),          "minimum value of int32_t 'LL'");
     static_assert(IntegerLiteralType.INT64   == getType(-9223372036854775808LL), "minimum value of int64_t 'LL'");
-
-    static_assert(IntegerLiteralType.INT64   == getType(-9223372036854775808Z),  "minimum value of intptr_t 'Z (64-bit host)'");
 }

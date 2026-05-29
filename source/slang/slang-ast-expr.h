@@ -91,6 +91,9 @@ class LiteralExpr : public Expr
     // The token that was used to express the literal. This can be
     // used to get the raw text of the literal, including any suffix.
     Token token;
+
+    // The suffix type is used to mark the literal type until a proper AST
+    // expression type is attached.
     FIDDLE() BaseType suffixType = BaseType::Void;
 };
 
@@ -99,6 +102,24 @@ class IntegerLiteralExpr : public LiteralExpr
 {
     FIDDLE(...)
     FIDDLE() IntegerLiteralValue value;
+
+    // The signed minimum integer exception. When true, the integer literal may
+    // be negated to express the minimum integer value.
+    //
+    // This is used for graceful handling of numeric expressions such as:
+    // - 2147483648           (INT_MIN)
+    // - 9223372036854775808  (INT64_MIN)
+    //
+    // True if the integer literal:
+    // - uses the decimal base
+    // - does not have the unsigned suffix
+    // - is a candidate for minimum signed integer
+    //
+    // This is used by parsePrefixExpr() to fix the type after negation (e.g.,
+    // -2147483648 back from Int64 to Int).
+    //
+    // See also docs/language-reference/expressions-literal.md
+    bool signedMinimumIntException { false };
 };
 
 FIDDLE()
