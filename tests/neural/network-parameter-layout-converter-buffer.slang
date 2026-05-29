@@ -17,6 +17,9 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=TOPBIT):-cuda -compute -entry topBitMaskMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=MIXEDROUNDTRIP):-vk -compute -entry mixedBiasRoundTripMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=MIXEDROUNDTRIP):-cuda -compute -entry mixedBiasRoundTripMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=THREADCOUNTS):-vk -compute -entry threadCountBoundaryMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=THREADCOUNTS):-mtl -compute -entry threadCountBoundaryMain -shaderobj -xslang -experimental-feature -output-using-type
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=THREADCOUNTS):-cuda -compute -entry threadCountBoundaryMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
 
 import slang.neural;
 
@@ -441,4 +444,107 @@ void mixedBiasRoundTripMain(uint tid : SV_GroupIndex)
 
     // MIXEDROUNDTRIP: 1
     // MIXEDROUNDTRIP-NEXT: 1
+}
+
+void fillBoundaryPortable(uint tid)
+{
+    for (uint i = tid; i < uint(BiasConverter.ElementCountLogical); i += 32)
+        portable[i] = float(i + 1);
+}
+
+void fillBoundaryOptimal(uint tid, float value)
+{
+    for (uint i = tid; i < uint(BiasConverter.ElementCountPhysical); i += 32)
+        optimal[i] = value;
+}
+
+bool checkBoundaryOptimal()
+{
+    bool commonOk =
+        optimal[0] == 1.0 &&
+        optimal[256] == 9.0 &&
+        optimal[257] == 10.0 &&
+        optimal[258] == 0.0 &&
+        optimal[271] == 0.0;
+
+    bool targetOk = false;
+    __target_switch
+    {
+    case cuda:
+        targetOk = optimal[1] == 2.0 && optimal[8] == 3.0 && optimal[9] == 4.0 &&
+            optimal[32] == 5.0 && optimal[33] == 6.0 && optimal[40] == 7.0 && optimal[41] == 8.0;
+    case spirv:
+    case metal:
+        targetOk = optimal[1] == 2.0 && optimal[2] == 3.0 && optimal[3] == 4.0 &&
+            optimal[16] == 5.0 && optimal[17] == 6.0 && optimal[18] == 7.0 && optimal[19] == 8.0;
+    }
+
+    return commonOk && targetOk;
+}
+
+bool checkBoundarySentinel(float sentinel)
+{
+    bool ok = true;
+    for (int i = 0; i < BiasConverter.ElementCountPhysical; ++i)
+        ok = ok && optimal[i] == sentinel;
+    return ok;
+}
+
+[shader("compute")]
+[numthreads(32, 1, 1)]
+void threadCountBoundaryMain(uint tid : SV_GroupIndex)
+{
+    fillBoundaryPortable(tid);
+    fillBoundaryOptimal(tid, -7.0);
+    AllMemoryBarrierWithGroupSync();
+
+    let portableAddress = BindlessAddress<float>(portable);
+    let optimalAddress = BindlessAddress<float>(optimal);
+
+    BiasConverter.toOptimalLayout(portableAddress, optimalAddress, tid, 0);
+    AllMemoryBarrierWithGroupSync();
+
+    if (tid == 0)
+        resultBuffer[0] = checkBoundarySentinel(-7.0) ? 1 : 0;
+    AllMemoryBarrierWithGroupSync();
+
+    fillBoundaryOptimal(tid, 0.0);
+    AllMemoryBarrierWithGroupSync();
+    if (tid == 0)
+        BiasConverter.toOptimalLayout(portableAddress, optimalAddress, 0, 1);
+    AllMemoryBarrierWithGroupSync();
+
+    if (tid == 0)
+        resultBuffer[1] = checkBoundaryOptimal() ? 1 : 0;
+    AllMemoryBarrierWithGroupSync();
+
+    fillBoundaryOptimal(tid, 0.0);
+    AllMemoryBarrierWithGroupSync();
+    BiasConverter.toOptimalLayout(
+        portableAddress,
+        optimalAddress,
+        tid,
+        uint(BiasConverter.ElementCountPhysical));
+    AllMemoryBarrierWithGroupSync();
+
+    if (tid == 0)
+        resultBuffer[2] = checkBoundaryOptimal() ? 1 : 0;
+    AllMemoryBarrierWithGroupSync();
+
+    fillBoundaryOptimal(tid, 0.0);
+    AllMemoryBarrierWithGroupSync();
+    BiasConverter.toOptimalLayout(
+        portableAddress,
+        optimalAddress,
+        tid,
+        uint(BiasConverter.ElementCountPhysical * 4));
+    AllMemoryBarrierWithGroupSync();
+
+    if (tid == 0)
+        resultBuffer[3] = checkBoundaryOptimal() ? 1 : 0;
+
+    // THREADCOUNTS: 1
+    // THREADCOUNTS-NEXT: 1
+    // THREADCOUNTS-NEXT: 1
+    // THREADCOUNTS-NEXT: 1
 }
