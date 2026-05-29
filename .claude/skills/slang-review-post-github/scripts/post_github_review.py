@@ -8,6 +8,7 @@ ambiguous or cannot be mapped to the GitHub diff, it exits before creating a rev
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
@@ -17,7 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Dict, Iterable, List, NoReturn, Optional, Sequence, Set, Tuple
 
 
 POSTABLE_STATUSES = {"Keep", "Revise", "Needs judgment call", "Needs human judgment"}
@@ -30,31 +31,22 @@ DEFAULT_AGENT_REVIEW_PREFIX = "Agent-generated clarity review: "
 
 
 class FatalError(Exception):
-    pass
+    """An input or environment problem that must stop before creating a review."""
 
 
+@dataclass(frozen=True)
 class Candidate:
-    def __init__(
-        self,
-        candidate_id: str,
-        title: str,
-        status: str,
-        scope_decision: str,
-        overlap_decision: str,
-        path: str,
-        start_line: int,
-        end_line: int,
-        body: str,
-    ) -> None:
-        self.candidate_id = candidate_id
-        self.title = title
-        self.status = status
-        self.scope_decision = scope_decision
-        self.overlap_decision = overlap_decision
-        self.path = path
-        self.start_line = start_line
-        self.end_line = end_line
-        self.body = body
+    """A filtered candidate comment that can be attached to a GitHub diff range."""
+
+    candidate_id: str
+    title: str
+    status: str
+    scope_decision: str
+    overlap_decision: str
+    path: str
+    start_line: int
+    end_line: int
+    body: str
 
 
 HEADING_RE = re.compile(r"^###\s+([A-Z]+[0-9]+):\s+(.+?)\s*$")
@@ -74,11 +66,15 @@ AGENT_REVIEW_LABEL_RE = re.compile(
 )
 
 
-def fail(message: str) -> None:
+def fail(message: str) -> NoReturn:
+    """Raise a fatal validation error with a user-facing message."""
+
     raise FatalError(message)
 
 
 def run_json(args: Sequence[str]) -> object:
+    """Run a command that must succeed and emit a JSON document."""
+
     result = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode != 0:
         fail(
@@ -93,6 +89,8 @@ def run_json(args: Sequence[str]) -> object:
 
 
 def run_text(args: Sequence[str]) -> str:
+    """Run a command that must succeed and return its stdout."""
+
     result = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode != 0:
         fail(
@@ -104,6 +102,8 @@ def run_text(args: Sequence[str]) -> str:
 
 
 def is_wsl() -> bool:
+    """Return true when the script is running under Windows Subsystem for Linux."""
+
     try:
         text = Path("/proc/version").read_text(encoding="utf-8", errors="ignore").lower()
     except OSError:
@@ -112,6 +112,8 @@ def is_wsl() -> bool:
 
 
 def find_gh(explicit: Optional[str]) -> str:
+    """Find the GitHub CLI executable that should share this repo's credential context."""
+
     if explicit:
         if shutil.which(explicit) or Path(explicit).exists():
             return explicit
@@ -136,6 +138,8 @@ def find_gh(explicit: Optional[str]) -> str:
 
 
 def parse_location(raw: str, candidate_id: str) -> Tuple[str, int, int]:
+    """Parse a candidate `Location` field into a path and inclusive right-side line range."""
+
     text = raw.strip()
     match = LOCATION_RE.match(text)
     if not match:
@@ -151,6 +155,12 @@ def parse_location(raw: str, candidate_id: str) -> Tuple[str, int, int]:
 
 
 def parse_proposed_comment(block: List[str], candidate_id: str) -> str:
+    """Extract a candidate's strict-blockquote `Proposed comment` body.
+
+    A blank line after the first quoted line terminates the proposed comment section, allowing
+    `Notes:` to follow. Blank lines inside the posted comment must therefore be written as `>`.
+    """
+
     for i, line in enumerate(block):
         if line.strip() == "Proposed comment:":
             body_lines: List[str] = []
@@ -169,9 +179,8 @@ def parse_proposed_comment(block: List[str], candidate_id: str) -> str:
                     if raw.strip() == "":
                         break
                     fail(
-                        "{} Proposed comment must use strict blockquote lines; offending line: {}".format(
-                            candidate_id, raw
-                        )
+                        "{} Proposed comment must use strict blockquote lines; "
+                        "offending line: {}".format(candidate_id, raw)
                     )
                 fail("{} has Proposed comment but no blockquote body".format(candidate_id))
             body = "\n".join(body_lines).strip()
@@ -182,6 +191,8 @@ def parse_proposed_comment(block: List[str], candidate_id: str) -> str:
 
 
 def extract_review_body(lines: List[str]) -> Optional[str]:
+    """Extract the optional strict-blockquote `## Review Body` section."""
+
     start: Optional[int] = None
     for index, line in enumerate(lines):
         if line.strip() == "## Review Body":
@@ -227,7 +238,11 @@ def extract_review_body(lines: List[str]) -> Optional[str]:
     return body
 
 
-def parse_candidates(path: Path, include_judgment_calls: bool) -> Tuple[List[Candidate], Optional[str]]:
+def parse_candidates(
+    path: Path, include_judgment_calls: bool
+) -> Tuple[List[Candidate], Optional[str]]:
+    """Parse and validate the candidate file sections that are needed before posting."""
+
     lines = path.read_text(encoding="utf-8").splitlines()
     review_body = extract_review_body(lines)
     headings: List[Tuple[int, str, str]] = []
@@ -279,9 +294,8 @@ def parse_candidates(path: Path, include_judgment_calls: bool) -> Tuple[List[Can
             continue
         if status not in POSTABLE_STATUSES:
             errors.append(
-                "{} has non-postable Status {!r}; run consolidation and scope filtering first".format(
-                    candidate_id, status
-                )
+                "{} has non-postable Status {!r}; run consolidation and scope filtering "
+                "first".format(candidate_id, status)
             )
             continue
 
@@ -353,6 +367,8 @@ def parse_candidates(path: Path, include_judgment_calls: bool) -> Tuple[List[Can
 
 
 def flatten_pages(value: object) -> List[dict]:
+    """Normalize a GitHub `--paginate --slurp` response into one list of JSON objects."""
+
     if not isinstance(value, list):
         fail("expected a JSON array from GitHub")
     if not value:
@@ -368,6 +384,13 @@ def flatten_pages(value: object) -> List[dict]:
 
 
 def right_lines_from_patch(patch: str) -> Set[int]:
+    """Return right-side line numbers that GitHub should accept for review comments.
+
+    GitHub allows comments on added lines and context lines in the unified diff. Removed lines
+    are left-side lines and cannot be targeted by this script because it always posts comments
+    on the PR version of the file.
+    """
+
     lines: Set[int] = set()
     current: Optional[int] = None
     for raw in patch.splitlines():
@@ -393,6 +416,8 @@ def right_lines_from_patch(patch: str) -> Set[int]:
 def validate_locations(
     gh: str, repo: str, pr: int, candidates: Iterable[Candidate]
 ) -> Tuple[str, Dict[str, Set[int]]]:
+    """Verify candidate locations against the PR diff and return the head commit id."""
+
     pr_info = run_json([gh, "api", "repos/{}/pulls/{}".format(repo, pr)])
     if not isinstance(pr_info, dict):
         fail("unexpected PR JSON shape")
@@ -437,7 +462,8 @@ def validate_locations(
         ]
         if missing:
             errors.append(
-                "{} Location {}:{}-{} is not fully present in the GitHub diff; missing line(s): {}".format(
+                "{} Location {}:{}-{} is not fully present in the GitHub diff; "
+                "missing line(s): {}".format(
                     candidate.candidate_id,
                     candidate.path,
                     candidate.start_line,
@@ -458,7 +484,11 @@ def build_payload(
     review_body: Optional[str],
     agent_review_prefix: Optional[str],
 ) -> dict:
-    judgment_call_count = sum(1 for candidate in candidates if candidate.status in JUDGMENT_STATUSES)
+    """Build the GitHub PR review API payload from validated candidates."""
+
+    judgment_call_count = sum(
+        1 for candidate in candidates if candidate.status in JUDGMENT_STATUSES
+    )
     if review_body is None:
         review_body = "Clarity review."
         if judgment_call_count:
@@ -494,6 +524,8 @@ def build_payload(
 
 
 def post_review(gh: str, repo: str, pr: int, payload: dict) -> str:
+    """Submit a GitHub PR review through `gh api` using a temporary JSON payload."""
+
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as f:
         json.dump(payload, f, indent=2)
         temp_path = f.name
@@ -517,6 +549,8 @@ def post_review(gh: str, repo: str, pr: int, payload: dict) -> str:
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
+    """Parse command-line arguments."""
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", required=True, help="GitHub repository, e.g. shader-slang/slang")
     parser.add_argument("--pr", required=True, type=int, help="Pull request number")
@@ -550,11 +584,15 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         action="store_true",
         help="Do not post candidates with Status: Needs judgment call",
     )
-    parser.add_argument("--dry-run", action="store_true", help="Validate and print payload; do not post")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Validate and print payload; do not post"
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str]) -> int:
+    """Validate input, build the review payload, and optionally post it to GitHub."""
+
     args = parse_args(argv)
     if not args.candidates.exists():
         fail("candidate file does not exist: {}".format(args.candidates))

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 
@@ -14,6 +15,8 @@ SPEC = importlib.util.spec_from_file_location("post_github_review", SCRIPT_PATH)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("could not load post_github_review.py")
 post_github_review = importlib.util.module_from_spec(SPEC)
+# Decorators such as `dataclass` expect the module to be registered while it is executing.
+sys.modules[SPEC.name] = post_github_review
 SPEC.loader.exec_module(post_github_review)
 
 
@@ -30,6 +33,8 @@ def make_candidate_text(
     proposed_comment_lines: list[str] | None = None,
     notes_lines: list[str] | None = None,
 ) -> str:
+    """Build a minimal candidate file for parser and payload tests."""
+
     lines: list[str] = ["# Scope-Filtered Review Candidates", ""]
     if review_body is not None:
         lines.append("## Review Body")
@@ -89,7 +94,11 @@ def make_candidate_text(
 
 
 class PostGithubReviewTests(unittest.TestCase):
+    """Regression tests for candidate parsing, diff validation, and review payloads."""
+
     def write_candidate_file(self, text: str) -> Path:
+        """Write candidate markdown to a temporary file cleaned up after the test."""
+
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
         path = Path(temp_dir.name) / "candidates.md"
@@ -97,6 +106,8 @@ class PostGithubReviewTests(unittest.TestCase):
         return path
 
     def test_parse_candidates_extracts_review_body_and_comment(self) -> None:
+        """Quoted review-body and proposed-comment content is extracted without metadata."""
+
         path = self.write_candidate_file(
             make_candidate_text(
                 review_body=(
@@ -131,6 +142,8 @@ class PostGithubReviewTests(unittest.TestCase):
         self.assertIn("invariant needed", candidates[0].body)
 
     def test_unquoted_review_body_line_fails(self) -> None:
+        """A review body with ordinary unquoted content is rejected."""
+
         path = self.write_candidate_file(
             make_candidate_text(review_body="Review summary.", quote_review_body=False)
         )
@@ -139,6 +152,8 @@ class PostGithubReviewTests(unittest.TestCase):
             post_github_review.parse_candidates(path, include_judgment_calls=True)
 
     def test_lazy_review_body_continuation_fails(self) -> None:
+        """A review body using Markdown lazy blockquote continuation is rejected."""
+
         path = self.write_candidate_file(
             make_candidate_text(
                 review_body="> Review summary.\nlazy continuation",
@@ -150,6 +165,8 @@ class PostGithubReviewTests(unittest.TestCase):
             post_github_review.parse_candidates(path, include_judgment_calls=True)
 
     def test_unquoted_review_body_heading_fails_instead_of_truncating(self) -> None:
+        """An unquoted heading inside the review body fails instead of ending the section."""
+
         path = self.write_candidate_file(
             make_candidate_text(
                 review_body="> Review summary.\n## Details\n> More detail.",
@@ -161,18 +178,24 @@ class PostGithubReviewTests(unittest.TestCase):
             post_github_review.parse_candidates(path, include_judgment_calls=True)
 
     def test_missing_required_metadata_fails(self) -> None:
+        """Posting fails when a required post-filter metadata field is absent."""
+
         path = self.write_candidate_file(make_candidate_text(scope_decision=None))
 
         with self.assertRaisesRegex(post_github_review.FatalError, "missing Scope decision"):
             post_github_review.parse_candidates(path, include_judgment_calls=True)
 
     def test_invalid_location_fails_before_posting(self) -> None:
+        """Invalid candidate line ranges are rejected during candidate parsing."""
+
         path = self.write_candidate_file(make_candidate_text(location="`source/file.cpp:0`"))
 
         with self.assertRaisesRegex(post_github_review.FatalError, "invalid Location line range"):
             post_github_review.parse_candidates(path, include_judgment_calls=True)
 
     def test_lazy_proposed_comment_continuation_fails(self) -> None:
+        """A proposed comment with unquoted continuation content is rejected."""
+
         path = self.write_candidate_file(
             make_candidate_text(
                 proposed_comment_lines=[
@@ -186,6 +209,8 @@ class PostGithubReviewTests(unittest.TestCase):
             post_github_review.parse_candidates(path, include_judgment_calls=True)
 
     def test_notes_metadata_does_not_override_candidate_metadata(self) -> None:
+        """Bullets in `Notes:` cannot override the candidate header metadata."""
+
         path = self.write_candidate_file(
             make_candidate_text(
                 notes_lines=[
@@ -203,6 +228,8 @@ class PostGithubReviewTests(unittest.TestCase):
         self.assertEqual(candidates[0].scope_decision, "Direct")
 
     def test_build_payload_labels_agent_review_and_maps_range(self) -> None:
+        """Payload construction labels agent reviews and preserves multi-line ranges."""
+
         candidate = post_github_review.Candidate(
             "C001",
             "Clarify the invariant",
@@ -241,6 +268,8 @@ class PostGithubReviewTests(unittest.TestCase):
         )
 
     def test_build_payload_does_not_duplicate_existing_agent_label(self) -> None:
+        """An existing agent-authorship label is not duplicated in the review body."""
+
         payload = post_github_review.build_payload(
             "abc123",
             "COMMENT",
@@ -264,9 +293,13 @@ class PostGithubReviewTests(unittest.TestCase):
         self.assertEqual(payload["body"], "Codex clarity review: Existing label.")
 
     def test_validate_locations_accepts_lines_in_patch(self) -> None:
+        """Location validation accepts right-side context and added lines from a patch."""
+
         old_run_json = post_github_review.run_json
 
         def fake_run_json(args: list[str]) -> object:
+            """Return enough fake GitHub API data to validate a successful location."""
+
             joined = " ".join(args)
             if "/pulls/123" in joined and "/files" not in joined:
                 return {"head": {"sha": "abc123"}}
@@ -312,9 +345,13 @@ class PostGithubReviewTests(unittest.TestCase):
         self.assertEqual(diff_lines["source/file.cpp"], {10, 11, 12})
 
     def test_validate_locations_rejects_lines_not_in_patch(self) -> None:
+        """Location validation rejects lines that GitHub cannot comment on."""
+
         old_run_json = post_github_review.run_json
 
         def fake_run_json(args: list[str]) -> object:
+            """Return enough fake GitHub API data to validate a failing location."""
+
             joined = " ".join(args)
             if "/pulls/123" in joined and "/files" not in joined:
                 return {"head": {"sha": "abc123"}}
