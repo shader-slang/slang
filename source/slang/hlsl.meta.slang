@@ -6606,12 +6606,6 @@ $}
                 originalValue = asfloat16((uint16_t)(_NvInterlockedAddFp16x2(byteAddress, packedInput) >> 16));
             }
             return;
-        case spvAtomicFloat16AddEXT:
-            {
-                let buf = __getEquivalentStructuredBuffer<half>(this);
-                originalValue = __atomic_add(buf[byteAddress/2], value);
-                return;
-            }
         default:
             {
                 let buf = __getEquivalentStructuredBuffer<half>(this);
@@ -33855,7 +33849,7 @@ uint packHalf2x16(half2 unpackedValue)
     return packHalf2x16(float2(unpackedValue));
 }
 
-[require(spirv, spvAtomicFloat16VectorNV)]
+[require(spirv)]
 void InterlockedAddF16Emulated(half* dest, half value, out half originalValue)
 {
     let buf = (half2*)(dest);
