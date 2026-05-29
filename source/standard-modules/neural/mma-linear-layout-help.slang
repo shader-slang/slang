@@ -4,6 +4,7 @@ public enum TargetEnum : uint32_t
 {
     CUDA = 0,
     SPIR_V = 1,
+    Metal = 2,
 }
 
 public enum ExecutionMode : uint32_t
@@ -27,6 +28,8 @@ internal uint getWaveId()
                 OpCapability GroupNonUniform;
                 result:$$uint = OpLoad builtin(SubgroupId:uint);
             };
+    case metal:
+        return WaveGetWaveIndex();
     }
 }
 
@@ -47,6 +50,8 @@ public int getWaveCount()
             uint3 workGroupSize = WorkgroupSize();
             int subGroupSize = WaveGetLaneCount();
             return (workGroupSize.x * workGroupSize.y * workGroupSize.z) / subGroupSize;
+        case metal:
+            return int(WaveGetNumWaves());
         }
     default:
         // We need this because WorkgroupSize() call requires compute stage only.

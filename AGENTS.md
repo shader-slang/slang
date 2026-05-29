@@ -17,16 +17,72 @@ Key directories:
 - `cmake/`: CMake helpers.
 - `external/`: vendored dependencies.
 
+## WSL and Windows Tooling
+
+When working in this repository from WSL on Windows, use Windows-native developer tools by
+default unless the user explicitly asks for the WSL/Linux version.
+
+- Use `git.exe`, not bare `git`. These worktrees use Windows path conventions; WSL Git can
+  corrupt or misinterpret worktree state, and Windows Git has much better file I/O performance
+  on this checkout.
+- When the `slang-build` skill invokes CMake, use `cmake.exe`, not bare `cmake`, for
+  Windows-hosted configure and build commands. Windows CMake can find Visual Studio 2026 and
+  the Windows toolchains required by the `vs2026` preset.
+- Use `gh.exe` instead of bare `gh` when GitHub CLI commands need to share the same
+  Windows-native Git and credential context.
+- Convert WSL paths before passing them to Windows tools, for example `wslpath -w "$path"`.
+  Convert paths printed by Windows tools back before using them in shell commands, for example
+  `wslpath -u "$win_path"`.
+- If a required `.exe` tool is unavailable, stop and report it instead of silently falling back
+  to the WSL/Linux tool.
+
 ## Build, Test, and Development Commands
 
-- `cmake --preset default`: configure the default Ninja Multi-Config build in `build/`.
-- `cmake --build --preset debug`: build the Debug configuration.
-- `cmake --build --preset releaseWithDebugInfo`: build an optimized configuration with symbols.
-- `cmake --workflow --preset release`: configure, build, and package a release build.
-- `build/Debug/bin/slang-test`: run the test suite from the repository root.
-- `build/Release/bin/slang-test -use-test-server -server-count 8`: run tests in parallel
-  using test servers.
-- `cmake --preset vs2026`: preferred Windows configuration preset for Visual Studio 2026.
+Slang build setup is platform-specific, especially under WSL. For compiler builds, use the
+`slang-build` skill from `skills/slang-build` in the `shader-slang/slang-skills` repository
+instead of following hard-coded commands in this file.
+
+If the skill is unavailable because skills cannot be installed or network access is limited, use
+`docs/building.md` as the fallback build reference.
+
+Examples:
+- `/slang-build build debug`: build the Debug configuration.
+- `/slang-build rebuild debug`: discard the existing build directory and rebuild Debug.
+- `/slang-build configure releasewithdebug`: configure an optimized build with symbols.
+- `/slang-build clean`: rename and remove the existing build directory.
+
+Do not infer WSL build commands from generic Linux instructions. Follow the platform detection,
+host-tool selection, CMake preset choice, and clean-build steps defined by the skill.
+
+After building, run tests from the repository root using the generated `slang-test` binary in
+the directory for the selected configuration:
+- `build/Debug/bin/slang-test`: run the Debug test suite.
+- `build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 8`: run optimized
+  tests with symbols in parallel using test servers.
+- `build/Release/bin/slang-test -use-test-server -server-count 8`: run Release tests in
+  parallel using test servers.
+
+On Windows-hosted builds, use the `.exe` suffix if that is the generated binary name.
+
+## Include Path Conventions
+
+Prefer direct paths over relative traversal in `#include` directives. The `source/` directory is
+on the compiler include path (exposed by the `core` CMake target), so cross-module headers are
+reachable without `../`:
+
+```cpp
+// Preferred in new code
+#include "core/slang-string.h"
+#include "compiler-core/slang-source-loc.h"
+
+// Existing code still uses the relative form; do not change it purely for style
+#include "../core/slang-string.h"
+#include "../compiler-core/slang-source-loc.h"
+```
+
+New files should use direct paths. Existing files need not be converted purely for style, but may
+be opportunistically updated when the file is already being substantially modified for other
+reasons (e.g., a security fix or feature addition touching many lines).
 
 ## Coding Style & Naming Conventions
 

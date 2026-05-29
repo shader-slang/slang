@@ -1,12 +1,9 @@
 // main.cpp
 
-#include "slang.h"
-
-SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
-
 #include "../core/slang-io.h"
 #include "../core/slang-test-tool-util.h"
 #include "../slang/slang-internal.h"
+#include "slang.h"
 
 using namespace Slang;
 

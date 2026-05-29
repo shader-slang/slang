@@ -917,6 +917,33 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
             getSink()->diagnoseRaw(
                 Severity::Error,
                 static_cast<char const*>(blob->getBufferPointer()));
+
+            // When the synthesized constructor has fewer parameters than
+            // members because some members are less visible than the struct
+            // itself, the user gets "too many arguments" without
+            // understanding why certain members were excluded from the
+            // constructor. Emit a note naming each non-public member so
+            // they know what to fix (issue #11005).
+            //
+            // Use the same criteria as `collectInitializableMembers`:
+            // instance members whose visibility is strictly less than the
+            // struct's are excluded from the synthesized ctor.
+            DeclVisibility structVis = getDeclVisibility(structDecl);
+            for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+            {
+                if (varDecl->hasModifier<HLSLStaticModifier>())
+                    continue;
+                DeclVisibility memberVis = getDeclVisibility(varDecl);
+                if (memberVis < structVis)
+                {
+                    diagnoseOnce(Diagnostics::InitializerListMemberVisibilityMismatch{
+                        .memberVis = memberVis,
+                        .type = toType,
+                        .structVis = structVis,
+                        .member = varDecl});
+                }
+            }
+
             return false;
         }
     }
@@ -2146,6 +2173,11 @@ bool SemanticsVisitor::_coerce(
             if (outToExpr)
             {
                 *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, fromIsToWitness);
+                // Type-equality casts preserve l-value status since the
+                // types are structurally equivalent (e.g., T.Differential == T
+                // via a where clause).
+                if (fromExpr)
+                    (*outToExpr)->type.isLeftValue = fromExpr->type.isLeftValue;
             }
             if (outCost)
                 *outCost = 0;

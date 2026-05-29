@@ -993,6 +993,109 @@ __file_decl
 }
 ```
 
+Lambda Expressions (Experimental)
+-------------------
+
+> **Note:** Lambda support is experimental. Syntax and capture semantics may change in future versions.
+
+Slang supports lambda expressions for passing small callable values to higher-order functions. A lambda has the form:
+
+```csharp
+(parameterList) => expression
+(parameterList) => { statements; return expression; }
+```
+
+Parameter types must be written explicitly. In the single-expression form, the expression's type is the return type. In the block form, all `return` statements must return the same type.
+
+### Basic usage
+
+Lambdas implement the `IFunc<TReturn, TArgs...>` interface (or `IMutatingFunc<...>` for mutating variants). Any function or method that takes an `IFunc` can be called with a matching lambda:
+
+```csharp
+struct Matrix
+{
+    float data[16];
+
+    [mutating]
+    void map(IFunc<float, float> f)
+    {
+        for (int i = 0; i < 16; ++i)
+            data[i] = f(data[i]);
+    }
+}
+
+void scale(inout Matrix m)
+{
+    int c = 2;
+    m.map((float x) => (float)(x * c));
+}
+```
+
+### Coercion to `IFunc`
+
+A lambda is implicitly converted to `IFunc<TReturn, TArgs...>` when passed to a function expecting that interface. Lambdas passed as `IFunc` may capture variables from the enclosing scope:
+
+```csharp
+func apply(f: IFunc<float, float>) -> float
+{
+    return f(2.0);
+}
+
+float scale = 3;
+let result = apply((float x) => x * scale);  // OK: 'scale' is captured
+```
+
+### Coercion to `functype`
+
+Lambdas can also be passed to functions expecting an explicit function type spelled with the `functype` keyword. Unlike `IFunc`, `functype` is more restrictive: only **non-capturing** lambdas can coerce to `functype`. A lambda that references any variable from the enclosing scope cannot coerce and the compiler reports an error:
+
+```csharp
+func sum(f: functype(int, int) -> float) -> float
+{
+    return f(2, 3);
+}
+
+let result = sum((int x, int y) => x + y); // OK: no captures, result == 5.0
+
+int bias = 1;
+let result2 = sum((int x, int y) => x + y + bias); // error: capturing lambda cannot coerce to functype
+```
+
+Parameter types must also match the `functype` signature exactly. The return type may be implicitly converted (for example, a lambda returning `int` can satisfy a `functype` with return type `float`).
+
+### Capture semantics
+
+A lambda body may reference variables from the enclosing scope. **Captured variables are read-only inside the lambda body.** Attempting to assign to a captured variable is an error:
+
+```csharp
+int c = 2;
+let f = (int x) => { c = x; return 0; };  // error: cannot assign to captured 'c'
+```
+
+If you need to mutate state, pass the state as a parameter or accumulate the result and assign after the lambda returns.
+
+### Interaction with generic type inference
+
+Lambdas participate in generic-argument inference. A generic function whose parameter is a function type can infer the generic argument from the lambda's return type:
+
+```csharp
+func foo<let N : int>(f: functype() -> vector<float, N>) -> vector<float, N>
+{
+    return f();
+}
+
+let v1 = foo(() => 2);                    // 2 is implicitly converted to vector<float, 1>; infers N = 1
+let v2 = foo(() => vector<float, 1>(3));  // infers N = 1 explicitly
+```
+
+Named function-object types (conforming to `IFunc`) work in the same position as lambdas.
+
+### Limitations
+
+- Lambdas are experimental; supported targets currently include SPIR-V, the CPU backend, and the Slang interpreter. Other targets may reject some lambda forms.
+- Captured variables are read-only (see above).
+- Each lambda expression has a unique anonymous type; two lambdas with the same signature are not directly interconvertible.
+
 User-Defined Attributes (Experimental)
 -------------------
 

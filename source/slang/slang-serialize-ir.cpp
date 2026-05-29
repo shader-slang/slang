@@ -570,6 +570,8 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     const auto numInsts = flat.instAllocInfo.getCount();
 #endif
 
+    const auto operandIndicesCount = flat.operandIndices.getCount();
+
     instsList.setCount(numInsts + 1);
     // nullptr instructions are represented as `-1`. We can save ourselves a
     // branch by just making that index valid.
@@ -621,6 +623,13 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     Int64 instIndex = 0;
     stringLengthIndex = 0;
     Int64 stringDataIndex = 0;
+    auto readInstRef = [&]() -> IRInst*
+    {
+        SLANG_RELEASE_ASSERT(operandIndex < operandIndicesCount);
+        const auto index = flat.operandIndices[operandIndex++];
+        SLANG_RELEASE_ASSERT(index >= -1 && index < numInsts);
+        return insts[index];
+    };
     const auto go = [&](auto& go, IRInst* parent) -> IRInst*
     {
         const auto thisInstIndex = instIndex++;
@@ -628,9 +637,9 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 
         // operands and sourcelocs
         inst->sourceLoc = sourceLocs[thisInstIndex];
-        inst->typeUse.init(inst, insts[flat.operandIndices[operandIndex++]]);
+        inst->typeUse.init(inst, readInstRef());
         for (Int64 o = 0; o < inst->operandCount; ++o)
-            inst->getOperands()[o].init(inst, insts[flat.operandIndices[operandIndex++]]);
+            inst->getOperands()[o].init(inst, readInstRef());
 
         // Handle special instructions
         switch (inst->m_op)

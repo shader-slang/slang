@@ -19,6 +19,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   linux-debug:
     uses: ./.github/workflows/cmake-options-build-container.yml
@@ -98,7 +101,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: debug
-      runs-on: '["windows-2022"]'
+      runs-on: '["windows-2025"]'
       buildtool: "Visual Studio 17 2022"
 
   windows-vs2022-release:
@@ -108,11 +111,28 @@ jobs:
       compiler: cl
       platform: x86_64
       config: release
-      runs-on: '["windows-2022"]'
+      runs-on: '["windows-2025"]'
       buildtool: "Visual Studio 17 2022"
 
-  # windows-vs2026-debug: disabled — VS 2026 not yet available on GitHub-hosted runners
-  # windows-vs2026-release: disabled — VS 2026 not yet available on GitHub-hosted runners
+  windows-vs2026-debug:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["windows-2025-vs2026"]'
+      buildtool: "Visual Studio 18 2026"
+
+  windows-vs2026-release:
+    uses: ./.github/workflows/cmake-options-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["windows-2025-vs2026"]'
+      buildtool: "Visual Studio 18 2026"
 
   check-cmake:
     needs:
@@ -127,6 +147,8 @@ jobs:
         windows-aarch64-release,
         windows-vs2022-debug,
         windows-vs2022-release,
+        windows-vs2026-debug,
+        windows-vs2026-release,
       ]
     runs-on: ubuntu-latest
     if: always()

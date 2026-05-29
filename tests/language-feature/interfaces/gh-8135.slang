@@ -1,0 +1,57 @@
+// Regression test for https://github.com/shader-slang/slang/issues/8135.
+// Using an associated type from an inherited generic interface in a child
+// interface method signature previously crashed in hoistable IR placement.
+
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=SPV): -target spirv-asm -stage compute -entry computeMain
+
+// SPV: OpEntryPoint GLCompute
+
+public interface IStorage<T>
+{
+    public associatedtype Address;
+}
+
+public interface IParameterStorage<T> : IStorage<T>
+{
+    public void add(Address address, T value);
+    public Address getAddress(T value);
+}
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<int> outputBuffer;
+
+struct DenseStorage : IParameterStorage<int>
+{
+    typedef uint Address;
+
+    void add(uint address, int value)
+    {
+        outputBuffer[address] = value;
+    }
+
+    uint getAddress(int value)
+    {
+        return uint(value - 7);
+    }
+}
+
+void testStorage<T, S : IParameterStorage<T>>(S storage, T value)
+{
+    S.Address address = storage.getAddress(value);
+    storage.add(address, value);
+}
+
+[shader("compute")]
+[numthreads(4, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    DenseStorage storage;
+    // CHECK: 7
+    // CHECK-NEXT: 8
+    // CHECK-NEXT: 9
+    // CHECK-NEXT: 10
+    testStorage(storage, int(dispatchThreadID.x) + 7);
+}
