@@ -342,6 +342,7 @@ The available format type names follow Slang's type naming convention, with name
 The plain scalar and vector element types, such as `float4`, `int4`, and `uint4`, are still supported for compatibility and for cases where the storage format is provided externally.
 They do not encode a specific storage format in the texture type.
 Using explicit format types whenever possible makes declarations easier to read and lets the type system distinguish textures that have the same data type but different storage formats.
+This explicit type form is required when a formatted texture is named through a descriptor handle: write the format in the texture element type, such as `DescriptorHandle<RWTexture2D<RGBA8Unorm>>` or `RWTexture2D<RGBA8Unorm>.Handle`, rather than relying on a `[format]` attribute on a handle to `RWTexture2D<float4>`.
 
 #### Sampler
 
