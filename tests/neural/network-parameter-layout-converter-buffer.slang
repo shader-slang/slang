@@ -12,6 +12,11 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-cuda -compute -entry multiTileMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=HALFROUNDTRIP):-vk -compute -entry halfRoundTripMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=HALFROUNDTRIP):-cuda -compute -entry halfRoundTripMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=TOPBIT):-vk -compute -entry topBitMaskMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=TOPBIT):-mtl -compute -entry topBitMaskMain -shaderobj -xslang -experimental-feature -output-using-type
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=TOPBIT):-cuda -compute -entry topBitMaskMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=MIXEDROUNDTRIP):-vk -compute -entry mixedBiasRoundTripMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=MIXEDROUNDTRIP):-cuda -compute -entry mixedBiasRoundTripMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
 
 import slang.neural;
 
@@ -20,6 +25,8 @@ typealias NoBiasConverter = NetworkParameterLayoutConverter<float, 0, 4, 2>;
 
 typealias MultiTileConverter = NetworkParameterLayoutConverter<float, 1, 17, 33>;
 typealias HalfConverter = NetworkParameterLayoutConverter<half, 1, 4, 2>;
+
+typealias MixedBiasConverter = NetworkParameterLayoutConverter<float, 0b1010ull, 4, 5, 3, 2, 6>;
 
 typealias ZeroMaskConverter = NetworkParameterLayoutConverter<float, 0ull, 1, 1, 1, 1, 1>;
 typealias AllBiasConverter = NetworkParameterLayoutConverter<float, 0xFull, 1, 1, 1, 1, 1>;
@@ -68,6 +75,21 @@ uniform RWStructuredBuffer<half>.Handle halfOptimal;
 
 //TEST_INPUT: set halfRoundTrip = ubuffer(stride=2, count=10)
 uniform RWStructuredBuffer<half>.Handle halfRoundTrip;
+
+//TEST_INPUT: set topPortable = ubuffer(stride=4, count=66)
+uniform RWStructuredBuffer<float>.Handle topPortable;
+
+//TEST_INPUT: set topOptimal = ubuffer(stride=4, count=17408)
+uniform RWStructuredBuffer<float>.Handle topOptimal;
+
+//TEST_INPUT: set mixedPortable = ubuffer(stride=4, count=62)
+uniform RWStructuredBuffer<float>.Handle mixedPortable;
+
+//TEST_INPUT: set mixedOptimal = ubuffer(stride=4, count=1088)
+uniform RWStructuredBuffer<float>.Handle mixedOptimal;
+
+//TEST_INPUT: set mixedRoundTrip = ubuffer(stride=4, count=62)
+uniform RWStructuredBuffer<float>.Handle mixedRoundTrip;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=resultBuffer
 RWStructuredBuffer<uint> resultBuffer;
@@ -123,6 +145,11 @@ void computeMain(uint tid : SV_GroupIndex)
         AllBiasConverter.ElementCountPhysical == 1088) ? 1 : 0;
     resultBuffer[8] = (TopBitMaskConverter.ElementCountLogical == 66 &&
         TopBitMaskConverter.ElementCountPhysical == 17408) ? 1 : 0;
+
+    // MixedBiasConverter covers four layers with bias on layers 1 and 3.
+    resultBuffer[0] = resultBuffer[0] != 0 &&
+        MixedBiasConverter.ElementCountLogical == 62 &&
+        MixedBiasConverter.ElementCountPhysical == 1088 ? 1 : 0;
 
     // BUFFER: 1
     // BUFFER-NEXT: 1
@@ -326,4 +353,92 @@ void halfRoundTripMain(uint tid : SV_GroupIndex)
     }
 
     // HALFROUNDTRIP: 1
+}
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void topBitMaskMain(uint tid : SV_GroupIndex)
+{
+    for (uint i = tid; i < uint(TopBitMaskConverter.ElementCountLogical); i += 64)
+        topPortable[i] = 0.0;
+    for (uint i = tid; i < uint(TopBitMaskConverter.ElementCountPhysical); i += 64)
+        topOptimal[i] = -1.0;
+    AllMemoryBarrierWithGroupSync();
+
+    if (tid == 0)
+    {
+        topPortable[0] = 101.0;
+        topPortable[1] = 102.0;
+        topPortable[2] = 201.0;
+        topPortable[64] = 6401.0;
+        topPortable[65] = 6402.0;
+    }
+    AllMemoryBarrierWithGroupSync();
+
+    let portableAddress = BindlessAddress<float>(topPortable);
+    let optimalAddress = BindlessAddress<float>(topOptimal);
+    TopBitMaskConverter.toOptimalLayout(portableAddress, optimalAddress, tid, 64);
+    AllMemoryBarrierWithGroupSync();
+
+    if (tid == 0)
+    {
+        static const int LayerPhysicalCount = 272;
+        bool topBitOk =
+            topOptimal[0] == 101.0 &&
+            topOptimal[256] == 102.0 &&
+            topOptimal[LayerPhysicalCount] == 201.0 &&
+            topOptimal[LayerPhysicalCount + 256] == 0.0 &&
+            topOptimal[62 * LayerPhysicalCount + 256] == 0.0 &&
+            topOptimal[63 * LayerPhysicalCount] == 6401.0 &&
+            topOptimal[63 * LayerPhysicalCount + 256] == 6402.0;
+        resultBuffer[0] = topBitOk ? 1 : 0;
+    }
+
+    // TOPBIT: 1
+}
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void mixedBiasRoundTripMain(uint tid : SV_GroupIndex)
+{
+    for (uint i = tid; i < uint(MixedBiasConverter.ElementCountLogical); i += 64)
+    {
+        mixedPortable[i] = float(i + 1);
+        mixedRoundTrip[i] = 0.0;
+    }
+    for (uint i = tid; i < uint(MixedBiasConverter.ElementCountPhysical); i += 64)
+        mixedOptimal[i] = -1.0;
+    AllMemoryBarrierWithGroupSync();
+
+    let portableAddress = BindlessAddress<float>(mixedPortable);
+    let optimalAddress = BindlessAddress<float>(mixedOptimal);
+    let roundTripAddress = BindlessAddress<float>(mixedRoundTrip);
+
+    MixedBiasConverter.toOptimalLayout(portableAddress, optimalAddress, tid, 64);
+    AllMemoryBarrierWithGroupSync();
+
+    MixedBiasConverter.toPortableLayout(optimalAddress, roundTripAddress, tid, 64);
+    AllMemoryBarrierWithGroupSync();
+
+    if (tid == 0)
+    {
+        static const int LayerPhysicalCount = 272;
+        bool biasSlotsOk =
+            mixedOptimal[256] == 0.0 &&
+            mixedOptimal[LayerPhysicalCount + 256] == 36.0 &&
+            mixedOptimal[LayerPhysicalCount + 258] == 38.0 &&
+            mixedOptimal[2 * LayerPhysicalCount + 256] == 0.0 &&
+            mixedOptimal[3 * LayerPhysicalCount + 256] == 57.0 &&
+            mixedOptimal[3 * LayerPhysicalCount + 261] == 62.0;
+
+        bool roundTripOk = true;
+        for (int i = 0; i < MixedBiasConverter.ElementCountLogical; ++i)
+            roundTripOk = roundTripOk && mixedRoundTrip[i] == float(i + 1);
+
+        resultBuffer[0] = biasSlotsOk ? 1 : 0;
+        resultBuffer[1] = roundTripOk ? 1 : 0;
+    }
+
+    // MIXEDROUNDTRIP: 1
+    // MIXEDROUNDTRIP-NEXT: 1
 }
