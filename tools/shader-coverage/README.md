@@ -39,7 +39,7 @@ coverage pass — no AST decl, so it does not appear in Slang's
 public reflection. Hosts discover the hidden resource binding through
 `slang::ISyntheticResourceMetadata` and use
 `slang::ICoverageTracingMetadata` to learn how many counters to
-allocate and which source line each slot corresponds to.
+allocate and how source coverage entries map to those counters.
 
 The `.coverage-mapping.json` sidecar is **optional** — it's a
 serialization of the same metadata for cross-process / offline
@@ -49,7 +49,7 @@ hosts that compile via the C++ API can ignore the sidecar entirely
 and read the metadata directly from the artifact.
 
 After the host dispatches the shader and reads the counter buffer
-back, the host can either consume the slot→source attribution
+back, the host can either consume the source-entry attribution
 directly or convert the snapshot to LCOV `.info` via
 [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py). LCOV is
 consumable by `genhtml`, Codecov, VS Code Coverage Gutters, etc.
@@ -59,6 +59,8 @@ weighed, see
 [`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md)
 and
 [`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
+For examples showing where each coverage mode inserts counters, see
+[`docs/design/shader-coverage-counter-placement.md`](../../docs/design/shader-coverage-counter-placement.md).
 
 ## Pinning the coverage buffer at an explicit slot
 
@@ -107,11 +109,11 @@ slangc shader.slang -target spirv -stage compute -entry main \
 
 Two equally supported paths, each suited to a different host
 architecture. For today's line coverage mode, both expose the same
-data: counter count, per-slot `(file, line)`, and the coverage
-buffer's hidden binding. The typed API exposes this through
+data: runtime counter count, source-entry attribution, and the
+coverage buffer's hidden binding. The typed API exposes this through
 `ICoverageTracingMetadata` plus `ISyntheticResourceMetadata`; the
 sidecar serializes the same contract.
-A slot may have no real source file/line; that is preserved in the
+A source entry may have no real source file/line; that is preserved in the
 metadata and filtered out later when exporting LCOV.
 
 ### A. In-process compile (Slang C++ API)
@@ -121,7 +123,7 @@ shader.slang ── compile (C++ API) ──► in-memory artifact + IMetadata
                                                  │
                                        castAs<ICoverageTracingMetadata>
                                        castAs<ISyntheticResourceMetadata>
-                                       → binding, slot→(file, line)
+                                       → binding, source entries
                                                  ▼
                                        host: allocate, bind, dispatch,
                                              readback, consume directly
@@ -144,7 +146,8 @@ auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
 auto* syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
     slang::ISyntheticResourceMetadata::getTypeGuid());
 
-uint32_t n = coverage->getCounterCount();
+uint32_t counterCount = coverage->getCounterCount();
+uint32_t entryCount = coverage->getEntryCount();
 SLANG_CHECK(syntheticResources != nullptr);
 
 // The current coverage implementation emits one synthetic resource:
@@ -161,19 +164,29 @@ if (SLANG_SUCCEEDED(syntheticResources->getResourceInfo(coverageResourceIndex, &
     // CPU/CUDA targets: resourceInfo.uniformOffset, resourceInfo.uniformStride.
 }
 
-for (uint32_t i = 0; i < n; ++i) {
+for (uint32_t i = 0; i < entryCount; ++i) {
     slang::CoverageEntryInfo entry;
     if (SLANG_SUCCEEDED(coverage->getEntryInfo(i, &entry))) {
-        // entry.file, entry.line — match against your counter[i] readback
+        // Current source-entry kinds:
+        //   Line     -> file / line attribution
+        //   Function -> functionName / functionMangledName
+        //   Branch   -> branchSiteID / branchArmID / branchArmKind
+        // entry.counterIndex selects counters[entry.counterIndex].
     }
 }
 ```
 
-The host allocates a `uint32_t[n]` counter buffer, binds it using the
-hidden binding information reported through
+The host allocates a `uint32_t[counterCount]` counter buffer, binds it
+using the hidden binding information reported through
 `ISyntheticResourceMetadata`, dispatches the shader, reads the
-counters back, and consumes the attribution data however it likes —
-direct telemetry, a custom LCOV writer, a dashboard, etc.
+counters back, and consumes the source entries however it likes —
+direct telemetry, a custom LCOV writer, a dashboard, etc. In the
+current line/function/branch producers, entries and counters are
+one-to-one. Future source-region modes may expose source entries that
+are not identical to runtime counter slots, including entries with no
+direct runtime counter of their own. Hosts should use
+`entry.counterIndex` and be prepared for future extended entry data
+rather than assuming the entry index equals the counter index.
 
 #### Producing the canonical manifest JSON in-process
 
@@ -211,7 +224,7 @@ shader.slang ── slangc -trace-coverage ──► shader.spv
                           on a different machine, possibly without Slang linked)
                                                        ▼
                                        host: parse sidecar → (set, binding),
-                                             slot→(file, line)
+                                             source entries
                                              allocate, bind, dispatch, readback
                                              emit LCOV via
                                              slang-coverage-to-lcov.py
@@ -233,7 +246,8 @@ slangc shader.slang -target spirv -stage compute -entry main \
 ```
 
 Hosts that aren't linked against Slang still get the data: the
-sidecar contains both the hidden binding and the slot attribution.
+sidecar contains both the hidden binding and the source-entry
+attribution.
 The [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py) Python
 script consumes this format after dispatch when converting readback
 counters to LCOV.
@@ -243,10 +257,13 @@ at export time: entries without a real source file or with a
 non-positive line number are skipped instead of being written as
 synthetic `SF:` / `DA:` records.
 
-The current metadata interface is the line-compatible view. Future
-branch, function, or source-region coverage may add a richer source
-coverage metadata interface and sidecar schema while keeping this line
-view available for compatibility.
+The sidecar schema follows `ICoverageTracingMetadata`: it records the
+runtime counter count and a list of source coverage entries. Current
+entries use `kind: "line"`, `kind: "function"`, or `kind: "branch"`,
+`mode: "count"`, and a numeric `counter` index. Future source-region
+coverage can add entries with richer source ranges and either direct,
+shared, or derived counter data while keeping the same hidden binding
+contract.
 
 ---
 
@@ -254,7 +271,9 @@ view available for compatibility.
 
 | Flag                                      | Effect                                                                                                                                                                                                                                                                |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `-trace-coverage`                         | Enables the feature. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites counter ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file. |
+| `-trace-coverage`                         | Enables per-statement line coverage. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites marker ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file. |
+| `-trace-function-coverage`                | Adds per-function-entry source entries and counters. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                                                                               |
+| `-trace-branch-coverage`                  | Adds per-branch-arm source entries and counters for `if`/`else`, loop-condition true/false, and source `switch` case/default dispatch arms, including the implicit no-match default path when no `default` label exists. Expression-level short-circuit and ternary branches are not instrumented yet. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object. |
 | `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                    |
 | `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                 |
 
@@ -263,14 +282,15 @@ view available for compatibility.
 ## Counter buffer format
 
 `uint32_t counters[N]` — flat little-endian array, no header. Indexed
-by slot. Saturates at ~4 × 10⁹ hits per slot (see _Current scope_).
+by `CoverageEntryInfo::counterIndex` / manifest `counter`. Saturates
+at ~4 × 10⁹ hits per slot (see [Current limitations](#current-limitations)).
 
 ---
 
 ## The converter — `slang-coverage-to-lcov.py`
 
 ```
---manifest <file.coverage-mapping.json>  Slot → (file, line) mapping.
+--manifest <file.coverage-mapping.json>  Source entry → counter mapping.
                                  Produced by slangc alongside the
                                  compiled artifact, or hand-built from
                                  ICoverageTracingMetadata.
@@ -283,11 +303,12 @@ by slot. Saturates at ~4 × 10⁹ hits per slot (see _Current scope_).
                                  disallows hyphens in test names)
 ```
 
-Aggregates counter values by `(file, line)` at LCOV-emission time,
-so multiple slots on the same source line contribute their hit
-counts together. Entries that do not resolve to a real source file
-and positive source line are skipped to match normal gcov/LCOV line
-coverage semantics.
+Emits line coverage as `DA:`, function coverage as `FN:` / `FNDA:`,
+and branch coverage as `BRDA:`. Line entries aggregate by `(file,
+line)` at LCOV-emission time, so multiple slots on the same source line
+contribute their hit counts together. Entries that do not resolve to a
+real source file and positive source line are skipped to match normal
+gcov/LCOV source-file semantics.
 
 ---
 
@@ -303,20 +324,25 @@ declares the slot in its own pipeline layout / root signature.
 
 | Backend                                   | Default `-trace-coverage`                                                                                                                                                                                                                                                                         | `-trace-coverage-binding=N:0`          | `-trace-coverage-binding=N:M` (M ≠ 0) |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
-| CPU                                       | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
+| CPU source                                | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
 | Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the descriptor set after the highest shader-visible or host-reserved set at binding 0.                                                                                                                                                                            | Supported                              | Compiler-side decoration correct      |
 | D3D12 / HLSL                              | Compiler metadata/codegen supported. D3D12 runtime binding policy is follow-up; hosts should query `ISyntheticResourceMetadata` and declare the reported UAV slot in their root signature.                                                                                                        | Supported                              | Compiler-side decoration correct      |
 | CUDA                                      | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
 | Metal (direct)                            | Compiles. End-to-end dispatch is unreliable due to a pre-existing slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)) — not a coverage-feature defect.                                                                             | (untested)                             | (untested)                            |
 | GLSL                                      | Supported codegen                                                                                                                                                                                                                                                                                 | (untested)                             | (untested)                            |
-| WGSL / WebGPU                             | **Not supported** — `-trace-coverage` emits a warning (E45102) and skips instrumentation. WGSL requires the synthesized counter buffer to use `atomic<u32>` element type, which the IR coverage pass does not yet produce. Use `-target spirv` for Vulkan-based WebGPU workflows as a workaround. | (n/a)                                  | (n/a)                                 |
+| LLVM-emitted CPU                          | **Not supported** — coverage tracing emits a warning (E45102) and skips instrumentation until the synthesized resource + atomic sequence has a verified LLVM lowering path.                                                                                                                       | (n/a)                                  | (n/a)                                 |
+| WGSL / WebGPU                             | **Not supported** — coverage tracing emits a warning (E45102) and skips instrumentation. WGSL requires the synthesized counter buffer to use `atomic<u32>` element type, which the IR coverage pass does not yet produce. Use `-target spirv` for Vulkan-based WebGPU workflows as a workaround. | (n/a)                                  | (n/a)                                 |
 
 ### Format scope
 
-- **Line coverage only** — emits `DA:` records; no `FN:` / `BRDA:`
-  (function / branch) coverage yet. Function, branch, and
-  lower-density source-region coverage are expected to use richer
-  source coverage metadata before being exported to LCOV records.
+- **Line/function/branch coverage.** The converter emits `DA:`,
+  `FN:` / `FNDA:`, and `BRDA:` records from v2 source-entry metadata.
+  Source-region coverage remains future work and will need a defined
+  projection to LCOV.
+- **Branch coverage is initial.** It covers `if`/`else` arms,
+  `for` / `while` / `do while` condition true/false arms, and
+  source `switch` case/default dispatch arms, including the implicit
+  no-match default path when no `default` label exists.
 - **Column position is dropped.** Only `(file, line)` reaches LCOV.
 - **Counter type is `uint32`.** Saturates at ~4 × 10⁹ hits per
   slot. Multiple ops on the same source line accumulate

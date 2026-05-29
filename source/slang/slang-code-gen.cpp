@@ -1392,6 +1392,14 @@ bool CodeGenContext::shouldTraceCoverage()
     return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::TraceCoverage);
 }
 
+bool CodeGenContext::shouldTraceAnyCoverage()
+{
+    auto& optionSet = getTargetProgram()->getOptionSet();
+    return optionSet.getBoolOption(CompilerOptionName::TraceCoverage) ||
+           optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage) ||
+           optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
+}
+
 bool CodeGenContext::shouldDumpIntermediates()
 {
     return getTargetProgram()->getOptionSet().shouldDumpIntermediates();

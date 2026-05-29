@@ -239,7 +239,7 @@ enum Channel
 }
 ```
 
-Unlike C/C++, `enum` types in Slang are always scoped by default (like `enum class` in C++). You can write `enum class` in Slang if it makes you happy, but it isn't required. If you want an `enum` type to be unscoped, you can use the `[UnscopedEnum]` attribute:
+Unlike C/C++, named `enum` types in Slang are always scoped by default (like `enum class` in C++), whereas anonymous `enum` types are unscoped. You can also write `enum class` explicitly in Slang for clarity, but it isn't required. If you want an `enum` type to be unscoped, you can use the `[UnscopedEnum]` attribute:
 
 ```csharp
 [UnscopedEnum]
@@ -252,6 +252,8 @@ void test(Channel c)
     if (c == Red) { /*...*/ }
 }
 ```
+
+You can also use the `-unscoped-enum` command-line option to make all named `enum` types other than `enum class` unscoped by default. It is an error to combine `[UnscopedEnum]` with `enum class`, or to declare an anonymous `enum class`.
 
 You can specify an explicit underlying integer type for `enum` types:
 
@@ -416,8 +418,9 @@ Swizzles can reorder elements (`v.yx`) or include duplicate elements (`v.yyy`).
 > #### Note ####
 > Unlike GLSL, Slang only supports `xyzw` and `rgba` as swizzle elements, and not the seldom-used `stpq`.
 
-> #### Note ####
-> Unlike HLSL, Slang does not currently support matrix swizzle syntax.
+Matrix values also support HLSL-style matrix swizzles such as `m._m00_m01` and
+`m._41_32`. Matrix swizzle l-values may be assigned, and constant-indexed
+subscripts of matrix swizzles may be used where an l-value is required.
 
 Statements
 ----------

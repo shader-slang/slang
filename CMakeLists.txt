@@ -127,6 +127,7 @@ option(
 option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
+option(SLANG_ENABLE_VALIDATION_VM_BYTECODE "Enable VM bytecode validation" ON)
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(
     SLANG_IGNORE_ABORT_MSG
@@ -304,11 +305,19 @@ advanced_option(
     OFF
 )
 
+set(SLANG_EXCLUDE_DAWN_DEFAULT ON)
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(SLANG_EXCLUDE_DAWN_DEFAULT OFF)
+endif()
 advanced_option(
     SLANG_EXCLUDE_DAWN
-    "Optionally exclude webgpu_dawn from the build"
-    OFF
+    "Optionally exclude Dawn WebGPU support from the build"
+    ${SLANG_EXCLUDE_DAWN_DEFAULT}
 )
+set(SLANG_HAS_WEBGPU_SUPPORT OFF)
+if(NOT SLANG_EXCLUDE_DAWN)
+    set(SLANG_HAS_WEBGPU_SUPPORT ON)
+endif()
 
 advanced_option(
     SLANG_EXCLUDE_TINT
@@ -389,7 +398,7 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     )
 endif()
 
-if(NOT SLANG_EXCLUDE_DAWN)
+if(SLANG_HAS_WEBGPU_SUPPORT)
     if(NOT DEFINED SLANG_WEBGPU_DAWN_BINARY_URL)
         set(webgpu_dawn_release_tag "webgpu_dawn-0")
         if(

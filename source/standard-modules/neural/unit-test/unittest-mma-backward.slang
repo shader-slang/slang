@@ -7,6 +7,7 @@ namespace neural_unittest
 // Full backward pass using TiledMMAHelper.backward() dispatcher:
 //   CUDA:   TiledMMACuda (WaveMatrix register ops)
 //   Vulkan: TiledMMAVulkan (WaveMatrix + shmem)
+//   Metal:  TiledMMAMetal (8x8 simdgroup_matrix + shmem)
 //
 // InputSize and OutputSize must be multiples of 16 (tiled layout requirement).
 
@@ -66,6 +67,9 @@ public DType[InputSize]
             inputData, dOutData, weightBuffer, weightGradBuffer, biasGradBuffer);
     case spirv:
         return testTiledBackwardImpl<DType, InputSize, OutputSize, ShMemSize, TargetEnum.SPIR_V, SubgroupCount>(
+            inputData, dOutData, weightBuffer, weightGradBuffer, biasGradBuffer);
+    case metal:
+        return testTiledBackwardImpl<DType, InputSize, OutputSize, ShMemSize, TargetEnum.Metal, SubgroupCount>(
             inputData, dOutData, weightBuffer, weightGradBuffer, biasGradBuffer);
     }
 }

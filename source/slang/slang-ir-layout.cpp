@@ -248,9 +248,24 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
                 this,
                 vecType->getElementType(),
                 &elementTypeLayout));
-            *outSizeAndAlignment = getVectorSizeAndAlignment(
-                elementTypeLayout,
-                getIntegerValueFromInst(vecType->getElementCount()));
+            // The element count must be a literal integer for the size to be
+            // known. Unspecialized generic vectors (e.g. `vector<T, N>` where
+            // N is still a generic parameter when this code runs, as can
+            // happen during link-time-specialization paths used by the d3d12
+            // backend and the `lowerReinterpret` pass) reach this code and
+            // would crash `getIntegerValueFromInst` (which asserts on
+            // non-`IRIntLit` inputs and reads garbage in release builds).
+            // Report the size as unknown so the caller can fall through to
+            // its own handling instead of segfaulting.
+            auto count = vecType->getElementCount();
+            if (!count || count->getOp() != kIROp_IntLit)
+            {
+                *outSizeAndAlignment =
+                    IRSizeAndAlignment(IRSizeAndAlignment::kIndeterminateSize, 1);
+                return SLANG_FAIL;
+            }
+            *outSizeAndAlignment =
+                getVectorSizeAndAlignment(elementTypeLayout, getIntegerValueFromInst(count));
             return SLANG_OK;
         }
         break;
@@ -325,7 +340,22 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         {
             auto matType = cast<IRMatrixType>(type);
             IRBuilder builder(type->getModule());
-            if (getIntegerValueFromInst(matType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
+            auto layout = matType->getLayout();
+            // The layout operand is normally a literal `SLANG_MATRIX_LAYOUT_*`
+            // constant produced by the front-end, so reaching this guard from
+            // ordinary user code is not expected. The check mirrors the
+            // sibling guard on the vector branch above as defense-in-depth:
+            // if a non-literal ever shows up here (e.g. via a future IR
+            // construction path that retains it as a generic), avoid the
+            // release-build null deref that motivated #11289 and return a
+            // clean `SLANG_FAIL` with an indeterminate size.
+            if (!layout || layout->getOp() != kIROp_IntLit)
+            {
+                *outSizeAndAlignment =
+                    IRSizeAndAlignment(IRSizeAndAlignment::kIndeterminateSize, 1);
+                return SLANG_FAIL;
+            }
+            if (getIntegerValueFromInst(layout) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
             {
                 auto colVector =
                     builder.getVectorType(matType->getElementType(), matType->getRowCount());

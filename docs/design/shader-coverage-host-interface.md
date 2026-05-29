@@ -67,7 +67,7 @@ The coverage-specific public object is:
 Its intended use is:
 
 - coverage reporting
-- slot-to-source attribution
+- source-entry attribution
 - coverage manifest serialization through `slang_writeCoverageManifestJson`
 
 The coverage query methods are:
@@ -75,17 +75,28 @@ The coverage query methods are:
 - `getCounterCount()`
 - `getEntryInfo(index, ...)`
 - `getBufferInfo(...)`
+- `getEntryCount()`
 
 These answer:
 
-- how many counters exist
-- what each counter slot means
+- how many runtime counters exist
+- what each source coverage entry means
 - the legacy coverage-specific descriptor binding view
+- how many source coverage entries exist
 
-Line counters are source-location based. If generic specialization,
-inlining, or other IR cloning creates multiple executable copies of
-the same source line, all those copies contribute to that source
-line's counter rather than receiving per-specialization counters.
+Coverage entries are source-location based. The current producers emit
+one source entry per inserted marker op: line entries, function-entry
+entries, and branch-arm entries. If generic specialization, inlining,
+or other IR cloning creates multiple executable copies that map to the
+same source location, those entries keep distinct counter slots; LCOV
+export aggregates line entries by `(file, line)`, function entries by
+function name, and branch entries by `(line, branch_site, branch_arm)`.
+Current entries all carry a runtime counter, but hosts should still use
+`CoverageEntryInfo::counterIndex` instead of assuming entry index equals
+counter index. Future source-region coverage can add ranged entries
+that use direct counters, shared counters, derived counter expressions,
+or no direct runtime counter of their own without changing the binding
+contract.
 
 Hosts use `ICoverageTracingMetadata` when they need to interpret the
 counter values they read back, or emit LCOV or manifest output.
@@ -179,7 +190,10 @@ exist in the host's runtime pipeline layout and are not referenced by
 the compiled shader IR. Khronos descriptor-set hosts with such externally
 owned sets should pass `-trace-coverage-reserved-space <space>` when
 compiling, or set `CompilerOptionName::TraceCoverageReservedSpace`
-through the API while also enabling `CompilerOptionName::TraceCoverage`.
+through the API while also enabling at least one coverage mode, such as
+`CompilerOptionName::TraceCoverage`,
+`CompilerOptionName::TraceFunctionCoverage`, or
+`CompilerOptionName::TraceBranchCoverage`.
 The option is repeatable and duplicate values are idempotent. It is an
 auto-allocation hint for whole Khronos descriptor sets; explicit
 `-trace-coverage-binding` still wins. Metal, CPU, CUDA, and D3D targets
@@ -263,7 +277,8 @@ For direct hosts, the intended usage is:
    - `ISyntheticResourceMetadata`
 4. query `ICoverageTracingMetadata` for:
    - counter count
-   - slot-to-source attribution
+   - source entry count
+   - source-entry attribution
 5. query `ISyntheticResourceMetadata` for the hidden binding contract:
    - `getResourceCount()`
    - `getResourceInfo(...)`

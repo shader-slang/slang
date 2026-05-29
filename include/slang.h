@@ -1164,16 +1164,18 @@ typedef uint32_t SlangSizeT;
 
         // Add new options HERE, immediately before CountOf.
 
-        TraceCoverage = 145, // bool: insert per-statement execution counters
+        TraceCoverage = 145, // bool: insert per-statement line coverage counters
         TraceCoverageBinding =
             146, // intValue0: register index; intValue1: register space — explicit
                  //   binding for the synthesized __slang_coverage buffer. Consumed
-                 //   only when TraceCoverage is enabled; the slangc CLI spelling also
-                 //   enables TraceCoverage.
+                 //   only when any coverage mode is enabled; the slangc CLI spelling
+                 //   also enables TraceCoverage.
         TraceCoverageReservedSpace =
             147, // intValue0: descriptor/register space reserved by the host when
                  //   auto-allocating the synthesized __slang_coverage buffer. This is
-                 //   a repeatable hint consumed only when TraceCoverage is enabled.
+                 //   a repeatable hint consumed only when any coverage mode is enabled.
+        TraceFunctionCoverage = 148, // bool: insert per-function-entry coverage counters
+        TraceBranchCoverage = 149,   // bool: insert per-branch-arm coverage counters
 
         CountOf,
     };
@@ -2510,8 +2512,15 @@ struct TypeReflection
         return spReflectionType_GetResourceAccess((SlangReflectionType*)this);
     }
 
+    /// Returns the type's name without any type-level modifier wrappers
+    /// (`no_diff`, `unorm`, `snorm`, ...). To inspect a modifier on a
+    /// specific declaration, use `findModifier()` on the owning
+    /// `VariableReflection` / `FunctionReflection`.
     char const* getName() { return spReflectionType_GetName((SlangReflectionType*)this); }
 
+    /// Returns the fully-qualified type name without any type-level
+    /// modifier wrappers (`no_diff`, `unorm`, `snorm`, ...). See
+    /// `getName()` for retrieving modifier information.
     SlangResult getFullName(ISlangBlob** outNameBlob)
     {
         return spReflectionType_GetFullName((SlangReflectionType*)this, outNameBlob);
@@ -4524,19 +4533,19 @@ struct IMetadata : public ISlangCastable
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
 
-/** Coverage tracing metadata produced when `-trace-coverage` is active.
+/** Coverage tracing metadata produced when any shader coverage mode is active.
 
-The current implementation reports line-oriented hit-count coverage:
-each counter slot in the synthesized coverage buffer maps to a source
-`(file, line)` pair. The interface lets hosts read that mapping at
-compile time so they can attribute counter values back to source lines
-at runtime without a separate sidecar file. The metadata is retrieved
-by calling `castAs` / `queryInterface` on the artifact-associated
-`IMetadata` object.
+The current implementation reports line, function-entry, and branch-arm
+hit-count coverage. Each emitted source entry carries the runtime
+counter slot that backs it. The interface lets hosts read that mapping
+at compile time so they can attribute counter values back to source
+locations at runtime without a separate sidecar file. The metadata is
+retrieved by calling `castAs` / `queryInterface` on the
+artifact-associated `IMetadata` object.
 
 Intended use:
   - use `ICoverageTracingMetadata` for coverage-specific semantics:
-    counter count, slot-to-source attribution, input to manifest
+    counter count, source-entry attribution, input to manifest
     serialization, and future coverage-entry semantics
   - use `ISyntheticResourceMetadata` for the generic hidden binding
     contract when the host needs to bind compiler-synthesized resources
@@ -4555,32 +4564,60 @@ Lifetime and ownership:
 
 Future coverage modes:
   - this interface is intended to grow to cover richer reporting modes
-    such as branch coverage, function coverage, binary
-    covered/uncovered reporting, or warp-aggregated coverage
+    such as source-region coverage, additional branch forms, binary
+    hit/not-hit counters, and warp/group-aggregated modes
   - callers should not assume that future revisions will always model
-    one entry as one source line or one counter value as an exact hit
-    count
+    one entry as one source line, one entry as one runtime counter, or
+    one counter value as the final reported count for a source range
 
 Extensible without ABI breakage in two ways:
   - tail-extending the `CoverageEntryInfo` struct (gated by its
     leading `structSize` field), or
   - adding a derived `ICoverageTracingMetadataN` interface with a
     new UUID, queryable through `castAs`.
-The vtable of `ICoverageTracingMetadata` itself is fixed; new
-methods would break ABI for callers compiled against the existing
-header.
+
+ABI note:
+  - this interface was extended in place while shader coverage still
+    had no known external implementors, to settle the source-entry
+    metadata model before broad adoption
+  - after this source-entry shape is externally consumed, future
+    vtable growth should use a derived/versioned interface instead
+    of appending methods to `ICoverageTracingMetadata`
 */
+enum class CoverageEntryKind : uint32_t
+{
+    Unknown = 0,
+    Line = 1,
+    Branch = 2,
+    Function = 3,
+    Region = 4,
+};
+
+enum class CoverageCounterMode : uint32_t
+{
+    Count = 0,
+};
+
+enum class CoverageBranchArmKind : uint32_t
+{
+    Unknown = 0,
+    TrueArm = 1,
+    FalseArm = 2,
+    CaseArm = 3,
+    DefaultArm = 4,
+};
+
+inline constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
+
 /// Per-coverage-entry attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
 /// `structSize` for ABI-versioned struct growth: future revisions
 /// may add fields such as column/span information, function identity,
 /// branch-arm identity, or coverage-mode-specific metadata at the end
-/// without changing the COM interface. The current implementation uses
-/// one entry per line-oriented counter slot. Entries are source-
-/// location based: if generic specialization, cloning, or inlining
-/// duplicates code for the same source line, all executions of that
-/// source location contribute to the same line counter rather than
-/// producing per-specialization counters.
+/// without changing the COM interface. Entries are source-location
+/// based: the current producers emit one source entry per marker op.
+/// If multiple line entries resolve to the same `(file, line)`, LCOV
+/// export aggregates them at report-generation time.
 struct CoverageEntryInfo
 {
     size_t structSize = sizeof(CoverageEntryInfo);
@@ -4592,10 +4629,60 @@ struct CoverageEntryInfo
 
     /// 1-based source line for this coverage entry, or 0 if the entry
     /// could not be attributed to a real source line. The current
-    /// implementation reports line-oriented entries; future revisions
-    /// may attach additional fields describing branch/function/region
-    /// semantics.
+    /// implementation reports line, function, and branch entries;
+    /// future revisions may add source-region entries or additional
+    /// branch forms.
     uint32_t line = 0;
+
+    /// Counter slot used by this entry, or
+    /// `kInvalidCoverageCounterIndex` when the entry has no runtime
+    /// counter. The current line/function/branch producers use one
+    /// direct counter per entry. Future source-region coverage may use
+    /// `kInvalidCoverageCounterIndex` for entries whose count is
+    /// derived from other counters or represented through tail-extended
+    /// fields.
+    uint32_t counterIndex = kInvalidCoverageCounterIndex;
+
+    /// Semantic kind of this source coverage entry.
+    CoverageEntryKind kind = CoverageEntryKind::Unknown;
+
+    /// Runtime accumulation mode for `counterIndex`. The current
+    /// implementation only defines `Count`; future concrete modes can
+    /// be appended when implemented.
+    CoverageCounterMode counterMode = CoverageCounterMode::Count;
+
+    /// 1-based inclusive start column for this entry, or 0 when
+    /// unavailable.
+    uint32_t startColumn = 0;
+
+    /// 1-based end line for this entry's half-open end coordinate, or
+    /// 0 when the exact range is unavailable. Future source-region
+    /// coverage can use `(line,startColumn)` to `(endLine,endColumn)`
+    /// for a half-open source range.
+    uint32_t endLine = 0;
+
+    /// 1-based exclusive end column for this entry, or 0 when
+    /// unavailable.
+    uint32_t endColumn = 0;
+
+    /// Function display name for function coverage entries, or
+    /// `nullptr` when not applicable or unavailable.
+    const char* functionName = nullptr;
+
+    /// Stable mangled function name for function coverage entries, or
+    /// `nullptr` when not applicable or unavailable.
+    const char* functionMangledName = nullptr;
+
+    /// Stable branch-site identifier within this metadata object, or 0
+    /// when not applicable.
+    uint32_t branchSiteID = 0;
+
+    /// Stable branch-arm identifier within `branchSiteID`, or 0 when
+    /// not applicable.
+    uint32_t branchArmID = 0;
+
+    /// Branch arm semantic for branch coverage entries.
+    CoverageBranchArmKind branchArmKind = CoverageBranchArmKind::Unknown;
 };
 
 /// Coverage-buffer descriptor binding info returned by
@@ -4633,18 +4720,21 @@ struct ICoverageTracingMetadata : public ISlangCastable
         0x4b9c,
         {0x8e, 0x21, 0x3f, 0x7b, 0x82, 0xa3, 0xd9, 0x51})
 
-    /// Number of coverage entries in the synthesized coverage buffer.
-    /// In the current implementation this is the number of line-
-    /// oriented source-location counter slots. Generic specializations
-    /// and other cloned instances of the same source line aggregate
-    /// into that source line's slot. Future revisions may extend the
-    /// entry model without changing the interface shape.
+    /// Number of runtime counter slots in the synthesized coverage
+    /// buffer. This can differ from `getEntryCount()` once a coverage
+    /// mode has counterless metadata entries, shares one counter across
+    /// several source entries, or reports entries whose counts are
+    /// derived from other counters.
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() = 0;
 
-    /// Populate `outInfo` with attribution info for counter slot
-    /// `index`. The caller must pre-set `outInfo->structSize =
-    /// sizeof(CoverageEntryInfo)`. Returns `SLANG_OK` on success,
-    /// `SLANG_E_INVALID_ARG` for null `outInfo`, mismatched
+    /// Populate `outInfo` with attribution info for source coverage
+    /// entry `index`. The valid range is `[0, getEntryCount())`. The
+    /// caller must pre-set `outInfo->structSize` to the size of the
+    /// `CoverageEntryInfo` definition it was compiled against. The
+    /// implementation accepts any prefix-compatible size at or above
+    /// the v1 minimum (`file` and `line`), and only writes tail fields
+    /// that fit in the caller-provided struct. Returns `SLANG_OK` on
+    /// success, `SLANG_E_INVALID_ARG` for null `outInfo`, too-small
     /// `structSize`, or out-of-range `index`.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getEntryInfo(uint32_t index, CoverageEntryInfo* outInfo) = 0;
@@ -4661,6 +4751,13 @@ struct ICoverageTracingMetadata : public ISlangCastable
     /// should query `ISyntheticResourceMetadata` from the same
     /// `IMetadata` object.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo* outInfo) = 0;
+
+    /// Number of source coverage entries available through
+    /// `getEntryInfo`. The current line/function/branch producers have
+    /// one entry per counter, but future source-region coverage may
+    /// expose entries that do not map one-to-one with runtime counter
+    /// slots.
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() = 0;
 };
     #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()
 
@@ -5441,11 +5538,12 @@ SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t s
  * in-process for hosts compiling via the C++ API.
  *
  * The returned JSON is consumable by
- * `tools/shader-coverage/slang-coverage-to-lcov.py` and any tool
- * expecting the version-1 manifest format. If `metadata` is the
+ * `tools/shader-coverage/slang-coverage-to-lcov.py` and tools
+ * expecting the source-entry manifest format. If `metadata` is the
  * artifact metadata object returned by Slang, it also supports
  * `ISyntheticResourceMetadata`, and the serializer includes the
- * coverage buffer's descriptor-facing binding fields when available.
+ * coverage buffer's descriptor or uniform-marshaling fields when
+ * available.
  *
  * @param metadata The coverage metadata, obtained via
  *                 `castAs<ICoverageTracingMetadata>` on the artifact's
