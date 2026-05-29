@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should-run: ${{ steps.filter.outputs.should-run }}
+      dxc-source-build: ${{ steps.filter.outputs.dxc-source-build }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,6 +24,7 @@ jobs:
       - id: filter
         run: |
           # This step prevents subsequent steps from running if only documentation was changed
+          dxcSourceBuild=false
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             git fetch origin ${{ github.base_ref }}
             BASE=origin/${{ github.base_ref }}
@@ -32,6 +34,10 @@ jobs:
 
           shouldRun=true
           if files="$(git diff --name-only $BASE...HEAD)"; then
+            if echo "$files" | grep -qE '^(cmake/FetchDXC\.cmake|external/CMakeLists\.txt|external/slang-rhi|\.github/cmake-options-matrix\.json|\.github/workflows/ci\.yml|docs/building\.md)$'; then
+              dxcSourceBuild=true
+            fi
+
             # Git diff succeeded, check if non-documentation files were changed
             if echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
               shouldRun=true
@@ -42,8 +48,10 @@ jobs:
           else
             echo "Git diff failed, conservatively running tests"
             shouldRun=true
+            dxcSourceBuild=true
           fi
           echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
+          echo "dxc-source-build=$dxcSourceBuild" >> $GITHUB_OUTPUT
 
   # Linux builds (containerized builds on GitHub-hosted runners)
   build-linux-debug-gcc-x86_64:
@@ -72,6 +80,77 @@ jobs:
       platform: wasm
       config: release
       runs-on: '["ubuntu-22.04"]'
+
+  dxc-source-build-linux-x86_64:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true' && needs.filter.outputs.dxc-source-build == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Free disk space
+        run: |
+          echo "=== Disk space before cleanup ==="
+          df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /usr/share/swift \
+            /usr/local/share/powershell \
+            /usr/local/share/chromium \
+            /usr/local/share/boost \
+            /opt/microsoft/msedge \
+            /opt/google/chrome \
+            /usr/local/lib/heroku \
+            || true
+          echo "=== Disk space after cleanup ==="
+          df -h /
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          config: release
+          build-llvm: false
+          min-disk-gb: "10"
+
+      - name: Build and smoke-test source-built DXC
+        run: |
+          cmake --preset default --fresh \
+            -DSLANG_DXC_BUILD_FROM_SOURCE=ON \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_ENABLE_EXAMPLES=OFF \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+
+          cmake --build build --config Release --target slangc copy-dxcompiler copy-dxil -j"$(nproc)"
+
+          test -f build/Release/lib/libdxcompiler.so
+          test -f build/Release/lib/libdxil.so
+
+          cat > /tmp/dxc-smoke.slang <<'SLANG'
+          [shader("compute")]
+          [numthreads(1, 1, 1)]
+          void main()
+          {
+          }
+          SLANG
+
+          LD_LIBRARY_PATH="$PWD/build/Release/lib:${LD_LIBRARY_PATH:-}" \
+            build/Release/bin/slangc /tmp/dxc-smoke.slang \
+              -target dxil -profile sm_6_0 -entry main -o /tmp/dxc-smoke.dxil
 
   # Sanitizer build+test (blocking via check-ci, runs on every PR)
   sanitizer-linux-clang-x86_64:
@@ -316,6 +395,7 @@ jobs:
         test-linux-release-gcc-aarch64,
         test-linux-debug-gcc-aarch64,
         test-materialx-windows-release,
+        dxc-source-build-linux-x86_64,
         sanitizer-linux-clang-x86_64,
       ]
     runs-on: ubuntu-latest
@@ -335,6 +415,7 @@ jobs:
           echo "Linux Release ARM64: ${{ needs.test-linux-release-gcc-aarch64.result }}"
           echo "Linux Debug ARM64: ${{ needs.test-linux-debug-gcc-aarch64.result }}"
           echo "MaterialX Windows: ${{ needs.test-materialx-windows-release.result }}"
+          echo "DXC Source Build Linux x64: ${{ needs.dxc-source-build-linux-x86_64.result }}"
           echo "Sanitizer Linux: ${{ needs.sanitizer-linux-clang-x86_64.result }}"
 
           # Check if any required jobs failed (allow success or skipped)
@@ -349,6 +430,7 @@ jobs:
              [[ "${{ needs.test-linux-release-gcc-aarch64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-linux-debug-gcc-aarch64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-materialx-windows-release.result }}" == "failure" ]] || \
+             [[ "${{ needs.dxc-source-build-linux-x86_64.result }}" == "failure" ]] || \
              [[ "${{ needs.sanitizer-linux-clang-x86_64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
@@ -360,6 +442,7 @@ jobs:
              [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-linux-release-gcc-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-linux-debug-gcc-aarch64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.dxc-source-build-linux-x86_64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.sanitizer-linux-clang-x86_64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-materialx-windows-release.result }}" == "cancelled" ]]; then
             echo "One or more CI jobs failed or were cancelled"

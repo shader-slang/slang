@@ -245,7 +245,7 @@ works for any given binary.
 | ------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `SLANG_VERSION`                       | Latest `v*` tag               | The project version, detected using git if available                                                                                     |
 | `SLANG_DXC_BINARY_URL`                | Platform dependent            | URL of the prebuilt DXC binary archive to download; overrides the default release URL and skips GLIBC auto-detection on Linux            |
-| `SLANG_DXC_BUILD_FROM_SOURCE`         | Unset (auto on native Linux) | `ON`: always build DXC from source; `OFF`: use prebuilt when available; unset: auto-select on native Linux (see [DXC GLIBC auto-detection](#dxc-glibc-auto-detection)) |
+| `SLANG_DXC_BUILD_FROM_SOURCE`         | Unset (auto on native Linux x86_64) | `ON`: always build DXC from source; `OFF`: use prebuilt when available; unset: auto-select on native Linux x86_64 (see [DXC GLIBC auto-detection](#dxc-glibc-auto-detection)) |
 | `SLANG_EMBED_CORE_MODULE`             | `TRUE`                        | Build slang with an embedded version of the core module                                                                                  |
 | `SLANG_EMBED_CORE_MODULE_SOURCE`      | `TRUE`                        | Embed the core module source in the binary                                                                                               |
 | `SLANG_ENABLE_DXIL`                   | `TRUE`                        | Enable generating DXIL using DXC                                                                                                         |
@@ -284,11 +284,12 @@ configure time and inspects the GLIBC requirements of both `libdxcompiler.so`
 and `libdxil.so`. If either library requires a newer GLIBC than the system
 provides, or if the requirement or system GLIBC version cannot be detected, DXC
 is built from source instead. Detection results are cached in stamp files so
-subsequent reconfigures are fast.
+subsequent reconfigures are fast. The checked-in `v1.9.2602` Linux prebuilt
+archive currently requires GLIBC 2.38 or newer.
 
 - `ON`: always build DXC from source (Windows and Linux only; fatal error on other platforms).
 - `OFF`: use the prebuilt binary when one is available and skip the GLIBC check; on non-x86_64 Linux without `SLANG_DXC_BINARY_URL`, DXC is unavailable because there is no official prebuilt binary.
-- unset on native non-x86_64 Linux (e.g. ARM64): automatically build DXC from source because no official prebuilt binary is available.
+- unset on native non-x86_64 Linux (e.g. ARM64): DXC is unavailable because no official prebuilt binary exists; set `ON` to build DXC from source.
 - unset while cross-compiling for Linux x86_64: skip GLIBC detection because the target system cannot be probed at configure time.
 
 The source-build path clones DXC plus LLVM/Clang submodules on the first run

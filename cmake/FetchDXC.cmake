@@ -16,10 +16,11 @@
 #   SLANG_DXC_BINARY_URL        - Override the prebuilt binary download URL
 #                                 (optional; skips auto-detection when set)
 #   SLANG_DXC_BUILD_FROM_SOURCE - ON: always build from source; OFF: always use
-#                                 prebuilt (skips detection); unset: auto-detect on
-#                                 Linux by downloading the prebuilt binary and
-#                                 inspecting the GLIBC requirements of both
-#                                 libdxcompiler.so and libdxil.so
+#                                 prebuilt when available (skips detection);
+#                                 unset: auto-detect on native Linux x86_64 by
+#                                 downloading the prebuilt binary and inspecting
+#                                 the GLIBC requirements of both libdxcompiler.so
+#                                 and libdxil.so
 #   SLANG_GITHUB_TOKEN          - GitHub token for authenticated downloads (optional)
 #
 # Requires the following variables to be set by the caller (set in SlangTarget.cmake):
@@ -366,11 +367,10 @@ elseif(
     AND NOT DEFINED SLANG_DXC_BINARY_URL
     AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
 )
-    # Non-x86_64 Linux: no prebuilt binary is available for this architecture,
-    # regardless of whether SLANG_DXC_BUILD_FROM_SOURCE was explicitly set to
-    # OFF or left unset. Warn and return immediately so the downstream URL
-    # check (which would also return early) is not the only signal that DXC
-    # is unavailable.
+    # Non-x86_64 Linux: no prebuilt binary is available for this architecture.
+    # Do not implicitly trigger a source build here; it is expensive and is not
+    # part of the default Linux ARM64 build. Users can still opt in explicitly
+    # with SLANG_DXC_BUILD_FROM_SOURCE=ON, which is handled by the first branch.
     if(DEFINED SLANG_DXC_BUILD_FROM_SOURCE AND NOT SLANG_DXC_BUILD_FROM_SOURCE)
         message(
             WARNING
@@ -380,18 +380,16 @@ elseif(
             "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source, "
             "or set -DSLANG_DXC_BINARY_URL=<url> to use a custom prebuilt binary."
         )
-        return()
     else()
         message(
-            STATUS
+            WARNING
             "No prebuilt DXC binary is available for ${CMAKE_SYSTEM_PROCESSOR} "
-            "on Linux; automatically building DXC from source "
-            "(${_dxc_version_tag}). "
-            "Set -DSLANG_DXC_BUILD_FROM_SOURCE=OFF to disable DXC entirely, "
+            "on Linux. DXC will be unavailable. "
+            "Set -DSLANG_DXC_BUILD_FROM_SOURCE=ON to build DXC from source, "
             "or set -DSLANG_DXC_BINARY_URL=<url> to use a custom prebuilt binary."
         )
-        set(_dxc_build_from_source ON)
     endif()
+    return()
 endif()
 
 # ---------------------------------------------------------------------------
