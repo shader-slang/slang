@@ -24,6 +24,8 @@
 // - tests/diagnostics/integer-literal-overflow.slang for overflow diagnostics.
 // - tests/front-end/integer-literal-types-intmin.slang for minimum
 //   negative integer values.
+// - tests/diagnostics/integer-literal-overflow-types.slang for correct types
+//   for overflown literals (warning cases)
 
 enum IntegerLiteralType
 {

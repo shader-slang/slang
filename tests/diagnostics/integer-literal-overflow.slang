@@ -30,23 +30,23 @@ void main()
     // suffix falls back to uint64_t per the (*)-marked rows of the spec table.
     //
 
-    static_assert(IntegerLiteralType.UINT64  == getType(9223372036854775808),               "dec, no suffix: uint64_t low bound (warning)");
-//CHECK:                                                ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    getType(9223372036854775808); //               "dec, no suffix: uint64_t low bound (warning)");
+//CHECK:    ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    static_assert(IntegerLiteralType.UINT64  == getType(18446744073709551615),              "dec, no suffix: uint64_t high bound (warning)");
-//CHECK:                                                ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    getType(18446744073709551615); //              "dec, no suffix: uint64_t high bound (warning)");
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    static_assert(IntegerLiteralType.UINT64  == getType(9223372036854775808L),              "dec, 'L' suffix: uint64_t low bound (warning)");
-//CHECK:                                                ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    getType(9223372036854775808L); //              "dec, 'L' suffix: uint64_t low bound (warning)");
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    static_assert(IntegerLiteralType.UINT64  == getType(18446744073709551615L),             "dec, 'L' suffix: uint64_t high bound (warning)");
-//CHECK:                                                ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    getType(18446744073709551615L); //             "dec, 'L' suffix: uint64_t high bound (warning)");
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    static_assert(IntegerLiteralType.UINT64  == getType(9223372036854775808LL),             "dec, 'LL' suffix: uint64_t low bound (warning)");
-//CHECK:                                                ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    getType(9223372036854775808LL); //             "dec, 'LL' suffix: uint64_t low bound (warning)");
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    static_assert(IntegerLiteralType.UINT64  == getType(18446744073709551615LL),            "dec, 'LL' suffix: uint64_t high bound (warning)");
-//CHECK:                                                ^^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    getType(18446744073709551615LL); //            "dec, 'LL' suffix: uint64_t high bound (warning)");
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     //
     // Errors: decimal value > UINT64_MAX (18446744073709551616 = UINT64_MAX + 1)
@@ -77,11 +77,11 @@ void main()
     // uintptr_t/uint64_t for a 'Z' (signed) suffix, so this is an error.
     //
 
-    static_assert(IntegerLiteralType.UINTPTR == getType(9223372036854775808Z), "dec, 'Z' suffix: intptr_t overflow (error)");
-//CHECK:                                                ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    getType(9223372036854775808Z); // "dec, 'Z' suffix: intptr_t overflow (error)");
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    static_assert(IntegerLiteralType.UINTPTR == getType(18446744073709551615Z), "dec, 'Z' suffix: intptr_t overflow (error)");
-//CHECK:                                                ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    getType(18446744073709551615Z); // "dec, 'Z' suffix: intptr_t overflow (error)");
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     //
     // Errors: decimal value > UINTPTR_MAX for 'Z'/'UZ'/'ZU' suffix.
@@ -128,13 +128,13 @@ void main()
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in any integer type
 
     // negated overflow
-    static_assert(IntegerLiteralType.INT64   == getType(-9223372036854775809),   "unary-minus(INT64_MAX+2), no suffix");
-//CHECK:                                                 ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    getType(-9223372036854775809); //   "unary-minus(INT64_MAX+2), no suffix");
+//CHECK:     ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     // check that not/plus prefixes still trigger the overflow warning (ignored with minus)
-    static_assert(IntegerLiteralType.INT64   == getType(~9223372036854775808),   "bit-wise-not(INT64_MAX+1), no suffix");
-//CHECK:                                                 ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    getType(~9223372036854775808); //   "bit-wise-not(INT64_MAX+1), no suffix");
+//CHECK:     ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    static_assert(IntegerLiteralType.INT64   == getType(+9223372036854775808),   "unary-plus(INT64_MAX+1), no suffix");
-//CHECK:                                                 ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    getType(+9223372036854775808); //   "unary-plus(INT64_MAX+1), no suffix");
+//CHECK:     ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 }
