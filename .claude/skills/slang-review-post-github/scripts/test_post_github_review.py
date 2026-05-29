@@ -561,6 +561,65 @@ class PostGithubReviewTests(unittest.TestCase):
         self.assertEqual(commit_id, "abc123")
         self.assertEqual(diff_lines["source/file.cpp"], {10, 11, 12})
 
+    def test_validate_locations_uses_full_diff_when_file_patch_is_missing(self) -> None:
+        """Location validation falls back when the PR files API omits a file patch."""
+
+        old_run_json = post_github_review.run_json
+        old_run_text = post_github_review.run_text
+
+        def fake_run_json(args: list[str]) -> object:
+            """Return PR metadata and a changed file entry without inline patch text."""
+
+            joined = " ".join(args)
+            if "/pulls/123" in joined and "/files" not in joined:
+                return {"head": {"sha": "abc123"}}
+            if "/pulls/123/files" in joined:
+                return [[{"filename": "source/large-file.cpp"}]]
+            raise AssertionError("unexpected gh api call: " + joined)
+
+        def fake_run_text(args: list[str]) -> str:
+            """Return the full PR diff that still contains the file's hunks."""
+
+            joined = " ".join(args)
+            self.assertIn("Accept: application/vnd.github.v3.diff", joined)
+            self.assertIn("repos/shader-slang/slang/pulls/123", joined)
+            return (
+                "diff --git a/source/large-file.cpp b/source/large-file.cpp\n"
+                "--- a/source/large-file.cpp\n"
+                "+++ b/source/large-file.cpp\n"
+                "@@ -1,2 +20,3 @@\n"
+                " context\n"
+                "+added\n"
+                " context2\n"
+            )
+
+        post_github_review.run_json = fake_run_json
+        post_github_review.run_text = fake_run_text
+        self.addCleanup(setattr, post_github_review, "run_json", old_run_json)
+        self.addCleanup(setattr, post_github_review, "run_text", old_run_text)
+
+        commit_id, diff_lines = post_github_review.validate_locations(
+            "gh",
+            "shader-slang/slang",
+            123,
+            [
+                post_github_review.Candidate(
+                    "C001",
+                    "Clarify the invariant",
+                    "Keep",
+                    "Direct",
+                    "Keep",
+                    "source/large-file.cpp",
+                    20,
+                    22,
+                    "The invariant is unclear.",
+                )
+            ],
+        )
+
+        self.assertEqual(commit_id, "abc123")
+        self.assertEqual(diff_lines["source/large-file.cpp"], {20, 21, 22})
+
     def test_validate_locations_rejects_lines_not_in_patch(self) -> None:
         """Location validation rejects lines that GitHub cannot comment on."""
 

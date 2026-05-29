@@ -451,6 +451,50 @@ def right_lines_from_patch(patch: str) -> Set[int]:
     return lines
 
 
+def path_from_diff_target(line: str) -> Optional[str]:
+    """Extract the right-side file path from a unified-diff target header."""
+
+    if not line.startswith("+++ "):
+        return None
+    path = line[4:]
+    if path == "/dev/null":
+        return None
+    if path.startswith("b/"):
+        return path[2:]
+    return path
+
+
+def right_lines_from_full_diff(diff_text: str) -> Dict[str, Set[int]]:
+    """Return right-side commentable lines for each file in a unified PR diff."""
+
+    diff_lines: Dict[str, Set[int]] = {}
+    current_path: Optional[str] = None
+    current_patch: List[str] = []
+
+    def finish_file() -> None:
+        """Record the current file's right-side lines before moving to the next file."""
+
+        if current_path is not None and current_patch:
+            diff_lines[current_path] = right_lines_from_patch("\n".join(current_patch))
+
+    for raw in diff_text.splitlines():
+        if raw.startswith("diff --git "):
+            finish_file()
+            current_path = None
+            current_patch = []
+            continue
+        path = path_from_diff_target(raw)
+        if path is not None or raw == "+++ /dev/null":
+            current_path = path
+            current_patch = []
+            continue
+        if current_path is not None:
+            current_patch.append(raw)
+
+    finish_file()
+    return diff_lines
+
+
 def validate_locations(
     gh: str, repo: str, pr: int, candidates: Iterable[Candidate]
 ) -> Tuple[str, Dict[str, Set[int]]]:
@@ -475,20 +519,40 @@ def validate_locations(
     )
     files = flatten_pages(pages)
     diff_lines: Dict[str, Set[int]] = {}
+    missing_patch_paths: Set[str] = set()
     for item in files:
         if not isinstance(item, dict):
             continue
         filename = item.get("filename")
         patch = item.get("patch")
-        if isinstance(filename, str) and isinstance(patch, str):
+        if not isinstance(filename, str):
+            continue
+        if isinstance(patch, str):
             diff_lines[filename] = right_lines_from_patch(patch)
+        else:
+            missing_patch_paths.add(filename)
+
+    if missing_patch_paths:
+        full_diff = run_text(
+            [
+                gh,
+                "api",
+                "-H",
+                "Accept: application/vnd.github.v3.diff",
+                "repos/{}/pulls/{}".format(repo, pr),
+            ]
+        )
+        fallback_lines = right_lines_from_full_diff(full_diff)
+        for path in missing_patch_paths:
+            if path in fallback_lines:
+                diff_lines[path] = fallback_lines[path]
 
     errors: List[str] = []
     for candidate in candidates:
         lines = diff_lines.get(candidate.path)
         if lines is None:
             errors.append(
-                "{} Location path is not present in fetched PR diff patches: {}".format(
+                "{} Location path is not present in fetched PR diff data: {}".format(
                     candidate.candidate_id, candidate.path
                 )
             )
