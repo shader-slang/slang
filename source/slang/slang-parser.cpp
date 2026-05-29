@@ -8134,75 +8134,77 @@ static BaseType _determineIntegerLiteralType(
     {
         switch (widthSuffix)
         {
-            case IntegerLiteralWidthSuffix::None:
-            case IntegerLiteralWidthSuffix::Long:
-                if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
-                {
-                    if (rawValue <= INT32_MAX)
-                        return BaseType::Int;
-                }
-                else
-                {
-                    if (rawValue <= UINT32_MAX)
-                        return BaseType::UInt;
-                }
+        case IntegerLiteralWidthSuffix::None:
+        case IntegerLiteralWidthSuffix::Long:
+            if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
+            {
+                if (rawValue <= INT32_MAX)
+                    return BaseType::Int;
+            }
+            else
+            {
+                if (rawValue <= UINT32_MAX)
+                    return BaseType::UInt;
+            }
 
-                // fall-through
-            case IntegerLiteralWidthSuffix::LongLong:
-                if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
-                {
-                    if (rawValue <= INT64_MAX)
-                        return BaseType::Int64;
+            // fall-through
+        case IntegerLiteralWidthSuffix::LongLong:
+            if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
+            {
+                if (rawValue <= INT64_MAX)
+                    return BaseType::Int64;
 
-                    // This is always overflowing. The case of INT64_MAX + 1 is
-                    // detected by SemanticsExprVisitor when assigning types.
-                    if (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 2U))
-                        sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
-                }
-
-                return BaseType::UInt64;
-
-            case IntegerLiteralWidthSuffix::Pointer:
-                if ((unsignedSuffix == IntegerLiteralUnsignedSuffix::None) &&
-                    (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 1U)))
-                {
-                    // Note: there is no negation exception for IntPtr
+                // This is always overflowing. The case of INT64_MAX + 1 is
+                // detected by SemanticsExprVisitor when assigning types.
+                if (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 2U))
                     sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
-                    return BaseType::UIntPtr;
-                }
+            }
 
-                return unsignedSuffix == IntegerLiteralUnsignedSuffix::None ? BaseType::IntPtr : BaseType::UIntPtr;
+            return BaseType::UInt64;
 
-            default:
-                SLANG_ASSERT(!"Unhandled width suffix");
-                break;
+        case IntegerLiteralWidthSuffix::Pointer:
+            if ((unsignedSuffix == IntegerLiteralUnsignedSuffix::None) &&
+                (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 1U)))
+            {
+                // Note: there is no negation exception for IntPtr
+                sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
+                return BaseType::UIntPtr;
+            }
+
+            return unsignedSuffix == IntegerLiteralUnsignedSuffix::None ? BaseType::IntPtr
+                                                                        : BaseType::UIntPtr;
+
+        default:
+            SLANG_ASSERT(!"Unhandled width suffix");
+            break;
         }
     }
     else
     {
         switch (widthSuffix)
         {
-            case IntegerLiteralWidthSuffix::None:
-            case IntegerLiteralWidthSuffix::Long:
-                if ((unsignedSuffix == IntegerLiteralUnsignedSuffix::None) && (rawValue <= INT32_MAX))
-                    return BaseType::Int;
+        case IntegerLiteralWidthSuffix::None:
+        case IntegerLiteralWidthSuffix::Long:
+            if ((unsignedSuffix == IntegerLiteralUnsignedSuffix::None) && (rawValue <= INT32_MAX))
+                return BaseType::Int;
 
-                if (rawValue <= UINT32_MAX)
-                    return BaseType::UInt;
+            if (rawValue <= UINT32_MAX)
+                return BaseType::UInt;
 
-                // fall-through
-            case IntegerLiteralWidthSuffix::LongLong:
-                if ((unsignedSuffix == IntegerLiteralUnsignedSuffix::None) && (rawValue <= INT64_MAX))
-                    return BaseType::Int64;
+            // fall-through
+        case IntegerLiteralWidthSuffix::LongLong:
+            if ((unsignedSuffix == IntegerLiteralUnsignedSuffix::None) && (rawValue <= INT64_MAX))
+                return BaseType::Int64;
 
-                return BaseType::UInt64;
+            return BaseType::UInt64;
 
-            case IntegerLiteralWidthSuffix::Pointer:
-                return unsignedSuffix == IntegerLiteralUnsignedSuffix::None ? BaseType::IntPtr : BaseType::UIntPtr;
+        case IntegerLiteralWidthSuffix::Pointer:
+            return unsignedSuffix == IntegerLiteralUnsignedSuffix::None ? BaseType::IntPtr
+                                                                        : BaseType::UIntPtr;
 
-            default:
-                SLANG_ASSERT(!"Unhandled width suffix");
-                break;
+        default:
+            SLANG_ASSERT(!"Unhandled width suffix");
+            break;
         }
     }
 }
@@ -8216,22 +8218,18 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
     constExpr->token = token;
 
     UnownedStringSlice suffix;
-    bool isDecimalBase { };
-    bool hasOverflowed { };
-    IntegerLiteralWidthSuffix widthSuffix { IntegerLiteralWidthSuffix::None };
-    IntegerLiteralUnsignedSuffix unsignedSuffix { IntegerLiteralUnsignedSuffix::None };
+    bool isDecimalBase{};
+    bool hasOverflowed{};
+    IntegerLiteralWidthSuffix widthSuffix{IntegerLiteralWidthSuffix::None};
+    IntegerLiteralUnsignedSuffix unsignedSuffix{IntegerLiteralUnsignedSuffix::None};
 
-    IntegerLiteralValue value = getIntegerLiteralValue(
-        token,
-        parser->sink,
-        &suffix,
-        &isDecimalBase,
-        &hasOverflowed);
+    IntegerLiteralValue value =
+        getIntegerLiteralValue(token, parser->sink, &suffix, &isDecimalBase, &hasOverflowed);
 
     // Look at any suffix on the value
     char const* suffixCursor = suffix.begin();
     const char* const suffixEnd = suffix.end();
-    bool unknownSuffix { };
+    bool unknownSuffix{};
 
     // First, parse suffix
     while (suffixCursor != suffixEnd)
@@ -8240,61 +8238,61 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
 
         switch (suffixChar)
         {
-            case 'l':
-            case 'L':
-                if (widthSuffix != IntegerLiteralWidthSuffix::None)
-                {
-                    unknownSuffix = true; // width already specified
-                    break;
-                }
-
-                // check if the next char is also 'l'/'L' (case matched), then
-                // the type is LongLong
-                if ((suffixCursor != suffixEnd) && (*suffixCursor == suffixChar))
-                {
-                    suffixCursor++;
-                    widthSuffix = IntegerLiteralWidthSuffix::LongLong;
-                }
-                else
-                {
-                    widthSuffix = IntegerLiteralWidthSuffix::Long;
-                }
+        case 'l':
+        case 'L':
+            if (widthSuffix != IntegerLiteralWidthSuffix::None)
+            {
+                unknownSuffix = true; // width already specified
                 break;
+            }
 
-            case 'u':
-            case 'U':
-                if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
-                    unsignedSuffix = IntegerLiteralUnsignedSuffix::Unsigned;
-                else
-                    unknownSuffix = true; // double 'U'
+            // check if the next char is also 'l'/'L' (case matched), then
+            // the type is LongLong
+            if ((suffixCursor != suffixEnd) && (*suffixCursor == suffixChar))
+            {
+                suffixCursor++;
+                widthSuffix = IntegerLiteralWidthSuffix::LongLong;
+            }
+            else
+            {
+                widthSuffix = IntegerLiteralWidthSuffix::Long;
+            }
+            break;
+
+        case 'u':
+        case 'U':
+            if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
+                unsignedSuffix = IntegerLiteralUnsignedSuffix::Unsigned;
+            else
+                unknownSuffix = true; // double 'U'
+            break;
+
+        case 'z':
+        case 'Z':
+            if (widthSuffix != IntegerLiteralWidthSuffix::None)
+            {
+                unknownSuffix = true; // width already specified
                 break;
+            }
 
-            case 'z':
-            case 'Z':
-                if (widthSuffix != IntegerLiteralWidthSuffix::None)
-                {
-                    unknownSuffix = true; // width already specified
-                    break;
-                }
+            widthSuffix = IntegerLiteralWidthSuffix::Pointer;
+            break;
 
-                widthSuffix = IntegerLiteralWidthSuffix::Pointer;
-                break;
-
-            default:
-                unknownSuffix = true;
-                break;
+        default:
+            unknownSuffix = true;
+            break;
         }
     }
 
     if (unknownSuffix)
     {
         parser->sink->diagnose(Diagnostics::InvalidIntegerLiteralSuffix{
-                .suffix = String(suffix),
-                .location = token.loc});
+            .suffix = String(suffix),
+            .location = token.loc});
     }
 
     BaseType suffixBaseType;
-    bool signedMinimumIntException { false };
+    bool signedMinimumIntException{false};
     if (!hasOverflowed)
     {
         suffixBaseType = _determineIntegerLiteralType(
@@ -8308,12 +8306,15 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
         // flag the special case for INT_MIN / INT64_MIN literal expressions
         if (isDecimalBase && (unsignedSuffix == IntegerLiteralUnsignedSuffix::None))
         {
-            if (((widthSuffix == IntegerLiteralWidthSuffix::None) || widthSuffix == IntegerLiteralWidthSuffix::Long) &&
+            if (((widthSuffix == IntegerLiteralWidthSuffix::None) ||
+                 widthSuffix == IntegerLiteralWidthSuffix::Long) &&
                 (value == -static_cast<int64_t>(INT_MIN)))
                 signedMinimumIntException = true;
             else if (
-                ((widthSuffix == IntegerLiteralWidthSuffix::None) || (widthSuffix == IntegerLiteralWidthSuffix::Long) ||
-                 (widthSuffix == IntegerLiteralWidthSuffix::LongLong)) && value == INT64_MIN)
+                ((widthSuffix == IntegerLiteralWidthSuffix::None) ||
+                 (widthSuffix == IntegerLiteralWidthSuffix::Long) ||
+                 (widthSuffix == IntegerLiteralWidthSuffix::LongLong)) &&
+                value == INT64_MIN)
                 signedMinimumIntException = true;
         }
     }
@@ -9502,19 +9503,23 @@ static Expr* parsePrefixExpr(Parser* parser)
                     IntegerLiteralValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
 
                     // Check if we need to diagnose the signed minimum int special case here. This
-                    // won't be detected by SemanticsExprVisitor, because the literal value is no longer INT64_MIN
-                    // after folding.
+                    // won't be detected by SemanticsExprVisitor, because the literal value is no
+                    // longer INT64_MIN after folding.
                     if ((tokenType == TokenType::OpBitNot) && newLiteral->signedMinimumIntException)
                     {
-                        parser->sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = intLit->loc});
+                        parser->sink->diagnose(
+                            Diagnostics::IntegerLiteralTooLarge{.location = intLit->loc});
                         newLiteral->signedMinimumIntException = false;
                     }
 
                     // Need to get the basic type, so we can fit to underlying type
                     if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))
                     {
-                        value =
-                            _fixIntegerLiteral(basicExprType->getBaseType(), value, nullptr, nullptr);
+                        value = _fixIntegerLiteral(
+                            basicExprType->getBaseType(),
+                            value,
+                            nullptr,
+                            nullptr);
                     }
 
                     newLiteral->value = value;
