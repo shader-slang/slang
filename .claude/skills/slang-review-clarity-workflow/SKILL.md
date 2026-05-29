@@ -71,8 +71,9 @@ candidate entries.
    Unless the workflow is posting through a GitHub account that already identifies the agent,
    the first line must identify the review as agent-authored. Use the form
    `<agent name>-authored <optional review type> review:`, such as
-   `Codex-authored clarity review:` or `Agent-authored clarity review:`. The separator before
-   `authored` may be whitespace instead of `-`.
+   `GPT-4.1-authored clarity review:` or `Claude 3.7 Sonnet authored review:`. The separator
+   before `authored` may be whitespace instead of `-`. The agent name may be any non-newline
+   text up to 50 Unicode scalar values.
 10. Validate the canonical file before posting.
 
     The posting script enforces the mechanical blocking checks:

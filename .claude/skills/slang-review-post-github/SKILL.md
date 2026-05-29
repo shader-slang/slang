@@ -82,14 +82,15 @@ The review body must start with:
 ```
 
 The separator before `authored` may be whitespace instead of `-`. If there is no review type,
-use a single space between `authored` and `review`.
+use a single space between `authored` and `review`. The agent name may be any non-newline
+text up to 50 Unicode scalar values.
 
 Examples:
 
 ```text
-Codex-authored clarity review:
-Codex authored review:
-Agent-authored clarity review:
+GPT-4.1-authored clarity review:
+Claude 3.7 Sonnet authored review:
+OpenAI/GPT-4.1 (reviewer)-authored clarity review:
 ```
 
 Use `--acting-as-bot-user` only when the initial user prompt or environment makes it clear that

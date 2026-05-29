@@ -27,6 +27,7 @@ IGNORED_STATUSES = {"Drop"}
 VALID_EVENTS = {"REQUEST_CHANGES", "COMMENT"}
 POSTABLE_SCOPE_DECISIONS = {"Direct", "Contextual"}
 POSTABLE_OVERLAP_DECISIONS = {"Keep", "Needs judgment call", "Needs human judgment"}
+MAX_AGENT_IDENTITY_SCALARS = 50
 
 
 class FatalError(Exception):
@@ -62,15 +63,13 @@ CANDIDATE_METADATA_BOUNDARIES = {"Context:", "Proposed comment:", "Notes:"}
 AGENT_REVIEW_ATTRIBUTION_RE = re.compile(
     r"""
     ^
-    [A-Za-z][A-Za-z0-9_.]*             # Agent name, first word.
-    (?:[ -][A-Za-z][A-Za-z0-9_.]*)*    # Additional agent-name words.
-    (?:-|\s+)authored                  # Either "Codex-authored" or "Codex authored".
+    (?P<agent>[^\r\n]+?)               # Agent identity; policy checks bound it.
+    (?:-|[^\S\r\n]+)authored           # Either "Codex-authored" or "Codex authored".
     (?:
-        \s+
-        [A-Za-z][A-Za-z0-9_.-]*        # Optional review-type phrase.
-        (?:\s+[A-Za-z][A-Za-z0-9_.-]*)*
+        [^\S\r\n]+
+        [^\r\n:]*?                     # Optional review-type phrase.
     )?
-    \s+review\s*:
+    [^\S\r\n]+review[^\S\r\n]*:
     """,
     re.IGNORECASE | re.VERBOSE,
 )
@@ -506,7 +505,11 @@ def validate_locations(
 def has_agent_review_attribution(review_body: str) -> bool:
     """Return true when the review body starts with the required attribution prefix."""
 
-    return AGENT_REVIEW_ATTRIBUTION_RE.match(review_body) is not None
+    match = AGENT_REVIEW_ATTRIBUTION_RE.match(review_body)
+    if match is None:
+        return False
+    agent_identity = match.group("agent").strip()
+    return 0 < len(agent_identity) <= MAX_AGENT_IDENTITY_SCALARS
 
 
 def default_review_body(candidates: List[Candidate]) -> str:
@@ -536,7 +539,8 @@ def prepare_review_body(
         fail(
             "review body is missing; add a ## Review Body section or pass --body/--body-file. "
             "When not using --acting-as-bot-user, the body must start with an attribution "
-            "such as 'Codex-authored clarity review:' or 'Codex authored review:'."
+            "such as 'GPT-4.1-authored clarity review:' or "
+            "'Claude 3.7 Sonnet authored review:'."
         )
 
     if not review_body.strip():
@@ -546,8 +550,9 @@ def prepare_review_body(
         fail(
             "review body must start with '<agent name>-authored <optional review type> "
             "review:' when posting on behalf of a human user, for example "
-            "'Codex-authored clarity review:' or 'Codex authored review:'. Pass "
-            "--acting-as-bot-user only when the GitHub account already identifies the agent."
+            "'GPT-4.1-authored clarity review:' or 'Claude 3.7 Sonnet authored review:'. "
+            "The agent name may be any non-newline text up to 50 Unicode scalar values. "
+            "Pass --acting-as-bot-user only when the GitHub account already identifies the agent."
         )
     return review_body
 

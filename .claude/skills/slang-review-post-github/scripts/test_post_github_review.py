@@ -247,23 +247,37 @@ class PostGithubReviewTests(unittest.TestCase):
         """Human-proxied reviews must already carry agent-authorship attribution."""
 
         body = post_github_review.prepare_review_body(
-            "Codex-authored clarity review: Review summary.",
+            "GPT-4.1-authored clarity review: Review summary.",
             [],
             acting_as_bot_user=False,
         )
 
-        self.assertEqual(body, "Codex-authored clarity review: Review summary.")
+        self.assertEqual(body, "GPT-4.1-authored clarity review: Review summary.")
 
     def test_prepare_review_body_accepts_whitespace_agent_attribution(self) -> None:
         """The attribution separator may be whitespace instead of a hyphen."""
 
         body = post_github_review.prepare_review_body(
-            "Codex authored review: Review summary.",
+            "Claude 3.7 Sonnet authored review: Review summary.",
             [],
             acting_as_bot_user=False,
         )
 
-        self.assertEqual(body, "Codex authored review: Review summary.")
+        self.assertEqual(body, "Claude 3.7 Sonnet authored review: Review summary.")
+
+    def test_prepare_review_body_accepts_punctuated_agent_identity(self) -> None:
+        """Agent identity may use punctuation as long as it stays on one line."""
+
+        body = post_github_review.prepare_review_body(
+            "OpenAI/GPT-4.1 (reviewer)-authored clarity review: Review summary.",
+            [],
+            acting_as_bot_user=False,
+        )
+
+        self.assertEqual(
+            body,
+            "OpenAI/GPT-4.1 (reviewer)-authored clarity review: Review summary.",
+        )
 
     def test_prepare_review_body_accepts_attribution_without_review_type(self) -> None:
         """When the review type is omitted, `authored review:` is sufficient."""
@@ -282,6 +296,28 @@ class PostGithubReviewTests(unittest.TestCase):
         with self.assertRaisesRegex(post_github_review.FatalError, "must start"):
             post_github_review.prepare_review_body(
                 "Review summary.", [], acting_as_bot_user=False
+            )
+
+    def test_prepare_review_body_rejects_overlong_agent_identity(self) -> None:
+        """Agent identity must stay within the conservative length limit."""
+
+        agent_identity = "A" * (post_github_review.MAX_AGENT_IDENTITY_SCALARS + 1)
+
+        with self.assertRaisesRegex(post_github_review.FatalError, "50 Unicode"):
+            post_github_review.prepare_review_body(
+                f"{agent_identity}-authored clarity review: Review summary.",
+                [],
+                acting_as_bot_user=False,
+            )
+
+    def test_prepare_review_body_rejects_multiline_agent_attribution(self) -> None:
+        """The agent identity must not contain a newline."""
+
+        with self.assertRaisesRegex(post_github_review.FatalError, "must start"):
+            post_github_review.prepare_review_body(
+                "GPT-4.1\n-authored clarity review: Review summary.",
+                [],
+                acting_as_bot_user=False,
             )
 
     def test_prepare_review_body_allows_missing_attribution_for_bot_user(self) -> None:
