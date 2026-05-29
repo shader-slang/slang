@@ -4321,7 +4321,62 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             {
                 if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
                 {
+                    // PR #10827 made the resolved `BwdDiffFuncType` for a
+                    // `[NoDiffThis]` non-static member method include `this`
+                    // as an explicit first parameter (typed `no_diff T`). The
+                    // bound `obj.method` form leaves the receiver off the
+                    // argument list, so we re-inject it as `arguments[0]`
+                    // after the higher-order rewrite below. Methods without
+                    // `[NoDiffThis]` resolve to a different shape (their
+                    // `this` flows differently) and are out of scope here;
+                    // `__apply_for_bwd` and `__fwd_diff` are also out of
+                    // scope for this regression fix (shader-slang/slang#11356).
+                    Expr* boundReceiverExpr = nullptr;
+                    if (as<BackwardDifferentiateExpr>(higherOrderInvoke))
+                    {
+                        auto innerMost = getInnerMostExprFromHigherOrderExpr(higherOrderInvoke);
+                        if (auto memberExpr = as<MemberExpr>(innerMost))
+                        {
+                            auto memberDeclRef = memberExpr->declRef;
+                            if (auto genDecl = as<GenericDecl>(memberDeclRef.getDecl()))
+                            {
+                                memberDeclRef = m_astBuilder->getMemberDeclRef(
+                                    memberDeclRef.as<GenericDecl>(),
+                                    genDecl->inner);
+                            }
+                            // Free-function `as<FunctionDeclBase>(Decl*)` does
+                            // a real dynamic type check via getClass();
+                            // `DeclRef::as<>` only rebinds and would let any
+                            // non-null inner decl pass.
+                            if (auto callableDecl =
+                                    as<FunctionDeclBase>(memberDeclRef.getDecl()))
+                            {
+                                if (callableDecl->hasModifier<NoDiffThisAttribute>())
+                                {
+                                    boundReceiverExpr = memberExpr->baseExpression;
+                                }
+                            }
+                        }
+                    }
+
                     invoke->functionExpr = convertHigherOrderExprToLookup(this, higherOrderInvoke);
+
+                    if (boundReceiverExpr)
+                    {
+                        // The receiver flows in raw rather than through
+                        // `coerce(CoercionSite::Argument, ...)`: for a generic
+                        // receiver constrained by an interface, the
+                        // `MemberExpr`'s base is already typed as the
+                        // interface, while the resolved derivative's `this`
+                        // slot holds the underlying generic-parameter type —
+                        // coerce() would reject that mismatch. Downstream
+                        // lowering reconciles the witness-table form.
+                        List<Expr*> newArgs;
+                        newArgs.add(boundReceiverExpr);
+                        for (auto a : invoke->arguments)
+                            newArgs.add(a);
+                        invoke->arguments = newArgs;
+                    }
                 }
             }
         }
