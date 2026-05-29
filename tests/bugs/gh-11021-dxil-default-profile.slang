@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain
+//TEST:SIMPLE(filecheck=DXIL): -target dxil-assembly -entry computeMain
 
 // DXIL: define void @computeMain()
 
