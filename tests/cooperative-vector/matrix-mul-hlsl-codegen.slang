@@ -7,9 +7,9 @@
 // CHECK609: ByteAddressBuffer bias_0 : register
 // CHECK609-COUNT-4: __slang_linalg_Mul
 
+// CHECK610: dx::linalg::Multiply<
 // CHECK610: dx::linalg::MultiplyAdd<
-// CHECK610: dx::linalg::MakeInterpretedVector<InputDT>(input)
-// CHECK610-NOT: PackedS8x32
+// CHECK610-NOT: MakeInterpretedVector
 
 RWStructuredBuffer<int32_t> outputBuffer;
 ByteAddressBuffer input;
