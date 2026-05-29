@@ -496,8 +496,8 @@ public struct NetworkParameterLayoutConverter<
     public static const int BytesLogical = Impl.BytesLogical;
     public static const int BytesPhysical = Impl.BytesPhysical;
 
-    // Each dispatch invocation owns a flattened physical-output element stream:
-    // elementIndex = dispatchThreadId.x + k * totalDispatchThreadCount.
+    // Each dispatch invocation owns part of the flattened physical-output element stream:
+    // elementIndex = flattenedGlobalThreadIndex + k * totalDispatchThreadCount.
     [require(cuda, compute)]
     [require(metal, compute)]
     [require(spirv, spirv_1_0, compute)]
@@ -525,8 +525,8 @@ public struct NetworkParameterLayoutConverter<
         }
     }
 
-    // Each dispatch invocation owns a flattened logical-output element stream:
-    // elementIndex = dispatchThreadId.x + k * totalDispatchThreadCount.
+    // Each dispatch invocation owns part of the flattened logical-output element stream:
+    // elementIndex = flattenedGlobalThreadIndex + k * totalDispatchThreadCount.
     [require(cuda, compute)]
     [require(metal, compute)]
     [require(spirv, spirv_1_0, compute)]

@@ -2508,9 +2508,10 @@ protected:
 
         auto indexAsString = String(workItem.attrIndex);
         SystemValueInfo info = getSystemValueInfo(semanticName, &indexAsString, var);
-        if (info.isSpecial)
+        if (info.isSpecial && !info.permittedTypes.getCount())
         {
             handleSpecialSystemValue(entryPoint, workItem, info, builder);
+            return;
         }
 
         if (info.isUnsupported)
@@ -2521,7 +2522,8 @@ protected:
         if (!info.permittedTypes.getCount())
             return;
 
-        builder.addTargetSystemValueDecoration(var, info.systemValueName.getUnownedSlice());
+        if (!info.isSpecial)
+            builder.addTargetSystemValueDecoration(var, info.systemValueName.getUnownedSlice());
 
         bool varTypeIsPermitted = false;
         for (auto& permittedType : info.permittedTypes)
@@ -2570,6 +2572,12 @@ protected:
                         .location = var->sourceLoc});
                 }
             }
+        }
+
+        if (info.isSpecial)
+        {
+            handleSpecialSystemValue(entryPoint, workItem, info, builder);
+            return;
         }
     }
 
@@ -3899,7 +3907,7 @@ protected:
             }
         case SystemValueSemanticName::DispatchThreadID:
             {
-                result.systemValueName = toSlice("thread_position_in_grid");
+                result.isSpecial = true;
                 result.permittedTypes.add(builder.getVectorType(
                     builder.getBasicType(BaseType::UInt),
                     builder.getIntValue(builder.getIntType(), 3)));
@@ -4159,6 +4167,73 @@ protected:
         return elementVarLayoutBuilder.build();
     }
 
+    IRInst* findSystemValueParam(
+        const EntryPointInfo& entryPoint,
+        SystemValueSemanticName semanticNameEnum)
+    {
+        auto systemValWorkItems = collectSystemValFromEntryPoint(entryPoint);
+        for (auto i : systemValWorkItems)
+        {
+            auto indexAsString = String(i.attrIndex);
+            if (getSystemValueInfo(i.attrName, &indexAsString, i.var).systemValueNameEnum ==
+                semanticNameEnum)
+                return i.var;
+        }
+        return nullptr;
+    }
+
+    IRInst* getOrCreateSystemValueParam(
+        const EntryPointInfo& entryPoint,
+        IRBuilder& builder,
+        Dictionary<IRFunc*, IRInst*>& cache,
+        SystemValueSemanticName semanticNameEnum,
+        UnownedStringSlice semanticName,
+        IRType* type)
+    {
+        if (cache.containsKey(entryPoint.entryPointFunc))
+            return cache[entryPoint.entryPointFunc];
+
+        if (auto existingParam = findSystemValueParam(entryPoint, semanticNameEnum))
+        {
+            cache[entryPoint.entryPointFunc] = existingParam;
+            return existingParam;
+        }
+
+        IRBuilder paramBuilder(builder);
+        paramBuilder.setInsertInto(entryPoint.entryPointFunc->getFirstBlock());
+        auto param = paramBuilder.emitParamAtHead(type);
+        cache[entryPoint.entryPointFunc] = param;
+        paramBuilder.addNameHintDecoration(param, semanticName);
+        paramBuilder.addSemanticDecoration(param, semanticName, 0);
+
+        SystemValLegalizationWorkItem newWorkItem = {
+            param,
+            param->getFullType(),
+            String(semanticName),
+            0};
+        legalizeSystemValue(entryPoint, newWorkItem);
+        return param;
+    }
+
+    IRInst* getComputeGroupExtents(
+        const EntryPointInfo& entryPoint,
+        IRBuilder& builder,
+        IRVectorType* uint3Type)
+    {
+        auto computeExtent = emitCalcGroupExtents(builder, entryPoint.entryPointFunc, uint3Type);
+        if (computeExtent)
+            return computeExtent;
+
+        m_sink->diagnose(Diagnostics::UnsupportedSpecializationConstantForNumThreads{
+            .location = entryPoint.entryPointFunc->sourceLoc});
+
+        static const int kAxisCount = 3;
+        IRInst* groupExtentAlongAxis[kAxisCount] = {};
+        for (int axis = 0; axis < kAxisCount; axis++)
+            groupExtentAlongAxis[axis] = builder.getIntValue(uint3Type->getElementType(), 1);
+        return builder.emitMakeVector(uint3Type, kAxisCount, groupExtentAlongAxis);
+    }
+
     void handleSpecialSystemValue(
         const EntryPointInfo& entryPoint,
         SystemValLegalizationWorkItem& workItem,
@@ -4172,6 +4247,39 @@ protected:
             // Metal does not support conservative rasterization, so this is always false.
             auto val = builder.getBoolValue(false);
             var->replaceUsesWith(val);
+            var->removeAndDeallocate();
+        }
+        else if (info.systemValueNameEnum == SystemValueSemanticName::DispatchThreadID)
+        {
+            IRBuilder svBuilder(builder.getModule());
+            svBuilder.setInsertBefore(entryPoint.entryPointFunc->getFirstOrdinaryInst());
+            auto uint3Type = as<IRVectorType>(getUInt3Type(svBuilder));
+            auto groupID = getOrCreateSystemValueParam(
+                entryPoint,
+                svBuilder,
+                entryPointToGroupId,
+                SystemValueSemanticName::GroupID,
+                groupIDString,
+                uint3Type);
+            auto groupThreadID = getOrCreateSystemValueParam(
+                entryPoint,
+                svBuilder,
+                entryPointToGroupThreadId,
+                SystemValueSemanticName::GroupThreadID,
+                groupThreadIDString,
+                uint3Type);
+            auto computeExtent = getComputeGroupExtents(entryPoint, svBuilder, uint3Type);
+            auto dispatchThreadIDCalc = emitCalcDispatchThreadID(
+                svBuilder,
+                uint3Type,
+                groupID,
+                groupThreadID,
+                computeExtent);
+            svBuilder.addNameHintDecoration(
+                dispatchThreadIDCalc,
+                UnownedStringSlice("sv_dispatchthreadid"));
+
+            var->replaceUsesWith(dispatchThreadIDCalc);
             var->removeAndDeallocate();
         }
         else if (info.systemValueNameEnum == SystemValueSemanticName::GroupIndex)
@@ -4238,24 +4346,8 @@ protected:
 
             IRBuilder svBuilder(builder.getModule());
             svBuilder.setInsertBefore(entryPoint.entryPointFunc->getFirstOrdinaryInst());
-            auto uint3Type = builder.getVectorType(
-                builder.getUIntType(),
-                builder.getIntValue(builder.getIntType(), 3));
-            auto computeExtent =
-                emitCalcGroupExtents(svBuilder, entryPoint.entryPointFunc, uint3Type);
-            if (!computeExtent)
-            {
-                m_sink->diagnose(Diagnostics::UnsupportedSpecializationConstantForNumThreads{
-                    .location = entryPoint.entryPointFunc->sourceLoc});
-
-                // Fill in placeholder values.
-                static const int kAxisCount = 3;
-                IRInst* groupExtentAlongAxis[kAxisCount] = {};
-                for (int axis = 0; axis < kAxisCount; axis++)
-                    groupExtentAlongAxis[axis] =
-                        builder.getIntValue(uint3Type->getElementType(), 1);
-                computeExtent = builder.emitMakeVector(uint3Type, kAxisCount, groupExtentAlongAxis);
-            }
+            auto uint3Type = as<IRVectorType>(getUInt3Type(svBuilder));
+            auto computeExtent = getComputeGroupExtents(entryPoint, svBuilder, uint3Type);
             auto groupIndexCalc = emitCalcGroupIndex(
                 svBuilder,
                 entryPointToGroupThreadId[entryPoint.entryPointFunc],
@@ -4479,14 +4571,21 @@ protected:
 
 private:
     ShortList<IRType*> permittedTypes_sv_target;
+    Dictionary<IRFunc*, IRInst*> entryPointToGroupId;
     Dictionary<IRFunc*, IRInst*> entryPointToGroupThreadId;
+    const UnownedStringSlice groupIDString = UnownedStringSlice("sv_groupid");
     const UnownedStringSlice groupThreadIDString = UnownedStringSlice("sv_groupthreadid");
 
-    static IRType* getGroupThreadIdType(IRBuilder& builder)
+    static IRType* getUInt3Type(IRBuilder& builder)
     {
         return builder.getVectorType(
             builder.getBasicType(BaseType::UInt),
             builder.getIntValue(builder.getIntType(), 3));
+    }
+
+    static IRType* getGroupThreadIdType(IRBuilder& builder)
+    {
+        return getUInt3Type(builder);
     }
 
     void generatePermittedTypes_sv_target()
