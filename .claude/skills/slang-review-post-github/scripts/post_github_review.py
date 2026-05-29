@@ -79,7 +79,13 @@ def run_command(args: Sequence[str]) -> subprocess.CompletedProcess:
     """Run a command and convert startup failures into fatal validation errors."""
 
     try:
-        return subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return subprocess.run(
+            args,
+            text=True,
+            encoding="utf-8",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
     except OSError as e:
         fail("failed to execute command {}: {}".format(" ".join(args), e))
 
@@ -629,8 +635,8 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument(
         "--event",
         choices=sorted(VALID_EVENTS),
-        default="REQUEST_CHANGES",
-        help="GitHub review event to submit",
+        default="COMMENT",
+        help="GitHub review event to submit; defaults to COMMENT",
     )
     parser.add_argument("--body", help="Review body text")
     parser.add_argument("--body-file", type=Path, help="Read review body text from this file")

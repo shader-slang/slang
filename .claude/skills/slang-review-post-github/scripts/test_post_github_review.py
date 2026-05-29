@@ -411,6 +411,42 @@ class PostGithubReviewTests(unittest.TestCase):
             ],
         )
 
+    def test_parse_args_defaults_to_comment_event(self) -> None:
+        """Automated review posting defaults to a non-blocking GitHub review event."""
+
+        args = post_github_review.parse_args(
+            [
+                "--repo",
+                "shader-slang/slang",
+                "--pr",
+                "123",
+                "--candidates",
+                "candidates.md",
+            ]
+        )
+
+        self.assertEqual(args.event, "COMMENT")
+
+    def test_run_command_uses_utf8_text_decoding(self) -> None:
+        """GitHub CLI output is decoded as UTF-8 instead of using the process locale."""
+
+        old_run = post_github_review.subprocess.run
+        seen_kwargs: dict[str, object] = {}
+
+        def fake_run(args: list[str], **kwargs: object) -> object:
+            """Record subprocess keyword arguments without launching a child process."""
+
+            seen_kwargs.update(kwargs)
+            return post_github_review.subprocess.CompletedProcess(args, 0, "{}", "")
+
+        post_github_review.subprocess.run = fake_run
+        self.addCleanup(setattr, post_github_review.subprocess, "run", old_run)
+
+        post_github_review.run_command(["gh", "api"])
+
+        self.assertTrue(seen_kwargs["text"])
+        self.assertEqual(seen_kwargs["encoding"], "utf-8")
+
     def test_run_json_wraps_command_startup_failure(self) -> None:
         """Command startup errors become `FatalError` instead of tracebacks."""
 

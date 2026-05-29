@@ -99,12 +99,11 @@ attribution requirement.
 
 ## Review Result
 
-Default to `REQUEST_CHANGES`. Surviving clarity candidates mean the PR author should do more
-work before the change is efficient for a human maintainer to review.
+Default to `COMMENT`. This repository's automated-review policy treats bot-authored reviews as
+non-blocking advisory reviews, and may reject or dismiss automated `REQUEST_CHANGES` reviews.
 
-Use `COMMENT` only when the initial user prompt explicitly asks for a non-blocking review,
-when a maintainer explicitly asks for an advisory trial run to be posted, or when local project
-policy for the specific run forbids blocking reviews from the account being used.
+Use `REQUEST_CHANGES` only when the initial user prompt explicitly asks for a blocking clarity
+review and local project policy for the account being used permits automated blocking reviews.
 
 Do not use `APPROVE` for this workflow.
 
