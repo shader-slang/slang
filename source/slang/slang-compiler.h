@@ -162,10 +162,16 @@ enum class FloatingPointDenormalMode : SlangFpDenormalModeIntegral
 };
 
 
-// Compute the target profile after applying any target-format-specific defaults
-// and minimum versions.
+// Compute the target profile after applying any target-format-specific defaults and minimum
+// versions. The single-argument form uses the target request's own option set for both the
+// profile fallback and option queries.
 Profile getEffectiveTargetProfile(TargetRequest* target);
-// Use `optionSet` as a fallback for inherited options after checking the target request.
+
+// Same as the single-argument form, but `optionSet` provides:
+// - a profile fallback when the target request's profile family is Unknown, and
+// - CompilerOptionName::GenerateWholeProgram, which selects between the entry-point SM 6.0
+//   floor and the whole-program lib_6_3 floor for DXIL.
+// Pass the merged target-program option set when whole-program or inherited options matter.
 Profile getEffectiveTargetProfile(TargetRequest* target, CompilerOptionSet& optionSet);
 
 // Compute the "effective" profile to use when outputting the given entry point
@@ -173,6 +179,9 @@ Profile getEffectiveTargetProfile(TargetRequest* target, CompilerOptionSet& opti
 //
 // The stage of the effective profile will always come from the entry point, while
 // the profile version (aka "shader model") will be computed as follows:
+//
+// - First, target-format-specific minimum versions are applied to the target
+//   profile via getEffectiveTargetProfile (e.g., DXIL is floored to SM 6.0).
 //
 // - If the entry point and target belong to the same profile family, then take
 //   the latest version between the two (e.g., if the entry point specified `ps_5_1`
