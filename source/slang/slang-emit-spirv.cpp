@@ -8509,8 +8509,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (m_memoryModel == SpvMemoryModelVulkan && m_volatileSpvVars.getCount() != 0)
         {
             SpvInst* ptrSpv = nullptr;
-            if (m_mapIRInstToSpvInst.tryGetValue(ptr, ptrSpv) &&
-                m_volatileSpvVars.contains(ptrSpv))
+            if (m_mapIRInstToSpvInst.tryGetValue(ptr, ptrSpv) && m_volatileSpvVars.contains(ptrSpv))
             {
                 memoryAccessMaskOut |= SpvMemoryAccessVolatileMask;
             }
