@@ -6,6 +6,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_EXCHANGE_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_EXCHANGE
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED_VECTOR_WIDTH,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_UNSUPPORTED_VECTOR_WIDTH
 //DIAGNOSTIC_TEST:SIMPLE(diag=EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_EMULATED
+//DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_EMULATED
+//DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_F16X2_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_F16X2
 //TEST:SIMPLE(filecheck=IGNORE_CAPS): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -ignore-capabilities -capability spirv_1_5
 //TEST:SIMPLE(filecheck=BOTH): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT -capability spvAtomicFloat16VectorNV
 //TEST:SIMPLE(filecheck=VECTOR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_ATOMIC
@@ -16,6 +18,7 @@
 
 RWByteAddressBuffer tmpBuffer;
 RWStructuredBuffer<float> outputBuffer;
+RWStructuredBuffer<half> halfBuffer;
 RWStructuredBuffer<half2> vectorBuffer;
 RWStructuredBuffer<half3> unsupportedVectorBuffer;
 
@@ -47,6 +50,18 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = float(originalValue);
     tmpBuffer.InterlockedAddF16Emulated(2, 1.0h, originalValue);
     outputBuffer[1] = float(originalValue);
+#elif defined(TEST_POINTER_EMULATED)
+    half originalValue;
+    InterlockedAddF16Emulated(&halfBuffer[0], 1.0h, originalValue);
+// POINTER_EMULATED_NO_VECTOR: entry point uses capabilities not in specified profile
+// POINTER_EMULATED_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
+    outputBuffer[0] = float(originalValue);
+#elif defined(TEST_POINTER_F16X2)
+    half2 originalValue;
+    InterlockedAddF16x2(&vectorBuffer[0], half2(1.0h, 2.0h), originalValue);
+// POINTER_F16X2_NO_VECTOR: entry point uses capabilities not in specified profile
+// POINTER_F16X2_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
+    outputBuffer[0] = float(originalValue.x + originalValue.y);
 #else
     half originalValue;
     tmpBuffer.InterlockedAddF16(0, 1.0h, originalValue);

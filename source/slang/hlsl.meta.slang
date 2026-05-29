@@ -6607,6 +6607,8 @@ $}
             }
             return;
         case spvAtomicFloat16AddEXT:
+            // Keep the explicit scalar capability case so this arm wins over the
+            // SPIR-V default when scalar fp16 atomic add is available.
         default:
             {
                 let buf = __getEquivalentStructuredBuffer<half>(this);
@@ -33850,7 +33852,7 @@ uint packHalf2x16(half2 unpackedValue)
     return packHalf2x16(float2(unpackedValue));
 }
 
-[require(spirv)]
+[require(spirv, spvAtomicFloat16VectorNV)]
 void InterlockedAddF16Emulated(half* dest, half value, out half originalValue)
 {
     let buf = (half2*)(dest);
@@ -33865,7 +33867,7 @@ void InterlockedAddF16Emulated(half* dest, half value, out half originalValue)
     }
 }
 
-[require(spirv)]
+[require(spirv, spvAtomicFloat16VectorNV)]
 void InterlockedAddF16x2(half2* dest, half2 value, out half2 originalValue)
 {
     originalValue = __atomic_add(*dest, value);
