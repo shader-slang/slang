@@ -6287,6 +6287,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 ensureExtensionDeclarationBeforeSpv15(toSlice("SPV_EXT_descriptor_indexing"));
 
                 requireSPIRVCapability(SpvCapabilityShaderNonUniform);
+                // The decoration's parent is the instruction being decorated
+                // NonUniform; its result type tells us which resource kind is
+                // indexed non-uniformly, and therefore which per-kind
+                // *ArrayNonUniformIndexing capability Vulkan also requires.
                 requireNonUniformIndexingCapabilityForInst(decoration->getParent());
                 emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
@@ -11207,10 +11211,26 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         });
                 }
 
-                // Propagate NonUniform through asm-local IDs.
-                // An instruction's result is non-uniform if any operand is
-                // either an IR value with IRSPIRVNonUniformResourceDecoration
-                // or an asm-local ID already in nonUniformLocalIDs.
+                // Propagate NonUniform through this asm instruction's result.
+                //
+                // These spirv_asm blocks are compiler-generated: texture
+                // sampling/fetch lowers to spirv_asm in the core module (see the
+                // `OpSampledImage` / `OpImage` snippets in `hlsl.meta.slang`). When
+                // the texture or sampler feeding such a block is indexed
+                // non-uniformly, Vulkan (VUID-RuntimeSpirv-None-10148) requires the
+                // resource operand actually consumed inside the block -- e.g. the
+                // `OpSampledImage` result -- to carry the `NonUniform` decoration.
+                // The non-uniformity arrives on IR-backed operands as
+                // `IRSPIRVNonUniformResourceDecoration` and must be carried onto the
+                // asm-local results those operands feed.
+                //
+                // Invariant: an asm instruction's result is non-uniform iff any of
+                // its operands is non-uniform -- either an IR value carrying
+                // `IRSPIRVNonUniformResourceDecoration`, or an asm-local `%id`
+                // already recorded in `nonUniformLocalIDs`. Instructions are visited
+                // in source order and an asm block is a straight-line sequence (no
+                // back-edges among asm-local ids), so a single forward pass reaches
+                // a fixed point.
                 {
                     bool hasNonUniformOperand = false;
                     for (const auto operand : spvInst->getSPIRVOperands())
@@ -11231,25 +11251,38 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         }
                     }
 
-                    if (hasNonUniformOperand)
+                    // Only result-producing instructions can carry the decoration.
+                    // Void instructions (e.g. `OpStore`, `OpImageWrite`) have no
+                    // result <id>; their resource operands were already decorated
+                    // where those operands were produced, so there is nothing to do
+                    // here.
+                    if (hasNonUniformOperand && opInfo &&
+                        opInfo->resultIdIndex != SPIRVCoreGrammarInfo::OpInfo::kNoResultId)
                     {
-                        // Find the result ID and mark it non-uniform.
+                        // Locate the result <id> using the grammar's `resultIdIndex`
+                        // rather than guessing "the first %id operand". Guessing is
+                        // wrong whenever the result *type* is itself a local %id:
+                        // the sparse-image intrinsics in `hlsl.meta.slang` emit
+                        // `%r:%sparseResultType = OpImageSparse...`, so operand 0 is
+                        // the type and operand 1 is the result. `getSPIRVOperands()`
+                        // omits the leading opcode word, so `resultIdIndex` (0 or 1)
+                        // indexes it directly.
                         SpvWord resultID = 0;
-                        for (const auto operand : spvInst->getSPIRVOperands())
+                        auto operands = spvInst->getSPIRVOperands();
+                        if (opInfo->resultIdIndex < operands.getCount())
                         {
-                            if (operand->getOp() == kIROp_SPIRVAsmOperandId)
+                            auto resultOperand = operands[opInfo->resultIdIndex];
+                            if (resultOperand->getOp() == kIROp_SPIRVAsmOperandResult)
+                                resultID = getID(last);
+                            else if (resultOperand->getOp() == kIROp_SPIRVAsmOperandId)
                             {
                                 auto idName =
-                                    cast<IRStringLit>(operand->getValue())->getStringSlice();
+                                    cast<IRStringLit>(resultOperand->getValue())->getStringSlice();
                                 idMap.tryGetValue(idName, resultID);
-                                break;
-                            }
-                            else if (operand->getOp() == kIROp_SPIRVAsmOperandResult)
-                            {
-                                resultID = getID(last);
-                                break;
                             }
                         }
+                        // `HashSet::add` returns false if already present, so each
+                        // result is recorded (and later decorated) at most once.
                         if (resultID && nonUniformLocalIDs.add(resultID))
                             nonUniformResults.add({opcode, resultID});
                     }
@@ -11257,6 +11290,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         }
 
+        // Emit the NonUniform decoration for every asm-local result we marked.
+        //
+        // We only request a resource-kind capability for SpvOpSampledImage here.
+        // The combined sampled image has no IR-level instruction of its own (it
+        // is materialized purely inside the asm block), so this loop is the only
+        // place that can require SampledImageArrayNonUniformIndexing for it. All
+        // other resource kinds enter the asm block as IR-backed operands (the
+        // texture/buffer being sampled), and their capability was already
+        // requested by requireNonUniformIndexingCapabilityForInst() when the
+        // operand's own IRSPIRVNonUniformResourceDecoration was emitted.
         for (const auto& [resultOpcode, resultID] : nonUniformResults)
         {
             ensureExtensionDeclarationBeforeSpv15(toSlice("SPV_EXT_descriptor_indexing"));
@@ -11285,8 +11328,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    // Given the IR type of a NonUniform-decorated instruction, determine and emit
-    // the resource-kind-specific NonUniformIndexing capability required by Vulkan.
+    // Given a NonUniform-decorated instruction, emit the resource-kind-specific
+    // *ArrayNonUniformIndexing capability that Vulkan requires in addition to the
+    // base ShaderNonUniform capability. Vulkan defines one such capability per
+    // descriptor kind (sampled image, storage image, storage/uniform buffer,
+    // texel buffer, input attachment); the cascade below maps each Slang resource
+    // type to its corresponding capability following that taxonomy.
     void requireNonUniformIndexingCapabilityForInst(IRInst* inst)
     {
         if (!inst)
@@ -11312,22 +11359,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         if (auto texType = as<IRTextureTypeBase>(type))
         {
+            auto access = texType->getAccess();
+            bool isStorageAccess = access == SLANG_RESOURCE_ACCESS_READ_WRITE ||
+                                   access == SLANG_RESOURCE_ACCESS_WRITE ||
+                                   access == SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
             if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER)
             {
-                auto access = texType->getAccess();
-                if (access == SLANG_RESOURCE_ACCESS_READ_WRITE ||
-                    access == SLANG_RESOURCE_ACCESS_WRITE ||
-                    access == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
+                if (isStorageAccess)
                     requireSPIRVCapability(SpvCapabilityStorageTexelBufferArrayNonUniformIndexing);
                 else
                     requireSPIRVCapability(SpvCapabilityUniformTexelBufferArrayNonUniformIndexing);
             }
             else
             {
-                auto access = texType->getAccess();
-                if (access == SLANG_RESOURCE_ACCESS_READ_WRITE ||
-                    access == SLANG_RESOURCE_ACCESS_WRITE ||
-                    access == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
+                if (isStorageAccess)
                     requireSPIRVCapability(SpvCapabilityStorageImageArrayNonUniformIndexing);
                 else
                     requireSPIRVCapability(SpvCapabilitySampledImageArrayNonUniformIndexing);

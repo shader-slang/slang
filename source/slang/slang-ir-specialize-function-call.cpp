@@ -63,6 +63,11 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         case kIROp_FieldAddress:
         case kIROp_FieldExtract:
         case kIROp_Load:
+        // A `CastDynamicResource` wraps a bindless/dynamic resource access in a
+        // concrete resource type. Like the indexing ops above, its result is
+        // suitable for specialization exactly when its underlying value (operand
+        // 0) is, so we trace through it to that base. Without this case a bindless
+        // resource argument would not be recognized as specializable.
         case kIROp_CastDynamicResource:
             {
                 auto base = arg->getOperand(0);
@@ -645,6 +650,11 @@ struct FunctionParameterSpecializationContext
         }
         else if (oldArg->getOp() == kIROp_CastDynamicResource)
         {
+            // `CastDynamicResource` is a transparent wrapper that views a
+            // dynamic/bindless resource as a concrete resource type. It
+            // contributes nothing to the specialization key itself, so we just
+            // recurse into its underlying value (operand 0), mirroring the
+            // `Load`/`FieldAddress` cases above.
             auto oldBase = oldArg->getOperand(0);
             getCallInfoForArg(ioInfo, oldBase);
         }
@@ -939,6 +949,10 @@ struct FunctionParameterSpecializationContext
         }
         else if (oldArg->getOp() == kIROp_CastDynamicResource)
         {
+            // Reconstruct the wrapper inside the specialized body: first obtain the
+            // specialized value for the wrapped operand, then re-apply the
+            // `CastDynamicResource` cast over it so the specialized callee sees the
+            // same concrete resource type the original argument had.
             auto oldBase = oldArg->getOperand(0);
             auto newBase = getSpecializedValueForArg(ioInfo, oldBase);
 

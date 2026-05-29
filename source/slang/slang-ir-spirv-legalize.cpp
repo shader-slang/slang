@@ -579,15 +579,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             builder.setInsertBefore(user);
                             auto index = getElement->getIndex();
 
-                            // If the index is wrapped in NonUniformResourceIndex, unwrap it
-                            // so the access chain uses the raw index, but transfer the
-                            // decoration to the new access chain instruction.
+                            // The non-uniform-ness of this access can be recorded in
+                            // any of three forms, depending on how far prior passes
+                            // got: (1) the index is still a `NonUniformResourceIndex`
+                            // inst, (2) that inst was already lowered away but left
+                            // its decoration on the index, or (3) the decoration is
+                            // on the getElement itself. All three must be detected
+                            // and carried onto the access chain created below,
+                            // because that rewrite drops the `NonUniformResourceIndex`
+                            // -- so without re-attaching the decoration the NonUniform
+                            // requirement (Vulkan VUID-RuntimeSpirv-None-10148) would
+                            // be silently dropped here.
                             bool isNonUniform =
                                 (index->getOp() == kIROp_NonUniformResourceIndex) ||
                                 index->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
                                     nullptr ||
                                 user->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
                                     nullptr;
+                            // Unwrap so the access chain indexes with the raw value;
+                            // the decoration (not the index inst) is what SPIR-V needs.
                             if (index->getOp() == kIROp_NonUniformResourceIndex)
                                 index = index->getOperand(0);
 
@@ -2133,6 +2143,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    // Adds the NonUniform decoration to `inst` if it is not already present.
+    // Returns true iff a *new* decoration was added (false if it was already
+    // decorated). The worklist propagation below relies on this "added exactly
+    // once" signal for termination: an instruction can transition from
+    // undecorated to decorated at most once, so it can be enqueued for
+    // re-visiting a bounded number of times.
     bool addNonUniformDecoration(IRInst* inst)
     {
         if (inst->findDecoration<IRSPIRVNonUniformResourceDecoration>())
@@ -2149,12 +2165,21 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     // Propagate NonUniform decorations through the IR so that the actual resource
     // operands consumed by memory/sampling instructions carry the decoration.
-    // Vulkan requires NonUniform on the resource operand of the consuming instruction,
-    // not just on the index used in an access chain.
+    // Vulkan (VUID-RuntimeSpirv-None-10148) requires NonUniform on the resource
+    // operand of the consuming instruction, not just on the index used in an
+    // access chain; earlier passes only decorate the index/access-chain, so we
+    // must push the decoration the rest of the way down the use-def chain.
     //
-    // Uses a worklist seeded with already-decorated instructions. When an
-    // instruction is newly decorated, its users are added to the worklist so
-    // propagation continues downstream without rescanning the whole module.
+    // Algorithm: a worklist seeded with every already-decorated instruction. When
+    // an instruction becomes decorated we enqueue its users, so the decoration
+    // flows downstream toward the consuming instruction without rescanning the
+    // whole module.
+    //
+    // Termination: decoration is monotonic -- addNonUniformDecoration() makes each
+    // instruction transition undecorated->decorated at most once, and only that
+    // transition enqueues users. With a finite instruction count and `inWorklist`
+    // preventing an instruction from being queued twice while pending, the
+    // worklist is drained in O(N + E) (instructions + use-def edges visited).
     void propagateNonUniformAccessChainDecorations()
     {
         List<IRInst*> worklist;
@@ -2192,7 +2217,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
         };
 
-        // Returns true if inst was newly decorated and its users should be visited.
+        // Decide whether `inst` derives a non-uniform resource from a non-uniform
+        // operand, and if so decorate it. Returns true only when a new decoration
+        // was added (so its users are worth visiting). Each case below encodes how
+        // non-uniformity flows for that opcode:
         auto tryPropagate = [&](IRInst* inst) -> bool
         {
             if (hasNonUniformDecoration(inst))
@@ -2208,10 +2236,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             case kIROp_FieldAddress:
             case kIROp_FieldExtract:
+                // A field of a non-uniform aggregate is non-uniform. Only the
+                // aggregate base (operand 0) matters; the field key is a constant.
                 if (hasNonUniformDecoration(inst->getOperand(0)))
                     return addNonUniformDecoration(inst);
                 break;
             case kIROp_Load:
+                // Loading through a non-uniform pointer yields a non-uniform
+                // value -- this is the step that carries the decoration onto the
+                // resource value finally consumed by a sampling/memory op.
                 if (hasNonUniformDecoration(inst->getOperand(0)))
                     return addNonUniformDecoration(inst);
                 break;

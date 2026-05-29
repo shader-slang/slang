@@ -80,6 +80,9 @@ void processNonUniformResourceIndex(
                     }
                     break;
                 case kIROp_GetElement:
+                    // A getElement can use the `NonUniformResourceIndex` either as
+                    // its base (operand 0) or as its index (operand 1); float it
+                    // out past the getElement in both cases.
                     if (user->getOperand(0) == inst)
                     {
                         // Replace getElement(nonuniformRes(obj), i), into
@@ -93,6 +96,10 @@ void processNonUniformResourceIndex(
                         floatMode == NonUniformResourceIndexFloatMode::SPIRV &&
                         user->getOperand(1) == inst)
                     {
+                        // Gated to SPIRV mode to match the kIROp_GetElementPtr case
+                        // above: only the SPIR-V backend needs NonUniform floated
+                        // onto a value-typed array access. (Other targets either do
+                        // not model NonUniform or handle the index form differently.)
                         // Replace getElement(obj, nonUniformRes(i)), into
                         // nonUniformRes(getElement(obj, i))
                         newUser = builder.emitElementExtract(
@@ -103,6 +110,12 @@ void processNonUniformResourceIndex(
                     break;
                 case kIROp_MakeCombinedTextureSampler:
                     {
+                        // Float the `NonUniformResourceIndex` out through
+                        // combined-sampler construction so the combined result is
+                        // itself non-uniform when either constituent is. The
+                        // `NonUniformResourceIndex` is exactly one of the two
+                        // operands; replace that operand with the base inst it wraps
+                        // and rebuild.
                         auto tex = user->getOperand(0);
                         auto samp = user->getOperand(1);
                         if (tex == inst)
@@ -110,6 +123,9 @@ void processNonUniformResourceIndex(
                         else if (samp == inst)
                             samp = inst->getOperand(0);
                         else
+                            // Neither operand is the `NonUniformResourceIndex` being
+                            // floated (e.g. `inst` reaches here only via some other
+                            // use); nothing to rewrite for this user.
                             break;
                         newUser =
                             builder.emitMakeCombinedTextureSampler(user->getFullType(), tex, samp);
