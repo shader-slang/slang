@@ -10,6 +10,7 @@
 //TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -entry computeMain -profile cs_5_1 -whole-program
 //TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -entry computeMain -profile cs_6_3 -whole-program
 //TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -whole-program
+//TEST:SIMPLE(filecheck=LIB68): -target dxil-assembly -profile lib_6_8 -whole-program
 //TEST(windows):COMPILE: tests/bugs/gh-11021-dxil-default-profile.slang -target dxil -o tests/bugs/gh-11021-dxil-default-profile.dxil
 //TEST(windows):COMPILE: tests/bugs/gh-11021-dxil-default-profile.slang -target dxil -entry computeMain -profile cs_5_1 -whole-program -o tests/bugs/gh-11021-dxil-whole-program-profile.dxil
 
@@ -31,6 +32,9 @@
 
 // LIB: !dx.shaderModel = !{![[SM:[0-9]+]]}
 // LIB: ![[SM]] = !{!"lib", i32 6, i32 3}
+
+// LIB68: !dx.shaderModel = !{![[SM:[0-9]+]]}
+// LIB68: ![[SM]] = !{!"lib", i32 6, i32 8}
 
 StructuredBuffer<float> buffer0;
 StructuredBuffer<float> buffer1;

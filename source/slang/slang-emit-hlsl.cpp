@@ -1048,6 +1048,12 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 
 static bool isTargetHLSL2018(HLSLSourceEmitter* emitter, CapabilitySet targetCaps, Stage stage)
 {
+    if (stage == Stage::Unknown)
+    {
+        // Whole-program emission may not have an entry-point stage.
+        return !targetCaps.implies(CapabilitySet(CapabilityName::hlsl_2018));
+    }
+
     auto stageAtom = getAtomFromStage(stage);
 
     // Cache the result of this function for easier lookup.
