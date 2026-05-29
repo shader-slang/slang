@@ -59,8 +59,9 @@ set(_dxc_linux_url_hash "SHA256=${_dxc_linux_sha256}")
 
 function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
     # Stage public DXC HLSL headers (e.g. dx/linalg.h) at a stable path so test
-    # directives like `-Xdxc -Ibuild/dxc/include` can resolve them. Done as a
-    # build-graph custom command, matching the DLL/.so copy pattern below.
+    # directives and local `slangc -Xdxc -Ibuild/dxc/include` invocations can
+    # resolve them. Done as a build-graph custom command, matching the DLL/.so
+    # copy pattern below.
     if(EXISTS "${dxc_root}/include/hlsl/dx/linalg.h")
         set(_dxc_hlsl_include_dir "${dxc_root}/include/hlsl")
     elseif(EXISTS "${dxc_root}/inc/hlsl/dx/linalg.h")
@@ -68,12 +69,24 @@ function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
     elseif(EXISTS "${dxc_root}/tools/clang/lib/Headers/hlsl/dx/linalg.h")
         set(_dxc_hlsl_include_dir "${dxc_root}/tools/clang/lib/Headers/hlsl")
     else()
+        if(SLANG_ENABLE_TESTS)
+            message(
+                FATAL_ERROR
+                "DXC ${dxc_origin} at ${dxc_root} is missing dx/linalg.h. "
+                "The cooperative-{vector,matrix} tests rely on this header. "
+                "If Microsoft has reorganized the layout, update FetchDXC.cmake."
+            )
+        endif()
         message(
-            FATAL_ERROR
+            WARNING
             "DXC ${dxc_origin} at ${dxc_root} is missing dx/linalg.h. "
-            "The cooperative-{vector,matrix} tests rely on this header. "
-            "If Microsoft has reorganized the layout, update FetchDXC.cmake."
+            "Skipping staged DXC HLSL headers because SLANG_ENABLE_TESTS is "
+            "disabled. DXIL cooperative-{vector,matrix} local builds that pass "
+            "-Xdxc -Ibuild/dxc/include will need an external DXC include path."
         )
+        add_custom_target(stage-dxc-headers)
+        set_target_properties(stage-dxc-headers PROPERTIES FOLDER generated)
+        return()
     endif()
 
     set(_dxc_inc_src "${_dxc_hlsl_include_dir}/dx/linalg.h")

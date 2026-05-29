@@ -591,6 +591,7 @@ add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
 if(TARGET slangc)
+    # Keep DXC runtime artifacts and headers staged for targeted slangc builds.
     foreach(_dxc_stage_target copy-dxcompiler copy-dxil stage-dxc-headers)
         if(TARGET ${_dxc_stage_target})
             add_dependencies(slangc ${_dxc_stage_target})
