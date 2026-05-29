@@ -2908,6 +2908,13 @@ warning(
     span { loc = "location", message = "modifier '~modifierName' has been deprecated: ~message" }
 )
 
+warning(
+    "deprecated-format-attribute",
+    31232,
+    "use of deprecated [format(...)] attribute",
+    span { loc = "location", message = "[format(...)] has been deprecated; use explicit texture storage types such as `RWTexture2D<RGBA8Unorm>` instead. See https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/02-conventional-features.html#texture-types" }
+)
+
 -- Enums (320xx)
 
 err(
