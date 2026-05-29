@@ -35,7 +35,7 @@ jobs:
 
           shouldRun=true
           if files="$(git diff --name-only $BASE...HEAD)"; then
-            if echo "$files" | grep -qE '^(cmake/FetchDXC\.cmake|external/CMakeLists\.txt|external/slang-rhi|\.github/cmake-options-matrix\.json|\.github/workflows/ci\.yml|docs/building\.md)$|^external/slang-rhi/'; then
+            if echo "$files" | grep -qE '^(CMakeLists\.txt|cmake/FetchDXC\.cmake|cmake/PredefinedParams\.cmake|external/CMakeLists\.txt|external/slang-rhi|\.github/cmake-options-matrix\.json|\.github/workflows/ci\.yml|docs/building\.md)$|^external/slang-rhi/'; then
               dxcSourceBuild=true
             fi
 

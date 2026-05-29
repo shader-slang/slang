@@ -69,6 +69,8 @@ function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
         set(_dxc_hlsl_include_dir "${dxc_root}/include/hlsl")
     elseif(EXISTS "${dxc_root}/inc/hlsl/dx/linalg.h")
         set(_dxc_hlsl_include_dir "${dxc_root}/inc/hlsl")
+    elseif(EXISTS "${dxc_root}/tools/clang/lib/Headers/hlsl/dx/linalg.h")
+        set(_dxc_hlsl_include_dir "${dxc_root}/tools/clang/lib/Headers/hlsl")
     else()
         message(
             FATAL_ERROR
