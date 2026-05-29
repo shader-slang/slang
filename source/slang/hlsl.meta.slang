@@ -6607,8 +6607,8 @@ $}
             }
             return;
         case spvAtomicFloat16AddEXT:
-            // Keep the explicit scalar capability case so this arm wins over the
-            // SPIR-V default when scalar fp16 atomic add is available.
+            // This shared body is the scalar fp16 atomic-add path; the explicit
+            // label records the SPIR-V capability that enables it.
         default:
             {
                 let buf = __getEquivalentStructuredBuffer<half>(this);
