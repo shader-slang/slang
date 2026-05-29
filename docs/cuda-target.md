@@ -106,8 +106,6 @@ extern "C" __global__  void computeMain(UniformEntryPointParams* params, Uniform
 
 With CUDA - the caller specifies how threading is broken up, so `[numthreads]` is available through reflection, and in a comment in output source code but does not produce varying code.
 
-CUDA compute shaders support `WorkgroupCount()` and the `SV_WorkgroupCount` system-value semantic. Both lower to CUDA's `gridDim` value, which contains the number of blocks launched in each dimension. This support is available for CUDA compute targets; the corresponding intrinsic is not available for targets that do not expose a dispatched workgroup count.
-
 The UniformState and UniformEntryPointParams struct typically vary by shader. UniformState holds 'normal' bindings, whereas UniformEntryPointParams hold the uniform entry point parameters. Where specific bindings or parameters are located can be determined by reflection. The structures for the example above would be something like the following...
 
 `StructuredBuffer<T>`,`RWStructuredBuffer<T>` become

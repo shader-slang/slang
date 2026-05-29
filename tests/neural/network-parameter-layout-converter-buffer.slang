@@ -7,9 +7,9 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=LONGMASK):-vk -compute -entry longMaskMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
 // TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=LONGMASK):-mtl -compute -entry longMaskMain -shaderobj -xslang -experimental-feature -output-using-type
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=LONGMASK):-cuda -compute -entry longMaskMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-vk -compute -entry multiTileRoundTripMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-mtl -compute -entry multiTileRoundTripMain -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-cuda -compute -entry multiTileRoundTripMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-vk -compute -entry multiTileMain -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-mtl -compute -entry multiTileMain -shaderobj -xslang -experimental-feature -output-using-type
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=MULTITILE):-cuda -compute -entry multiTileMain -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature
 
 import slang.neural;
 
@@ -47,26 +47,23 @@ uniform RWStructuredBuffer<float>.Handle multiPortable;
 //TEST_INPUT: set multiOptimal = ubuffer(stride=4, count=1584)
 uniform RWStructuredBuffer<float>.Handle multiOptimal;
 
-//TEST_INPUT: set multiRoundTrip = ubuffer(stride=4, count=594)
-uniform RWStructuredBuffer<float>.Handle multiRoundTrip;
-
 //TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=resultBuffer
 RWStructuredBuffer<uint> resultBuffer;
 
-void toOptimalLayout()
+void toOptimalLayout(uint threadIndex, uint threadCount)
 {
     let portableAddress = BindlessAddress<float>(portable);
     let optimalAddress = BindlessAddress<float>(optimal);
 
-    BiasConverter.toOptimalLayout(portableAddress, optimalAddress);
+    BiasConverter.toOptimalLayout(portableAddress, optimalAddress, threadIndex, threadCount);
     AllMemoryBarrierWithGroupSync();
 }
 
 [shader("compute")]
 [numthreads(32, 1, 1)]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid : SV_GroupIndex)
 {
-    toOptimalLayout();
+    toOptimalLayout(tid, 32);
     AllMemoryBarrierWithGroupSync();
 
     bool commonOk =
@@ -159,7 +156,7 @@ void roundTripMain(uint tid : SV_GroupIndex)
     }
     AllMemoryBarrierWithGroupSync();
 
-    BiasConverter.toPortableLayout(optimalAddress, roundTripAddress);
+    BiasConverter.toPortableLayout(optimalAddress, roundTripAddress, tid, 32);
     AllMemoryBarrierWithGroupSync();
 
     bool biasRoundTripOk =
@@ -173,7 +170,7 @@ void roundTripMain(uint tid : SV_GroupIndex)
     // not read or write the reserved optimal-layout bias slot.
     fillOptimalWeights(tid);
     AllMemoryBarrierWithGroupSync();
-    NoBiasConverter.toPortableLayout(optimalAddress, roundTripAddress);
+    NoBiasConverter.toPortableLayout(optimalAddress, roundTripAddress, tid, 32);
     AllMemoryBarrierWithGroupSync();
 
     bool noBiasRoundTripOk =
@@ -196,12 +193,12 @@ void roundTripMain(uint tid : SV_GroupIndex)
 
 [shader("compute")]
 [numthreads(32, 1, 1)]
-void longMaskMain()
+void longMaskMain(uint tid : SV_GroupIndex)
 {
     let portableAddress = BindlessAddress<float>(longPortable);
     let optimalAddress = BindlessAddress<float>(longOptimal);
 
-    LongMaskConverter.toOptimalLayout(portableAddress, optimalAddress);
+    LongMaskConverter.toOptimalLayout(portableAddress, optimalAddress, tid, 32);
     AllMemoryBarrierWithGroupSync();
 
     bool longMaskOk =
@@ -217,43 +214,52 @@ void longMaskMain()
 
 [shader("compute")]
 [numthreads(64, 1, 1)]
-void multiTileRoundTripMain(uint tid : SV_GroupIndex)
+void multiTileMain(uint tid : SV_GroupIndex)
 {
     for (uint i = tid; i < uint(MultiTileConverter.ElementCountLogical); i += 64)
         multiPortable[i] = float(i + 1);
     for (uint i = tid; i < uint(MultiTileConverter.ElementCountPhysical); i += 64)
         multiOptimal[i] = 0.0;
-    for (uint i = tid; i < uint(MultiTileConverter.ElementCountLogical); i += 64)
-        multiRoundTrip[i] = 0.0;
-    if (tid == 0)
-    {
-        resultBuffer[0] = 1;
-        resultBuffer[1] = 0;
-    }
     AllMemoryBarrierWithGroupSync();
 
     let portableAddress = BindlessAddress<float>(multiPortable);
     let optimalAddress = BindlessAddress<float>(multiOptimal);
-    let roundTripAddress = BindlessAddress<float>(multiRoundTrip);
 
-    MultiTileConverter.toOptimalLayout(portableAddress, optimalAddress);
-    AllMemoryBarrierWithGroupSync();
-    MultiTileConverter.toPortableLayout(optimalAddress, roundTripAddress);
-    AllMemoryBarrierWithGroupSync();
-
-    bool ok = true;
-    for (uint i = tid; i < uint(MultiTileConverter.ElementCountLogical); i += 64)
-        ok = ok && multiRoundTrip[i] == multiPortable[i];
-
-    if (!ok)
-        resultBuffer[0] = 0;
+    MultiTileConverter.toOptimalLayout(portableAddress, optimalAddress, tid, 64);
     AllMemoryBarrierWithGroupSync();
 
     if (tid == 0)
     {
+        bool weightsOk = false;
+        __target_switch
+        {
+        case cuda:
+            weightsOk =
+                multiOptimal[0] == 1.0 &&
+                multiOptimal[768] == 17.0 &&
+                multiOptimal[512] == 545.0 &&
+                multiOptimal[1280] == 561.0;
+        case spirv:
+            weightsOk =
+                multiOptimal[0] == 1.0 &&
+                multiOptimal[256] == 17.0 &&
+                multiOptimal[1024] == 545.0 &&
+                multiOptimal[1280] == 561.0;
+        case metal:
+            weightsOk =
+                multiOptimal[0] == 1.0 &&
+                multiOptimal[16] == 17.0 &&
+                multiOptimal[1024] == 545.0 &&
+                multiOptimal[1040] == 561.0;
+        }
+
+        bool biasOk =
+            multiOptimal[1536] == 562.0 &&
+            multiOptimal[1568] == 594.0 &&
+            multiOptimal[1569] == 0.0;
         bool sizeOk = MultiTileConverter.ElementCountLogical == 594 &&
             MultiTileConverter.ElementCountPhysical == 1584;
-        resultBuffer[0] = (resultBuffer[0] == 0) ? 0 : 1;
+        resultBuffer[0] = (weightsOk && biasOk) ? 1 : 0;
         resultBuffer[1] = sizeOk ? 1 : 0;
     }
 

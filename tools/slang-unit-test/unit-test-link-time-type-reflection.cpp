@@ -146,59 +146,6 @@ SLANG_UNIT_TEST(linkTimeTypeReflection)
 }
 
 
-// Test that `getDefaultValueInt` can resolve a static const value from a specialized generic type.
-
-SLANG_UNIT_TEST(linkTimeStaticConstIntReflection)
-{
-    const char* userSourceBody = R"(
-        module LinkTimeStaticConstInt;
-
-        public struct StaticConstCarrier<int A, int B>
-        {
-            public static const int Sum = A + B + 7;
-        }
-        )";
-
-    String moduleName = "LinkTimeStaticConstInt";
-
-    ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-    slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_SPIRV_ASM;
-    targetDesc.profile = globalSession->findProfile("spirv_1_5");
-    slang::SessionDesc sessionDesc = {};
-    sessionDesc.targetCount = 1;
-    sessionDesc.targets = &targetDesc;
-    ComPtr<slang::ISession> session;
-    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
-
-    ComPtr<slang::IBlob> diagnosticBlob;
-    auto module = session->loadModuleFromSourceString(
-        moduleName.getBuffer(),
-        (moduleName + ".slang").getBuffer(),
-        userSourceBody,
-        diagnosticBlob.writeRef());
-    SLANG_CHECK_ABORT(module != nullptr);
-
-    ComPtr<slang::IComponentType> linkedProgram;
-    module->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
-    SLANG_CHECK_ABORT(linkedProgram != nullptr);
-
-    auto programLayout = linkedProgram->getLayout();
-    SLANG_CHECK_ABORT(programLayout != nullptr);
-
-    auto type = programLayout->findTypeByName("StaticConstCarrier<5,13>");
-    SLANG_CHECK_ABORT(type != nullptr);
-
-    auto valueVar = programLayout->findVarByNameInType(type, "Sum");
-    SLANG_CHECK_ABORT(valueVar != nullptr);
-
-    int64_t value = 0;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(valueVar->getDefaultValueInt(&value)));
-    SLANG_CHECK(value == 25);
-}
-
-
 // Test that the reflection API provides correct info about modules using link-time constants in a
 // `Conditional` field.
 

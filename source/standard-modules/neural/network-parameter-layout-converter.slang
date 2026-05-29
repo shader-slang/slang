@@ -64,7 +64,10 @@ internal int rowMajorToCudaNativeLayout(int row, int col)
     return lane * 8 + localPos;
 }
 
-internal int2 cudaNativeLayoutToRowMajor(int nativeIndex)
+internal void cudaNativeLayoutToRowMajor(
+    int nativeIndex,
+    out int row,
+    out int col)
 {
     // Inverse of rowMajorToCudaNativeLayout(): recover the row/column coordinate
     // inside a native CUDA MatrixB 16x16 tile from the physical element index.
@@ -77,10 +80,8 @@ internal int2 cudaNativeLayoutToRowMajor(int nativeIndex)
     int rowGroup = localInSub / 2;
     int pair = localInSub - rowGroup * 2;
 
-    int2 coord;
-    coord.x = rowGroup * 8 + tidLocal * 2 + pair;
-    coord.y = sub * 8 + gid;
-    return coord;
+    row = rowGroup * 8 + tidLocal * 2 + pair;
+    col = sub * 8 + gid;
 }
 
 internal struct LayerConverter<
@@ -212,39 +213,18 @@ internal int physicalWeightOffset(
 }
 
 
-internal struct ConverterThreadScope
-{
-    uint index;
-    uint stride;
-}
 
-internal ConverterThreadScope getConverterThreadScope()
-{
-    // Flatten the full 3-D dispatch domain. Each invocation owns
-    // index + k * stride, where stride is the total number of launched threads.
-    uint3 workgroupCount = WorkgroupCount();
-    int3 workgroupSize = WorkgroupSize();
-    uint3 dispatchSize = workgroupCount * uint3(workgroupSize);
-
-    ConverterThreadScope scope;
-    scope.index = __builtinDispatchThreadID.x +
-                  __builtinDispatchThreadID.y * dispatchSize.x +
-                  __builtinDispatchThreadID.z * dispatchSize.x * dispatchSize.y;
-    scope.stride = dispatchSize.x * dispatchSize.y * dispatchSize.z;
-    return scope;
-}
-
-
-internal int2 physicalWeightIndexToLogicalCoordForTarget<TargetEnum Target>(
+internal void physicalWeightIndexToLogicalCoordForTarget<TargetEnum Target>(
     int inputSize,
     int outputSize,
-    int physicalWeightIndex)
+    int physicalWeightIndex,
+    out int outputIndex,
+    out int inputIndex)
 {
     static const int TileSize = 16;
 
     int paddedInputSize = align16(inputSize);
     int paddedOutputSize = align16(outputSize);
-    int2 coord;
 
     if (Target == TargetEnum.CUDA)
     {
@@ -253,10 +233,12 @@ internal int2 physicalWeightIndexToLogicalCoordForTarget<TargetEnum Target>(
         int tileCols = paddedOutputSize / TileSize;
         int inputTile = tileIndex / tileCols;
         int outputTile = tileIndex - inputTile * tileCols;
-        int2 tileCoord = cudaNativeLayoutToRowMajor(indexInTile);
+        int tileRow = 0;
+        int tileCol = 0;
+        cudaNativeLayoutToRowMajor(indexInTile, tileRow, tileCol);
 
-        coord.x = outputTile * TileSize + tileCoord.y;
-        coord.y = inputTile * TileSize + tileCoord.x;
+        outputIndex = outputTile * TileSize + tileCol;
+        inputIndex = inputTile * TileSize + tileRow;
     }
     else if (Target == TargetEnum.SPIR_V)
     {
@@ -268,40 +250,38 @@ internal int2 physicalWeightIndexToLogicalCoordForTarget<TargetEnum Target>(
         int outputInTile = indexInTile / TileSize;
         int inputInTile = indexInTile - outputInTile * TileSize;
 
-        coord.x = outputTile * TileSize + outputInTile;
-        coord.y = inputTile * TileSize + inputInTile;
+        outputIndex = outputTile * TileSize + outputInTile;
+        inputIndex = inputTile * TileSize + inputInTile;
     }
     else
     {
-        coord.x = physicalWeightIndex / paddedInputSize;
-        coord.y = physicalWeightIndex - coord.x * paddedInputSize;
+        outputIndex = physicalWeightIndex / paddedInputSize;
+        inputIndex = physicalWeightIndex - outputIndex * paddedInputSize;
     }
-
-    return coord;
 }
 
-internal int2 physicalWeightIndexToLogicalCoord(
+internal void physicalWeightIndexToLogicalCoord(
     int inputSize,
     int outputSize,
-    int physicalWeightIndex)
+    int physicalWeightIndex,
+    out int outputIndex,
+    out int inputIndex)
 {
     __target_switch
     {
     case cuda:
-        return physicalWeightIndexToLogicalCoordForTarget<TargetEnum.CUDA>(
-            inputSize, outputSize, physicalWeightIndex);
+        physicalWeightIndexToLogicalCoordForTarget<TargetEnum.CUDA>(
+            inputSize, outputSize, physicalWeightIndex, outputIndex, inputIndex);
     case spirv:
-        return physicalWeightIndexToLogicalCoordForTarget<TargetEnum.SPIR_V>(
-            inputSize, outputSize, physicalWeightIndex);
+        physicalWeightIndexToLogicalCoordForTarget<TargetEnum.SPIR_V>(
+            inputSize, outputSize, physicalWeightIndex, outputIndex, inputIndex);
     case metal:
-        return physicalWeightIndexToLogicalCoordForTarget<TargetEnum.Metal>(
-            inputSize, outputSize, physicalWeightIndex);
+        physicalWeightIndexToLogicalCoordForTarget<TargetEnum.Metal>(
+            inputSize, outputSize, physicalWeightIndex, outputIndex, inputIndex);
     default:
         static_assert(false, "NetworkParameterLayoutConverter supports CUDA, SPIR-V, and Metal targets only");
-        int2 coord;
-        coord.x = 0;
-        coord.y = 0;
-        return coord;
+        outputIndex = 0;
+        inputIndex = 0;
     }
 }
 
@@ -336,12 +316,14 @@ internal void convertOneLayerToOptimalLayout<
 
         if (layerElementIndex < weightElementCountPhysical)
         {
-            int2 coord = physicalWeightIndexToLogicalCoord(
+            int outputIndex = 0;
+            int inputIndex = 0;
+            physicalWeightIndexToLogicalCoord(
                 inputSize,
                 outputSize,
-                layerElementIndex);
-            int outputIndex = coord.x;
-            int inputIndex = coord.y;
+                layerElementIndex,
+                outputIndex,
+                inputIndex);
             if (outputIndex < outputSize && inputIndex < inputSize)
             {
                 int srcOffset = outputIndex * inputSize + inputIndex;
@@ -496,23 +478,27 @@ public struct NetworkParameterLayoutConverter<
     public static const int BytesLogical = Impl.BytesLogical;
     public static const int BytesPhysical = Impl.BytesPhysical;
 
-    // Each dispatch invocation owns part of the flattened physical-output element stream:
-    // elementIndex = flattenedGlobalThreadIndex + k * totalDispatchThreadCount.
+    // Each caller-provided thread owns part of the flattened physical-output
+    // element stream: elementIndex = threadIndex + k * threadCount.
     [require(cuda, compute)]
     [require(metal, compute)]
     [require(spirv, spirv_1_0, compute)]
     public static void toOptimalLayout<PortableAddress, OptimalAddress>(
         PortableAddress portableLayoutStorage,
-        OptimalAddress optimalLayoutStorage)
+        OptimalAddress optimalLayoutStorage,
+        uint threadIndex,
+        uint threadCount)
             where PortableAddress : IPointerLikeAddress<T>
             where OptimalAddress : IPointerLikeAddress<T>
     {
-        uint elementCount = uint(ElementCountPhysical);
-        let scope = getConverterThreadScope();
+        if (threadCount == 0)
+            return;
 
-        for (uint elementIndex = scope.index;
+        uint elementCount = uint(ElementCountPhysical);
+
+        for (uint elementIndex = threadIndex;
              elementIndex < elementCount;
-             elementIndex += scope.stride)
+             elementIndex += threadCount)
         {
             convertNetworkToOptimalLayout<
                 T,
@@ -525,23 +511,27 @@ public struct NetworkParameterLayoutConverter<
         }
     }
 
-    // Each dispatch invocation owns part of the flattened logical-output element stream:
-    // elementIndex = flattenedGlobalThreadIndex + k * totalDispatchThreadCount.
+    // Each caller-provided thread owns part of the flattened logical-output
+    // element stream: elementIndex = threadIndex + k * threadCount.
     [require(cuda, compute)]
     [require(metal, compute)]
     [require(spirv, spirv_1_0, compute)]
     public static void toPortableLayout<OptimalAddress, PortableAddress>(
         OptimalAddress optimalLayoutStorage,
-        PortableAddress portableLayoutStorage)
+        PortableAddress portableLayoutStorage,
+        uint threadIndex,
+        uint threadCount)
             where OptimalAddress : IPointerLikeAddress<T>
             where PortableAddress : IPointerLikeAddress<T>
     {
-        uint elementCount = uint(ElementCountLogical);
-        let scope = getConverterThreadScope();
+        if (threadCount == 0)
+            return;
 
-        for (uint elementIndex = scope.index;
+        uint elementCount = uint(ElementCountLogical);
+
+        for (uint elementIndex = threadIndex;
              elementIndex < elementCount;
-             elementIndex += scope.stride)
+             elementIndex += threadCount)
         {
             convertNetworkToPortableLayout<
                 T,

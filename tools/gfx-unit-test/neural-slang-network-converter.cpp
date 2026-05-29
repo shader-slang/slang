@@ -211,40 +211,85 @@ static Slang::String makeShaderSource(const TargetCase& target)
     return R"(
         import slang.neural;
 
+        static const uint ConverterThreadGroupSizeX = 8;
+        static const uint ConverterThreadGroupSizeY = 4;
+        static const uint ConverterThreadGroupSizeZ = 2;
+        static const uint ConverterDispatchGroupY = 2;
+        static const uint ConverterDispatchGroupZ = 3;
+        static const uint ConverterThreadsPerGroup =
+            ConverterThreadGroupSizeX * ConverterThreadGroupSizeY * ConverterThreadGroupSizeZ;
+
         uniform RWStructuredBuffer<float>.Handle portableBuffer;
         uniform RWStructuredBuffer<float>.Handle optimalBuffer;
         uniform RWStructuredBuffer<float>.Handle roundTripBuffer;
 
-        void toOptimalLayout()
+        uint getConverterDispatchGroupX(uint elementCount)
+        {
+            uint elementsPerDispatchX =
+                ConverterThreadsPerGroup * ConverterDispatchGroupY * ConverterDispatchGroupZ;
+            return (elementCount + elementsPerDispatchX - 1) / elementsPerDispatchX;
+        }
+
+        uint getConverterThreadIndex(uint3 dispatchThreadId, uint elementCount)
+        {
+            uint dispatchGroupX = getConverterDispatchGroupX(elementCount);
+            uint dispatchSizeX = dispatchGroupX * ConverterThreadGroupSizeX;
+            uint dispatchSizeY = ConverterDispatchGroupY * ConverterThreadGroupSizeY;
+            return dispatchThreadId.x +
+                dispatchThreadId.y * dispatchSizeX +
+                dispatchThreadId.z * dispatchSizeX * dispatchSizeY;
+        }
+
+        uint getConverterThreadCount(uint elementCount)
+        {
+            return getConverterDispatchGroupX(elementCount) *
+                ConverterDispatchGroupY *
+                ConverterDispatchGroupZ *
+                ConverterThreadsPerGroup;
+        }
+
+        void toOptimalLayout(uint3 dispatchThreadId)
         {
             let portable = BindlessAddress<float>(portableBuffer);
             let optimal = BindlessAddress<float>(optimalBuffer);
+            uint elementCount =
+                uint(NetworkParameterLayoutConverter<float, 5, 5, 13, 7, 19>.ElementCountPhysical);
 
             NetworkParameterLayoutConverter<float, 5, 5, 13, 7, 19>
-                .toOptimalLayout(portable, optimal);
+                .toOptimalLayout(
+                    portable,
+                    optimal,
+                    getConverterThreadIndex(dispatchThreadId, elementCount),
+                    getConverterThreadCount(elementCount));
         }
 
-        void toPortableLayout()
+        void toPortableLayout(uint3 dispatchThreadId)
         {
             let optimal = BindlessAddress<float>(optimalBuffer);
             let roundTrip = BindlessAddress<float>(roundTripBuffer);
+            uint elementCount =
+                uint(NetworkParameterLayoutConverter<float, 5, 5, 13, 7, 19>.ElementCountLogical);
 
             NetworkParameterLayoutConverter<float, 5, 5, 13, 7, 19>
-                .toPortableLayout(optimal, roundTrip);
+                .toPortableLayout(
+                    optimal,
+                    roundTrip,
+                    getConverterThreadIndex(dispatchThreadId, elementCount),
+                    getConverterThreadCount(elementCount));
         }
 
         [shader("compute")]
         [numthreads(8, 4, 2)]
-        void toOptimalMain()
+        void toOptimalMain(uint3 dispatchThreadId : SV_DispatchThreadID)
         {
-            toOptimalLayout();
+            toOptimalLayout(dispatchThreadId);
         }
 
         [shader("compute")]
         [numthreads(8, 4, 2)]
-        void toPortableMain()
+        void toPortableMain(uint3 dispatchThreadId : SV_DispatchThreadID)
         {
-            toPortableLayout();
+            toPortableLayout(dispatchThreadId);
         }
     )";
 }

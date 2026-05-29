@@ -73,7 +73,7 @@ void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedInputSize, i
 
     let portable = BindlessAddress<DType>(portableWeightBuffer);
     let optimal = BindlessAddress<DType>(inputBuffer);
-    NetworkParameterLayoutConverter<DType, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal);
+    NetworkParameterLayoutConverter<DType, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal, tid, BatchSize);
     AllMemoryBarrierWithGroupSync();
 }
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
