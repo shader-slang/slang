@@ -420,25 +420,33 @@ SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact
 // `slang_writeCoverageManifestJson` API; both that API and this sidecar
 // writer emit byte-identical output, so customers working in-process can
 // pipe the API output through the same downstream tooling.
-SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
-    const String& path,
-    IArtifact* artifact)
+static bool _hasCoverageMappingData(IArtifact* artifact)
 {
     if (!artifact)
-        return SLANG_OK;
+        return false;
     auto coverage = findAssociatedRepresentation<slang::ICoverageTracingMetadata>(artifact);
     // Emit the sidecar if either dimension has data. Future coverage
     // modes may record source entries without runtime counters, or
     // runtime counter allocation before all source-entry metadata is
     // populated; the sidecar is the persisted handoff for both.
-    if (!coverage || (coverage->getCounterCount() == 0 && coverage->getEntryCount() == 0))
+    return coverage && (coverage->getCounterCount() != 0 || coverage->getEntryCount() != 0);
+}
+
+SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
+    const String& path,
+    IArtifact* artifact)
+{
+    if (!_hasCoverageMappingData(artifact))
         return SLANG_OK;
+    auto coverage = findAssociatedRepresentation<slang::ICoverageTracingMetadata>(artifact);
 
     const String explicitSidecarPath =
         getOptionSet().getStringOption(CompilerOptionName::CoverageMappingOutput);
     String sidecarPath;
     if (explicitSidecarPath.getLength() != 0)
     {
+        // Explicit sidecar uniqueness is preflighted before any artifact writes.
+        // Keep this guard as a defensive check for future call paths.
         if (m_didWriteExplicitCoverageMapping)
         {
             getSink()->diagnose(
@@ -527,6 +535,28 @@ static String _getDebugSpvPath(const String& basePath)
     return basePath + dbgExt;
 }
 
+String EndToEndCompileRequest::_getDebugArtifactPath(
+    TargetProgram* targetProgram,
+    const String& path,
+    IArtifact* artifact)
+{
+    if (!targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
+        return String();
+
+    const auto dbgArtifact = getSeparateDbgArtifact(artifact);
+    if (!dbgArtifact)
+        return String();
+
+    // The artifact's name may have been set to the debug build id hash, use
+    // it as the filename if it exists.
+    String dbgPath = dbgArtifact->getName();
+    if (dbgPath.getLength() == 0)
+        dbgPath = _getDebugSpvPath(path);
+    else
+        dbgPath.append(".dbg.spv");
+    return dbgPath;
+}
+
 SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
     TargetProgram* targetProgram,
     const String& path,
@@ -538,17 +568,89 @@ SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
         // Check if a debug artifact was actually created (only for SPIR-V targets)
         if (dbgArtifact)
         {
-            // The artifact's name may have been set to the debug build id hash, use
-            // it as the filename if it exists.
-            String dbgPath = dbgArtifact->getName();
-            if (dbgPath.getLength() == 0)
-                dbgPath = _getDebugSpvPath(path);
-            else
-                dbgPath.append(".dbg.spv");
+            String dbgPath = _getDebugArtifactPath(targetProgram, path, artifact);
             return _maybeWriteArtifact(dbgPath, dbgArtifact);
         }
         // If no debug artifact exists (e.g., for non-SPIR-V targets), just silently succeed
         // The warning about unsupported targets is already issued during option parsing
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult EndToEndCompileRequest::_validateCoverageMappingOutputPaths()
+{
+    const String explicitSidecarPath =
+        getOptionSet().getStringOption(CompilerOptionName::CoverageMappingOutput);
+    if (explicitSidecarPath.getLength() == 0)
+        return SLANG_OK;
+
+    if (!m_isCommandLineCompile || m_containerFormat != ContainerFormat::None)
+        return SLANG_OK;
+
+    auto linkage = getLinkage();
+    auto program = getSpecializedGlobalAndEntryPointsComponentType();
+
+    List<String> emittedArtifactPaths;
+    Index coverageArtifactCount = 0;
+
+    auto recordArtifact = [&](TargetProgram* targetProgram, const String& path, IArtifact* artifact)
+    {
+        if (!artifact)
+            return;
+        if (path.getLength() != 0)
+            emittedArtifactPaths.add(path);
+
+        String dbgPath = _getDebugArtifactPath(targetProgram, path, artifact);
+        if (dbgPath.getLength() != 0)
+            emittedArtifactPaths.add(dbgPath);
+
+        if (_hasCoverageMappingData(artifact))
+            coverageArtifactCount++;
+    };
+
+    for (auto targetReq : linkage->targets)
+    {
+        auto targetProgram = program->getTargetProgram(targetReq);
+
+        if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
+        {
+            recordArtifact(
+                targetProgram,
+                _getWholeProgramPath(targetReq),
+                targetProgram->getExistingWholeProgramResult());
+        }
+        else
+        {
+            Index entryPointCount = program->getEntryPointCount();
+            for (Index ee = 0; ee < entryPointCount; ++ee)
+            {
+                recordArtifact(
+                    targetProgram,
+                    _getEntryPointPath(targetReq, ee),
+                    targetProgram->getExistingEntryPointResult(ee));
+            }
+        }
+    }
+
+    if (coverageArtifactCount > 1)
+    {
+        getSink()->diagnose(
+            Diagnostics::CoverageMappingOutputMultipleArtifacts{.path = explicitSidecarPath});
+        return SLANG_FAIL;
+    }
+
+    if (coverageArtifactCount != 0)
+    {
+        for (const auto& artifactPath : emittedArtifactPaths)
+        {
+            if (Path::equals(explicitSidecarPath, artifactPath))
+            {
+                getSink()->diagnose(Diagnostics::CoverageMappingOutputCollidesWithArtifact{
+                    .path = explicitSidecarPath});
+                return SLANG_FAIL;
+            }
+        }
     }
 
     return SLANG_OK;
@@ -828,6 +930,9 @@ void EndToEndCompileRequest::generateOutput()
 
     if (m_isCommandLineCompile && m_containerFormat == ContainerFormat::None)
     {
+        if (SLANG_FAILED(_validateCoverageMappingOutputPaths()))
+            return;
+
         auto linkage = getLinkage();
         auto program = getSpecializedGlobalAndEntryPointsComponentType();
 

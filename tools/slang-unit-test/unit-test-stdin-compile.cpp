@@ -778,12 +778,99 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteArtifact(UnitTestC
         return SLANG_FAIL;
     if (!_contains(result.standardError, "must differ from the compiled artifact output path"))
         return SLANG_FAIL;
-    if (!File::exists(files.outputPath))
+    if (File::exists(files.outputPath))
         return SLANG_FAIL;
 
-    String artifactText;
-    SLANG_RETURN_ON_FAIL(File::readAllText(files.outputPath, artifactText));
-    if (_contains(artifactText, "\"coverage_mapping\""))
+    return SLANG_OK;
+}
+
+struct DebugSpvFileCollector : Path::Visitor
+{
+    List<String>* files = nullptr;
+
+    void accept(Path::Type type, const UnownedStringSlice& filename) SLANG_OVERRIDE
+    {
+        if (type == Path::Type::File)
+            files->add(String(filename));
+    }
+};
+
+static bool _containsFileName(const List<String>& files, const String& path)
+{
+    for (const auto& file : files)
+    {
+        if (file == path)
+            return true;
+    }
+    return false;
+}
+
+static SlangResult _collectDebugSpvFiles(List<String>& outFiles)
+{
+    DebugSpvFileCollector collector;
+    collector.files = &outFiles;
+    SlangResult result = Path::find(Path::getCurrentPath(), "*.dbg.spv", &collector);
+    return result == SLANG_E_NOT_FOUND ? SLANG_OK : result;
+}
+
+static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
+    UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> debugFilesBefore;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesBefore));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+
+    List<String> debugFilesAfter;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesAfter));
+
+    String debugArtifactPath;
+    for (const auto& file : debugFilesAfter)
+    {
+        if (!_containsFileName(debugFilesBefore, file))
+        {
+            debugArtifactPath = file;
+            break;
+        }
+    }
+    if (debugArtifactPath.getLength() == 0)
+        return SLANG_FAIL;
+
+    File::remove(files.outputPath);
+    File::remove(files.autoManifestPath);
+    File::remove(debugArtifactPath);
+
+    args.clear();
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-coverage-mapping-output");
+    args.add(debugArtifactPath);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "must differ from the compiled artifact output path"))
+        return SLANG_FAIL;
+    if (File::exists(files.outputPath) || File::exists(debugArtifactPath) ||
+        File::exists(files.autoManifestPath))
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -821,6 +908,9 @@ static SlangResult _testCoverageExplicitSidecarRejectsMultipleArtifacts(UnitTest
     if (!_contains(
             result.standardError,
             "would be written by multiple coverage-instrumented artifacts"))
+        return SLANG_FAIL;
+    if (File::exists(files.outputPath) || File::exists(files.disassemblyOutputPath) ||
+        File::exists(files.explicitManifestPath))
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -881,6 +971,8 @@ SLANG_UNIT_TEST(SlangcCoverageMappingOutput)
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarWithStdoutArtifact(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteArtifact(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteDebugArtifact(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsMultipleArtifacts(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarRequiresCoverage(unitTestContext)));
