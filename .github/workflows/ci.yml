@@ -135,7 +135,7 @@ jobs:
             -DSLANG_ENABLE_EXAMPLES=OFF \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
 
-          cmake --build build --config Release --target slangc copy-dxcompiler copy-dxil -j"$(nproc)"
+          cmake --build build --config Release --target slangc -j"$(nproc)"
 
           test -f build/Release/lib/libdxcompiler.so
           test -f build/Release/lib/libdxil.so
