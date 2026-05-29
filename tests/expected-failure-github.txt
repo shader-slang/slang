@@ -19,3 +19,6 @@ tests/bugs/array-size-groupshared.slang.1 syn (wgpu)
 tests/bugs/generic-groupshared.slang.2 syn (wgpu)
 tests/compute/groupshared.slang.4 syn (wgpu)
 tests/metal/groupshared-threadlocal-same-parameter.slang.4 syn (wgpu)
+
+tests/cooperative-vector/matrix-mul-hlsl-codegen.slang.1
+tests/cooperative-vector/training-hlsl-codegen.slang.1
