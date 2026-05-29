@@ -117,12 +117,12 @@ Profile getEffectiveTargetProfile(TargetRequest* target)
             // DXIL generation goes through DXC, which requires Shader Model 6.0 or later.
             auto minVersion = ProfileVersion::DX_6_0;
 
-            if (targetProfile.getStage() == Stage::Unknown &&
-                target->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
+            if (target->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
             {
                 // Whole-program DXIL uses a lib_* profile. DXC validation rejects lib_6_1 and
                 // lib_6_2, so default DXIL libraries to the first accepted library profile.
                 minVersion = ProfileVersion::DX_6_3;
+                targetProfile.setStage(Stage::Unknown);
             }
 
             if (targetProfile.getFamily() != ProfileFamily::DX ||
