@@ -4432,9 +4432,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
             return;
 
-        bool specificProfileRequested = optionSet.hasOption(CompilerOptionName::Profile) &&
-                                        (optionSet.getIntOption(CompilerOptionName::Profile) !=
-                                         SLANG_PROFILE_UNKNOWN);
+        bool specificProfileRequested =
+            optionSet.hasOption(CompilerOptionName::Profile) &&
+            (optionSet.getIntOption(CompilerOptionName::Profile) != SLANG_PROFILE_UNKNOWN);
         bool specificCapabilityRequested = false;
         for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
         {
