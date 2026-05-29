@@ -22,6 +22,15 @@ on:
       - "tools/**"
       - "CMakeLists.txt"
       - "cmake/**"
+      # Self-policing: also trigger on changes to the review automation itself,
+      # so PRs that mutate reviewer prompts, REVIEW.md protocol, or any workflow
+      # that interacts with PR review are reviewed by the workflow they would
+      # otherwise bypass. Without these, a drift PR that breaks
+      # SUBAGENT_DIFF_GATE_v1 (or removes the pre-stage step) wouldn't trigger
+      # any review at all — see #11333.
+      - ".github/workflows/**"
+      - ".claude/agents/**"
+      - "REVIEW.md"
 
 permissions:
   contents: read
@@ -68,6 +77,133 @@ jobs:
       - name: Clone Slang spec (for proposal validation)
         run: git clone --depth 1 https://github.com/shader-slang/spec.git external/spec
         continue-on-error: true
+
+      # Pre-stage the PR diff and changed-file list so the parent reviewer and
+      # all 6 specialist subagents read a consistent, CI-guaranteed snapshot.
+      # Subagents have no Bash/gh access (see .claude/agents/*-reviewer.md tools)
+      # and depend on these files; without this step the contract is enforced
+      # only by REVIEW.md prose. Fail loud (no continue-on-error) so a missing
+      # diff aborts the workflow before any subagent burns tokens reviewing
+      # master content.
+      - name: Pre-stage PR diff for subagents
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # set -u catches unset, not empty: an unexpected event type can resolve
+          # both fallback expressions to "" and silently call gh with no PR.
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::error::PR_NUMBER is empty — workflow event mismatch (neither inputs.pr_number nor pull_request.number resolved)."
+            exit 1
+          fi
+          mkdir -p tmp
+          # Defensive: GitHub-hosted runners give a fresh workspace, but a self-hosted
+          # runner could carry stale tmp/ from a prior job. Re-staging from scratch is cheap.
+          rm -f tmp/pr-diff.patch tmp/pr-files.txt
+          gh pr diff "$PR_NUMBER" -R "$REPO" >tmp/pr-diff.patch
+          gh pr view "$PR_NUMBER" -R "$REPO" --json files -q '.files[].path' >tmp/pr-files.txt
+          test -s tmp/pr-diff.patch
+          test -s tmp/pr-files.txt
+          echo "Pre-staged $(wc -l <tmp/pr-diff.patch) diff lines, $(wc -l <tmp/pr-files.txt) changed files."
+
+      # Verify all reviewer subagents carry the SUBAGENT_DIFF_GATE_v1 directive.
+      # The directive is duplicated across .claude/agents/*-reviewer.md (no shared
+      # prelude mechanism in claude-code-runner). Drift here lets a regression in
+      # one agent silently revert to pre-#11333 behavior.
+      #
+      # The gate has three layers, each catching a different drift mode:
+      #   1. presence — every reviewer carries the SUBAGENT_DIFF_GATE_v1 marker
+      #      (catches: marker entirely removed from a reviewer);
+      #   2. content — the canonical block contains every required phrase
+      #      (catches: marker preserved but body silently weakened across all
+      #       reviewers — e.g. tmp/pr-files.txt or "STOP" deleted in lockstep);
+      #   3. equality — every reviewer's extracted block hashes identically
+      #      (catches: marker + body preserved on N-1 reviewers but mutated on
+      #       the Nth, or text drift like trailing whitespace).
+      #
+      # Reviewer set is globbed (.claude/agents/*-reviewer.md, ≥6 expected) so
+      # adding a 7th reviewer auto-extends coverage; deleting below the floor
+      # fails the job.
+      - name: Verify subagent diff-gate sentinel
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          REVIEWERS=(.claude/agents/*-reviewer.md)
+          MIN_REVIEWERS=6
+          if [ "${#REVIEWERS[@]}" -lt "$MIN_REVIEWERS" ]; then
+            echo "::error::Found ${#REVIEWERS[@]} reviewer files matching .claude/agents/*-reviewer.md, expected at least $MIN_REVIEWERS."
+            exit 1
+          fi
+
+          # Layer 1: presence — every reviewer carries the SUBAGENT_DIFF_GATE_v1 marker.
+          missing=0
+          for f in "${REVIEWERS[@]}"; do
+            if ! grep -q 'SUBAGENT_DIFF_GATE_v1' "$f"; then
+              echo "::error file=$f::Missing SUBAGENT_DIFF_GATE_v1 sentinel — fail-fast directive required (see REVIEW.md Step 1)."
+              missing=$((missing + 1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then
+            exit 1
+          fi
+
+          # Layer 2 + 3 prep: extract the marked block (from the SUBAGENT_DIFF_GATE_v1
+          # heading through the next bare `---` terminator) for each reviewer.
+          declare -A blocks
+          declare -A hashes
+          for f in "${REVIEWERS[@]}"; do
+            block=$(awk '
+              /SUBAGENT_DIFF_GATE_v1/ { in_block = 1 }
+              in_block { print }
+              in_block && /^---$/ && !/SUBAGENT_DIFF_GATE_v1/ { exit }
+            ' "$f")
+            if [ -z "$block" ]; then
+              echo "::error file=$f::SUBAGENT_DIFF_GATE_v1 block extraction returned empty — heading or trailing '---' separator missing."
+              exit 1
+            fi
+            blocks[$f]=$block
+            hashes[$f]=$(printf '%s\n' "$block" | sha256sum | cut -d' ' -f1)
+          done
+
+          # Layer 2: content — the canonical block contains every required phrase.
+          # Catches the case where the marker + structure are preserved but the
+          # contract body is silently weakened across all reviewers (e.g. someone
+          # edits all six in lockstep to drop `tmp/pr-files.txt` from the gate).
+          ref_file=${REVIEWERS[0]}
+          REQUIRED_PHRASES=(
+            'Read tmp/pr-diff.patch'
+            'tmp/pr-files.txt'
+            'ERROR: PR diff not pre-staged'
+            'and STOP'
+          )
+          contract=0
+          for phrase in "${REQUIRED_PHRASES[@]}"; do
+            if ! grep -qF "$phrase" <<<"${blocks[$ref_file]}"; then
+              echo "::error file=$ref_file::SUBAGENT_DIFF_GATE_v1 canonical block missing required phrase: $phrase"
+              contract=$((contract + 1))
+            fi
+          done
+          if [ "$contract" -gt 0 ]; then
+            exit 1
+          fi
+
+          # Layer 3: equality — every reviewer's block hashes identically to the
+          # canonical. Layer 2 only checks the canonical; this layer ensures all
+          # other reviewers carry the same canonical contract, byte for byte.
+          ref_hash=${hashes[$ref_file]}
+          drift=0
+          for f in "${REVIEWERS[@]}"; do
+            if [ "${hashes[$f]}" != "$ref_hash" ]; then
+              echo "::error file=$f::SUBAGENT_DIFF_GATE_v1 directive drift — block hash ${hashes[$f]} != canonical $ref_hash (from $ref_file)."
+              drift=$((drift + 1))
+            fi
+          done
+          if [ "$drift" -gt 0 ]; then
+            exit 1
+          fi
+          echo "All ${#REVIEWERS[@]} reviewers carry identical SUBAGENT_DIFF_GATE_v1 directive (sha256: ${ref_hash:0:12}..., ${#REQUIRED_PHRASES[@]} required phrases verified on canonical)."
 
       # Minimize previous Claude reviews/comments and resolve threads.
       # Targets both 'claude' (OIDC) and 'github-actions' (fallback) logins.
@@ -210,8 +346,10 @@ jobs:
 
             IMPORTANT: The BASE branch (master) is checked out locally. You can read CLAUDE.md and any
             existing source files locally to understand repo structure and surrounding code context.
-            However, the PR branch is NOT checked out — to see what the PR actually changes, you MUST
-            use `gh pr diff` or GitHub MCP tools. Do NOT assume local files reflect the PR's changes.
+            However, the PR branch is NOT checked out — the PR diff and changed-file list have been
+            pre-staged for you at `tmp/pr-diff.patch` and `tmp/pr-files.txt`. Read those files for
+            the PR's changes. `gh pr diff` and GitHub MCP tools remain available as a fallback. Do
+            NOT assume local files reflect the PR's changes.
 
             NOTE: Any previous Claude reviews on this PR have been automatically minimized
             and their threads resolved. You are posting a fresh, self-contained review.

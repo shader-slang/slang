@@ -2,17 +2,26 @@
 
 Follow this protocol. Do NOT skip steps. Do NOT write a free-form review. Do NOT post a review without dispatching all 6 teammates first.
 
-## Step 1: Fetch the PR diff and save to file
+## Step 1: Verify the pre-staged PR diff
 
-Save the diff and file list to `tmp/` so agents can read them without bloating prompts:
+The workflow pre-stages the diff and changed-file list at `tmp/pr-diff.patch` and `tmp/pr-files.txt` before you run (see `.github/workflows/claude-pr-review.yml`, step **Pre-stage PR diff for subagents**). Verify both files exist and are non-empty before dispatching reviewers:
 
 ```bash
+test -s tmp/pr-diff.patch && test -s tmp/pr-files.txt
+```
+
+If either file is missing or empty, the workflow's pre-stage step did not run successfully — re-stage by hand using the same commands the workflow runs (including the empty-file assertions, otherwise a transient `gh` failure produces a 0-byte file and subagents will abort with `ERROR: PR diff not pre-staged` — see the `SUBAGENT_DIFF_GATE_v1` check in each `.claude/agents/*-reviewer.md`):
+
+```bash
+set -euo pipefail
 mkdir -p tmp
 gh pr diff <number> -R <repo> > tmp/pr-diff.patch
 gh pr view <number> -R <repo> --json files -q '.files[].path' > tmp/pr-files.txt
+test -s tmp/pr-diff.patch
+test -s tmp/pr-files.txt
 ```
 
-Agents will read these files directly — do NOT embed the full diff in agent prompts.
+Agents read these files directly — do NOT embed the full diff in agent prompts.
 
 ## Step 2: Determine applicable reviewers and dispatch
 
