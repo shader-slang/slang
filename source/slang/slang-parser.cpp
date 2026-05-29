@@ -8164,9 +8164,10 @@ static BaseType _determineIntegerLiteralType(
 
         case IntegerLiteralWidthSuffix::Pointer:
             if ((unsignedSuffix == IntegerLiteralUnsignedSuffix::None) &&
-                (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 1U)))
+                (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 2U)))
             {
-                // Note: there is no negation exception for IntPtr
+                // This is always overflowing. The case of INT64_MAX + 1 is
+                // detected by SemanticsExprVisitor when assigning types.
                 sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
                 return BaseType::UIntPtr;
             }
@@ -8317,7 +8318,8 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
             else if (
                 ((widthSuffix == IntegerLiteralWidthSuffix::None) ||
                  (widthSuffix == IntegerLiteralWidthSuffix::Long) ||
-                 (widthSuffix == IntegerLiteralWidthSuffix::LongLong)) &&
+                 (widthSuffix == IntegerLiteralWidthSuffix::LongLong) ||
+                 (widthSuffix == IntegerLiteralWidthSuffix::Pointer)) &&
                 value == INT64_MIN)
                 signedMinimumIntException = true;
         }

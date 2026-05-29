@@ -2345,7 +2345,8 @@ Expr* SemanticsExprVisitor::visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
         expr->type = m_astBuilder->getBuiltinType(expr->suffixType);
 
         // check if we have a overflow diagnostics pending
-        if (expr->signedMinimumIntException && (expr->suffixType == BaseType::UInt64) &&
+        if (expr->signedMinimumIntException &&
+            (expr->suffixType == BaseType::UInt64 || expr->suffixType == BaseType::UIntPtr) &&
             (expr->value == INT64_MIN))
         {
             getSink()->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = expr->loc});

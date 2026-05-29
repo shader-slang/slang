@@ -35,4 +35,6 @@ void main()
 
     static_assert(IntegerLiteralType.INT64   == getType(-2147483648LL),          "minimum value of int32_t 'LL'");
     static_assert(IntegerLiteralType.INT64   == getType(-9223372036854775808LL), "minimum value of int64_t 'LL'");
+
+    static_assert(IntegerLiteralType.INT64   == getType(-9223372036854775808Z),  "minimum value of intptr_t 'Z'");
 }
