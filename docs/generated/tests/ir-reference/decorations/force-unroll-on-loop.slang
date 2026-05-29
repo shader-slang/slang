@@ -1,0 +1,31 @@
+//META: generated=true
+//META: model=claude-opus-4-7
+//META: generated_at=2026-05-21T00:00:00Z
+//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: doc_ref=docs/generated/design/ir-reference/decorations.md#loop-and-branch-hints
+//META: doc_section_digest=d7cf9915ec0da5de567edb118ec898dd57bb3e7b5414db216254906018825537
+//META: purpose=Boundary - the [ForceUnroll] attribute is loop-statement-only and produces a ForceUnroll decoration on the loop with an integer operand recording the requested unroll count (0 when omitted).
+//META: intent=boundary
+//META: pipeline_stage=lower
+//META: warning=Auto-generated. May drift from source. Do not edit by hand.
+
+// Boundary - the doc lists ForceUnroll with "no operands" but the
+// observed dump records an integer operand (0 when no count is
+// supplied). The BUNDLE's doc gaps already flag that ForceUnroll
+// is loop-only; this is the positive-side anchor that fixes the
+// observed shape.
+
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+
+uniform RWStructuredBuffer<int> buf;
+
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    int s = 0;
+    [ForceUnroll]
+    for (int i = 0; i < 4; i++) s += int(tid.x) * i;
+    buf[0] = s;
+}
+
+// CHECK: [ForceUnroll({{[0-9]+}} : Int)]
