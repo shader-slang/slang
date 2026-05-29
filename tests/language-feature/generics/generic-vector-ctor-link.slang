@@ -34,6 +34,13 @@ void computeMain()
 // CHECK: OpCapability Shader
 // CHECK: OpEntryPoint GLCompute
 // CHECK: OpExecutionMode {{.*}} LocalSize 1 1 1
-// CHECK: OpTypeVector
+// CHECK: ; Types, variables and constants
+// CHECK-COUNT-1: OpTypeFunction
+// CHECK-NOT: OpTypeFunction
+// CHECK: OpTypeFloat 32
+// CHECK-NOT: OpTypeFunction
+// CHECK-COUNT-1: OpTypeVector %float 3
+// CHECK-NOT: OpTypeFunction
+// CHECK-NOT: OpTypeVector %float 3
 // CHECK: OpStore
 // CHECK: OpReturn

@@ -2060,6 +2060,9 @@ public:
     {
         auto key = IRInstKey{inst};
         IRInst* value = nullptr;
+        // Keep the first scope-blind entry for a key. Structurally identical instructions in
+        // disjoint generic scopes can collide here; the scoped map below records the visible
+        // instruction for each scope.
         if (!m_globalValueNumberingMap.tryGetValue(key, value))
             m_globalValueNumberingMap.add(key, inst);
         m_instReplacementMap.remove(inst);

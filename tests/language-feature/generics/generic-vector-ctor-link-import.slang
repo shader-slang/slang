@@ -1,3 +1,5 @@
+//TEST_IGNORE_FILE:
+
 // Imported helper module for generic-vector-ctor-link.slang.
 
 [Differentiable]
