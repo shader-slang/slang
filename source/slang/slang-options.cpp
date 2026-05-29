@@ -653,7 +653,7 @@ void initCommandOptions(CommandOptions& options)
          "Write shader coverage mapping metadata to an explicit JSON sidecar path. "
          "Use this when compiled output is written to stdout or when the build needs "
          "a stable manifest path instead of the default "
-         "`<output>.coverage-mapping.json` sidecar."},
+         "`<output>.coverage-mapping.json` sidecar. Requires at least one coverage tracing mode."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,

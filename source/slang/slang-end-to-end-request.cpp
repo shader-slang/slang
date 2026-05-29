@@ -172,6 +172,12 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         getSink()->diagnose(Diagnostics::CoverageMappingOutputWithoutCoverage{});
         return SLANG_FAIL;
     }
+    if (optionSet.getStringOption(CompilerOptionName::CoverageMappingOutput).getLength() != 0 &&
+        m_containerFormat != ContainerFormat::None)
+    {
+        getSink()->diagnose(Diagnostics::CoverageMappingOutputWithContainer{});
+        return SLANG_FAIL;
+    }
 
     // We only do parsing and semantic checking if we *aren't* doing
     // a pass-through compilation.
@@ -432,6 +438,33 @@ static bool _hasCoverageMappingData(IArtifact* artifact)
     return coverage && (coverage->getCounterCount() != 0 || coverage->getEntryCount() != 0);
 }
 
+static String _normalizeOutputPathForCompare(const String& path)
+{
+    if (path.getLength() == 0)
+        return String();
+
+    String absolutePath = path;
+    if (!Path::isAbsolute(path))
+    {
+        String currentPath = Path::getCurrentPath();
+        if (currentPath.getLength() != 0)
+            absolutePath = Path::combine(currentPath, path);
+    }
+    return Path::simplify(absolutePath);
+}
+
+static bool _areOutputPathsEquivalent(const String& left, const String& right)
+{
+    String normalizedLeft = _normalizeOutputPathForCompare(left);
+    String normalizedRight = _normalizeOutputPathForCompare(right);
+#if SLANG_WINDOWS_FAMILY
+    return normalizedLeft.getUnownedSlice().caseInsensitiveEquals(
+        normalizedRight.getUnownedSlice());
+#else
+    return normalizedLeft == normalizedRight;
+#endif
+}
+
 SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
     const String& path,
     IArtifact* artifact)
@@ -453,7 +486,7 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
                 Diagnostics::CoverageMappingOutputMultipleArtifacts{.path = explicitSidecarPath});
             return SLANG_FAIL;
         }
-        if (path.getLength() != 0 && Path::equals(explicitSidecarPath, path))
+        if (path.getLength() != 0 && _areOutputPathsEquivalent(explicitSidecarPath, path))
         {
             getSink()->diagnose(Diagnostics::CoverageMappingOutputCollidesWithArtifact{
                 .path = explicitSidecarPath});
@@ -644,7 +677,7 @@ SlangResult EndToEndCompileRequest::_validateCoverageMappingOutputPaths()
     {
         for (const auto& artifactPath : emittedArtifactPaths)
         {
-            if (Path::equals(explicitSidecarPath, artifactPath))
+            if (_areOutputPathsEquivalent(explicitSidecarPath, artifactPath))
             {
                 getSink()->diagnose(Diagnostics::CoverageMappingOutputCollidesWithArtifact{
                     .path = explicitSidecarPath});

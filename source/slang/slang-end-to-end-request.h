@@ -395,8 +395,10 @@ private:
         const String& path,
         IArtifact* artifact);
     SlangResult _validateCoverageMappingOutputPaths();
-    /// If the artifact carries shader-coverage tracing data, write
-    /// `<path>.coverage-mapping.json` next to the compiled output.
+    /// If the artifact carries shader-coverage tracing data, write its JSON mapping sidecar. By
+    /// default writes `<path>.coverage-mapping.json` next to file outputs.
+    /// `-coverage-mapping-output <path>` overrides that location and also works for stdout
+    /// artifacts.
     SlangResult _maybeWriteCoverageMapping(const String& path, IArtifact* artifact);
     SlangResult _writeArtifact(const String& path, IArtifact* artifact);
 

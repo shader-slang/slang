@@ -4814,6 +4814,12 @@ err(
     "`-coverage-mapping-output` path '~path' must differ from the compiled artifact output path"
 )
 
+err(
+    "coverage-mapping-output-with-container",
+    45111,
+    "`-coverage-mapping-output` is not supported when writing a container output"
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(

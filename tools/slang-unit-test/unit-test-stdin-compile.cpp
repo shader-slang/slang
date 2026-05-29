@@ -7,7 +7,6 @@
 #include "unit-test/slang-unit-test.h"
 
 #ifdef _WIN32
-#include <direct.h>
 #include <fcntl.h>
 #include <io.h>
 #else
@@ -22,15 +21,6 @@ using namespace Slang;
 static bool _contains(const String& text, const char* expected)
 {
     return text.getUnownedSlice().indexOf(UnownedStringSlice(expected)) >= 0;
-}
-
-static SlangResult _setCurrentDirectory(const String& path)
-{
-#ifdef _WIN32
-    return _chdir(path.getBuffer()) == 0 ? SLANG_OK : SLANG_FAIL;
-#else
-    return chdir(path.getBuffer()) == 0 ? SLANG_OK : SLANG_FAIL;
-#endif
 }
 
 static void _appendDiagnostic(char const* message, void* userData)
@@ -589,6 +579,7 @@ struct TempCoverageCliFiles
     String disassemblyOutputPath;
     String disassemblyManifestPath;
     String explicitManifestPath;
+    String containerOutputPath;
 
     ~TempCoverageCliFiles()
     {
@@ -599,6 +590,7 @@ struct TempCoverageCliFiles
         File::remove(disassemblyOutputPath);
         File::remove(disassemblyManifestPath);
         File::remove(explicitManifestPath);
+        File::remove(containerOutputPath);
     }
 };
 
@@ -611,6 +603,7 @@ static SlangResult _createTempCoverageCliFiles(TempCoverageCliFiles& out)
     out.disassemblyOutputPath = out.basePath + ".spv-asm";
     out.disassemblyManifestPath = out.disassemblyOutputPath + ".coverage-mapping.json";
     out.explicitManifestPath = out.basePath + ".coverage-mapping.json";
+    out.containerOutputPath = out.basePath + ".slang-module";
     return File::writeAllText(out.sourcePath, kCoverageCliShader);
 }
 
@@ -794,6 +787,35 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteArtifact(UnitTestC
     return SLANG_OK;
 }
 
+static SlangResult _testCoverageExplicitSidecarCannotOverwriteArtifactAlias(
+    UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    String outputAlias = Path::combine(
+        Path::combine(Path::getParentDirectory(files.outputPath), "."),
+        Path::getFileName(files.outputPath));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-coverage-mapping-output");
+    args.add(outputAlias);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "must differ from the compiled artifact output path"))
+        return SLANG_FAIL;
+    if (File::exists(files.outputPath))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 struct DebugSpvFileCollector : Path::Visitor
 {
     List<String>* files = nullptr;
@@ -813,34 +835,24 @@ static SlangResult _collectDebugSpvFiles(List<String>& outFiles)
     return result == SLANG_E_NOT_FOUND ? SLANG_OK : result;
 }
 
-struct ScopedTemporaryCurrentDirectory
+static bool _containsFileName(const List<String>& files, const String& path)
+{
+    for (const auto& file : files)
+    {
+        if (file == path)
+            return true;
+    }
+    return false;
+}
+
+struct ScopedDebugArtifactFile
 {
     String path;
-    String previousPath;
-    bool didChangeDirectory = false;
 
-    ~ScopedTemporaryCurrentDirectory()
+    ~ScopedDebugArtifactFile()
     {
-        if (didChangeDirectory)
-            _setCurrentDirectory(previousPath);
         if (path.getLength() != 0)
-            Path::removeNonEmpty(path);
-    }
-
-    SlangResult init(const char* prefix)
-    {
-        previousPath = Path::getCurrentPath();
-        if (previousPath.getLength() == 0)
-            return SLANG_FAIL;
-
-        SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice(prefix), path));
-        SLANG_RETURN_ON_FAIL(File::remove(path));
-        if (!Path::createDirectory(path))
-            return SLANG_FAIL;
-
-        SLANG_RETURN_ON_FAIL(_setCurrentDirectory(path));
-        didChangeDirectory = true;
-        return SLANG_OK;
+            File::remove(path);
     }
 };
 
@@ -850,8 +862,8 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     TempCoverageCliFiles files;
     SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
 
-    ScopedTemporaryCurrentDirectory debugWorkingDirectory;
-    SLANG_RETURN_ON_FAIL(debugWorkingDirectory.init("slangc-coverage-debug"));
+    List<String> debugFilesBefore;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesBefore));
 
     List<String> args;
     _addCoverageCliCompileArgs(args, files.sourcePath, true);
@@ -866,11 +878,22 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     if (result.resultCode != 0)
         return SLANG_FAIL;
 
-    List<String> debugFiles;
-    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFiles));
-    if (debugFiles.getCount() != 1)
+    List<String> debugFilesAfter;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesAfter));
+
+    ScopedDebugArtifactFile debugArtifact;
+    for (const auto& file : debugFilesAfter)
+    {
+        if (!_containsFileName(debugFilesBefore, file))
+        {
+            if (debugArtifact.path.getLength() != 0)
+                return SLANG_FAIL;
+            debugArtifact.path = file;
+        }
+    }
+    if (debugArtifact.path.getLength() == 0)
         return SLANG_FAIL;
-    String debugArtifactPath = debugFiles[0];
+    String debugArtifactPath = debugArtifact.path;
 
     File::remove(files.outputPath);
     File::remove(files.autoManifestPath);
@@ -960,6 +983,30 @@ static SlangResult _testCoverageExplicitSidecarRequiresCoverage(UnitTestContext*
     return SLANG_OK;
 }
 
+static SlangResult _testCoverageExplicitSidecarRejectsContainerOutput(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-coverage-mapping-output");
+    args.add(files.explicitManifestPath);
+    args.add("-o");
+    args.add(files.containerOutputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "is not supported when writing a container output"))
+        return SLANG_FAIL;
+    if (File::exists(files.containerOutputPath) || File::exists(files.explicitManifestPath))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testSlangStdin(unitTestContext)));
@@ -994,8 +1041,12 @@ SLANG_UNIT_TEST(SlangcCoverageMappingOutput)
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteArtifact(unitTestContext)));
     SLANG_CHECK(
+        SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteArtifactAlias(unitTestContext)));
+    SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteDebugArtifact(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsMultipleArtifacts(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarRequiresCoverage(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsContainerOutput(unitTestContext)));
 }
