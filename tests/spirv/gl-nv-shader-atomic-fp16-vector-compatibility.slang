@@ -30,10 +30,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
 // POSITIVE: OpCapability AtomicFloat16VectorNV
 // POSITIVE: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// POSITIVE: OpAtomicFAddEXT %v2half
 
 // POSITIVE_IGNORE_CAPS-NOT: warning[E41012]
 // POSITIVE_IGNORE_CAPS: OpCapability AtomicFloat16VectorNV
 // POSITIVE_IGNORE_CAPS: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// POSITIVE_IGNORE_CAPS: OpAtomicFAddEXT %v2half
 
 // POSITIVE_MIN_MAX: OpCapability AtomicFloat16VectorNV
 // POSITIVE_MIN_MAX: OpExtension "SPV_NV_shader_atomic_fp16_vector"
