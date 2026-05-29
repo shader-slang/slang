@@ -244,6 +244,8 @@ works for any given binary.
 | Option                                | Default                       | Description                                                                                                                              |
 | ------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `SLANG_VERSION`                       | Latest `v*` tag               | The project version, detected using git if available                                                                                     |
+| `SLANG_DXC_BINARY_URL`                | Platform dependent            | URL of the prebuilt DXC binary archive to download; overrides the default release URL and skips GLIBC auto-detection on Linux            |
+| `SLANG_DXC_BUILD_FROM_SOURCE`         | Unset (auto on native Linux) | `ON`: always build DXC from source; `OFF`: use prebuilt when available; unset: auto-select on native Linux (see [DXC GLIBC auto-detection](#dxc-glibc-auto-detection)) |
 | `SLANG_EMBED_CORE_MODULE`             | `TRUE`                        | Build slang with an embedded version of the core module                                                                                  |
 | `SLANG_EMBED_CORE_MODULE_SOURCE`      | `TRUE`                        | Embed the core module source in the binary                                                                                               |
 | `SLANG_ENABLE_DXIL`                   | `TRUE`                        | Enable generating DXIL using DXC                                                                                                         |
@@ -269,9 +271,32 @@ works for any given binary.
 | `SLANG_ENABLE_SPLIT_DEBUG_INFO`       | `TRUE`                        | Enable generating split debug info for Debug and RelWithDebInfo configs                                                                  |
 | `SLANG_SLANG_LLVM_FLAVOR`             | `FETCH_BINARY_IF_POSSIBLE`    | How to set up llvm support                                                                                                               |
 | `SLANG_SLANG_LLVM_BINARY_URL`         | System dependent              | URL specifying the location of the slang-llvm prebuilt library                                                                           |
+| `SLANG_RHI_FETCH_DXC`                 | `OFF` when Slang manages DXC  | Fetch slang-rhi's own DXC copy for the D3D12 backend; Slang sets this to `OFF` when `SLANG_ENABLE_DXIL=ON` unless explicitly overridden |
 | `SLANG_USE_SCCACHE`                   | `FALSE`                       | Use sccache as compiler launcher (auto-disables PCH)                                                                                     |
 | `SLANG_GENERATORS_PATH`               | ``                            | Path to an installed `all-generators` target for cross compilation                                                                       |
 | `SLANG_IGNORE_ABORT_MSG`              | `FALSE`                       | Suppress the Windows modal abort dialog at compile time (baked into all built executables; recommended for unattended/LLM-driven builds) |
+
+#### DXC GLIBC auto-detection
+
+When `SLANG_DXC_BUILD_FROM_SOURCE` is unset on native Linux x86_64 (and
+`SLANG_DXC_BINARY_URL` is not set), CMake downloads the prebuilt DXC binary at
+configure time and inspects the GLIBC requirements of both `libdxcompiler.so`
+and `libdxil.so`. If either library requires a newer GLIBC than the system
+provides, or if the requirement or system GLIBC version cannot be detected, DXC
+is built from source instead. Detection results are cached in stamp files so
+subsequent reconfigures are fast.
+
+- `ON`: always build DXC from source (Windows and Linux only; fatal error on other platforms).
+- `OFF`: use the prebuilt binary when one is available and skip the GLIBC check; on non-x86_64 Linux without `SLANG_DXC_BINARY_URL`, DXC is unavailable because there is no official prebuilt binary.
+- unset on native non-x86_64 Linux (e.g. ARM64): automatically build DXC from source because no official prebuilt binary is available.
+- unset while cross-compiling for Linux x86_64: skip GLIBC detection because the target system cannot be probed at configure time.
+
+The source-build path clones DXC plus LLVM/Clang submodules on the first run
+and can take tens of minutes to configure and build; later reconfigures and
+incremental builds use stamp files and build outputs to skip repeated work.
+When Slang manages DXC, it sets `SLANG_RHI_FETCH_DXC=OFF` by default so
+slang-rhi does not download a second DXC copy; Slang's `copy-dxcompiler` and
+`copy-dxil` targets deploy the required DLLs or shared libraries instead.
 
 The following options relate to optional dependencies for additional backends
 and running additional tests. Left unchanged they are auto detected, however
