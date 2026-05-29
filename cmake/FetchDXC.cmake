@@ -194,25 +194,26 @@ elseif(
     # re-using a stale archive from a previous version.
     set(_dxc_probe_tarball "${_dxc_probe_dir}/dxc_${_dxc_version_tag}.tar.gz")
     # Stamp stores the highest GLIBC version required across both .so files
-    # (e.g. "2.34"), or the sentinel "DETECTION_FAILED" when objdump/readelf
-    # could not extract version info.
+    # (e.g. "2.34"). Failed detections are intentionally not cached so transient
+    # download/tooling issues are retried on the next reconfigure.
     set(_dxc_glibc_stamp "${_dxc_probe_dir}/req_glibc_${_dxc_version_tag}.txt")
 
     set(_dxc_required_glibc "0.0")
     if(EXISTS "${_dxc_glibc_stamp}")
         file(READ "${_dxc_glibc_stamp}" _dxc_required_glibc)
         string(STRIP "${_dxc_required_glibc}" _dxc_required_glibc)
-        # "DETECTION_FAILED" is written when probing could not prove prebuilt
-        # compatibility; fall back to source to avoid runtime linker failures.
         if(_dxc_required_glibc STREQUAL "DETECTION_FAILED")
             message(
                 STATUS
-                "DXC GLIBC requirement detection previously failed; "
-                "building DXC from source (${_dxc_version_tag})."
+                "Discarding stale DXC GLIBC detection failure stamp; "
+                "retrying detection for ${_dxc_version_tag}."
             )
-            set(_dxc_build_from_source ON)
+            file(REMOVE "${_dxc_glibc_stamp}")
+            set(_dxc_required_glibc "0.0")
         endif()
-    else()
+    endif()
+
+    if(NOT EXISTS "${_dxc_glibc_stamp}")
         file(MAKE_DIRECTORY "${_dxc_probe_dir}")
 
         # Download the tarball once; reused by FetchContent for the actual
@@ -257,7 +258,6 @@ elseif(
                     "Building DXC from source instead."
                 )
                 file(REMOVE "${_dxc_probe_tarball}")
-                file(WRITE "${_dxc_glibc_stamp}" "DETECTION_FAILED")
                 set(_dxc_build_from_source ON)
             endif()
         endif()
@@ -284,9 +284,6 @@ elseif(
                 # Remove the tarball so a fresh download is attempted on the
                 # next reconfigure rather than retrying with a bad archive.
                 file(REMOVE "${_dxc_probe_tarball}")
-                # Write sentinel so the inspection is not re-attempted on the
-                # next reconfigure before a fresh download succeeds.
-                file(WRITE "${_dxc_glibc_stamp}" "DETECTION_FAILED")
                 set(_dxc_build_from_source ON)
             else()
                 find_program(_dxc_objdump NAMES objdump)
@@ -340,11 +337,9 @@ elseif(
                         WARNING
                         "Could not extract GLIBC version requirements from DXC "
                         "shared libraries (objdump/readelf unavailable or produced "
-                        "no output). Building DXC from source instead."
+                        "no output). Building DXC from source instead; detection "
+                        "will be retried on the next reconfigure."
                     )
-                    # Write a sentinel so subsequent reconfigures skip the
-                    # inspection and avoid repeating this warning.
-                    file(WRITE "${_dxc_glibc_stamp}" "DETECTION_FAILED")
                     set(_dxc_build_from_source ON)
                 endif()
             endif() # else() of tar extraction success check
