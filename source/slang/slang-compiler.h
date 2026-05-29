@@ -165,6 +165,7 @@ enum class FloatingPointDenormalMode : SlangFpDenormalModeIntegral
 // Compute the target profile after applying any target-format-specific defaults
 // and minimum versions.
 Profile getEffectiveTargetProfile(TargetRequest* target);
+// Use `optionSet` as a fallback for inherited options after checking the target request.
 Profile getEffectiveTargetProfile(TargetRequest* target, CompilerOptionSet& optionSet);
 
 // Compute the "effective" profile to use when outputting the given entry point

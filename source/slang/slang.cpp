@@ -80,7 +80,11 @@ const char* getBuildTagString()
 
 Profile getEffectiveTargetProfile(TargetRequest* target, CompilerOptionSet& optionSet)
 {
-    auto targetProfile = optionSet.getProfile();
+    auto targetProfile = target->getOptionSet().getProfile();
+    if (targetProfile.getFamily() == ProfileFamily::Unknown)
+    {
+        targetProfile = optionSet.getProfile();
+    }
 
     // Depending on the target *format* we might have to restrict the
     // profile family to one that makes sense.
