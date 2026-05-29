@@ -174,9 +174,8 @@ static void _outputIncludesRec(
     case PathInfo::Type::TokenPaste:
     case PathInfo::Type::CommandLine:
     case PathInfo::Type::TypeParse:
-    case PathInfo::Type::MacroExpansion:
         {
-            // Synthetic views — not real files, don't output.
+            // If any of these types we don't output
             return;
         }
     default:
