@@ -617,6 +617,22 @@ interface ITexelElement
     static const int format;
     [OverloadRank(-1)]
     __init(DataType.Element x);
+    [OverloadRank(-1)]
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(DataType value);
+    DataType __getData();
+}
+
+extension<T:ITexelData> T
+{
+    [OverloadRank(-1)]
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    [ForceInline]
+    __init<U:ITexelElement>(U value)
+        where U.DataType == T
+    {
+        this = value.__getData();
+    }
 }
 
 extension<T:__BuiltinArithmeticType> T : ITexelData, ITexelElement
@@ -626,6 +642,7 @@ extension<T:__BuiltinArithmeticType> T : ITexelData, ITexelElement
     static const int elementCount = 1;
     static const int format = 0;
     __intrinsic_op(0) __init(T x);
+    T __getData() { return this; }
 }
 
 ${
@@ -650,6 +667,7 @@ extension<int N> vector<$(elementType), N> : ITexelData, ITexelElement
     static const int elementCount = N;
     static const int format = 0;
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init($(elementType) x);
+    vector<$(elementType), N> __getData() { return this; }
 }
 
 ${
@@ -664,6 +682,7 @@ extension double : ITexelData, ITexelElement
     static const int elementCount = 1;
     static const int format = 0;
     __intrinsic_op(0) __init(double x);
+    double __getData() { return this; }
 }
 extension double2 : ITexelData, ITexelElement
 {
@@ -672,6 +691,7 @@ extension double2 : ITexelData, ITexelElement
     static const int elementCount = 2;
     static const int format = 0;
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(double x);
+    double2 __getData() { return this; }
 }
 extension uint64_t : ITexelData, ITexelElement
 {
@@ -680,6 +700,7 @@ extension uint64_t : ITexelData, ITexelElement
     static const int elementCount = 1;
     static const int format = 0;
     __intrinsic_op(0) __init(uint64_t x);
+    uint64_t __getData() { return this; }
 }
 extension int64_t : ITexelData, ITexelElement
 {
@@ -688,6 +709,7 @@ extension int64_t : ITexelData, ITexelElement
     static const int elementCount = 1;
     static const int format = 0;
     __intrinsic_op(0) __init(int64_t x);
+    int64_t __getData() { return this; }
 }
 extension vector<uint64_t,2> : ITexelData, ITexelElement
 {
@@ -696,6 +718,7 @@ extension vector<uint64_t,2> : ITexelData, ITexelElement
     static const int elementCount = 2;
     static const int format = 0;
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(uint64_t x);
+    vector<uint64_t,2> __getData() { return this; }
 }
 extension vector<int64_t,2> : ITexelData, ITexelElement
 {
@@ -704,6 +727,7 @@ extension vector<int64_t,2> : ITexelData, ITexelElement
     static const int elementCount = 2;
     static const int format = 0;
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(int64_t x);
+    vector<int64_t,2> __getData() { return this; }
 }
 
 ${
@@ -770,7 +794,10 @@ struct $(texelFormatType.codeName) : ITexelElement
 {
     typealias DataType = $(dataType);
     static const int format = $(texelFormatType.format);
-    __intrinsic_op(0) __init($(elementType) x) {}
+    DataType value;
+    __init($(elementType) x) { value = DataType(x); }
+    __init(DataType value) { this.value = value; }
+    DataType __getData() { return value; }
 }
 ${
 }
@@ -20892,6 +20919,7 @@ struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType, ITexelData, ITex
     static const int elementCount = 1;
     static const int format = 0;
     __intrinsic_op(0) __init(float x){}
+    SAMPLER_FEEDBACK_MIN_MIP __getData() { return this; }
 };
 
 /// @category texture_types
@@ -20905,6 +20933,7 @@ struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType, ITexelDa
     static const int elementCount = 1;
     static const int format = 0;
     __intrinsic_op(0) __init(float x){}
+    SAMPLER_FEEDBACK_MIP_REGION_USED __getData() { return this; }
 };
 
 // All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.
