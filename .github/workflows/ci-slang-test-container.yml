@@ -165,7 +165,18 @@ jobs:
             slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
           fi
 
-          "$bin_dir/slang-test" "${test_roots[@]}" "${slang_test_args[@]}"
+          find tests/ -name '*.actual' -delete
+
+          test_exit=0
+          "$bin_dir/slang-test" "${test_roots[@]}" "${slang_test_args[@]}" || test_exit=$?
+
+          for f in $(find tests/ -name '*.actual')
+          do
+            echo "===== dump begin : $f ======"
+            cat "$f"
+            echo "===== dump end   : $f ======"
+          done
+          exit "$test_exit"
 
       - name: Run slangc tests
         if: inputs.gpu-tier == 't4'
@@ -179,6 +190,10 @@ jobs:
           ulimit -c unlimited
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+
+          find tests/ -name '*.actual' -delete
+
+          test_exit=0
           "$bin_dir/slang-test" \
             -use-test-server \
             -server-count ${{ inputs.server-count }} \
@@ -189,7 +204,15 @@ jobs:
             -expected-failure-list tests/expected-failure-via-glsl.txt \
             -expected-failure-list tests/expected-failure-github.txt \
             -expected-failure-list tests/expected-failure-linux.txt \
-            -expected-failure-list tests/expected-failure-linux-gpu.txt
+            -expected-failure-list tests/expected-failure-linux-gpu.txt || test_exit=$?
+
+          for f in $(find tests/ -name '*.actual')
+          do
+            echo "===== dump begin : $f ======"
+            cat "$f"
+            echo "===== dump end   : $f ======"
+          done
+          exit "$test_exit"
 
       # Extract gdb backtraces from any cores written to /var/cores during
       # the test steps above. /var/cores lives on the host (bind-mounted in
