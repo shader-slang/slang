@@ -6607,8 +6607,11 @@ $}
             }
             return;
         case spvAtomicFloat16AddEXT:
-            // This shared body is the scalar fp16 atomic-add path; the explicit
-            // label records the SPIR-V capability that enables it.
+            {
+                let buf = __getEquivalentStructuredBuffer<half>(this);
+                originalValue = __atomic_add(buf[byteAddress/2], value);
+                return;
+            }
         default:
             {
                 let buf = __getEquivalentStructuredBuffer<half>(this);

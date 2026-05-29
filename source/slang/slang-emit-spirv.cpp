@@ -4425,12 +4425,29 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    Dictionary<IRFunc*, HashSet<String>> m_diagnosedRestrictiveCaps;
-    void maybeDiagnoseRestrictiveCapabilityUse(IRInst* inst, CapabilityName capabilityName)
+    Dictionary<IRFunc*, HashSet<String>> m_diagnosedCapabilityUses;
+    void maybeDiagnoseCapabilityUse(IRInst* inst, CapabilityName capabilityName)
     {
         auto& optionSet = m_targetProgram->getOptionSet();
-        if (!optionSet.getBoolOption(CompilerOptionName::RestrictiveCapabilityCheck) ||
-            optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+        if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+            return;
+
+        bool specificProfileRequested = optionSet.hasOption(CompilerOptionName::Profile) &&
+                                        (optionSet.getIntOption(CompilerOptionName::Profile) !=
+                                         SLANG_PROFILE_UNKNOWN);
+        bool specificCapabilityRequested = false;
+        for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
+        {
+            if ((atomVal.kind == CompilerOptionValueKind::Int &&
+                 atomVal.intValue != SLANG_CAPABILITY_UNKNOWN) ||
+                atomVal.kind == CompilerOptionValueKind::String)
+            {
+                specificCapabilityRequested = true;
+                break;
+            }
+        }
+        if (!optionSet.getBoolOption(CompilerOptionName::RestrictiveCapabilityCheck) &&
+            !specificProfileRequested && !specificCapabilityRequested)
             return;
 
         auto parentFunc = getParentFunc(inst);
@@ -4471,18 +4488,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             StringBuilder capsSb;
             printDiagnosticArg(capsSb, addedAtoms);
             String missingCapsStr = capsSb.toString();
-            if (!m_diagnosedRestrictiveCaps[entryPoint].add(missingCapsStr))
+            if (!m_diagnosedCapabilityUses[entryPoint].add(missingCapsStr))
                 continue;
 
             StringBuilder entryPointSb;
             printDiagnosticArg(entryPointSb, entryPoint);
 
-            m_sink->diagnose(Diagnostics::ProfileImplicitlyUpgradedRestrictive{
-                .entryPoint = entryPointSb.toString(),
-                .profile = optionSet.getProfile().getName(),
-                .capabilities = missingCapsStr,
-                .location = entryPoint->sourceLoc,
-            });
+            maybeDiagnoseWarningOrError(
+                m_sink,
+                optionSet,
+                DiagnosticCategory::Capability,
+                Diagnostics::ProfileImplicitlyUpgraded{
+                    .entryPoint = entryPointSb.toString(),
+                    .profile = optionSet.getProfile().getName(),
+                    .capabilities = missingCapsStr,
+                    .location = entryPoint->sourceLoc,
+                },
+                Diagnostics::ProfileImplicitlyUpgradedRestrictive{
+                    .entryPoint = entryPointSb.toString(),
+                    .profile = optionSet.getProfile().getName(),
+                    .capabilities = missingCapsStr,
+                    .location = entryPoint->sourceLoc,
+                });
         }
     }
 
@@ -4529,9 +4556,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 return true;
             }
 
-            maybeDiagnoseRestrictiveCapabilityUse(
-                atomicInst,
-                CapabilityName::spvAtomicFloat16VectorNV);
+            maybeDiagnoseCapabilityUse(atomicInst, CapabilityName::spvAtomicFloat16VectorNV);
             ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
             requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
             return true;
