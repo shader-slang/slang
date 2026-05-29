@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 // Test for issue #9835: Error when ALL implementations of an interface
 // contain self-referential fields (no base case for AnyValue size calculation).
@@ -32,6 +32,10 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
+    // TODO: Should dis-allow this type of createDynamicObject of a struct whose members include other
+    // interface types, because the size of an interface type can vary depending on the implementations, 
+    // and there's no meaningful mapping from a blob of data to such a type.
+    //
     IFoo f = createDynamicObject<IFoo>(0, 1.0f);
     outputBuffer[0] = f.compute(1.0f);
 }

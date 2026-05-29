@@ -131,6 +131,8 @@ local insts = {
 			},
 			-- Represents an `Optional<T>`.
 			{ Optional = { struct_name = "OptionalType", operands = { { "valueType", "IRType" } }, hoistable = true } },
+			-- Represents a `Conditional<T, hasValue>`.
+			{ Conditional = { struct_name = "ConditionalType", operands = { { "valueType", "IRType" }, { "hasValue", "IRInst" } }, hoistable = true } },
 			-- Represents an enum type
 			{ Enum = { struct_name = "EnumType", operands = { { "tagType", "IRType" } }, parent = true } },
 			{
@@ -143,12 +145,6 @@ local insts = {
 						},
 					},
 					{
-						DiffPairUserCode = {
-							struct_name = "DifferentialPairUserCodeType",
-							operands = { { "valueType", "IRType" }, { "witnessTable" } },
-						},
-					},
-					{
 						DiffRefPair = {
 							struct_name = "DifferentialPtrPairType",
 							operands = { { "valueType", "IRType" }, { "witnessTable" } },
@@ -157,12 +153,53 @@ local insts = {
 				},
 			},
 			{
-				BwdDiffIntermediateCtxType = {
-					struct_name = "BackwardDiffIntermediateContextType",
-					operands = { { "func" } },
+				TranslatedTypeBase = 
+				{
 					hoistable = true,
+					{
+						BackwardDiffIntermediateContextType = {
+							struct_name = "BackwardDiffIntermediateContextType",
+							operands = { { "func" } }
+						}
+					},
+					{
+						TrivialBackwardDiffIntermediateContextType = {
+							struct_name = "TrivialBackwardDiffIntermediateContextType",
+							operands = { { "func" } }
+						}
+					},
+					{
+						BackwardContextFromLegacyBwdDiffFunc = {
+							operands = { { "func" }, {"legacyBwdDiffFunc"} }
+						}
+					},
+					{
+						BackwardDiffMinimalContextType = {
+							struct_name = "BackwardDiffMinimalContextType",
+							operands = { { "func" } }
+						}
+					},
+					{
+						TrivialBackwardDiffMinimalContextType = {
+							struct_name = "TrivialBackwardDiffMinimalContextType",
+							operands = { { "func" } }
+						}
+					},
+					{
+						BackwardMinimalContextFromLegacyBwdDiffFunc = {
+							struct_name = "BackwardMinimalContextFromLegacyBwdDiffFunc",
+							operands = { { "func" }, {"legacyBwdDiffFunc"} }
+				  		}
+					},
 				},
 			},
+
+			{ ForwardDiffFuncType = { hoistable = true } },
+			{ BackwardDiffFuncType = { hoistable = true } },
+			{ ApplyForBwdFuncType = { hoistable = true } },
+			{ BwdCallableFuncType = { hoistable = true } },
+			{ RematFuncType = { hoistable = true } },
+
 			{
 				TensorView = {
 					struct_name = "TensorViewType",
@@ -655,6 +692,15 @@ local insts = {
 					hoistable = true,
 				},
 			},
+			-- A sentinel type used as the last operand of a TupleType to provide a custom
+			-- name for the generated struct when the tuple is lowered.
+			{
+				TupleName = {
+					struct_name = "TupleNameType",
+					operands = { { "name", "IRStringLit" } },
+					hoistable = true,
+				},
+			},
 			-- Represents the type of a generic value pack parameter.
 			-- e.g. `let each D : int` lowers to a param of type ValuePackType(int).
 			{ ValuePackType = { operands = { { "elementType", "IRType" } }, hoistable = true } },
@@ -857,12 +903,6 @@ local insts = {
 				MakeDiffPair = { struct_name = "MakeDifferentialPair", operands = { { "primal" }, { "differential" } } },
 			},
 			{
-				MakeDiffPairUserCode = {
-					struct_name = "MakeDifferentialPairUserCode",
-					operands = { { "primal" }, { "differential" } },
-				},
-			},
-			{
 				MakeDiffRefPair = {
 					struct_name = "MakeDifferentialPtrPair",
 					operands = { { "primal" }, { "differential" } },
@@ -873,12 +913,6 @@ local insts = {
 	{
 		DifferentialPairGetDifferentialBase = {
 			{ GetDifferential = { struct_name = "DifferentialPairGetDifferential", operands = { { "pair" } } } },
-			{
-				GetDifferentialUserCode = {
-					struct_name = "DifferentialPairGetDifferentialUserCode",
-					operands = { { "pair" } },
-				},
-			},
 			{
 				GetDifferentialPtr = {
 					struct_name = "DifferentialPtrPairGetDifferential",
@@ -891,12 +925,6 @@ local insts = {
 		DifferentialPairGetPrimalBase = {
 			{
 				GetPrimal = { struct_name = "DifferentialPairGetPrimal", operands = { { "pair" } } },
-			},
-			{
-				GetPrimalUserCode = {
-					struct_name = "DifferentialPairGetPrimalUserCode",
-					min_operands = 1,
-				},
 			},
 			{ GetPrimalRef = { struct_name = "DifferentialPtrPairGetPrimal", operands = { { "ptrPair" } } } },
 		},
@@ -975,6 +1003,13 @@ local insts = {
 			hoistable = true,
 		},
 	},
+	-- Holds witness tables for differential type info (this type witness, return type witness, param witnesses).
+	-- This is lowered to MakeTuple after specialization.
+	{
+		DiffTypeInfo = {
+			hoistable = true,
+		},
+	},
 	{ Expand = { operands = { { "value" } } } },
 	{
 		Each = {
@@ -991,6 +1026,8 @@ local insts = {
 	{ optionalHasValue = { operands = { { "optionalOperand" } } } },
 	{ makeOptionalValue = { operands = { { "value" } } } },
 	{ makeOptionalNone = {} },
+	{ getConditionalValue = { operands = { { "conditionalOperand" } } } },
+	{ makeConditionalValue = { operands = { { "value" } } } },
 	{ CombinedTextureSamplerGetTexture = { operands = { { "sampler" } } } },
 	{ CombinedTextureSamplerGetSampler = { operands = { { "sampler" } } } },
 	{ call = { operands = { { "callee" } } } },
@@ -1059,6 +1096,46 @@ local insts = {
 			{ atomicDec = { operands = { { "ptr" } } } },
 		},
 	},
+	-- Emitted at AST lowering when line coverage is on. The instruction
+	-- has no operands; its source position is carried on the standard
+	-- per-instruction `sourceLoc` field, which is always preserved and
+	-- never stripped by `stripDebugInfo`. The coverage-instrument IR pass
+	-- later rewrites each coverage marker into an atomic add on the IR-
+	-- synthesized `__slang_coverage` buffer. The current line/function/
+	-- branch producers assign one direct counter per marker; future
+	-- source-region coverage can keep using marker metadata without
+	-- preserving that one-to-one lowering. Host-side tooling reads
+	-- source coverage entries and projects them to LCOV records.
+	-- Inherent side-effect semantics keep the optimizer from deleting or
+	-- hoisting these ops.
+	{ IncrementCoverageCounter = {} },
+	-- Function-entry coverage marker. The marker's sourceLoc points at
+	-- the function declaration/body start. Display and mangled names are
+	-- carried as operands so later IR passes do not need AST access.
+	{
+		IncrementFunctionCoverageCounter =
+		{
+			operands =
+			{
+				{ "functionName", "IRStringLit" },
+				{ "functionMangledName", "IRStringLit" },
+			}
+		}
+	},
+	-- Branch-arm coverage marker. SourceLoc points at the branch
+	-- condition. Site/arm ids are local to the emitted metadata object;
+	-- semantic arm kind lets LCOV export distinguish true/false/case.
+	{
+		IncrementBranchCoverageCounter =
+		{
+			operands =
+			{
+				{ "branchSiteID", "IRIntLit" },
+				{ "branchArmID", "IRIntLit" },
+				{ "branchArmKind", "IRIntLit" },
+			}
+		}
+	},
 	-- Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 	-- currently accumulated derivative to pass to some dOut argument in a nested call.
 	{ LoadReverseGradient = { operands = { { "value" } } } },
@@ -1071,8 +1148,6 @@ local insts = {
 	-- Produced and removed during backward auto-diff pass. This inst is generated by the splitting step
 	-- to represent a reference to an inout parameter for use in the back-prop part of the computation.
 	{ DiffParamRef = { operands = { { "referencedParam" } } } },
-	-- Check that the value is a differential null value.
-	{ IsDifferentialNull = { operands = { { "base" } } } },
 	{
 		get_field = {
 			struct_name = "FieldExtract",
@@ -1085,6 +1160,9 @@ local insts = {
 	-- Pointer offset: computes pBase + offset_in_elements
 	{ getOffsetPtr = { operands = { { "base" }, { "offset" } } } },
 	{ getAddr = { struct_name = "GetAddress", operands = { { "ptr" } } } },
+	-- An address obtained via __getAddress. Lowered away after validation
+	-- into the underlying address operand.
+	{ assumeAddress = { operands = { { "addr" } } } },
 	{ castDynamicResource = { operands = { { "resource" } } } },
 	-- Get an unowned NativeString from a String.
 	{ getNativeStr = { operands = { { "stringValue" } } } },
@@ -1108,6 +1186,8 @@ local insts = {
 	},
 	-- Store into an Image.
 	{ imageStore = { operands = { { "image" }, { "coord" }, { "value" } } } },
+	-- Load from a SubpassInput.
+	{ SubpassLoad = { operands = { { "subpassInput" }, { "sample", optional = true } } } },
 	-- Load (almost) arbitrary-type data from a byte-address buffer
 	-- %dst = byteAddressBufferLoad(%buffer, %offset, %alignment)
 	-- where
@@ -1219,7 +1299,26 @@ local insts = {
 	--
 	--   for(ii : 0 ... M-1 )
 	--     dst[ii] = src[idx[ii]];
+	
 	{ swizzledStore = { operands = { { "dest" }, { "source" } }, min_operands = 2 } },
+	-- Store to a matrix with a swizzle
+	--
+	-- matrixSwizzleStore %dst %src %row0 %col0 %row1 %col1 ...
+	--
+	-- where:
+	-- - `dst` is a pointer to a matrix<T,R,C>
+	-- - `src` is a scalar T or vector<T,M>
+	-- - pairs of (row_i, col_i) are literal integers identifying matrix elements
+	--
+	-- The semantics of the op is:
+	--
+	--   for(ii : 0 ... M-1 )
+	--     dst[row_ii][col_ii] = src[ii];  (or src if scalar)
+	{ matrixSwizzleStore = { operands = { { "dest" }, { "source" } }, min_operands = 2 } },
+	-- Transposed operation of MakeVectorFromScalar
+	{ SumVectorElements = { min_operands = 1 } },
+	-- Transposed operation of MakeMatrixFromScalar
+	{ SumMatrixElements = { min_operands = 1 } },
 	{
 		TerminatorInst = {
 			{ return_val = { struct_name = "Return", operands = { { "val" } } } },
@@ -1385,6 +1484,17 @@ local insts = {
 	},
 	{ loopExitValue = { min_operands = 1 } },
 	{
+		ReportCheckpointStore = {
+			-- Marker instruction that reports a checkpoint store to the user.
+			-- Operands: (storedType, originalFunc, storeRef)
+			-- storedType is the IRType of the value being checkpointed.
+			-- originalFunc is the function that the checkpoint is associated with.
+			-- storeRef is a weak reference to the store or address instruction.
+			--   If the store is optimized out, this operand will become poison.
+			operands = { { "storedType" }, { "originalFunc" }, { "storeRef" } },
+		},
+	},
+	{
 		getStringHash = {
 			operands = { { "stringLit", "IRStringLit" } },
 		},
@@ -1450,6 +1560,48 @@ local insts = {
 	{ TorchGetCudaStream = {} },
 	{ TorchTensorGetView = {} },
 	{ CoopMatMapElementIFunc = { min_operands = 2 } },
+	{ CoopMatMulAdd = { operands = { { "matA" }, { "matB" }, { "matC" }, { "saturatingAccumulation" } } } },
+	{
+		CoopVecMatMulAdd = {
+			operands = {
+				{ "input" },
+				{ "inputInterpretation" },
+				{ "inputInterpretationPackingFactor" },
+				{ "matrixPtr" },
+				{ "matrixOffset" },
+				{ "matrixInterpretation" },
+				{ "k" },
+				{ "memoryLayout" },
+				{ "transpose" },
+				{ "matrixStride" },
+				{ "biasPtr", optional = true },
+				{ "biasOffset", optional = true },
+				{ "biasInterpretation", optional = true },
+			},
+		},
+	},
+	{
+		CoopVecOuterProductAccumulate = {
+			operands = {
+				{ "matrixPtr" },
+				{ "matrixOffset" },
+				{ "a" },
+				{ "b" },
+				{ "memoryLayout" },
+				{ "matrixInterpretation" },
+				{ "matrixStride" },
+			},
+		},
+	},
+	{
+		CoopVecReduceSumAccumulate = {
+			operands = {
+				{ "bufferPtr" },
+				{ "offset" },
+				{ "value" },
+			},
+		},
+	},
 	{ allocateOpaqueHandle = {} },
 	{
 		BindingQuery = {
@@ -1828,6 +1980,15 @@ local insts = {
 				},
 			},
 			{
+				AllowPreTranslationInlining = {
+					-- This decoration indicates the callee should be inlined after translation passes,
+					-- Typically, this is because the callee has non-trivial values associated with it that need to be preserved 
+					-- for translation.
+					--
+					struct_name = "AllowPreTranslationInliningDecoration",
+				},
+			},
+			{
 				ForceUnroll = {
 					-- A `[ForceUnroll]` decoration indicates the loop should be unrolled by the Slang compiler.
 					struct_name = "ForceUnrollDecoration",
@@ -2115,12 +2276,6 @@ local insts = {
 				},
 			},
 			{
-				forwardDifferentiable = {
-					-- Decorated function is marked for the forward-mode differentiation pass.
-					struct_name = "ForwardDifferentiableDecoration",
-				},
-			},
-			{
 				AutoDiffOriginalValueDecoration = {
 					-- Decorates a auto-diff transcribed value with the original value that the inst is transcribed from.
 					operands = { { "originalValue" } },
@@ -2129,61 +2284,6 @@ local insts = {
 			{
 				AutoDiffBuiltinDecoration = {
 					-- Decorates a type as auto-diff builtin type.
-				},
-			},
-			{
-				fwdDerivative = {
-					-- Used by the auto-diff pass to hold a reference to the
-					-- generated derivative function.
-					struct_name = "ForwardDerivativeDecoration",
-					operands = { { "forwardDerivativeFunc" } },
-				},
-			},
-			{
-				backwardDifferentiable = {
-					-- Used by the auto-diff pass to hold a reference to the
-					-- generated derivative function.
-					struct_name = "BackwardDifferentiableDecoration",
-					min_operands = 1,
-				},
-			},
-			{
-				primalSubstFunc = {
-					-- Used by the auto-diff pass to hold a reference to the
-					-- primal substitute function.
-					struct_name = "PrimalSubstituteDecoration",
-					operands = { { "primalSubstituteFunc" } },
-				},
-			},
-			{
-				backwardDiffPrimalReference = {
-					-- Decorations to associate an original function with compiler generated backward derivative functions.
-					struct_name = "BackwardDerivativePrimalDecoration",
-					operands = { { "backwardDerivativePrimalFunc" } },
-				},
-			},
-			{
-				backwardDiffPropagateReference = {
-					struct_name = "BackwardDerivativePropagateDecoration",
-					operands = { { "backwardDerivativePropagateFunc" } },
-				},
-			},
-			{
-				backwardDiffIntermediateTypeReference = {
-					struct_name = "BackwardDerivativeIntermediateTypeDecoration",
-					operands = { { "backwardDerivativeIntermediateType" } },
-				},
-			},
-			{
-				backwardDiffReference = {
-					struct_name = "BackwardDerivativeDecoration",
-					operands = { { "backwardDerivativeFunc" } },
-				},
-			},
-			{
-				userDefinedBackwardDiffReference = {
-					struct_name = "UserDefinedBackwardDerivativeDecoration",
-					operands = { { "backwardDerivativeFunc" } },
 				},
 			},
 			{ BackwardDerivativePrimalContextDecoration = { operands = { { "backwardDerivativePrimalContextVar" } } } },
@@ -2195,6 +2295,7 @@ local insts = {
 			},
 			{ loopCounterDecoration = {} },
 			{ loopCounterUpdateDecoration = {} },
+			{ ParamsContextDecoration = { operands = {"value"} } },
 			{
 				AutodiffInstDecoration = {
 					-- Auto-diff inst decorations
@@ -2232,7 +2333,7 @@ local insts = {
 					-- Used by the auto-diff pass to mark insts whose result is stored
 					-- in an intermediary struct for reuse in backward propagation phase.
 					struct_name = "PrimalValueStructKeyDecoration",
-					operands = { { "structKey", "IRStructKey" } },
+					operands = { { "firstKey", "IRStructKey" }, { "secondKey", "IRStructKey" } },
 				},
 			},
 			{
@@ -2250,15 +2351,13 @@ local insts = {
 				},
 			},
 			{
+				ReturnValueContextFieldDecoration = { },
+			},
+			{
 				derivativeMemberDecoration = {
 					-- Used by the auto-diff pass to hold a reference to a
 					-- differential member of a type in its associated differential type.
 					operands = { { "derivativeMemberStructKey" } },
-				},
-			},
-			{
-				treatAsDifferentiableDecoration = {
-					-- Treat a function as differentiable function
 				},
 			},
 			{
@@ -2295,12 +2394,6 @@ local insts = {
 					{
 						PreferRecomputeDecoration = {
 							-- Hint that the result from a call to the decorated function should be recomputed in backward prop function.
-						},
-					},
-					{
-						CheckpointIntermediateDecoration = {
-							-- Hint that a struct is used for reverse mode checkpointing
-							operands = { { "sourceFunction" } },
 						},
 					},
 				},
@@ -2388,7 +2481,7 @@ local insts = {
 			},
 			{
 				DisallowSpecializationWithExistentialsDecoration = { },
-			}
+			},
 		},
 	},
 	-- Decoration
@@ -2467,8 +2560,8 @@ local insts = {
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
-	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType", optional = true } } } },
-	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType", optional = true } } } },
+	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
+	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
 	{ countOf = { operands = { { "type" } } } },
 	{ ExtractFirstFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
 	{ ExtractLastFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
@@ -2496,17 +2589,46 @@ local insts = {
 	{ IsSignedInt = { operands = { { "value" } } } },
 	{ IsVector = { operands = { { "value" } } } },
 	{ GetDynamicResourceHeap = { hoistable = true } },
-	{ ForwardDifferentiate = { operands = { { "baseFn" } } } },
-	-- Produces the primal computation of backward derivatives, will return an intermediate context for
-	-- backward derivative func.
-	{ BackwardDifferentiatePrimal = { operands = { { "baseFn" } } } },
-	-- Produces the actual backward derivative propagate function, using the intermediate context returned by the
-	-- primal func produced from `BackwardDifferentiatePrimal`.
-	{ BackwardDifferentiatePropagate = { operands = { { "baseFn" } } } },
-	-- Represents the conceptual backward derivative function. Only produced by lower-to-ir and will be
-	-- replaced with `BackwardDifferentiatePrimal` and `BackwardDifferentiatePropagate`.
-	{ BackwardDifferentiate = { operands = { { "baseFn" } } } },
-	{ PrimalSubstitute = { operands = { { "baseFn" } } } },
+	{ TranslateBase = {
+		hoistable = true,
+
+		-- TODO: Document these.
+		{ TrivialForwardDifferentiate = { min_operands = 1 } },
+
+		{ BackwardDifferentiatePrimal = { min_operands = 1 } },
+		{ BackwardRemat = { min_operands = 1 } },
+		{ BackwardDifferentiatePropagate = { min_operands = 1 } },
+
+		{ TrivialBackwardDifferentiate = { min_operands = 1 } },
+
+		{ TrivialBackwardDifferentiatePrimal = { min_operands = 1 } },
+		{ TrivialBackwardRemat = { min_operands = 1 } },
+		{ TrivialBackwardDifferentiatePropagate = { min_operands = 1 } },
+
+		{ FunctionCopy = { min_operands = 1 } },
+
+		{ BackwardDifferentiate = { min_operands = 3 } },
+		{ ForwardDifferentiate = { min_operands = 1, operands = { { "baseFn" } } } },
+
+		{ LegacyBackwardDifferentiate = { min_operands = 3 } },
+		
+		{ BackwardPrimalFromLegacyBwdDiffFunc = { min_operands = 2 } },
+		{ BackwardRematFromLegacyBwdDiffFunc = { min_operands = 2 } },
+		{ BackwardPropagateFromLegacyBwdDiffFunc = { min_operands = 2 } },
+
+		{ BackwardFromLegacyBwdDiffFunc = { min_operands = 2 } },
+		{ ForwardDifferentiatePropagate = { min_operands = 1 } },
+
+		-- For higher-order derivatives.
+		{ SynthesizedForwardDerivativeWitnessTable = { min_operands = 1 } },
+		{ SynthesizedBackwardDerivativeWitnessTable = { min_operands = 1 } },
+		{ MakeIDifferentiableWitness = { min_operands = 1 } },
+		{ SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc = { min_operands = 2 } },
+
+		-- For user-provided apply (__func_extension __apply(fn)).
+		-- Identity remat for when MinimalContext == BwdCallable.
+		{ IdentityRemat = { min_operands = 1 } },
+	} },
 	{ DispatchKernel = { operands = { { "baseFn" }, { "threadGroupSize" }, { "dispatchSize" } } } },
 	{
 		CudaKernelLaunch = {
@@ -2611,15 +2733,12 @@ local insts = {
 	{
 		LiveRangeMarker = { { liveRangeStart = { min_operands = 2 } }, { liveRangeEnd = {} } },
 	},
-	-- IRSpecialization
-	{ SpecializationDictionaryItem = {} },
-	{ GenericSpecializationDictionary = { parent = true } },
-	{ ExistentialFuncSpecializationDictionary = { parent = true } },
-	{ ExistentialTypeSpecializationDictionary = { parent = true } },
 	-- Differentiable Type Dictionary
 	{ DifferentiableTypeDictionaryItem = { operands = { { "concreteType" }, { "witness" } } } },
 	-- Differentiable Type Annotation (for run-time types)
 	{ DifferentiableTypeAnnotation = { operands = { { "baseType" }, { "witness" } }, hoistable = true } },
+	{ WitnessTableAnnotation = { min_operands = 2, hoistable = true } }, -- TODO: remove this..
+	{ Annotation = { min_operands = 2, hoistable = true } },
 	{ BeginFragmentShaderInterlock = {} },
 	{
 		EndFragmentShaderInterlock = { struct_name = "EndFragmentShaderInterlock" },
@@ -2653,6 +2772,12 @@ local insts = {
 	{
 		DebugBuildIdentifier = {
 			min_operands = 2,
+		},
+	},
+	{
+		DebugCompilationUnit = {
+			operands = { { "source" } },
+			hoistable = true,
 		},
 	},
 	-- Embedded Precompiled Libraries
@@ -2806,6 +2931,11 @@ local insts = {
 	},
 	{ CastInterfaceToTaggedUnionPtr = {
 		-- Cast an interface-typed pointer to a tagged-union pointer with a known set.
+		-- Operands: (ptr, witnessTableSet, typeSet)
+		-- The witness table set and type set are carried here so that information
+		-- from the original TaggedUnionType is available during lowering,
+		-- even after the TaggedUnionType itself has been replaced.
+		operands = { { "ptr" }, { "witnessTableSet" }, { "typeSet" } }
 	} }, 
 	{ GetTagForSuperSet = {
 		-- Translate a tag from a set to its equivalent in a super-set
@@ -3003,6 +3133,37 @@ local insts = {
 		--
 		hoistable = true
 	} },
+	{ WeakUse = { hoistable = true } },
+	{ FuncTypeOf = { hoistable = true }},
+	{ SpecializeExistentialsInFunc = {
+		-- Represents a reference to a function with specific existential parameter bindings.
+		--
+		-- Used by the type-flow specialization pass to represent different
+		-- specialized versions of the same function, each with different
+		-- existential parameter type bindings.
+		--
+		-- Operands: (func, binding0, binding1, ...)
+		-- The first operand is the base function (IRFunc or IRSpecialize).
+		-- Subsequent operands are the parameter binding infos, one per
+		-- function parameter. A VoidLit binding means "any" (unconstrained).
+		-- A non-void binding is the type-flow info for that parameter.
+		--
+		hoistable = true,
+		operands = { {"func"} }
+	} },
+	{ SpecializeExistentialsInType = {
+		-- Represents an existential specialization key for type specialization caching.
+		--
+		-- Used as a compiler-dictionary key for specialized BindExistentialsType results.
+		-- Operands: (baseType, binding0, binding1, ...)
+		--
+		hoistable = true,
+		operands = { {"baseType"} }
+	} },
+	{ CompilerDictionaryEntry = { hoistable = true, parent = true }},
+	{ CompilerDictionaryValue = { operands = { {"value"} } } },
+	{ CompilerDictionary = { parent = true } },
+	{ CompilerDictionaryScope = { parent = true } },
 	{ LateRequireCapability = {
 		-- A capability requirement that is checked after linking, specialization, and IR-level dead
 		-- code elimination passes.
@@ -3043,7 +3204,7 @@ local insts = {
 	{ constexprFloatCast = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastIntToEnum = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastEnumToInt = { operands = { { "value" } }, hoistable = true } },
-	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } },
+	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } }
 }
 
 -- A function to calculate some useful properties and put it in the table,

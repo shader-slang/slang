@@ -6,12 +6,12 @@ interface IFoo<T>
     property DifferentialPtrPair<Parameters> parametersDual { get; }
 }
 
-extension<T: __BuiltinFloatingPointType> T: IDifferentiablePtrType
+extension<T: __BuiltinArithmeticType> T: IDifferentiablePtrType
 {
     typealias Differential = T;
 }
 
-struct Foo<T:__BuiltinFloatingPointType> : IFoo<T>
+struct Foo<T:__BuiltinArithmeticType> : IFoo<T>
 {
     typealias Parameters = Array<T, 1>;
     property DifferentialPtrPair<Parameters> parametersDual

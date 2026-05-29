@@ -32,6 +32,7 @@ float test_simple(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_strided'{{$}}
 [Differentiable]
 float test_strided(float y)
 {
@@ -45,6 +46,7 @@ float test_strided(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_offset'{{$}}
 [Differentiable]
 float test_offset(float y)
 {
@@ -58,6 +60,7 @@ float test_offset(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_negative_stride'{{$}}
 [Differentiable]
 float test_negative_stride(float y)
 {
@@ -71,6 +74,7 @@ float test_negative_stride(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_nested'{{$}}
 [Differentiable]
 float test_nested(float y)
 {
@@ -87,6 +91,7 @@ float test_nested(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_nested_with_offset'{{$}}
 [Differentiable]
 float test_nested_with_offset(float y)
 {
@@ -103,6 +108,7 @@ float test_nested_with_offset(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_nested_with_conditions'{{$}}
 [Differentiable]
 float test_nested_with_conditions(float y)
 {
@@ -125,6 +131,7 @@ float test_nested_with_conditions(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_with_continue'{{$}}
 [Differentiable]
 float test_with_continue(float y)
 {
@@ -143,6 +150,7 @@ float test_with_continue(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_nested_with_continue'{{$}}
 [Differentiable]
 float test_nested_with_continue(float y)
 {

@@ -7,7 +7,7 @@ Doesn't work because, can't compare T as it is any type.
 .slang(15): error 39999: no overload for '>' applicable to arguments of type (T, T)
         if (arr[i] > m)
                    ^
-core.meta.slang(2572): note 39999: candidate: func >(uint64_t, uint64_t) -> bool
+core.meta.slang(2572): note 40011: candidate: func >(uint64_t, uint64_t) -> bool
 
  */
 

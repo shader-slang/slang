@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
+//TEST:SIMPLE(filecheck=REPORT): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -17,9 +17,8 @@ struct A : IDifferentiable
 // loop state.
 // 
 
-// CHECK: struct s_bwd_prop_B_eval_Intermediates_0
-// CHECK-NOT: int {{[A-Za-z0-9_]+}}[{{.*}}]
-// CHECK: }
+// REPORT: checkpointing context of {{[0-9]+}} bytes associated with: '{{.*}}eval'
+// REPORT-NOT: FixedArray<int
 
 __generic<let TBsdfCount : int>
 struct B

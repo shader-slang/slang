@@ -18,6 +18,7 @@
 // CHECK-NEXT: 6
 // CHECK-NEXT: 7
 // CHECK-NEXT: 8
+
 #pragma warning(disable:41017)
 //TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8], stride=4, count=256):name=input
 ByteAddressBuffer input;
@@ -47,7 +48,6 @@ void computeMain()
 
     Ptr<int32_t, Access::ReadWrite, AddressSpace::GroupShared> tempSharedPtr = __getAddress(tempShared[0]);
     let matC = CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>.Load<CoopMatMatrixLayout.RowMajor>(tempSharedPtr, stride);
-
 
     Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared> tempSharedPtr1 = __getAddress(tempShared1[0]);
     matC.Store<CoopMatMatrixLayout.RowMajor, uint4>(tempSharedPtr1, stride);

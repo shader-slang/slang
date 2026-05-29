@@ -10,6 +10,67 @@ namespace SlangRecord
 using Slang::String;
 using Slang::StringBuilder;
 
+namespace
+{
+
+// Nested arrays are legal in replay streams, but decoder recursion still needs a hard
+// ceiling so malformed input cannot exhaust the process stack.
+static const int kMaxReplayDecodeNestingDepth = 64;
+
+// Replay array counts come from the input file. Cap the logical element count so a
+// well-sized but malicious stream cannot make the decoder spend unbounded CPU in
+// decodeValueFromStream or skipValueInStream.
+static const uint64_t kMaxReplayDecodeArrayElementCount = 1000000;
+
+// Keep text dumps useful and bounded: display the first elements, then skip the rest
+// through the same guarded traversal used by ordinary skipping.
+static const uint64_t kMaxDisplayedArrayElementCount = 100;
+
+void reportReplayDecodeError(const char* message)
+{
+    // These checks reject malformed external replay data. Use the decoder's existing
+    // exception path so public dump APIs can catch and print an ERROR line; a
+    // SLANG_RELEASE_ASSERT would turn a bad replay file into a process abort.
+    throw Slang::Exception(message);
+}
+
+void checkReplayDecodeNestingDepth(int recursionDepth)
+{
+    if (recursionDepth > kMaxReplayDecodeNestingDepth)
+        reportReplayDecodeError("Maximum replay decode nesting depth exceeded");
+}
+
+void validateReplayDecodeArrayElementCount(ReplayStream& stream, uint64_t count)
+{
+    if (count > kMaxReplayDecodeArrayElementCount)
+        reportReplayDecodeError("Array element count exceeds decoder limit");
+
+    size_t position = stream.getPosition();
+    size_t size = stream.getSize();
+    uint64_t remainingBytes = position < size ? uint64_t(size - position) : 0;
+
+    // Each serialized array element has at least a one-byte TypeId. Reject impossible counts
+    // before recursively walking the array.
+    if (count > remainingBytes)
+        reportReplayDecodeError("Array element count exceeds remaining stream bytes");
+}
+
+uint64_t readReplayDecodeArrayElementCount(ReplayStream& stream)
+{
+    uint8_t countTypeValue;
+    stream.read(&countTypeValue, sizeof(countTypeValue));
+    TypeId countType = static_cast<TypeId>(countTypeValue);
+    if (countType != TypeId::UInt64)
+        reportReplayDecodeError("Array element count has invalid type");
+
+    uint64_t count;
+    stream.read(&count, sizeof(count));
+    validateReplayDecodeArrayElementCount(stream, count);
+    return count;
+}
+
+} // namespace
+
 // =============================================================================
 // Public Static API - Full Stream Decoding
 // =============================================================================
@@ -143,6 +204,17 @@ void ReplayStreamDecoder::decodeValueFromStream(
     StringBuilder& output,
     int indentLevel)
 {
+    decodeValueFromStream(stream, output, indentLevel, 0);
+}
+
+void ReplayStreamDecoder::decodeValueFromStream(
+    ReplayStream& stream,
+    StringBuilder& output,
+    int indentLevel,
+    int recursionDepth)
+{
+    checkReplayDecodeNestingDepth(recursionDepth);
+
     TypeId type = readTypeId(stream);
 
     switch (type)
@@ -370,26 +442,26 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::Array:
         {
-            uint64_t count;
-            stream.skip(1); // the type of the count (1B, should be TypeId::UInt64)
-            stream.read(&count, sizeof(count));
+            uint64_t count = readReplayDecodeArrayElementCount(stream);
 
             output << "Array[" << count << "]:";
-            for (uint64_t i = 0; i < count && i < 100; i++)
+            uint64_t displayedCount =
+                count < kMaxDisplayedArrayElementCount ? count : kMaxDisplayedArrayElementCount;
+            for (uint64_t i = 0; i < displayedCount; i++)
             {
                 output << "\n";
                 indent(output, indentLevel + 1);
                 output << "[" << i << "] ";
-                decodeValueFromStream(stream, output, indentLevel + 1);
+                decodeValueFromStream(stream, output, indentLevel + 1, recursionDepth + 1);
             }
-            if (count > 100)
+            if (count > kMaxDisplayedArrayElementCount)
             {
                 output << "\n";
                 indent(output, indentLevel + 1);
-                output << "... (" << (count - 100) << " more elements)";
+                output << "... (" << (count - kMaxDisplayedArrayElementCount) << " more elements)";
                 // Skip remaining elements
-                for (uint64_t i = 100; i < count; ++i)
-                    skipValueInStream(stream);
+                for (uint64_t i = kMaxDisplayedArrayElementCount; i < count; ++i)
+                    skipValueInStream(stream, recursionDepth + 1);
             }
         }
         break;
@@ -428,7 +500,14 @@ String ReplayStreamDecoder::decodeValueFromBytes(const void* data, size_t size)
 {
     ReplayStream stream(data, size);
     StringBuilder output;
-    decodeValueFromStream(stream, output, 0);
+    try
+    {
+        decodeValueFromStream(stream, output, 0);
+    }
+    catch (const Slang::Exception& e)
+    {
+        output << "ERROR: " << e.Message.getBuffer();
+    }
     return output.produceString();
 }
 
@@ -479,6 +558,13 @@ void ReplayStreamDecoder::decodeByteRange(
 
 void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)
 {
+    skipValueInStream(stream, 0);
+}
+
+void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream, int recursionDepth)
+{
+    checkReplayDecodeNestingDepth(recursionDepth);
+
     TypeId type = readTypeId(stream);
 
     switch (type)
@@ -548,11 +634,9 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)
 
     case TypeId::Array:
         {
-            uint64_t count;
-            stream.skip(1); // the type of the count (1B, should be TypeId::UInt64)
-            stream.read(&count, sizeof(count));
+            uint64_t count = readReplayDecodeArrayElementCount(stream);
             for (uint64_t i = 0; i < count; i++)
-                skipValueInStream(stream);
+                skipValueInStream(stream, recursionDepth + 1);
         }
         break;
 

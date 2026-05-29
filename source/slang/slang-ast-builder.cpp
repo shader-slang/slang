@@ -463,6 +463,36 @@ Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const c
     return rsType;
 }
 
+Type* ASTBuilder::getForwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("ForwardDiffFuncInterfaceType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayView({as<Val>(baseType), as<Val>(typeInfoWitness)})));
+}
+
+Type* ASTBuilder::getBackwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("BwdDiffFuncInterfaceType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayView({as<Val>(baseType), as<Val>(typeInfoWitness)})));
+}
+
+Type* ASTBuilder::getBwdCallableBaseType(Type* baseType, Witness* typeInfoWitness)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("BwdCallableBaseType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayView({as<Val>(baseType), as<Val>(typeInfoWitness)})));
+}
+
 Type* ASTBuilder::getMagicEnumType(const char* magicEnumName)
 {
     auto& cache = getSharedASTBuilder()->m_magicEnumTypes;
@@ -712,6 +742,13 @@ DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterfaceDecl()
     return declRef;
 }
 
+DeclRef<InterfaceDecl> ASTBuilder::getFunctionBaseInterfaceDecl()
+{
+    DeclRef<InterfaceDecl> declRef =
+        DeclRef<InterfaceDecl>(getBuiltinDeclRef("FunctionBaseType", nullptr));
+    return declRef;
+}
+
 DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableRefInterfaceDecl()
 {
     DeclRef<InterfaceDecl> declRef =
@@ -759,6 +796,11 @@ MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
 Type* ASTBuilder::getDifferentiableInterfaceType()
 {
     return DeclRefType::create(this, getDifferentiableInterfaceDecl());
+}
+
+Type* ASTBuilder::getFunctionBaseType()
+{
+    return DeclRefType::create(this, getFunctionBaseInterfaceDecl());
 }
 
 Type* ASTBuilder::getDifferentiableRefInterfaceType()
@@ -858,8 +900,8 @@ FuncType* ASTBuilder::getFuncType(ArrayView<Type*> parameters, Type* result, Typ
 TupleType* ASTBuilder::getTupleType(ArrayView<Type*> types)
 {
     // The canonical form of a tuple type is always a DeclRefType(GenAppDeclRef(TupleDecl,
-    // ConcreteTypePack(types...))). If `types` is already a single ConcreteTypePack, then we can
-    // use that directly.
+    // ConcreteTypePack(types...))). If `types` is already a single ConcreteTypePack, then we
+    // can use that directly.
     if (types.getCount() == 1)
     {
         if (isTypePack(types[0]))
@@ -1336,6 +1378,12 @@ NonEmptyPackWitness* ASTBuilder::getNonEmptyPackWitness(Val* pack)
     return getOrCreate<NonEmptyPackWitness>(pack);
 }
 
+HasDiffTypeInfoWitness* ASTBuilder::getHasDiffTypeInfoWitness(
+    DeclRef<HasDiffTypeInfoConstraintDecl> declRef)
+{
+    return getOrCreate<HasDiffTypeInfoWitness>(declRef);
+}
+
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(Type* type)
 {
     return getOrCreate<TypeEqualityWitness>(type, type);
@@ -1481,18 +1529,18 @@ top:
     {
         return bIsSubtypeOfCWitness;
     }
-    else if (auto declAIsSubtypeOfBWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
+
+    if (as<TypeEqualityWitness>(bIsSubtypeOfCWitness))
+    {
+        return aIsSubtypeOfBWitness;
+    }
+
+    if (auto declAIsSubtypeOfBWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
     {
         if (declAIsSubtypeOfBWitness->isEquality())
             return bIsSubtypeOfCWitness;
     }
 
-    // Similarly, if `b == c`, then the `a <: b` witness is a witness for `a <: c`
-    //
-    if (as<TypeEqualityWitness>(bIsSubtypeOfCWitness))
-    {
-        return aIsSubtypeOfBWitness;
-    }
     else if (auto declBIsSubtypeOfCWitness = as<DeclaredSubtypeWitness>(bIsSubtypeOfCWitness))
     {
         if (declBIsSubtypeOfCWitness->isEquality())

@@ -48,4 +48,5 @@ void computeMain()
     ISelfOp copy = obj.clone();
     outputBuffer[0] = obj.matches(copy) ? 1.0 : 0.0;
 //CHECK: type mismatch in expression
+//CHECK: the concrete 'This' type identity is lost after type erasure
 }

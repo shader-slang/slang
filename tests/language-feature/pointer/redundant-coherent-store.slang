@@ -15,9 +15,10 @@ void computeMain(uint3 group_thread_id: SV_GroupThreadID)
     if (group_thread_id.x == 0)
     {
         // This store will not optimize out, Device > Invocation.
-        // SPIRV: OpStore %ptr %int_1
+        // SPIRV: %[[#PTR:]] = OpPtrAccessChain {{.*}} %int_0
+        // SPIRV: OpStore %[[#PTR]] %int_1
         storeCoherent<4, MemoryScope::Device>(ptr, 1);
-        // SPIRV-NEXT: OpStore %ptr %int_2
+        // SPIRV-NEXT: OpStore %[[#PTR]] %int_2
         storeCoherent<4, MemoryScope::Invocation>(ptr, 2);
 
         // Both of these stores will optimize out, Subgroup > Invocation.

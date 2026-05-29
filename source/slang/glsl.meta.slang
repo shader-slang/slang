@@ -2455,7 +2455,7 @@ public vector<T.Element,4> textureLod(_Texture<
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
 {
     __target_switch
@@ -2473,13 +2473,16 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
     }
 }
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_shadowlod_ext)]
 public float textureLod(sampler2DArrayShadow sampler, vec4 p, float lod)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod";
     case spirv:
     {
         float compareValue = p.w;
@@ -2492,22 +2495,38 @@ public float textureLod(sampler2DArrayShadow sampler, vec4 p, float lod)
     }
 }
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_shadowlod_ext)]
 public float textureLod(samplerCubeShadow sampler, vec4 p, float lod)
 {
-    return sampler.SampleCmpLevel(p.xyz, p.w, lod);
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        return sampler.SampleCmpLevel(p.xyz, p.w, lod);
+    default:
+        return sampler.SampleCmpLevel(p.xyz, p.w, lod);
+    }
 }
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_shadowlod_ext)]
 public float textureLod(samplerCubeArrayShadow sampler, vec4 p, float compareValue, float lod)
 {
-    return sampler.SampleCmpLevel(p, compareValue, lod);
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        return sampler.SampleCmpLevel(p, compareValue, lod);
+    default:
+        return sampler.SampleCmpLevel(p, compareValue, lod);
+    }
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 {
     __target_switch
@@ -2526,7 +2545,7 @@ public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
 {
     __target_switch
@@ -3194,7 +3213,7 @@ public vector<T.Element,4> textureLodOffset(_Texture<
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, constexpr int offset)
 {
     __target_switch
@@ -3214,7 +3233,7 @@ public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, conste
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, constexpr ivec2 offset)
 {
     __target_switch
@@ -3234,7 +3253,7 @@ public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, conste
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLodOffset(sampler1DArrayShadow sampler, vec3 p, float lod, constexpr int offset)
 {
     __target_switch
@@ -4451,6 +4470,10 @@ __generic<T : __BuiltinType>
     }
 }
 
+// Typed pointer to an image texel used by image atomic spirv_asm snippets.
+internal typealias __ImagePtr<T> =
+    Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::Image)>;
+
 ${
 {
     struct ImageTypeInfo
@@ -4667,8 +4690,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) %ptr Device None $data
                 };
             }
@@ -4690,8 +4712,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicExchange %ptr Device Relaxed $data
                 };
             }
@@ -4713,8 +4734,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
                 };
             }
@@ -4736,8 +4756,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
                 };
             }
@@ -4762,8 +4781,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicAnd %ptr Device Relaxed $data
                 };
             }
@@ -4784,8 +4802,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicOr %ptr Device Relaxed $data
                 };
             }
@@ -4807,8 +4824,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicXor %ptr Device Relaxed $data
                 };
             }
@@ -4829,8 +4845,7 @@ $}
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptrType = OpTypePointer Image $$$(targetType.type);
-                    %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
+                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
                     result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device Relaxed Relaxed $data $compare
                 };
             }
@@ -7263,19 +7278,10 @@ public property uint gl_NumSubgroups
 
 public property uint gl_SubgroupID
 {
+    [ForceInline]
     [require(glsl_spirv, subgroup_basic)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_SubgroupID)";
-        case spirv:
-            return spirv_asm {
-                        OpCapability GroupNonUniform;
-                        result:$$uint = OpLoad builtin(SubgroupId:uint);
-                    };
-        }
+        return WaveGetWaveIndex();
     }
 }
 
@@ -10591,7 +10597,7 @@ $}
     __generic<T>
     [__NoSideEffect]
     [ForceInline]
-    [require(glsl_hlsl_spirv, subpass)]
+    [require(glsl_hlsl_metal_spirv, subpass)]
     public T subpassLoad(__SubpassImpl<T,0> subpass)
     {
         return subpass.SubpassLoad();
@@ -10599,7 +10605,7 @@ $}
     __generic<T>
     [__NoSideEffect]
     [ForceInline]
-    [require(glsl_hlsl_spirv, subpass)]
+    [require(glsl_hlsl_metal_spirv, subpass)]
     public T subpassLoad(__SubpassImpl<T,1> subpass, int sample)
     {
         return subpass.SubpassLoad(sample);

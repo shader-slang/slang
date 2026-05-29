@@ -9,10 +9,12 @@
 
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <mutex>
 #include <slang-com-helper.h>
 #include <slang-com-ptr.h>
 #include <slang.h>
+#include <type_traits>
 
 namespace SlangRecord
 {
@@ -52,6 +54,14 @@ constexpr uint64_t kCustomFileSystemHandle =
 constexpr uint64_t kDefaultFileSystemHandle =
     3; ///< Default file system (when user doesn't provide one)
 constexpr uint64_t kFirstValidHandle = 0x100; ///< First handle for tracked objects
+
+/// Replay file sanity limits. They bound attacker-controlled allocation sizes
+/// before deserializers allocate replay-owned buffers.
+constexpr uint32_t kMaxReplayStringLength = 64 * 1024 * 1024;
+constexpr uint64_t kMaxReplayArrayCount = 16 * 1024 * 1024;
+constexpr size_t kMaxReplayArrayAllocationSize = 64 * 1024 * 1024;
+constexpr size_t kMaxReplayTotalAllocationSize = 256 * 1024 * 1024;
+constexpr size_t kMaxReplayAllocationToStreamSizeRatio = 16;
 
 /// Fixed-size index entry for the call index stream.
 /// Each entry stores only the byte offset of a call in stream.bin.
@@ -198,6 +208,53 @@ private:
     size_t m_offset, m_size;
 };
 
+/// Require the current playback stream position to contain a byte range.
+inline void requireReplayStreamBytes(const ReplayStream& stream, size_t offset, size_t size)
+{
+    const size_t streamPosition = stream.getPosition();
+    const size_t streamSize = stream.getSize();
+    if (streamPosition > streamSize || size > streamSize - streamPosition)
+        throw DataMismatchException(offset, size);
+}
+
+/// Validate a replayed array count before allocation and element deserialization.
+inline void validateReplayArrayCount(
+    const ReplayStream& stream,
+    uint64_t arrayCount,
+    uint64_t maxCountForCountType,
+    size_t elementSize,
+    size_t minStreamBytesPerElement,
+    size_t countOffset)
+{
+    if (arrayCount > maxCountForCountType || arrayCount > kMaxReplayArrayCount)
+        throw DataMismatchException(countOffset, sizeof(arrayCount));
+
+    if (arrayCount > uint64_t((std::numeric_limits<size_t>::max)()))
+        throw DataMismatchException(countOffset, sizeof(arrayCount));
+
+    const size_t sizeCount = static_cast<size_t>(arrayCount);
+    if (elementSize == 0 || minStreamBytesPerElement == 0 ||
+        sizeCount > kMaxReplayArrayAllocationSize / elementSize)
+        throw DataMismatchException(countOffset, sizeof(arrayCount));
+
+    const size_t streamPosition = stream.getPosition();
+    const size_t streamSize = stream.getSize();
+    if (streamPosition > streamSize)
+        throw DataMismatchException(streamPosition, sizeof(arrayCount));
+
+    const size_t bytesAvailable = streamSize - streamPosition;
+    if (arrayCount > uint64_t(bytesAvailable / minStreamBytesPerElement))
+        throw DataMismatchException(streamPosition, sizeof(arrayCount));
+}
+
+template<typename T>
+inline constexpr size_t getReplayArrayMinStreamBytesPerElement()
+{
+    using ElementType = typename std::remove_cv<T>::type;
+    return (std::is_arithmetic<ElementType>::value || std::is_enum<ElementType>::value) ? sizeof(T)
+                                                                                        : 1;
+}
+
 /// Unified serializer for binary I/O during record/replay.
 /// Provides a uniform API for both reading and writing serialized data.
 /// Owns its own ReplayStream and MemoryArena internally.
@@ -213,6 +270,18 @@ public:
     /// Get the global singleton instance (for recording).
     /// Thread-safe. The singleton starts in Idle or Record mode based on env var.
     SLANG_API static ReplayContext& get();
+
+    /// Return the singleton if it has already been constructed, or nullptr.
+    /// Thread-safe - uses a mutex to synchronize with get().
+    /// Use this in cleanup paths (e.g. slang_shutdown) to avoid constructing
+    /// the singleton just to tear it down.
+    SLANG_API static ReplayContext* tryGet();
+
+    /// Destroy the singleton instance if it exists, freeing all resources.
+    /// Thread-safe - uses a mutex to synchronize with get() and tryGet().
+    /// Safe to call when no singleton exists (no-op). After this call,
+    /// get() will lazily re-create a fresh instance if called again.
+    SLANG_API static void destroySingleton();
 
     /// Create an idle context.
     /// Will switch to Record mode if SLANG_RECORD_LAYER=1 is set.
@@ -315,6 +384,14 @@ public:
     SLANG_API ReplayStream& getStream() { return m_stream; }
     SLANG_API const ReplayStream& getStream() const { return m_stream; }
     SLANG_API MemoryArena& getArena() { return m_arena; }
+    SLANG_API size_t testsOnlyGetReplayArenaAllocationSize() const
+    {
+        return m_replayArenaAllocationSize;
+    }
+    SLANG_API void testsOnlyRequireReplayArenaAllocation(size_t offset, size_t size)
+    {
+        requireReplayArenaAllocation(offset, size);
+    }
 
     /// Lock the context for thread-safe access.
     /// Returns an RAII lock guard.
@@ -672,10 +749,14 @@ private:
     SLANG_API void setupRecordingMirror();
     SLANG_API void closeRecordingMirror();
     SLANG_API static String generateTimestampFolderName();
+    SLANG_API void requireReplayArenaAllocation(size_t offset, size_t size);
 
     /// Record a COM interface pointer (internal implementation).
     template<typename T>
     void recordInterfaceImpl(RecordFlag flags, T*& obj);
+
+    template<typename T, typename CountT>
+    T* readArrayInPlayback(RecordFlag flags, CountT& count);
 
     // Core streams + mutex
     std::recursive_mutex m_mutex;
@@ -683,6 +764,7 @@ private:
     ReplayStream m_indexStream;     ///< Index stream for call navigation (index.bin)
     ReplayStream m_referenceStream; ///< Reference stream for sync mode comparison
     MemoryArena m_arena;
+    size_t m_replayArenaAllocationSize = 0;
     Mode m_mode;
     List<uint8_t> m_compareBuffer; ///< Reusable buffer for sync comparisons
 
@@ -715,6 +797,36 @@ private:
 // Template implementations
 
 template<typename T, typename CountT>
+T* ReplayContext::readArrayInPlayback(RecordFlag flags, CountT& count)
+{
+    expectTypeId(TypeId::Array);
+    uint64_t arrayCount;
+    record(flags, arrayCount);
+    size_t countOffset = m_stream.getPosition() - sizeof(arrayCount);
+    validateReplayArrayCount(
+        m_stream,
+        arrayCount,
+        uint64_t((std::numeric_limits<CountT>::max)()),
+        sizeof(T),
+        getReplayArrayMinStreamBytesPerElement<T>(),
+        countOffset);
+    count = static_cast<CountT>(arrayCount);
+    if (arrayCount == 0)
+        return nullptr;
+
+    size_t sizeCount = static_cast<size_t>(arrayCount);
+    size_t allocationSize = sizeCount * sizeof(T);
+    requireReplayArenaAllocation(countOffset, allocationSize);
+    T* buf = m_arena.allocateArray<T>(sizeCount);
+    for (size_t i = 0; i < sizeCount; ++i)
+    {
+        new (&buf[i]) T{};
+        record(flags, buf[i]);
+    }
+    return buf;
+}
+
+template<typename T, typename CountT>
 void ReplayContext::recordArray(RecordFlag flags, T*& arr, CountT& count)
 {
     if (m_mode == Mode::Idle)
@@ -729,24 +841,7 @@ void ReplayContext::recordArray(RecordFlag flags, T*& arr, CountT& count)
     }
     else
     {
-        expectTypeId(TypeId::Array);
-        uint64_t arrayCount;
-        record(flags, arrayCount);
-        count = static_cast<CountT>(arrayCount);
-        if (arrayCount > 0)
-        {
-            T* buf = m_arena.allocateArray<T>(static_cast<size_t>(arrayCount));
-            for (uint64_t i = 0; i < arrayCount; ++i)
-            {
-                new (&buf[i]) T{};
-                record(flags, buf[i]);
-            }
-            arr = buf;
-        }
-        else
-        {
-            arr = nullptr;
-        }
+        arr = readArrayInPlayback<T>(flags, count);
     }
 }
 
@@ -765,24 +860,7 @@ void ReplayContext::recordArray(RecordFlag flags, const T*& arr, CountT& count)
     }
     else
     {
-        expectTypeId(TypeId::Array);
-        uint64_t arrayCount;
-        record(flags, arrayCount);
-        count = static_cast<CountT>(arrayCount);
-        if (arrayCount > 0)
-        {
-            T* buf = m_arena.allocateArray<T>(static_cast<size_t>(arrayCount));
-            for (uint64_t i = 0; i < arrayCount; ++i)
-            {
-                new (&buf[i]) T{};
-                record(flags, buf[i]);
-            }
-            arr = buf;
-        }
-        else
-        {
-            arr = nullptr;
-        }
+        arr = readArrayInPlayback<T>(flags, count);
     }
 }
 

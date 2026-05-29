@@ -179,6 +179,12 @@ Versions
 `cuda_sm_8_0`
 > cuda 8.0 and related capabilities of other targets.
 
+`cuda_sm_8_9`
+> cuda 8.9 (Ada Lovelace) and related capabilities of other targets.  Required
+> for PTX features that landed in PTX ISA 8.7 / SM 8.9, notably the
+> `mma.sync.m16n8k16` instruction with `.e4m3` / `.e5m2` floating-point inputs
+> (FP8 cooperative matrices).
+
 `cuda_sm_9_0`
 > cuda 9.0 and related capabilities of other targets.
 
@@ -223,6 +229,9 @@ Versions
 
 `metallib_3_1`
 > Represents MetalLib 3.1.
+
+`metallib_4_0`
+> Represents MetalLib 4.0.
 
 `metallib_latest`
 > Represents the latest MetalLib version.
@@ -783,11 +792,17 @@ Extensions
 `spvFragmentShaderPixelInterlockEXT`
 > Represents the SPIR-V capability for using SPV_EXT_fragment_shader_interlock.
 
+`spvGroupNonUniform`
+> Represents the SPIR-V GroupNonUniform capability (basic subgroup operations).
+
 `spvGroupNonUniformArithmetic`
 > Represents the SPIR-V capability for group non-uniform arithmetic operations.
 
 `spvGroupNonUniformBallot`
 > Represents the SPIR-V capability for group non-uniform ballot operations.
+
+`spvGroupNonUniformClustered`
+> Represents the SPIR-V capability for group non-uniform clustered operations.
 
 `spvGroupNonUniformPartitionedNV`
 > Represents the SPIR-V capability for group non-uniform partitioned operations.
@@ -800,6 +815,9 @@ Extensions
 
 `spvGroupNonUniformShuffle`
 > Represents the SPIR-V capability for group non-uniform shuffle operations.
+
+`spvGroupNonUniformShuffleRelative`
+> Represents the SPIR-V capability for group non-uniform shuffle relative operations.
 
 `spvGroupNonUniformVote`
 > Represents the SPIR-V capability for group non-uniform vote operations.
@@ -1093,6 +1111,9 @@ Compound Capabilities
 `cpp_cuda_metal_spirv`
 > CPP, CUDA, Metal, and SPIRV code-gen targets
 
+`cpp_cuda_metal_spirv_llvm`
+> CPP, CUDA, Metal, SPIRV, and LLVM code-gen targets
+
 `cpp_cuda_spirv`
 > CPP, CUDA and SPIRV code-gen targets
 
@@ -1158,6 +1179,9 @@ Compound Capabilities
 
 `cuda_hlsl_spirv`
 > CUDA, HLSL, SPIRV code-gen targets
+
+`cuda_metal_spirv`
+> CUDA, Metal and SPIRV code-gen targets
 
 `cuda_spirv`
 > CUDA and SPIRV code-gen targets
@@ -1235,6 +1259,9 @@ Compound Capabilities
 > @remark Implicit derivatives for the compute stage can be enabled by declaring capability `GL_NV_compute_shader_derivatives` (GLSL),
 > `SPV_KHR_compute_shader_derivatives` (SPIR-V), or profile `cs_6_6` (HLSL).
 > 
+
+`mem_model`
+> Capabilities needed to use memory model
 
 `memorybarrier`
 > Capabilities required to use sm_5_0 style memory barriers
@@ -1477,7 +1504,14 @@ Compound Capabilities
 > New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 
 `texture_shadowlod`
-> Capabilities required to query shadow texture lod info
+> Capabilities required for shadow texture LOD sampling on types
+> natively supported by GLSL 1.50 (sampler1DShadow, sampler1DArrayShadow,
+> sampler2DShadow).
+
+`texture_shadowlod_ext`
+> Capabilities required for shadow texture LOD sampling on types
+> that need GL_EXT_texture_shadow_lod (sampler2DArrayShadow, samplerCubeShadow,
+> samplerCubeArrayShadow).
 
 `texture_size`
 > Capabilities required to query texture sample info
@@ -1585,6 +1619,9 @@ Other
 
 `METAL_3_1`
 > Use `metallib_3_1` instead
+
+`METAL_4_0`
+> Use `metallib_4_0` instead
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead

@@ -54,6 +54,7 @@ struct RequiredLoweringPassSet
     bool debugInfo;
     bool resultType;
     bool optionalType;
+    bool conditionalType;
     bool enumType;
     bool combinedTextureSamplers;
     bool reinterpret;
@@ -75,6 +76,8 @@ struct RequiredLoweringPassSet
     bool specializeStageSwitch;
     bool missingReturn;
     bool nonVectorCompositeSelect;
+    bool matrixSwizzleStore;
+    bool coverageTracing;
 };
 
 /// A context for code generation in the compiler back-end
@@ -175,6 +178,8 @@ public:
     bool shouldDumpIR();
     bool shouldReportCheckpointIntermediates();
     bool shouldReportDynamicDispatchSites();
+    bool shouldTraceCoverage();
+    bool shouldTraceAnyCoverage();
 
     bool shouldTrackLiveness();
 

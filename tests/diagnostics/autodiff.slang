@@ -30,9 +30,7 @@ float m(float x)
     float x1 = no_diff x; // invalid use of no_diff here.
 //CHECK:       ^^^^^^^ invalid 'no_diff' usage
 //CHECK:       ^^^^^^^ 'no_diff' can only be used to decorate a call or a subscript operation
-    return no_diff f(x);  // no_diff on a differentiable call has no meaning.
-//CHECK:   ^^^^^^^ 'no_diff' on differentiable function has no meaning
-//CHECK:   ^^^^^^^ use 'no_diff' on a call to a differentiable function has no meaning.
+    return no_diff f(x);
 }
 
 float n(float x)

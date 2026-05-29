@@ -1,0 +1,13 @@
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: slang-compiler
+Description: Slang shading language compiler library
+Version: @SLANG_VERSION_NUMERIC@
+Libs: -L${libdir} -lslang-compiler
+Cflags: -I${includedir}
+
+# Note: pkg-config --static is not currently supported,
+# so Libs.private is not populated.

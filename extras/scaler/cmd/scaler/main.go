@@ -68,6 +68,8 @@ type config struct {
 	gcpPlatform         string
 	gcpVMPrefix         string
 	gcpCleanupInterval  time.Duration
+	sessionMaxAge       time.Duration
+	orphanGracePeriod   time.Duration
 }
 
 func (c *config) buildLabels() []scaleset.Label {
@@ -149,8 +151,16 @@ func parseFlags() config {
 	flag.StringVar(&cfg.gcpPlatform, "platform", "windows", "Runner platform: windows or linux")
 	flag.StringVar(&cfg.gcpVMPrefix, "vm-prefix", "", "VM name prefix (default: win-test for windows, linux-test for linux)")
 	flag.DurationVar(&cfg.gcpCleanupInterval, "gcp-cleanup-interval", 2*time.Minute, "Interval for scanning and deleting terminated VMs")
+	flag.DurationVar(&cfg.sessionMaxAge, "session-max-age", 0, "Maximum age before draining and recreating the GitHub scale-set session (0 disables)")
+	flag.DurationVar(&cfg.orphanGracePeriod, "orphan-grace-period", 0, "Time a tracked VM may stay idle (never marked busy) before the cleanup loop evicts it as an orphan (0 uses the package default; negative disables)")
 
 	flag.Parse()
+
+	if err := validateSessionMaxAge(cfg.sessionMaxAge); err != nil {
+		fmt.Fprintf(os.Stderr, "error: invalid --session-max-age: %v\n", err)
+		flag.Usage()
+		os.Exit(1)
+	}
 
 	if cfg.registrationURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --url is required")
@@ -191,6 +201,22 @@ func parseFlags() config {
 		}
 		cfg.gcpCleanupInterval = d
 	}
+	if v := os.Getenv("SCALER_SESSION_MAX_AGE"); v != "" {
+		d, err := parseSessionMaxAge(v)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: invalid SCALER_SESSION_MAX_AGE: %v\n", err)
+			os.Exit(1)
+		}
+		cfg.sessionMaxAge = d
+	}
+	if v := os.Getenv("SCALER_ORPHAN_GRACE_PERIOD"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: invalid SCALER_ORPHAN_GRACE_PERIOD %q: %v\n", v, err)
+			os.Exit(1)
+		}
+		cfg.orphanGracePeriod = d
+	}
 
 	return cfg
 }
@@ -201,6 +227,24 @@ func parseCleanupInterval(v string) (time.Duration, error) {
 		return 0, fmt.Errorf("%q: %w", v, err)
 	}
 	return d, nil
+}
+
+func parseSessionMaxAge(v string) (time.Duration, error) {
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0, fmt.Errorf("%q: %w", v, err)
+	}
+	if err := validateSessionMaxAge(d); err != nil {
+		return 0, fmt.Errorf("%q: %w", v, err)
+	}
+	return d, nil
+}
+
+func validateSessionMaxAge(d time.Duration) error {
+	if d < 0 {
+		return fmt.Errorf("must be non-negative")
+	}
+	return nil
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
@@ -270,14 +314,6 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		ScaleSetID: ss.ID,
 	})
 
-	// Clean up scale set on exit
-	defer func() {
-		logger.Info("deleting scale set", "id", ss.ID)
-		if err := ssClient.DeleteRunnerScaleSet(context.WithoutCancel(ctx), ss.ID); err != nil {
-			logger.Error("failed to delete scale set", "error", err)
-		}
-	}()
-
 	// Runner name prefix
 	vmPrefix := cfg.gcpVMPrefix
 	if vmPrefix == "" {
@@ -290,13 +326,14 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 
 	// Initialize GCP VM manager
 	vmManager, err := gcpvm.NewManager(ctx, gcpvm.ManagerConfig{
-		Project:          cfg.gcpProject,
-		Zones:            cfg.gcpZones,
-		InstanceTemplate: cfg.gcpInstanceTemplate,
-		GPUType:          cfg.gcpGPUType,
-		Platform:         cfg.gcpPlatform,
-		VMPrefix:         vmPrefix,
-		CleanupInterval:  cfg.gcpCleanupInterval,
+		Project:           cfg.gcpProject,
+		Zones:             cfg.gcpZones,
+		InstanceTemplate:  cfg.gcpInstanceTemplate,
+		GPUType:           cfg.gcpGPUType,
+		Platform:          cfg.gcpPlatform,
+		VMPrefix:          vmPrefix,
+		CleanupInterval:   cfg.gcpCleanupInterval,
+		OrphanGracePeriod: cfg.orphanGracePeriod,
 	})
 	if err != nil {
 		return fmt.Errorf("creating GCP VM manager: %w", err)
@@ -336,20 +373,67 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		vmPrefix:       vmPrefix,
 	}
 
+	// Clean up scale set on exit, except after a graceful drain. A scaler
+	// that exits via drain mode (SIGUSR1, --session-max-age, or systemctl
+	// reload) is being restarted, not decommissioned — preserving the scale
+	// set lets the next instance reuse the same ID via GetRunnerScaleSet
+	// above, so any in-flight runners keep their JIT registration valid.
+	// Deleting the scale set under a live runner orphans it in a
+	// "Registration not found" retry loop (#11067).
+	//
+	// This defer is declared before defer gcpScaler.shutdown(...) below so
+	// that LIFO ordering runs shutdown first; isDraining() then reflects
+	// the post-shutdown state.
+	defer func() {
+		if gcpScaler.isDraining() {
+			logger.Info("preserving scale set for next scaler instance",
+				"id", ss.ID, "active_vms", vmManager.ActiveCount())
+			return
+		}
+		logger.Info("deleting scale set", "id", ss.ID)
+		if err := ssClient.DeleteRunnerScaleSet(context.WithoutCancel(ctx), ss.ID); err != nil {
+			logger.Error("failed to delete scale set", "error", err)
+		}
+	}()
+
 	// SIGUSR1 enters drain mode: stop accepting new jobs, wait for running
 	// jobs to finish. This enables seamless binary updates:
 	//   1. Send SIGUSR1 (or: systemctl reload scaler-windows)
 	//   2. Wait for "all VMs finished, exiting drain mode" in logs
 	//   3. Send SIGTERM (or: systemctl stop scaler-windows)
 	//   4. Replace binary, restart service
+	var drainOnce sync.Once
+	requestDrain := func(reason string) {
+		drainOnce.Do(func() {
+			logger.Info("entering drain mode: no new jobs will be accepted, waiting for running VMs to finish", "reason", reason)
+			gcpScaler.setDraining(true)
+			lst.SetMaxRunners(0)
+		})
+	}
+
 	drainCh := make(chan os.Signal, 1)
 	signal.Notify(drainCh, syscall.SIGUSR1)
+	defer signal.Stop(drainCh)
 	go func() {
-		<-drainCh
-		logger.Info("entering drain mode: no new jobs will be accepted, waiting for running VMs to finish")
-		lst.SetMaxRunners(0)
-		gcpScaler.setDraining(true)
+		select {
+		case <-drainCh:
+			requestDrain("signal")
+		case <-ctx.Done():
+		}
 	}()
+
+	if cfg.sessionMaxAge > 0 {
+		go func() {
+			timer := time.NewTimer(cfg.sessionMaxAge)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+				requestDrain("session_max_age")
+			case <-ctx.Done():
+			}
+		}()
+		logger.Info("session max age enabled", "duration", cfg.sessionMaxAge)
+	}
 
 	defer gcpScaler.shutdown(context.WithoutCancel(ctx))
 

@@ -56,6 +56,7 @@ include(SlangTarget)
 include(AutoOption)
 include(GitHubRelease)
 include(FetchedSharedLibrary)
+include(CheckSecureCRT)
 
 #
 # Options
@@ -126,6 +127,7 @@ option(
 option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
+option(SLANG_ENABLE_VALIDATION_VM_BYTECODE "Enable VM bytecode validation" ON)
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(
     SLANG_IGNORE_ABORT_MSG
@@ -152,7 +154,6 @@ option(
     ON
 )
 
-option(SLANG_ENABLE_PREBUILT_BINARIES "Enable using prebuilt binaries" ON)
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
 option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
 option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
@@ -304,11 +305,19 @@ advanced_option(
     OFF
 )
 
+set(SLANG_EXCLUDE_DAWN_DEFAULT ON)
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(SLANG_EXCLUDE_DAWN_DEFAULT OFF)
+endif()
 advanced_option(
     SLANG_EXCLUDE_DAWN
-    "Optionally exclude webgpu_dawn from the build"
-    OFF
+    "Optionally exclude Dawn WebGPU support from the build"
+    ${SLANG_EXCLUDE_DAWN_DEFAULT}
 )
+set(SLANG_HAS_WEBGPU_SUPPORT OFF)
+if(NOT SLANG_EXCLUDE_DAWN)
+    set(SLANG_HAS_WEBGPU_SUPPORT ON)
+endif()
 
 advanced_option(
     SLANG_EXCLUDE_TINT
@@ -389,7 +398,7 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     )
 endif()
 
-if(NOT SLANG_EXCLUDE_DAWN)
+if(SLANG_HAS_WEBGPU_SUPPORT)
     if(NOT DEFINED SLANG_WEBGPU_DAWN_BINARY_URL)
         set(webgpu_dawn_release_tag "webgpu_dawn-0")
         if(
@@ -541,6 +550,10 @@ if(${SLANG_USE_SYSTEM_GLSLANG})
     endif()
 endif()
 
+if(SLANG_ENABLE_DXIL)
+    include(FetchDXC)
+endif()
+
 add_subdirectory(external)
 
 # webgpu_dawn is only available as a fetched shared library, since Dawn's nested source
@@ -647,6 +660,21 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
             NAMESPACE ${PROJECT_NAME}::
             DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
         )
+
+        if(UNIX)
+            configure_file(
+                "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
+                "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+                @ONLY
+            )
+
+            # TODO: When build system is changed to respect CMAKE_INSTALL_LIBDIR,
+            # update this destination.
+            install(
+                FILES "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+                DESTINATION "lib/pkgconfig"
+            )
+        endif()
     endif()
 endif()
 

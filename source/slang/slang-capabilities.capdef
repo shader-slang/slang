@@ -198,9 +198,13 @@ def metallib_3_0 : metallib_2_4;
 /// [Version]
 def metallib_3_1 : metallib_3_0;
 
+/// Represents MetalLib 4.0.
+/// [Version]
+def metallib_4_0 : metallib_3_1;
+
 /// Represents the latest MetalLib version.
 /// [Version]
-alias metallib_latest = metallib_3_1;
+alias metallib_latest = metallib_4_0;
 
 // HLSL versions
 
@@ -244,7 +248,8 @@ def _cuda_sm_5_0 : _cuda_sm_4_0;
 def _cuda_sm_6_0 : _cuda_sm_5_0;
 def _cuda_sm_7_0 : _cuda_sm_6_0;
 def _cuda_sm_8_0 : _cuda_sm_7_0;
-def _cuda_sm_9_0 : _cuda_sm_8_0;
+def _cuda_sm_8_9 : _cuda_sm_8_0;
+def _cuda_sm_9_0 : _cuda_sm_8_9;
 /// Represents capabilities required for optix cooperative vector support.
 def optix_coopvec : _cuda_sm_9_0;
 /// Represents capabilities required for optix multi-level traversal support.
@@ -290,9 +295,17 @@ alias cpp_cuda_spirv_llvm = cpp | cuda | spirv | llvm;
 /// [Compound]
 alias cpp_cuda_metal_spirv = cpp | cuda | metal | spirv;
 
+/// CPP, CUDA, Metal, SPIRV, and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_metal_spirv_llvm = cpp | cuda | metal | spirv | llvm;
+
 /// CUDA and SPIRV code-gen targets
 /// [Compound]
 alias cuda_spirv = cuda | spirv;
+
+/// CUDA, Metal and SPIRV code-gen targets
+/// [Compound]
+alias cuda_metal_spirv = cuda | metal | spirv;
 
 /// CPP, CUDA, GLSL and SPIRV code-gen targets
 /// [Compound]
@@ -752,6 +765,10 @@ def spvFragmentBarycentricKHR : SPV_KHR_fragment_shader_barycentric;
 /// [EXT]
 def spvFragmentFullyCoveredEXT : SPV_EXT_fragment_fully_covered;
 
+/// Represents the SPIR-V GroupNonUniform capability (basic subgroup operations).
+/// [EXT]
+def spvGroupNonUniform : _spirv_1_3;
+
 /// Represents the SPIR-V capability for group non-uniform ballot operations.
 /// [EXT]
 def spvGroupNonUniformBallot : _spirv_1_3;
@@ -759,6 +776,14 @@ def spvGroupNonUniformBallot : _spirv_1_3;
 /// Represents the SPIR-V capability for group non-uniform shuffle operations.
 /// [EXT]
 def spvGroupNonUniformShuffle : _spirv_1_3;
+
+/// Represents the SPIR-V capability for group non-uniform shuffle relative operations.
+/// [EXT]
+def spvGroupNonUniformShuffleRelative : _spirv_1_3;
+
+/// Represents the SPIR-V capability for group non-uniform clustered operations.
+/// [EXT]
+def spvGroupNonUniformClustered : _spirv_1_3;
 
 /// Represents the SPIR-V capability for group non-uniform arithmetic operations.
 /// [EXT]
@@ -1179,11 +1204,11 @@ alias GL_KHR_shader_subgroup_ballot = _GL_KHR_shader_subgroup_ballot | spvGroupN
 
 /// Represents the GL_KHR_shader_subgroup_basic extension.
 /// [EXT]
-alias GL_KHR_shader_subgroup_basic = _GL_KHR_shader_subgroup_basic | spvGroupNonUniformBallot;
+alias GL_KHR_shader_subgroup_basic = _GL_KHR_shader_subgroup_basic | spvGroupNonUniform;
 
 /// Represents the GL_KHR_shader_subgroup_clustered extension.
 /// [EXT]
-alias GL_KHR_shader_subgroup_clustered = _GL_KHR_shader_subgroup_clustered | spvGroupNonUniformShuffle;
+alias GL_KHR_shader_subgroup_clustered = _GL_KHR_shader_subgroup_clustered | spvGroupNonUniformClustered;
 
 /// Represents the GL_KHR_shader_subgroup_quad extension.
 /// [EXT]
@@ -1195,7 +1220,7 @@ alias GL_KHR_shader_subgroup_shuffle = _GL_KHR_shader_subgroup_shuffle | spvGrou
 
 /// Represents the GL_KHR_shader_subgroup_shuffle_relative extension.
 /// [EXT]
-alias GL_KHR_shader_subgroup_shuffle_relative = _GL_KHR_shader_subgroup_shuffle_relative | spvGroupNonUniformShuffle;
+alias GL_KHR_shader_subgroup_shuffle_relative = _GL_KHR_shader_subgroup_shuffle_relative | spvGroupNonUniformShuffleRelative;
 
 /// Represents the GL_KHR_shader_subgroup_vote extension.
 /// [EXT]
@@ -1356,7 +1381,7 @@ alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV
 alias cooperative_vector_training = spvCooperativeVectorTrainingNV | _GL_NV_cooperative_vector;
 /// Capabilities needed to use cooperative matrices
 /// [Compound]
-alias cooperative_matrix = spvCooperativeMatrixKHR | cuda;
+alias cooperative_matrix = spvCooperativeMatrixKHR | cuda | _sm_6_10 | metal;
 /// Capabilities needed to use reduction operations with cooperative matrix
 /// [Compound]
 alias cooperative_matrix_spirv = spvCooperativeMatrixKHR;
@@ -1365,7 +1390,7 @@ alias cooperative_matrix_spirv = spvCooperativeMatrixKHR;
 alias cooperative_matrix_reduction = spvCooperativeMatrixReductionsNV;
 /// Capabilities needed to convert cooperative matrices, all the conversions can be supported by cuda
 /// [Compound]
-alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV | cuda;
+alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV | cuda | _sm_6_10;
 /// Capabilities needed to use MapElement operation with cooperative matrix
 /// [Compound]
 alias cooperative_matrix_map_element = spvCooperativeMatrixPerElementOperationsNV;
@@ -1385,6 +1410,10 @@ alias cooperative_matrix_2 = spvCooperativeMatrixKHR + spvCooperativeMatrixReduc
 /// Capabilities needed to use vulkan memory model
 /// [Compound]
 alias vk_mem_model = spvVulkanMemoryModelKHR + spvVulkanMemoryModelDeviceScopeKHR;
+
+/// Capabilities needed to use memory model
+/// [Compound]
+alias mem_model = vk_mem_model | _sm_6_10;
 
 /// Targets that support DescriptorHandle types for bindless descriptor access.
 /// [Compound]
@@ -1714,7 +1743,7 @@ alias sm_6_0_version = _sm_6_0
 /// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_0 = sm_6_0_version
-             |  GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_shuffle + GL_KHR_shader_subgroup_arithmetic + GL_KHR_shader_subgroup_quad + GL_KHR_shader_subgroup_vote
+             |  GL_KHR_shader_subgroup_basic + GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_shuffle + GL_KHR_shader_subgroup_arithmetic + GL_KHR_shader_subgroup_quad + GL_KHR_shader_subgroup_vote
              // previous
              | sm_5_1
              ;
@@ -2166,9 +2195,16 @@ alias cuda_sm_7_0 = _cuda_sm_7_0 | cuda_sm_6_0;
 /// [Version]
 alias cuda_sm_8_0 = _cuda_sm_8_0 | cuda_sm_7_0;
 
+/// cuda 8.9 (Ada Lovelace) and related capabilities of other targets.  Required
+/// for PTX features that landed in PTX ISA 8.7 / SM 8.9, notably the
+/// `mma.sync.m16n8k16` instruction with `.e4m3` / `.e5m2` floating-point inputs
+/// (FP8 cooperative matrices).
+/// [Version]
+alias cuda_sm_8_9 = _cuda_sm_8_9 | cuda_sm_8_0;
+
 /// cuda 9.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_9_0 = _cuda_sm_9_0 | cuda_sm_8_0 | sm_5_0;
+alias cuda_sm_9_0 = _cuda_sm_9_0 | cuda_sm_8_9 | sm_5_0;
 
 /// Atomic reduction operations using PTX `red` instruction. Requires SM 7.0 on CUDA.
 /// On non-CUDA targets, falls back to regular atomic operations with no additional requirement.
@@ -2196,6 +2232,10 @@ alias METAL_3_0 = metallib_3_0;
 /// Use `metallib_3_1` instead
 /// [Other]
 alias METAL_3_1 = metallib_3_1;
+
+/// Use `metallib_4_0` instead
+/// [Other]
+alias METAL_4_0 = metallib_4_0;
 
 // Capabilities of convenience
 //
@@ -2315,9 +2355,16 @@ alias texture_querylod = texture_sm_4_1 | GL_EXT_texture_query_lod;
 /// Capabilities required to query texture level info
 /// [Compound]
 alias texture_querylevels = texture_sm_4_1 | GL_ARB_texture_query_levels;
-/// Capabilities required to query shadow texture lod info
+/// Capabilities required for shadow texture LOD sampling on types
+/// natively supported by GLSL 1.50 (sampler1DShadow, sampler1DArrayShadow,
+/// sampler2DShadow).
 /// [Compound]
 alias texture_shadowlod = texture_sm_4_1;
+/// Capabilities required for shadow texture LOD sampling on types
+/// that need GL_EXT_texture_shadow_lod (sampler2DArrayShadow, samplerCubeShadow,
+/// samplerCubeArrayShadow).
+/// [Compound]
+alias texture_shadowlod_ext = texture_sm_4_1 | GL_EXT_texture_shadow_lod;
 /// Capabilities required for shadow texture sampling with bias and gradients.
 /// New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 /// [Compound]

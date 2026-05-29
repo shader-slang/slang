@@ -95,7 +95,8 @@ void main(int tid: SV_DispatchThreadID)
     // No warning expected here
     expectUniform(asDynamicUniform(ff));
 
-// CHECK-COUNT-7: warning[E41201]
+// CHECK-COUNT-7: warning[E412
 // CHECK-NOT: warning[E41201]
+// CHECK-NOT: warning[E41203]
 
 }

@@ -174,7 +174,55 @@ struct ShaderBindingRange
     }
 };
 
-class ArtifactPostEmitMetadata : public ComBaseObject, public IArtifactPostEmitMetadata
+/// Source coverage entry populated by `instrumentCoverage` when
+/// `-trace-coverage` is active.
+struct CoverageTracingEntry
+{
+    String file;
+    uint32_t line = 0;
+    uint32_t counterIndex = slang::kInvalidCoverageCounterIndex;
+    slang::CoverageEntryKind kind = slang::CoverageEntryKind::Unknown;
+    slang::CoverageCounterMode counterMode = slang::CoverageCounterMode::Count;
+    uint32_t startColumn = 0;
+    uint32_t endLine = 0;
+    uint32_t endColumn = 0;
+    String functionName;
+    String functionMangledName;
+    uint32_t branchSiteID = 0;
+    uint32_t branchArmID = 0;
+    slang::CoverageBranchArmKind branchArmKind = slang::CoverageBranchArmKind::Unknown;
+};
+
+struct SyntheticResourceRecord
+{
+    uint32_t id = 0;
+    slang::BindingType bindingType = slang::BindingType::Unknown;
+    uint32_t arraySize = 1;
+    slang::SyntheticResourceScope scope = slang::SyntheticResourceScope::Global;
+    slang::SyntheticResourceAccess access = slang::SyntheticResourceAccess::Read;
+    int32_t entryPointIndex = -1;
+    int32_t space = -1;
+    int32_t binding = -1;
+    int32_t uniformOffset = -1;
+    int32_t uniformStride = 0;
+    String debugName;
+};
+
+// Internal registry for stable synthetic resource ids. Public API
+// exposes ids as opaque non-zero values, but compiler features still
+// need one shared allocation point so independently-added synthetic
+// resources do not collide.
+enum class SyntheticResourceKnownID : uint32_t
+{
+    None = 0,
+    Coverage = 1,
+};
+
+class ArtifactPostEmitMetadata : public ComBaseObject,
+                                 public IArtifactPostEmitMetadata,
+                                 public slang::ICoverageTracingMetadata,
+                                 public slang::ISyntheticResourceMetadata,
+                                 public slang::ICooperativeTypesMetadata
 {
 public:
     typedef ArtifactPostEmitMetadata ThisType;
@@ -201,6 +249,41 @@ public:
 
     SLANG_NO_THROW virtual const char* SLANG_MCALL getDebugBuildIdentifier() SLANG_OVERRIDE;
 
+    // ICoverageTracingMetadata
+    SLANG_NO_THROW virtual uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL
+    getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
+        SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE;
+
+    // ISyntheticResourceMetadata
+    SLANG_NO_THROW virtual uint32_t SLANG_MCALL getResourceCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL
+    getResourceInfo(uint32_t index, slang::SyntheticResourceInfo* outInfo) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL
+    findResourceIndexByID(uint32_t id, uint32_t* outIndex) SLANG_OVERRIDE;
+
+    // ICooperativeTypesMetadata
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeMatrixTypeByIndex(
+        SlangUInt index,
+        slang::CooperativeMatrixType* outType) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeMatrixCombinationCount()
+        SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeMatrixCombinationByIndex(
+        SlangUInt index,
+        slang::CooperativeMatrixCombination* outCombination) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeVectorTypeCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeVectorTypeByIndex(
+        SlangUInt index,
+        slang::CooperativeVectorTypeUsageInfo* outType) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeVectorCombinationCount()
+        SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeVectorCombinationByIndex(
+        SlangUInt index,
+        slang::CooperativeVectorCombination* outCombination) SLANG_OVERRIDE;
+
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
@@ -211,7 +294,24 @@ public:
 
     List<ShaderBindingRange> m_usedBindings;
     List<String> m_exportedFunctionMangledNames;
+    List<slang::CooperativeMatrixType> m_cooperativeMatrixTypes;
+    List<slang::CooperativeMatrixCombination> m_cooperativeMatrixCombinations;
+    List<slang::CooperativeVectorTypeUsageInfo> m_cooperativeVectorTypes;
+    List<slang::CooperativeVectorCombination> m_cooperativeVectorCombinations;
     String m_debugBuildIdentifier;
+
+    // Coverage tracing data, populated by `instrumentCoverage` when
+    // `-trace-coverage` is active. Empty otherwise.
+    uint32_t m_coverageCounterCount = 0;
+    List<CoverageTracingEntry> m_coverageEntries;
+
+    // Generic compiler-synthesized bindable resources, including
+    // coverage's hidden buffer. Empty when the compiled target does
+    // not introduce any such resources. Records are finalized before
+    // the metadata object is returned to the host; public getters are
+    // read-only and may return raw `const char*` pointers into the
+    // stored `String`s.
+    List<SyntheticResourceRecord> m_syntheticResources;
 };
 
 } // namespace Slang

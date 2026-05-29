@@ -5,7 +5,7 @@
 // 3. Inout parameters preserving the ability to change concrete type
 //
 // For composite return containing interfaces (Tuple<IFoo, int>), see
-// return-interface-tuple-limitation.slang (currently crashes the compiler).
+// return-interface-tuple-limitation.slang (fixed in #10172).
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type

@@ -36,6 +36,7 @@ struct SingleReturnContext : public InstPassBase
         if (resultType->getOp() != kIROp_VoidType)
         {
             retValParam = builder.emitParam(resultType);
+            retValParam->sourceLoc = func->sourceLoc;
         }
         builder.emitBranch(returnBlock);
 

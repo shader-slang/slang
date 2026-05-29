@@ -118,6 +118,21 @@ runs:
         # Platform-specific API checks - fail if APIs are not available
         if [[ "${{ inputs.os }}" == "macos" ]]; then
           check_api_support "mtl,metal"
+
+          # Structured environment dump (matches Linux print-env-info format)
+          echo "ENV_INFO_START"
+          gpu_info=$(system_profiler SPDisplaysDataType 2>/dev/null || true)
+          gpu_name=$(echo "$gpu_info" | grep -E 'Chipset Model' | head -1 | sed 's/.*: //' || true)
+          echo "gpu_name=${gpu_name:-unknown}"
+          gpu_memory=$(echo "$gpu_info" | grep -E 'VRAM' | head -1 | sed 's/.*: //' || true)
+          echo "gpu_memory=${gpu_memory:-unknown}"
+          metal_support=$(echo "$gpu_info" | grep -E 'Metal Support' | head -1 | sed 's/.*: //' || true)
+          echo "metal_support=${metal_support:-unknown}"
+          macos_version=$(sw_vers -productVersion 2>/dev/null || true)
+          echo "macos_version=${macos_version:-unknown}"
+          echo "runner_name=${RUNNER_NAME:-unknown}"
+          echo "os=macos"
+          echo "ENV_INFO_END"
         elif [[ "${{ inputs.os }}" == "windows" ]]; then
           check_api_support "vk,vulkan" "dx12,d3d12" "dx11,d3d11" "cuda"
 
@@ -127,6 +142,21 @@ runs:
           nvidia-smi -q | grep Version || (echo "ERROR: NVIDIA driver (nvidia-smi) not available on Windows" && exit 1)
           echo "Printing Vulkan SDK version: ..."
           vulkaninfo | grep -i version || (echo "ERROR: Vulkan SDK (vulkaninfo) not available on Windows" && exit 1)
-        fi        
+
+          # Structured environment dump (matches Linux print-env-info format)
+          echo "ENV_INFO_START"
+          driver_version=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1 || true)
+          echo "driver_version=${driver_version:-unknown}"
+          gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || true)
+          echo "gpu_name=${gpu_name:-unknown}"
+          gpu_memory=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null | head -1 || true)
+          echo "gpu_memory=${gpu_memory:-unknown}"
+          cuda_version=$(nvcc --version 2>&1 | grep -o 'release [0-9.]*' | cut -d' ' -f2 || true)
+          echo "cuda_version=${cuda_version:-unknown}"
+          echo "vulkan_sdk=${VULKAN_SDK:-not_set}"
+          echo "runner_name=${RUNNER_NAME:-unknown}"
+          echo "os=windows"
+          echo "ENV_INFO_END"
+        fi
         echo "All environment variables:"
         env | sort

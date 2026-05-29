@@ -1,0 +1,31 @@
+# LeakSanitizer suppression file for Slang.
+#
+# Add patterns here for known leaks in third-party code or drivers that
+# are not actionable. Each line suppresses leaks whose stack trace
+# contains the given function or module pattern.
+#
+# Syntax:
+#   leak:<function_or_module_pattern>
+#
+# See https://clang.llvm.org/docs/AddressSanitizer.html#suppressing-memory-leaks
+
+# The prebuilt slang-llvm shared library is not compiled with sanitizers.
+# LSan cannot track allocations inside non-instrumented code, producing
+# false-positive leak reports. LLVM also intentionally never frees certain
+# singleton caches.
+#
+# The pattern "libslang-llvm" matches when LSan can resolve the module name.
+# When LSan cannot identify the non-instrumented module, it reports frames
+# as "<unknown module>"; the second pattern catches those.
+# WARNING: "leak:<unknown module>" is broad -- it suppresses leaks from ANY
+# module where LSan cannot resolve symbols (not just slang-llvm). This is a
+# known trade-off.
+# TODO(#10754): Periodically re-validate without this suppression and replace
+# it with a narrower module or function-based pattern once LSan can resolve the
+# relevant non-instrumented shared-library frames reliably.
+leak:libslang-llvm
+leak:<unknown module>
+
+# Minor leak (665 bytes) of ArtifactPostEmitMetadata in linkAndOptimizeIR.
+# TODO: Fix the ownership so metadata is properly freed.
+leak:linkAndOptimizeIR

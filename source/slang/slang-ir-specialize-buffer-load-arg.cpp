@@ -113,7 +113,7 @@ struct FuncBufferLoadSpecializationCondition : FunctionCallSpecializeCondition
         // 2. A user pointer or bindless resource handle that can be passed to the callee as
         //    ordinary argument.
         //
-        if (const auto argGlobalParam = as<IRGlobalParam>(a))
+        if (const auto argGlobalParam = as<IRGlobalParam>(a); argGlobalParam)
         {
             return true;
         }

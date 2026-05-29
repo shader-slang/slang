@@ -79,7 +79,7 @@ void invalidateSharedMemoryA(uint tid)
         if (index >= 32 * 2)
             break;
 
-        TestPool.data[OffsetA + index] = uint4(0x3C003C00);
+        neural_unittest.writeSharedMemory<TestShMemSize>(OffsetA + index, uint4(0x3C003C00));
     }
     GroupMemoryBarrierWithWaveSync();
 }
@@ -89,18 +89,7 @@ static const int SubgroupSize = 32;
 public struct TestShMemSize : ISharedMemorySize {
     public static const uint Bytes = (32 * 2) * sizeof(uint4);
 }
-typealias TestPool = SharedMemoryPool<TestShMemSize>;
 static const uint OffsetA = 0;
-
-void testLoadShA<TargetEnum Target, int M, int K>(uint tid, uint tileIndex)
-{
-    typealias Address = BindlessAddress<half>;
-
-    Address address = Address(inputBuffer);
-
-    MMAHelper<half, K, M, SubgroupSize, Target, TestShMemSize, false>.loadShA<half, Address>(OffsetA, tileIndex, address);
-    GroupMemoryBarrierWithWaveSync();
-}
 
 bool verifiedOutput<int M, int K>(uint tid, uint sharedMemOffset, uint tileIndex)
 {
@@ -118,7 +107,7 @@ bool verifiedOutput<int M, int K>(uint tid, uint sharedMemOffset, uint tileIndex
         for (int i = 0; i < 2; i++)
         {
             uint indexInTile = tid * 2 + i;
-            uint4 values = TestPool.data[sharedMemOffset + indexInTile];
+            uint4 values = neural_unittest.readSharedMemory<TestShMemSize>(sharedMemOffset + indexInTile);
             uint4 element = values;
             if (indexInTile / 2 >= M)
             {
@@ -164,7 +153,7 @@ bool verifiedOutput<int M, int K>(uint tid, uint sharedMemOffset, uint tileIndex
         for (int i = 0; i < 2; i++)
         {
             uint indexInTile = tid * 2 + i;
-            uint4 values = TestPool.data[sharedMemOffset + indexInTile];
+            uint4 values = neural_unittest.readSharedMemory<TestShMemSize>(sharedMemOffset + indexInTile);
             if (!values.equals(uint4(0x3C003C00)))
             {
                 return false;
@@ -181,51 +170,13 @@ void Test<int M, int K>(uint tid, uint tileIndex, int resIndex)
 
     // fill the shared memory with invalid values.
     invalidateSharedMemoryA(tid);
-
-    __target_switch
-    {
-    case cuda:
-        testLoadShA<TargetEnum.CUDA, M, K>(tid, tileIndex);
-        break;
-    case spirv:
-        testLoadShA<TargetEnum.SPIR_V, M, K>(tid, tileIndex);
-        break;
-    }
-    // serialRead(tid, OffsetA);
+    neural_unittest.testLoadShA<K, M, SubgroupSize, TestShMemSize, false, 1>(OffsetA, tileIndex, inputBuffer);
 
     bool res = verifiedOutput<M, K>(tid, OffsetA, tileIndex);
     res = WaveActiveAllTrue(res);
 
     if (tid == 0)
         outputBuffer[resIndex] = res ? 1 : 0;
-}
-
-// This function is just used for debugging, not for verification. So keep it here.
-void serialRead(uint tid, uint sharedMemOffset)
-{
-    if (tid > 0)
-        return;
-
-    for (int id = 0; id < 32; id++)
-    {
-        printf("tid: %d\n", id);
-        for (int i = 0; i < 2; i++)
-        {
-            uint4 values = TestPool.data[sharedMemOffset + id * 2 + i];
-            uint4 element = values;
-            for (int j = 0; j < 4; j++)
-            {
-                uint value = element[j];
-                uint16_t a = (uint16_t)(value & 0xFFFF);
-                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
-
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
-                printf("%.1f %.1f ", float(aa), float(bb));
-            }
-        }
-        printf("\n");
-    }
 }
 
 [numthreads(1024, 1, 1)]

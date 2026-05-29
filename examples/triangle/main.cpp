@@ -343,7 +343,7 @@ struct HelloWorld : public WindowedAppBase
         // basis, even though the data that is loaded does not change
         // per-frame (we always use an identity matrix).
         //
-        auto deviceInfo = gDevice->getInfo();
+        gDevice->getInfo();
 
         // We know that `rootObject` is a root shader object created
         // from our program, and that it is set up to hold values for

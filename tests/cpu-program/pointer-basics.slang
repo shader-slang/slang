@@ -2,13 +2,13 @@
 export __extern_cpp int main()
 {
     uint2 value;
-    int *pValue = (int*)&value;
+    int *pValue = (int*)__getAddress(value);
     *pValue = 1;
     (*pValue)++;
     ++pValue[0];
     ++pValue;
     *pValue = 1;
-    pValue = (int *)&value;
+    pValue = (int *)__getAddress(value);
     int64_t ptrVal = int64_t(pValue);
     pValue = (int *)ptrVal;
     if (pValue

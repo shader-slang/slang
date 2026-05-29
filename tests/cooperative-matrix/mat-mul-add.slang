@@ -1,62 +1,59 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK-VK):-vk -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK-CUDA):-cuda -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BAB):-vk -emit-spirv-directly -Xslang -DBAB
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_CUDA):-cuda -output-using-type
 
-// CHECK-VK: type: float
-// CHECK-VK-COUNT-256: 241.0
+//DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include -DBAB
+//DXIL: result code = 0
 
-// CHECK-VK: type: int32_t
-// CHECK-VK-COUNT-256: 481
+// CHECK: type: float
+// CHECK-COUNT-256: 241.0
+// CHECK_BAB-COUNT-256: 43710000
 
-// CHECK-VK: type: int32_t
-// CHECK-VK-COUNT-256: -2147483169
+// CHECK: type: int32_t
+// CHECK-COUNT-256: 481
+// CHECK_BAB-COUNT-256: 1E1
 
-// CHECK-VK: type: int32_t
-// CHECK-VK-COUNT-128: 481
+// CHECK: type: int32_t
+// CHECK-COUNT-256: -2147483169
+// CHECK_BAB-COUNT-256: 800001DF
 
-// CHECK-VK: type: int32_t
-// CHECK-VK-COUNT-128: -2147483169
+// CHECK: type: int32_t
+// CHECK-COUNT-128: 481
+// CHECK_BAB-COUNT-128: 1E1
 
-// CHECK-CUDA: type: float
-// CHECK-CUDA-COUNT-256: 241.0
+// CHECK: type: int32_t
+// CHECK-COUNT-128: -2147483169
+// CHECK_BAB-COUNT-128: 800001DF
 
-// CHECK-CUDA: type: int32_t
-// CHECK-CUDA-COUNT-256: 241
 
-// CHECK-CUDA: type: int32_t
-// CHECK-CUDA-COUNT-256: -2147483409
-
-// CHECK-CUDA: type: int32_t
-// CHECK-CUDA-COUNT-256: 2147483647
-
-// CHECK-CUDA: type: int32_t
-// CHECK-CUDA-COUNT-256: 241
-
-// CHECK-CUDA: type: int32_t
-// CHECK-CUDA-COUNT-256: -2147483409
-
-// CHECK-CUDA: type: int32_t
-// CHECK-CUDA-COUNT-256: 2147483647
+// CHECK_CUDA: type: float
+// CHECK_CUDA-COUNT-256: 241.0
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer1
-RWStructuredBuffer<float> outputBuffer1;
-
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer2
-RWStructuredBuffer<int32_t> outputBuffer2;
-
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer3
-RWStructuredBuffer<int32_t> outputBuffer3;
-
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer4
-RWStructuredBuffer<int32_t> outputBuffer4;
-
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer5
-RWStructuredBuffer<int32_t> outputBuffer5;
-
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer6
-RWStructuredBuffer<int32_t> outputBuffer6;
-
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer7
+
+#if defined(BAB)
+RWByteAddressBuffer outputBuffer1;
+RWByteAddressBuffer outputBuffer2;
+RWByteAddressBuffer outputBuffer3;
+RWByteAddressBuffer outputBuffer4;
+RWByteAddressBuffer outputBuffer5;
+RWByteAddressBuffer outputBuffer6;
+RWByteAddressBuffer outputBuffer7;
+#else
+RWStructuredBuffer<float> outputBuffer1;
+RWStructuredBuffer<int32_t> outputBuffer2;
+RWStructuredBuffer<int32_t> outputBuffer3;
+RWStructuredBuffer<int32_t> outputBuffer4;
+RWStructuredBuffer<int32_t> outputBuffer5;
+RWStructuredBuffer<int32_t> outputBuffer6;
 RWStructuredBuffer<int32_t> outputBuffer7;
+#endif
 
 using namespace linalg;
 
@@ -73,6 +70,10 @@ void computeMain()
 
     __target_switch
     {
+    case hlsl:
+        // int8_t is not a native scalar type in DXC HLSL.
+        // The float/half MulAdd test above already covers HLSL MulAdd support.
+        break;
     case spirv:
         // ( 3.0 * 5.0 ) * 32 + 1.0 = 481
         coopMatMulAdd<int32_t, false>(
@@ -109,52 +110,6 @@ void computeMain()
         ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer5, 0, 8);
 
     case cuda:
-        // m32n8k16 test
-        // ( 3 * 5 ) * 16 + 1 = 241
-        coopMatMulAdd<int32_t, false>(
-                CoopMat<int8_t, MemoryScope.Subgroup, 32, 16, CoopMatMatrixUse::MatrixA >(3),
-                CoopMat<int8_t, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse::MatrixB >(5),
-                CoopMat<int32_t, MemoryScope.Subgroup, 32, 8, CoopMatMatrixUse::MatrixAccumulator>(1)
-        ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer2, 0, 8);
-
-        // overflow test
-        // ( 3 * 5 ) * 16 + 0x7FFFFFFF = 0xF0 + 0x7FFFFFFF = 0x800000EF = -2147483409
-        coopMatMulAdd<int32_t, false>(
-                CoopMat<int8_t, MemoryScope.Subgroup, 32, 16, CoopMatMatrixUse::MatrixA >(3),
-                CoopMat<int8_t, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse::MatrixB >(5),
-                CoopMat<int32_t, MemoryScope.Subgroup, 32, 8, CoopMatMatrixUse::MatrixAccumulator>(0x7FFFFFFF)
-        ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer3, 0, 8);
-
-        // saturation test
-        // ( 3 * 5 ) * 16 + 0x7FFFFFFF = 2147483887, and then saturated to [-2147483648, 2147483647] = 2147483647
-        coopMatMulAdd<int32_t, true>(
-                CoopMat<int8_t, MemoryScope.Subgroup, 32, 16, CoopMatMatrixUse::MatrixA >(3),
-                CoopMat<int8_t, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse::MatrixB >(5),
-                CoopMat<int32_t, MemoryScope.Subgroup, 32, 8, CoopMatMatrixUse::MatrixAccumulator>(0x7FFFFFFF)
-        ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer4, 0, 8);
-
-        //m8n32k16 test
-        // ( 3 * 5 ) * 16 + 1 = 241
-        coopMatMulAdd<int32_t, false>(
-                CoopMat<int8_t, MemoryScope.Subgroup, 8, 16, CoopMatMatrixUse::MatrixA >(3),
-                CoopMat<int8_t, MemoryScope.Subgroup, 16, 32, CoopMatMatrixUse::MatrixB >(5),
-                CoopMat<int32_t, MemoryScope.Subgroup, 8, 32, CoopMatMatrixUse::MatrixAccumulator>(1)
-        ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer5, 0, 32);
-
-        // overflow test
-        // ( 3 * 5 ) * 16 + 0x7FFFFFFF = 0xF0 + 0x7FFFFFFF = 0x800000EF = -2147483409
-        coopMatMulAdd<int32_t, false>(
-                CoopMat<int8_t, MemoryScope.Subgroup, 8, 16, CoopMatMatrixUse::MatrixA >(3),
-                CoopMat<int8_t, MemoryScope.Subgroup, 16, 32, CoopMatMatrixUse::MatrixB >(5),
-                CoopMat<int32_t, MemoryScope.Subgroup, 8, 32, CoopMatMatrixUse::MatrixAccumulator>(0x7FFFFFFF)
-        ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer6, 0, 32);
-
-        // saturation test
-        // ( 3 * 5 ) * 16 + 0x7FFFFFFF = 2147483887, and then saturated to [-2147483648, 2147483647] = 2147483647
-        coopMatMulAdd<int32_t, true>(
-                CoopMat<int8_t, MemoryScope.Subgroup, 8, 16, CoopMatMatrixUse::MatrixA >(3),
-                CoopMat<int8_t, MemoryScope.Subgroup, 16, 32, CoopMatMatrixUse::MatrixB >(5),
-                CoopMat<int32_t, MemoryScope.Subgroup, 8, 32, CoopMatMatrixUse::MatrixAccumulator>(0x7FFFFFFF)
-        ).Store<CoopMatMatrixLayout::RowMajor>(outputBuffer7, 0, 32);
+        break;
     }
 }

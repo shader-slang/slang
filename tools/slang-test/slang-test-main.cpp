@@ -166,7 +166,10 @@ typedef TestResult (*TestCallback)(TestContext* context, TestInput& input);
 // Globals
 
 // Pre declare
-static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine);
+static void _addRenderTestOptions(
+    const Options& options,
+    CommandLine& ioCmdLine,
+    bool allowCacheRHI);
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -1422,7 +1425,6 @@ static SlangResult _extractRenderTestRequirements(
     }
 
     // The native language for the API
-    SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
     SlangCompileTarget target = SLANG_TARGET_NONE;
     SlangPassThrough passThru = SLANG_PASS_THROUGH_NONE;
 
@@ -1430,12 +1432,10 @@ static SlangResult _extractRenderTestRequirements(
     {
     case RenderApiType::D3D11:
         target = SLANG_DXBC;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
         passThru = SLANG_PASS_THROUGH_FXC;
         break;
     case RenderApiType::D3D12:
         target = SLANG_DXIL;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
         passThru = SLANG_PASS_THROUGH_DXC;
         if (useDxbc)
         {
@@ -1445,40 +1445,32 @@ static SlangResult _extractRenderTestRequirements(
         break;
     case RenderApiType::Vulkan:
         target = SLANG_SPIRV;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
         passThru = SLANG_PASS_THROUGH_GLSLANG;
         break;
     case RenderApiType::Metal:
         target = SLANG_METAL_LIB;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_METAL;
         passThru = SLANG_PASS_THROUGH_METAL;
         break;
     case RenderApiType::CPU:
         target = SLANG_SHADER_HOST_CALLABLE;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
         passThru = SLANG_PASS_THROUGH_GENERIC_C_CPP;
         break;
     case RenderApiType::CUDA:
         target = SLANG_PTX;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
         passThru = SLANG_PASS_THROUGH_NVRTC;
         break;
     case RenderApiType::WebGPU:
         target = SLANG_WGSL;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_WGSL;
         passThru = SLANG_PASS_THROUGH_TINT;
         break;
     case RenderApiType::LLVM:
         target = SLANG_SHADER_HOST_CALLABLE;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_LLVM;
         passThru = SLANG_PASS_THROUGH_NONE;
         break;
     }
 
-    SlangSourceLanguage sourceLanguage = nativeLanguage;
     if (!usePassthru)
     {
-        sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
         passThru = SLANG_PASS_THROUGH_NONE;
     }
 
@@ -1618,7 +1610,9 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                 CommandLine cmdLine;
                 cmdLine.setExecutableLocation(
                     ExecutableLocation(context->options.binDir, "render-test"));
-                _addRenderTestOptions(context->options, cmdLine);
+                // Don't cache startup devices: a cached non-experimental device would prevent
+                // D3D12EnableExperimentalFeatures from succeeding in subsequent test runs.
+                _addRenderTestOptions(context->options, cmdLine, false);
                 // We just want to see if the device can be started up
                 cmdLine.addArg("-only-startup");
 
@@ -2927,7 +2921,7 @@ TestResult runCompileTarget(TestContext* context, TestInput& input)
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(input.filePath);
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -3861,7 +3855,10 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
-static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine)
+static void _addRenderTestOptions(
+    const Options& options,
+    CommandLine& ioCmdLine,
+    bool allowCacheRHI)
 {
     if (!options.emitSPIRVDirectly)
     {
@@ -3879,7 +3876,7 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
         ioCmdLine.addArg("-enable-debug-layers");
     }
 
-    if (options.cacheRhiDevice)
+    if (allowCacheRHI && options.cacheRhiDevice)
     {
         ioCmdLine.addArg("-cache-rhi-device");
     }
@@ -3917,7 +3914,7 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
     cmdLine.addArg(input.filePath);
     cmdLine.addArg("-performance-profile");
 
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -4042,6 +4039,9 @@ static SlangResult _compareWithType(
         case ScalarType::Float16:
         case ScalarType::Float32:
         case ScalarType::Float64:
+        case ScalarType::BFloat16:
+        case ScalarType::FloatE4M3:
+        case ScalarType::FloatE5M2:
             {
 
                 // Compare as double
@@ -4076,7 +4076,7 @@ TestResult runComputeComparisonImpl(
     cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath999);
 
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -4184,7 +4184,7 @@ TestResult doRenderComparisonTestRun(
     cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath);
 
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {

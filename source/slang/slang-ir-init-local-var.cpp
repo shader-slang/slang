@@ -2,7 +2,9 @@
 #include "slang-ir-init-local-var.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
+
 
 namespace Slang
 {
@@ -34,6 +36,12 @@ void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
                     case kIROp_GetElementPtr:
                     case kIROp_FieldAddress:
                         continue;
+                    case kIROp_Load:
+                        // --- WORKAROUND ---
+                        if (nextInst->getOperand(0) == inst &&
+                            as<IRReturn>(nextInst->firstUse->getUser()))
+                            initialized = true; // Ignore the return value load.
+                        break;
                     default:
                         if (userSet.contains(nextInst))
                         {
@@ -57,6 +65,32 @@ void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func)
                     builder.emitDefaultConstruct(
                         as<IRPtrTypeBase>(inst->getFullType())->getValueType()));
             }
+        }
+    }
+}
+
+
+void initializeOutParameters(IRModule* module, IRGlobalValueWithCode* func)
+{
+    IRBuilder builder(module);
+
+    if (!func->getFirstBlock())
+        return;
+
+    for (auto inst : func->getFirstBlock()->getChildren())
+    {
+        if (inst->getOp() == kIROp_Param)
+        {
+            auto [direction, type] = splitParameterDirectionAndType(inst->getDataType());
+            if (direction != ParameterDirectionInfo::Kind::Out)
+                continue;
+
+            IRBuilderSourceLocRAII sourceLocationScope(&builder, inst->sourceLoc);
+            setInsertAfterOrdinaryInst(&builder, inst);
+            builder.emitStore(
+                inst,
+                builder.emitDefaultConstruct(
+                    as<IRPtrTypeBase>(inst->getFullType())->getValueType()));
         }
     }
 }

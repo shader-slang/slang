@@ -37,16 +37,33 @@ static inline SlangReflectionUserAttribute* convert(Attribute* attrib)
 
 static inline Type* convert(SlangReflectionType* type)
 {
+    // `SlangReflectionType*` is opaque to callers, so every value reaching
+    // this helper originated from `convert(Type*)` below, which already
+    // peels `ModifiedType` / `AtomicType`. No additional unwrap is needed.
     return (Type*)type;
 }
 
 static inline SlangReflectionType* convert(Type* type)
 {
+    // Peel off any modifier wrappers (e.g. `no_diff`, `unorm`, `snorm`).
+    // These can appear on function return/parameter types after generic
+    // specialization (see issue #11277) and on `no_diff`-qualified struct
+    // fields. Without this, every structural query (`getKind`,
+    // `getElementType`, layout, `getFullName`) falls through to its
+    // `UNEXPECTED` path and reports NONE / zero, which downstream consumers
+    // like slangpy treat as an unknown type. Modifier information remains
+    // available via `findModifier()` on the owning variable / function.
+    //
+    // Unwrap up-front so the `AtomicType` check below catches
+    // `ModifiedType(AtomicType(...))`, and re-unwrap the element so it also
+    // catches `AtomicType(ModifiedType(...))`.
+    type = unwrapModifiedType(type);
+
     // Prevent the AtomicType struct from being visible to the user
     // through the reflection API.
     if (auto atomicType = as<AtomicType>(type))
     {
-        return (SlangReflectionType*)atomicType->getElementType();
+        return (SlangReflectionType*)unwrapModifiedType(atomicType->getElementType());
     }
     return (SlangReflectionType*)type;
 }
@@ -142,6 +159,14 @@ static inline ProgramLayout* convert(SlangReflection* program)
 [[maybe_unused]] static inline SlangReflection* convert(ProgramLayout* program)
 {
     return (SlangReflection*)program;
+}
+
+static bool isScalarType(Type* type)
+{
+    if (as<BasicExpressionType>(type))
+        return true;
+
+    return as<BFloat16Type>(type) || as<FloatE4M3Type>(type) || as<FloatE5M2Type>(type);
 }
 
 // user attribute
@@ -402,27 +427,27 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
 
     // TODO(tfoley): Don't emit the same type more than once...
 
-    if (const auto basicType = as<BasicExpressionType>(type))
+    if (isScalarType(type))
     {
         return SLANG_TYPE_KIND_SCALAR;
     }
-    else if (const auto vectorType = as<VectorExpressionType>(type))
+    else if (const auto vectorType = as<VectorExpressionType>(type); vectorType)
     {
         return SLANG_TYPE_KIND_VECTOR;
     }
-    else if (const auto matrixType = as<MatrixExpressionType>(type))
+    else if (const auto matrixType = as<MatrixExpressionType>(type); matrixType)
     {
         return SLANG_TYPE_KIND_MATRIX;
     }
-    else if (const auto parameterBlockType = as<ParameterBlockType>(type))
+    else if (const auto parameterBlockType = as<ParameterBlockType>(type); parameterBlockType)
     {
         return SLANG_TYPE_KIND_PARAMETER_BLOCK;
     }
-    else if (const auto constantBufferType = as<ConstantBufferType>(type))
+    else if (const auto constantBufferType = as<ConstantBufferType>(type); constantBufferType)
     {
         return SLANG_TYPE_KIND_CONSTANT_BUFFER;
     }
-    else if (const auto streamOutputType = as<HLSLStreamOutputType>(type))
+    else if (const auto streamOutputType = as<HLSLStreamOutputType>(type); streamOutputType)
     {
         return SLANG_TYPE_KIND_OUTPUT_STREAM;
     }
@@ -438,27 +463,27 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_SHADER_STORAGE_BUFFER;
     }
-    else if (const auto samplerStateType = as<SamplerStateType>(type))
+    else if (const auto samplerStateType = as<SamplerStateType>(type); samplerStateType)
     {
         return SLANG_TYPE_KIND_SAMPLER_STATE;
     }
-    else if (const auto textureType = as<TextureTypeBase>(type))
+    else if (const auto textureType = as<TextureTypeBase>(type); textureType)
     {
         return SLANG_TYPE_KIND_RESOURCE;
     }
-    else if (const auto subpassInputType = as<SubpassInputType>(type))
+    else if (const auto subpassInputType = as<SubpassInputType>(type); subpassInputType)
     {
         return SLANG_TYPE_KIND_RESOURCE;
     }
-    else if (const auto feedbackType = as<FeedbackType>(type))
+    else if (const auto feedbackType = as<FeedbackType>(type); feedbackType)
     {
         return SLANG_TYPE_KIND_FEEDBACK;
     }
-    else if (const auto ptrType = as<PtrType>(type))
+    else if (const auto ptrType = as<PtrType>(type); ptrType)
     {
         return SLANG_TYPE_KIND_POINTER;
     }
-    else if (const auto dynamicResourceType = as<DynamicResourceType>(type))
+    else if (const auto dynamicResourceType = as<DynamicResourceType>(type); dynamicResourceType)
     {
         return SLANG_TYPE_KIND_DYNAMIC_RESOURCE;
     }
@@ -482,7 +507,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     CASE(GLSLShaderStorageBufferType);
 #undef CASE
 
-    else if (const auto arrayType = as<ArrayExpressionType>(type))
+    else if (const auto arrayType = as<ArrayExpressionType>(type); arrayType)
     {
         return SLANG_TYPE_KIND_ARRAY;
     }
@@ -511,11 +536,11 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
             return SLANG_TYPE_KIND_ENUM;
         }
     }
-    else if (const auto specializedType = as<ExistentialSpecializedType>(type))
+    else if (const auto specializedType = as<ExistentialSpecializedType>(type); specializedType)
     {
         return SLANG_TYPE_KIND_SPECIALIZED;
     }
-    else if (const auto errorType = as<ErrorType>(type))
+    else if (const auto errorType = as<ErrorType>(type); errorType)
     {
         // This means we saw a type we didn't understand in the user's code
         return SLANG_TYPE_KIND_NONE;
@@ -682,11 +707,11 @@ SLANG_API unsigned int spReflectionType_GetRowCount(SlangReflectionType* inType)
     {
         return (unsigned int)getIntVal(matrixType->getRowCount());
     }
-    else if (const auto vectorType = as<VectorExpressionType>(type))
+    else if (const auto vectorType = as<VectorExpressionType>(type); vectorType)
     {
         return 1;
     }
-    else if (const auto basicType = as<BasicExpressionType>(type))
+    else if (isScalarType(type))
     {
         return 1;
     }
@@ -708,7 +733,7 @@ SLANG_API unsigned int spReflectionType_GetColumnCount(SlangReflectionType* inTy
     {
         return (unsigned int)getIntVal(vectorType->getElementCount());
     }
-    else if (const auto basicType = as<BasicExpressionType>(type))
+    else if (isScalarType(type))
     {
         return 1;
     }
@@ -752,15 +777,23 @@ SLANG_API SlangScalarType spReflectionType_GetScalarType(SlangReflectionType* in
             CASE(Half, FLOAT16);
             CASE(Float, FLOAT32);
             CASE(Double, FLOAT64);
+            CASE(IntPtr, INTPTR);
+            CASE(UIntPtr, UINTPTR);
 
 #undef CASE
 
         default:
             SLANG_REFLECTION_UNEXPECTED();
             return SLANG_SCALAR_TYPE_NONE;
-            break;
         }
     }
+
+    if (as<BFloat16Type>(type))
+        return SLANG_SCALAR_TYPE_BFLOAT16;
+    if (as<FloatE4M3Type>(type))
+        return SLANG_SCALAR_TYPE_FLOAT_E4M3;
+    if (as<FloatE5M2Type>(type))
+        return SLANG_SCALAR_TYPE_FLOAT_E5M2;
 
     return SLANG_SCALAR_TYPE_NONE;
 }
@@ -1831,7 +1864,8 @@ SlangBindingType _calcResourceBindingType(Type* type)
             return SlangBindingType(SLANG_BINDING_TYPE_TYPED_BUFFER | mutableFlag);
         }
     }
-    else if (const auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type))
+    else if (const auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type);
+             structuredBufferType)
     {
         if (as<HLSLStructuredBufferType>(type))
         {
@@ -1846,7 +1880,7 @@ SlangBindingType _calcResourceBindingType(Type* type)
     {
         return SLANG_BINDING_TYPE_RAY_TRACING_ACCELERATION_STRUCTURE;
     }
-    else if (const auto untypedBufferType = as<UntypedBufferResourceType>(type))
+    else if (const auto untypedBufferType = as<UntypedBufferResourceType>(type); untypedBufferType)
     {
         if (as<HLSLByteAddressBufferType>(type))
         {
@@ -1994,6 +2028,16 @@ struct ExtendedTypeLayoutContext
 
         RefPtr<TypeLayout::ExtendedInfo::DescriptorSetInfo> descriptorSet =
             new TypeLayout::ExtendedInfo::DescriptorSetInfo();
+        // Record the (HLSL `space` / Vulkan descriptor set) that this
+        // descriptor set was constructed for. Without this,
+        // `getDescriptorSetSpaceOffset` always returns 0, which causes
+        // slang-rhi backends (D3D12 root-signature builder, Vulkan
+        // descriptor-set allocator, WebGPU bind-group builder) to
+        // place all parameters at space=0 — resulting in
+        // root-signature rejections on D3D12 and silent wrong-binding
+        // on Vulkan/WebGPU when a user has `register(_, spaceN)` or
+        // `[[vk::binding(_, N)]]` with `N != 0`.
+        descriptorSet->spaceOffset = space;
         m_extendedInfo->m_descriptorSets.add(descriptorSet);
 
         return index;

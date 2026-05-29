@@ -90,7 +90,7 @@ endfunction()
 function(set_default_compile_options target)
     cmake_parse_arguments(
         ARG
-        "USE_EXTRA_WARNINGS;USE_FEWER_WARNINGS"
+        "USE_EXTRA_WARNINGS;USE_FEWER_WARNINGS;SKIP_ASAN"
         ""
         ""
         ${ARGN}
@@ -112,9 +112,6 @@ function(set_default_compile_options target)
             -Wno-invalid-offsetof
             -Wno-newline-eof
             -Wno-return-std-move
-            # Allow unused variables with a pattern of `if (auto v = as<...>(...))`.
-            # This pattern is very common in Slang code base.
-            -Wno-unused-but-set-variable
             # Allowed warnings:
             # If a function returns an address/reference to a local, we want it to
             # produce an error, because it probably means something very bad.
@@ -153,6 +150,20 @@ function(set_default_compile_options target)
     endif()
 
     add_supported_cxx_flags(${target} PRIVATE ${warning_flags})
+
+    # Strip the absolute source directory prefix from __FILE__ so that build-machine
+    # paths are not baked into the binary's read-only data section.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(
+            ${target}
+            PRIVATE "-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/="
+        )
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+        target_compile_options(
+            ${target}
+            PRIVATE "/d1trimfile:${CMAKE_SOURCE_DIR}\\"
+        )
+    endif()
 
     if(NOT WIN32)
         # these options are for ELF specific and not for Windows
@@ -207,20 +218,24 @@ function(set_default_compile_options target)
         ${target}
         PRIVATE
             SLANG_ENABLE_DXIL_SUPPORT=$<BOOL:${SLANG_ENABLE_DXIL}>
+            SLANG_ENABLE_WEBGPU=$<BOOL:${SLANG_HAS_WEBGPU_SUPPORT}>
+            SLANG_ENABLE_VALIDATION_VM_BYTECODE=$<BOOL:${SLANG_ENABLE_VALIDATION_VM_BYTECODE}>
             $<$<BOOL:${SLANG_ENABLE_FULL_DEBUG_VALIDATION}>:SLANG_ENABLE_FULL_IR_VALIDATION>
             $<$<BOOL:${SLANG_ENABLE_IR_BREAK_ALLOC}>:SLANG_ENABLE_IR_BREAK_ALLOC>
             $<$<BOOL:${SLANG_ENABLE_DX_ON_VK}>:SLANG_CONFIG_DX_ON_VK>
             $<$<STREQUAL:${SLANG_LIB_TYPE},STATIC>:STB_IMAGE_STATIC>
     )
 
-    if(SLANG_ENABLE_ASAN)
+    if(SLANG_ENABLE_ASAN AND NOT ARG_SKIP_ASAN)
+        # -fno-sanitize-recover=undefined is intentionally omitted so that
+        # halt_on_error can be controlled at runtime via UBSAN_OPTIONS.
+        # For abort-on-first-UB locally, set UBSAN_OPTIONS=halt_on_error=1.
         if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             target_compile_options(
                 ${target}
                 PRIVATE
                     -fsanitize=address
                     -fsanitize=undefined
-                    -fno-sanitize-recover=undefined
                     -fsanitize-ignorelist=${PROJECT_SOURCE_DIR}/cmake/sanitizer-ignorelist.txt
             )
             target_link_options(
@@ -239,10 +254,7 @@ function(set_default_compile_options target)
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             target_compile_options(
                 ${target}
-                PRIVATE
-                    -fsanitize=address
-                    -fsanitize=undefined
-                    -fno-sanitize-recover=undefined
+                PRIVATE -fsanitize=address -fsanitize=undefined
             )
             target_link_options(
                 ${target}
@@ -258,9 +270,9 @@ function(set_default_compile_options target)
     endif()
 
     if(SLANG_ENABLE_COVERAGE)
-        # Coverage instrumentation for Clang/GCC
-        # Both flags must be used together for source mapping to work
-        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+            # Clang source-based coverage: both flags required together for
+            # source mapping to work
             target_compile_options(
                 ${target}
                 PRIVATE -fprofile-instr-generate -fcoverage-mapping
@@ -270,6 +282,34 @@ function(set_default_compile_options target)
                 BEFORE
                 PUBLIC -fprofile-instr-generate
             )
+        elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+            # GCC gcov-based coverage
+            target_compile_options(${target} PRIVATE --coverage)
+            target_link_options(${target} BEFORE PUBLIC --coverage)
+        elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+            # MSVC has no native source-level coverage tool; Windows coverage
+            # is collected externally by OpenCppCoverage via PDBs. The only
+            # build-time tuning that matters is keeping more of the source
+            # visible in the PDB. CMake's default RelWithDebInfo flags are
+            # `/O2 /Ob1`, which already downgrades inlining from /Ob2 but
+            # still inlines any function marked `inline` or `__inline`
+            # (covering most header-defined methods in Slang). /Ob0
+            # disables inlining entirely so every function body remains
+            # distinct in the binary, giving a truthful hit/miss verdict
+            # for every source line. Runtime is ~2-3x slower -- acceptable
+            # for a nightly coverage job where accuracy is the target.
+            # (MSVC emits D9025 "overriding '/Ob1' with '/Ob0'" -- harmless
+            # noise; /wd9025 can't suppress driver warnings, so we just live
+            # with it.)
+            target_compile_options(${target} PRIVATE /Ob0)
+            # Force /INCREMENTAL:NO at the target level. Windows +
+            # Ninja-Multi-Config + RelWithDebInfo otherwise leaves
+            # /INCREMENTAL on the link line (CMake's default for the
+            # configuration), racing with slang-proxy's explicit
+            # /INCREMENTAL:NO and producing LNK1104 on slang.ilk. Disabling
+            # incremental linking globally for coverage targets avoids the
+            # .ilk file entirely. No runtime cost.
+            target_link_options(${target} PRIVATE /INCREMENTAL:NO)
         endif()
     endif()
 

@@ -7,8 +7,8 @@
 
 Looks like the problem is that it sees 'a' as 'overloaded' - which I guess is one way to look at it. It is then followed with ...
     
-core.meta.slang(230): note 39999: candidate: int.init(uint64_t)
-core.meta.slang(230): note 39999: candidate: int.init(uint)
+core.meta.slang(230): note 40011: candidate: int.init(uint64_t)
+core.meta.slang(230): note 40011: candidate: int.init(uint)
 
 Which doesn't seem appropriate    
  */

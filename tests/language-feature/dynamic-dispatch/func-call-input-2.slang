@@ -55,6 +55,7 @@ float calc(IInterface obj, float y)
 {
     return obj.calc(y);
     // REPORT: note[E50102]: generated dynamic dispatch code
+    // REPORT: note[E50102]: generated dynamic dispatch code
 }
 
 float f(uint id, float x)

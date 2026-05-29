@@ -3,13 +3,77 @@
 
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
-#include "slang-mangled-lexer.h"
 #include "slang-rich-diagnostics.h"
 
 #include <assert.h>
 
 namespace Slang
 {
+
+static void emitUnsupportedTargetIntrinsicExpr(
+    CUDASourceEmitter* emitter,
+    IRInst* inst,
+    const char* operation,
+    SourceLoc location)
+{
+    emitter->getSink()->diagnose(
+        Diagnostics::UnsupportedTargetIntrinsic{.operation = operation, .location = location});
+    emitter->getSourceWriter()->emit("(");
+    emitter->emitType(inst->getDataType());
+    emitter->getSourceWriter()->emit("{})");
+}
+
+static UnownedStringSlice getOptixCoopVecComponentTypeName(int componentType)
+{
+    switch (componentType)
+    {
+    case SLANG_SCALAR_TYPE_FLOAT_E4M3:
+        return UnownedStringSlice("OPTIX_COOP_VEC_ELEM_TYPE_FLOAT8_E4M3");
+    case SLANG_SCALAR_TYPE_FLOAT_E5M2:
+        return UnownedStringSlice("OPTIX_COOP_VEC_ELEM_TYPE_FLOAT8_E5M2");
+    case SLANG_SCALAR_TYPE_FLOAT16:
+        return UnownedStringSlice("OPTIX_COOP_VEC_ELEM_TYPE_FLOAT16");
+    case SLANG_SCALAR_TYPE_FLOAT32:
+        return UnownedStringSlice("OPTIX_COOP_VEC_ELEM_TYPE_FLOAT32");
+    case SLANG_SCALAR_TYPE_INT8:
+        return UnownedStringSlice("OPTIX_COOP_VEC_ELEM_TYPE_INT8");
+    case SLANG_SCALAR_TYPE_INT32:
+        return UnownedStringSlice("OPTIX_COOP_VEC_ELEM_TYPE_INT32");
+    case SLANG_SCALAR_TYPE_UINT8:
+        return UnownedStringSlice("OPTIX_COOP_VEC_ELEM_TYPE_UINT8");
+    case SLANG_SCALAR_TYPE_UINT32:
+        return UnownedStringSlice("OPTIX_COOP_VEC_ELEM_TYPE_UINT32");
+    default:
+        return UnownedStringSlice();
+    }
+}
+
+static UnownedStringSlice getOptixCoopVecMatrixLayoutName(int matrixLayout)
+{
+    switch (matrixLayout)
+    {
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR:
+        return UnownedStringSlice("OPTIX_COOP_VEC_MATRIX_LAYOUT_ROW_MAJOR");
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR:
+        return UnownedStringSlice("OPTIX_COOP_VEC_MATRIX_LAYOUT_COLUMN_MAJOR");
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL:
+        return UnownedStringSlice("OPTIX_COOP_VEC_MATRIX_LAYOUT_INFERENCING_OPTIMAL");
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL:
+        return UnownedStringSlice("OPTIX_COOP_VEC_MATRIX_LAYOUT_TRAINING_OPTIMAL");
+    default:
+        SLANG_UNEXPECTED("invalid OptiX cooperative vector matrix layout");
+    }
+}
+
+struct FragmentShape
+{
+    int m, n, k;
+
+    bool isValid() const { return m > 0 && n > 0 && k > 0; }
+};
+
+inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col);
+static bool coopMatMulAddTypeCombinationIsValid(IROp aType, IROp bType, IROp cType, IROp dType);
 
 static CUDAExtensionTracker::BaseTypeFlags _findBaseTypesUsed(IRModule* module)
 {
@@ -274,9 +338,16 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         }
     case kIROp_CoopMatrixType:
         {
-            // CUDA wmma require SM 7.5+
-            m_extensionTracker->requireSMVersion(SemanticVersion(7, 5));
-            return emitWMMAFragmentType(as<IRCoopMatrixType>(type), out);
+            auto coopType = as<IRCoopMatrixType>(type);
+            auto result = emitWMMAFragmentType(coopType, out);
+            m_extensionTracker->requireSMVersion(SemanticVersion(8, 0));
+            // FP8 mma instructions (mma.sync.m16n8k16 with .e4m3/.e5m2) were
+            // introduced in PTX ISA 8.7 / SM 8.9 (Ada Lovelace).  Earlier SM
+            // targets reject the PTX as invalid at JIT time.
+            auto elemOp = coopType->getElementType()->getOp();
+            if (elemOp == kIROp_FloatE4M3Type || elemOp == kIROp_FloatE5M2Type)
+                m_extensionTracker->requireSMVersion(SemanticVersion(8, 9));
+            return result;
         }
     case kIROp_FloatE4M3Type:
         out << "__nv_fp8_e4m3";
@@ -768,6 +839,117 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", -1);\n");
             return true;
         }
+    case kIROp_CoopVecMatMulAdd:
+        {
+            if (!isOptixCoopVec)
+            {
+                getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                    .operation = "cooperative vector matrix multiply-add",
+                    .location = inst->sourceLoc});
+                _emitInstAsDefaultInitializedVar(inst, inst->getDataType());
+                return true;
+            }
+
+            emitInstResultDecl(inst);
+            emitInstExpr(inst, getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+            return true;
+        }
+    case kIROp_CoopMatMulAdd:
+        {
+            emitInstResultDecl(inst);
+            emitInstExpr(inst, getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+            return true;
+        }
+    case kIROp_CoopVecOuterProductAccumulate:
+        {
+            if (!isOptixCoopVec)
+            {
+                getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                    .operation = "cooperative vector outer-product accumulate",
+                    .location = inst->sourceLoc});
+                m_writer->emit("/* unsupported cooperative vector outer-product accumulate */\n");
+                return true;
+            }
+
+            auto outerProduct = cast<IRCoopVecOuterProductAccumulate>(inst);
+            auto matrixLayout = cast<IRIntLit>(outerProduct->getMemoryLayout())->getValue();
+            auto matrixInterpretation =
+                cast<IRIntLit>(outerProduct->getMatrixInterpretation())->getValue();
+
+            if (matrixLayout != SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL)
+            {
+                getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                    .operation =
+                        "cooperative vector outer-product accumulate requires TrainingOptimal "
+                        "matrix layout for OptiX",
+                    .location = inst->sourceLoc});
+                m_writer->emit("/* unsupported cooperative vector outer-product accumulate */\n");
+                return true;
+            }
+
+            if (matrixInterpretation != SLANG_SCALAR_TYPE_FLOAT16)
+            {
+                getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                    .operation =
+                        "cooperative vector outer-product accumulate requires Float16 matrix "
+                        "interpretation for OptiX",
+                    .location = inst->sourceLoc});
+                m_writer->emit("/* unsupported cooperative vector outer-product accumulate */\n");
+                return true;
+            }
+
+            m_writer->emit("optixCoopVecOuterProductAccumulate(");
+            emitOperand(outerProduct->getA(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(outerProduct->getB(), getInfo(EmitOp::General));
+            m_writer->emit(", (CUdeviceptr)(&(");
+            emitOperand(outerProduct->getMatrixPtr(), getInfo(EmitOp::General));
+            m_writer->emit(")), ");
+            emitOperand(outerProduct->getMatrixOffset(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(outerProduct->getMatrixStride(), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_CoopVecReduceSumAccumulate:
+        {
+            if (!isOptixCoopVec)
+            {
+                getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                    .operation = "cooperative vector reduce-sum accumulate",
+                    .location = inst->sourceLoc});
+                m_writer->emit("/* unsupported cooperative vector reduce-sum accumulate */\n");
+                return true;
+            }
+
+            auto reduceSum = cast<IRCoopVecReduceSumAccumulate>(inst);
+            auto valueType = as<IRCoopVectorType>(reduceSum->getValue()->getDataType());
+            SLANG_ASSERT(valueType);
+            auto valueElementType = as<IRBasicType>(valueType->getElementType());
+            SLANG_ASSERT(valueElementType);
+            if (valueElementType->getBaseType() != BaseType::Half &&
+                valueElementType->getBaseType() != BaseType::Float)
+            {
+                getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                    .operation =
+                        "cooperative vector reduce-sum accumulate requires Float16 or Float32 "
+                        "vector element type for OptiX",
+                    .location = inst->sourceLoc});
+                m_writer->emit("/* unsupported cooperative vector reduce-sum accumulate */\n");
+                return true;
+            }
+
+            m_writer->emit("optixCoopVecReduceSumAccumulate(");
+            emitOperand(reduceSum->getValue(), getInfo(EmitOp::General));
+            m_writer->emit(", (CUdeviceptr)(&(");
+            emitOperand(reduceSum->getBufferPtr(), getInfo(EmitOp::General));
+            m_writer->emit(")), ");
+            emitOperand(reduceSum->getOffset(), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
     case kIROp_SetOptiXPayloadRegister:
         {
             auto idxInst = as<IRIntLit>(inst->getOperand(0));
@@ -877,7 +1059,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 m_writer->emit(")");
                 return true;
             }
-            else if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
+            else if (const auto matrixType = as<IRMatrixType>(inst->getDataType()); matrixType)
             {
                 m_writer->emit("make");
                 emitType(inst->getDataType());
@@ -919,6 +1101,207 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
+            return true;
+        }
+    case kIROp_CoopMatMulAdd:
+        {
+            auto coopMatMulAdd = cast<IRCoopMatMulAdd>(inst);
+            auto matA = coopMatMulAdd->getMatA();
+            auto matB = coopMatMulAdd->getMatB();
+            auto matC = coopMatMulAdd->getMatC();
+            auto saturatingAccumulation =
+                cast<IRBoolLit>(coopMatMulAdd->getSaturatingAccumulation())->getValue();
+
+            auto aElemType = cast<IRCoopMatrixType>(matA->getDataType())->getElementType();
+            auto bElemType = cast<IRCoopMatrixType>(matB->getDataType())->getElementType();
+            auto cElemType = cast<IRCoopMatrixType>(matC->getDataType())->getElementType();
+            auto dElemType = cast<IRCoopMatrixType>(coopMatMulAdd->getDataType())->getElementType();
+            if (!coopMatMulAddTypeCombinationIsValid(
+                    aElemType->getOp(),
+                    bElemType->getOp(),
+                    cElemType->getOp(),
+                    dElemType->getOp()))
+            {
+                auto formatElem = [&](IRType* type) -> String
+                {
+                    StringBuilder sb;
+                    calcTypeName(type, CodeGenTarget::CUDASource, sb);
+                    return sb.toString();
+                };
+                getSink()->diagnose(Diagnostics::CooperativeMatrixInvalidMmaTypeCombination{
+                    .aType = formatElem(aElemType),
+                    .bType = formatElem(bElemType),
+                    .cType = formatElem(cElemType),
+                    .dType = formatElem(dElemType),
+                    .location = inst->sourceLoc});
+                // The DiagnosticSink has already recorded the error, but the
+                // surrounding statement-emit path expects an expression to
+                // follow `Type _Sname = ` (otherwise we'd emit the syntactically
+                // invalid `Type _Sname = ;`).  Emit a default-constructed
+                // value of the result type as a placeholder; the recorded
+                // error makes the overall compile fail anyway, so the
+                // placeholder never reaches NVRTC.
+                m_writer->emit("(");
+                emitType(inst->getDataType());
+                m_writer->emit("{})");
+                return true;
+            }
+
+            m_writer->emit("Slang_CUDA_WMMA::coopMatMulAdd<");
+            emitType(matA->getDataType());
+            m_writer->emit("::ElementType, ");
+            emitType(matB->getDataType());
+            m_writer->emit("::ElementType, ");
+            emitType(matC->getDataType());
+            m_writer->emit("::ElementType, ");
+            emitType(coopMatMulAdd->getDataType());
+            m_writer->emit("::ElementType, ");
+            emitType(matA->getDataType());
+            m_writer->emit("::m_M, ");
+            emitType(matA->getDataType());
+            m_writer->emit("::m_N, ");
+            emitType(matA->getDataType());
+            m_writer->emit("::m_K, ");
+            m_writer->emit(saturatingAccumulation ? "true" : "false");
+            m_writer->emit(">(");
+            emitOperand(matA, getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(matB, getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(matC, getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+    case kIROp_CoopVecMatMulAdd:
+        {
+            // CoopVec matmul ops are always emitted as statements, so non-OptiX handling lives in
+            // tryEmitInstStmtImpl().
+            SLANG_ASSERT(isOptixCoopVec);
+
+            auto coopVecMatMulAdd = cast<IRCoopVecMatMulAdd>(inst);
+            auto inputInterpretationPackingFactor =
+                cast<IRIntLit>(coopVecMatMulAdd->getInputInterpretationPackingFactor())->getValue();
+            auto inputInterpretation =
+                cast<IRIntLit>(coopVecMatMulAdd->getInputInterpretation())->getValue();
+            auto matrixInterpretation =
+                cast<IRIntLit>(coopVecMatMulAdd->getMatrixInterpretation())->getValue();
+            auto biasInterpretation = coopVecMatMulAdd->getBiasInterpretation();
+            const bool hasBias = biasInterpretation != nullptr;
+
+            if (inputInterpretationPackingFactor != 1)
+            {
+                emitUnsupportedTargetIntrinsicExpr(
+                    this,
+                    inst,
+                    "cooperative vector matrix multiply-add with packed input is not implemented "
+                    "yet",
+                    inst->sourceLoc);
+                return true;
+            }
+
+            auto inputInterpretationName =
+                getOptixCoopVecComponentTypeName((uint32_t)inputInterpretation);
+            if (!inputInterpretationName.getLength())
+            {
+                emitUnsupportedTargetIntrinsicExpr(
+                    this,
+                    inst,
+                    "cooperative vector matrix multiply-add with unsupported OptiX input "
+                    "interpretation type",
+                    inst->sourceLoc);
+                return true;
+            }
+
+            auto matrixInterpretationName =
+                getOptixCoopVecComponentTypeName((uint32_t)matrixInterpretation);
+            if (!matrixInterpretationName.getLength())
+            {
+                emitUnsupportedTargetIntrinsicExpr(
+                    this,
+                    inst,
+                    "cooperative vector matrix multiply-add with unsupported OptiX matrix "
+                    "interpretation type",
+                    inst->sourceLoc);
+                return true;
+            }
+
+            auto matrixLayout = cast<IRIntLit>(coopVecMatMulAdd->getMemoryLayout())->getValue();
+            auto matrixLayoutName = getOptixCoopVecMatrixLayoutName((uint32_t)matrixLayout);
+
+            auto transposeValue = cast<IRBoolLit>(coopVecMatMulAdd->getTranspose())->getValue();
+            if (transposeValue)
+            {
+                if (matrixInterpretation != SLANG_SCALAR_TYPE_FLOAT16 ||
+                    (matrixLayout != SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL &&
+                     matrixLayout != SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL))
+                {
+                    emitUnsupportedTargetIntrinsicExpr(
+                        this,
+                        inst,
+                        "cooperative vector matrix multiply-add with transpose requires Float16 "
+                        "matrix interpretation and InferencingOptimal or TrainingOptimal matrix "
+                        "layout for OptiX",
+                        inst->sourceLoc);
+                    return true;
+                }
+            }
+
+            UnownedStringSlice biasInterpretationName;
+            if (hasBias)
+            {
+                biasInterpretationName = getOptixCoopVecComponentTypeName(
+                    (uint32_t)cast<IRIntLit>(biasInterpretation)->getValue());
+                if (!biasInterpretationName.getLength())
+                {
+                    emitUnsupportedTargetIntrinsicExpr(
+                        this,
+                        inst,
+                        "cooperative vector matrix multiply-add with unsupported OptiX bias "
+                        "interpretation type",
+                        inst->sourceLoc);
+                    return true;
+                }
+            }
+
+            m_writer->emit("(");
+            m_writer->emit("slangOptixCoopVecMatMul<");
+            emitType(inst->getDataType());
+            m_writer->emit(", ");
+            emitType(coopVecMatMulAdd->getInput()->getDataType());
+            m_writer->emit(", ");
+            m_writer->emit(inputInterpretationName);
+            m_writer->emit(", ");
+            m_writer->emit(matrixInterpretationName);
+            m_writer->emit(", ");
+            m_writer->emit(matrixLayoutName);
+            if (hasBias)
+            {
+                m_writer->emit(", ");
+                m_writer->emit(biasInterpretationName);
+            }
+            m_writer->emit(">((");
+            emitOperand(coopVecMatMulAdd->getInput(), getInfo(EmitOp::General));
+            m_writer->emit("), (CUdeviceptr)(&((");
+            emitOperand(coopVecMatMulAdd->getMatrixPtr(), getInfo(EmitOp::General));
+            m_writer->emit("))), ");
+            emitOperand(coopVecMatMulAdd->getMatrixOffset(), getInfo(EmitOp::General));
+            if (hasBias)
+            {
+                m_writer->emit(", (CUdeviceptr)(&((");
+                emitOperand(coopVecMatMulAdd->getBiasPtr(), getInfo(EmitOp::General));
+                m_writer->emit("))), ");
+                emitOperand(coopVecMatMulAdd->getBiasOffset(), getInfo(EmitOp::General));
+            }
+            else if (
+                as<IRHLSLStructuredBufferTypeBase>(
+                    coopVecMatMulAdd->getMatrixPtr()->getDataType()) == nullptr)
+            {
+                m_writer->emit(", ");
+                emitOperand(coopVecMatMulAdd->getTranspose(), getInfo(EmitOp::General));
+            }
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMulAdd->getMatrixStride(), getInfo(EmitOp::General));
+            m_writer->emit("))");
             return true;
         }
     case kIROp_MakeArray:
@@ -1198,105 +1581,92 @@ static bool typeCheck(IROp op, uint32_t matrixUse)
 {
     switch (matrixUse)
     {
-    case 0: // matrixA
-    case 1: // matrixB
-        return op == kIROp_UInt8Type || op == kIROp_Int8Type || op == kIROp_HalfType ||
-               op == kIROp_BFloat16Type || op == kIROp_FloatE4M3Type || op == kIROp_FloatE5M2Type;
-    case 2: // accumulator
-        return op == kIROp_IntType || op == kIROp_HalfType || op == kIROp_FloatType;
+    case SLANG_COOPERATIVE_MATRIX_USE_A:
+    case SLANG_COOPERATIVE_MATRIX_USE_B:
+        // PTX m16n8k16 supports f16, bf16, 8-bit integer (s8 / u8), and 8-bit
+        // float (e4m3 / e5m2) inputs.
+        return op == kIROp_HalfType || op == kIROp_BFloat16Type || op == kIROp_Int8Type ||
+               op == kIROp_UInt8Type || op == kIROp_FloatE4M3Type || op == kIROp_FloatE5M2Type;
+    case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
+        // Union of the legal accumulator element types across all
+        // currently-supported A/B element types: half/float (for f16, bf16, f8
+        // inputs) and int (for s8 / u8 inputs).  The full A/B/C/D combination
+        // is checked separately by `coopMatMulAddTypeCombinationIsValid`
+        // before code emission.
+        return op == kIROp_HalfType || op == kIROp_FloatType || op == kIROp_IntType;
     }
     return false;
+}
+
+// Validate that a `coopMatMulAdd` (A * B + C -> D) is one of the legal
+// (AType, BType, CType, DType) tuples for the CUDA backend.  The helper
+// templates in `prelude/slang-cuda-prelude.h` only have specializations for
+// these tuples; without this check, an illegal combination would compile
+// through Slang and only fail later inside NVRTC with a hard-to-read C++
+// template error.
+static bool coopMatMulAddTypeCombinationIsValid(IROp aType, IROp bType, IROp cType, IROp dType)
+{
+    // Both A and B must share the same element type — every supported
+    // CUDA mma form has matching `.atype` and `.btype`.
+    if (aType != bType)
+        return false;
+
+    auto isHalfOrFloat = [](IROp t) { return t == kIROp_HalfType || t == kIROp_FloatType; };
+    auto isFloat = [](IROp t) { return t == kIROp_FloatType; };
+    auto isInt32 = [](IROp t) { return t == kIROp_IntType; };
+
+    switch (aType)
+    {
+    case kIROp_HalfType:
+        // f16 mma supports both f16 and f32 accumulator/output, and CType
+        // and DType may be picked independently from {half, float}.
+        return isHalfOrFloat(cType) && isHalfOrFloat(dType);
+    case kIROp_BFloat16Type:
+        // bf16 mma only allows an f32 accumulator and output on PTX.
+        return isFloat(cType) && isFloat(dType);
+    case kIROp_Int8Type:
+    case kIROp_UInt8Type:
+        // Integer mma only allows an s32 accumulator and output.
+        return isInt32(cType) && isInt32(dType);
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+        // fp8 mma supports half or float accumulator/output; the prelude only
+        // provides specializations where CType == DType for these.
+        return (cType == kIROp_HalfType && dType == kIROp_HalfType) ||
+               (cType == kIROp_FloatType && dType == kIROp_FloatType);
+    default:
+        return false;
+    }
 }
 
 static UnownedStringSlice getMatrixUseName(uint32_t matrixUse)
 {
     switch (matrixUse)
     {
-    case 0:
+    case SLANG_COOPERATIVE_MATRIX_USE_A:
         return UnownedStringSlice("Slang_CUDA_WMMA::MatrixA");
-    case 1:
+    case SLANG_COOPERATIVE_MATRIX_USE_B:
         return UnownedStringSlice("Slang_CUDA_WMMA::MatrixB");
-    case 2:
+    case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
         return UnownedStringSlice("Slang_CUDA_WMMA::MatrixC");
     default:
-        return UnownedStringSlice();
+        SLANG_UNEXPECTED("invalid cooperative matrix use");
     }
 }
 
-struct FragmentShape
-{
-    int m, n, k;
-
-    bool isValid() const { return m > 0 && n > 0 && k > 0; }
-};
-
 /*
- * Strict Shape Validation Strategy:
- * Users must provide exact dimensions that match one of the allowed WMMA shapes:
- *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16)
- *   - m8n32k16:  Matrix A (8x16),  Matrix B (16x32), Matrix C/D (8x32)
- *   - m32n8k16:  Matrix A (32x16), Matrix B (16x8),  Matrix C/D (32x8)
+ * Shape Validation Strategy:
+ * Maps CoopMat dimensions to the canonical MMA shape (m, n, k).
+ * Only m16n16k16 is supported (internally uses 2x mma.sync.m16n8k16).
  *
- * Note: k dimension is always 16 for all shapes.
+ * Supported shapes:
+ *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16)
  */
-inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col)
+inline FragmentShape computeShapeCombination(uint32_t /*matrixUse*/, uint32_t row, uint32_t col)
 {
-    switch (matrixUse)
-    {
-    case 0: // Matrix A: row=m, col=k
-        {
-            // k must always be 16
-            if (col != 16)
-            {
-                return {0, 0, 0}; // Invalid
-            }
-            // Check exact m values
-            switch (row)
-            {
-            case 16:
-                return {16, 16, 16};
-            case 8:
-                return {8, 32, 16};
-            case 32:
-                return {32, 8, 16};
-            default:
-                return {0, 0, 0}; // Invalid
-            }
-        }
-    case 1: // Matrix B: row=k, col=n
-        {
-            // k must always be 16
-            if (row != 16)
-            {
-                return {0, 0, 0}; // Invalid
-            }
-            // Check exact n values
-            switch (col)
-            {
-            case 16:
-                return {16, 16, 16};
-            case 32:
-                return {8, 32, 16};
-            case 8:
-                return {32, 8, 16};
-            default:
-                return {0, 0, 0}; // Invalid
-            }
-        }
-    case 2: // Matrix C/D: row=m, col=n
-    default:
-        {
-            // Check exact (m, n) combinations
-            if (row == 16 && col == 16)
-                return {16, 16, 16};
-            else if (row == 8 && col == 32)
-                return {8, 32, 16};
-            else if (row == 32 && col == 8)
-                return {32, 8, 16};
-            else
-                return {0, 0, 0}; // Invalid
-        }
-    }
+    if (row == 16 && col == 16)
+        return {16, 16, 16};
+    return {0, 0, 0};
 }
 
 SlangResult CUDASourceEmitter::emitWMMAFragmentType(
@@ -1319,7 +1689,9 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     {
         getSink()->diagnose(Diagnostics::CooperativeMatrixUnsupportedElementType{
             .elementType = typeName,
-            .matrixUse = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
+            .matrixUse = matrixUse == SLANG_COOPERATIVE_MATRIX_USE_A
+                             ? "A"
+                             : (matrixUse == SLANG_COOPERATIVE_MATRIX_USE_B ? "B" : "C")});
         SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }
@@ -1332,7 +1704,9 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
         getSink()->diagnose(Diagnostics::CooperativeMatrixInvalidShape{
             .rowCount = String(rowCount),
             .colCount = String(colCount),
-            .matrixUse = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
+            .matrixUse = matrixUse == SLANG_COOPERATIVE_MATRIX_USE_A
+                             ? "A"
+                             : (matrixUse == SLANG_COOPERATIVE_MATRIX_USE_B ? "B" : "C")});
         SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }

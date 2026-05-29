@@ -2,8 +2,13 @@ name: Slash Command Dispatch
 on:
   issue_comment:
     types: [created]
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
 jobs:
   slashCommandDispatch:
+    if: github.repository == 'shader-slang/slang'
     runs-on: ubuntu-latest
     steps:
       - name: Slash Command Dispatch
@@ -17,17 +22,17 @@ jobs:
             [
               {
                 "command": "format",
-                "permission": "none",
+                "permission": "write",
                 "issue_type": "pull-request"
               },
               {
                 "command": "regenerate-toc",
-                "permission": "none",
+                "permission": "write",
                 "issue_type": "pull-request"
               },
               {
                 "command": "regenerate-cmdline-ref",
-                "permission": "none",
+                "permission": "write",
                 "issue_type": "pull-request"
               }
             ]

@@ -1,4 +1,4 @@
-if(SLANG_EMBED_CORE_MODULE)
+if(TARGET slang-glsl-module)
     set(SLANG_GLSL_MODULE_DEPENDENCY REQUIRES slang-glsl-module)
 else()
     set(SLANG_GLSL_MODULE_DEPENDENCY)
