@@ -256,20 +256,20 @@ struct MyVec : IDifferentiable
 {
     typealias Differential = MyVecDiff;
 
-    [DerivativeMember(MyVecDiff.x)]
+    [DerivativeMember(Differential.x)]
     float x;
 
-    [DerivativeMember(MyVecDiff.y)]
+    [DerivativeMember(Differential.y)]
     float y;
 
     [Differentiable]
-    static MyVecDiff dzero()
+    static Differential dzero()
     {
         return { 0.0f, 0.0f };
     }
 
     [Differentiable]
-    static MyVecDiff dadd(MyVecDiff a, MyVecDiff b)
+    static Differential dadd(Differential a, Differential b)
     {
         return { a.x + b.x, a.y + b.y };
     }
