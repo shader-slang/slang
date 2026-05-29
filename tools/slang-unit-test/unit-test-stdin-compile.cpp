@@ -7,6 +7,7 @@
 #include "unit-test/slang-unit-test.h"
 
 #ifdef _WIN32
+#include <direct.h>
 #include <fcntl.h>
 #include <io.h>
 #else
@@ -21,6 +22,15 @@ using namespace Slang;
 static bool _contains(const String& text, const char* expected)
 {
     return text.getUnownedSlice().indexOf(UnownedStringSlice(expected)) >= 0;
+}
+
+static SlangResult _setCurrentDirectory(const String& path)
+{
+#ifdef _WIN32
+    return _chdir(path.getBuffer()) == 0 ? SLANG_OK : SLANG_FAIL;
+#else
+    return chdir(path.getBuffer()) == 0 ? SLANG_OK : SLANG_FAIL;
+#endif
 }
 
 static void _appendDiagnostic(char const* message, void* userData)
@@ -795,16 +805,6 @@ struct DebugSpvFileCollector : Path::Visitor
     }
 };
 
-static bool _containsFileName(const List<String>& files, const String& path)
-{
-    for (const auto& file : files)
-    {
-        if (file == path)
-            return true;
-    }
-    return false;
-}
-
 static SlangResult _collectDebugSpvFiles(List<String>& outFiles)
 {
     DebugSpvFileCollector collector;
@@ -813,14 +813,45 @@ static SlangResult _collectDebugSpvFiles(List<String>& outFiles)
     return result == SLANG_E_NOT_FOUND ? SLANG_OK : result;
 }
 
+struct ScopedTemporaryCurrentDirectory
+{
+    String path;
+    String previousPath;
+    bool didChangeDirectory = false;
+
+    ~ScopedTemporaryCurrentDirectory()
+    {
+        if (didChangeDirectory)
+            _setCurrentDirectory(previousPath);
+        if (path.getLength() != 0)
+            Path::removeNonEmpty(path);
+    }
+
+    SlangResult init(const char* prefix)
+    {
+        previousPath = Path::getCurrentPath();
+        if (previousPath.getLength() == 0)
+            return SLANG_FAIL;
+
+        SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice(prefix), path));
+        SLANG_RETURN_ON_FAIL(File::remove(path));
+        if (!Path::createDirectory(path))
+            return SLANG_FAIL;
+
+        SLANG_RETURN_ON_FAIL(_setCurrentDirectory(path));
+        didChangeDirectory = true;
+        return SLANG_OK;
+    }
+};
+
 static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     UnitTestContext* context)
 {
     TempCoverageCliFiles files;
     SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
 
-    List<String> debugFilesBefore;
-    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesBefore));
+    ScopedTemporaryCurrentDirectory debugWorkingDirectory;
+    SLANG_RETURN_ON_FAIL(debugWorkingDirectory.init("slangc-coverage-debug"));
 
     List<String> args;
     _addCoverageCliCompileArgs(args, files.sourcePath, true);
@@ -835,20 +866,11 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     if (result.resultCode != 0)
         return SLANG_FAIL;
 
-    List<String> debugFilesAfter;
-    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesAfter));
-
-    String debugArtifactPath;
-    for (const auto& file : debugFilesAfter)
-    {
-        if (!_containsFileName(debugFilesBefore, file))
-        {
-            debugArtifactPath = file;
-            break;
-        }
-    }
-    if (debugArtifactPath.getLength() == 0)
+    List<String> debugFiles;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFiles));
+    if (debugFiles.getCount() != 1)
         return SLANG_FAIL;
+    String debugArtifactPath = debugFiles[0];
 
     File::remove(files.outputPath);
     File::remove(files.autoManifestPath);
