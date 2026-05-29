@@ -1,10 +1,12 @@
-//TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain
+//TEST:SIMPLE(filecheck=DXIL,SM60): -target dxil -entry computeMain
 //TEST:SIMPLE(filecheck=DXIL,SM60): -target dxil-assembly -entry computeMain
-//TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain -profile cs_5_1
+//TEST:SIMPLE(filecheck=DXIL,SM60): -target dxil -entry computeMain -profile cs_5_1
 //TEST:SIMPLE(filecheck=DXIL,SM60): -target dxil-assembly -entry computeMain -profile cs_5_1
-//TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain -profile cs_5_0
+//TEST:SIMPLE(filecheck=DXIL,SM60): -target dxil -entry computeMain -profile cs_5_0
 //TEST:SIMPLE(filecheck=DXIL,SM60): -target dxil-assembly -entry computeMain -profile cs_5_0
+//TEST:SIMPLE(filecheck=DXIL,SM65): -target dxil-assembly -entry computeMain -profile cs_6_5
 //TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -entry computeMain -profile cs_5_1 -whole-program
+//TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -entry computeMain -profile cs_6_3 -whole-program
 //TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -whole-program
 //TEST(windows):COMPILE: tests/bugs/gh-11021-dxil-default-profile.slang -target dxil -o tests/bugs/gh-11021-dxil-default-profile.dxil
 //TEST(windows):COMPILE: tests/bugs/gh-11021-dxil-default-profile.slang -target dxil -entry computeMain -profile cs_5_1 -whole-program -o tests/bugs/gh-11021-dxil-whole-program-profile.dxil
@@ -13,6 +15,9 @@
 
 // SM60: !dx.shaderModel = !{![[SM:[0-9]+]]}
 // SM60: ![[SM]] = !{!"cs", i32 6, i32 0}
+
+// SM65: !dx.shaderModel = !{![[SM:[0-9]+]]}
+// SM65: ![[SM]] = !{!"cs", i32 6, i32 5}
 
 // LIB: !dx.shaderModel = !{![[SM:[0-9]+]]}
 // LIB: ![[SM]] = !{!"lib", i32 6, i32 3}
