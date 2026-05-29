@@ -287,7 +287,9 @@ subsequent reconfigures are fast. The checked-in `v1.9.2602` Linux prebuilt
 archive currently requires GLIBC 2.38 or newer.
 
 - `ON`: build DXC from source on Windows and Linux; on other platforms, DXC is unavailable.
-- `OFF`: use the prebuilt binary when one is available and skip the GLIBC check; on non-x86_64 Linux without `SLANG_DXC_BINARY_URL`, DXC is unavailable because there is no official prebuilt binary.
+- `OFF`: use the prebuilt binary when one is available and skip the GLIBC check; on
+  non-x86_64 Linux, DXC is unavailable unless `SLANG_DXC_BINARY_URL` is set to a
+  custom prebuilt for that architecture.
 - unset on native non-x86_64 Linux (e.g. ARM64): DXC is unavailable because no official prebuilt binary exists; set `ON` to build DXC from source.
 - unset while cross-compiling for Linux x86_64: skip GLIBC detection because the target system cannot be probed at configure time.
 
