@@ -342,7 +342,53 @@ The available format type names follow Slang's type naming convention, with name
 The plain scalar and vector element types, such as `float4`, `int4`, and `uint4`, are still supported for compatibility and for cases where the storage format is provided externally.
 They do not encode a specific storage format in the texture type.
 Using explicit format types whenever possible makes declarations easier to read and lets the type system distinguish textures that have the same data type but different storage formats.
-This explicit type form is required when a formatted texture is named through a descriptor handle: write the format in the texture element type, such as `DescriptorHandle<RWTexture2D<RGBA8Unorm>>` or `RWTexture2D<RGBA8Unorm>.Handle`, rather than relying on a `[format]` attribute on a handle to `RWTexture2D<float4>`.
+
+##### Explicit Texture Element Formats
+
+| Texture element type | Storage format | Value type |
+|----------------------|----------------|------------|
+| `RGBA32F` | `rgba32f` | `float4` |
+| `RGBA16F` | `rgba16f` | `float4` |
+| `RG32F` | `rg32f` | `float2` |
+| `RG16F` | `rg16f` | `float2` |
+| `R11G11B10F` | `r11f_g11f_b10f` | `float3` |
+| `R32F` | `r32f` | `float` |
+| `R16F` | `r16f` | `float` |
+| `RGBA16Unorm` | `rgba16` | `float4` |
+| `RGB10A2Unorm` | `rgb10_a2` | `float4` |
+| `RGBA8Unorm` | `rgba8` | `float4` |
+| `RG16Unorm` | `rg16` | `float2` |
+| `RG8Unorm` | `rg8` | `float2` |
+| `R16Unorm` | `r16` | `float` |
+| `R8Unorm` | `r8` | `float` |
+| `RGBA16Snorm` | `rgba16_snorm` | `float4` |
+| `RGBA8Snorm` | `rgba8_snorm` | `float4` |
+| `RG16Snorm` | `rg16_snorm` | `float2` |
+| `RG8Snorm` | `rg8_snorm` | `float2` |
+| `R16Snorm` | `r16_snorm` | `float` |
+| `R8Snorm` | `r8_snorm` | `float` |
+| `RGBA32I` | `rgba32i` | `int4` |
+| `RGBA16I` | `rgba16i` | `int4` |
+| `RGBA8I` | `rgba8i` | `int4` |
+| `RG32I` | `rg32i` | `int2` |
+| `RG16I` | `rg16i` | `int2` |
+| `RG8I` | `rg8i` | `int2` |
+| `R32I` | `r32i` | `int` |
+| `R16I` | `r16i` | `int` |
+| `R8I` | `r8i` | `int` |
+| `RGBA32UI` | `rgba32ui` | `uint4` |
+| `RGBA16UI` | `rgba16ui` | `uint4` |
+| `RGB10A2UI` | `rgb10_a2ui` | `uint4` |
+| `RGBA8UI` | `rgba8ui` | `uint4` |
+| `RG32UI` | `rg32ui` | `uint2` |
+| `RG16UI` | `rg16ui` | `uint2` |
+| `RG8UI` | `rg8ui` | `uint2` |
+| `R32UI` | `r32ui` | `uint` |
+| `R16UI` | `r16ui` | `uint` |
+| `R8UI` | `r8ui` | `uint` |
+| `R64UI` | `r64ui` | `uint64_t` |
+| `R64I` | `r64i` | `int64_t` |
+| `BGRA8Unorm` | `bgra8` | `float4` |
 
 #### Sampler
 
