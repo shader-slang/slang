@@ -539,6 +539,72 @@ static bool isPointerRangeInRange(
     return start >= rangeStart && end <= rangeEnd;
 }
 
+static bool findAncestorWorkingSetContainingPointer(
+    ByteCodeInterpreter* ctx,
+    uintptr_t ptr,
+    uintptr_t& outFrameStart,
+    uintptr_t& outFrameEnd)
+{
+    // A callee can legally receive an out/ref pointer into one of its caller's
+    // working sets. Find that ancestor frame so later validation can bound the
+    // actual access to the same frame instead of accepting an arbitrary pointer.
+    auto workingSetBuffer = ctx->m_workingSetBuffer.getBuffer();
+    for (auto& stackFrame : ctx->m_stack)
+    {
+        auto frameStart =
+            reinterpret_cast<uintptr_t>(workingSetBuffer + stackFrame.m_workingSetOffset);
+        auto frameEnd = frameStart + stackFrame.m_currentWorkingSetSizeInBytes;
+        if (isPointerInRangeOrAtEnd(ptr, frameStart, frameEnd))
+        {
+            outFrameStart = frameStart;
+            outFrameEnd = frameEnd;
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool isAccessThroughPointerParameter(
+    ByteCodeInterpreter* ctx,
+    uintptr_t accessStart,
+    uintptr_t accessEnd)
+{
+    // Pointer-sized parameters may be by-ref/out arguments that alias caller
+    // storage. In static-const-array-requirement.slang, eval() receives
+    // `output` this way, and `output[i]` stores through offsets from that
+    // parameter pointer. Accept such accesses only when the parameter points
+    // into an ancestor frame and the whole access stays inside that frame.
+    auto currentFunction = ctx->m_currentFunction;
+    if (!currentFunction)
+        return false;
+
+    auto parameterCount = currentFunction->m_header->parameterCount;
+    auto parameterBytes = reinterpret_cast<uint8_t*>(ctx->m_currentWorkingSet);
+    for (uint32_t i = 0; i < parameterCount; i++)
+    {
+        auto parameterOffset = currentFunction->m_parameterOffsets[i];
+        auto nextParameterOffset = currentFunction->m_parameterOffsets[i + 1];
+        if (nextParameterOffset - parameterOffset != sizeof(void*))
+            continue;
+
+        void* parameterPtr = nullptr;
+        memcpy(&parameterPtr, parameterBytes + parameterOffset, sizeof(parameterPtr));
+        auto parameterPtrStart = reinterpret_cast<uintptr_t>(parameterPtr);
+        if (accessStart < parameterPtrStart)
+            continue;
+
+        uintptr_t frameStart = 0;
+        uintptr_t frameEnd = 0;
+        if (findAncestorWorkingSetContainingPointer(ctx, parameterPtrStart, frameStart, frameEnd) &&
+            isPointerRangeInRange(accessStart, accessEnd, frameStart, frameEnd))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool ByteCodeInterpreter::validatePointerAccess(const void* ptr, size_t size, bool isWrite)
 {
     if (!ptr && size != 0)
@@ -569,6 +635,14 @@ bool ByteCodeInterpreter::validatePointerAccess(const void* ptr, size_t size, bo
             return failExecution("VM pointer access exceeded the constants section.");
         return true;
     }
+
+    // Current-frame and constants accesses were handled above. Check bounded
+    // pointer-parameter accesses here so out/ref array elements like
+    // static-const-array-requirement.slang's `output[i]` are accepted, while
+    // the exact pointer fallback below remains available for parameters whose
+    // pointee range is not represented by a VM working-set frame.
+    if (isAccessThroughPointerParameter(this, accessStart, accessEnd))
+        return true;
 
     auto parameterSize = m_currentFunction ? m_currentFunction->m_header->parameterSizeInBytes : 0;
     if (parameterSize >= sizeof(void*))
