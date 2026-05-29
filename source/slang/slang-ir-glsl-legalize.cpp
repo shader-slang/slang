@@ -3077,7 +3077,10 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 }
 
 // Consolidate ray tracing parameters for an entry point function
-void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* func)
+void consolidateRayTracingParameters(
+    GLSLLegalizationContext* context,
+    CodeGenContext* codeGenContext,
+    IRFunc* func)
 {
     auto builder = context->getBuilder();
     auto firstBlock = func->getFirstBlock();
@@ -3093,6 +3096,16 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
         auto paramLayout = findVarLayout(param);
         if (!isVaryingParameter(paramLayout))
             continue;
+
+        if (!codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
+        {
+            if (auto systemValueAttr = paramLayout->findSystemValueSemanticAttr())
+            {
+                if (systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid")))
+                    continue;
+            }
+        }
+
         builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
         if (as<IROutParamType>(param->getDataType()) ||
             as<IRBorrowInOutParamType>(param->getDataType()))
@@ -4208,6 +4221,16 @@ void legalizeEntryPointParameterForGLSL(
     // to a single variable, and we can lower reads/writes of it
     // directly, rather than introduce an intermediate temporary.
     //
+    bool isRayTracingPrimitiveIDSystemValueParam = false;
+    if (!codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
+    {
+        if (auto systemValueAttr = paramLayout->findSystemValueSemanticAttr())
+        {
+            isRayTracingPrimitiveIDSystemValueParam =
+                systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid"));
+        }
+    }
+
     switch (stage)
     {
     default:
@@ -4219,7 +4242,9 @@ void legalizeEntryPointParameterForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        return;
+        if (!isRayTracingPrimitiveIDSystemValueParam)
+            return;
+        break;
     }
 
     // Is the parameter type a special pointer type
@@ -4918,7 +4943,7 @@ void legalizeEntryPointForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        consolidateRayTracingParameters(&context, func);
+        consolidateRayTracingParameters(&context, codeGenContext, func);
         break;
     default:
         break;
