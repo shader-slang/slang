@@ -78,9 +78,9 @@ const char* getBuildTagString()
     return SLANG_TAG_VERSION;
 }
 
-Profile getEffectiveTargetProfile(TargetRequest* target)
+Profile getEffectiveTargetProfile(TargetRequest* target, CompilerOptionSet& optionSet)
 {
-    auto targetProfile = target->getOptionSet().getProfile();
+    auto targetProfile = optionSet.getProfile();
 
     // Depending on the target *format* we might have to restrict the
     // profile family to one that makes sense.
@@ -117,7 +117,7 @@ Profile getEffectiveTargetProfile(TargetRequest* target)
             // DXIL generation goes through DXC, which requires Shader Model 6.0 or later.
             auto minVersion = ProfileVersion::DX_6_0;
 
-            if (target->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
+            if (optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))
             {
                 // Whole-program DXIL uses a lib_* profile. DXC validation rejects lib_6_1 and
                 // lib_6_2, so default DXIL libraries to the first accepted library profile.
@@ -143,6 +143,11 @@ Profile getEffectiveTargetProfile(TargetRequest* target)
     }
 
     return targetProfile;
+}
+
+Profile getEffectiveTargetProfile(TargetRequest* target)
+{
+    return getEffectiveTargetProfile(target, target->getOptionSet());
 }
 
 Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)

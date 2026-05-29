@@ -671,7 +671,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             if (compilerType == PassThroughMode::Dxc)
             {
                 // Can support no entry points on DXC because we can build libraries
-                profile = getEffectiveTargetProfile(targetReq);
+                profile = getEffectiveTargetProfile(targetReq, getTargetProgram()->getOptionSet());
             }
             else
             {
