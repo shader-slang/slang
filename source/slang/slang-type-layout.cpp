@@ -3539,7 +3539,7 @@ static bool isSM5OrEarlier(TargetRequest* targetReq)
     if (!isD3DTarget(targetReq))
         return false;
 
-    auto profile = targetReq->getOptionSet().getProfile();
+    auto profile = getEffectiveTargetProfile(targetReq);
 
     if (profile.getFamily() == ProfileFamily::DX)
     {
@@ -3555,7 +3555,7 @@ static bool isSM5_1OrLater(TargetRequest* targetReq)
     if (!isD3DTarget(targetReq))
         return false;
 
-    auto profile = targetReq->getOptionSet().getProfile();
+    auto profile = getEffectiveTargetProfile(targetReq);
 
     if (profile.getFamily() == ProfileFamily::DX)
     {

@@ -1,5 +1,8 @@
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain
 //TEST:SIMPLE(filecheck=DXIL): -target dxil-assembly -entry computeMain
+//TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain -profile cs_5_1
+//TEST:SIMPLE(filecheck=DXIL): -target dxil-assembly -entry computeMain -profile cs_5_1
+//TEST(windows):COMPILE: tests/bugs/gh-11021-dxil-default-profile.slang -target dxil -o tests/bugs/gh-11021-dxil-default-profile.dxil
 
 // DXIL: define void @computeMain()
 

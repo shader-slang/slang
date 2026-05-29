@@ -672,8 +672,7 @@ void HLSLSourceEmitter::ensureCoopVecHlslPreludeForProfile()
 {
     ensurePrelude("#include \"dx/linalg.h\"");
 
-    auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
-    if (targetProfile.getVersion() > ProfileVersion::DX_6_9)
+    if (m_effectiveProfile.getVersion() > ProfileVersion::DX_6_9)
     {
         ensurePrelude(m_CoopVecPrelude_sm610);
     }
@@ -1163,8 +1162,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             // SM6.0 requires to use `and()` and `or()` functions for the logical-AND and
             // logical-OR, respectively, with non-scalar operands.
-            auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
-            if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
+            if (m_effectiveProfile.getVersion() < ProfileVersion::DX_6_0)
                 return false;
             auto targetCaps = getTargetReq()->getTargetCaps();
             if (!isTargetHLSL2018(this, targetCaps, m_entryPointStage))
@@ -1191,8 +1189,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             // SM6.0 requires to use `select()` instead of the ternary operator "?:" when the
             // operands are non-scalar.
-            auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
-            if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
+            if (m_effectiveProfile.getVersion() < ProfileVersion::DX_6_0)
                 return false;
             auto targetCaps = getTargetReq()->getTargetCaps();
             if (!isTargetHLSL2018(this, targetCaps, m_entryPointStage))
