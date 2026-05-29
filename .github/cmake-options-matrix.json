@@ -2,9 +2,7 @@
   "include": [
     {
       "option": "SLANG_DXC_BUILD_FROM_SOURCE",
-      "value": "ON",
-      "container_only": "true",
-      "extra_cmake_flags": "-DSLANG_ENABLE_EXAMPLES=OFF"
+      "value": "ON"
     },
     { "option": "SLANG_EMBED_CORE_MODULE_SOURCE" },
     { "option": "SLANG_EMBED_CORE_MODULE" },

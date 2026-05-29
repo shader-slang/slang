@@ -15,8 +15,8 @@
 # Variables:
 #   SLANG_DXC_BINARY_URL        - Override the prebuilt binary download URL
 #                                 (optional; skips auto-detection when set)
-#   SLANG_DXC_BUILD_FROM_SOURCE - ON: always build from source; OFF: always use
-#                                 prebuilt when available (skips detection);
+#   SLANG_DXC_BUILD_FROM_SOURCE - ON: build from source when supported; OFF:
+#                                 always use prebuilt when available (skips detection);
 #                                 unset: auto-detect on native Linux x86_64 by
 #                                 downloading the prebuilt binary and inspecting
 #                                 the GLIBC requirements of both libdxcompiler.so
@@ -58,10 +58,6 @@ set(_dxc_windows_url_hash "SHA256=${_dxc_windows_sha256}")
 set(_dxc_linux_url_hash "SHA256=${_dxc_linux_sha256}")
 
 function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
-    if(NOT SLANG_ENABLE_TESTS)
-        return()
-    endif()
-
     # Stage public DXC HLSL headers (e.g. dx/linalg.h) at a stable path so test
     # directives like `-Xdxc -Ibuild/dxc/include` can resolve them. Done as a
     # build-graph custom command, matching the DLL/.so copy pattern below.
@@ -102,7 +98,16 @@ set(_dxc_build_from_source OFF)
 
 if(SLANG_DXC_BUILD_FROM_SOURCE)
     # User explicitly requested a source build.
-    set(_dxc_build_from_source ON)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set(_dxc_build_from_source ON)
+    else()
+        message(
+            WARNING
+            "SLANG_DXC_BUILD_FROM_SOURCE=ON is not supported on "
+            "${CMAKE_SYSTEM_NAME}. DXC will be unavailable."
+        )
+        return()
+    endif()
 elseif(
     DEFINED SLANG_DXC_BUILD_FROM_SOURCE
     AND NOT SLANG_DXC_BUILD_FROM_SOURCE
@@ -441,12 +446,6 @@ if(_dxc_build_from_source)
         # actively suppress existing ones. Pass -w via CMAKE_*_FLAGS to silence
         # all GCC/Clang warnings from DXC's source.
         set(_dxc_warning_flags "-DCMAKE_C_FLAGS=-w" "-DCMAKE_CXX_FLAGS=-w")
-    else()
-        message(
-            FATAL_ERROR
-            "SLANG_DXC_BUILD_FROM_SOURCE is not supported on "
-            "${CMAKE_SYSTEM_NAME}; supported platforms are Windows and Linux."
-        )
     endif()
 
     # DXC's build (PredefinedParams.cmake) is designed for a single-config
@@ -583,6 +582,8 @@ if(_dxc_build_from_source)
             ${CMAKE_COMMAND}
             --build
             "${_dxc_build_dir}"
+            --config
+            MinSizeRel
             --target
             dxcompiler
             dxildll
