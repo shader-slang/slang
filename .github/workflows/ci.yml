@@ -18,8 +18,9 @@ jobs:
       should-run: ${{ steps.filter.outputs.should-run }}
       dxc-source-build: ${{ steps.filter.outputs.dxc-source-build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           fetch-depth: "2"
       - id: filter
         run: |
@@ -34,7 +35,7 @@ jobs:
 
           shouldRun=true
           if files="$(git diff --name-only $BASE...HEAD)"; then
-            if echo "$files" | grep -qE '^(cmake/FetchDXC\.cmake|external/CMakeLists\.txt|external/slang-rhi|\.github/cmake-options-matrix\.json|\.github/workflows/ci\.yml|docs/building\.md)$'; then
+            if echo "$files" | grep -qE '^(cmake/FetchDXC\.cmake|external/CMakeLists\.txt|external/slang-rhi|\.github/cmake-options-matrix\.json|\.github/workflows/ci\.yml|docs/building\.md)$|^external/slang-rhi/'; then
               dxcSourceBuild=true
             fi
 
@@ -112,8 +113,9 @@ jobs:
           echo "=== Disk space after cleanup ==="
           df -h /
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           submodules: "recursive"
           fetch-depth: "2"
 
@@ -139,6 +141,7 @@ jobs:
 
           test -f build/Release/lib/libdxcompiler.so
           test -f build/Release/lib/libdxil.so
+          test -f build/dxc/include/dx/linalg.h
 
           cat > /tmp/dxc-smoke.slang <<'SLANG'
           [shader("compute")]

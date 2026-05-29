@@ -57,6 +57,41 @@ set(_dxc_linux_sha256
 set(_dxc_windows_url_hash "SHA256=${_dxc_windows_sha256}")
 set(_dxc_linux_url_hash "SHA256=${_dxc_linux_sha256}")
 
+function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
+    if(NOT SLANG_ENABLE_TESTS)
+        return()
+    endif()
+
+    # Stage public DXC HLSL headers (e.g. dx/linalg.h) at a stable path so test
+    # directives like `-Xdxc -Ibuild/dxc/include` can resolve them. Done as a
+    # build-graph custom command, matching the DLL/.so copy pattern below.
+    if(EXISTS "${dxc_root}/include/hlsl/dx/linalg.h")
+        set(_dxc_hlsl_include_dir "${dxc_root}/include/hlsl")
+    elseif(EXISTS "${dxc_root}/inc/hlsl/dx/linalg.h")
+        set(_dxc_hlsl_include_dir "${dxc_root}/inc/hlsl")
+    else()
+        message(
+            FATAL_ERROR
+            "DXC ${dxc_origin} at ${dxc_root} is missing dx/linalg.h. "
+            "The cooperative-{vector,matrix} tests rely on this header. "
+            "If Microsoft has reorganized the layout, update FetchDXC.cmake."
+        )
+    endif()
+
+    set(_dxc_inc_src "${_dxc_hlsl_include_dir}/dx/linalg.h")
+    set(_dxc_inc_dst "${CMAKE_BINARY_DIR}/dxc/include/dx/linalg.h")
+    add_custom_command(
+        OUTPUT "${_dxc_inc_dst}"
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_directory "${_dxc_hlsl_include_dir}"
+            "${CMAKE_BINARY_DIR}/dxc/include"
+        DEPENDS "${_dxc_inc_src}"
+        VERBATIM
+    )
+    add_custom_target(stage-dxc-headers DEPENDS "${_dxc_inc_dst}")
+    set_target_properties(stage-dxc-headers PROPERTIES FOLDER generated)
+endfunction()
+
 # ---------------------------------------------------------------------------
 # Decide whether to build DXC from source.
 # ---------------------------------------------------------------------------
@@ -623,6 +658,8 @@ if(_dxc_build_from_source)
         endforeach()
     endif()
 
+    _dxc_stage_hlsl_headers("${_dxc_src_dir}" "source tree")
+
     return()
 endif()
 
@@ -676,35 +713,7 @@ if(NOT dxc_POPULATED)
     FetchContent_MakeAvailable(dxc)
 endif()
 
-if(SLANG_ENABLE_TESTS)
-    # Stage public DXC HLSL headers (e.g. dx/linalg.h) at a stable path so test
-    # directives like `-Xdxc -Ibuild/dxc/include` can resolve them. Done as a
-    # build-graph custom command, matching the DLL/.so copy pattern below.
-    if(EXISTS "${dxc_SOURCE_DIR}/include/hlsl/dx/linalg.h")
-        set(_dxc_hlsl_include_dir "${dxc_SOURCE_DIR}/include/hlsl")
-    elseif(EXISTS "${dxc_SOURCE_DIR}/inc/hlsl/dx/linalg.h")
-        set(_dxc_hlsl_include_dir "${dxc_SOURCE_DIR}/inc/hlsl")
-    else()
-        message(
-            FATAL_ERROR
-            "DXC archive at ${SLANG_DXC_BINARY_URL} is missing dx/linalg.h. "
-            "The cooperative-{vector,matrix} tests rely on this header. "
-            "If Microsoft has reorganized the archive layout, update FetchDXC.cmake."
-        )
-    endif()
-    set(_dxc_inc_src "${_dxc_hlsl_include_dir}/dx/linalg.h")
-    set(_dxc_inc_dst "${CMAKE_BINARY_DIR}/dxc/include/dx/linalg.h")
-    add_custom_command(
-        OUTPUT "${_dxc_inc_dst}"
-        COMMAND
-            ${CMAKE_COMMAND} -E copy_directory "${_dxc_hlsl_include_dir}"
-            "${CMAKE_BINARY_DIR}/dxc/include"
-        DEPENDS "${_dxc_inc_src}"
-        VERBATIM
-    )
-    add_custom_target(stage-dxc-headers DEPENDS "${_dxc_inc_dst}")
-    set_target_properties(stage-dxc-headers PROPERTIES FOLDER generated)
-endif()
+_dxc_stage_hlsl_headers("${dxc_SOURCE_DIR}" "archive")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
