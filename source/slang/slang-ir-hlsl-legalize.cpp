@@ -59,29 +59,11 @@ static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
         builder.addRayPayloadDecoration(type);
 }
 
-static bool isRayTracingHitStage(Stage stage)
-{
-    switch (stage)
-    {
-    case Stage::Intersection:
-    case Stage::AnyHit:
-    case Stage::ClosestHit:
-        return true;
-    default:
-        return false;
-    }
-}
-
-static bool isPrimitiveIDSystemValueSemantic(UnownedStringSlice semanticName)
-{
-    return String(semanticName).toLower() == "sv_primitiveid";
-}
-
 static bool isPrimitiveIDSystemValueParam(IRParam* param)
 {
     if (auto semanticDecor = param->findDecoration<IRSemanticDecoration>())
     {
-        if (isPrimitiveIDSystemValueSemantic(semanticDecor->getSemanticName()))
+        if (semanticDecor->getSemanticName().caseInsensitiveEquals(toSlice("sv_primitiveid")))
             return true;
     }
 
@@ -97,7 +79,7 @@ static bool isPrimitiveIDSystemValueParam(IRParam* param)
     if (!systemValueAttr)
         return false;
 
-    return isPrimitiveIDSystemValueSemantic(systemValueAttr->getName());
+    return systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid"));
 }
 
 static IRFunc* getHLSLPrimitiveIndexFunc(IRModule* module, IRFunc*& primitiveIndexFunc)
@@ -334,8 +316,15 @@ void legalizeRayTracingPrimitiveIDParamForHLSL(IRModule* module)
         if (!entryPointDecor)
             continue;
 
-        if (!isRayTracingHitStage(entryPointDecor->getProfile().getStage()))
+        switch (entryPointDecor->getProfile().getStage())
+        {
+        case Stage::Intersection:
+        case Stage::AnyHit:
+        case Stage::ClosestHit:
+            break;
+        default:
             continue;
+        }
 
         auto firstBlock = func->getFirstBlock();
         if (!firstBlock)
