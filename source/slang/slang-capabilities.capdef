@@ -391,6 +391,10 @@ alias cpp_hlsl = cpp | hlsl;
 /// [Compound]
 alias cuda_glsl_hlsl = cuda | glsl | hlsl;
 
+/// CUDA, GLSL, and NVAPI code-gen targets
+/// [Compound]
+alias cuda_glsl_nvapi = cuda | glsl | hlsl_nvapi;
+
 /// CUDA, HLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias cuda_hlsl_metal_spirv = cuda | hlsl | metal | spirv;
