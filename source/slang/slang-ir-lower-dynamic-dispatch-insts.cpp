@@ -491,7 +491,10 @@ struct TagOpsLoweringContext : public InstPassBase
         auto srcSet = cast<IRWitnessTableSet>(
             cast<IRSetTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
         auto destSet = cast<IRSetBase>(cast<IRSetTagType>(inst->getDataType())->getOperand(0));
-        auto key = cast<IRStructKey>(inst->getOperand(1));
+        // The requirement key; `IRInst*` rather than `IRStructKey*` because a
+        // built-in interface requirement uses the hoistable `IRBuiltinRequirementKey`.
+        // Used only as a witness-table lookup key below.
+        IRInst* key = inst->getOperand(1);
 
         IRBuilder builder(inst->getModule());
         builder.setInsertAfter(inst);

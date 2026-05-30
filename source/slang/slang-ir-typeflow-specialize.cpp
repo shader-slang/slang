@@ -6363,7 +6363,13 @@ struct TypeFlowSpecializationContext
         };
 
         Kind kind;
-        IRStructKey* lookupKey = nullptr;
+        // A witness-table requirement key. This is `IRInst*` rather than
+        // `IRStructKey*` because a built-in interface requirement (e.g. an
+        // `IDifferentiable`/`IBackwardDifferentiable` method reached through
+        // dynamic dispatch) uses the hoistable `IRBuiltinRequirementKey`, which is
+        // not an `IRStructKey`. It is only used below as a witness-table lookup key
+        // and to read a name hint, both of which accept any `IRInst*`.
+        IRInst* lookupKey = nullptr;
         List<IRInst*> specArgs;
         List<IRInst*> bindings;
     };
@@ -6392,7 +6398,7 @@ struct TypeFlowSpecializationContext
             {
                 DispatchAction action;
                 action.kind = DispatchAction::Kind::Lookup;
-                action.lookupKey = cast<IRStructKey>(mapped->getOperand(1));
+                action.lookupKey = mapped->getOperand(1);
                 actions.add(action);
                 baseOperand = mapped->getOperand(0);
             }
