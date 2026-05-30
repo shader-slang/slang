@@ -4062,6 +4062,19 @@ static NodeBase* parseInterfaceConstraintDecl(Parser* parser, void*)
 {
     auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
     parser->FillPosition(constraint);
+
+    // `__constraint` is only meaningful as a requirement of an interface (it refines
+    // `This` and/or inherited associated types). Reject it in any other context with
+    // a diagnostic, rather than letting an invalid constraint decl leak into checking.
+    // (Generic-parameter constraints use a different parse path and are unaffected.)
+    if (!(parser->currentScope &&
+          as<InterfaceDecl>(parser->currentScope->containerDecl) != nullptr))
+    {
+        parser->sink->diagnose(Diagnostics::DeclNotAllowed{
+            .declType = String("__constraint"),
+            .location = constraint->loc});
+    }
+
     constraint->sub = parser->ParseTypeExp();
     Token constraintToken;
     if (AdvanceIf(parser, TokenType::OpEql, &constraintToken))

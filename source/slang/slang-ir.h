@@ -2177,7 +2177,10 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 18;
+    // Bumped to 19: added the `BuiltinRequirementDecoration` and
+    // `BuiltinRequirementKey` IR instructions (built-in interface requirement
+    // role tagging / hoistable requirement keys).
+    const static UInt k_maxSupportedModuleVersion = 19;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

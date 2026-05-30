@@ -177,8 +177,7 @@ IRInterfaceRequirementEntry* getInterfaceEntryByBuiltinRequirement(
     IRInterfaceType* interface,
     BuiltinRequirementKind kind)
 {
-    if (!interface)
-        return nullptr;
+    SLANG_RELEASE_ASSERT(interface);
     for (UInt i = 0; i < interface->getOperandCount(); i++)
     {
         auto entry = as<IRInterfaceRequirementEntry>(interface->getOperand(i));
@@ -191,7 +190,14 @@ IRInterfaceRequirementEntry* getInterfaceEntryByBuiltinRequirement(
                 return entry;
         }
     }
-    return nullptr;
+    // Every caller looks up a *mandatory* built-in requirement (the
+    // `IDifferentiable`/`IBackwardDifferentiable`/`IBwdCallable` roles), so a
+    // missing role means the interface is malformed (e.g. a precompiled core
+    // module out of sync, or a `__builtin_requirement` annotation that wasn't
+    // emitted/linked). Fail loudly with the role's integer kind rather than
+    // returning null for callers to dereference -- this restores the diagnostic
+    // the previous index-based `getInterfaceEntryAtIndex` provided.
+    SLANG_UNEXPECTED("interface is missing an expected built-in requirement entry");
 }
 
 AutoDiffSharedContext::AutoDiffSharedContext(

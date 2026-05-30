@@ -409,20 +409,25 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
         }
         else if (auto constraintDecl = as<GenericTypeConstraintDecl>(requirementKey))
         {
-            auto assocFromExp = [](TypeExp const& exp) -> AssocTypeDecl*
+            // Look for the built-in requirement modifier on *either* endpoint of the
+            // constraint. We search both sides for the modifier itself rather than
+            // committing to the first side that happens to be an associated type: a
+            // constraint such as `A == Differential` pairs a (non-built-in) assoc on
+            // one side with the built-in `Differential` assoc on the other, and `==`
+            // is symmetric, so `A == Differential` and `Differential == A` must
+            // resolve identically.
+            auto builtinReqFromExp = [](TypeExp const& exp) -> BuiltinRequirementModifier*
             {
                 if (auto declRefType = as<DeclRefType>(exp.type))
-                    return as<AssocTypeDecl>(declRefType->getDeclRef().getDecl());
+                    if (auto assoc = as<AssocTypeDecl>(declRefType->getDeclRef().getDecl()))
+                        return assoc->findModifier<BuiltinRequirementModifier>();
                 return nullptr;
             };
-            auto assoc = assocFromExp(constraintDecl->sub);
-            if (!assoc)
-                assoc = assocFromExp(constraintDecl->sup);
-            if (assoc)
-            {
-                builtinReq = assoc->findModifier<BuiltinRequirementModifier>();
+            builtinReq = builtinReqFromExp(constraintDecl->sub);
+            if (!builtinReq)
+                builtinReq = builtinReqFromExp(constraintDecl->sup);
+            if (builtinReq)
                 isConstraint = true;
-            }
         }
         if (!builtinReq)
             return nullptr;

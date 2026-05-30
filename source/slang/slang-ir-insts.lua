@@ -3015,7 +3015,10 @@ local insts = {
 		--         discriminate which witness table to use, and the rest of the parameters.
 		--
 		hoistable = true,
-		operands = {{"witnessTableSet", "IRWitnessTableSet"}, {"lookupKey", "IRStructKey"}}
+		-- `lookupKey` is an `IRInst` (not `IRStructKey`) because a built-in interface
+		-- requirement reached through dynamic dispatch uses the hoistable
+		-- `IRBuiltinRequirementKey`, which is not an `IRStructKey`.
+		operands = {{"witnessTableSet", "IRWitnessTableSet"}, {"lookupKey", "IRInst"}}
 	} },
 	{ GetSpecializedDispatcher = {
 		-- Get a specialized dispatcher function for a given witness table set + key, where
