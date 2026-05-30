@@ -9945,6 +9945,18 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     //
     if (auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
     {
+        // If a witness for this constraint was already provided when the
+        // conformance was synthesized (e.g. an `enum`'s automatic `__EnumType`
+        // conformance supplies the `__Tag : __BuiltinIntegerType` witness
+        // directly), respect it rather than re-deriving the constraint here.
+        // This is required for cases the conformance synthesis trusts but a fresh
+        // subtype check would reject -- e.g. a `bool`-tagged `enum`, where `bool`
+        // is a permitted tag type yet does not conform to `__BuiltinIntegerType`.
+        if (witnessTable->m_requirementDictionary.containsKey(requiredConstraintDeclRef.getDecl()))
+        {
+            return true;
+        }
+
         auto constraintSub = getSub(m_astBuilder, requiredConstraintDeclRef);
         auto constraintSup = getSup(m_astBuilder, requiredConstraintDeclRef);
 
@@ -11801,9 +11813,32 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
         // Okay, add the conformance witness for `__Tag` being satisfied by `tagType`
         witnessTable->add(tagAssociatedTypeDecl, RequirementWitness(tagType));
 
-        // TODO: we actually also need to synthesize a witness for the conformance of `tagType`
-        // to the `__BuiltinIntegerType` interface, because that is a constraint on the
-        // associated type `__Tag`.
+        // `__EnumType` constrains its `__Tag` associated type with
+        // `__Tag : __BuiltinIntegerType`. In the unified representation that bound is a
+        // constraint requirement of the `__EnumType` interface (a sibling of `__Tag`),
+        // so this compiler-synthesized conformance must supply its witness too --
+        // otherwise the conformance check would re-derive it and reject permitted tag
+        // types. For an integer tag type the witness is the real subtype witness; for
+        // `bool` -- a permitted tag type that does not conform to `__BuiltinIntegerType`
+        // -- no such witness exists, so we record a `NoneWitness` to mark the
+        // (compiler-trusted) constraint as satisfied. (This addresses a long-standing
+        // TODO that became load-bearing once the bound is modeled as a requirement.)
+        if (auto enumInterfaceDecl = as<InterfaceDecl>(tagAssociatedTypeDecl->parentDecl))
+        {
+            for (auto constraintDecl :
+                 enumInterfaceDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+            {
+                auto subDeclRefType = as<DeclRefType>(constraintDecl->sub.type);
+                if (!subDeclRefType ||
+                    subDeclRefType->getDeclRef().getDecl() != tagAssociatedTypeDecl)
+                    continue;
+
+                Val* constraintWitness = tryGetSubtypeWitness(tagType, constraintDecl->sup.type);
+                if (!constraintWitness)
+                    constraintWitness = m_astBuilder->getOrCreate<NoneWitness>();
+                witnessTable->add(constraintDecl, RequirementWitness(constraintWitness));
+            }
+        }
 
         // TODO: eventually we should consider synthesizing other requirements for
         // the min/max tag values, or the total number of tags, so that people don't
