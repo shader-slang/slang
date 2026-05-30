@@ -832,5 +832,7 @@ return {
 	["SubpassLoad"] = 856,
 	["TranslateBase.IdentityRemat"] = 857,
 	["IncrementFunctionCoverageCounter"] = 858,
-	["IncrementBranchCoverageCounter"] = 859
+	["IncrementBranchCoverageCounter"] = 859,
+	["Decoration.BuiltinRequirementDecoration"] = 860,
+	["builtinRequirementKey"] = 861
 }

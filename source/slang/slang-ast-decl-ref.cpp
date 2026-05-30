@@ -394,10 +394,35 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
     bool isConstraint = false;
     if (!builtinReq)
     {
+        // The requirement key is a constraint, not the associated type itself.
+        // Determine which associated type the constraint constrains. This must
+        // be answered from the constraint's *subject*, not from where the
+        // constraint happens to be declared: a constraint may be nested inside
+        // the associated-type declaration (`associatedtype Differential : ...`)
+        // or declared as a sibling requirement of the enclosing interface
+        // (`__constraint`); both forms denote a constraint on the same
+        // associated type.
         if (auto parentAssocType = as<AssocTypeDecl>(requirementKey->parentDecl))
         {
             builtinReq = parentAssocType->findModifier<BuiltinRequirementModifier>();
             isConstraint = true;
+        }
+        else if (auto constraintDecl = as<GenericTypeConstraintDecl>(requirementKey))
+        {
+            auto assocFromExp = [](TypeExp const& exp) -> AssocTypeDecl*
+            {
+                if (auto declRefType = as<DeclRefType>(exp.type))
+                    return as<AssocTypeDecl>(declRefType->getDeclRef().getDecl());
+                return nullptr;
+            };
+            auto assoc = assocFromExp(constraintDecl->sub);
+            if (!assoc)
+                assoc = assocFromExp(constraintDecl->sup);
+            if (assoc)
+            {
+                builtinReq = assoc->findModifier<BuiltinRequirementModifier>();
+                isConstraint = true;
+            }
         }
         if (!builtinReq)
             return nullptr;

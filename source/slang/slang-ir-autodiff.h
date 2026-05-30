@@ -68,25 +68,30 @@ struct AutoDiffSharedContext
     // defined inside IDifferential. We use this to lookup the differential
     // type in the conformance table associated with the concrete type.
     //
-    IRStructKey* differentialAssocTypeStructKey = nullptr;
+    // NOTE: these requirement keys are `IRInst*` rather than `IRStructKey*`
+    // because built-in `IDifferentiable` requirements use the hoistable
+    // `IRBuiltinRequirementKey` (deduplicated by role), which is not an
+    // `IRStructKey`. They are only ever used as witness-table lookup keys, which
+    // accept any `IRInst*`.
+    IRInst* differentialAssocTypeStructKey = nullptr;
 
-    // The struct key for the witness that `Differential` associated type conforms to
+    // The key for the witness that `Differential` associated type conforms to
     // `IDifferential`.
-    IRStructKey* differentialAssocTypeWitnessStructKey = nullptr;
+    IRInst* differentialAssocTypeWitnessStructKey = nullptr;
     IRWitnessTableType* differentialAssocTypeWitnessTableType = nullptr;
 
     // The struct key for the 'zero()' associated type
     // defined inside IDifferential. We use this to lookup the
     // implementation of zero() for a given type.
     //
-    IRStructKey* zeroMethodStructKey = nullptr;
+    IRInst* zeroMethodStructKey = nullptr;
     IRFuncType* zeroMethodType = nullptr;
 
     // The struct key for the 'add()' associated type
     // defined inside IDifferential. We use this to lookup the
     // implementation of add() for a given type.
     //
-    IRStructKey* addMethodStructKey = nullptr;
+    IRInst* addMethodStructKey = nullptr;
     IRFuncType* addMethodType = nullptr;
 
     // Refernce to NullDifferential struct type. These are used
@@ -107,11 +112,11 @@ struct AutoDiffSharedContext
     // defined inside IDifferentialPtrType. We use this to lookup the differential
     // type in the conformance table associated with the concrete type.
     //
-    IRStructKey* differentialAssocRefTypeStructKey = nullptr;
+    IRInst* differentialAssocRefTypeStructKey = nullptr;
 
-    // The struct key for the witness that `Differential` associated type conforms to
+    // The key for the witness that `Differential` associated type conforms to
     // `IDifferentialPtrType`.
-    IRStructKey* differentialAssocRefTypeWitnessStructKey = nullptr;
+    IRInst* differentialAssocRefTypeWitnessStructKey = nullptr;
     IRWitnessTableType* differentialAssocRefTypeWitnessTableType = nullptr;
 
     // Modules that don't use differentiable types
@@ -599,6 +604,14 @@ IRInst* _lookupWitness(
     IRInst* witness,
     IRInst* requirementKey,
     IRType* resultType = nullptr);
+
+// Find the interface requirement entry tagged with the given built-in requirement
+// role. Witness-table / interface requirement entries are an unordered key->value
+// collection, so built-in requirements must be addressed by role (the
+// `IRBuiltinRequirementDecoration` on the key), never by entry position.
+IRInterfaceRequirementEntry* getInterfaceEntryByBuiltinRequirement(
+    IRInterfaceType* interface,
+    BuiltinRequirementKind kind);
 
 void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 

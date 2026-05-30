@@ -173,26 +173,27 @@ bool isRuntimeType(IRType* type)
     return false;
 }
 
-IRInterfaceRequirementEntry* getInterfaceEntryAtIndex(
-    IRModule* moduleInst,
+IRInterfaceRequirementEntry* getInterfaceEntryByBuiltinRequirement(
     IRInterfaceType* interface,
-    UInt index)
+    BuiltinRequirementKind kind)
 {
-    SLANG_UNUSED(moduleInst);
-    if (interface)
+    if (!interface)
+        return nullptr;
+    for (UInt i = 0; i < interface->getOperandCount(); i++)
     {
-        // Assume for now that IDifferentiable has exactly five fields.
-        // SLANG_ASSERT(interface->getOperandCount() == 5);
-        if (auto entry = as<IRInterfaceRequirementEntry>(interface->getOperand(index)))
-            return entry;
-        else
+        auto entry = as<IRInterfaceRequirementEntry>(interface->getOperand(i));
+        if (!entry)
+            continue;
+        if (auto decor =
+                entry->getRequirementKey()->findDecoration<IRBuiltinRequirementDecoration>())
         {
-            SLANG_UNEXPECTED("IDifferentiable interface entry unexpected type");
+            if ((BuiltinRequirementKind)decor->getKind() == kind)
+                return entry;
         }
     }
-
     return nullptr;
 }
+
 AutoDiffSharedContext::AutoDiffSharedContext(
     TargetProgram* targetProgram,
     IRModuleInst* inModuleInst)
@@ -249,21 +250,28 @@ AutoDiffSharedContext::AutoDiffSharedContext(
 
     if (differentiableInterfaceType)
     {
-        differentialAssocTypeStructKey = cast<IRStructKey>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 0)->getRequirementKey());
-        differentialAssocTypeWitnessStructKey = cast<IRStructKey>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 1)->getRequirementKey());
-        differentialAssocTypeWitnessTableType = cast<IRWitnessTableType>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 1)->getRequirementVal());
+        auto diffTypeEntry = getInterfaceEntryByBuiltinRequirement(
+            differentiableInterfaceType,
+            BuiltinRequirementKind::DifferentialType);
+        auto diffWitnessEntry = getInterfaceEntryByBuiltinRequirement(
+            differentiableInterfaceType,
+            BuiltinRequirementKind::DifferentialWitness);
+        auto zeroEntry = getInterfaceEntryByBuiltinRequirement(
+            differentiableInterfaceType,
+            BuiltinRequirementKind::DZeroFunc);
+        auto addEntry = getInterfaceEntryByBuiltinRequirement(
+            differentiableInterfaceType,
+            BuiltinRequirementKind::DAddFunc);
 
-        zeroMethodStructKey = cast<IRStructKey>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 2)->getRequirementKey());
-        zeroMethodType = cast<IRFuncType>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 2)->getRequirementVal());
-        addMethodStructKey = cast<IRStructKey>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 5)->getRequirementKey());
-        addMethodType = cast<IRFuncType>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 5)->getRequirementVal());
+        differentialAssocTypeStructKey = diffTypeEntry->getRequirementKey();
+        differentialAssocTypeWitnessStructKey = diffWitnessEntry->getRequirementKey();
+        differentialAssocTypeWitnessTableType =
+            cast<IRWitnessTableType>(diffWitnessEntry->getRequirementVal());
+
+        zeroMethodStructKey = zeroEntry->getRequirementKey();
+        zeroMethodType = cast<IRFuncType>(zeroEntry->getRequirementVal());
+        addMethodStructKey = addEntry->getRequirementKey();
+        addMethodType = cast<IRFuncType>(addEntry->getRequirementVal());
 
         if (nullDifferentialStructType)
         {
@@ -289,15 +297,17 @@ AutoDiffSharedContext::AutoDiffSharedContext(
 
     if (differentiablePtrInterfaceType)
     {
-        differentialAssocRefTypeStructKey =
-            cast<IRStructKey>(getInterfaceEntryAtIndex(module, differentiablePtrInterfaceType, 0)
-                                  ->getRequirementKey());
-        differentialAssocRefTypeWitnessStructKey =
-            cast<IRStructKey>(getInterfaceEntryAtIndex(module, differentiablePtrInterfaceType, 1)
-                                  ->getRequirementKey());
-        differentialAssocRefTypeWitnessTableType = cast<IRWitnessTableType>(
-            getInterfaceEntryAtIndex(module, differentiablePtrInterfaceType, 1)
-                ->getRequirementVal());
+        auto ptrTypeEntry = getInterfaceEntryByBuiltinRequirement(
+            differentiablePtrInterfaceType,
+            BuiltinRequirementKind::DifferentialPtrType);
+        auto ptrWitnessEntry = getInterfaceEntryByBuiltinRequirement(
+            differentiablePtrInterfaceType,
+            BuiltinRequirementKind::DifferentialPtrWitness);
+
+        differentialAssocRefTypeStructKey = ptrTypeEntry->getRequirementKey();
+        differentialAssocRefTypeWitnessStructKey = ptrWitnessEntry->getRequirementKey();
+        differentialAssocRefTypeWitnessTableType =
+            cast<IRWitnessTableType>(ptrWitnessEntry->getRequirementVal());
 
         isPtrInterfaceAvailable = true;
     }

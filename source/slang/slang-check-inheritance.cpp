@@ -616,11 +616,31 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     typeConstraintDeclRef.as<GenericTypeConstraintDecl>();
                 if (genericTypeConstraintDeclRef)
                 {
+                    auto subExpr = genericTypeConstraintDeclRef.getDecl()->sub.exp;
+
                     // If the base expr on the constraint isn't even a `VarExpr`, then it can't be
                     // referencing the associated type itself and we can skip this constraint.
-                    if (!genericTypeConstraintDeclRef.getDecl()->sub.type &&
-                        !as<VarExpr>(genericTypeConstraintDeclRef.getDecl()->sub.exp))
+                    if (!genericTypeConstraintDeclRef.getDecl()->sub.type && !as<VarExpr>(subExpr))
                         continue;
+
+                    // Interface-level constraints declared via `__constraint` are direct members
+                    // of the interface. Only a constraint whose subject is the bare `This` type
+                    // (e.g. `__constraint This : IExtra`) refines the interface's own set of bases
+                    // here. Constraints on inherited associated types (e.g.
+                    // `__constraint This.DataType == This`) are surfaced when computing the
+                    // inheritance of the corresponding associated-type access, so we must not
+                    // eagerly process (and recursively check) them while enumerating the
+                    // interface's bases -- doing so would form a cycle when the subject names an
+                    // inherited associated type.
+                    if (containerDeclRef.as<InterfaceDecl>())
+                    {
+                        auto subVarExpr = as<VarExpr>(subExpr);
+                        bool subjectIsThis =
+                            subVarExpr && subVarExpr->name ==
+                                              astBuilder->getSharedASTBuilder()->getThisTypeName();
+                        if (!subjectIsThis)
+                            continue;
+                    }
                 }
 
                 visitor.ensureDecl(
@@ -667,6 +687,200 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             }
         }
         break;
+    }
+
+    // Surface interface-level constraints (declared via `__constraint` in an
+    // interface body, including those produced by an `associatedtype` with a
+    // trailing constraint) when computing the inheritance of an associated-type
+    // access such as `T.DataType` or `T.TA.TB`.
+    //
+    // A constraint like `__constraint This.DataType == This` is a direct
+    // `GenericTypeConstraintDecl` member of an interface that some type in the
+    // access chain conforms to. Its subject is written relative to the
+    // interface's `This`, so it constrains an associated-type access anchored at
+    // any type that conforms to the interface. We therefore walk the lookup
+    // chain of `selfType` and, at each anchor type, enumerate the interfaces it
+    // conforms to and match constraints whose subject (relative to `This`) names
+    // exactly the chain of associated types leading from the anchor down to
+    // `selfType`. The opposite endpoint of a matching constraint is added as a
+    // base of `selfType`.
+    //
+    if (declRef.as<AssocTypeDecl>())
+    {
+        // Decompose an associated-type access into the ordered list of
+        // associated-type declarations applied to its root type, appending them
+        // in natural (outermost-first) order to `outChain` and returning the
+        // root. Only associated-type lookups are traversed.
+        auto decomposeAssocChain = [](Type* type, List<Decl*>& outChain) -> Type*
+        {
+            List<Decl*> reversed;
+            Type* cur = type;
+            for (;;)
+            {
+                auto declRefType = as<DeclRefType>(cur);
+                if (!declRefType)
+                    break;
+                auto assocDeclRef = declRefType->getDeclRef().as<AssocTypeDecl>();
+                auto lookupDeclRef = as<LookupDeclRef>(declRefType->getDeclRef().declRefBase);
+                if (!assocDeclRef || !lookupDeclRef)
+                    break;
+                reversed.add(assocDeclRef.getDecl());
+                cur = lookupDeclRef->getLookupSource();
+            }
+            for (Index i = reversed.getCount() - 1; i >= 0; --i)
+                outChain.add(reversed[i]);
+            return cur;
+        };
+
+        auto isThisType = [](Type* type) -> bool
+        {
+            if (auto declRefType = as<DeclRefType>(type))
+                return declRefType->getDeclRef().as<ThisTypeDecl>().getDecl() != nullptr;
+            return false;
+        };
+
+        auto chainsEqual = [](List<Decl*> const& a, List<Decl*> const& b) -> bool
+        {
+            if (a.getCount() != b.getCount())
+                return false;
+            for (Index i = 0; i < a.getCount(); ++i)
+                if (a[i] != b[i])
+                    return false;
+            return true;
+        };
+
+        // The depth (number of associated-type lookups) of the access we are
+        // computing inheritance for. We never add a base that is a *deeper*
+        // associated-type access than `selfType`: an equality constraint such as
+        // `Differential.Differential == Differential` would otherwise make
+        // `T.Differential` claim `T.Differential.Differential` as a base, which
+        // re-expands without bound. Only the reduce-to-shallower direction of an
+        // equality is useful for member lookup, and it terminates.
+        List<Decl*> selfChain;
+        decomposeAssocChain(selfType, selfChain);
+        Index selfChainDepth = selfChain.getCount();
+
+        // Collect the ancestor anchors along `selfType`'s lookup chain, pairing
+        // each anchor type with the chain of associated types leading from it
+        // down to `selfType`.
+        struct Anchor
+        {
+            Type* type;
+            List<Decl*> chainToSelf;
+        };
+        List<Anchor> anchors;
+        {
+            List<Decl*> trailing;
+            Type* cur = selfType;
+            for (;;)
+            {
+                auto declRefType = as<DeclRefType>(cur);
+                if (!declRefType)
+                    break;
+                auto assocDeclRef = declRefType->getDeclRef().as<AssocTypeDecl>();
+                auto lookupDeclRef = as<LookupDeclRef>(declRefType->getDeclRef().declRefBase);
+                if (!assocDeclRef || !lookupDeclRef)
+                    break;
+
+                List<Decl*> chainToSelf;
+                chainToSelf.add(assocDeclRef.getDecl());
+                chainToSelf.addRange(trailing);
+
+                Anchor anchor;
+                anchor.type = lookupDeclRef->getLookupSource();
+                anchor.chainToSelf = chainToSelf;
+                anchors.add(anchor);
+
+                trailing = chainToSelf;
+                cur = anchor.type;
+            }
+        }
+
+        for (auto const& anchor : anchors)
+        {
+            auto anchorInheritanceInfo = getInheritanceInfo(anchor.type, circularityInfo);
+            for (auto facet : anchorInheritanceInfo.facets)
+            {
+                auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>();
+                if (!interfaceDeclRef)
+                    continue;
+                auto anchorIsInterfaceWitness = facet->subtypeWitness;
+                if (!anchorIsInterfaceWitness)
+                    continue;
+
+                for (auto constraintDeclRef :
+                     getMembersOfType<GenericTypeConstraintDecl>(astBuilder, interfaceDeclRef))
+                {
+                    // Skip a constraint that is currently being checked: resolving
+                    // a multi-level subject (e.g. `This.TA.TB`) requires the
+                    // inheritance of a shallower access (`This.TA`), which can
+                    // re-enter this routine. Skipping the in-progress constraint
+                    // breaks that cycle; the shallower access does not need the
+                    // deeper constraint as one of its bases anyway.
+                    if (constraintDeclRef.getDecl()->checkState.isBeingChecked())
+                        continue;
+
+                    ensureDecl(
+                        &visitor,
+                        constraintDeclRef.getDecl(),
+                        DeclCheckState::CanSpecializeGeneric);
+                    auto constraintDecl = constraintDeclRef.getDecl();
+
+                    // An endpoint denotes `selfType` (anchored at `anchor.type`)
+                    // when it is rooted at the interface's `This` and its chain of
+                    // associated types matches the chain leading from the anchor
+                    // down to `selfType`. For a subtype constraint `sub : sup`
+                    // only the sub endpoint is meaningful; for an equality
+                    // constraint `sub == sup` (which the checker may canonicalize
+                    // in either order) either endpoint may match, and the *other*
+                    // endpoint becomes a base of `selfType`.
+                    List<Decl*> subChain, supChain;
+                    Type* subRoot = constraintDecl->sub.type
+                                        ? decomposeAssocChain(constraintDecl->sub.type, subChain)
+                                        : nullptr;
+                    Type* supRoot = constraintDecl->sup.type
+                                        ? decomposeAssocChain(constraintDecl->sup.type, supChain)
+                                        : nullptr;
+
+                    bool matchOnSub =
+                        subRoot && isThisType(subRoot) && chainsEqual(subChain, anchor.chainToSelf);
+                    bool matchOnSup = constraintDecl->isEqualityConstraint && supRoot &&
+                                      isThisType(supRoot) &&
+                                      chainsEqual(supChain, anchor.chainToSelf);
+                    if (!matchOnSub && !matchOnSup)
+                        continue;
+
+                    // Re-express the constraint as a lookup through the witness
+                    // that the anchor type conforms to this interface; this
+                    // substitutes the interface's `This` with the anchor type, so
+                    // both endpoints are expressed in terms of the anchor.
+                    auto lookedUpConstraint =
+                        astBuilder->getLookupDeclRef(anchorIsInterfaceWitness, constraintDecl)
+                            .as<GenericTypeConstraintDecl>();
+                    if (!lookedUpConstraint)
+                        continue;
+
+                    Type* baseType = matchOnSub ? getSup(astBuilder, lookedUpConstraint)
+                                                : getSub(astBuilder, lookedUpConstraint);
+                    if (!baseType)
+                        continue;
+
+                    // Never introduce a base that is a deeper associated-type
+                    // access than `selfType`; that is the non-terminating
+                    // direction of a self-referential equality constraint.
+                    List<Decl*> baseChain;
+                    decomposeAssocChain(baseType, baseChain);
+                    if (baseChain.getCount() > selfChainDepth)
+                        continue;
+
+                    auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
+                        selfType,
+                        baseType,
+                        lookedUpConstraint);
+                    addDirectBaseType(baseType, satisfyingWitness);
+                }
+            }
+        }
     }
 
     if (auto genericDeclRef = getDependentGenericParent(declRef))

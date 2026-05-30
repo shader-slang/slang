@@ -6111,6 +6111,14 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
     // We will enumerate the type constraints placed on the
     // associated type and see if they can be satisfied.
     //
+    // In the unified representation a constraint on an associated type `A` is
+    // recorded as a requirement of the enclosing interface (a sibling of `A`),
+    // regardless of whether it was written `associatedtype A : IBar`,
+    // `associatedtype A where A : IBar`, or `__constraint A : IBar`. Those
+    // relocated interface-level constraints are validated by the main
+    // conformance loop (`findWitnessForInterfaceRequirement`); here we only
+    // enumerate any constraints nested directly under `requirementDeclRef`.
+    //
     bool conformance = true;
     Val* witness = nullptr;
 
@@ -9924,6 +9932,47 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // The ThisType requirement is always satisfied.
     if (as<ThisTypeDecl>(requiredMemberDeclRef.getDecl()))
     {
+        return true;
+    }
+
+    // An interface-level constraint requirement (declared in an interface body
+    // as `__constraint <type> == <type>` or `__constraint <type> : <type>`)
+    // refines the implicit `This` type and/or its inherited associated types.
+    // Such a requirement is not satisfied by a member of the conforming type;
+    // instead, it is satisfied by verifying that the constraint holds once
+    // `This` has been replaced by the conforming type (which the surrounding
+    // `LookupDeclRef` substitution has already done in `requiredMemberDeclRef`).
+    //
+    if (auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
+    {
+        auto constraintSub = getSub(m_astBuilder, requiredConstraintDeclRef);
+        auto constraintSup = getSup(m_astBuilder, requiredConstraintDeclRef);
+
+        SubtypeWitness* constraintWitness = nullptr;
+        if (constraintSub && constraintSup)
+            constraintWitness = isSubtype(constraintSub, constraintSup, IsSubTypeOptions::None);
+
+        // An equality constraint (`==`) must be satisfied by a type-equality
+        // witness, not merely by a subtype relationship.
+        if (constraintWitness && requiredConstraintDeclRef.getDecl()->isEqualityConstraint &&
+            !isTypeEqualityWitness(constraintWitness))
+        {
+            constraintWitness = nullptr;
+        }
+
+        if (!constraintWitness)
+        {
+            getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                .typeArg = subType,
+                .interface = superInterfaceType,
+                .location = inheritanceDecl ? inheritanceDecl->loc
+                                            : requiredConstraintDeclRef.getDecl()->loc});
+            return false;
+        }
+
+        witnessTable->add(
+            requiredConstraintDeclRef.getDecl(),
+            RequirementWitness(constraintWitness));
         return true;
     }
 

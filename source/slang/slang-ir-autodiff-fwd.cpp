@@ -918,35 +918,40 @@ struct ForwardDiffTranslationContext
             IRInterfaceType* bwdCallableInterfaceType = cast<IRInterfaceType>(
                 getGenericReturnVal(context->sharedContext->backwardCallableInterfaceType));
 
-            // Key for contextType in IBackwardDifferentiable table
-            auto bwdDiffContextTypeReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(0))
-                    ->getRequirementKey();
+            // Requirement keys in the IBackwardDifferentiable / IBwdCallable tables, addressed
+            // by built-in requirement *role* rather than by operand position. Addressing by
+            // role is robust to the order in which requirements (and the relocated
+            // `BwdCallable : IBwdCallable` conformance) appear in the interface.
+            auto bwdDiffContextTypeReqKey = getInterfaceEntryByBuiltinRequirement(
+                                                bwdDiffInterfaceType,
+                                                BuiltinRequirementKind::BwdCallableContextType)
+                                                ->getRequirementKey();
 
-            // Key for minimalContextType in IBackwardDifferentiable table
-            auto bwdDiffMinimalContextTypeReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(2))
-                    ->getRequirementKey();
+            auto bwdDiffMinimalContextTypeReqKey = getInterfaceEntryByBuiltinRequirement(
+                                                       bwdDiffInterfaceType,
+                                                       BuiltinRequirementKind::MinimalContextType)
+                                                       ->getRequirementKey();
 
-            // Key for contextType : IBackwardCallable in IBackwardDifferentiable table
             auto bwdDiffContextTypeCallableConformanceReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(1))
+                getInterfaceEntryByBuiltinRequirement(
+                    bwdDiffInterfaceType,
+                    BuiltinRequirementKind::BwdCallableContextWitness)
                     ->getRequirementKey();
 
-            // Key for `apply` in IBackwardDifferentiable table
-            auto bwdDiffApplyReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(3))
-                    ->getRequirementKey();
+            auto bwdDiffApplyReqKey = getInterfaceEntryByBuiltinRequirement(
+                                          bwdDiffInterfaceType,
+                                          BuiltinRequirementKind::BwdApplyFunc)
+                                          ->getRequirementKey();
 
-            // Key for `remat` in IBackwardDifferentiable table
-            auto bwdDiffRematReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(4))
-                    ->getRequirementKey();
+            auto bwdDiffRematReqKey = getInterfaceEntryByBuiltinRequirement(
+                                          bwdDiffInterfaceType,
+                                          BuiltinRequirementKind::BwdCallableRematFunc)
+                                          ->getRequirementKey();
 
-            // Key for 'operator()' (back-prop) in IBackwardCallable table
-            auto bwdCallableOpReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdCallableInterfaceType->getOperand(0))
-                    ->getRequirementKey();
+            auto bwdCallableOpReqKey = getInterfaceEntryByBuiltinRequirement(
+                                           bwdCallableInterfaceType,
+                                           BuiltinRequirementKind::BwdCallablePropFunc)
+                                           ->getRequirementKey();
 
             // Lookup contextType in IBackwardDifferentiable table
             auto higherOrderContextType = _lookupWitness(
@@ -3540,21 +3545,9 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             ->getConformanceType(),
         (IRType*)baseFunc);
 
-    // For now, we're going to hardcode the fact that the IBackwardDifferentiable interface
-    // always contains exactly 3 requirements, the context-type, context-type : IBackwardCallable,
-    // apply and bwd_diff (legacy)
-    //
-    // This will help us catch errors if the interface definition changes.
-    //
-    // IBackwardDifferentiable has 6 requirements:
-    // 0: BwdCallable associated type
-    // 1: BwdCallable : IBwdCallable conformance
-    // 2: MinimalContext associated type
-    // 3: apply_bwd func
-    // 4: remat func
-    // 5: bwd_diff (legacy)
-    //
-    SLANG_ASSERT(baseConformanceType->getRequirementCount() == 6);
+    // The IBackwardDifferentiable requirements are addressed by built-in requirement *role*
+    // rather than by operand position, so this is robust to the order in which the requirements
+    // (and the relocated `BwdCallable : IBwdCallable` conformance) appear in the interface.
     IRInst* typeOperand = baseFunc->getFullType();
 
     auto contextType = builder.emitIntrinsicInst(
@@ -3564,12 +3557,14 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
         &baseFunc);
     builder.createWitnessTableEntry(
         newWitnessTable,
-        as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(0))->getRequirementKey(),
+        getInterfaceEntryByBuiltinRequirement(
+            baseConformanceType,
+            BuiltinRequirementKind::BwdCallableContextType)
+            ->getRequirementKey(),
         contextType);
     {
         auto callableConformanceBaseType = cast<IRInterfaceType>(
             getGenericReturnVal(sharedContext->backwardCallableInterfaceType));
-        SLANG_ASSERT(callableConformanceBaseType->getRequirementCount() == 1);
 
         auto callableConformanceType = builder.emitSpecializeInst(
             builder.getTypeKind(),
@@ -3590,13 +3585,17 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             &baseFunc);
         builder.createWitnessTableEntry(
             callableWitnessTable,
-            as<IRInterfaceRequirementEntry>(callableConformanceBaseType->getOperand(0))
+            getInterfaceEntryByBuiltinRequirement(
+                callableConformanceBaseType,
+                BuiltinRequirementKind::BwdCallablePropFunc)
                 ->getRequirementKey(),
             propFunc);
 
         builder.createWitnessTableEntry(
             newWitnessTable,
-            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(1))
+            getInterfaceEntryByBuiltinRequirement(
+                baseConformanceType,
+                BuiltinRequirementKind::BwdCallableContextWitness)
                 ->getRequirementKey(),
             callableWitnessTable);
     }
@@ -3609,7 +3608,10 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
         &baseFunc);
     builder.createWitnessTableEntry(
         newWitnessTable,
-        as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(2))->getRequirementKey(),
+        getInterfaceEntryByBuiltinRequirement(
+            baseConformanceType,
+            BuiltinRequirementKind::MinimalContextType)
+            ->getRequirementKey(),
         minimalContextType);
 
     // apply_bwd func.
@@ -3625,7 +3627,9 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             baseFunc);
         builder.createWitnessTableEntry(
             newWitnessTable,
-            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(3))
+            getInterfaceEntryByBuiltinRequirement(
+                baseConformanceType,
+                BuiltinRequirementKind::BwdApplyFunc)
                 ->getRequirementKey(),
             applyFunc);
     }
@@ -3645,7 +3649,9 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             &baseFunc);
         builder.createWitnessTableEntry(
             newWitnessTable,
-            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(4))
+            getInterfaceEntryByBuiltinRequirement(
+                baseConformanceType,
+                BuiltinRequirementKind::BwdCallableRematFunc)
                 ->getRequirementKey(),
             rematFunc);
     }
@@ -3654,7 +3660,9 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
         // bwd_diff (legacy) - should never be required, so we just emit a poison value.
         builder.createWitnessTableEntry(
             newWitnessTable,
-            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(5))
+            getInterfaceEntryByBuiltinRequirement(
+                baseConformanceType,
+                BuiltinRequirementKind::LegacyBackwardDerivativeFunc)
                 ->getRequirementKey(),
             builder.emitPoison(builder.getVoidType()));
     }

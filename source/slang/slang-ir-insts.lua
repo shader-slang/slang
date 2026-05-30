@@ -814,6 +814,23 @@ local insts = {
 	-- for linkage).
 	--
 	{ key = { struct_name = "StructKey", global = true } },
+	-- A requirement key for a recognized built-in interface requirement (e.g. an
+	-- `IDifferentiable` requirement identified by `BuiltinRequirementKind`).
+	-- Unlike an ordinary struct key -- which is a distinct `global` symbol per
+	-- field/requirement decl, unified across modules by its `key_<mangled>`
+	-- linkage name -- a built-in requirement key is `hoistable`, so it is
+	-- deduplicated *by construction* from its `kind` operand. This guarantees the
+	-- same logical built-in requirement always resolves to a single key inst,
+	-- even when referenced from several decls (the canonical interface constraint
+	-- and a constraint synthesized while building a type's `Differential`) or
+	-- across the precompiled-core-module boundary.
+	{
+		builtinRequirementKey = {
+			struct_name = "BuiltinRequirementKey",
+			operands = { { "kindOperand", "IRIntLit" } },
+			hoistable = true,
+		},
+	},
 	{ global_generic_param = { global = true } },
 	{ witness_table = { hoistable = true } },
 	{ indexedFieldKey = { operands = { { "baseType" }, { "index" } }, hoistable = true } },
@@ -2087,6 +2104,16 @@ local insts = {
 					-- Attaches a name to this instruction so that it can be identified
 					-- later in the compiler reliably
 					operands = { { "nameOperand", "IRIntLit" } },
+				},
+			},
+			{
+				BuiltinRequirementDecoration = {
+					-- Marks an interface requirement key with the `BuiltinRequirementKind`
+					-- (stored as its integer value) of the built-in requirement it
+					-- represents. This lets consumers (e.g. autodiff) identify a built-in
+					-- requirement entry by its role rather than by its position in the
+					-- interface's requirement list, which is not semantically meaningful.
+					operands = { { "kindOperand", "IRIntLit" } },
 				},
 			},
 			{

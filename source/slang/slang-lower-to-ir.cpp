@@ -487,7 +487,11 @@ struct SharedIRGenContext
     // requirement to the IR-level "key" that
     // is used to fetch that requirement from a
     // witness table.
-    Dictionary<Decl*, IRStructKey*> interfaceRequirementKeys;
+    // Cached requirement keys per requirement decl. The value is an `IRInst*`
+    // rather than `IRStructKey*` because a built-in requirement uses a hoistable
+    // `IRBuiltinRequirementKey` (not a `StructKey`); ordinary requirements still
+    // use an `IRStructKey`.
+    Dictionary<Decl*, IRInst*> interfaceRequirementKeys;
 
     // Arrays we keep around strictly for memory-management purposes:
 
@@ -1642,7 +1646,7 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     return true;
 }
 
-IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
+IRInst* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
 {
     // Only specific types of decls are treated as requirements, e.g. methods and asssociated types.
     // Other types of decls are allowed but not regarded as a requirement.
@@ -1656,7 +1660,7 @@ IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirement
     if (auto genericDecl = as<GenericDecl>(requirementDecl))
         return getInterfaceRequirementKey(context, genericDecl->inner);
 
-    IRStructKey* requirementKey = nullptr;
+    IRInst* requirementKey = nullptr;
     if (context->shared->interfaceRequirementKeys.tryGetValue(requirementDecl, requirementKey))
     {
         return requirementKey;
@@ -1666,6 +1670,74 @@ IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirement
     auto builder = &builderStorage;
 
     builder->setInsertInto(builder->getModule());
+
+    // Determine whether this requirement is a recognized built-in requirement,
+    // and if so, its `BuiltinRequirementKind` role.
+    //
+    //  - A requirement tagged with `__builtin_requirement(kind)` carries the role
+    //    directly (e.g. `IDifferentiable.Differential`, `.dzero`, `.dadd`).
+    //  - The conformance-witness requirement of a built-in associated type (the
+    //    `Differential : IDifferentiable` inheritance clause) does not carry its
+    //    own marker, so we derive its role from the constrained associated type's
+    //    kind (`DifferentialType` -> `DifferentialWitness`). This lets autodiff
+    //    find the witness by role without having to split the associated type's
+    //    declaration (which would change front-end resolution of `Differential`).
+    bool hasBuiltinRole = false;
+    BuiltinRequirementKind builtinRole = BuiltinRequirementKind::DifferentialType;
+    if (auto builtinReq = requirementDecl->findModifier<BuiltinRequirementModifier>())
+    {
+        hasBuiltinRole = true;
+        builtinRole = builtinReq->kind;
+    }
+    else if (auto constraint = as<GenericTypeConstraintDecl>(requirementDecl);
+             constraint && !constraint->isEqualityConstraint)
+    {
+        if (auto subDeclRefType = as<DeclRefType>(constraint->sub.type))
+        {
+            if (auto assoc = as<AssocTypeDecl>(subDeclRefType->getDeclRef().getDecl()))
+            {
+                if (auto assocReq = assoc->findModifier<BuiltinRequirementModifier>())
+                {
+                    switch (assocReq->kind)
+                    {
+                    case BuiltinRequirementKind::DifferentialType:
+                        builtinRole = BuiltinRequirementKind::DifferentialWitness;
+                        hasBuiltinRole = true;
+                        break;
+                    case BuiltinRequirementKind::DifferentialPtrType:
+                        builtinRole = BuiltinRequirementKind::DifferentialPtrWitness;
+                        hasBuiltinRole = true;
+                        break;
+                    case BuiltinRequirementKind::BwdCallableContextType:
+                        builtinRole = BuiltinRequirementKind::BwdCallableContextWitness;
+                        hasBuiltinRole = true;
+                        break;
+                    default:
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (hasBuiltinRole)
+    {
+        // Use the hoistable, deduplicated-by-construction key for this built-in
+        // role. Its identity is the `kind` operand, so the same logical
+        // requirement always resolves to a single key inst -- whether referenced
+        // from the canonical interface constraint or from a constraint
+        // synthesized while building a type's `Differential`, and across the
+        // precompiled-core-module boundary. No `key_<mangled>` linkage decoration
+        // is needed (or wanted): identity comes from the operand, not a name.
+        requirementKey = builder->getBuiltinRequirementKey((IRIntegerValue)builtinRole);
+        context->shared->interfaceRequirementKeys.add(requirementDecl, requirementKey);
+        // Also tag the role as a decoration so role-scanning consumers (autodiff's
+        // `getInterfaceEntryByBuiltinRequirement`) work unchanged. The key is
+        // shared, so add the decoration only once.
+        if (!requirementKey->findDecoration<IRBuiltinRequirementDecoration>())
+            builder->addBuiltinRequirementDecoration(requirementKey, (IRIntegerValue)builtinRole);
+        return requirementKey;
+    }
 
     // Construct a key to serve as the representation of
     // this requirement in the IR, and to allow lookup
@@ -10319,6 +10391,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
     {
+        // An interface-level constraint (declared via `__constraint` in an
+        // interface body) is a direct member of the interface. It lowers as the
+        // key for that interface requirement, just like a constraint attached to
+        // an associated type or interface method.
+        if (as<InterfaceDecl>(decl->parentDecl))
+        {
+            return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
+        }
+
         // This might be a type constraint on an associated type,
         // in which case it should lower as the key for that
         // interface requirement.
@@ -11462,7 +11543,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return varVal;
     }
 
-    IRStructKey* getInterfaceRequirementKey(Decl* requirementDecl)
+    IRInst* getInterfaceRequirementKey(Decl* requirementDecl)
     {
         return Slang::getInterfaceRequirementKey(context, requirementDecl);
     }
@@ -11613,15 +11694,35 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         UInt entryIndex = 0;
-        auto addEntry = [&](IRStructKey* requirementKey, DeclRef<Decl> requirementDeclRef)
+        auto addEntry = [&](IRInst* requirementKey, DeclRef<Decl> requirementDeclRef)
         {
             auto entry = subBuilder->createInterfaceRequirementEntry(requirementKey, nullptr);
+            auto relocatedSubtypeConstraint = requirementDeclRef.as<GenericTypeConstraintDecl>();
             if (auto inheritance = requirementDeclRef.as<InheritanceDecl>())
             {
                 auto irBaseType =
                     lowerType(subContext, getSup(subContext->astBuilder, inheritance));
                 auto irWitnessTableType = subBuilder->getWitnessTableType(irBaseType);
                 entry->setRequirementVal(irWitnessTableType);
+            }
+            else if (
+                relocatedSubtypeConstraint &&
+                !relocatedSubtypeConstraint.getDecl()->isEqualityConstraint)
+            {
+                // A subtype constraint on an associated type (`associatedtype A : IBar`,
+                // `associatedtype A where A : IBar`) is recorded in the unified
+                // representation as an interface-level requirement (a sibling of `A`). It is
+                // a *conformance* requirement: its witness is a witness table for the bound.
+                // We must lower it the same way the conformance was lowered when the bound was
+                // nested in the associated type (see the associated-type constraint loop
+                // below), i.e. with a `WitnessTableType` requirement value -- otherwise
+                // consumers (e.g. autodiff) that read the requirement get a malformed entry.
+                // (Equality constraints, e.g. `__constraint A == B`, are handled by the
+                // generic path below.)
+                auto irBaseType = lowerType(
+                    subContext,
+                    getSup(subContext->astBuilder, relocatedSubtypeConstraint));
+                entry->setRequirementVal(subBuilder->getWitnessTableType(irBaseType));
             }
             else
             {
