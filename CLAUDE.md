@@ -89,11 +89,47 @@ if (auto foo = as<IRFoo>(inst))
 
 For variables that are set but never read outside an `if` (e.g., a plain local variable), use `SLANG_UNUSED(var)` with a comment explaining why.
 
+### Problem-Solving Methodology
+
+Follow the **principled path**, not the minimal-edit-distance path. The goal is a correct
+representation that is robust by construction, even when that means a larger rework.
+
+- **Fix root causes, not symptoms.** When a bug appears in emit/codegen, the cause is usually
+  upstream (an IR pass, type legalization, specialization, lowering, or the AST/IR representation
+  itself). Trace it there and fix it there.
+- **Question every change.** Before keeping a change, answer: _Why is this change necessary? What
+  test fails without it? Is this the right fix, or is the problem telling me the
+  direction/representation is flawed?_ If you cannot name a test that fails without a change, the
+  change probably should not exist.
+- **Do not mask.** A guard, null-check, or special case that papers over a malformed
+  AST/IR/witness-table is a band-aid that hides a representation bug. A guard that is never hit
+  under correct input is dead code. Prefer making the representation correct so consumers stay
+  simple.
+- **Prefer correct representation over edit distance.** If two surface forms _should_ be
+  equivalent, model them identically. If a consumer reads data by position/index/identity when the
+  data is conceptually an unordered key→value set (e.g. witness-table / interface requirement
+  entries), make the access by role/key, not by position.
+- **Keep a working log/report.** Maintain a scratch markdown document throughout the task that
+  records: the problem and a motivating example, road-blockers encountered, how issues **cascade**
+  (one fix exposing the next), the fix chosen for each and _why it is principled_ (with a concrete
+  code trace), and alternatives that were rejected and why. This log is what you distill into the
+  PR description below. (Keep the log out of the commit — it feeds the PR body, it is not a repo
+  artifact.)
+
 ### PR Workflow
 
 1. **Format your code**: Run `./extras/formatting.sh` before committing
 2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking" (for ABI/language breaking changes)
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
+4. **Write the PR description in this required four-part format:**
+   1. **Motivation** — the problem being solved, with a concrete example / motivating test case.
+   2. **Proposed solution** — the approach, and why it is the principled one.
+   3. **Change summary** — a table or list of the files/areas touched and what each does.
+   4. **Process report** — explain _every_ change with a logical reason. For a change that
+      addresses a **cascading** issue, describe the issue (with its motivating test case) and
+      justify why the fix is correct with a **code trace** (the exact functions/insts involved),
+      not just a description. State explicitly why each change is necessary and principled rather
+      than a workaround.
 
 ### Testing
 

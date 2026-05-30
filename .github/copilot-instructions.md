@@ -52,6 +52,30 @@ Add the "pr: breaking" label to your PR if you are introducing public API change
 or you are introducing changes to the Slang language that will cause the compiler to error out on existing Slang code.
 It is rare for a PR to be a breaking change.
 
+## Problem-solving methodology
+
+Follow the principled path, not the minimal-edit-distance path: fix root causes (usually upstream
+in an IR pass, lowering, or the AST/IR representation), not symptoms in emit/codegen. Question every
+change — if you cannot name a test that fails without it, it probably should not exist. Do not mask
+malformed AST/IR with guards or special cases; make the representation correct so consumers stay
+simple. When data is conceptually an unordered key→value set (e.g. witness-table / interface
+requirement entries), address it by role/key, never by position/index. Keep a scratch log
+throughout the task recording the problem, how issues cascade (one fix exposing the next), the fix
+for each and why it is principled (with a code trace), and rejected alternatives; distill that log
+into the PR description.
+
+## PR description format
+
+Write every PR description in this four-part format:
+
+1. **Motivation** — the problem, with a concrete example / motivating test case.
+2. **Proposed solution** — the approach and why it is principled.
+3. **Change summary** — the files/areas touched and what each does.
+4. **Process report** — explain every change with a logical reason. For a change addressing a
+   cascading issue, describe the issue (with its motivating test case) and justify the fix with a
+   code trace (the exact functions/insts involved), explaining why it is necessary and principled
+   rather than a workaround.
+
 ## Debugging
 
 If you encounter a bug related to a problematic instruction, it is often useful to trace the location where the instruction is created.
