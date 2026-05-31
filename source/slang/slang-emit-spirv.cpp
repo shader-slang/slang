@@ -6305,22 +6305,36 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 const auto topologyType = OutputTopologyType(o->getTopologyType());
 
                 SpvExecutionMode m = SpvExecutionModeMax;
+                bool isTessStage = false;
                 if (entryPointDecor)
                 {
                     switch (entryPointDecor->getProfile().getStage())
                     {
+                    // Stage::Domain is defensive: the current frontend only
+                    // attaches IROutputTopologyDecoration to hull entry points,
+                    // but pairing the cases keeps the tess gate complete should
+                    // a future producer extend that surface.
                     case Stage::Domain:
                     case Stage::Hull:
+                        isTessStage = true;
                         if (topologyType == OutputTopologyType::TriangleCW)
                             m = SpvExecutionModeVertexOrderCw;
                         else if (topologyType == OutputTopologyType::TriangleCCW)
                             m = SpvExecutionModeVertexOrderCcw;
                         else if (topologyType == OutputTopologyType::Point)
                             m = SpvExecutionModePointMode;
+                        // OutputTopologyType::Line on isoline hull: Isolines (from
+                        // kIROp_DomainDecoration) already conveys the topology, so
+                        // no execution mode is needed here. The mesh-shader
+                        // OutputLinesEXT must not be emitted on a tess entry point.
                         break;
                     }
                 }
-                if (m == SpvExecutionModeMax)
+                // Mesh-shader fallback — gated on a known non-tess stage so it
+                // cannot fire on hull/domain (whose Line topology is conveyed by
+                // Isolines via kIROp_DomainDecoration) or when no stage info is
+                // available.
+                if (m == SpvExecutionModeMax && !isTessStage && entryPointDecor)
                 {
                     if (topologyType == OutputTopologyType::Triangle)
                         m = SpvExecutionModeOutputTrianglesEXT;
@@ -6330,8 +6344,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         m = SpvExecutionModeOutputPoints;
                 }
 
-                SLANG_ASSERT(m != SpvExecutionModeMax);
-                requireSPIRVExecutionMode(decoration, dstID, m);
+                if (m != SpvExecutionModeMax)
+                    requireSPIRVExecutionMode(decoration, dstID, m);
             }
             break;
 
