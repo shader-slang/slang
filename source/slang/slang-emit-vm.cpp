@@ -230,8 +230,17 @@ public:
                 byteCodeBuilder.constantSection.addRange((uint8_t*)&value, sizeof(value));
                 break;
             }
+        case kIROp_BoolLit:
+            {
+                int64_t value = static_cast<IRBoolLit*>(inst)->getValue() ? 1 : 0;
+                byteCodeBuilder.constantSection.addRange((uint8_t*)&value, sizeAlignment.size);
+                operand.setType(OperandDataType::General);
+                break;
+            }
         case kIROp_VoidLit:
             break;
+        default:
+            SLANG_UNEXPECTED("unhandled IRConstant op in VM emitter");
         }
         return operand;
     }
