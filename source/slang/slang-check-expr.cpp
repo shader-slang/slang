@@ -3831,15 +3831,6 @@ static Expr* convertHigherOrderExprToLookup(
     {
         lookupName = visitor->getName("bwd_diff");
     }
-    else if (as<ValueAndBackwardDifferentiateExpr>(resultExpr))
-    {
-        // Phase-1: value_and_bwd_diff does not participate in IBackwardDifferentiable
-        // conformance. Reuse the bwd_diff lookup so the same witness/specialization
-        // path applies; the surface type ValueAndBwdDiffFuncType is still attached
-        // by ValueAndBackwardDifferentiateExprCheckingActions, and the IR layer
-        // unwraps it via maybeTranslateValueAndBackwardDerivative.
-        lookupName = visitor->getName("bwd_diff");
-    }
     else if (as<ApplyForBwdExpr>(resultExpr))
     {
         lookupName = visitor->getName("apply_bwd");
@@ -4330,7 +4321,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             {
                 if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
                 {
-                    invoke->functionExpr = convertHigherOrderExprToLookup(this, higherOrderInvoke);
+                    // value_and_bwd_diff survives to IR lowering (its lowering visitor emits
+                    // the new opcode directly, mirroring fwd_diff); the bwd_diff lookup
+                    // conversion would otherwise bind it to the legacy void-return backward op.
+                    if (!as<ValueAndBackwardDifferentiateExpr>(invoke->functionExpr))
+                        invoke->functionExpr =
+                            convertHigherOrderExprToLookup(this, higherOrderInvoke);
                 }
             }
         }

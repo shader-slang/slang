@@ -42,6 +42,9 @@ public:
             case kIROp_BackwardDifferentiate:
                 level = std::max(level, DiffCheckingLevel::Backward);
                 break;
+            case kIROp_ValueAndBackwardDifferentiate:
+                level = std::max(level, DiffCheckingLevel::Backward);
+                break;
             case kIROp_BackwardDifferentiatePrimal:
                 level = std::max(level, DiffCheckingLevel::Backward);
                 break;

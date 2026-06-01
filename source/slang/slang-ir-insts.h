@@ -3568,6 +3568,7 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRInst* emitForwardDifferentiateInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn);
+    IRInst* emitValueAndBackwardDifferentiateInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
     IRInst* emitForwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);

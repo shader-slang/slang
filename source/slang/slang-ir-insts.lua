@@ -2613,7 +2613,7 @@ local insts = {
 
 		{ LegacyBackwardDifferentiate = { min_operands = 3 } },
 
-		{ ValueAndBackwardDifferentiate = { min_operands = 3 } },
+		{ ValueAndBackwardDifferentiate = { min_operands = 1, operands = { { "baseFn" } } } },
 		
 		{ BackwardPrimalFromLegacyBwdDiffFunc = { min_operands = 2 } },
 		{ BackwardRematFromLegacyBwdDiffFunc = { min_operands = 2 } },

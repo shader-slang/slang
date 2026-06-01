@@ -917,11 +917,43 @@ IRInst* maybeTranslateValueAndBackwardDerivative(
     DiagnosticSink* sink,
     IRValueAndBackwardDifferentiate* translateInst)
 {
-    SLANG_UNUSED(sink);
-    IRInst* applyBwdFunc = translateInst->getOperand(0);
-    IRInst* rematFunc = translateInst->getOperand(1);
-    IRInst* bwdPropFunc = translateInst->getOperand(2);
     IRFuncType* bwdDiffFuncType = cast<IRFuncType>(translateInst->getDataType());
+
+    // The op now carries a single base-function operand (mirroring fwd_diff). Derive the
+    // backward machinery by building a kIROp_BackwardDifferentiate over the same base and
+    // translating it to the standard 5-tuple
+    //   (primalFunc, rematFunc, propagateFunc, ctxType, minimalCtxType).
+    // Elements 0/1/2 are the apply(primal)/remat/propagate funcs the wrapper below composes,
+    // semantically identical to the (applyBwdFunc, rematFunc, bwdPropFunc) operands this op used
+    // to carry directly. Element 0 (primalFunc) is the same function translate.cpp surfaces as
+    // kIROp_BackwardDifferentiatePrimal, so its result shape (Tuple<R, MinimalCtx> for non-void
+    // R, else bare R) matches the emitElementExtract sites in the wrapper below.
+    IRInst* baseFn = translateInst->getOperand(0);
+
+    IRInst* applyBwdFunc = nullptr;
+    IRInst* rematFunc = nullptr;
+    IRInst* bwdPropFunc = nullptr;
+    {
+        IRBuilder subBuilder(sharedContext->moduleInst);
+        subBuilder.setInsertBefore(translateInst);
+        auto bwdDiffInst =
+            subBuilder.emitIntrinsicInst(nullptr, kIROp_BackwardDifferentiate, 1, &baseFn);
+
+        auto translatedTuple = maybeTranslateBackwardDerivative(
+            sharedContext,
+            sink,
+            cast<IRBackwardDifferentiate>(bwdDiffInst));
+
+        // If the base function could not be translated (e.g. not an IRFunc yet), leave the op
+        // in place to be retried after further specialization.
+        if (translatedTuple == bwdDiffInst)
+            return translateInst;
+
+        SLANG_ASSERT(as<IRMakeTuple>(translatedTuple));
+        applyBwdFunc = as<IRMakeTuple>(translatedTuple)->getOperand(0);
+        rematFunc = as<IRMakeTuple>(translatedTuple)->getOperand(1);
+        bwdPropFunc = as<IRMakeTuple>(translatedTuple)->getOperand(2);
+    }
 
     IRBuilder builder(sharedContext->moduleInst);
 

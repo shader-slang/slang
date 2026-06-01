@@ -5603,8 +5603,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitValueAndBackwardDifferentiateExpr(ValueAndBackwardDifferentiateExpr* expr)
     {
-        SLANG_UNUSED(expr);
-        SLANG_UNEXPECTED("ValueAndBackwardDifferentiateExpr present during IR lowered");
+        auto baseVal = lowerSubExpr(expr->baseFunction);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        return LoweredValInfo::simple(getBuilder()->emitValueAndBackwardDifferentiateInst(
+            lowerType(context, expr->type),
+            baseVal.val));
     }
 
     LoweredValInfo visitApplyForBwdExpr(ApplyForBwdExpr* expr)

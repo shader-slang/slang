@@ -466,6 +466,7 @@ void calcRequiredLoweringPassSet(
         result.bindingQuery = true;
         break;
     case kIROp_BackwardDifferentiate:
+    case kIROp_ValueAndBackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
         result.autodiff = true;
         break;
