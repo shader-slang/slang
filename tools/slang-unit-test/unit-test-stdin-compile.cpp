@@ -570,6 +570,34 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 )";
 
+static const char* kCoverageCliTwoEntryShader = R"(
+RWStructuredBuffer<uint> outputBuffer;
+
+void writeValue(uint value)
+{
+    outputBuffer[0] = value;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    writeValue(tid.x);
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main2(uint3 tid : SV_DispatchThreadID)
+{
+    uint value = tid.x + 1;
+    if ((value & 1u) == 0u)
+        value += 1;
+    else
+        value += 2;
+    writeValue(value);
+}
+)";
+
 struct TempCoverageCliFiles
 {
     String basePath;
@@ -1000,6 +1028,40 @@ static SlangResult _testCoverageExplicitSidecarRejectsWholeProgramCollision(
     return SLANG_OK;
 }
 
+static SlangResult _testCoverageExplicitSidecarSupportsMultiEntrySingleArtifact(
+    UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files, kCoverageCliTwoEntryShader));
+
+    List<String> args;
+    args.add(files.sourcePath);
+    args.add("-target");
+    args.add("spirv");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("-entry");
+    args.add("main2");
+    args.add("-stage");
+    args.add("compute");
+    args.add("-trace-coverage");
+    args.add("-trace-function-coverage");
+    args.add("-trace-branch-coverage");
+    args.add("-coverage-mapping-output");
+    args.add(files.explicitManifestPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (result.standardOutput.getLength() == 0)
+        return SLANG_FAIL;
+
+    return _checkCoverageManifest(files.explicitManifestPath);
+}
+
 static SlangResult _testCoverageExplicitSidecarRejectsMultipleArtifacts(UnitTestContext* context)
 {
     TempCoverageCliFiles files;
@@ -1259,6 +1321,8 @@ SLANG_UNIT_TEST(SlangcCoverageMappingOutput)
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteDebugArtifact(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsWholeProgramCollision(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testCoverageExplicitSidecarSupportsMultiEntrySingleArtifact(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsMultipleArtifacts(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(
