@@ -8,7 +8,6 @@
 #
 # Variables:
 #   SLANG_DXC_BINARY_URL  - Override the download URL (optional)
-#   SLANG_GITHUB_TOKEN    - GitHub token for authenticated downloads (optional)
 #
 # Requires the following variables to be set by the caller (set in SlangTarget.cmake):
 #   runtime_subdir        - Destination for Windows DLLs (e.g. "bin")
@@ -53,15 +52,6 @@ set(_dxc_fetch_args
 if(DEFINED _dxc_url_hash)
     list(APPEND _dxc_fetch_args URL_HASH "${_dxc_url_hash}")
 endif()
-if(SLANG_GITHUB_TOKEN)
-    list(
-        APPEND
-        _dxc_fetch_args
-        HTTP_HEADER
-        "Authorization: token ${SLANG_GITHUB_TOKEN}"
-    )
-endif()
-
 FetchContent_Declare(${_dxc_fetch_args})
 
 FetchContent_GetProperties(dxc)
