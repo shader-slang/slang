@@ -49,14 +49,14 @@ void main()
 //CHECK:                                                ^^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     //
-    // Errors: decimal value in [INTPTR_MAX + 1, UINT64_MAX] for 'Z' suffix.
-    // The spec defines 'Z' dec only for [0, INTPTR_MAX]; no row falls back to
-    // uintptr_t/uint64_t for a 'Z' (signed) suffix, so this is an error.
+    // Warnings: decimal value in [INTPTR_MAX + 1, UINT64_MAX] with 'Z' suffix
+    // falls back to uintptr_t per the (*)-marked rows of the spec table, in the
+    // same way as the 'LL' cases above.
     //
-    static_assert(IntegerLiteralType.UINTPTR == getType(9223372036854775808Z), "dec, 'Z' suffix: intptr_t overflow (error)");
+    static_assert(IntegerLiteralType.UINTPTR == getType(9223372036854775808Z),              "dec, 'Z' suffix: uintptr_t low bound (warning)");
 //CHECK:                                                ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    static_assert(IntegerLiteralType.UINTPTR == getType(18446744073709551615Z), "dec, 'Z' suffix: intptr_t overflow (error)");
+    static_assert(IntegerLiteralType.UINTPTR == getType(18446744073709551615Z),             "dec, 'Z' suffix: uintptr_t high bound (warning)");
 //CHECK:                                                ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
 

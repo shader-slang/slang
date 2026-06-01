@@ -73,7 +73,7 @@ Suffix        | Decimal base                     | Hex, binary, octal bases
 `LL`          | `int64_t`, `uint64_t`(\*)        | `int64_t`, `uint64_t`
 `U`/`UL`/`LU` | `uint`, `uint64_t`               | `uint`, `uint64_t`
 `ULL`/`LLU`   | `uint64_t`                       | `uint64_t`
-`Z`           | `intptr_t`                       | `intptr_t`
+`Z`           | `intptr_t`, `uintptr_t`(\*)      | `intptr_t`
 `UZ`/`ZU`     | `uintptr_t`                      | `uintptr_t`
 
 Types marked with (\*) trigger a warning; they are intended only as a fallback to silently accept values
@@ -108,10 +108,12 @@ Suffix                 | Base        | Value range                              
 `U`/`UL`/`LU`          | any         | [4294967296, 18446744073709551615]          | `uint64_t`
 `ULL`/`LLU`            | any         | [0, 18446744073709551615]                   | `uint64_t`
 `Z` (32-bit)           | dec         | [0, 2147483647] (\*\*)                      | `intptr_t`
+`Z` (32-bit)           | dec         | [2147483648, 4294967295]                    | `uintptr_t` (\*)
 `Z` (32-bit)           | hex/bin/oct | [0x0, 0xFFFFFFFF]                           | `intptr_t`
 `UZ`/`ZU` (32-bit)     | dec         | [0, 4294967295]                             | `uintptr_t`
 `UZ`/`ZU` (32-bit)     | hex/bin/oct | [0x0, 0xFFFFFFFF]                           | `uintptr_t`
 `Z` (64-bit)           | dec         | [0, 9223372036854775807] (\*\*)             | `intptr_t`
+`Z` (64-bit)           | dec         | [9223372036854775808, 18446744073709551615] | `uintptr_t` (\*)
 `Z` (64-bit)           | hex/bin/oct | [0x0, 0xFFFFFFFFFFFFFFFF]                   | `intptr_t`
 `UZ`/`ZU` (64-bit)     | dec         | [0, 18446744073709551615]                   | `uintptr_t`
 `UZ`/`ZU` (64-bit)     | hex/bin/oct | [0x0, 0xFFFFFFFFFFFFFFFF]                   | `uintptr_t`
