@@ -314,10 +314,12 @@ There are several options for getting llvm-support:
   - You can set `SLANG_SLANG_LLVM_BINARY_URL` to point to a local
     `libslang-llvm.so/slang-llvm.dll` or set it to a URL of an zip/archive
     containing such a file
-  - If this isn't set then the build system tries to download it from the
-    release on github matching the current tag. If such a tag doesn't exist
-    or doesn't have the correct os\*arch combination then the latest release
-    will be tried.
+  - If this isn't set then the build system constructs the download URL from
+    the current git tag (e.g. `v2025.21`). Git tags must be available locally;
+    if they are missing the build will warn and skip slang-llvm. Fetch them
+    with `git fetch --tags` (or
+    `git fetch https://github.com/shader-slang/slang.git 'refs/tags/*:refs/tags/*'`
+    when cloning from a fork).
   - If `SLANG_SLANG_LLVM_BINARY_URL` is `FETCH_BINARY_IF_POSSIBLE` then in
     the case that a prebuilt binary can't be found then the build will proceed
     as though `DISABLE` was chosen
