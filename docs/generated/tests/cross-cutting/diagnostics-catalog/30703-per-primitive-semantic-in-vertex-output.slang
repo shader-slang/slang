@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0ea27f1136f8534dac9eb5c39a09f627d027a72832c3ced0f43c9c79236b31b0
 //META: purpose=Fires diagnostic E30703 (per-primitive-semantic-in-vertex-output) -- per-primitive system value semantic '~semantic' must be placed in an 'OutputPrimitives' (or 'out primitives') parameter, not in a vertex or index output
 //META: intent=negative
 //META: pipeline_stage=check

@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=510294c72102216c9ce081d3f044769f9c4bfd6d3087f1d79082cf1e5fb0e398
 //META: purpose=Fires diagnostic E30521 (interface-default-initializer) -- initializing an interface variable with defaults is deprecated and may cause unexpected behavior
 //META: intent=negative
 //META: pipeline_stage=check

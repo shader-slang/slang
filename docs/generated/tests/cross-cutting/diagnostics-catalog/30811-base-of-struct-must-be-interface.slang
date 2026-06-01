@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=866be3496132bbd79919472dedcbee988e9c4318616a9ceaf237f0c34b36eb73
 //META: purpose=Fires diagnostic E30811 (base-of-struct-must-be-interface) -- struct '~decl:Decl' cannot inherit from non-interface type '~baseType:Type'
 //META: intent=negative
 //META: pipeline_stage=check

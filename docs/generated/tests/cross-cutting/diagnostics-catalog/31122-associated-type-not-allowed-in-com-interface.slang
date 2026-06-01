@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=00709b4517ae7e0e37dacff7c72522b671f8a836b7f84a4b06ca53d9afaad62d
 //META: purpose=Fires diagnostic E31122 (associated-type-not-allowed-in-com-interface) -- associatedtype not allowed in [COM] interface
 //META: intent=negative
 //META: pipeline_stage=check

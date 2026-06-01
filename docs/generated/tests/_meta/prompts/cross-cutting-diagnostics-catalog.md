@@ -62,7 +62,6 @@ that triggers that diagnostic from a minimum-reproduction input.
 //META: generated_at=<ISO 8601 UTC>
 //META: source_commit=<HEAD>
 //META: doc_ref=source/slang/slang-diagnostics.lua    ← or the appropriate -defs.h
-//META: doc_section_digest=<sha256 of the catalog-entry line>
 //META: purpose=Fires diagnostic E<code> (<name>) — <message>
 //META: intent=negative
 //META: pipeline_stage=<lex | parse | check | lower | ir-pass | emit | link>
@@ -70,6 +69,12 @@ that triggers that diagnostic from a minimum-reproduction input.
 //META: catalog_name=<name from catalog>
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 ```
+
+`doc_section_digest` is intentionally **omitted** for this bundle even
+though `_common.md` lists it: catalog `doc_ref`s are path-only with no
+`#anchor`, so the anchored-doc-section digest `_common.md` defines is
+undefined here, and bundle-level `watched_paths_digest` already covers
+catalog-source drift. Do not add it back (see shader-slang/slang#11410).
 
 Note the new field `catalog_code` (and `catalog_name`). They are
 catalog-specific and ignored by the existing lint, but make grep

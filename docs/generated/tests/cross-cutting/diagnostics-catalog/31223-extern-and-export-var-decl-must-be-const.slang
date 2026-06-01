@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=ed9fc3c49d706a3797eb62be556b218888ed9d7e974f3accbfff8de355e1d59c
 //META: purpose=Fires diagnostic E31223 (extern-and-export-var-decl-must-be-const) -- extern/export requires static const
 //META: intent=negative
 //META: pipeline_stage=check

@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=2de927d27133cbec140320e57314df0801bd615f6b2a75d0a313be0344265db7
 //META: purpose=Fires diagnostic E31200 (deprecated-usage) -- use of deprecated declaration
 //META: intent=negative
 //META: pipeline_stage=check

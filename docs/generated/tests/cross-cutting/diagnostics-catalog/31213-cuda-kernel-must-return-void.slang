@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=d606a21c71d21efca994cdce3cbb90801a9986c7147b70db8931b31e52199857
 //META: purpose=Fires diagnostic E31213 (cuda-kernel-must-return-void) -- CUDA kernel return type error
 //META: intent=negative
 //META: pipeline_stage=check
