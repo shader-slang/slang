@@ -5078,63 +5078,11 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
         // Work out the test stem
 
-        StringBuilder outputStemBuilder;
-        outputStemBuilder << filePath;
+        StringBuilder outputStem;
+        outputStem << filePath;
         if (subTestIndex != 0)
         {
-            outputStemBuilder << "." << subTestIndex;
-        }
-        String outputStem = outputStemBuilder.produceString();
-
-        // File-level exclusions are handled before parsing. Re-check the output stem here so
-        // callers can exclude generated subtests such as foo.slang.6 without dropping the whole
-        // file.
-        auto matchesSubtestPrefix = [&](const String& prefix)
-        {
-            int prefixSubtestIndex = getSubtestIndex(prefix, filePath);
-            if (prefixSubtestIndex >= 0)
-                return prefixSubtestIndex == subTestIndex;
-
-            return outputStem.startsWith(prefix);
-        };
-
-        bool isExcludedBySubtestPrefix = false;
-        for (auto& excludePrefix : context->options.excludePrefixes)
-        {
-            if (matchesSubtestPrefix(excludePrefix))
-            {
-                if (context->options.verbosity == VerbosityLevel::Verbose)
-                {
-                    context->getTestReporter()->messageFormat(
-                        TestMessageType::Info,
-                        "%s test is excluded because it matches an exclusion prefix\n",
-                        outputStem.getBuffer());
-                }
-                isExcludedBySubtestPrefix = true;
-                break;
-            }
-        }
-        if (!isExcludedBySubtestPrefix)
-        {
-            for (auto& skipEntry : context->options.skipList)
-            {
-                if (matchesSubtestPrefix(skipEntry))
-                {
-                    if (context->options.verbosity == VerbosityLevel::Verbose)
-                    {
-                        context->getTestReporter()->messageFormat(
-                            TestMessageType::Info,
-                            "%s test is skipped because it matches the skip list\n",
-                            outputStem.getBuffer());
-                    }
-                    isExcludedBySubtestPrefix = true;
-                    break;
-                }
-            }
-        }
-        if (isExcludedBySubtestPrefix)
-        {
-            continue;
+            outputStem << "." << subTestIndex;
         }
 
         // Work out the test name - taking into account render api / if synthesized

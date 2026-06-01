@@ -12,8 +12,6 @@
 #   - slang-unit-test-tool/RecordReplayApiTypeOperations  (Windows / OCC)
 #   - tests/autodiff/global-param-hoisting                (Windows / OCC,
 #                                                          intermittent crash)
-#   - tests/compute/parameter-block.slang.6               (macOS / llvm-cov,
-#                                                          intermittent crash)
 # Update both this file and the workflow when adding a new coverage-only
 # skip.
 
