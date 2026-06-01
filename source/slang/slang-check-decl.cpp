@@ -9240,9 +9240,7 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
             if (auto callable = drt->getDeclRef().as<FunctionDeclBase>())
                 targetVis = getDeclVisibility(callable.getDecl());
     }
-    addVisibilityModifier(
-        synFunc,
-        getSynthesizedExtensionVisibility(targetVis).memberVisibility);
+    addVisibilityModifier(synFunc, getSynthesizedExtensionVisibility(targetVis).memberVisibility);
 
     synFunc->parentDecl = context->parentDecl;
 
