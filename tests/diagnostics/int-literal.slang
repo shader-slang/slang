@@ -34,7 +34,7 @@ int doSomething(int a)
 //CHECK:           ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     // This is INT64_MIN and valid negative signed integer, no warning will be emitted.
-    uint64_t d2 = -9223372036854775808;
+    int64_t d2 = -9223372036854775808;
 
     // No warning: the type ladder for non-decimal integer literals admits
     // `uint64_t`, so `0xFFFFFFFFFFFFFFFF` is silently typed as `uint64_t`
