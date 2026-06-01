@@ -1,0 +1,199 @@
+name: Agentic Tests (Nightly)
+
+# Runs the LLM-generated, doc-anchored test bundles under
+# docs/generated/tests/ via `slang-test -test-dir docs/generated/tests`.
+# This is Phase B2 of the agentic-tests framework — the suite is
+# additive, not a replacement for tests/, and runs nightly only because
+# regenerating it from docs is expensive.
+#
+# Linux-only on purpose: every directive in the suite either runs
+# under slangi (interpreter), the CPU/LLVM backend, or a text-emit
+# target (HLSL/SPIRV-asm/Metal/WGSL/CUDA/CPP). No GPU runtime is
+# required. Adding macOS/Windows would multiply runner cost without
+# catching new regressions — slang-test ignores backends the runner
+# doesn't have.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run nightly at 4:00 AM UTC, after coverage-nightly's 02:00 slot
+    # (which has a 240-min timeout) so they don't fight for the same
+    # Linux runner pool. Matches the schedule documented in
+    # docs/generated/tests/_meta/regenerate.md § CI integration.
+    - cron: "0 4 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write # Workload Identity for GCS-cached LLVM
+  contents: read
+  packages: read # Pull slang-linux-clang-ci container from GHCR
+
+jobs:
+  agentic-tests:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    container:
+      image: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user root
+
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          persist-credentials: false
+
+      - name: Authenticate to Google Cloud
+        if: env.IS_FORK_PR != 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      - name: Setup sccache
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: linux
+
+      - name: Setup LLVM from GCS
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          config: release
+          build-llvm: true
+          use-cached-llvm: false
+
+      - name: Build slang-test, slangi, slangc, test-server
+        run: |
+          cmake_launcher_defines=()
+          if [[ -n "${sccache_path:-}" ]]; then
+            cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${sccache_path}")
+            cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${sccache_path}")
+            cmake_launcher_defines+=("-DSLANG_ENABLE_PCH=OFF")
+          fi
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            "${cmake_launcher_defines[@]}"
+          cmake --build --preset release \
+            --target slang-test slangi slangc test-server
+
+      - name: Lint the agentic-tests bundles
+        # Structural lint must pass before slang-test runs — a bundle
+        # whose front-matter or //META block is malformed produces
+        # spurious slang-test failures that obscure real ones.
+        run: |
+          python3 docs/generated/tests/_meta/regenerate.py lint
+
+      - name: Run agentic test suite
+        id: run-tests
+        env:
+          SLANG_RUN_SPIRV_VALIDATION: "1"
+          SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN: "1"
+        run: |
+          # The agentic suite is doc-anchored, text-emit-focused, and
+          # designed to surface compiler bugs (see
+          # docs/generated/tests/README.md). Some failures are expected
+          # while the suite is being de-bugged — they're tracked under
+          # docs/generated/tests/_meta/findings/. We still want to fail
+          # the job on net new failures, so the threshold is a hard
+          # count in tests/expected-failure-agentic.txt rather than
+          # "any failure is fine."
+
+          # Run via the regenerate.py wrapper so the pass/ignored/FAILED
+          # bucketing matches what agents see locally. server-count 4
+          # matches the suite's documented invocation.
+          #
+          # `tee` swallows the upstream exit code under default bash
+          # semantics, so we enable `pipefail` and read `PIPESTATUS[0]`
+          # to get the actual verify exit code (not tee's).
+          set +e
+          set -o pipefail
+          python3 docs/generated/tests/_meta/regenerate.py verify \
+            --server-count 4 \
+            | tee verify-output.log
+          rc=${PIPESTATUS[0]}
+          set +o pipefail
+          set -e
+
+          # Extract counts for the job summary.
+          passed=$(grep -E '^  passed:' verify-output.log | awk '{print $2}' || echo 0)
+          ignored=$(grep -E '^  ignored:' verify-output.log | awk '{print $2}' || echo 0)
+          ignored_tool=$(grep -E '^  ignored-tool:' verify-output.log | awk '{print $2}' || echo 0)
+          expected_fail=$(grep -E '^  expected-fail:' verify-output.log | awk '{print $2}' || echo 0)
+          failed=$(grep -E '^  FAILED:' verify-output.log | awk '{print $2}' || echo 0)
+          ignored=${ignored:-0}
+          ignored_tool=${ignored_tool:-0}
+          expected_fail=${expected_fail:-0}
+          failed=${failed:-0}
+
+          {
+            echo "# Agentic Test Suite"
+            echo ""
+            echo "| Bucket | Count |"
+            echo "| --- | --- |"
+            echo "| Passed | ${passed} |"
+            echo "| Ignored (backend missing in slang-test) | ${ignored} |"
+            if [ "${ignored_tool}" -gt 0 ]; then
+              echo "| Ignored (requires-tool missing on PATH) | ${ignored_tool} |"
+            fi
+            if [ "${expected_fail}" -gt 0 ]; then
+              echo "| Expected-fail (filed compiler bug) | ${expected_fail} |"
+            fi
+            echo "| **FAILED** | **${failed}** |"
+            echo ""
+            if [ "${expected_fail}" -gt 0 ]; then
+              echo "Expected-fail entries are tracked in"
+              echo "\`docs/generated/tests/_meta/expected-failures.txt\`."
+              echo ""
+            fi
+            if [ "${failed}" -gt 0 ]; then
+              echo "Unexpected failing tests:"
+              echo ""
+              echo '```'
+              sed -n '/^Failing tests:/,/^Fix every/p' verify-output.log | grep '^  docs/' || true
+              echo '```'
+              echo ""
+              echo "See docs/generated/tests/_meta/prompts/_common.md § Verify before committing."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Job result is the slang-test exit code, but verify already
+          # bucketed expected-failures away from the FAILED count, so
+          # the exit code is non-zero only on UNEXPECTED failures.
+          exit $rc
+
+      - name: Upload verify output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentic-verify-log
+          path: verify-output.log
+          retention-days: 14
+          if-no-files-found: ignore
