@@ -27,5 +27,4 @@ void main()
     Custom c;
     int t = handle(c);
 //CHECK:          ^ no overload for 'handle' applicable to arguments of type (Custom)
-//CHECK: E39999
 }

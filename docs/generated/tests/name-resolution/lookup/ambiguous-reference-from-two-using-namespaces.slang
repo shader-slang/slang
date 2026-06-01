@@ -16,10 +16,12 @@
 // here we cover the *value* (constant) ambiguity surface for the
 // same diagnostic.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 namespace A { static const int VAL = 1; }
+//CHECK:                       ^^^ candidate: static const int A::VAL
 namespace B { static const int VAL = 2; }
+//CHECK:                       ^^^ candidate: static const int B::VAL
 
 using namespace A;
 using namespace B;
@@ -28,5 +30,4 @@ void main()
 {
     int z = VAL;
 //CHECK:    ^^^ ambiguous reference to 'VAL'
-//CHECK: E39999
 }

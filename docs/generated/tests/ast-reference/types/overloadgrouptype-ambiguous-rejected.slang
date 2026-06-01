@@ -15,14 +15,19 @@
 // context where no target type forces a pick, is rejected as
 // "ambiguous reference".
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 int convert(int x) { return x * 2; }
+/*CHECK:
+    ^^^^^^^ candidate: func convert(int) -> int
+*/
 float convert(float x) { return x + 1.0; }
+/*CHECK:
+      ^^^^^^^ candidate: func convert(float) -> float
+*/
 
 void main()
 {
     int x = convert;
 //CHECK:    ^^^^^^^ ambiguous reference to 'convert'
-//CHECK: E39999
 }

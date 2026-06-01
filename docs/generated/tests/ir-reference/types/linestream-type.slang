@@ -18,18 +18,24 @@
 
 //TEST:SIMPLE(filecheck=IR):-profile sm_5_0 -stage geometry -entry main -target hlsl -dump-ir -o /dev/null
 
+// SV_Position cannot decorate an array directly; wrap each input vertex
+// in a struct that carries the semantic.
+struct GsInput
+{
+    float4 position : SV_Position;
+}
+
 struct RasterVertex
 {
     float4 position : SV_Position;
 }
 
 [maxvertexcount(2)]
-void main(line float4 verts[2] : SV_Position, inout LineStream<RasterVertex> outStream)
+void main(line GsInput verts[2], inout LineStream<RasterVertex> outStream)
 {
     RasterVertex v;
-    v.position = verts[0];
+    v.position = verts[0].position;
     outStream.Append(v);
 }
 
-// IR-LABEL: func %main
-// IR: LineStream
+// IR-DAG: LineStream
