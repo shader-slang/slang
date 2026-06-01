@@ -532,7 +532,14 @@ IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type);
 bool isReadNoneCallee(IRInst* callee);
 
 /// True iff `callee` is read-none AND every user-supplied derivative variant
-/// associated with it (forward and backward) is also read-none.
+/// of it whose read-none-ness is not already implied by the primary is also
+/// read-none.
+///
+/// In practice this checks the `ForwardDerivative` annotation and the
+/// `BackwardDerivativePropagate` annotation. `BackwardDerivativeApply` is
+/// intentionally not consulted because the apply wrapper inherits
+/// read-none-ness from the primary callee — see the implementation comment
+/// in `slang-ir-util.cpp` for the unwrapping chain.
 ///
 /// The carry-set analysis in slang-ir-check-differentiability needs this
 /// stronger property: a primary callee can be `[__readNone]` while its
