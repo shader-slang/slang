@@ -13,7 +13,7 @@
 // Status::GenericArgumentInferenceFailed. CompleteOverloadCandidate
 // emits generic-argument-inference-failed".
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 struct Box<T>
 {
@@ -21,10 +21,12 @@ struct Box<T>
 }
 
 T unbox<T>(Box<T> b) { return b.inner; }
+/*CHECK:
+  ^^^^^ see declaration of func unbox<T> -> T
+*/
 
 void main()
 {
     int x = unbox(42);
 //CHECK:         ^ could not specialize generic for arguments of type (int)
-//CHECK: E39999
 }
