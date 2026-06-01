@@ -1,7 +1,7 @@
 //META: generated=true
 //META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T07:55:45Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: generated_at=2026-06-01T21:16:29Z
+//META: source_commit=a621b651a447846e5c57c2678ffbdf87971b8b0c
 //META: doc_ref=source/slang/slang-diagnostics.lua
 //META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
 //META: purpose=Fires diagnostic E30055 (use-of-non-short-circuiting-operator-in-diff-func) - non-short-circuiting `?:` not allowed in differentiable function
