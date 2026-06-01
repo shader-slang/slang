@@ -234,6 +234,12 @@ static SlangResult _getCanonicalOrExecutablePath(const char* exePath, String& ou
     if (suffix.getLength() < 2 || suffix[0] != '.')
         return -1;
 
+    // Reject implausibly long digit runs (suffix is '.' + digits): >9 digits could
+    // overflow the 32-bit accumulator below (signed overflow is UB). No real subtest
+    // index needs this many digits; -1 is the existing "not a subtest" sentinel.
+    if (suffix.getLength() > 10)
+        return -1;
+
     // Check all remaining chars are digits
     int index = 0;
     for (Index i = 1; i < suffix.getLength(); i++)

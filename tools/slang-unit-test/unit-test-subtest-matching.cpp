@@ -34,6 +34,12 @@ SLANG_UNIT_TEST(subtestGetSubtestIndex)
 
     // A different file path does not match.
     SLANG_CHECK(TestToolUtil::getSubtestIndex("tests/other.slang.1", file) == -1);
+
+    // An implausibly long digit run is rejected (guards 32-bit signed overflow),
+    // rather than wrapping to a bogus index.
+    SLANG_CHECK(
+        TestToolUtil::getSubtestIndex("tests/compute/parameter-block.slang.99999999999", file) ==
+        -1);
 }
 
 SLANG_UNIT_TEST(subtestInsertSubtestIndex)
@@ -66,6 +72,9 @@ SLANG_UNIT_TEST(subtestMatchExcludeEntry)
     SLANG_CHECK(!match6("tests/compute/parameter-block.slang.60"));
     // A different subtest's full name does not match.
     SLANG_CHECK(!match6("tests/compute/parameter-block.slang.5 syn (llvm)"));
+    // A ".0" stem must not match subtest 6 (exercises the entrySubtest==0 branch's
+    // outputStem==filePath guard: subtest 6's outputStem is "<file>.6", not "<file>").
+    SLANG_CHECK(!match6("tests/compute/parameter-block.slang.0"));
     // The bare file path is handled pre-expansion in shouldRunTest, not here.
     SLANG_CHECK(!match6(file));
 

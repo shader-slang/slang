@@ -116,6 +116,9 @@ cannot cover a subtest that _crashes_ the test process. Use `-dry-run` to find t
 exclude; any line it prints (including the `.0` form shown for the first subtest of a multi-subtest
 file) can be copied verbatim into `-exclude-prefix` / `-skip-list`.
 
+Entries are normalized as paths before matching (`Path::simplify`), so write expanded-name entries
+with `/` separators and no `./` or `../` segments — matching the form `-dry-run` prints.
+
 ## Test Types
 
 Tests are identified by a special comment at the start of the test file: `//TEST:<type>:`

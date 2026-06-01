@@ -5096,7 +5096,10 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         // ("<path>.<idx>") or a full variant display name ("<path>.<idx> syn (<api>)").
         // This is required to skip a synthesized variant that crashes the test process
         // before its result can be classified (so -expected-failure-list cannot help).
-        // Exclusion takes precedence over any positive -test-prefix selection below.
+        // Exclusion takes precedence over any positive -test-prefix selection below (the
+        // continue here runs before that block). The matcher is unit-tested in
+        // unit-test-subtest-matching.cpp; this wiring (skip + precedence) is exercised via
+        // `slang-test -dry-run`.
         {
             auto matchesAnySkipEntry = [&](const List<String>& entries) -> bool
             {
