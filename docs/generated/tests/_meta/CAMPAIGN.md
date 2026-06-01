@@ -140,4 +140,5 @@ re-litigate the decision.
 
 | Doc | Reason for skip | When |
 | --- | --- | --- |
-| (none yet) | | |
+| `docs/language-reference/expressions-conversions.md` | Marked `> TODO`; section body is empty. | 2026-06-01 |
+| `docs/language-reference/expressions-evaluation-classes.md` | Content is taxonomy of compile-time-vs-runtime classification with few user-observable claims; "static const forces compile-time" is the main testable claim but its observability is brittle. Revisit when reflection/sizeof surface is richer. | 2026-06-01 |

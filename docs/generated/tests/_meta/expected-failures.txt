@@ -55,3 +55,15 @@ docs/generated/tests/language-reference/types-vector-and-matrix/vector-binary-sc
 # when compiling a vector swizzle-assign (v.xz = int2(...)). The
 # doc shows this as a supported construct.
 docs/generated/tests/language-reference/types-vector-and-matrix/vector-swizzle-assign.slang
+
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-matrix-mij-swizzle-working-set-oob.yaml
+# slangi VM triggers "operand access out of bounds in working set
+# section" when reading a matrix element via `_mij` swizzle. Doc
+# lists this as supported.
+docs/generated/tests/language-reference/expressions-member-access/matrix-mij-zero-based.slang
+
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-colon-colon-static-access-bytecode-unimplemented.yaml
+# slangi VM aborts with "unimplemented: VM bytecode gen for inst"
+# on `EnumType::Name` static-access. Doc states `.` and `::` are
+# equivalent; `.` works in slangi, `::` does not.
+docs/generated/tests/language-reference/expressions-member-access/static-dot-vs-colon-colon.slang

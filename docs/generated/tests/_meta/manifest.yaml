@@ -871,4 +871,15 @@ bundles:
       - source/slang/slang-check-decl.cpp
     size_cap_files: 20
 
+  language-reference/expressions-member-access:
+    prompt: prompts/language-reference-expressions-member-access.md
+    source_doc: docs/language-reference/expressions-member-access.md
+    watched_paths:
+      - docs/language-reference/expressions-member-access.md
+      - source/slang/slang-check-expr.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-check-expr.cpp
+    size_cap_files: 25
+
   # --- top-level reference -----------------------------------------------
