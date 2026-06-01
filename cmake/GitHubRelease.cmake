@@ -36,7 +36,7 @@ function(get_best_slang_binary_release_url out_var)
             "If you cloned from https://github.com/shader-slang/slang.git, fetch tags:\n"
             "    git fetch --tags\n"
             "If you cloned from a mirror or fork, fetch tags from the official repository:\n"
-            "    git fetch https://github.com/shader-slang/slang.git 'refs/tags/*:refs/tags/*'\n"
+            "    git fetch https://github.com/shader-slang/slang.git \"refs/tags/*:refs/tags/*\"\n"
             "Alternatively, set SLANG_SLANG_LLVM_BINARY_URL manually or use a different SLANG_SLANG_LLVM_FLAVOR."
         )
         return()
