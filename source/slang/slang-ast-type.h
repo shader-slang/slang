@@ -689,6 +689,13 @@ class BwdDiffFuncType : public BuiltinType
 };
 
 FIDDLE()
+class ValueAndBwdDiffFuncType : public BuiltinType
+{
+    FIDDLE(...)
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
 class BwdCallableFuncType : public BuiltinType
 {
     FIDDLE(...)

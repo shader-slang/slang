@@ -2801,6 +2801,13 @@ err(
 )
 
 err(
+    "value-and-bwd-diff-requires-non-void-return",
+    31232,
+    "value_and_bwd_diff requires non-void return",
+    span { loc = "location", message = "value_and_bwd_diff requires a function with a non-void return type; use bwd_diff for void-returning functions" }
+)
+
+err(
     "cannot-use-unsized-type-in-constant-buffer",
     31215,
     "unsized type in constant buffer",

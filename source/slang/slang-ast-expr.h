@@ -779,6 +779,16 @@ class BackwardDifferentiateExpr : public DifferentiateExpr
     FIDDLE(...)
 };
 
+/// An expression of the form `__value_and_bwd_diff(fn)` to access the
+/// backward-mode derivative version of `fn` that also surfaces the
+/// primal `f(x)` value.
+///
+FIDDLE()
+class ValueAndBackwardDifferentiateExpr : public DifferentiateExpr
+{
+    FIDDLE(...)
+};
+
 /// An expression of the form `__apply(fn)` to access the
 /// apply-for-backward version of the function `fn`.
 /// Used in __func_extension to define a custom forward pass

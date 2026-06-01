@@ -205,8 +205,10 @@ struct DifferentiableTypeConformanceContext
                 return builder->getFuncType(paramTypes, resultType);
             }
         case kIROp_BackwardDiffFuncType:
+        case kIROp_ValueAndBackwardDiffFuncType:
             {
                 auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+                bool isValueAndBwd = (typeInst->getOp() == kIROp_ValueAndBackwardDiffFuncType);
 
                 List<IRType*> origParamTypes;
                 for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
@@ -302,7 +304,9 @@ struct DifferentiableTypeConformanceContext
                     }
                 }
 
-                return builder->getFuncType(paramTypes, builder->getVoidType());
+                IRType* bwdResultType =
+                    isValueAndBwd ? innerFnType->getResultType() : builder->getVoidType();
+                return builder->getFuncType(paramTypes, bwdResultType);
             }
         case kIROp_ApplyForBwdFuncType:
             {

@@ -1828,6 +1828,10 @@ public:
     // Convert a function's original type to it's forward/backward diff'd type.
     Type* getForwardDiffFuncType(FuncType* originalType, QualType thisType);
     Type* getBackwardDiffFuncType(FuncType* originalType, QualType thisType = QualType());
+    Type* getValueAndBackwardDiffFuncType(
+        FuncType* originalType,
+        QualType thisType = QualType(),
+        SourceLoc diagnosticLoc = SourceLoc());
 
     /// Registers a type as conforming to IDifferentiable, along with a witness
     /// describing the relationship.
@@ -3633,6 +3637,7 @@ public:
 
     Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
     Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
+    Expr* visitValueAndBackwardDifferentiateExpr(ValueAndBackwardDifferentiateExpr* expr);
     Expr* visitApplyForBwdExpr(ApplyForBwdExpr* expr);
     Expr* visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr);
     Expr* visitDispatchKernelExpr(DispatchKernelExpr* expr);

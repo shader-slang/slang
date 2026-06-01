@@ -833,6 +833,12 @@ void ASTPrinter::addExpr(Expr* expr)
         {
             sb << "__bwd_diff(";
         }
+        else if (const auto valueAndBwdDiffExpr =
+                     as<ValueAndBackwardDifferentiateExpr>(higherOrderInvokeExpr);
+                 valueAndBwdDiffExpr)
+        {
+            sb << "__value_and_bwd_diff(";
+        }
         else if (const auto dispatchKernelExpr = as<DispatchKernelExpr>(higherOrderInvokeExpr);
                  dispatchKernelExpr)
         {

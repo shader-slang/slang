@@ -63,7 +63,7 @@ Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr, FunctionDifferentiableLeve
     outLevel = FunctionDifferentiableLevel::None;
     while (auto higherOrder = as<HigherOrderInvokeExpr>(expr))
     {
-        if (as<BackwardDifferentiateExpr>(expr))
+        if (as<BackwardDifferentiateExpr>(expr) || as<ValueAndBackwardDifferentiateExpr>(expr))
             outLevel = FunctionDifferentiableLevel::Backward;
         else if (
             as<ForwardDifferentiateExpr>(expr) && outLevel == FunctionDifferentiableLevel::None)
@@ -87,6 +87,8 @@ UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr)
         return UnownedStringSlice("fwd_diff");
     else if (as<BackwardDifferentiateExpr>(expr))
         return UnownedStringSlice("bwd_diff");
+    else if (as<ValueAndBackwardDifferentiateExpr>(expr))
+        return UnownedStringSlice("value_and_bwd_diff");
     return UnownedStringSlice();
 }
 

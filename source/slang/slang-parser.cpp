@@ -2882,6 +2882,27 @@ static NodeBase* parseBackwardDifferentiate(Parser* parser, void* /* unused */)
     return parseBackwardDifferentiate(parser);
 }
 
+/// Parse an expression of the form value_and_bwd_diff(fn) where fn is an
+/// identifier pointing to a function.
+static Expr* parseValueAndBackwardDifferentiate(Parser* parser)
+{
+    ValueAndBackwardDifferentiateExpr* valueAndBwdDiffExpr =
+        parser->astBuilder->create<ValueAndBackwardDifferentiateExpr>();
+
+    parser->ReadToken(TokenType::LParent);
+
+    valueAndBwdDiffExpr->baseFunction = parser->ParseExpression();
+
+    parser->ReadToken(TokenType::RParent);
+
+    return valueAndBwdDiffExpr;
+}
+
+static NodeBase* parseValueAndBackwardDifferentiate(Parser* parser, void* /* unused */)
+{
+    return parseValueAndBackwardDifferentiate(parser);
+}
+
 /// Parse an expression of the form __apply(fn) where fn is an
 /// identifier pointing to a function.
 static Expr* parseApplyForBwd(Parser* parser)
@@ -10416,9 +10437,11 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("no_diff", parseTreatAsDifferentiableExpr),
     _makeParseExpr("__fwd_diff", parseForwardDifferentiate),
     _makeParseExpr("__bwd_diff", parseBackwardDifferentiate),
+    _makeParseExpr("__value_and_bwd_diff", parseValueAndBackwardDifferentiate),
     _makeParseExpr("__func_as_type", parseFuncAsTypeExpr),
     _makeParseExpr("fwd_diff", parseForwardDifferentiate),
     _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
+    _makeParseExpr("value_and_bwd_diff", parseValueAndBackwardDifferentiate),
     _makeParseExpr("__apply", parseApplyForBwd),
     _makeParseExpr("__dispatch_kernel", parseDispatchKernel),
     _makeParseExpr("sizeof", parseSizeOfExpr),

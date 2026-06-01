@@ -3831,6 +3831,15 @@ static Expr* convertHigherOrderExprToLookup(
     {
         lookupName = visitor->getName("bwd_diff");
     }
+    else if (as<ValueAndBackwardDifferentiateExpr>(resultExpr))
+    {
+        // Phase-1: value_and_bwd_diff does not participate in IBackwardDifferentiable
+        // conformance. Reuse the bwd_diff lookup so the same witness/specialization
+        // path applies; the surface type ValueAndBwdDiffFuncType is still attached
+        // by ValueAndBackwardDifferentiateExprCheckingActions, and the IR layer
+        // unwraps it via maybeTranslateValueAndBackwardDerivative.
+        lookupName = visitor->getName("bwd_diff");
+    }
     else if (as<ApplyForBwdExpr>(resultExpr))
     {
         lookupName = visitor->getName("apply_bwd");
@@ -5022,6 +5031,129 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
     return m_astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
 }
 
+Type* SemanticsVisitor::getValueAndBackwardDiffFuncType(
+    FuncType* originalType,
+    QualType thisQualType,
+    SourceLoc diagnosticLoc)
+{
+    // Mirrors getBackwardDiffFuncType but the result type is the original function's
+    // return type (Q1 = bare R) instead of void. value_and_bwd_diff requires a non-void
+    // return type (Q2): emit the dedicated diagnostic post-substitution if the wrapped
+    // function returns void.
+    List<Type*> paramTypes;
+
+    auto resultType = originalType->getResultType();
+    if (resultType->equals(m_astBuilder->getVoidType()))
+    {
+        getSink()->diagnose(
+            Diagnostics::ValueAndBwdDiffRequiresNonVoidReturn{.location = diagnosticLoc});
+        return m_astBuilder->getErrorType();
+    }
+
+    // No support for differentiating function that throw errors, for now.
+    SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
+    auto errorType = originalType->getErrorType();
+
+    // Handle implicit `this` parameter for non-static member methods.
+    if (thisQualType.type)
+    {
+        if (auto diffPairType = tryGetDifferentialPairType(thisQualType.type))
+        {
+            paramTypes.add(
+                thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(diffPairType)
+                                         : diffPairType);
+        }
+        else
+        {
+            auto noDiffThisType = m_astBuilder->getModifiedType(
+                thisQualType.type,
+                {m_astBuilder->getNoDiffModifierVal()});
+            paramTypes.add(
+                thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(noDiffThisType)
+                                         : noDiffThisType);
+        }
+    }
+
+    for (Index i = 0; i < originalType->getParamCount(); i++)
+    {
+        auto paramValType = originalType->getParamValueType(i);
+        auto paramPassingMode = originalType->getParamPassingMode(i);
+
+        switch (paramPassingMode)
+        {
+        case ParamPassingMode::Out:
+            {
+                auto diffElementType = tryGetDifferentialValueType(m_astBuilder, paramValType);
+                if (diffElementType)
+                    paramTypes.add(diffElementType);
+
+                break;
+            }
+        case ParamPassingMode::In:
+            {
+                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
+                {
+                    if (as<DifferentialPairType>(diffPairValType))
+                        paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
+                    else if (as<DifferentialPtrPairType>(diffPairValType))
+                        paramTypes.add(diffPairValType);
+                }
+                else
+                {
+                    paramTypes.add(m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()}));
+                }
+
+                break;
+            }
+        case ParamPassingMode::BorrowInOut:
+            {
+                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
+                {
+                    paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
+                }
+                else
+                {
+                    paramTypes.add(m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()}));
+                }
+
+                break;
+            }
+        case ParamPassingMode::BorrowIn:
+            {
+                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
+                {
+                    paramTypes.add(m_astBuilder->getConstRefParamType(diffPairValType));
+                }
+                else
+                {
+                    paramTypes.add(m_astBuilder->getConstRefParamType(m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()})));
+                }
+
+                break;
+            }
+        case ParamPassingMode::Ref:
+            {
+                SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+            }
+
+            break;
+        }
+    }
+
+    // Last parameter is the initial derivative of the original return type
+    auto dOutType = tryGetDifferentialValueType(m_astBuilder, originalType->getResultType());
+    if (dOutType)
+        paramTypes.add(dOutType);
+
+    return m_astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
+}
+
 struct HigherOrderInvokeExprCheckingActions
 {
     virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) = 0;
@@ -5183,6 +5315,56 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
     }
 };
 
+struct ValueAndBackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingActions
+{
+    virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) override
+    {
+        return semantics->getASTBuilder()->create<ValueAndBackwardDifferentiateExpr>();
+    }
+    void fillHigherOrderInvokeExpr(
+        HigherOrderInvokeExpr* resultDiffExpr,
+        SemanticsVisitor* semantics,
+        Expr* funcExpr) override
+    {
+        resultDiffExpr->baseFunction = funcExpr;
+        auto baseFuncType = getBaseFunctionType(semantics, funcExpr);
+        if (!baseFuncType)
+        {
+            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
+            semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
+            return;
+        }
+        auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->type =
+            semantics->getValueAndBackwardDiffFuncType(baseFuncType, thisType, resultDiffExpr->loc);
+        if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
+        {
+            auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
+            if (auto genDecl = as<GenericDecl>(declRefExpr->declRef.getDecl()))
+            {
+                funcDecl = as<CallableDecl>(genDecl->inner);
+            }
+            if (funcDecl)
+            {
+                if (thisType.type)
+                    resultDiffExpr->newParameterNames.add(semantics->getName("this"));
+                for (auto param : funcDecl->getParameters())
+                {
+                    if (param->findModifier<NoDiffModifier>())
+                    {
+                        if (param->findModifier<OutModifier>() &&
+                            !param->findModifier<InModifier>() &&
+                            !param->findModifier<InOutModifier>())
+                            continue;
+                    }
+                    resultDiffExpr->newParameterNames.add(param->getName());
+                }
+                resultDiffExpr->newParameterNames.add(semantics->getName("resultGradient"));
+            }
+        }
+    }
+};
+
 template<typename ExprASTType>
 struct PassthroughHighOrderExprCheckingActionsBase : HigherOrderInvokeExprCheckingActions
 {
@@ -5290,6 +5472,13 @@ Expr* SemanticsExprVisitor::visitForwardDifferentiateExpr(ForwardDifferentiateEx
 Expr* SemanticsExprVisitor::visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
 {
     BackwardDifferentiateExprCheckingActions actions;
+    return _checkHigherOrderInvokeExpr(this, expr, &actions);
+}
+
+Expr* SemanticsExprVisitor::visitValueAndBackwardDifferentiateExpr(
+    ValueAndBackwardDifferentiateExpr* expr)
+{
+    ValueAndBackwardDifferentiateExprCheckingActions actions;
     return _checkHigherOrderInvokeExpr(this, expr, &actions);
 }
 

@@ -196,6 +196,7 @@ local insts = {
 
 			{ ForwardDiffFuncType = { hoistable = true } },
 			{ BackwardDiffFuncType = { hoistable = true } },
+			{ ValueAndBackwardDiffFuncType = { hoistable = true } },
 			{ ApplyForBwdFuncType = { hoistable = true } },
 			{ BwdCallableFuncType = { hoistable = true } },
 			{ RematFuncType = { hoistable = true } },
@@ -2611,6 +2612,8 @@ local insts = {
 		{ ForwardDifferentiate = { min_operands = 1, operands = { { "baseFn" } } } },
 
 		{ LegacyBackwardDifferentiate = { min_operands = 3 } },
+
+		{ ValueAndBackwardDifferentiate = { min_operands = 3 } },
 		
 		{ BackwardPrimalFromLegacyBwdDiffFunc = { min_operands = 2 } },
 		{ BackwardRematFromLegacyBwdDiffFunc = { min_operands = 2 } },
