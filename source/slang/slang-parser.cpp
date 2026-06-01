@@ -8126,9 +8126,11 @@ static BaseType _determineIntegerLiteralType(
     IntegerLiteralWidthSuffix widthSuffix,
     IntegerLiteralUnsignedSuffix unsignedSuffix,
     Token* token,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    bool *outSignedMinimumIntException)
 {
     const uint64_t rawValue = static_cast<uint64_t>(value);
+    *outSignedMinimumIntException = false;
 
     if (isDecimalBase)
     {
@@ -8152,28 +8154,45 @@ static BaseType _determineIntegerLiteralType(
             if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
             {
                 if (rawValue <= INT64_MAX)
+                {
                     return BaseType::Int64;
-
-                // This is always overflowing. The case of INT64_MAX + 1 is
-                // detected by SemanticsExprVisitor when assigning types.
-                if (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 2U))
+                }
+                else if (rawValue == static_cast<uint64_t>(INT64_MAX) + 1U)
+                {
+                    // Diagnostics is deferred to SemanticsExprVisitor, since we
+                    // might still the get unary minus treatment, which is fine.
+                    *outSignedMinimumIntException = true;
+                }
+                else if (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 2U))
+                {
+                    // This is always overflowing.
                     sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
+                }
             }
 
             return BaseType::UInt64;
 
         case IntegerLiteralWidthSuffix::Pointer:
-            if ((unsignedSuffix == IntegerLiteralUnsignedSuffix::None) &&
-                (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 2U)))
+            if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
             {
-                // This is always overflowing. The case of INT64_MAX + 1 is
-                // detected by SemanticsExprVisitor when assigning types.
-                sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
-                return BaseType::UIntPtr;
+                if (rawValue <= INT64_MAX)
+                {
+                    return BaseType::IntPtr;
+                }
+                else if (rawValue == static_cast<uint64_t>(INT64_MAX) + 1U)
+                {
+                    // Diagnostics is deferred to SemanticsExprVisitor, since we
+                    // might still the get unary minus treatment, which is fine.
+                    *outSignedMinimumIntException = true;
+                }
+                else if (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 2U))
+                {
+                    // This is always overflowing.
+                    sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
+                }
             }
 
-            return unsignedSuffix == IntegerLiteralUnsignedSuffix::None ? BaseType::IntPtr
-                                                                        : BaseType::UIntPtr;
+            return BaseType::UIntPtr;
 
         default:
             SLANG_ASSERT(!"Unhandled width suffix");
@@ -8306,23 +8325,8 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
             widthSuffix,
             unsignedSuffix,
             &token,
-            parser->sink);
-
-        // flag the special case for INT_MIN / INT64_MIN literal expressions
-        if (isDecimalBase && (unsignedSuffix == IntegerLiteralUnsignedSuffix::None))
-        {
-            if (((widthSuffix == IntegerLiteralWidthSuffix::None) ||
-                 widthSuffix == IntegerLiteralWidthSuffix::Long) &&
-                (value == -static_cast<int64_t>(INT_MIN)))
-                signedMinimumIntException = true;
-            else if (
-                ((widthSuffix == IntegerLiteralWidthSuffix::None) ||
-                 (widthSuffix == IntegerLiteralWidthSuffix::Long) ||
-                 (widthSuffix == IntegerLiteralWidthSuffix::LongLong) ||
-                 (widthSuffix == IntegerLiteralWidthSuffix::Pointer)) &&
-                value == INT64_MIN)
-                signedMinimumIntException = true;
-        }
+            parser->sink,
+            &signedMinimumIntException);
     }
     else
     {
