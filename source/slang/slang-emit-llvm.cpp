@@ -709,9 +709,14 @@ struct LLVMEmitter
             Slang::LLVMBuilderOptions options,
             Slang::IArtifact** outErrorArtifact);
 
-        auto builderFunc = (BuilderFuncV3)library->findFuncByName("createLLVMBuilder_V3");
+        const char* const builderFuncName = "createLLVMBuilder_V3";
+        auto builderFunc = (BuilderFuncV3)library->findFuncByName(builderFuncName);
         if (!builderFunc)
+        {
+            getSink()->diagnose(Diagnostics::IncompatibleSlangLlvmLibrary{
+                .symbol = UnownedStringSlice(builderFuncName)});
             return SLANG_FAIL;
+        }
 
         auto targetTripleOption =
             getOptions().getStringOption(CompilerOptionName::LLVMTargetTriple).getUnownedSlice();

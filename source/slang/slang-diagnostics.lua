@@ -407,6 +407,12 @@ err(
 
 err("null-component-type", 105, "componentTypes[~index:Int] is `nullptr`")
 
+err(
+    "incompatible-slang-llvm-library",
+    109,
+    "the loaded 'slang-llvm' library is too old for this compiler: it does not export '~symbol'; fetch a newer slang-llvm release or build slang-llvm from source"
+)
+
 -- Code 99996: moved from 99999 to avoid severity conflict with internal-severity diagnostics at that code.
 standalone_note("note-failed-to-load-dynamic-library", 99996, "failed to load dynamic library '~path'")
 
