@@ -8127,7 +8127,7 @@ static BaseType _determineIntegerLiteralType(
     IntegerLiteralUnsignedSuffix unsignedSuffix,
     Token* token,
     DiagnosticSink* sink,
-    bool *outSignedMinimumIntException)
+    bool* outSignedMinimumIntException)
 {
     const uint64_t rawValue = static_cast<uint64_t>(value);
     *outSignedMinimumIntException = false;
