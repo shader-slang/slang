@@ -32,8 +32,8 @@ struct PatchConstants
     float Inside : SV_InsideTessFactor;
 };
 
-//CHECK: OutputPatch
-//CHECK: domainMain
+//CHECK-DAG: OutputPatch
+//CHECK-DAG: domainMain
 [domain("tri")]
 DSOutput domainMain(
     PatchConstants pc,

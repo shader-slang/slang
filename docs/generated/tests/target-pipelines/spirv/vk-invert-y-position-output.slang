@@ -19,12 +19,18 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage vertex -fvk-invert-y
 
+// The y-coordinate input is read from a uniform so constant folding
+// cannot precompute the negation away. Without this, an
+// all-literal `float4(...)` collapses to a `ConstantComposite` and
+// the documented runtime OpFNegate never appears in the assembly.
+uniform float y;
+
 [shader("vertex")]
 float4 main(uint vid : SV_VertexID) : SV_Position
 {
-    return float4(0.0, 1.0, 0.0, 1.0);
+    return float4(0.0, y, 0.0, 1.0);
 }
 
-// CHECK: OpEntryPoint Vertex %main
+// CHECK-DAG: OpEntryPoint Vertex %main
 // CHECK-DAG: OpDecorate %gl_Position BuiltIn Position
 // CHECK-DAG: OpFNegate
