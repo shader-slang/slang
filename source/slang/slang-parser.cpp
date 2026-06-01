@@ -8141,7 +8141,16 @@ static BaseType _determineIntegerLiteralType(
             if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
             {
                 if (rawValue <= INT32_MAX)
+                {
                     return BaseType::Int;
+                }
+                else if (rawValue == static_cast<uint64_t>(INT32_MAX) + 1U)
+                {
+                    // This literal is eligible for demotion back to Int if
+                    // prefixed by unary minus.
+                    *outSignedMinimumIntException = true;
+                    return BaseType::Int64;
+                }
             }
             else
             {
@@ -9499,7 +9508,10 @@ static Expr* parsePrefixExpr(Parser* parser)
                     }
                     else if (newLiteral->value == INT64_MIN)
                     {
-                        newLiteral->suffixType = BaseType::Int64;
+                        if (newLiteral->suffixType == BaseType::UIntPtr)
+                            newLiteral->suffixType = BaseType::IntPtr;
+                        else
+                            newLiteral->suffixType = BaseType::Int64;
                     }
                     else
                     {
@@ -9515,7 +9527,7 @@ static Expr* parsePrefixExpr(Parser* parser)
                     // Check if we need to diagnose the signed minimum int special case here. This
                     // won't be detected by SemanticsExprVisitor, because the literal value is no
                     // longer INT64_MIN after folding.
-                    if ((tokenType == TokenType::OpBitNot) && newLiteral->signedMinimumIntException)
+                    if (newLiteral->signedMinimumIntException)
                     {
                         parser->sink->diagnose(
                             Diagnostics::IntegerLiteralTooLarge{.location = intLit->loc});
