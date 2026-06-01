@@ -225,4 +225,68 @@ static SlangResult _getCanonicalOrExecutablePath(const char* exePath, String& ou
     return SLANG_OK;
 }
 
+/* static */ int TestToolUtil::getSubtestIndex(const String& prefix, const String& filePath)
+{
+    if (prefix.getLength() <= filePath.getLength() || !prefix.startsWith(filePath))
+        return -1;
+
+    auto suffix = prefix.getUnownedSlice().tail(filePath.getLength());
+    if (suffix.getLength() < 2 || suffix[0] != '.')
+        return -1;
+
+    // Check all remaining chars are digits
+    int index = 0;
+    for (Index i = 1; i < suffix.getLength(); i++)
+    {
+        char c = suffix[i];
+        if (c < '0' || c > '9')
+            return -1;
+        index = index * 10 + (c - '0');
+    }
+
+    return index;
+}
+
+/* static */ String TestToolUtil::insertSubtestIndex(const String& testName, int index)
+{
+    Index spacePos = testName.indexOf(' ');
+    StringBuilder result;
+    if (spacePos >= 0)
+    {
+        result << testName.subString(0, spacePos) << "." << index
+               << testName.subString(spacePos, testName.getLength() - spacePos);
+    }
+    else
+    {
+        result << testName << "." << index;
+    }
+    return result.produceString();
+}
+
+/* static */ bool TestToolUtil::doesSubtestMatchExcludeEntry(
+    const String& entry,
+    const String& filePath,
+    const String& outputStem,
+    const String& testName,
+    Index subTestIndex,
+    Index subtestCount)
+{
+    // Full expanded display name -> skip just this api/synthesized variant.
+    if (testName == entry)
+        return true;
+    // The first subtest of a multi-subtest file prints with an explicit ".0" under
+    // -dry-run, while its internal name omits it; accept the printed form too.
+    if (subTestIndex == 0 && subtestCount > 1 && insertSubtestIndex(testName, 0) == entry)
+        return true;
+    // Subtest stem -> skip all variants of that subtest index. Exact compare (not
+    // startsWith) so ".6" does not also match ".60". ".0" names the first subtest,
+    // whose stem carries no ".0" suffix.
+    const int entrySubtest = getSubtestIndex(entry, filePath);
+    if (entrySubtest == 0 && outputStem == filePath)
+        return true;
+    if (entrySubtest > 0 && outputStem == entry)
+        return true;
+    return false;
+}
+
 } // namespace Slang

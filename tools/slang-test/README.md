@@ -104,14 +104,17 @@ test as it is expanded:
   subtest index. Matching is exact, so `.6` does not also match `.60`.
 - **Full expanded subtest name** (e.g. `tests/compute/parameter-block.slang.6 syn (llvm)`): excludes
   just that one variant. The name is the same string `slang-test` prints with `-dry-run`:
-  `<path>[.<idx>][ syn][ (<api>)]` (the `syn` marker appears for synthesized tests and the API name
-  for synthesized compile-target tests).
+  `<path>[.<idx>][ syn][ (<api>)]` — the `syn` marker appears for synthesized tests, and the
+  `(<api>)` suffix appears both for synthesized compile-target tests and for any test that uses a
+  render API (e.g. a non-synthesized `tests/compute/parameter-block.slang.3 (vk)`).
 
-Because the match happens before the test is dispatched, this is the only mechanism that can skip a
-subtest that _crashes_ the test process — unlike `-expected-failure-list`, which reclassifies a
-result only after the test returns. Use `-dry-run` to find the exact name to exclude; any line it
-prints (including the `.0` form shown for the first subtest of a multi-subtest file) can be copied
-verbatim into `-exclude-prefix` / `-skip-list`.
+A file-path prefix already skips a whole crashing file pre-dispatch (in `shouldRunTest`), but the
+subtest-stem and full-name forms are the only way to skip an _individual_ crashing subtest without
+also dropping its sibling subtests. Either way the match happens before the test is dispatched —
+unlike `-expected-failure-list`, which reclassifies a result only after the test returns, and so
+cannot cover a subtest that _crashes_ the test process. Use `-dry-run` to find the exact name to
+exclude; any line it prints (including the `.0` form shown for the first subtest of a multi-subtest
+file) can be copied verbatim into `-exclude-prefix` / `-skip-list`.
 
 ## Test Types
 
