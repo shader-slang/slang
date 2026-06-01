@@ -124,10 +124,12 @@ This makes the bundle browseable by code and by name.
   `README.md` with a one-line reason ("internal diagnostic with no
   user trigger" / "requires multi-file test" / "requires API
   surface not available to slangc CLI" / etc.).
-- **Verify the example compiles and fires the code before asserting
-  its `// CHECK:`.** Run the minimum reproduction (see "Inputs
-  available to you") and confirm the observed output. An example that
-  fails to parse — e.g. an unsupported `?:` form such as the GNU
+- **Verify the example runs and fires the code, with no unrelated
+  errors, before asserting its `// CHECK:`.** Run the minimum
+  reproduction (see "Inputs available to you") and confirm the
+  observed output: the target code is emitted and nothing else fails
+  the compile for an unrelated reason. An example that fails to parse
+  — e.g. an unsupported `?:` form such as the GNU
   "elvis" `a ?: b`, or a scalar `?:` where only a vector condition
   fires the code — makes slang-test fail with that parse error or a
   missing-diagnostic mismatch, never your target diagnostic. An
