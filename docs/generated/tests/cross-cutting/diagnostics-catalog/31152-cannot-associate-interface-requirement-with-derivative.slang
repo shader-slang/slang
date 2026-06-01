@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=1272d010ea70caacbe5be8411ce7665288ddc372c51f08efe165435ed08db818
 //META: purpose=Fires diagnostic E31152 (cannot-associate-interface-requirement-with-derivative) -- interface requirement cannot have derivative
 //META: intent=negative
 //META: pipeline_stage=check

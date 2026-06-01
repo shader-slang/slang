@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=4308fbe31167a7a2b9786bfadb0ed1310f96dff875724fee9c11ee36ed811772
 //META: purpose=Fires diagnostic E30831 (cannot-inherit-from-implicitly-sealed-declaration-in-another-module) -- cannot inherit from type '~baseType:Type' in module '~moduleName:Name' because it is implicitly 'sealed'
 //META: intent=negative
 //META: pipeline_stage=check

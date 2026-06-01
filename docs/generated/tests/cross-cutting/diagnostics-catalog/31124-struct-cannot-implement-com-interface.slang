@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=da3fe0989367526edafe4cdbb58b63121678c46bbefd4ab112925f91083e28e4
 //META: purpose=Fires diagnostic E31124 (struct-cannot-implement-com-interface) -- struct types cannot implement COM interfaces
 //META: intent=negative
 //META: pipeline_stage=check

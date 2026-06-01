@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=90515e39946c6c0aaf3bb3944720235c740a17183dcf5e70ad5578c650153888
 //META: purpose=Fires diagnostic E30704 (parameter-without-default-after-parameter-with-default) -- parameter '~param:Decl' does not have a default value, but follows a parameter that does
 //META: intent=negative
 //META: pipeline_stage=check

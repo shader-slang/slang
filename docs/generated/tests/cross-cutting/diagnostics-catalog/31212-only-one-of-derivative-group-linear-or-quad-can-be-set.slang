@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=336e7d6d0383a588312b935e96dce0831d84f29a9b3a39256ea8cbd3f3840bd4
 //META: purpose=Fires diagnostic E31212 (only-one-of-derivative-group-linear-or-quad-can-be-set) -- conflicting derivative group settings
 //META: intent=negative
 //META: pipeline_stage=check

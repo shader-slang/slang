@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=43ed5231e6f1f77762d6477873cbc222600c01f258623c1c480d305ae6c79d42
 //META: purpose=Fires diagnostic E31109 (set-accessor-param-wrong-type) -- 'set' parameter type mismatch
 //META: intent=negative
 //META: pipeline_stage=check

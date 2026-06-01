@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=8142a7b52e4e5e8c1d0ee91db4606b10018522e852f1cc2966dcddc87ba6c494
 //META: purpose=Fires diagnostic E31220 (variable-cannot-be-push-and-specialization-constant) -- conflicting constant qualifiers
 //META: intent=negative
 //META: pipeline_stage=check
