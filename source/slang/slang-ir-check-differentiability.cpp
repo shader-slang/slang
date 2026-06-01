@@ -3,6 +3,7 @@
 #include "slang-ir-autodiff.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
@@ -467,11 +468,47 @@ public:
             case kIROp_Call:
                 if (shouldTreatCallAsDifferentiable(inst))
                     return false;
-                return isDifferentiableFunc(
-                           diffTypeContext,
-                           as<IRCall>(inst)->getCallee(),
-                           requiredDiffLevel) &&
-                       diffTypeContext.isDifferentiableType(inst->getFullType());
+                {
+                    auto callInst = as<IRCall>(inst);
+                    auto callee = callInst->getCallee();
+                    if (!isDifferentiableFunc(diffTypeContext, callee, requiredDiffLevel) ||
+                        !diffTypeContext.isDifferentiableType(inst->getFullType()))
+                        return false;
+                    // The "no carrying input ⇒ no carrying output" tightening
+                    // (#11285) is only sound for functions whose result can
+                    // only depend on their arguments. A function with side
+                    // effects or memory reads (e.g. a texture/buffer load with
+                    // a user-supplied `[BackwardDerivative]`) can legitimately
+                    // produce a derivative from captured state without any
+                    // differentiable input. For non-readNone callees, fall
+                    // back to the original conservative behavior of treating
+                    // every differentiable-function call as carrying.
+                    if (!isReadNoneCallee(callee))
+                        return true;
+
+                    // For readNone callees, a call carries a derivative only
+                    // when at least one of its *differentiable-input*
+                    // arguments does. Arguments bound to a callee parameter
+                    // slot that is output-only or `no_diff` are skipped.
+                    auto calleeFuncType = as<IRFuncType>(callee->getFullType());
+                    UInt argCount = callInst->getArgCount();
+                    for (UInt i = 0; i < argCount; i++)
+                    {
+                        if (calleeFuncType && calleeFuncType->getParamCount() == argCount)
+                        {
+                            auto paramType = calleeFuncType->getParamType(i);
+                            auto [paramDirectionInfo, paramBaseType] =
+                                splitParameterDirectionAndType(paramType);
+                            if (paramDirectionInfo.kind == ParameterDirectionInfo::Kind::Out)
+                                continue;
+                            if (!diffTypeContext.isDifferentiableType(paramBaseType))
+                                continue;
+                        }
+                        if (carryNonTrivialDiffSet.contains(callInst->getArg(i)))
+                            return true;
+                    }
+                    return false;
+                }
             case kIROp_Load:
                 // We don't have more knowledge on whether diff is available at the destination
                 // address. Just assume it is producing diff if the dest address can hold a
@@ -509,10 +546,16 @@ public:
         };
 
         // Run data flow analysis and generate `produceDiffSet` and an intial `expectDiffSet`.
+        // `carryNonTrivialDiffSet` derives from `produceDiffSet` plus its own
+        // phi-propagation, so the fixed-point loop must terminate only when
+        // BOTH sets stop growing — watching only `produceDiffSet` can miss a
+        // carry-set update that arrives via a back-edge call result (#11285).
         Index lastProduceDiffCount = 0;
+        Index lastCarryDiffCount = 0;
         do
         {
             lastProduceDiffCount = produceDiffSet.getCount();
+            lastCarryDiffCount = carryNonTrivialDiffSet.getCount();
             for (auto block : funcInst->getBlocks())
             {
                 if (block != funcInst->getFirstBlock())
@@ -529,6 +572,19 @@ public:
                                 if (branch->getArgCount() > paramIndex)
                                 {
                                     auto arg = branch->getArg(paramIndex);
+                                    // Don't propagate derivative tracking into a
+                                    // block param whose type cannot hold a derivative
+                                    // (e.g. a `no_diff`-wrapped type). The author has
+                                    // explicitly opted that location out of derivative
+                                    // flow; propagating either set into it causes a
+                                    // downstream
+                                    // `LossOfDerivativeAssigningToNonDifferentiableLocation` false
+                                    // positive when the param is read and stored into a
+                                    // similarly-untracked location (#11285).
+                                    auto [_, paramBaseType] =
+                                        splitParameterDirectionAndType(param->getDataType());
+                                    if (!diffTypeContext.isDifferentiableType(paramBaseType))
+                                        continue;
                                     if (produceDiffSet.contains(arg))
                                         produceDiffSet.add(param);
                                     if (carryNonTrivialDiffSet.contains(arg))
@@ -582,7 +638,8 @@ public:
                     }
                 }
             }
-        } while (produceDiffSet.getCount() != lastProduceDiffCount);
+        } while (produceDiffSet.getCount() != lastProduceDiffCount ||
+                 carryNonTrivialDiffSet.getCount() != lastCarryDiffCount);
 
         // Reverse propagate `expectDiffSet`.
         for (int i = 0; i < expectDiffInstWorkList.getCount(); i++)
