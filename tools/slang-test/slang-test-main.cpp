@@ -5841,6 +5841,11 @@ SlangResult innerMain(int argc, char** argv)
             SLANG_CPP_SOURCE,
             SLANG_SHADER_HOST_CALLABLE);
 
+        if (hasLlvm)
+        {
+            SLANG_RETURN_ON_FAIL(context.locateLLVMFileCheck());
+        }
+
         if (hasLlvm && hostCallableCompiler == SLANG_PASS_THROUGH_LLVM && SLANG_PROCESSOR_X86)
         {
             // TODO(JS)
