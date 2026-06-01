@@ -153,6 +153,7 @@ Install CMake and Ninja; we recommend using [Homebrew](https://brew.sh/) for ins
 ```
 $ brew install ninja
 $ brew install cmake
+$ brew install zstd
 ```
 
 Run CMake with the following command to generate Makefile:
