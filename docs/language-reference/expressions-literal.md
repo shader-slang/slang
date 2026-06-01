@@ -172,9 +172,6 @@ the special cases listed above (for example, the `int` row also accepts `2147483
 > 📝 **Remark 2:** Integer literal types follow the C++11 rules, with additional special-case handling for
 > minimum integer values preceded by unary minus.
 
-> 📝 **Remark 3:** The current implementation does not fully conform to the language manual.
-> This is tracked by GitHub issue [#11216](https://github.com/shader-slang/slang/issues/11216).
-
 ## Floating-Point Literal Expressions
 
 > *`FloatLiteral`* =<br>
