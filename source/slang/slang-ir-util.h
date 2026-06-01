@@ -530,6 +530,19 @@ IRType* getTextureTypeFromCombinedTextureSampler(IRType* type);
 IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type);
 
 bool isReadNoneCallee(IRInst* callee);
+
+/// True iff `callee` is read-none AND every user-supplied derivative variant
+/// associated with it (forward and backward) is also read-none.
+///
+/// The carry-set analysis in slang-ir-check-differentiability needs this
+/// stronger property: a primary callee can be `[__readNone]` while its
+/// user-supplied `[ForwardDerivative]` or `[BackwardDerivative]` has side
+/// effects, in which case a call to the primary still produces observable
+/// derivative state through differentiation. Other callers of
+/// `isReadNoneCallee` reason about the local function's own read-none-ness
+/// and should not use this variant.
+bool isReadNoneCalleeAndAllDerivatives(IRInst* callee);
+
 bool isNoSideEffectCallee(IRInst* callee);
 
 bool tryGetConstantIntLit(IRInst* inst, Int64& outValue);

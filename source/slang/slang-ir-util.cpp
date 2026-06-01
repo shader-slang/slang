@@ -3234,6 +3234,46 @@ bool isReadNoneCallee(IRInst* callee)
     return false;
 }
 
+bool isReadNoneCalleeAndAllDerivatives(IRInst* callee)
+{
+    // The primary callee must be read-none first; the carry-set gate cannot
+    // weaken its existing guarantee.
+    if (!isReadNoneCallee(callee))
+        return false;
+
+    // `[ForwardDerivative]` and `[BackwardDerivative]` are recorded as
+    // annotations attached to the underlying function. The callee passed in
+    // may be an IRSpecialize or IRGeneric wrapper; resolve to the inst the
+    // annotations are attached to before looking them up.
+    IRInst* annotated = getResolvedInstForDecorations(callee);
+    if (!annotated)
+        return true;
+
+    IRBuilder builder(annotated->getModule());
+
+    auto isAssociatedDerivativeReadNone = [&](AnnotationKind kind) -> bool
+    {
+        IRInst* derivativeFunc = builder.tryLookupAnnotation(annotated, kind);
+        if (!derivativeFunc)
+            return true;
+        return isReadNoneCallee(derivativeFunc);
+    };
+
+    // ForwardDerivative points directly at the user's fwd-diff function.
+    if (!isAssociatedDerivativeReadNone(AnnotationKind::ForwardDerivative))
+        return false;
+
+    // BackwardDerivativePropagate points at the synthesized propagate-phase
+    // wrapper, which inherits its readNone-ness from the user-supplied
+    // backward function. (BackwardDerivativeApply by contrast inherits from
+    // the *primary*, so checking it would always agree with the
+    // already-checked primary-callee gate and add no information.)
+    if (!isAssociatedDerivativeReadNone(AnnotationKind::BackwardDerivativePropagate))
+        return false;
+
+    return true;
+}
+
 
 bool isNoSideEffectCallee(IRInst* callee)
 {
