@@ -67,3 +67,10 @@ docs/generated/tests/language-reference/expressions-member-access/matrix-mij-zer
 # on `EnumType::Name` static-access. Doc states `.` and `::` are
 # equivalent; `.` works in slangi, `::` does not.
 docs/generated/tests/language-reference/expressions-member-access/static-dot-vs-colon-colon.slang
+
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-global-var-bytecode-unsupported.yaml
+# slangi VM aborts with "unsupported global inst for vm bytecode
+# emit" when any module-scope global variable is declared (e.g.
+# `static int x = 42;` in an enum extension). Doc Example 1 for
+# enum extensions uses this exact construct.
+docs/generated/tests/language-reference/types-extension/enum-extension-static-members.slang
