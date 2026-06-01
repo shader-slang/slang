@@ -17,16 +17,17 @@ The suite is **additive** — it does not replace the hand-written
 
 ## Layout
 
-| Subtree             | Purpose                                                                                |
-| ------------------- | -------------------------------------------------------------------------------------- |
-| `pipeline/`         | Tests anchored to the compilation-pipeline docs (lex → emit)                           |
-| `syntax-reference/` | Tests anchored to the syntax / grammar / keywords docs                                 |
-| `ast-reference/`    | Tests anchored to the AST node reference                                               |
-| `ir-reference/`     | Tests anchored to the IR opcode reference                                              |
-| `name-resolution/`  | Tests anchored to scoping / lookup / overload-resolution docs                          |
-| `cross-cutting/`    | Tests anchored to diagnostics, IR instruction set, targets, etc.                       |
-| `target-pipelines/` | Tests anchored to per-target (SPIR-V/HLSL/Metal/WGSL/CUDA) end-to-end docs             |
-| `_meta/`            | Pipeline infrastructure: manifest, prompts, schemas, freshness + findings state, driver |
+| Subtree              | Purpose                                                                                |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| `language-reference/` | Tests anchored to the **authoritative human-written spec** at `docs/language-reference/`. Outranks the generated-design bundles when both cover the same claim. |
+| `pipeline/`          | Tests anchored to the compilation-pipeline docs (lex → emit)                           |
+| `syntax-reference/`  | Tests anchored to the syntax / grammar / keywords docs                                 |
+| `ast-reference/`     | Tests anchored to the AST node reference                                               |
+| `ir-reference/`      | Tests anchored to the IR opcode reference                                              |
+| `name-resolution/`   | Tests anchored to scoping / lookup / overload-resolution docs                          |
+| `cross-cutting/`     | Tests anchored to diagnostics, IR instruction set, targets, etc.                       |
+| `target-pipelines/`  | Tests anchored to per-target (SPIR-V/HLSL/Metal/WGSL/CUDA) end-to-end docs             |
+| `_meta/`             | Pipeline infrastructure: manifest, prompts, schemas, freshness + findings state, driver |
 
 The directory structure mirrors `docs/generated/design/` for every
 **behaviorally normative** doc: each `docs/generated/design/<section>/<doc>.md`
@@ -95,16 +96,21 @@ what is implemented today versus what is scaffolded or planned:
 
 ## Trust model
 
-- The source code is authoritative.
-- The hand-written `tests/` suite is authoritative for the behaviors
-  it covers.
-- The docs in [`../design/`](../design/) are
-  the spec this suite checks against. They may drift from source; the
-  doc-side regeneration loop closes that drift.
-- Tests under `docs/generated/tests/` are valid only to the extent that their
-  cited docs are valid. A failing agentic test means one of:
-  doc says X but compiler does not-X (compiler bug **or** doc bug),
-  or the test is wrong (regenerate).
+- **`docs/language-reference/`** is the authoritative spec — the
+  human-written description of what Slang behaviour *should be*.
+  Bundles under `language-reference/` anchor to this. When the
+  language reference and the compiler disagree, the test is the
+  honest signal; the human triage step decides which side is wrong.
+- **`docs/generated/design/`** is reverse-engineered from the actual
+  compiler source and may codify bugs. Bundles outside
+  `language-reference/` anchor to it. A failing test there is most
+  likely a regression in already-known behaviour.
+- The hand-written `tests/` suite is authoritative for the behaviours
+  it covers (separate from this suite).
+- A failing agentic test means one of: doc says X but compiler does
+  not-X (compiler bug **or** doc bug), or the test is wrong
+  (regenerate). When the cited doc is `language-reference/`, a real
+  spec/compiler disagreement should be filed as a finding.
 
 ## Running the suite
 

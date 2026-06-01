@@ -25,6 +25,47 @@ bundle's `source_doc` (or a secondary doc the per-section prompt
 explicitly allows). The test's `purpose` field paraphrases the claim
 being verified.
 
+### Source-of-truth hierarchy
+
+When a behaviour is described in more than one place, **the language
+reference outranks the generated design docs**.
+
+1. **`docs/language-reference/*.md`** — the human-written language
+   reference manual. Describes what Slang behaviour *should be*. This
+   is the **authoritative spec**. Anchor to the language reference
+   whenever it covers the claim you are testing.
+2. **`docs/generated/design/*.md`** — the LLM-generated architectural
+   docs. Reverse-engineered from the compiler source and therefore
+   liable to codify bugs as if they were intentional behaviour.
+   Anchor here **only when the language reference is silent** on the
+   specific behaviour (the language reference is a work-in-progress
+   and incomplete; the design-doc fallback path stays load-bearing).
+3. **Compiler source** — never the test's primary citation. See
+   `## Reporting suspected compiler bugs` for how to handle
+   spec-vs-compiler disagreements you observe.
+
+If you find a behaviour described in **both** the language reference
+and a generated-design doc, and the two disagree, anchor the test to
+the **language reference** and let the test fail. The failure is the
+signal: the compiler matches one of them and not the other, and the
+human triage step decides whether the spec or the compiler is wrong.
+Write a `drift-from-source` doc-gap row in the bundle README naming
+both citations so the next regeneration of either doc consumes it.
+
+### Anchor format
+
+The `//META: doc_ref=` value is a single `path#anchor` pointing at the
+authoritative doc for that one claim. Examples:
+
+```
+//META: doc_ref=docs/language-reference/expressions-literal.md#integer-literal-expressions
+//META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#name-binding
+```
+
+The path must exist; the lint pass validates this. If the anchor
+fragment does not match a heading in the file, the test still passes
+lint but the citation is fragile and reviewers will catch it.
+
 You will be asked at times to "increase coverage" or to "expand" a
 bundle. **You must never** in that case:
 

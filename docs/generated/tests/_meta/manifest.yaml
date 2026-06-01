@@ -787,4 +787,44 @@ bundles:
       - source/slang/slang-emit-c-like.cpp
     size_cap_files: 100
 
+  # --- language reference (authoritative spec) --------------------------
+  # Bundles anchored to docs/language-reference/* (the human-written spec).
+  # See _meta/prompts/_common.md § Source-of-truth hierarchy for why
+  # these outrank docs/generated/design/* when both cover the same claim.
+
+  language-reference/expressions-literal:
+    prompt: prompts/language-reference-expressions-literal.md
+    source_doc: docs/language-reference/expressions-literal.md
+    watched_paths:
+      - docs/language-reference/expressions-literal.md
+      - docs/language-reference/types-fundamental.md
+      - source/compiler-core/slang-lexer.cpp
+    depends_on: []
+    coverage_targets:
+      - source/compiler-core/slang-lexer.cpp
+    size_cap_files: 40
+
+  language-reference/types-fundamental-integer:
+    prompt: prompts/language-reference-types-fundamental-integer.md
+    source_doc: docs/language-reference/types-fundamental.md
+    watched_paths:
+      - docs/language-reference/types-fundamental.md
+      - source/slang/slang-check-expr.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-check-expr.cpp
+    size_cap_files: 30
+
+  language-reference/expressions-operators:
+    prompt: prompts/language-reference-expressions-operators.md
+    source_doc: docs/language-reference/expressions-operators.md
+    watched_paths:
+      - docs/language-reference/expressions-operators.md
+      - source/slang/slang-check-expr.cpp
+      - source/slang/slang-parser.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-check-expr.cpp
+    size_cap_files: 40
+
   # --- top-level reference -----------------------------------------------
