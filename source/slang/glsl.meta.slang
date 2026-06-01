@@ -1952,6 +1952,16 @@ public float texture(sampler1DShadow sampler, vec3 p)
         return sampler.SampleCmpLevelZero(p.x, p.z);
 }
 
+// NOTE: The `case spirv:` paths below use spirv_asm blocks that pass combined
+// texture-sampler operands ($sampler) directly to OpImageSample*/OpImageFetch.
+// When the combined sampler is non-uniformly indexed, the SPIR-V emitter's
+// asm-block NonUniform propagation (Stage 3 as described in the overview at
+// slang-ir-float-non-uniform-resource-index.cpp; implemented in
+// slang-emit-spirv.cpp, propagateNonUniformThroughAsmResult) carries the
+// decoration from the IR operand onto the asm result. That logic depends on the operand->result flow
+// being straightforward; if this structure changes, verify propagation still
+// reaches the consumed resource operand per VUID-RuntimeSpirv-None-10148.
+
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DShadow sampler, vec3 p, float bias)

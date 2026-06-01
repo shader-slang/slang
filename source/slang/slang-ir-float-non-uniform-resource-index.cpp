@@ -1,3 +1,31 @@
+// NonUniform propagation pipeline overview
+// =========================================
+// Correct SPIR-V NonUniform handling is a three-stage pipeline:
+//
+// 1. Float pass (this file): hoists `NonUniformResourceIndex` wrappers outward
+//    through value-level ops (GetElement, GetElementPtr, Load, Swizzle,
+//    IntCast, MakeCombinedTextureSampler) so the wrapper reaches the final
+//    resource-producing instruction. Then replaces the wrapper with an
+//    `IRSPIRVNonUniformResourceDecoration` on the index or resource value.
+//
+// 2. SPIR-V legalization (`slang-ir-spirv-legalize.cpp`,
+//    `propagateNonUniformAccessChainDecorations`): forward-propagates those
+//    decorations through Load, FieldAddress, FieldExtract, and
+//    MakeCombinedTextureSampler so that the actual resource operand consumed by
+//    memory/sampling instructions carries the decoration.
+//
+// 3. SPIR-V emitter (`slang-emit-spirv.cpp`, asm-block propagation): carries
+//    NonUniform through compiler-generated `spirv_asm` blocks (e.g.
+//    OpSampledImage in hlsl.meta.slang) so the asm-materialized result that
+//    feeds the final OpImageSample*/OpImageFetch also gets decorated.
+//
+// Each stage relies on the prior stage having already run. A missing decoration
+// at any stage produces invalid SPIR-V that violates VUID-RuntimeSpirv-None-10148.
+//
+// Completion guarantee: after all three stages, every SPIR-V resource operand
+// consumed by a memory or sampling instruction whose provenance includes a
+// `NonUniformResourceIndex` carries the `NonUniform` decoration.
+
 #include "slang-ir-float-non-uniform-resource-index.h"
 
 #include "slang-ir-util.h"
@@ -81,11 +109,15 @@ void processNonUniformResourceIndex(
                     break;
                 case kIROp_GetElement:
                     // A getElement can use the `NonUniformResourceIndex` either as
-                    // its base (operand 0) or as its index (operand 1); float it
-                    // out past the getElement in both cases.
+                    // its base (operand 0) or as its index (operand 1). The base
+                    // case runs unconditionally (the base wraps a resource value
+                    // that all targets need floated). The index case is SPIRV-only
+                    // because only the SPIR-V backend requires the NonUniform
+                    // decoration on the access index itself -- other targets do not
+                    // model per-index NonUniform and would produce spurious wrappers.
                     if (user->getOperand(0) == inst)
                     {
-                        // Replace getElement(nonuniformRes(obj), i), into
+                        // Replace getElement(nonUniformRes(obj), i), into
                         // nonUniformRes(getElement(obj, i))
                         newUser = builder.emitElementExtract(
                             user->getFullType(),
@@ -96,10 +128,6 @@ void processNonUniformResourceIndex(
                         floatMode == NonUniformResourceIndexFloatMode::SPIRV &&
                         user->getOperand(1) == inst)
                     {
-                        // Gated to SPIRV mode to match the kIROp_GetElementPtr case
-                        // above: only the SPIR-V backend needs NonUniform floated
-                        // onto a value-typed array access. (Other targets either do
-                        // not model NonUniform or handle the index form differently.)
                         // Replace getElement(obj, nonUniformRes(i)), into
                         // nonUniformRes(getElement(obj, i))
                         newUser = builder.emitElementExtract(
@@ -123,9 +151,11 @@ void processNonUniformResourceIndex(
                         else if (samp == inst)
                             samp = inst->getOperand(0);
                         else
-                            // Neither operand is the `NonUniformResourceIndex` being
-                            // floated (e.g. `inst` reaches here only via some other
-                            // use); nothing to rewrite for this user.
+                            // Should be structurally unreachable: traverseUses gave
+                            // us this user, so `inst` must be one of its operands,
+                            // and MakeCombinedTextureSampler has exactly two data
+                            // operands (texture, sampler). Kept as a defensive break
+                            // rather than an assertion.
                             break;
                         newUser =
                             builder.emitMakeCombinedTextureSampler(user->getFullType(), tex, samp);
@@ -135,8 +165,8 @@ void processNonUniformResourceIndex(
                     // Ignore when `NonUniformResourceIndex` is not on base
                     if (user->getOperand(0) == inst)
                     {
-                        // Replace getElement(nonuniformRes(obj), i), into
-                        // nonUniformRes(getElement(obj, i))
+                        // Replace swizzle(nonUniformRes(obj), indices), into
+                        // nonUniformRes(swizzle(obj, indices))
                         ShortList<IRInst*> operands;
                         for (UInt i = 0; i < user->getOperandCount(); i++)
                             operands.add(user->getOperand(i));
@@ -210,6 +240,14 @@ void processNonUniformResourceIndex(
         // with a [NonUniformResource] decoration. For SPIR-V we want the decoration on the
         // index used in access chains, so prefer decorating index operands for getElement/
         // getElementPtr (and loads of those).
+        //
+        // Rationale for preferring the index: processGlobalParam in
+        // slang-ir-spirv-legalize.cpp detects non-uniformity by checking
+        // getElement->getIndex() for the decoration (form 2 of its three-form
+        // check), and the access-chain rewrite places NonUniform on the new
+        // address from that signal. Decorating the index here ensures Stage 2
+        // finds it without requiring Stage 1 to also decorate the getElement
+        // itself (though form 3 covers that as a fallback).
         auto operand = inst->getOperand(0);
         auto type = operand->getDataType();
         if (isResourceType(type) || isPointerToResourceType(type))

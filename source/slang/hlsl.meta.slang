@@ -2477,6 +2477,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     static const int access = 0;
     static const int isCombined = 0;
 
+    // NOTE: The `case spirv:` paths in this extension use spirv_asm blocks that
+    // construct OpSampledImage from $this (texture) and $s (sampler). When either
+    // operand is non-uniformly indexed, the SPIR-V emitter's asm-block NonUniform
+    // propagation (Stage 3 as described in the overview at
+    // slang-ir-float-non-uniform-resource-index.cpp; implemented in
+    // slang-emit-spirv.cpp, propagateNonUniformThroughAsmResult)
+    // carries the NonUniform decoration onto the %sampledImage result. That logic
+    // depends on these blocks having a straightforward operand->result flow; if
+    // this structure is changed (e.g., intermediate asm-locals between the texture
+    // operand and OpSampledImage), verify the propagation still reaches the final
+    // consumed resource operand per VUID-RuntimeSpirv-None-10148.
+
     //@public:
     [__readNone]
     [ForceInline]

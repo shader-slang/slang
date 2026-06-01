@@ -1,4 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -emit-spirv-directly
+// Second pass uses a separate prefix so NODECOR-NOT scans the entire output
+// independently of the positive CHECK patterns (FileCheck NOT-directives only
+// apply between surrounding positive matches of the same prefix).
 //TEST:SIMPLE(filecheck=NODECOR):-target spirv -entry main -stage compute -emit-spirv-directly
 
 // Regression test for NonUniform propagation through a compiler-generated

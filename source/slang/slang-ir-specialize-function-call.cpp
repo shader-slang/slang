@@ -953,6 +953,16 @@ struct FunctionParameterSpecializationContext
             // specialized value for the wrapped operand, then re-apply the
             // `CastDynamicResource` cast over it so the specialized callee sees the
             // same concrete resource type the original argument had.
+            //
+            // Decorations (including IRSPIRVNonUniformResourceDecoration) are not
+            // copied from `oldArg` to `newVal` -- this is intentional.
+            // getSpecializedValueForArg recursively reconstructs the entire access
+            // chain inside the specialized body, and that chain includes instructions
+            // (like the access-chain index) that already carry
+            // IRSPIRVNonUniformResourceDecoration from Stage 1's decoration phase.
+            // Stage 2's worklist (propagateNonUniformAccessChainDecorations) will
+            // find those as seeds and re-derive NonUniform on the cast result via
+            // forward propagation.
             auto oldBase = oldArg->getOperand(0);
             auto newBase = getSpecializedValueForArg(ioInfo, oldBase);
 

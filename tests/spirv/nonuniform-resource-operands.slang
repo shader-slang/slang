@@ -3,6 +3,11 @@
 // Regression test for https://github.com/shader-slang/slang/issues/10525
 // Ensure NonUniform decorations are placed on the actual resource operands
 // consumed by memory/sampling instructions, not just on the index/access-chain.
+//
+// This test uses bindless __DynamicResource + asOpaqueDescriptor to exercise
+// the CastDynamicResource -> function-call specialization path (in
+// slang-ir-specialize-function-call.cpp). The other nonuniform-*.slang tests
+// use typed arrays and exercise the getElement/getElementPtr legalization path.
 
 // Capabilities:
 // CHECK-DAG: OpCapability ShaderNonUniform
