@@ -230,8 +230,24 @@ public:
                 byteCodeBuilder.constantSection.addRange((uint8_t*)&value, sizeof(value));
                 break;
             }
+        case kIROp_BoolLit:
+            {
+                // Mirror kIROp_IntLit: write `sizeAlignment.size` bytes so the
+                // operand reserved above is actually backed.
+                uint64_t value = static_cast<IRBoolLit*>(inst)->getValue() ? 1u : 0u;
+                byteCodeBuilder.constantSection.addRange((uint8_t*)&value, sizeAlignment.size);
+                if (sizeAlignment.size == 4)
+                    operand.setType(OperandDataType::Int32);
+                else if (sizeAlignment.size == 8)
+                    operand.setType(OperandDataType::Int64);
+                else
+                    operand.setType(OperandDataType::General);
+                break;
+            }
         case kIROp_VoidLit:
             break;
+        default:
+            SLANG_UNEXPECTED("VM emit: unhandled IRConstant op kind");
         }
         return operand;
     }
