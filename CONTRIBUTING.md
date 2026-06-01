@@ -157,7 +157,7 @@ $ brew install zstd
 ```
 
 > [!NOTE]
-> - The intallation of zstd can be skipped if you use SLANG_SLANG_LLVM_FLAVOR=disable
+> - The intallation of zstd can be skipped if you use a cmake option of `-DSLANG_SLANG_LLVM_FLAVOR=DISABLE`
 
 Run CMake with the following command to generate Makefile:
 
