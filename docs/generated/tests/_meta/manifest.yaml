@@ -849,4 +849,15 @@ bundles:
       - source/slang/slang-check-expr.cpp
     size_cap_files: 40
 
+  language-reference/types-array:
+    prompt: prompts/language-reference-types-array.md
+    source_doc: docs/language-reference/types-array.md
+    watched_paths:
+      - docs/language-reference/types-array.md
+      - source/slang/slang-check-decl.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-check-decl.cpp
+    size_cap_files: 30
+
   # --- top-level reference -----------------------------------------------
