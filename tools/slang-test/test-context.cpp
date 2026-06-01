@@ -122,7 +122,11 @@ Result TestContext::init(const char* inExePath)
     SLANG_RETURN_ON_FAIL(TestToolUtil::getExeDirectoryPath(inExePath, exeDirectoryPath));
     SLANG_RETURN_ON_FAIL(TestToolUtil::getDllDirectoryPath(inExePath, dllDirectoryPath));
 
-    SLANG_RETURN_ON_FAIL(locateFileCheck());
+    // FileCheck is provided by the slang-llvm library, which is absent when Slang
+    // is built with SLANG_SLANG_LLVM_FLAVOR=DISABLE. A failure to locate it must
+    // not be fatal: slang-test still runs the suite and FileCheck-dependent tests
+    // are reported as Ignored (see _fileCheckTest). Ignore the result deliberately.
+    locateFileCheck();
 
     return SLANG_OK;
 }
