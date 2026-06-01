@@ -49,6 +49,16 @@ though the narrative doc is also referenced for general framing.
   reachable from a minimum-reproduction input** (not to mine
   behaviors the catalog doesn't already specify).
 
+  **Reachability is empirical, never guessed.** Before you assert a
+  `// CHECK:` for a code, you MUST actually run your minimum
+  reproduction through `slang-test` (or `slangc`) and observe that
+  the compiler (a) accepts the input without unrelated errors —
+  especially a parse/syntax error from a construct Slang does not
+  support — and (b) emits the exact code you assert. Reading the
+  catalog entry or the emit site in source is not sufficient
+  evidence; only observed compiler output is. Never lock in a
+  `// CHECK:` for output you have not seen the compiler produce.
+
 ## What to produce
 
 For each uncovered code in your bucket, produce **one `.slang` test**
@@ -114,6 +124,14 @@ This makes the bundle browseable by code and by name.
   `README.md` with a one-line reason ("internal diagnostic with no
   user trigger" / "requires multi-file test" / "requires API
   surface not available to slangc CLI" / etc.).
+- **Verify the example compiles and fires the code before asserting
+  its `// CHECK:`.** Run the minimum reproduction (see "Inputs
+  available to you") and confirm the observed output. An example that
+  fails to parse — e.g. an unsupported `?:` form such as the GNU
+  "elvis" `a ?: b`, or a scalar `?:` where only a vector condition
+  fires the code — makes slang-test fail with that parse error or a
+  missing-diagnostic mismatch, never your target diagnostic. An
+  unverified CHECK is the single most common defect in this catalog.
 - **Don't lock in buggy behavior.** If the compiler emits something
   other than what the catalog message says, drop the code; do not
   write a test that asserts the buggy output.

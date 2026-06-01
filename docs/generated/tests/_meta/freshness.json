@@ -71,11 +71,11 @@
       "watched_paths_digest": "08f5c97804066390eaef8f35683e268a87641fe6769b8dbf0eb3b240f7589eea"
     },
     "cross-cutting/diagnostics-catalog": {
-      "generated_at": "2026-05-21T08:38:46+00:00",
+      "generated_at": "2026-06-01T21:16:29+00:00",
       "model": "claude-opus-4-7",
-      "source_commit": "2964da04de136705348240f2bd9affa5f3818226",
+      "source_commit": "a621b651a447846e5c57c2678ffbdf87971b8b0c",
       "source_doc_digest": "800517b213b39778644cb089acb61f547ec51c31801764ffbc63f8712b950674",
-      "watched_paths_digest": "da4910b630bc3a229680013ef916cb3aa4876930e6d234bd51c59a00079feb1a"
+      "watched_paths_digest": "fd2b069fd118d6d7a7578a9a8cee114c1a12660f5290c63026122f0fd017478a"
     },
     "cross-cutting/ir-instructions": {
       "generated_at": "2026-05-21T09:32:19+00:00",

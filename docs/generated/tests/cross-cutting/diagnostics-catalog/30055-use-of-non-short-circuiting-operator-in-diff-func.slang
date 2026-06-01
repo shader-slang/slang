@@ -11,14 +11,14 @@
 //META: catalog_name=use-of-non-short-circuiting-operator-in-diff-func
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Non-short-circuiting `?:` operator inside a differentiable function triggers the diagnostic.
+// Non-short-circuiting `?:` with a vector condition inside a differentiable function triggers the diagnostic (a scalar condition short-circuits and does not).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 [Differentiable]
-float f(float x, bool b)
+float f(float x, bool2 b)
 {
-    return b ?: 0.0;
+    return (b ? float2(x) : float2(0.0)).x;
 }
 
 void main() {}
