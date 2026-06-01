@@ -314,11 +314,19 @@ There are several options for getting llvm-support:
   - You can set `SLANG_SLANG_LLVM_BINARY_URL` to point to a local
     `libslang-llvm.so/slang-llvm.dll` or set it to a URL of an zip/archive
     containing such a file
-  - If this isn't set then the build system tries to download it from the
-    release on github matching the current tag. If such a tag doesn't exist
-    or doesn't have the correct os\*arch combination then the latest release
-    will be tried.
-  - If `SLANG_SLANG_LLVM_BINARY_URL` is `FETCH_BINARY_IF_POSSIBLE` then in
+  - If this isn't set then the build system constructs the download URL
+    directly from the version derived from git tags (`SLANG_VERSION_NUMERIC`)
+    and downloads the matching release asset. This needs the tags to be
+    fetched (`git fetch --tags`); if the version can't be determined or
+    predates `v2024.1.27` (the first release that distributed `libslang-llvm`),
+    no prebuilt URL is resolved and a warning explains how to fetch tags.
+  - The URL is constructed without checking that the asset exists, so if the
+    resolved release publishes no asset for the current OS/arch the download
+    fails (HTTP 404). Under `FETCH_BINARY_IF_POSSIBLE` the build then proceeds
+    without LLVM support (warning only); under `FETCH_BINARY` it is a fatal
+    error. In that case point `SLANG_SLANG_LLVM_BINARY_URL` at a working
+    archive/path, or use `USE_SYSTEM_LLVM` / `DISABLE`.
+  - If `SLANG_SLANG_LLVM_FLAVOR` is `FETCH_BINARY_IF_POSSIBLE` then in
     the case that a prebuilt binary can't be found then the build will proceed
     as though `DISABLE` was chosen
 - Use a system supplied LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`, you
