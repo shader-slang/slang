@@ -7,11 +7,13 @@
 # test crashes the slang-test process itself -- the runner dies before
 # any classification step.
 #
-# Crash-mode skips therefore live elsewhere: as `-exclude-prefix`
-# arguments in `.github/workflows/ci-slang-coverage.yml`. As of writing:
+# Crash-mode skips therefore live elsewhere: as workflow-level filters in
+# `.github/workflows/ci-slang-coverage.yml`. As of writing:
 #   - slang-unit-test-tool/RecordReplayApiTypeOperations  (Windows / OCC)
 #   - tests/autodiff/global-param-hoisting                (Windows / OCC,
 #                                                          intermittent crash)
+#   - generated synthetic LLVM runtime variants           (macOS / LLVM
+#                                                          coverage crash)
 # Update both this file and the workflow when adding a new coverage-only
 # skip.
 
