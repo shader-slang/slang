@@ -28,3 +28,17 @@ docs/generated/tests/ast-reference/expressions/logic-and-short-circuit.slang
 docs/generated/tests/ast-reference/expressions/logic-or-short-circuit.slang
 docs/generated/tests/ast-reference/expressions/bwd-differentiate-expr.slang
 docs/generated/tests/ast-reference/statements/ifstmt-predicate-evaluated-once.slang
+
+# https://github.com/shader-slang/slang/issues/11402 — slangi VM
+# treats the bool `false` literal as `true` inside a function body
+# when passed as a bool argument. Frontend HLSL/CPU emit are correct,
+# so the bug is in the bytecode VM. Discovered while writing the
+# language-reference/expressions-literal bundle.
+docs/generated/tests/language-reference/expressions-literal/bool-true-false.slang
+
+# https://github.com/shader-slang/slang/issues/11403 — slangi VM
+# short-circuits `?:` contra the language-reference spec. The HLSL
+# emit shows both branches; the VM evaluates only the selected
+# branch. Discovered while writing the
+# language-reference/expressions-operators bundle.
+docs/generated/tests/language-reference/expressions-operators/conditional-does-not-short-circuit.slang
