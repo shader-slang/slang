@@ -13,9 +13,12 @@
 // candidate succeeds. Verify the "not enough arguments" diagnostic
 // when the call passes one argument to a two-argument function.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 void foo(int a, int b) {}
+/*CHECK:
+     ^^^ candidate: func foo(int, int) -> void
+*/
 
 void main()
 {
@@ -24,5 +27,4 @@ void main()
        ^ not enough arguments to call
        ^ not enough arguments to call (got 1, expected 2)
 */
-//CHECK: E39999
 }

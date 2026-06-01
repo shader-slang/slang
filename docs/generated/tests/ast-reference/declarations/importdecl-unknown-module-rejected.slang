@@ -16,7 +16,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 import this_module_does_not_exist_zzz;
+/*CHECK:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot open file 'this_module_does_not_exist_zzz.slang'
+*/
 
 void main() {}
-//CHECK: error
-//CHECK: E15301

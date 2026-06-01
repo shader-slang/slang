@@ -15,18 +15,20 @@
 // arg, ...` — without an `arg` the IR opcode is ill-defined and
 // must be rejected before lowering.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv-asm -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv-asm -entry main -stage compute
 
 interface IFoo { int run(int x); };
 
 uniform RWStructuredBuffer<int> buf;
 
 int doStuff<T : IFoo>() { return 0; }
+/*CHECK:
+    ^^^^^^^ see declaration of func doStuff<T> -> int
+*/
 
 [numthreads(1, 1, 1)]
 void main()
 {
     buf[0] = doStuff<>();
 //CHECK:              ^ could not specialize generic for arguments of type ()
-//CHECK: E39999
 }

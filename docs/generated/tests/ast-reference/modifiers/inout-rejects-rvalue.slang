@@ -13,7 +13,7 @@
 // because the callee writes back through it. Passing a literal (an
 // r-value) is rejected by the checker.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 void inc(inout int x)
 {

@@ -14,7 +14,7 @@
 // raw source text — the macro name is not expanded. We check that
 // the diagnostic carries the verbatim identifier `WHAT_TOKEN`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 #define WHAT_TOKEN expanded
 
