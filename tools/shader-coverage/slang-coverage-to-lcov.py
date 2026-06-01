@@ -7,7 +7,9 @@ Pipeline:
            slangc shader.slang -trace-coverage ...
        This instruments the shader with a synthesized
        `RWStructuredBuffer<uint> __slang_coverage`. Counter slots are
-       assigned one-per-op in traversal order.
+       assigned according to the coverage metadata. The current
+       line/function/branch modes use one direct counter per marker op,
+       but consumers must treat the manifest as authoritative.
     2. Read the `.coverage-mapping.json` sidecar describing each
        source coverage entry's counter/source mapping, or query the
        same data through
@@ -95,7 +97,7 @@ def get_manifest_counter_count(manifest):
     return total
 
 
-def iter_line_entries(manifest, skipped_by_kind=None):
+def iter_manifest_entries(manifest):
     version = get_manifest_version(manifest)
     try:
         entries = manifest["entries"]
@@ -106,42 +108,35 @@ def iter_line_entries(manifest, skipped_by_kind=None):
     for entry in entries:
         if version == 1:
             try:
-                yield (
-                    parse_manifest_int(entry["index"], "v1 entry index"),
-                    entry.get("file"),
-                    parse_manifest_int(entry["line"], "v1 entry line"),
-                )
+                yield {
+                    "kind": "line",
+                    "counter": parse_manifest_int(entry["index"], "v1 entry index"),
+                    "file": entry.get("file"),
+                    "line": parse_manifest_int(entry["line"], "v1 entry line"),
+                }
             except (AttributeError, KeyError, TypeError, ValueError):
                 sys.exit("error: invalid v1 entry in manifest")
             continue
         if version == 2:
             try:
-                # Non-line kinds and counterless line entries are not
-                # representable in LCOV's line-oriented model and are
-                # intentionally skipped here. Record the skip category
-                # so `main` can surface a stderr summary for
-                # debuggability — future producers emitting branch /
-                # function / region entries should otherwise see empty
-                # LCOV with no diagnostic.
                 kind = entry.get("kind", "line")
-                if kind != "line":
-                    if skipped_by_kind is not None:
-                        skipped_by_kind[kind] = skipped_by_kind.get(kind, 0) + 1
-                    continue
+                if not isinstance(kind, str):
+                    sys.exit("error: manifest v2 entry kind must be a string")
                 counter = entry.get("counter")
-                if counter is None:
-                    if skipped_by_kind is not None:
-                        skipped_by_kind["line-counterless"] = (
-                            skipped_by_kind.get("line-counterless", 0) + 1
-                        )
-                    continue
-                yield (
-                    parse_manifest_int(counter, "v2 entry counter"),
-                    entry.get("file"),
-                    parse_manifest_int(entry["line"], "v2 entry line"),
-                )
+                yield {
+                    "kind": kind,
+                    "counter": None
+                    if counter is None
+                    else parse_manifest_int(counter, "v2 entry counter"),
+                    "file": entry.get("file"),
+                    "line": parse_manifest_int(entry["line"], "v2 entry line"),
+                    "function": entry.get("function"),
+                    "function_mangled": entry.get("function_mangled"),
+                    "branch_site": entry.get("branch_site"),
+                    "branch_arm": entry.get("branch_arm"),
+                }
             except (AttributeError, KeyError, TypeError, ValueError):
-                sys.exit("error: invalid v2 line entry in manifest")
+                sys.exit("error: invalid v2 entry in manifest")
             continue
 
 
@@ -188,20 +183,80 @@ def main():
     # line numbers. Keep unattributable slots in the manifest/metadata,
     # but filter them out when exporting LCOV.
     hits_by_line = collections.defaultdict(lambda: collections.defaultdict(int))
+    functions_by_source = collections.defaultdict(dict)
+    branches_by_source = collections.defaultdict(dict)
     skipped_entries = 0
     skipped_by_kind = {}
-    for idx, source, line in iter_line_entries(manifest, skipped_by_kind):
+    for entry in iter_manifest_entries(manifest):
+        kind = entry["kind"]
+        idx = entry["counter"]
+        if idx is None:
+            skipped_by_kind[f"{kind}-counterless"] = (
+                skipped_by_kind.get(f"{kind}-counterless", 0) + 1
+            )
+            continue
         if idx < 0 or idx >= len(counters):
             sys.exit(f"error: counter index {idx} out of range [0, {len(counters)})")
+        source = entry["file"]
+        line = entry["line"]
         if not source or line <= 0:
             skipped_entries += 1
             continue
-        hits_by_line[source][line] += counters[idx]
+        count = counters[idx]
+
+        if kind == "line":
+            hits_by_line[source][line] += count
+        elif kind == "function":
+            function_name = entry.get("function") or entry.get("function_mangled")
+            if not function_name:
+                skipped_by_kind["function-without-name"] = (
+                    skipped_by_kind.get("function-without-name", 0) + 1
+                )
+                continue
+            old_line, old_count = functions_by_source[source].get(function_name, (line, 0))
+            functions_by_source[source][function_name] = (min(old_line, line), old_count + count)
+        elif kind == "branch":
+            branch_site = entry.get("branch_site")
+            branch_arm = entry.get("branch_arm")
+            if branch_site is None or branch_arm is None:
+                skipped_by_kind["branch-without-site"] = (
+                    skipped_by_kind.get("branch-without-site", 0) + 1
+                )
+                continue
+            branch_site = parse_manifest_int(branch_site, "v2 entry branch_site")
+            branch_arm = parse_manifest_int(branch_arm, "v2 entry branch_arm")
+            if branch_site < 0 or branch_arm < 0:
+                sys.exit(
+                    "error: manifest v2 entry branch_site and branch_arm "
+                    "must be non-negative"
+                )
+            branch_key = (line, branch_site, branch_arm)
+            branches_by_source[source][branch_key] = (
+                branches_by_source[source].get(branch_key, 0) + count
+            )
+        else:
+            skipped_by_kind[kind] = skipped_by_kind.get(kind, 0) + 1
 
     out = sys.stdout if args.output == "-" else open(args.output, "w")
     out.write(f"TN:{args.test_name}\n")
-    for source in sorted(hits_by_line):
+    sources = set(hits_by_line) | set(functions_by_source) | set(branches_by_source)
+    for source in sorted(sources):
         out.write(f"SF:{source}\n")
+        functions = functions_by_source[source]
+        function_sort_key = lambda item: (item[1][0], item[0])
+        for function_name, (line, _) in sorted(functions.items(), key=function_sort_key):
+            out.write(f"FN:{line},{function_name}\n")
+        for function_name, (_, count) in sorted(functions.items(), key=function_sort_key):
+            out.write(f"FNDA:{count},{function_name}\n")
+        if functions:
+            out.write(f"FNF:{len(functions)}\n")
+            out.write(f"FNH:{sum(1 for _, count in functions.values() if count > 0)}\n")
+        branches = branches_by_source[source]
+        for (line, branch_site, branch_arm), count in sorted(branches.items()):
+            out.write(f"BRDA:{line},{branch_site},{branch_arm},{count}\n")
+        if branches:
+            out.write(f"BRF:{len(branches)}\n")
+            out.write(f"BRH:{sum(1 for count in branches.values() if count > 0)}\n")
         for line in sorted(hits_by_line[source]):
             out.write(f"DA:{line},{hits_by_line[source][line]}\n")
         out.write("end_of_record\n")
@@ -215,8 +270,12 @@ def main():
         )
     for kind in sorted(skipped_by_kind):
         count = skipped_by_kind[kind]
-        if kind == "line-counterless":
-            label = "line entries without a runtime counter"
+        if kind.endswith("-counterless"):
+            label = f"{kind[:-12]} entries without a runtime counter"
+        elif kind == "function-without-name":
+            label = "function entries without a name"
+        elif kind == "branch-without-site":
+            label = "branch entries without site/arm ids"
         else:
             label = f"entries of kind {kind!r}"
         print(

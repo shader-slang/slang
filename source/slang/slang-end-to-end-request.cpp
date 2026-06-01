@@ -149,7 +149,9 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // C++ API callers using `setPassThrough()` are also covered —
     // OptionsParser only runs for the slangc CLI path.
     if (m_passThrough != PassThroughMode::None &&
-        getOptionSet().getBoolOption(CompilerOptionName::TraceCoverage))
+        (getOptionSet().getBoolOption(CompilerOptionName::TraceCoverage) ||
+         getOptionSet().getBoolOption(CompilerOptionName::TraceFunctionCoverage) ||
+         getOptionSet().getBoolOption(CompilerOptionName::TraceBranchCoverage)))
     {
         getSink()->diagnose(Diagnostics::CoveragePassThroughIncompatible{});
         return SLANG_FAIL;

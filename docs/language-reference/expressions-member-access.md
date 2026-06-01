@@ -35,7 +35,15 @@ A vector swizzle expression is an l-value if the base expression was an l-value 
 
 ### Matrix Swizzles
 
-> Note: The Slang implementation currently doesn't support matrix swizzles.
+When the base expression of a member expression is of a matrix type, then a
+member expression with HLSL-style matrix swizzle syntax is a _matrix swizzle
+expression_. Supported forms include zero-based `_mij` components and
+one-based shorthand components such as `_41`. Multiple components can be
+combined, for example `m._41_32`.
+
+A matrix swizzle expression is an l-value if the base expression was an l-value
+and the swizzle does not select duplicate matrix elements. Constant-indexed
+subscripts of matrix swizzle l-values are also l-values.
 
 ### Static Member Expressions
 

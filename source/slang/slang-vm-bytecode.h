@@ -4,6 +4,7 @@
 #include "core/slang-basic.h"
 #include "core/slang-riff.h"
 #include "slang-com-ptr.h"
+#include "slang.h"
 
 namespace Slang
 {
@@ -218,6 +219,7 @@ struct VMFunctionView
 struct VMModuleView
 {
     uint8_t* code;
+    uint32_t codeSize;
     uint32_t functionCount;
     uint32_t* functionOffsets;
     uint8_t* constants;
@@ -247,7 +249,11 @@ struct VMModuleView
     }
 };
 
-SlangResult initVMModule(uint8_t* code, uint32_t codeSize, VMModuleView* moduleView);
+SlangResult initVMModule(
+    uint8_t* code,
+    uint32_t codeSize,
+    VMModuleView* moduleView,
+    StringBuilder* errorSink = nullptr);
 
 StringBuilder& operator<<(StringBuilder& sb, VMOp op);
 StringBuilder& operator<<(StringBuilder& sb, VMModuleView& module);
