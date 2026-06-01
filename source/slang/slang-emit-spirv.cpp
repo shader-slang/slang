@@ -6305,22 +6305,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 const auto topologyType = OutputTopologyType(o->getTopologyType());
 
                 SpvExecutionMode m = SpvExecutionModeMax;
+                bool isTessStage = false;
                 if (entryPointDecor)
                 {
                     switch (entryPointDecor->getProfile().getStage())
                     {
                     case Stage::Domain:
                     case Stage::Hull:
+                        isTessStage = true;
                         if (topologyType == OutputTopologyType::TriangleCW)
                             m = SpvExecutionModeVertexOrderCw;
                         else if (topologyType == OutputTopologyType::TriangleCCW)
                             m = SpvExecutionModeVertexOrderCcw;
                         else if (topologyType == OutputTopologyType::Point)
                             m = SpvExecutionModePointMode;
+                        // OutputTopologyType::Line on tessellation needs no
+                        // SPIR-V execution mode here; `Isolines` is emitted
+                        // by kIROp_DomainDecoration.
                         break;
                     }
                 }
-                if (m == SpvExecutionModeMax)
+                if (m == SpvExecutionModeMax && !isTessStage)
                 {
                     if (topologyType == OutputTopologyType::Triangle)
                         m = SpvExecutionModeOutputTrianglesEXT;
@@ -6330,8 +6335,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         m = SpvExecutionModeOutputPoints;
                 }
 
-                SLANG_ASSERT(m != SpvExecutionModeMax);
-                requireSPIRVExecutionMode(decoration, dstID, m);
+                if (m != SpvExecutionModeMax)
+                {
+                    requireSPIRVExecutionMode(decoration, dstID, m);
+                }
+                else
+                {
+                    SLANG_ASSERT(isTessStage);
+                }
             }
             break;
 
