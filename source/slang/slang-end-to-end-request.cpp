@@ -450,7 +450,16 @@ static String _normalizeOutputPathForCompare(const String& path)
         if (currentPath.getLength() != 0)
             absolutePath = Path::combine(currentPath, path);
     }
-    return Path::simplify(absolutePath);
+    absolutePath = Path::simplify(absolutePath);
+
+    String canonicalPath;
+    if (SLANG_SUCCEEDED(Path::getCanonical(absolutePath, canonicalPath)) &&
+        canonicalPath.getLength() != 0)
+    {
+        return canonicalPath;
+    }
+
+    return absolutePath;
 }
 
 static bool _areOutputPathsEquivalent(const String& left, const String& right)
@@ -670,6 +679,13 @@ SlangResult EndToEndCompileRequest::_validateCoverageMappingOutputPaths()
     {
         getSink()->diagnose(
             Diagnostics::CoverageMappingOutputMultipleArtifacts{.path = explicitSidecarPath});
+        return SLANG_FAIL;
+    }
+
+    if (coverageArtifactCount == 0)
+    {
+        getSink()->diagnose(
+            Diagnostics::CoverageMappingOutputWithoutCoverageData{.path = explicitSidecarPath});
         return SLANG_FAIL;
     }
 

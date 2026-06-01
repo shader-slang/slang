@@ -4820,6 +4820,12 @@ err(
     "`-coverage-mapping-output` is not supported when writing a container output"
 )
 
+err(
+    "coverage-mapping-output-without-coverage-data",
+    45112,
+    "`-coverage-mapping-output` path '~path' was requested, but the selected target did not produce coverage metadata"
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(

@@ -594,7 +594,9 @@ struct TempCoverageCliFiles
     }
 };
 
-static SlangResult _createTempCoverageCliFiles(TempCoverageCliFiles& out)
+static SlangResult _createTempCoverageCliFiles(
+    TempCoverageCliFiles& out,
+    const char* source = kCoverageCliShader)
 {
     SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slangc-coverage-cli"), out.basePath));
     out.sourcePath = out.basePath + ".slang";
@@ -604,7 +606,7 @@ static SlangResult _createTempCoverageCliFiles(TempCoverageCliFiles& out)
     out.disassemblyManifestPath = out.disassemblyOutputPath + ".coverage-mapping.json";
     out.explicitManifestPath = out.basePath + ".coverage-mapping.json";
     out.containerOutputPath = out.basePath + ".slang-module";
-    return File::writeAllText(out.sourcePath, kCoverageCliShader);
+    return File::writeAllText(out.sourcePath, source);
 }
 
 static void _addCoverageCliCompileArgs(
@@ -816,6 +818,58 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteArtifactAlias(
     return SLANG_OK;
 }
 
+static SlangResult _testCoverageExplicitSidecarCannotOverwriteExistingArtifactSymlink(
+    UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    String symlinkPath = files.basePath + "-link.spv";
+
+#if SLANG_WINDOWS_FAMILY
+    // Symlink creation needs elevated privileges on some Windows configurations.
+    SLANG_UNUSED(context);
+    SLANG_UNUSED(symlinkPath);
+    return SLANG_OK;
+#else
+    const char* originalOutput = "existing output";
+    SLANG_RETURN_ON_FAIL(File::writeAllText(files.outputPath, originalOutput));
+    if (::symlink(files.outputPath.getBuffer(), symlinkPath.getBuffer()) != 0)
+        return SLANG_FAIL;
+
+    struct ScopedSymlink
+    {
+        String path;
+        ~ScopedSymlink()
+        {
+            if (path.getLength() != 0)
+                File::remove(path);
+        }
+    } scopedSymlink;
+    scopedSymlink.path = symlinkPath;
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-coverage-mapping-output");
+    args.add(symlinkPath);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "must differ from the compiled artifact output path"))
+        return SLANG_FAIL;
+    String outputText;
+    SLANG_RETURN_ON_FAIL(File::readAllText(files.outputPath, outputText));
+    if (outputText != originalOutput)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+#endif
+}
+
 struct DebugSpvFileCollector : Path::Visitor
 {
     List<String>* files = nullptr;
@@ -881,18 +935,17 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     List<String> debugFilesAfter;
     SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesAfter));
 
-    ScopedDebugArtifactFile debugArtifact;
+    List<String> debugArtifactCandidates;
     for (const auto& file : debugFilesAfter)
     {
         if (!_containsFileName(debugFilesBefore, file))
-        {
-            if (debugArtifact.path.getLength() != 0)
-                return SLANG_FAIL;
-            debugArtifact.path = file;
-        }
+            debugArtifactCandidates.add(file);
     }
-    if (debugArtifact.path.getLength() == 0)
+    if (debugArtifactCandidates.getCount() != 1)
         return SLANG_FAIL;
+
+    ScopedDebugArtifactFile debugArtifact;
+    debugArtifact.path = debugArtifactCandidates[0];
     String debugArtifactPath = debugArtifact.path;
 
     File::remove(files.outputPath);
@@ -916,6 +969,32 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
         return SLANG_FAIL;
     if (File::exists(files.outputPath) || File::exists(debugArtifactPath) ||
         File::exists(files.autoManifestPath))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+static SlangResult _testCoverageExplicitSidecarRejectsWholeProgramCollision(
+    UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-whole-program");
+    args.add("-coverage-mapping-output");
+    args.add(files.outputPath);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "must differ from the compiled artifact output path"))
+        return SLANG_FAIL;
+    if (File::exists(files.outputPath))
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -956,6 +1035,29 @@ static SlangResult _testCoverageExplicitSidecarRejectsMultipleArtifacts(UnitTest
         return SLANG_FAIL;
     if (File::exists(files.outputPath) || File::exists(files.disassemblyOutputPath) ||
         File::exists(files.explicitManifestPath))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+static SlangResult _testCoverageExplicitSidecarRejectsUnsupportedCoverageTarget(
+    UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true, "wgsl");
+    args.add("-coverage-mapping-output");
+    args.add(files.explicitManifestPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_contains(result.standardError, "did not produce coverage metadata"))
+        return SLANG_FAIL;
+    if (File::exists(files.explicitManifestPath))
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -1007,6 +1109,115 @@ static SlangResult _testCoverageExplicitSidecarRejectsContainerOutput(UnitTestCo
     return SLANG_OK;
 }
 
+static slang::CompilerOptionEntry _makeBoolCompilerOption(
+    slang::CompilerOptionName name,
+    bool value)
+{
+    slang::CompilerOptionEntry entry = {};
+    entry.name = name;
+    entry.value.kind = slang::CompilerOptionValueKind::Int;
+    entry.value.intValue0 = value ? 1 : 0;
+    return entry;
+}
+
+static slang::CompilerOptionEntry _makeStringCompilerOption(
+    slang::CompilerOptionName name,
+    const char* value)
+{
+    slang::CompilerOptionEntry entry = {};
+    entry.name = name;
+    entry.value.kind = slang::CompilerOptionValueKind::String;
+    entry.value.stringValue0 = value;
+    return entry;
+}
+
+static bool _blobContentEquals(ISlangBlob* left, ISlangBlob* right)
+{
+    if (!left || !right || left->getBufferSize() != right->getBufferSize())
+        return false;
+    return ::memcmp(left->getBufferPointer(), right->getBufferPointer(), left->getBufferSize()) ==
+           0;
+}
+
+static SlangResult _getCoverageOptionEntryPointHash(
+    const char* coverageMappingOutput,
+    bool traceCoverage,
+    ComPtr<ISlangBlob>& outHash)
+{
+    slang::CompilerOptionEntry options[] = {
+        _makeBoolCompilerOption(slang::CompilerOptionName::TraceCoverage, traceCoverage),
+        _makeStringCompilerOption(
+            slang::CompilerOptionName::CoverageMappingOutput,
+            coverageMappingOutput),
+    };
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()));
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntryCount = SLANG_COUNT_OF(options);
+    sessionDesc.compilerOptionEntries = options;
+
+    ComPtr<slang::ISession> session;
+    SLANG_RETURN_ON_FAIL(globalSession->createSession(sessionDesc, session.writeRef()));
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module;
+    module = session->loadModuleFromSourceString(
+        "coverageHash",
+        "coverage-hash.slang",
+        kCoverageCliShader,
+        diagnostics.writeRef());
+    if (!module)
+        return SLANG_FAIL;
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_RETURN_ON_FAIL(module->findAndCheckEntryPoint(
+        "main",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnostics.writeRef()));
+
+    slang::IComponentType* components[] = {module.get(), entryPoint.get()};
+    ComPtr<slang::IComponentType> compositeProgram;
+    SLANG_RETURN_ON_FAIL(session->createCompositeComponentType(
+        components,
+        SLANG_COUNT_OF(components),
+        compositeProgram.writeRef(),
+        diagnostics.writeRef()));
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    SLANG_RETURN_ON_FAIL(compositeProgram->link(linkedProgram.writeRef(), diagnostics.writeRef()));
+
+    linkedProgram->getEntryPointHash(0, 0, outHash.writeRef());
+    return outHash ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _testCoverageMappingOutputDoesNotAffectCompilerOptionHash()
+{
+    ComPtr<ISlangBlob> explicitManifestAHash;
+    SLANG_RETURN_ON_FAIL(_getCoverageOptionEntryPointHash("a.json", true, explicitManifestAHash));
+
+    ComPtr<ISlangBlob> explicitManifestBHash;
+    SLANG_RETURN_ON_FAIL(_getCoverageOptionEntryPointHash("b.json", true, explicitManifestBHash));
+
+    if (!_blobContentEquals(explicitManifestAHash, explicitManifestBHash))
+        return SLANG_FAIL;
+
+    ComPtr<ISlangBlob> traceCoverageDisabledHash;
+    SLANG_RETURN_ON_FAIL(
+        _getCoverageOptionEntryPointHash("a.json", false, traceCoverageDisabledHash));
+    if (_blobContentEquals(explicitManifestAHash, traceCoverageDisabledHash))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testSlangStdin(unitTestContext)));
@@ -1042,11 +1253,18 @@ SLANG_UNIT_TEST(SlangcCoverageMappingOutput)
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteArtifact(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteArtifactAlias(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testCoverageExplicitSidecarCannotOverwriteExistingArtifactSymlink(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteDebugArtifact(unitTestContext)));
     SLANG_CHECK(
+        SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsWholeProgramCollision(unitTestContext)));
+    SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsMultipleArtifacts(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testCoverageExplicitSidecarRejectsUnsupportedCoverageTarget(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarRequiresCoverage(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsContainerOutput(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageMappingOutputDoesNotAffectCompilerOptionHash()));
 }

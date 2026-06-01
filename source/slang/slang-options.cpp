@@ -653,7 +653,8 @@ void initCommandOptions(CommandOptions& options)
          "Write shader coverage mapping metadata to an explicit JSON sidecar path. "
          "Use this when compiled output is written to stdout or when the build needs "
          "a stable manifest path instead of the default "
-         "`<output>.coverage-mapping.json` sidecar. Requires at least one coverage tracing mode."},
+         "`<output>.coverage-mapping.json` sidecar. Requires at least one coverage tracing mode "
+         "and is not supported for container outputs."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -4345,6 +4346,16 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                         .format = TypeTextUtil::getCompileTargetName(
                             SlangCompileTarget(rawOutput.impliedFormat))});
                 }
+            }
+
+            if (rawOutput.targetIndex != -1 &&
+                m_rawTargets[rawOutput.targetIndex].optionSet.getBoolOption(
+                    CompilerOptionName::GenerateWholeProgram))
+            {
+                // `-whole-program` emits one target-level artifact, even when the command line
+                // names a single entry point. Keep `-o` aligned with the artifact that
+                // `generateOutput()` will actually write.
+                rawOutput.isWholeProgram = true;
             }
 
             // We won't do any searching to match an output file
