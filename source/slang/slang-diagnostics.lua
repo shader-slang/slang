@@ -410,7 +410,7 @@ err("null-component-type", 105, "componentTypes[~index:Int] is `nullptr`")
 err(
     "incompatible-slang-llvm-library",
     109,
-    "the loaded 'slang-llvm' library is too old for this compiler: it does not export '~symbol'; fetch a newer slang-llvm release or build slang-llvm from source"
+    "the loaded 'slang-llvm' library is incompatible with this compiler: it does not export '~symbol'; the prebuilt is likely older than this compiler -- fetch a newer slang-llvm release or build slang-llvm from source"
 )
 
 -- Code 99996: moved from 99999 to avoid severity conflict with internal-severity diagnostics at that code.
