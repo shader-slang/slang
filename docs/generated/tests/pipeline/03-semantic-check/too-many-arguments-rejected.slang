@@ -13,11 +13,13 @@
 // "not enough arguments" case — verify the opposite, too-many-args,
 // also fires.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 void foo() {}
+/*CHECK:
+     ^^^ candidate: func foo() -> void
+*/
 
 void main() { foo(1, 2); }
 //CHECK:         ^ too many arguments to call
 //CHECK:         ^ too many arguments to call (got 2, expected 0)
-//CHECK: E39999

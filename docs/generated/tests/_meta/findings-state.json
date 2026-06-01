@@ -148,6 +148,23 @@
       "dup_of": 10241,
       "note": "Exact match: CUDA target ICEs on vertex/fragment shaders instead of clear diagnostic",
       "title": "[cuda] slangc SIGSEGVs when a `[shader(\"fragment\")]` entry point is compiled wi\u2026"
+    },
+    "slangi-vm-constants-oob-after-short-circuit-printf": {
+      "issue": 11375,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszguV-9k",
+      "title": "[slangi] VM constants-OOB on printf after short-circuit logic-and/or",
+      "url": "https://github.com/shader-slang/slang/issues/11375"
     }
   },
   "schema_version": 1

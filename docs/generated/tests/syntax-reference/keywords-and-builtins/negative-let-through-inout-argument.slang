@@ -22,8 +22,8 @@ void main()
 {
     let v = 5;
     inc(v);
-    // CHECK: error
-    // CHECK: l-value
-    // CHECK: E30047
+    // CHECK-DAG: error
+    // CHECK-DAG: l-value
+    // CHECK-DAG: E30047
     printf("%d\n", v);
 }

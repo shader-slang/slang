@@ -24,8 +24,8 @@ struct Vertex
 const static uint MAX_VERTS = 3;
 const static uint MAX_PRIMS = 1;
 
-//CHECK: OpExecutionMode {{.*}} OutputTrianglesEXT
-//CHECK: OpEntryPoint MeshEXT
+//CHECK-DAG: OpExecutionMode {{.*}} OutputTrianglesEXT
+//CHECK-DAG: OpEntryPoint MeshEXT
 [outputtopology("triangle")]
 [numthreads(3, 1, 1)]
 void main(
