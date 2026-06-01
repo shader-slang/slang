@@ -691,7 +691,11 @@ def lint_expected_failures() -> list[LintIssue]:
     # line or another link comment resets the group. This lets one
     # tracking-issue cover a block of paths without repeating the link.
     active_link = False
-    link_re = re.compile(r"(https?://|github\.com|#\d+|issues/)")
+    # Accept either a real tracking-issue link (URLs, github.com, #NNN,
+    # issues/...) OR a campaign-mode pending-finding reference (e.g.
+    # "Pending: ..._meta/findings/<id>.yaml"). The latter is converted
+    # to a real URL at human-triage time; see _common.md § Campaign mode.
+    link_re = re.compile(r"(https?://|github\.com|#\d+|issues/|_meta/findings/)")
 
     for lineno, raw in enumerate(path.read_text().splitlines(), start=1):
         s = raw.strip()

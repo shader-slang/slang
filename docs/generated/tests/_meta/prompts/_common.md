@@ -66,6 +66,70 @@ The path must exist; the lint pass validates this. If the anchor
 fragment does not match a heading in the file, the test still passes
 lint but the citation is fragile and reviewers will catch it.
 
+### Where the test lives — Option B (parallel trees)
+
+The framework uses **two parallel test trees** with distinct roles:
+
+| Tree | Bundles' `source_doc` points at | Role |
+| --- | --- | --- |
+| `docs/generated/tests/language-reference/` | `docs/language-reference/*.md` (the human-written spec) | **Spec conformance.** A failing test is a spec-vs-compiler signal. |
+| All other subtrees (`pipeline/`, `ast-reference/`, `ir-reference/`, `syntax-reference/`, `name-resolution/`, `cross-cutting/`, `target-pipelines/`) | `docs/generated/design/*.md` (LLM-derived design docs) | **Regression coverage.** A failing test is a behavioural regression in known-codified behaviour. |
+
+The two trees are intentionally allowed to overlap on the same
+compiler surface — they verify *different* properties (spec
+conformance vs. behavioural regression). When a `language-reference/`
+test fails and its design-tree counterpart passes, that IS the
+spec-vs-compiler drift signal the suite is designed to surface; file
+a finding.
+
+**Where to write a new test:**
+
+1. If the language reference describes the claim → put the test in
+   `docs/generated/tests/language-reference/<doc-name>/` (creating
+   the bundle if absent). `<doc-name>` mirrors the lang-ref filename
+   without the `.md` suffix.
+2. Otherwise → put the test in the appropriate existing design-tree
+   bundle.
+3. If you find the same surface described in both, write a test
+   in **both** trees. They are doing different jobs.
+
+This keeps coverage of the language reference trivially measurable
+per-bundle, lets the bundle path tell a reviewer the failure
+semantics at a glance, and removes the per-test ambiguity an "anchor
+tag" approach would introduce.
+
+### Campaign mode (autonomous batch generation)
+
+When an operator runs an autonomous-generation campaign across many
+lang-ref docs at once, the **bug-finding flow is local-only**:
+
+- Write the structured finding YAML under
+  `docs/generated/tests/_meta/findings/<id>.yaml` exactly as the
+  schema requires.
+- Run `regenerate.py lint` to validate the YAML.
+- Add the affected test path to
+  `docs/generated/tests/_meta/expected-failures.txt` with a `#`
+  comment naming the *local* finding ID (not yet a tracking-issue
+  URL — that comes later).
+- **Do NOT** run `regenerate.py findings file <id>` during campaign
+  mode. The YAML stays in `_meta/findings/` (not `_meta/findings/filed/`).
+  A later human-led triage pass reviews the pending findings, edits
+  them if needed, files the ones worth filing, and de-dupes any that
+  share root cause.
+
+The expected-failures-lint enforces a tracking-issue-style link
+above every entry block; during campaign mode you can satisfy this
+with the pending finding's filename:
+
+```
+# Pending: docs/generated/tests/_meta/findings/slangi-foo-bar.yaml
+# (will become a tracking issue at human-triage time)
+docs/generated/tests/language-reference/.../some-test.slang
+```
+
+This preserves the bug signal without generating a flood of GitHub
+issues during a single-session burst.
+
 You will be asked at times to "increase coverage" or to "expand" a
 bundle. **You must never** in that case:
 
