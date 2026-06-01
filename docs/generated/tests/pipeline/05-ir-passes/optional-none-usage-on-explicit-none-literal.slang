@@ -13,7 +13,7 @@
 // optional is initialized explicitly with `= none`. The pass still
 // flags the always-none read.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

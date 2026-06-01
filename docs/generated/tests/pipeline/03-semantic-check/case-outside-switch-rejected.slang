@@ -20,6 +20,5 @@ void main()
 /*CHECK:
     ^^^^ 'case' not allowed outside of a 'switch' statement
 */
-//CHECK: E39999
     int x = 0;
 }

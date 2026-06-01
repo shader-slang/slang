@@ -11,12 +11,14 @@
 
 // The doc's raytracing-payload table lists `getOptiXRayPayloadPtr` and
 // `getOptiXHitAttribute` as the OptiX-side opcodes that materialize
-// payload/attribute access in a `closesthit` entry point. The portable
-// surface is the `[shader("closesthit")]` entry point's `inout Payload`
-// + `BuiltInTriangleIntersectionAttributes` parameters; the payload
-// here is large enough to force the pointer-based path.
+// payload/attribute access in a `closesthit` entry point. The opcodes
+// are synthesized inside `slang-ir-legalize-varying-params.cpp` during
+// target legalization, AFTER the `-dump-ir` snapshot point, so they
+// are not observable via IR dump. The user-visible artifact of the
+// lowering is the CUDA text emit calling `optixGetPayload_*`; we check
+// for that instead.
 
-//TEST:SIMPLE(filecheck=IR):-target cuda -dump-ir -o /dev/null -stage closesthit -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target cuda -stage closesthit -entry main
 
 struct LargePayload
 {
@@ -38,5 +40,5 @@ void main(inout LargePayload payload, BuiltInTriangleIntersectionAttributes attr
     payload.a = float4(bary, RayTCurrent());
 }
 
-// IR-DAG: getOptiXRayPayloadPtr
-// IR-DAG: getOptiXHitAttribute
+// CHECK-DAG: optixGetPayload_
+// CHECK-DAG: optixGetAttribute_
