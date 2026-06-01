@@ -87,7 +87,7 @@ what is implemented today versus what is scaffolded or planned:
 | A                      | Framework scaffold (driver, schemas, prompts, manifest)                  | implemented                                         |
 | B1                     | Bootstrap generation across 47 bundles                                   | implemented                                         |
 | B1.5 / B1.6 / B1.7     | Boundary expansion, coverage-driven refinement, diagnostics-catalog sweep | implemented                                         |
-| B2                     | `slang-test -test-dir docs/generated/tests` wired into a nightly job     | planned                                             |
+| B2                     | `slang-test -test-dir docs/generated/tests` wired into a nightly job     | implemented                                         |
 | C                      | Cross-link pass — bundles consume each other's READMEs                   | planned                                             |
 | D                      | Review + remediation against a non-Claude model                          | scaffolded (schemas, prompts, state file in place)  |
 | E                      | Coverage-driven expansion loop                                           | scaffolded (driver subcommands stub the data flow)  |
@@ -122,8 +122,8 @@ python3 docs/generated/tests/_meta/regenerate.py lint
 ```
 
 **`slang-test` is the runtime check.** It compiles every `.slang` file
-against the targets each test declares. CI nightly runs this once
-Phase B2 lands; locally it is optional.
+against the targets each test declares. CI nightly runs this; locally
+it is optional but recommended via `regenerate.py verify <bundle>`.
 
 ```bash
 ./build/Release/bin/slang-test -use-test-server -server-count 4 -test-dir docs/generated/tests

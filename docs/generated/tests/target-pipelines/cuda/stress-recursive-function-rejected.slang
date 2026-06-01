@@ -13,7 +13,7 @@
 // recursion (the checkForRecursive* Phase-B validation rejects
 // before emit). The diagnostic text is copied verbatim.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target cuda -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 

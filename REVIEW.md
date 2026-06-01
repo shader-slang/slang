@@ -2,14 +2,43 @@
 
 Follow this protocol. Do NOT skip steps. Do NOT write a free-form review. Do NOT post a review without dispatching all 6 teammates first.
 
+## Optional Clarity Review Candidate Pass
+
+The ordinary review protocol below is a high-confidence bug/gap/question filter. It is not
+intended to preserve the higher-volume feedback from a dedicated clarity and explainability
+review pass.
+
+When the user asks for a clarity review, agent-authored-code review, explainability review,
+or review focused on comments/naming/terminology, run the repository-local skills under
+`.claude/skills/` before posting anything:
+
+1. Run `slang-review-clarity` for high-level algorithm/comment/model concerns.
+2. Run `slang-review-fine-grained-clarity` for line-by-line name/comment/type/function
+   consistency concerns.
+3. Run `slang-review-consolidate-candidates` to merge candidates and resolve duplicates,
+   overlap, and superseded comments.
+4. Run `slang-review-scope-filter` before posting, so the final comments focus on code the
+   PR author actually changed, comments made stale by the PR, or nearby contracts made relevant
+   by the PR.
+5. Run `slang-review-resolve-judgment-calls` for candidates that need focused follow-up
+   analysis before a posting decision.
+6. If posting, run `slang-review-post-github` so comments are submitted as one proper GitHub
+   PR review.
+
+These skills write candidate comment files under `tmp/review-candidates/`. Do not feed their
+output through Step 3's bug/gap/question filter unless the user explicitly asks for that. A
+clarity candidate may be worth posting even when it does not prove a concrete bug, because the
+review claim is that the changed code is unclear, internally inconsistent, or insufficiently
+explained.
+
 ## Step 1: Fetch the PR diff and save to file
 
 Save the diff and file list to `tmp/` so agents can read them without bloating prompts:
 
 ```bash
 mkdir -p tmp
-gh pr diff <number> -R <repo> > tmp/pr-diff.patch
-gh pr view <number> -R <repo> --json files -q '.files[].path' > tmp/pr-files.txt
+gh.exe pr diff <number> -R <repo> > tmp/pr-diff.patch
+gh.exe pr view <number> -R <repo> --json files -q '.files[].path' > tmp/pr-files.txt
 ```
 
 Agents will read these files directly — do NOT embed the full diff in agent prompts.

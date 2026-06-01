@@ -12,7 +12,7 @@
 // `PrivateModifier` restricts visibility to the enclosing type
 // declaration. Accessing a `private` field from outside is diagnosed.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 struct S
 {

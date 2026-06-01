@@ -13,12 +13,12 @@
 // cycle and is reported via the cyclic-reference-in-inheritance
 // diagnostic.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 struct A : A {}
 /*CHECK:
+           ^ support for inheritance is unstable and will be removed in future language versions, consider using composition instead
        ^ cyclic reference in inheritance graph 'A'
 */
-//CHECK: E39999
 
 void main() {}
