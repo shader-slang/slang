@@ -255,6 +255,12 @@ Every `.slang` file must begin with:
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 ```
 
+Optional keys:
+
+```slang
+//META: requires-tool=<comma-separated list>
+```
+
 After the `//META` block, add 1–3 short comment lines in plain English
 describing the test in human terms. Then the test directive(s).
 
@@ -264,14 +270,54 @@ anchor up to but not including the next same-or-higher-level heading.
 The agent can compute this directly from the doc file at
 `source_commit`.
 
+### `requires-tool` (optional)
+
+Some tests need a downstream binary that is not part of the Slang
+build itself: `dxc` for DXIL, `nvrtc` for CUDA PTX, the Apple
+`metal` compiler / `metallib` toolchain, and so on. When such a
+binary is missing locally, the test cannot run; without a gate, it
+reports as **FAILED** instead of being correctly skipped, polluting
+the verify output and (eventually) the nightly CI signal.
+
+Declare the prerequisite explicitly:
+
+```slang
+//META: requires-tool=dxc
+```
+
+Allowed values (comma-separated when more than one is needed):
+
+| Value | What it gates |
+| --- | --- |
+| `dxc` | DXC binary for `-target dxil` / DXIL-assembly. |
+| `fxc` | Legacy fxc.exe for `-target dxbc`. |
+| `nvrtc` | NVRTC / CUDA toolchain for `-target cuda` runtime, `-target ptx`, OptiX runtime. |
+| `metal-toolchain` | Apple `metal` compiler / `metallib` (Mac-only). |
+| `spirv-tools` | spirv-link / spirv-val / spirv-opt downstream chain. |
+| `tint` | Tint downstream (`-target wgsl-spirv`). |
+
+`regenerate.py verify` honors `requires-tool`: when a required
+binary is not on `$PATH`, the test is reported as `ignored`
+(backend not available locally — CI validates) rather than executed.
+CI nightly runs with all tools provisioned, so the test still runs
+there.
+
+Do **not** use `requires-tool` to silence tests that are merely
+failing — that is the job of the suite-level expected-failure list
+([see below](#suite-level-expected-failures)). `requires-tool` is
+for environmental gating only.
+
 ## Test directives you may use
 
 The bundle is run by `slang-test`. **CI has full runner access**
 (GPU, DXC, nvrtc, Apple toolchain, etc.); the agent runtime that
-generates tests may not. The agent commits any test that has a
-`//TEST` (or `//DIAGNOSTIC_TEST`) directive and at least one CHECK
-pattern, even if the agent cannot execute the directive locally.
-CI catches behavioral failures.
+generates tests does not. CI is the safety net for the directives
+you cannot execute locally — **not** a substitute for verifying the
+ones you can. You must run `regenerate.py verify <bundle>` (see
+[`## Verify before committing`](#verify-before-committing) below)
+on every bundle you touch and fix every failing test before commit.
+A test that fails locally and ships to CI wastes nightly runs and
+buries genuine compiler bugs in the failure noise.
 
 Allowed directives (any of these — pick what fits the claim):
 
@@ -484,20 +530,190 @@ These are not lint-enforced, but skip them only with a
   `[[kernel]] ... [[thread_position_in_grid]] ... [[buffer(N)]]`),
   use `// CHECK-SAME:` for additional matches following the initial
   `// CHECK:`.
+- **Default to `CHECK-DAG` for any test with more than one CHECK
+  line.** FileCheck's plain `CHECK:` cursor advances monotonically:
+  a `CHECK: error` followed by `CHECK: E30011` cannot match
+  `error[E30011]: msg` (the second pattern's text is *behind* the
+  cursor after the first match). Use `CHECK-DAG:` for unordered
+  matches, `CHECK:` only when source-text order is the property you
+  are verifying. This single rule prevents the most common
+  agent-generated FileCheck failure: ordered CHECKs against tokens
+  the compiler emits on one line.
+- **DIAGNOSTIC_TEST CHECK lines** without a caret are also
+  unordered substring matches; the same `CHECK-DAG` discipline
+  applies if you write multiple of them. With carets, position
+  anchors the match — order between caret-anchored CHECKs is not
+  enforced by the runner, but mixing caret-anchored and substring
+  CHECKs against the same line is fragile; prefer caret-anchored.
 
-#### `-dump-ir` directive (when observing IR instructions)
+#### Pipeline observation points — `-dump-ir` vs target emit vs `-dump-ir-after`
 
-- Combine `-dump-ir` with **`-target <text-target>`** AND **`-o /dev/null`**.
-  Without `-target` the compile stops early; without `-o /dev/null` the
-  target text mixes with IR on stdout and FileCheck fails. With both,
-  IR goes to stdout and target text is discarded.
+The Slang pipeline lowers a Slang program through several IR phases:
+frontend lowering → generic specialization → SSA → optimization → **target
+legalization** → final text emit. Different test claims are observable at
+different points. Picking the wrong observation point is the single most
+common cause of "the doc says X, my CHECK looks for X, the test fails."
+
+**`-dump-ir`** prints the IR snapshot **before target legalization**.
+What you see: opcodes that exist in the platform-neutral IR, decorations
+attached in the frontend, generic specializations after monomorphization.
+What you do **NOT** see: any opcode synthesized inside `slang-ir-legalize-*`
+passes. That includes:
+
+- OptiX-specific: `getOptiXPayloadRegister`, `setOptiXPayloadRegister`,
+  `getOptiXSbtDataPointer`, `getOptiXRayPayloadPtr`,
+  `getOptiXHitAttribute`. (Synthesized in `slang-ir-legalize-varying-params.cpp`.)
+- SPIR-V-bindless: `SPIRVLoadDescriptorFromHeap`, `SPIRVResourceHeap`,
+  `SPIRVSamplerHeap`, `SPIRVLoadTexelPointerFromHeap`. (Synthesized in
+  SPIR-V target legalization.)
+- Vulkan-RT: `GetVulkanRayTracingPayloadLocation`. (Synthesized in
+  SPIR-V target legalization.)
+- HLSL-DXR shape transforms run inside the HLSL legalizer.
+
+When the IR-reference doc lists an opcode under a target-specific
+section ("OptiX-side", "SPIR-V bindless", "Vulkan raytracing", etc.),
+**do not anchor the test to `-dump-ir`** — the opcode is not in that
+snapshot. Anchor it to the final text emit instead:
+
+- For CUDA / OptiX: check `optixGetPayload_N(...)`, `optixSetPayload_N(...)`,
+  `optixGetAttribute_N(...)` in the CUDA C++ text.
+- For SPIR-V: check `OpCapability RuntimeDescriptorArray`,
+  `__slang_resource_heap`, `OpCapability RayTracingKHR`,
+  `OpDecorate %p Location N` in the SPIR-V assembly.
+- For HLSL DXR: check the actual closesthit/anyhit signature in the
+  emitted HLSL text.
+
+**Target text emit** (`-target <text-target>` without `-dump-ir`) is
+the right observation point for anything documented as "the compiler
+emits …" — HLSL/GLSL/SPIRV-asm/Metal/WGSL/CUDA/CPP/Torch text. This is
+also what users see, so it is the most stable contract.
+
+**Combining `-dump-ir` with target emit** requires both
+`-target <text-target>` and `-o /dev/null`. Without `-target` the
+compile stops early; without `-o /dev/null` the target text mixes
+with IR on stdout and FileCheck fails. With both, IR goes to stdout
+and the target text is discarded.
+
+**Other -dump-ir hazards** that the agent must guard against:
+
 - **Constant folding** collapses literal-arithmetic before IR can be
   observed. To observe `add(%a, %b)` in IR, pass operands as `uniform`
   function parameters (or read them from a buffer) rather than as
-  literal integers.
+  literal integers. The same defense works against an emit-stage test
+  for an optimization pass: see [Defeat the optimizer](#defeat-the-optimizer)
+  below.
 - **Trivial locals are eliminated** during initial lowering. The `var`
   opcode survives in IR when the local is a struct accessed by field
   address, but a plain `int x = a;` is collapsed.
+- **Phase names for `-dump-ir-after`** — if you genuinely need a
+  later snapshot (e.g. to observe what a specific IR pass produced),
+  use `-dump-ir-after <passName>` and name the pass exactly as it
+  appears in `source/slang/slang-ir-*.cpp` (e.g. `lowerGenerics`).
+  Beware: legalization passes that depend on the active target are
+  internal; their snapshots are unstable across compiler revisions
+  and tests anchored to them tend to bit-rot. Prefer the final text
+  emit when available.
+
+#### Defeat the optimizer
+
+The compiler aggressively folds constants and DCEs unused values.
+A test that uses literal inputs to verify an optimization pass or
+emit behavior will often fail because the pass had nothing to do.
+
+- **Use `uniform`-fed inputs** when the test is for an optimization
+  pass or any IR-pass that operates on runtime values. Example: a
+  test for `invertYOfPositionOutput` (negates Y under `-fvk-invert-y`)
+  with the literal vertex `float4(0.0, 1.0, 0.0, 1.0)` will not see
+  `OpFNegate` in the SPIR-V — the constant folder pre-computes the
+  negation. Read the Y component from a `uniform float` instead.
+- **Use entry-point parameters or dispatch IDs**, not module-scope
+  literals, for any value the pass needs to see at runtime.
+- **Sink intermediate values into an `RWStructuredBuffer`** so DCE
+  cannot remove them.
+- **Defeat compile-time literal recognition** when the value matters:
+  on CUDA `__ldg(&uniform)` reads, the optimizer can re-fold loads
+  into temporaries (see "CUDA factors `__ldg(&uniform)` reads into
+  temporaries" above). Use thread/dispatch IDs as operands when the
+  CHECK must observe a binary op on the result.
+
+#### Tests must compile cleanly first
+
+A test that does not compile is not a CHECK failure — it is a
+broken test. `verify` reports the compiler's error message; **fix
+the compile failure before tuning any CHECK**. Common invalid-shader
+pitfalls observed in earlier bundles:
+
+- **`SV_Position` cannot decorate an array directly.** A geometry-
+  shader input `triangle float4 verts[3] : SV_Position` rejects
+  with E30701. Wrap each input vertex in a struct that carries the
+  semantic, then pass an array of structs:
+  ```slang
+  struct GsInput { float4 position : SV_Position; }
+  void main(triangle GsInput verts[3], ...) { ... }
+  ```
+  The same rule applies to `point`, `line`, and tessellation input
+  patches.
+- **`[raypayload]` on the payload struct is required** for HLSL DXR
+  legalization passes (`legalizeEmptyRayPayloadsForHLSL`,
+  `replaceLocationIntrinsicsWithRaytracingObject`) to fire. Without
+  the decoration, the payload parameter is dropped during lowering
+  and the closesthit/anyhit signature emits without it.
+- **Entry-point stage capabilities are checked at type-check time.**
+  If the core module excludes a target from the capability set for
+  a given intrinsic (e.g. `NonUniformResourceIndex` requires
+  `cpp_cuda_glsl_hlsl_spirv` and so excludes Metal), the test
+  rejects with E36107 before any emit happens. This is usually a
+  doc-bug; see [Record a doc-gap](#record-a-doc-gap-when-the-doc-claims-a-surface-the-compiler-rejects)
+  below.
+
+#### Record a doc-gap when the doc claims a surface the compiler rejects
+
+If `verify` shows the compiler rejecting the **input the doc
+proposes** (E00017 "unknown command-line option", E36107
+"unavailable features in entry point", and similar), the right
+response is **not** to silently commit a failing test or shoehorn a
+workaround. The right response is to record a `drift-from-source`
+row in `## Doc gaps observed` in the bundle README, classified by
+the controlled `Kind` vocabulary in this file. Examples of doc-bugs
+we have already surfaced:
+
+- The SPIR-V doc names `-validate-spirv` as the CLI flag enabling
+  spirv-val; no such flag exists. Only `SLANG_RUN_SPIRV_VALIDATION`
+  (env var) and `-skip-spirv-validation` are real surfaces.
+- The Metal doc claims `NonUniformResourceIndex` is a pass-through;
+  the core module excludes Metal from its capability set, so the
+  intrinsic does not even compile.
+
+Recording the doc-gap is more valuable than working around the
+fabrication: the next doc regeneration consumes the row and fixes
+the source-of-truth.
+
+#### Use the real CLI flag spellings, not C++ enum names
+
+The design docs occasionally use internal C++ enum names where the
+user-visible surface is different. The agent must use the CLI
+spelling — what `slangc -h` accepts — not the internal name.
+
+Observed cases:
+
+- `CUDAHeader` (C++) is `-target cuh` (CLI). Not `cuda-header`,
+  which slangc rejects.
+- `CUDASource` is `-target cuda`.
+- `DXIL` is `-target dxil`; the assembly form is `-target dxil-asm`.
+- `SPIRV` is `-target spirv`; the assembly form is `-target spirv-asm`.
+- `HostCPP` is `-target host-cpp`; the executable form is
+  `-target host-executable`.
+
+When the doc names a target / option using a C++ enum or class
+identifier, the test must still use the CLI spelling. If unsure,
+run `./build/Release/bin/slangc -h` (or check
+`source/slang/slang-options.cpp`).
+
+Similarly, IR opcode names in `-dump-ir` output can differ between
+the C++ class (`IRStreamOutputTypeDecoration`) and the dump-printer
+name (`streamOutputTypeLayout`); when the test fails because the
+expected substring isn't there, check the actual `-dump-ir` output
+for the dump-printer spelling.
 
 #### `DIAGNOSTIC_TEST` directive (for negative / "is rejected" claims)
 
@@ -505,16 +721,22 @@ These are not lint-enforced, but skip them only with a
   argument list, not a directive prefix:
   `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):` — not
   `//DIAGNOSTIC_TEST(non-exhaustive):SIMPLE(diag=CHECK):`.
-- The runner **rejects** `non-exhaustive` when all diagnostics in the
-  test happen to be matched. Omit the flag in that case.
+- **Default to omitting `non-exhaustive`.** The runner errors with
+  `Unnecessary 'non-exhaustive': All N diagnostic(s) were matched
+  by annotations` when the flag is set but every emitted diagnostic
+  was matched — and this is the single most common cause of FAILED
+  results during `verify`. Write your CHECK annotations, run
+  `verify`, and add `non-exhaustive` **only** if the verify output
+  shows unmatched diagnostics left over after your CHECKs consume
+  the expected ones. Do not add it defensively.
 - The runner sometimes emits **two diagnostics for a single
   user-visible error** — a short form and a span form (e.g. the
   span form repeats the same message with full type substitutions
-  like `vector<int,3>`). Use `non-exhaustive` and match just the
-  short form. Always copy the diagnostic text **verbatim** from
-  the "Suggested annotations" output — even a single token mismatch
-  (`entry point` vs `entrypoint`) will fail the test and waste an
-  iteration round.
+  like `vector<int,3>`). When verify shows this, add `non-exhaustive`
+  and match just the short form. Always copy the diagnostic text
+  **verbatim** from the "Suggested annotations" output — even a
+  single token mismatch (`entry point` vs `entrypoint`) will fail
+  the test and waste an iteration round.
 - The `//CHECK:` annotation must appear on the source line
   **immediately following** the offending source line — not several
   lines downstream. The matcher is position-based; placement matters.
@@ -529,6 +751,85 @@ These are not lint-enforced, but skip them only with a
 - **Some diagnostics attach to unexpected lines** (e.g. missing-return
   attaches to the function signature line, not the return statement).
   Look at the actual compiler output before placing annotations.
+
+## Verify before committing
+
+After you finish writing or editing tests, run:
+
+```bash
+python3 docs/generated/tests/_meta/regenerate.py lint <bundle>
+python3 docs/generated/tests/_meta/regenerate.py verify <bundle>
+```
+
+`verify` runs `slang-test -test-dir docs/generated/tests` filtered to
+the bundle and reports three buckets:
+
+- **passed** — the directive ran and its CHECK patterns matched. Good.
+- **ignored** — the runner doesn't have the backend the directive
+  requested (`-target dxil` with no DXC, GPU APIs without a driver,
+  Apple toolchain on Linux, etc.). The directive is still committed;
+  CI's nightly job has those backends and will validate. Ignored is
+  not a failure.
+- **FAILED** — the directive ran and the CHECK patterns did not match,
+  OR the diagnostic-test runner objected (e.g. `Unnecessary
+  'non-exhaustive'`, line-count mismatch, message-text mismatch).
+  **Every FAILED test must be fixed before commit.**
+
+The two most common causes of a FAILED result on first verify are:
+
+1. **`DIAGNOSTIC_TEST` with `non-exhaustive` set when the compiler
+   emits exactly the diagnostics you annotated.** The runner enforces
+   "don't say there might be more diagnostics when there aren't" — see
+   the [DIAGNOSTIC_TEST](#diagnostic_test-directive-for-negative--is-rejected-claims)
+   section. Default to omitting the flag; only add it after a verify
+   run shows leftover unmatched diagnostics.
+2. **CHECK lines that don't match the actual output.** Often the
+   compiler emits the same information in a slightly different form
+   than you guessed (extra modifiers, different precision suffix,
+   token reordered). Re-read `actual-output` from the verify output,
+   then either edit the CHECK line to match what the compiler
+   actually says, or rewrite the test to ask a question that has a
+   stable answer.
+
+If a test fails for a reason that looks like a real compiler bug (not
+a test bug), file a finding (see
+[`## Reporting suspected compiler bugs`](#reporting-suspected-compiler-bugs-findings)).
+A finding lets you ship the bundle without the broken test; do not
+ship a known-failing test just to "let CI flag it" — that pollutes
+the failure signal.
+
+For runners that have **none** of the backends a directive targets,
+verify-ignored is the right answer; ship the test and CI validates
+it. For runners that have **some** of the backends, the test runs
+against the subset the runner does have; verify uses that subset.
+
+### Suite-level expected failures
+
+A test that fails because of a **filed compiler bug** (i.e. there is
+a finding under `_meta/findings/filed/` and a tracking issue) should
+be listed in `docs/generated/tests/_meta/expected-failures.txt` so
+the nightly job stays green while the fix is in flight. Format:
+
+```
+# One path per line. Comments start with #.
+# Always include the tracking issue link as a comment above the path.
+# Remove the entry when the underlying bug is fixed.
+
+# https://github.com/shader-slang/slang/issues/11375 — slangi VM constants OOB
+docs/generated/tests/ast-reference/expressions/logic-and-short-circuit.slang
+docs/generated/tests/ast-reference/expressions/logic-or-short-circuit.slang
+```
+
+`regenerate.py verify` honors this file: matching tests are reported
+under a separate `expected-fail` bucket (not `FAILED`) and do not
+count against the exit code. The nightly job's pass/fail gate is
+**only** the unexpected-failure count.
+
+This list is **only** for failures attributable to a filed compiler
+bug (or a comparable cross-component issue with a tracking link).
+It is not a place to park flaky tests, test-runner bugs, or
+genuinely broken tests — those need real fixes, not silencing. A
+line without a tracking-issue comment fails lint.
 
 ## Slang command line — quick reminders
 
