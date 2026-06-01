@@ -266,6 +266,12 @@ jobs:
 
           # --with-synthesis runs a second pass with -only-synthesized to
           # exercise backend emit paths without a GPU.
+          # `run-coverage.sh` also supports `--with-agentic-tests`, which
+          # rolls the doc-anchored bundles under docs/generated/tests/
+          # into the merged coverage report. We deliberately do NOT pass
+          # it here yet — the suite is still being stabilized under
+          # ci-agentic-tests-nightly.yml; flip the switch once the
+          # nightly is green steady-state.
           # Retry once on failure to handle intermittent test failures.
           if ! ./tools/coverage/run-coverage.sh --with-synthesis "${test_args[@]}"; then
             echo "::warning::First coverage run failed. Retrying..."
