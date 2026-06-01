@@ -30,7 +30,7 @@ jobs:
             let source;
             if (username === BOT_LOGIN) {
               source = 'Bot';
-            } else {	    
+            } else {
               let isOrgMember = false;
 
               try {
