@@ -16,7 +16,7 @@
 // time — the front end never reaches IR lowering to build an
 // `Array(...)`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -stage compute -entry main
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;
@@ -26,6 +26,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 {
     int arr[n];
 //CHECK:    ^ expression does not evaluate to a compile-time constant
-//CHECK: E39999
+//CHECK:^^^ cannot instantiate unsized type
+//CHECK:^^^ cannot instantiate a variable of unsized type.
     buf[0] = arr[0];
 }
