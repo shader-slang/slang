@@ -111,6 +111,10 @@ Because the match happens before the test is dispatched, this is the only mechan
 subtest that _crashes_ the test process — unlike `-expected-failure-list`, which reclassifies a
 result only after the test returns. Use `-dry-run` to confirm the exact name to exclude.
 
+Note: subtest index `0` carries no `.0` in its internal name, so exclude it by its bare stem/name
+(e.g. `tests/foo.slang` or `tests/foo.slang syn (llvm)`), not the `.0` form `-dry-run` shows when a
+file has multiple subtests.
+
 ## Test Types
 
 Tests are identified by a special comment at the start of the test file: `//TEST:<type>:`
