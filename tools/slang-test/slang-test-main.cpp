@@ -5136,14 +5136,26 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         // before its result can be classified (so -expected-failure-list cannot help).
         // Exclusion takes precedence over any positive -test-prefix selection below.
         {
+            // The first subtest of a multi-subtest file prints with an explicit ".0"
+            // under -dry-run (see the dry-run branch below), while its internal name
+            // carries no ".0". Accept the printed form too, so a name copied from
+            // -dry-run can always be excluded.
+            const bool hasDryRunZeroSuffix = (subTestIndex == 0 && testList.tests.getCount() > 1);
+            const String dryRunName =
+                hasDryRunZeroSuffix ? insertSubtestIndex(testName, 0) : String();
+
             auto matchesSkipEntry = [&](const String& entry) -> bool
             {
                 // Full display name -> skip just this api/synthesized variant.
-                if (testName == entry)
+                if (testName == entry || (hasDryRunZeroSuffix && dryRunName == entry))
                     return true;
                 // Subtest stem -> skip all variants of that subtest index. Exact compare
-                // (not startsWith) so ".6" does not also match ".60".
-                if (getSubtestIndex(entry, filePath) >= 0 && outputStem == entry)
+                // (not startsWith) so ".6" does not also match ".60". ".0" names the
+                // first subtest, whose stem carries no ".0" suffix.
+                const int entrySubtest = getSubtestIndex(entry, filePath);
+                if (entrySubtest == 0 && outputStem == filePath)
+                    return true;
+                if (entrySubtest > 0 && outputStem == entry)
                     return true;
                 return false;
             };
