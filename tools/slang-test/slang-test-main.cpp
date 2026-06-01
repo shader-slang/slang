@@ -5128,6 +5128,56 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             testName << ")";
         }
 
+        // Pre-run skip for an exclusion/skip entry that targets this specific expanded
+        // subtest. shouldRunTest() already drops whole files by path prefix before
+        // expansion; here we additionally honor entries that name a subtest index
+        // ("<path>.<idx>") or a full variant display name ("<path>.<idx> syn (<api>)").
+        // This is required to skip a synthesized variant that crashes the test process
+        // before its result can be classified (so -expected-failure-list cannot help).
+        // Exclusion takes precedence over any positive -test-prefix selection below.
+        {
+            auto matchesSkipEntry = [&](const String& entry) -> bool
+            {
+                // Full display name -> skip just this api/synthesized variant.
+                if (testName == entry)
+                    return true;
+                // Subtest stem -> skip all variants of that subtest index. Exact compare
+                // (not startsWith) so ".6" does not also match ".60".
+                if (getSubtestIndex(entry, filePath) >= 0 && outputStem == entry)
+                    return true;
+                return false;
+            };
+
+            bool isExcludedSubtest = false;
+            for (auto& entry : context->options.excludePrefixes)
+            {
+                if (matchesSkipEntry(entry))
+                {
+                    isExcludedSubtest = true;
+                    break;
+                }
+            }
+            for (auto& entry : context->options.skipList)
+            {
+                if (isExcludedSubtest)
+                    break;
+                if (matchesSkipEntry(entry))
+                    isExcludedSubtest = true;
+            }
+
+            if (isExcludedSubtest)
+            {
+                if (context->options.verbosity == VerbosityLevel::Verbose)
+                {
+                    context->getTestReporter()->messageFormat(
+                        TestMessageType::Info,
+                        "%s subtest is skipped because it matches an exclusion entry\n",
+                        testName.getBuffer());
+                }
+                continue;
+            }
+        }
+
         // Check if any prefix is more specific than the file path (has subtest index).
         // If so, filter to only run tests whose outputStem matches the prefix.
         if (context->options.testPrefixes.getCount() > 0)
