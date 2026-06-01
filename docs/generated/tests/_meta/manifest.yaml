@@ -827,4 +827,15 @@ bundles:
       - source/slang/slang-check-expr.cpp
     size_cap_files: 40
 
+  language-reference/lexical-structure:
+    prompt: prompts/language-reference-lexical-structure.md
+    source_doc: docs/language-reference/lexical-structure.md
+    watched_paths:
+      - docs/language-reference/lexical-structure.md
+      - source/compiler-core/slang-lexer.cpp
+    depends_on: []
+    coverage_targets:
+      - source/compiler-core/slang-lexer.cpp
+    size_cap_files: 30
+
   # --- top-level reference -----------------------------------------------
