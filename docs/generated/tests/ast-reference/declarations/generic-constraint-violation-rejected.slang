@@ -13,18 +13,20 @@
 // constrained generic cannot be specialized at a type that does not
 // satisfy the constraint, and the checker diagnoses the call site.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 interface IShape { int area(); }
 
 struct NotAShape { int v; }
 
 int polyArea<T : IShape>(T shape) { return shape.area(); }
+/*CHECK:
+    ^^^^^^^^ see declaration of func polyArea<T> -> int
+*/
 
 void main()
 {
     NotAShape n; n.v = 1;
     int x = polyArea(n);
-//CHECK: error
-//CHECK: E39999
+//CHECK:            ^ could not specialize generic for arguments of type (NotAShape)
 }

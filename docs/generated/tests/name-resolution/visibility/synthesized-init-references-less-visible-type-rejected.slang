@@ -14,14 +14,15 @@
 // field of type `IS`, the synthesized `$init` references a less
 // visible type and `checkVisibility` rejects.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 struct IS {}
 
 public struct PS
 //CHECK:      ^^ references less visible type
-//CHECK:      ^^ '$init' references less visible type 'IS'.
-// CHECK: E30604
+//CHECK:      ^^ 'PS.init' references less visible type 'IS'.
 {
     public IS member;
+//CHECK:      ^^^^^^ references less visible type
+//CHECK:      ^^^^^^ 'member' references less visible type 'IS'.
 }

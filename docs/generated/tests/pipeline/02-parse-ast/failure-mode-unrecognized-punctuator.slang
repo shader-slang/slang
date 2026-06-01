@@ -13,8 +13,11 @@
 // parser cannot place. The doc's `## Failure modes` section names
 // this as a parse-time diagnostic.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 struct S { int a; @ int b; };
-//CHECK: unexpected '@'
-//CHECK: E20003
+//CHECK:          ^ unexpected token
+//CHECK:          ^ unexpected '@', expected identifier
+//CHECK:                ^ unexpected token
+//CHECK:                ^ unexpected identifier, expected ';'
+//CHECK:                ^ declaration does not declare anything

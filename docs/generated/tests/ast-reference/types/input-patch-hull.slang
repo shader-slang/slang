@@ -42,8 +42,8 @@ PatchConstants ConstantsHS()
     return pc;
 }
 
-//CHECK: InputPatch
-//CHECK: hullMain
+//CHECK-DAG: InputPatch
+//CHECK-DAG: hullMain
 [domain("tri")]
 [partitioning("integer")]
 [outputtopology("triangle_cw")]
