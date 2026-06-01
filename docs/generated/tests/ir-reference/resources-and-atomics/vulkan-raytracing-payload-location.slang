@@ -9,13 +9,16 @@
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's raytracing-payload table lists `GetVulkanRayTracingPayloadLocation`
-// as the synthesized opcode that returns the binding location of a
-// Vulkan ray-tracing payload. It is invoked by the GLSL/SPIR-V
-// lowering of `CallShader(...)` (via the internal
-// `__callablePayloadLocation` helper).
+// The doc's raytracing-payload table lists
+// `GetVulkanRayTracingPayloadLocation` as the synthesized opcode that
+// returns the binding location of a Vulkan ray-tracing payload. The
+// opcode is created during SPIR-V target legalization, AFTER the
+// `-dump-ir` snapshot point, so the early IR dump cannot observe it.
+// The user-visible artifact is the SPIR-V assembly's
+// `OpDecorate %p Location 0` on the callable-data variable plus the
+// `RayTracingKHR` capability declaration; we pin those instead.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage raygeneration -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage raygeneration -entry main
 
 struct CallablePayload
 {
@@ -30,4 +33,5 @@ void main()
     CallShader(0, payload);
 }
 
-// IR-DAG: GetVulkanRayTracingPayloadLocation
+// CHECK-DAG: OpCapability RayTracingKHR
+// CHECK-DAG: OpDecorate %p Location 0

@@ -14,7 +14,7 @@
 // observable counterpart of "every use site refers to a Decl by
 // name".
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 void main()
 {

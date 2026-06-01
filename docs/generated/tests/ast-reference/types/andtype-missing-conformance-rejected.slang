@@ -13,7 +13,7 @@
 // only IA but not IB is NOT accepted where `IA & IB` is required,
 // and the checker rejects the call.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 interface IA { int a(); }
 interface IB { int b(); }
@@ -21,11 +21,13 @@ interface IB { int b(); }
 struct OnlyA : IA { int a() { return 1; } }
 
 int combined<T : IA & IB>(T v) { return v.a() * 10 + v.b(); }
+/*CHECK:
+    ^^^^^^^^ see declaration of func combined<T> -> int
+*/
 
 void main()
 {
     OnlyA o;
     int r = combined(o);
 //CHECK:            ^ could not specialize generic for arguments of type (OnlyA)
-//CHECK: E39999
 }
