@@ -26,15 +26,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  id-token: write # Workload Identity for GCS-cached LLVM
-  contents: read
-  packages: read # Pull slang-linux-clang-ci container from GHCR
-
 jobs:
   agentic-tests:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
+    permissions:
+      id-token: write # Workload Identity for GCS-cached LLVM
+      contents: read
+      packages: read # Pull slang-linux-clang-ci container from GHCR
     container:
       image: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
       credentials:
@@ -122,9 +121,11 @@ jobs:
           # docs/generated/tests/README.md). Some failures are expected
           # while the suite is being de-bugged — they're tracked under
           # docs/generated/tests/_meta/findings/. We still want to fail
-          # the job on net new failures, so the threshold is a hard
-          # count in tests/expected-failure-agentic.txt rather than
-          # "any failure is fine."
+          # the job on net new failures; `regenerate.py verify` handles
+          # this by bucketing failures listed in
+          # docs/generated/tests/_meta/expected-failures.txt as
+          # "expected-fail" and exiting non-zero only on FAILED entries
+          # outside that list.
 
           # Run via the regenerate.py wrapper so the pass/ignored/FAILED
           # bucketing matches what agents see locally. server-count 4
@@ -148,6 +149,10 @@ jobs:
           ignored_tool=$(grep -E '^  ignored-tool:' verify-output.log | awk '{print $2}' || echo 0)
           expected_fail=$(grep -E '^  expected-fail:' verify-output.log | awk '{print $2}' || echo 0)
           failed=$(grep -E '^  FAILED:' verify-output.log | awk '{print $2}' || echo 0)
+          # `awk` exits 0 even when grep matches nothing, so the `|| echo 0`
+          # fallbacks above never fire; ${var:-0} is what actually rescues
+          # a missing bucket line from rendering as a blank cell.
+          passed=${passed:-0}
           ignored=${ignored:-0}
           ignored_tool=${ignored_tool:-0}
           expected_fail=${expected_fail:-0}
