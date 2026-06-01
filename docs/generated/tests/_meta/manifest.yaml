@@ -860,4 +860,15 @@ bundles:
       - source/slang/slang-check-decl.cpp
     size_cap_files: 30
 
+  language-reference/types-enum:
+    prompt: prompts/language-reference-types-enum.md
+    source_doc: docs/language-reference/types-enum.md
+    watched_paths:
+      - docs/language-reference/types-enum.md
+      - source/slang/slang-check-decl.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-check-decl.cpp
+    size_cap_files: 20
+
   # --- top-level reference -----------------------------------------------
