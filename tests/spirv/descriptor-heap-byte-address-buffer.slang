@@ -38,6 +38,8 @@
 
 // HLSL: StructuredBuffer<uint >{{.*}}ResourceDescriptorHeap[
 // HLSL: RWStructuredBuffer<uint >{{.*}}ResourceDescriptorHeap[
+// HLSL: [int(1)] = 7U
+// HLSL: InterlockedAdd
 // HLSL-NOT: asStructuredBuffer
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=output
@@ -78,6 +80,11 @@ void hlslMain()
 
     output[0] = readOnlyStructured[0];
     output[1] = readWriteStructured[0];
+    readWriteStructured[1] = 7;
+
+    uint original = 0;
+    InterlockedAdd(readWriteStructured[2], 5, original);
+    output[2] = original;
 }
 
 [shader("fragment")]
