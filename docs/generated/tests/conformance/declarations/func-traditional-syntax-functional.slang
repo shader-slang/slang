@@ -9,7 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "Functions can also be declared with traditional C-style syntax."
+// Verifies that the traditional C-style function declaration (return-type before name) works.
+// `float add(int x, float y)` is called and 5.5 confirms the result,
+// proving C-style syntax is accepted and produces correct output.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

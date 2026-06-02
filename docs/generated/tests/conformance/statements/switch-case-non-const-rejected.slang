@@ -9,8 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that a case label with a non-constant expression is a compile error.
-// The doc states: "The expression must evaluate to a compile-time constant integer."
+// Verifies that a `case` label whose expression is a runtime variable is
+// rejected with E39999. The test uses `case y:` where `y` is an `int` local;
+// CHECK asserts E39999 at that token, proving the compiler requires a
+// compile-time constant integer in case expressions.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 void main()

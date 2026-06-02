@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verify that T* declares a pointer-to-T, that &obj yields a pointer,
-// and that *p reads back the original value.
+// Verifies that `T*` declares a pointer-to-T and that `&` / `*` round-trip correctly.
+// Assigns `int* p = &x`, then reads `*p`; CHECK asserts the value matches
+// the original, proving declaration, address-of, and dereference all work together.
 //TEST:INTERPRET(filecheck=CHECK):
 
 void main()

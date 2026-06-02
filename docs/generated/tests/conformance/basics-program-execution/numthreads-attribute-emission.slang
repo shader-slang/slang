@@ -9,14 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "The thread group size is similarly specified with a 3-dimensional
-// vector group_dim. Within the thread group, individual thread invocations b are
-// instantiated such that 0 <= b.x < group_dim.x, 0 <= b.y < group_dim.y,
-// 0 <= b.z < group_dim.z. The thread group dimensions are typically specified in
-// the compute entry point as an attribute."
-//
-// We verify that [numthreads(8, 4, 2)] emits the correct dimensions in both HLSL
-// and SPIR-V (LocalSize 8 4 2).
+// Verifies that the [numthreads] attribute on a compute entry point preserves its
+// three dimensions through emit. CHECK asserts HLSL output contains `[numthreads(8, 4, 2)]`
+// and SPIR-V output contains `LocalSize 8 4 2`, proving the group dimensions are not
+// silently altered or dropped during lowering.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry computeMain -stage compute

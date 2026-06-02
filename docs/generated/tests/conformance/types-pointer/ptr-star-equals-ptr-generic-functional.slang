@@ -9,11 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's Remark 1 states that `T*` is equivalent to
-// Ptr<T, Access.ReadWrite, AddressSpace.Device>.
-// Verify the equivalence is a true type alias: a `T*` value can be
-// assigned to a `Ptr<T, Access.ReadWrite, AddressSpace.Device>` variable
-// and both read the same value.
+// Verifies that `T*` and `Ptr<T, Access.ReadWrite, AddressSpace.Device>` are the same type.
+// Assigns a `T*` value directly to the fully-qualified `Ptr<>` form without a cast;
+// CHECK asserts both variables read the same value, confirming the two spellings are
+// interchangeable and no conversion is required.
 //TEST:INTERPRET(filecheck=CHECK):
 
 void main()

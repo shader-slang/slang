@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "When a user-provided constructor is defined, a constructor is executed on object instantiation."
-// "When an initializer is not provided, the no-parameter constructor is invoked."
-// obj1 is declared without an initializer list; the no-arg __init must run and set a=1, b=2.
+// Verifies that declaring an object without an initializer list invokes the no-parameter `__init`.
+// obj1 is declared bare; the constructor sets a=1 and b=2. CHECK confirms those values are
+// live after construction, proving the no-arg path ran.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

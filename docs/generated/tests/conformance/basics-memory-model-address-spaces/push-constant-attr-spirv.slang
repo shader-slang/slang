@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Push constant" lists TWO attribute spellings:
-// `[push_constant]` and `[vk_push_constant]`.
-// The primary smoke test (push-constant-spirv.slang) uses `[vk::push_constant]`.
-// This boundary test verifies the `[push_constant]` spelling also produces
-// PushConstant storage class in SPIRV.
+// Verifies that the `[[push_constant]]` attribute spelling (the non-vk-namespaced form)
+// also routes a struct to the Push constant address space. CHECK asserts the SPIRV declares
+// `%pc` as `OpVariable ... PushConstant`, proving both attribute spellings produce the same
+// storage-class mapping as the `[[vk::push_constant]]` form tested in push-constant-spirv.slang.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

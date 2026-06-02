@@ -9,8 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A call expression is never an l-value."
-// Directly assigning to the result of a call must be rejected at compile time (E30011).
+// Verifies that a call expression is never an l-value and cannot appear on the left
+// of an assignment. `makeVal() = 10` is invalid Slang; CHECK asserts E30011 fires,
+// proving the compiler enforces this constraint at the assignment expression.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 

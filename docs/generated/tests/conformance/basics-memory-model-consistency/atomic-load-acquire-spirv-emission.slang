@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "Acquire memory order — loads and stores after a load-acquire
-// operation cannot be reordered before the operation."
-// In SPIRV, OpAtomicLoad with Acquire semantics has a non-zero semantics operand
-// containing the Acquire bit (2) plus UniformMemory (64) = 66 for Device scope.
+// Verifies that `Atomic<T>.load` with `MemoryOrder.Acquire` emits `OpAtomicLoad`
+// with a non-zero memory semantics operand, confirming the Acquire bit is set.
+// CHECK-NOT %uint_0 rules out the relaxed (None) encoding; anything non-zero
+// indicates the acquire ordering constraint is present in the emitted SPIRV.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

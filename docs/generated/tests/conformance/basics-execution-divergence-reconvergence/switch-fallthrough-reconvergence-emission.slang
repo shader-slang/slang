@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "reconvergence between threads on adjacent case label groups
-// occurs on a switch case fall-through." In SPIRV, the fall-through from case 0
-// to case 1 appears as a plain OpBranch (not a new OpSelectionMerge), and
-// both case 0 fall-through and case 1 threads execute the shared block.
-// The entire switch has one OpSelectionMerge at the outer merge point.
+// Verifies that fall-through between adjacent `switch` cases causes reconvergence at
+// the shared case body rather than at the switch exit. Case 0 falls through into
+// case 1; CHECK asserts a single `OpSelectionMerge` for the outer switch and `OpSwitch`
+// for dispatch, with no additional merge instruction between the two cases.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

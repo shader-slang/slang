@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Specialization constant" lists TWO attribute spellings:
-// `[SpecializationConstant]` and `[vk::specialization_constant]`.
-// The primary smoke test uses `[vk::specialization_constant]`.
-// This boundary test verifies the `[SpecializationConstant]` spelling also produces
-// OpSpecConstant in SPIRV.
+// Verifies that the `[[SpecializationConstant]]` attribute (the non-vk-namespaced form)
+// also routes a constant to the Specialization constant address space. CHECK-DAG asserts
+// the SPIRV output contains both `OpSpecConstant` and an `OpDecorate ... SpecId` decoration,
+// proving both attribute spellings produce the same encoding as `[[vk::specialization_constant]]`.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

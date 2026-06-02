@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Thread-local" states: `static` (global scope, not groupshared)
-// is in the Thread-local address space, instance scope = thread.
-// Each thread gets its own separate instance of the variable.
-// HLSL: emits as `static <type> <name>` at module scope.
+// Verifies that a non-groupshared `static` global belongs to the Thread-local address space,
+// meaning each thread has its own instance. The shader writes `g_perThread` from one function
+// and reads it from another; CHECK asserts the HLSL output retains `static int g_perThread`
+// at module scope, confirming the per-thread storage class.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

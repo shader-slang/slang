@@ -9,9 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Exercise the doc's Example section: interface inheritance, default impl,
-// override with the `override` modifier, and calling via an interface-typed
-// function parameter (compile-time specialization).
+// Verifies interface inheritance, default implementation, and override together.
+// ITest inherits IBase; ConcreteInt16 overrides someFunc() while ConcreteInt32
+// inherits it unchanged. CHECK asserts sq32=16, sq16=9 (getValSquared), and
+// sf32=7 (default) vs sf16=8 (override), confirming each path fires correctly.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

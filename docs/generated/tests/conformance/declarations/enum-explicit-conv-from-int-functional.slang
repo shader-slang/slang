@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "Values of the tag type can be explicitly converted to the
-// enumeration type: `Color red = Color(r);`"
+// Verifies that an integer can be explicitly converted back to an enum via a constructor cast.
+// The tag value of `Color.Green` (3) is round-tripped through `int` then `Color(g)`;
+// printing `int(c)` and checking for 3 proves the conversion produces the correct enumerator.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A structure may conform to one or more interface types."
-// MyStruct conforms to IHasValue and provides the getValue() method required by the interface.
+// Verifies that a struct conforming to an interface satisfies a generic constraint.
+// MyStruct : IHasValue provides getValue(); readValue<T:IHasValue> calls it; CHECK confirms
+// the concrete value flows back through the generic call.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

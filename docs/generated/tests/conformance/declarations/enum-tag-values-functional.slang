@@ -9,10 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "If the first case declaration… elides an initial-value expression,
-// the value `0` is used… If any other case declaration elides an initial-value
-// expression, its tag value is one greater than the tag value of the immediately
-// preceding case declaration."
+// Verifies the default tag-value assignment rule: first case = 0, each subsequent case = previous + 1.
+// `Status.Active`, `Status.Inactive`, and `Status.Pending` must print 0, 1, 2 respectively;
+// the three CHECK lines confirm the sequential assignment.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

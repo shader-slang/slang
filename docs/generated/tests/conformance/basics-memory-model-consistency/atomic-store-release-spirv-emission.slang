@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "Release memory order — loads or stores before a store-release
-// operation cannot be reordered after the operation."
-// In SPIRV, OpAtomicStore with Release semantics has a semantics operand
-// containing the Release bit (4) plus UniformMemory (64) = 68.
+// Verifies that `Atomic<T>.store` with `MemoryOrder.Release` emits `OpAtomicStore`
+// with semantics operand 68 (Release(4) | UniformMemory(64)) in SPIRV.
+// CHECK-SAME pins %uint_68 on the OpAtomicStore line, confirming the Release bit
+// is present — distinguishing it from a relaxed (None/0) store.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

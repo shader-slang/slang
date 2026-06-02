@@ -9,11 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "Mixed precedence and associativity" example:
-//   `a = b = c + d + e` <=> `a = (b = ((c + d) + e))`
-// - `+` is left-associative (level 4): `c + d + e` = `(c+d)+e`
-// - `=` is right-associative (level 14): `a = b = X` = `a = (b = X)`
-// With c=1, d=2, e=3: RHS = ((1+2)+3) = 6; b = 6; a = 6.
+// Verifies mixed associativity in one expression: `+` (level 4, left-assoc)
+// and `=` (level 14, right-assoc) combine so `a = b = c + d + e` groups as
+// `a = (b = ((c+d)+e))`. The arithmetic runs left-to-right first, then both
+// assignments propagate right-to-left; CHECK asserts a=6 and b=6.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

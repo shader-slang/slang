@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "An associated type declaration introduces a type into the
-// signature of an interface… different implementations of an interface may
-// provide different types that satisfy the same associated type."
+// Verifies that `associatedtype` in an interface introduces a per-implementation type slot.
+// IntWrapper satisfies it with `int`; getValue() returns data via ValueType, and 99
+// confirms the concrete type resolved correctly at runtime.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

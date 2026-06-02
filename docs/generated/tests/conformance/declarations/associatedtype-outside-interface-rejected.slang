@@ -9,8 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "It is an error to declare an associated type anywhere other
-// than the body of an interface declaration."
+// Verifies that `associatedtype` outside an interface body is a compile error.
+// Placing it inside a `struct` must trigger E30102; CHECK-DAG confirms both the
+// error severity and the exact diagnostic code.
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 

@@ -9,8 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "In some cases a function declaration does not include a body,
-// and in these cases the declaration must be terminated with a semicolon (`;`)."
+// Verifies that a body-less function declaration (forward declaration, terminated with `;`) compiles.
+// `func getCount() -> int;` declares without a body; the subsequent definition satisfies it.
+// Emitting `void main` (asserted below) confirms the program compiled successfully.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

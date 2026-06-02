@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "The Slang standard library provides atomic memory access
-// primitives as follows: Relaxed atomic operations (global decls/atomic)."
-// The global-decl atomics (InterlockedMin/Max/And/Or/Xor/Exchange) are relaxed
-// and map to SPIRV OpAtomic* with None (0) semantics (no ordering constraint).
+// Verifies that all six global-decl relaxed atomics (InterlockedMin/Max/And/Or/Xor/Exchange)
+// each compile to their corresponding SPIRV OpAtomic* opcode. CHECK-DAG pins all six
+// opcodes regardless of emission order; the HLSL CHECKs confirm each intrinsic name
+// survives lowering, proving the global-decl atomic surface maps one-to-one.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute

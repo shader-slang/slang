@@ -9,9 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "To obtain the address of an object, the address-of
-// operator & is used." Verify that &obj produces a live pointer and
-// *(&obj) == obj.
+// Verifies that `&obj` produces a pointer to the object.
+// Takes the address of a local int, then reads back through the pointer;
+// CHECK asserts the printed value equals the original, confirming the
+// address-of operator yields a usable, non-stale pointer.
 //TEST:INTERPRET(filecheck=CHECK):
 
 void main()

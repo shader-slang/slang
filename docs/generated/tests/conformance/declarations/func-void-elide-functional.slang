@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "If the function result type is `void`, the result type clause
-// may be elided."  We use a traditional-syntax `func` with no arrow clause.
-// Note: func + in/out/inout parameters causes an ICE; we use a simple func here.
+// Verifies that a `func` with a void result can omit the `-> void` clause entirely.
+// `doNothing` compiles and runs without an arrow clause; ok confirms execution
+// reached the printf, proving the elided result type is accepted.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

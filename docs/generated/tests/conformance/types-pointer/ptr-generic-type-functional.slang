@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verify that the standard library's generic Ptr<T> type alias is usable:
-// declare a Ptr<int>, assign it from &x, and read back the same value.
+// Verifies that the `Ptr<T>` generic type alias is usable as a pointer.
+// Declares `Ptr<int> p = &x` and dereferences it; CHECK asserts the
+// value read equals the original, confirming the alias behaves like `T*`.
 //TEST:INTERPRET(filecheck=CHECK):
 
 void main()

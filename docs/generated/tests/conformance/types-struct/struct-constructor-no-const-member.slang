@@ -9,7 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "`const` data members cannot be initialized by the constructor."
+// Verifies that assigning to a `const` data member inside a `__init` body is rejected.
+// The diagnostic test compiles HasConst whose __init tries to write `c`; CHECK-DAG
+// asserts the compiler emits an E30011 l-value error.
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 

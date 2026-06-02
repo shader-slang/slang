@@ -9,9 +9,8 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "By default, only a read access to the object members is allowed by a member function.
-// If write access is required, the member function must be declared with the `[mutating]` attribute."
-// Attempting to write without [mutating] should be a compiler error.
+// Verifies that writing to a non-static member field in a non-`[mutating]` function is rejected.
+// badWrite() assigns to `a` without the attribute; CHECK-DAG asserts E30011 (l-value) fires.
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 

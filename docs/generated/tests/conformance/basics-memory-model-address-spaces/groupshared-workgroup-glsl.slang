@@ -9,9 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Group-shared" states: `static groupshared` (global scope)
-// is in the Group-shared address space, visible to all threads in the thread group.
-// On GLSL, the equivalent qualifier is `shared`.
+// Verifies that `static groupshared` at global scope maps to the Group-shared address space
+// on GLSL. CHECK asserts the emitted GLSL uses the `shared` storage qualifier on the array,
+// confirming the thread-group-visible memory mapping.
 
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry computeMain -stage compute
 

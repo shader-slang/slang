@@ -9,10 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `<<=`, `>>=`, `&=`, `|=`, `^=`
-// all at level 14 with right associativity.
-// `a += b = 3` groups as `a += (b = 3)`.
-// If a=10, b=0: after the expression, b=3 and a=10+3=13.
+// Verifies that compound-assignment operators (`+=` etc.) at precedence level 14
+// are right-associative, just like plain `=`. In `a += b = 3`, right-to-left
+// grouping gives `a += (b = 3)`: b is set to 3 first, then a increases by 3.
+// CHECK asserts a=13 and b=3, which only holds under right-assoc grouping.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

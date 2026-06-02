@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: conformance constraints can be declared inline (T : U) or
-// via `where T : U` clauses.  Both are equivalent.
+// Verifies that a conformance constraint in a `where` clause is equivalent to an inline constraint.
+// `extractValue<T>(T x) where T : IValued` calls `x.getValue()` on a Valued instance;
+// CHECK asserts 123, reachable only if the where-clause constraint unlocked the interface method.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

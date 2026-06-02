@@ -9,8 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A `let` declaration… may not be… used as the argument for
-// an `in out` or `out` parameter."  Passing a `let` to `inout` must be rejected.
+// Verifies that a `let` variable cannot be passed as an `inout` argument.
+// Passing the immutable `x` to `add1(inout int v)` must trigger E30047; CHECK-DAG
+// asserts the error severity and code.
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 

@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "In the function body, other members may be referenced using `this.`,
-// although it is optional."
-// Both sum() using `this.x + this.y` and sumBare() using `x + y` should return the same result.
+// Verifies that `this.member` and bare `member` are equivalent inside a non-static method.
+// sumExplicit() uses `this.x + this.y`; sumImplicit() uses `x + y`; both are called on the
+// same instance and CHECK confirms both return the same sum.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

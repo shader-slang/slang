@@ -9,8 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's Remark 2 uses `ptr++` and `ptr--` syntax. Verify that
-// prefix-increment and decrement on a pointer operate element-wise.
+// Verifies that `++` and `--` on a pointer each step by exactly one element.
+// Increments from arr[0] to arr[1], reads the value, then decrements back;
+// CHECK asserts both reads are correct, confirming step size is element-wise
+// in both directions.
 //TEST:INTERPRET(filecheck=CHECK):
 
 void main()

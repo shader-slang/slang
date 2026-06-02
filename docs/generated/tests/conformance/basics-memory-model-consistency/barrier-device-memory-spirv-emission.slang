@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "Device — applies to address spaces with all threads instance scope.
-// This includes all storage buffers and images."
-// SPIRV: OpMemoryBarrier Device scope (1), semantics 2120
-// (= SeqCst(8) | UniformMemory(64) | ImageMemory(2048)).
-// WorkgroupMemory(256) is absent (unlike AllMemoryBarrier).
+// Verifies that `DeviceMemoryBarrier()` emits `OpMemoryBarrier` with Device scope (1)
+// and semantics 2120 (SeqCst | UniformMemory | ImageMemory), covering storage buffers
+// and images but not groupshared memory. The absence of WorkgroupMemory(256) in 2120
+// (vs 2376 for AllMemoryBarrier) is what distinguishes the device-only scope.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute

@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A subscript [] operator can be added using a __subscript declaration."
-// "The get accessor of a __subscript is invoked when the subscript operator is applied to
-// return a value. The set accessor is invoked to assign a value."
+// Verifies that a `__subscript` operator routes reads to `get` and writes to `set`.
+// Three elements are written via x[i] = v and read back via float v = x[i]; CHECK confirms
+// each element retains the assigned value, proving both accessors fired.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -9,7 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: a constraint on a type parameter pack applies to every type in the pack.
+// Verifies that a `where T == float` constraint on a type parameter pack applies to every element.
+// `sumFloatPack(1.0f, 2.0f, 3.0f)` expands the pack of three floats and accumulates them;
+// CHECK asserts 6, which is only possible if all elements satisfied the constraint and were summed.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 

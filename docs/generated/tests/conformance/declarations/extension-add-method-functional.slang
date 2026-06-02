@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "An extension declaration adds behavior to an existing type."
-// "The members of an extension are accessed through the type that is being extended."
+// Verifies that an extension adds both instance and static methods to an existing struct.
+// `getLengthSq()` is called on a `MyVec` instance and `getDimensionality()` on the type itself;
+// CHECK lines assert 25 and 2, proving both extension members dispatch correctly.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

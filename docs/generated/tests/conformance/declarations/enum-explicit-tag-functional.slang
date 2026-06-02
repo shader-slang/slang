@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A case declaration consists of the name of the case, along
-// with an optional initial-value expression that specifies the tag value."
-// And subsequent cases without explicit values increment from the previous.
+// Verifies that an explicit tag value mid-enum resets the counter and subsequent cases increment.
+// `Red` gets 0 by default, `Green` is pinned to 3, and `Blue` must be 4;
+// CHECK lines assert all three printed values match.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

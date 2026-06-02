@@ -9,10 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "Alternatively, a property may be implemented by declaring
-// a compatible variable with a matching name."
-// Verifies that a plain data member with the same name satisfies a
-// property requirement.
+// Verifies that a plain struct field with the same name satisfies a property
+// requirement. StructWithField declares `float myVal` rather than explicit
+// accessors; CHECK asserts the assigned value 3.5 is readable, confirming the
+// field was accepted as the conformance witness for the property.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

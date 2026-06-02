@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's example declares `uint *start, uint *end` as function
-// parameters. Verify that passing a pointer to a function parameter
-// lets the callee mutate the caller's variable through dereference.
+// Verifies that a pointer passed to a function lets the callee mutate the caller's variable.
+// Calls `addDelta(&x, 5)` which writes through `*p`; CHECK asserts `x` at the call site
+// reflects the mutation, proving pointer parameters convey write access.
 //TEST:INTERPRET(filecheck=CHECK):
 
 void addDelta(int* p, int delta)

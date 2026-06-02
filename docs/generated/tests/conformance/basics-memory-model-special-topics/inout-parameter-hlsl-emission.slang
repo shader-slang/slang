@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: the function may read and write the argument passed to
-// the inout-parameter any number of times during the function call.
-// In HLSL, Slang emits `inout` directly on the parameter, and multiple
-// reads/writes in the body appear as sequential in-place assignments.
+// Verifies that an `inout` parameter emits with the `inout` keyword in HLSL and
+// allows multiple reads and writes inside the callee. `multiReadWrite` reads `val`
+// twice then writes it twice; CHECK asserts the HLSL signature carries `inout` and
+// that assignment to `val` appears in the body.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

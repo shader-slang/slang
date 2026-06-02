@@ -9,9 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states an associated type requirement must be provided by
-// either a nested struct or a typealias. When neither is present,
-// E38100 fires.
+// Verifies that omitting a required associated type from a conforming struct
+// produces E38100. FailsAssoc declares no ElemType; CHECK pins the caret-aligned
+// "missing interface member" message and E38100 on the struct declaration line.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
 

@@ -9,12 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "A variable declared with an interface type is an
-// interface-conforming variant. An interface variant may have any type
-// conforming to the interface."
-// Verifies that an interface-typed variable is declarable and callable.
-// Uses HLSL emission because slangi does not support interface variants
-// with non-const globals.
+// Verifies that variables of concrete types conforming to an interface are
+// accepted and their methods are callable. Two local variables of different
+// conforming types (ConcreteInt32 and ConcreteInt16) are used inside the same
+// entry point; CHECK asserts both type names appear in the HLSL output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

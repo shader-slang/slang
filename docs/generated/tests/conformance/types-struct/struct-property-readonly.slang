@@ -9,8 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A property that only provides the `get` accessor is a read-only property."
-// A get-only property should work correctly for reads; its emitted code shows a get function.
+// Verifies that a property with only a `get` accessor emits and is readable.
+// ReadOnlyProp.xVal returns m_x; CHECK confirms the field name appears in the HLSL output,
+// proving the get accessor wired through correctly.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

@@ -9,10 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "The default pointer address space is AddressSpace.Device,
-// and the default access mode is Access.ReadWrite."
-// Verify that int* can be assigned to the fully-specified Ptr<> form,
-// demonstrating they are the same type (both reads return the same value).
+// Verifies that `T*` defaults to `Access.ReadWrite` and `AddressSpace.Device`.
+// Assigns an `int*` to a `Ptr<int, Access.ReadWrite, AddressSpace.Device>` variable
+// without a cast; CHECK asserts both pointers read the same value, proving they are
+// the same type under the default parameters.
 //TEST:INTERPRET(filecheck=CHECK):
 
 void main()

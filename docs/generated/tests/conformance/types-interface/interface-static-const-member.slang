@@ -9,11 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "Any number of `static` `const` data members without
-// initializers... The type of a `static` `const` member must be either
-// `int` or `bool`."
-// Verifies that int static const and bool static const requirements are
-// satisfiable and readable via the conforming type.
+// Verifies that interface `static const` requirements with `int` and `bool`
+// types are satisfiable. ConcreteWithConstants provides both members; CHECK
+// asserts the concrete values are readable as intConst=10 and boolConst=1,
+// confirming both types are accepted and the values propagate correctly.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

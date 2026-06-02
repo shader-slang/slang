@@ -9,12 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "The relaxed memory ordering with atomic memory access does
-// not provide any ordering relationship with other memory accesses. All that
-// is guaranteed is that the modifications are atomic and the modifications
-// occur in a total order specific to the variable."
-// SPIRV: OpAtomicStore with memory semantics operand = 0 (None/Relaxed).
-// %uint_0 is the semantics operand in the store below.
+// Verifies that `Atomic<T>.store` with `MemoryOrder.Relaxed` emits `OpAtomicStore`
+// with memory semantics operand 0 (None) in SPIRV, confirming no ordering constraint
+// is attached. CHECK-SAME pins %uint_0 immediately after OpAtomicStore, which is the
+// semantics operand position — proving the relaxed encoding is used.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

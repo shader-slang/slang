@@ -9,12 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "A memory barrier imposes reordering constraints for memory
-// accesses. Memory accesses before and after a barrier cannot be reordered
-// across the barrier, matching the acquire-release memory order for the barrier."
-// AllMemoryBarrier covers "all" scope: device and thread group memory accesses.
-// SPIRV: OpMemoryBarrier with Device scope (1) and semantics 2376
-// (= SequentiallyConsistent(8) | UniformMemory(64) | WorkgroupMemory(256) | ImageMemory(2048)).
+// Verifies that `AllMemoryBarrier()` emits `OpMemoryBarrier` with Device scope (1) and
+// semantics 2376 (SeqCst | UniformMemory | WorkgroupMemory | ImageMemory), covering all
+// memory address spaces. CHECK-SAME chains pin both %uint_1 (Device scope) and %uint_2376
+// (all-memory semantics) on the same OpMemoryBarrier instruction.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute

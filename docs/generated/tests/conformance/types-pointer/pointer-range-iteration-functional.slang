@@ -9,9 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's example (## Pointers Denoting a Range) shows iterating a
-// half-open range [start, end) by comparing pointer against a past-end
-// sentinel. Verify this pattern produces the correct sum.
+// Verifies that a half-open pointer range `[start, end)` with a past-the-end sentinel
+// iterates all elements exactly once. `sumRange` accumulates elements by walking
+// `start != end; ++start`; CHECK asserts the total equals the known array sum,
+// confirming both past-end pointer validity and the iteration pattern.
 //TEST:INTERPRET(filecheck=CHECK):
 
 uint sumRange(uint* start, uint* end)

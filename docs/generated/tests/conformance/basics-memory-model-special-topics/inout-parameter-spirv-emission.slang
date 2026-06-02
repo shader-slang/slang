@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: the function may read and write the argument passed to
-// the inout-parameter any number of times during the function call.
-// In SPIRV, Slang implements this by passing inout arguments as
-// Function-storage-class pointers (OpTypePointer Function), enabling
-// the callee to issue multiple OpLoad (read) and OpStore (write) operations.
+// Verifies that `inout` parameters are passed as Function-storage-class pointers
+// in SPIR-V, enabling multiple reads and writes inside the callee.
+// CHECK asserts `%_ptr_Function_int`, `%val = OpFunctionParameter %_ptr_Function_int`,
+// multiple `OpLoad %int %val` instructions, and at least one `OpStore %val`.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

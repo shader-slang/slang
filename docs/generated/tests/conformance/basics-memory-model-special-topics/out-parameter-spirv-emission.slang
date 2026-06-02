@@ -9,12 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: the function may write the argument passed to the
-// out-parameter any number of times during the function call.
-// In SPIRV, `out` arguments are passed as Function-storage-class pointers
-// (OpTypePointer Function), and the callee writes to it via OpStore.
-// The doc allows multiple writes; here we verify the pointer-passing mechanism
-// that enables writes inside the callee (at least one OpStore observed).
+// Verifies that an `out` parameter is passed as a Function-storage-class pointer
+// in SPIR-V, letting the callee write to the caller's variable via OpStore.
+// CHECK asserts `%_ptr_Function_int`, `%result = OpFunctionParameter %_ptr_Function_int`,
+// and `OpStore %result`, confirming the pointer-passing mechanism for `out` parameters.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

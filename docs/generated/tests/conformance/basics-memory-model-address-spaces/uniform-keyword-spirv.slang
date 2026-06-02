@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Uniform" names TWO Slang constructs: `uniform` keyword AND
-// `ConstantBuffer<T>`. This test exercises the `uniform` keyword form.
-// On SPIRV, a single `uniform` entry-point parameter typically lowers to a
-// PushConstant block (the implementation packs small uniform entry-point params there).
+// Verifies that the `uniform` keyword on an entry-point parameter also belongs to the Uniform
+// address space. Small `uniform` parameters are packed into a PushConstant block on SPIRV;
+// CHECK asserts the assembly declares an `OpVariable ... PushConstant`, distinguishing this
+// path from the `ConstantBuffer<T>` form tested in uniform-constant-buffer-spirv.slang.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

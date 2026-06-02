@@ -9,10 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "When an object is initialized using a constructor, the default initializer of a
-// non-static data member specifies the initial value of the data member. A constructor may override
-// this, unless the member is `const`."
-// The default value is 99 but the constructor overrides it to 42.
+// Verifies that a constructor's explicit assignment overrides a field's default initializer.
+// WithDefault.x has default 99, but __init(int) overwrites it; CHECK confirms the constructed
+// value is 42, not 99.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

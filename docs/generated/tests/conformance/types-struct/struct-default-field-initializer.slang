@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "When an object is initialized using an initializer list, the default initializer
-// of a non-static data member specifies the initial value when the initializer list does not provide one."
+// Verifies that a field's default initializer applies when the initializer list stops before that field.
+// Defaults has x=99, y (none), z=77; initializing with {1,2} supplies x and y but not z.
+// CHECK confirms z retains its default value of 77.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

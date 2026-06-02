@@ -9,9 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// A static data member is allocated from global storage (not per-instance).
-// The doc says "The storage for a static data member is allocated from the global storage."
-// Emission test: static int b = 5 must appear in the emitted code as a global/static.
+// Verifies that a `static` data member is allocated from global storage and emits as a
+// module-scope static variable in HLSL. TestStruct.b is initialised to 5 and read in the
+// entry point; CHECK confirms a static variable with value int(5) appears in the output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

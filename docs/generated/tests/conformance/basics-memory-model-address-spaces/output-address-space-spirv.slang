@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Output" states: entry point output parameters and entry point
-// return values are in the Output address space, instance scope = thread.
-// "Entry point outputs from a graphics shader stage are inputs to the next stage."
-// SPIRV: vertex shader output parameters emit with `Output` storage class.
+// Verifies that entry-point output values (return value fields and out parameters) map to
+// the Output address space. A vertex shader returns a struct carrying `SV_Position` and
+// `TEXCOORD0`; CHECK asserts the SPIRV declares at least one `OpVariable ... Output`,
+// confirming the Output address-space-to-storage-class mapping for stage outputs.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry vsMain -stage vertex
 

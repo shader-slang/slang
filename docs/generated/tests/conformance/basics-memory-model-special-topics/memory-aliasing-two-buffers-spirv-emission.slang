@@ -4,17 +4,16 @@
 //META: source_commit=57fb63455095efe1465661001ad147b24b968932
 //META: doc_ref=docs/language-reference/basics-memory-model-special-topics.md#memory-aliasing-via-binding
 //META: doc_section_digest=0cb77e4bc46ab9a7f3eefef7b0e375bb9755811b790ee7577f7b13bbf467bf6b
-//META: purpose=Two `RWStructuredBuffer<int>` resources emit as independent StorageBuffer variables with distinct SPIRV Binding decorations; the doc states that if the client API binds them to the same underlying memory they are aliased and concurrent non-atomic access constitutes a data race.
+//META: purpose=Two `RWStructuredBuffer<int>` resources emit as independent StorageBuffer variables with distinct SPIRV Binding decorations; if the client API binds them to the same memory, concurrent non-atomic access is a data race.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: if the same underlying memory is bound to multiple resources
-// such as RWStructuredBuffer<T>, it is aliased. A data race can occur even when
-// two concurrent accesses use different buffer handles, when they modify
-// overlapping underlying memory non-atomically without happens-before.
-// This emission test pins that two separate RWStructuredBuffer bindings are
-// emitted as independent StorageBuffer variables, each with its own Binding.
+// Verifies that two separate `RWStructuredBuffer` resources emit as independently
+// bound `StorageBuffer` variables in SPIR-V. CHECK-DAG asserts distinct `Binding`
+// decorations on `bufA` and `bufB` and that an `OpVariable ... StorageBuffer`
+// appears; independent bindings allow the client API to alias them at the storage
+// layer, which is the precondition for the data-race scenario the doc describes.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

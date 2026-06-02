@@ -9,8 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "The type of a `static` `const` member must be either
-// `int` or `bool`." Verifies that using `float` fires E30306.
+// Verifies that a `static const` requirement with a type other than `int` or
+// `bool` is rejected with E30306. IHasBadStatic uses `float`; CHECK pins the
+// caret-aligned "invalid static const requirement type" message and E30306.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl
 

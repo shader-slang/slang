@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A subscript declaration introduces a way for a user-defined
-// type to support subscripting with the `[]` braces… A `get` accessor
-// declaration introduces a _getter_ for the subscript."
+// Verifies that a `__subscript` with a `get` accessor enables `[]` read syntax.
+// `v[0]` and `v[1]` call the getter which branches on the index; CHECK lines assert
+// 5 and 9, confirming both accesses invoked the getter with the correct index.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

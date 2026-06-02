@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A value of an enumeration type can be implicitly converted to
-// a value of its tag type."
+// Verifies that enum values implicitly convert to their tag type (int) without an explicit cast.
+// Assigning `Color.Red` and `Color.Green` directly to `int` variables and printing them
+// proves the implicit conversion yields the correct tag values 0 and 3.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

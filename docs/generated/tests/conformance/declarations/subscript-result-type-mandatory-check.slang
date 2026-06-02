@@ -9,8 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "The result type clause of a subscript declaration cannot be elided."
-// Without a `->` return type, slangc emits E30901.
+// Verifies that omitting the `->` result type from a `__subscript` is a compile error.
+// A subscript without an explicit return type must trigger E30901; CHECK-DAG asserts
+// both the error severity and the diagnostic code.
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 

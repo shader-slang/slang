@@ -9,14 +9,11 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "All atomic modifications of a single variable occur in a total
-// order. That is, the modifications are serialized. For example, if one thread
-// increments a 0-initialized atomic variable by 1 and another thread increments it
-// by 2, all threads will observe the increments in the same order: either 0->1->3
-// or 0->2->3."
-// This test dispatches 64 threads each incrementing by 1 and verifies the final
-// sum is exactly 64, proving all increments are serialized without loss.
-// GPU-only (CI nightly); not executable locally without a GPU.
+// Verifies that atomic modifications to a single variable are serialized in a total
+// order: 64 threads each do InterlockedAdd(+1) on a zero-initialized counter, and
+// the final result must be exactly 64. If any increment were lost due to a race,
+// the value would be less; 64 proves all 64 operations were serialized.
+// GPU-only; CI nightly validates.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -output-using-type
 

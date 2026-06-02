@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: type checking of parameterized types is performed based on their type
-// constraints before specialization. An operation on a parameterized generic type is legal
-// if it is legal for all possible concrete types conforming to the declared constraints.
+// Verifies that operations permitted by a type constraint compile and execute correctly
+// before any specific type is substituted. `scaleBy10<T : IScalable>` calls `x.scale(10)`,
+// which is valid for any IScalable conformer; CHECK asserts 70 for the concrete `ScalableInt` case.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

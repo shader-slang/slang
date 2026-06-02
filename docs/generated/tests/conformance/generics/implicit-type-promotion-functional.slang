@@ -9,10 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: when inference is ambiguous and all inferred types are
-// fundamental scalar types, the element type with the highest promotion rank is used.
-// Promotion ranks: int8_t < ... < int32_t < ... < float < double.
-// Passing int8_t and int32_t to a generic `f(T, T)` should resolve T to int32_t.
+// Verifies that ambiguous inference between scalar types resolves to the highest-ranked type.
+// `addInts(int8_t(3), int32_t(100))` must infer T as int32_t (higher promotion rank than int8_t);
+// CHECK asserts 103, which is only correct if the wider type was chosen and no truncation occurred.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

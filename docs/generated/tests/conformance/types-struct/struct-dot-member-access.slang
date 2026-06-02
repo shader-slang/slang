@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "The static and non-static structure members and nested types are accessed using `.`"
-// Tests access of: non-static field via obj.a, static field via TestStruct.b, nested type via TestStruct.NestedStruct.
+// Verifies that `.` accesses non-static fields, static fields, nested types, and member functions.
+// Four CHECK lines confirm instance field, type-qualified static, chained-dot nested static, and
+// method return all resolve correctly under the interpreter.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

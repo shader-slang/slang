@@ -9,9 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A static member function is a regular function enclosed within the struct name space.
-// Invocation of a static member function does not require an object."
-// On HLSL, it must emit as a function callable without a struct instance.
+// Verifies that a static member function is callable without an instance and emits as a named
+// function in HLSL. TestStruct.getB() is called in the entry point; CHECK confirms the function
+// name and a return statement appear in the emitted output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

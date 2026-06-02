@@ -9,9 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "There is no implicit conversion from read-write to
-// read-only pointers."
-// Verify the compiler rejects the implicit assignment with E30019.
+// Verifies that assigning a `Ptr<T>` (read-write) to an `ImmutablePtr<T>` without
+// an explicit cast is rejected. Declares both types, attempts a bare assignment,
+// and checks that E30019 fires; proves the type system enforces the no-implicit-
+// conversion rule.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target cpp
 
 void main()

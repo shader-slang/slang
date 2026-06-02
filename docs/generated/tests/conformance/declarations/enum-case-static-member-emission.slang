@@ -9,8 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "An enumeration case is referred to as if it were a `static`
-// member of the enumeration type (e.g., `Color.Red`)."
+// Verifies that enum cases are accessible via dot-notation as static members of the enum type.
+// `Color.Red` and `Color.Green` are assigned to ints and written to a buffer; CHECK-DAG
+// confirms the expected tag values 0 and 3 reach the output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

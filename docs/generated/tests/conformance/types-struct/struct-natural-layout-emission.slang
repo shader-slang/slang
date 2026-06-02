@@ -9,10 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says natural layout: "The data is laid out in order of: Parent types, Non-static data members."
-// "Offset of the first data item is 0; offset of the Nth item is offset+size of previous item
-// rounded up to the alignment of the item."
-// We verify the field ordering is preserved in emitted HLSL.
+// Verifies that non-static fields appear in declaration order in emitted HLSL, reflecting
+// natural layout. Mixed has int x, float y, int z; CHECK asserts all three field names appear
+// in the emitted struct in that order.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

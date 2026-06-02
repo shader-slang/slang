@@ -9,10 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A function call () operator can be added using an `operator ()` declaration.
-// This allows applying parameters to an object as if the object was a function."
-// "Multiple declarations are allowed as long as the declarations have different signatures.
-// Overload resolution is the same as overload resolution with function invocations."
+// Verifies that `operator ()` overloads with different arities are all reachable and that
+// overload resolution selects the right one by argument count. Three calls m(), m(x), m(x,y)
+// exercise the zero-, one-, and two-parameter overloads; CHECK asserts each returns the
+// expected product of `base` with the supplied arguments.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

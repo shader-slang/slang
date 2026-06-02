@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states that an integer may be subtracted from a pointer and the
-// result "points to an element offset by that value."
-// Verify that p - 3 retreats by 3 elements.
+// Verifies that subtracting an integer from a pointer retreats by that many elements.
+// Points to the last element of a 5-element array, subtracts 3, dereferences;
+// CHECK asserts the value at the retreated position, proving subtraction is element-wise.
 //TEST:INTERPRET(filecheck=CHECK):
 
 void main()

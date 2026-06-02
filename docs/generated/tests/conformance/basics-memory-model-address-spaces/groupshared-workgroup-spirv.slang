@@ -9,10 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Group-shared" states: `static groupshared` (global scope)
-// is in the Group-shared address space, with instance scope = thread group.
-// Group-shared variable instances are shared by a thread group.
-// SPIRV: variable must use `Workgroup` storage class.
+// Verifies that `static groupshared` at global scope maps to the Workgroup storage class in
+// SPIRV. The kernel reverses values through `sharedData`; CHECK asserts the SPIRV assembly
+// declares the array as `OpVariable ... Workgroup`, confirming the thread-group address space.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

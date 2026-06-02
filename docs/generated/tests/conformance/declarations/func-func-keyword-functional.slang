@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "Functions are declared using the `func` keyword" with
-// `name: type` parameter pairs and an arrow result-type clause.
+// Verifies the `func` keyword syntax: `name: type` parameter pairs and `->` result type.
+// `add(x: int, y: float) -> float` is called with concrete arguments and the result 5
+// printed; CHECK confirms the function compiled and executed correctly.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

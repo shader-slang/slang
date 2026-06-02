@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Image" states: Slang texture types (Texture1D, Texture2D, etc.)
-// belong to the Image address space, visible to all threads.
-// SPIRV Remark 3: address spaces roughly map to SPIRV storage classes.
-// Expected: Texture2D variable emits with SPIRV `UniformConstant` storage class.
+// Verifies that `Texture2D<T>` belongs to the Image address space. The shader samples the
+// texture and writes the result to an output buffer so DCE cannot remove the resource;
+// CHECK asserts the SPIRV assembly declares `%myTexture` as `OpVariable ... UniformConstant`,
+// confirming the Image address space maps to the UniformConstant storage class.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

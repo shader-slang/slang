@@ -9,9 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Group-shared" states: `static groupshared` (global scope)
-// is in the Group-shared address space, instance scope = thread group.
-// On CUDA, group-shared variables map to the `__shared__` memory qualifier.
+// Verifies that `static groupshared` at global scope maps to the Group-shared address space
+// on CUDA. The compute kernel writes to `sharedArr` and reads back in reverse; CHECK asserts
+// the emitted CUDA text carries the `__shared__` qualifier, confirming the thread-group scope.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cuda -entry computeMain -stage compute
 

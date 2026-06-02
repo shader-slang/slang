@@ -9,13 +9,11 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "Different precedence levels" example:
-//   `a + b * c == d && e << f`
-//   <=> `((a + (b * c)) == d) && (e << f)`
-// Choose values so the expression evaluates to true:
-//   a=2, b=3, c=4, d=14 → (2+12)==14 → true
-//   e=1, f=2 → 1<<2=4 → nonzero → true
-//   true && true → true
+// Verifies four precedence levels interact correctly in one expression:
+// `*` (level 3) > `+` (level 4) > `==` (level 7) > `&&` (level 11) > `<<` (level 5).
+// With a=2, b=3, c=4, d=14, e=1, f=2 the grouping `((a+(b*c))==d) && (e<<f)`
+// yields 1; changing d to 13 breaks the equality and yields 0, ruling out
+// alternative groupings.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

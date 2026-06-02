@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: no assumptions are made about generic value parameters other than
-// their declared type. This verifies a simple uint value param is treated as its type.
+// Verifies that a `let N : uint` value parameter carries its compile-time constant into the struct body.
+// Two specializations `Sized<7>` and `Sized<100>` are instantiated and `capacity()` called on each;
+// CHECK asserts 7 and 100, proving the value parameter is preserved through specialization.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

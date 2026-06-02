@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Image" lists multiple texture types: Texture1D, Texture2D, etc.
-// This test verifies that Texture1D (a different dimensionality from Texture2D) also
-// lands in the Image / UniformConstant storage class in SPIRV.
-// Boundary: different texture dimensionality from the primary smoke test.
+// Verifies that `Texture1D<T>` (a different dimensionality than the primary Texture2D test)
+// also falls in the Image address space. CHECK asserts the SPIRV declares `%tex1d` as
+// `OpVariable ... UniformConstant`, confirming the Image→UniformConstant mapping holds
+// across texture dimensionalities, not only for 2-D textures.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

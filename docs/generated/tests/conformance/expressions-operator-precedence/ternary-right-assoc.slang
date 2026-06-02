@@ -9,11 +9,11 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc example shows `!!a` = `!(!a)` for right-associative unary.
-// For `?:`, the doc says right associativity (level 13).
-// `true ? 1 : false ? 2 : 3`:
-//   right-assoc: `true ? 1 : (false ? 2 : 3)` = 1 (outer cond true)
-//   left-assoc:  `(true ? 1 : false) ? 2 : 3` = `1 ? 2 : 3` = 2 (different!)
+// Verifies that `?:` at precedence level 13 is right-associative.
+// In `a ? x : b ? y : z`, right-grouping gives `a ? x : (b ? y : z)`.
+// Three cases (outer-true, inner-true, both-false) produce distinct results
+// (1, 2, 3) that only match under right-assoc; left-assoc would collapse
+// the outer-true case to 2.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

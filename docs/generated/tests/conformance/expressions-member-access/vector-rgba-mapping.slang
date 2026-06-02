@@ -9,9 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "The characters must come either from the set
-// (`x`, `y`, `z`, `w`) or (`r`, `g`, `b`, `a`), corresponding to
-// element indics of (0, 1, 2, 3)." Verify rgba == xyzw.
+// Verifies that `.r`/`.g`/`.b`/`.a` swizzle characters map to vector elements
+// 0/1/2/3 exactly like `.x`/`.y`/`.z`/`.w`. An `int4` initialized with distinct
+// values is compared component-by-component; CHECK asserts all four pairs match
+// and the equality flag is 1, ruling out any index permutation.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

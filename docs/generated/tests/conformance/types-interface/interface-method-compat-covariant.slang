@@ -9,13 +9,11 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "A member function implementation is compatible with an
-// interface member function when: the implementation function can be called
-// with the parameter types of the interface; AND the implementation function
-// return type can be converted to the interface function return type."
-// This is the "covariant return / contravariant parameter" compatibility rule.
-// Verifies with the doc's own Remark 1 example: interface requires
-// int32_t someFunc(int8_t, int16_t) and the impl uses int16_t someFunc(int, int32_t).
+// Verifies the method compatibility rule: an implementation is accepted when its
+// parameters are wider than the requirement's (so callers can pass narrower values)
+// and its return type is narrower than the requirement's (so it converts up).
+// Test mirrors the Remark 1 example: interface requires int32_t someFunc(int8_t, int16_t),
+// impl uses int16_t someFunc(int, int32_t); CHECK asserts result=7.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

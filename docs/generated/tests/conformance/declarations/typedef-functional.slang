@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "Type aliases can also be declared with traditional C-style
-// syntax: `typedef int Height;`"
+// Verifies that the C-style `typedef` syntax introduces a type alias equivalent to the named type.
+// `Height` is a typedef for `int`; assigning 200 and reading it back as raw `int`
+// and checking for 200 proves the alias is transparent.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

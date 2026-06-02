@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A clause like `T : IFoo` is used to introduce a generic type
-// parameter `T` where the parameter is _constrained_ so that it must conform
-// to the `IFoo` interface."
+// Verifies that a `T : IHasScore` constraint allows the generic body to call interface methods.
+// `sumScores<T>` calls `getScore()` on both arguments; 50 confirms the method
+// dispatch worked, which is only possible if the constraint was satisfied.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

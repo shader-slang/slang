@@ -9,8 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A variable declared at global scope and marked with `static`
-// (but not with `const`) is a _static global variable_."
+// Verifies that a `static` (non-const) global emits as a `static` module-scope variable in HLSL.
+// `gCounter` is incremented inside the compute shader; CHECK lines assert both the `static`
+// keyword and the variable name appear in the emitted HLSL.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

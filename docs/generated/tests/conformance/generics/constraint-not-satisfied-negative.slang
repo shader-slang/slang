@@ -9,9 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: an operation on a generic type is legal only if it is legal
-// for all possible concrete types conforming to the constraints. Passing a type
-// that violates the constraint is rejected.
+// Verifies that passing a type that does not conform to the declared constraint is rejected.
+// `usesFoo<T : IFoo>` requires IFoo; passing `NotFoo` (no conformance) should trigger E39999,
+// confirming that constraint checking fires before specialization.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 

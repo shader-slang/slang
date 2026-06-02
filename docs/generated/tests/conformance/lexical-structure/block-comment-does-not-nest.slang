@@ -9,17 +9,11 @@
 //META: pipeline_stage=lex
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "Block comments do not nest." That means the
-// first `*/` terminates the surrounding block comment, regardless
-// of intervening `/*` tokens. If nesting WERE supported, the
-// program below would parse differently (the inner `*/` would
-// close the inner comment, and a stray `*/` would remain).
-//
-// We test by writing `/* /* */ int valid = 1;` — under no-nesting,
-// the first `*/` closes the comment, then `int valid = 1;` is a
-// real declaration. Under nesting, the `int valid = 1;` would still
-// be inside the comment and the parser would see only the trailing
-// `*/` as a stray token.
+// Verifies that block comments do not nest: the first `*/` ends the
+// comment regardless of any preceding `/*` inside it. The test places
+// `/* /* */ int valid = 42;` in the body — if nesting were supported,
+// the declaration would still be inside the comment and `valid` would
+// be undefined. CHECK observing `valid=42` proves non-nesting.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

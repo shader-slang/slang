@@ -9,9 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc example: `a = b = c + d + e` groups as `a = (b = ((c+d)+e))`.
-// This verifies: `+` (level 4) > `=` (level 14), and `=` is right-associative.
-// Test: with c=1, d=2, e=3, result is a=(b=((1+2)+3))=a=(b=6); both a,b = 6.
+// Verifies that `+` (level 4) binds tighter than `=` (level 14) and that `=`
+// is right-associative. `a = b = c + d + e` groups as `a = (b = ((c+d)+e))`.
+// With c=1, d=2, e=3 the arithmetic completes first yielding 6, then both
+// assignments propagate right-to-left, so CHECK asserts a=6 and b=6.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

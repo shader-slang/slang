@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "`let` introduces an immutable variable".
-// We verify that the declared value is readable with the expected value.
+// Verifies that a `let` variable is readable and holds its initialized value.
+// Both `let x = 7` (inferred type) and `let y : int = 42` (explicit type) are printed;
+// CHECK lines assert the correct values, confirming both forms bind and retain their values.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

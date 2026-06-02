@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: when generic parameters are bound, a generic type or function is specialized.
-// A specialized generic is a concrete type or function, which can be used like any other
-// concrete type or function.
+// Verifies that the same generic struct specializes independently for each concrete type argument.
+// `Pair<int>` and `Pair<float>` are each instantiated and swapped via a generic `swap<T>`;
+// CHECK asserts the correct swapped values for both, proving distinct concrete types are produced.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

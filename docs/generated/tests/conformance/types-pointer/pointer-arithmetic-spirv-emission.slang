@@ -9,9 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states integer add/subtract on a pointer-to-array-element
-// yields an offset pointer.  Verify the SPIR-V backend emits
-// OpPtrAccessChain for this pattern when the offset is a runtime value.
+// Verifies that pointer arithmetic with a runtime offset emits `OpPtrAccessChain` in SPIR-V.
+// Reads the offset from a buffer (preventing constant folding), advances a local-array
+// pointer by it, and writes through the result; CHECK finds `OpPtrAccessChain` in the
+// SPIR-V assembly, confirming the backend lowers pointer add to the correct opcode.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute
 
 [numthreads(1,1,1)]

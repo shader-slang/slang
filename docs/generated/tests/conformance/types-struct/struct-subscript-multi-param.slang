@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A subscript declaration may have any number of parameters, including no parameters at all."
-// "Multiple __subscript declarations are allowed as long as the declarations have different signatures.
-// Overload resolution is the same as overload resolution with function invocations."
+// Verifies that multiple `__subscript` overloads with different parameter counts coexist and
+// that overload resolution dispatches each call correctly. m[] exercises the zero-parameter
+// overload and m[1] the one-parameter overload; CHECK confirms both read and write paths.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

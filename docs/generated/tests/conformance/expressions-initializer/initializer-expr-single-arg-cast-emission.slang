@@ -9,9 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// C3 emission: the doc states int(1.0f) and (int) 1.0f are equivalent.
-// Verify that HLSL emission uses int(...) cast form for both.
-// The function must be reachable to avoid DCE.
+// Verifies that a single-argument initializer expression `int(f)` and its
+// C-style cast equivalent `(int)f` both emit as `int(...)` in HLSL.
+// Two separate helper functions prevent DCE; both must appear in the emitted
+// HLSL with `int(` casts, confirming the initializer-expression form is equivalent.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry main
 

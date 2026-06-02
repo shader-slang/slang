@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Push constant" states: `[push_constant]` / `[vk_push_constant]`
-// annotated variables belong to the Push constant address space, visible to all threads.
-// On Vulkan, these correspond to push constants (small, frequently updated constants
-// passed directly through the command stream).
-// SPIRV: expected `PushConstant` storage class on the variable.
+// Verifies that a struct annotated with `[[vk::push_constant]]` belongs to the Push constant
+// address space. The shader reads two fields and writes their product to an output buffer so
+// the variable is not DCE'd; CHECK asserts the SPIRV declares `%pushConst` as
+// `OpVariable ... PushConstant`, confirming the attribute-to-storage-class mapping.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

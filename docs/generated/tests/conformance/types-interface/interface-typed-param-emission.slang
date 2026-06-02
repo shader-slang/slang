@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc (Non-Normative section) states "when a function with an
-// interface-typed parameter is invoked with a type known at compile time,
-// the function is specialized for the concrete type."
-// Pins that the emitted HLSL calls the concrete method directly.
+// Verifies that a compile-time-known concrete type causes the interface-typed
+// parameter function to be specialized rather than dynamically dispatched.
+// CHECK scans the HLSL output for `Doubler_process` and `callProcess`, proving
+// the concrete method name — not a virtual dispatch table — is emitted.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

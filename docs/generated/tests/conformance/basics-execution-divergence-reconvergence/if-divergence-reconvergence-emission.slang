@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: in an `if` statement, divergence occurs when some threads
-// take the `then` branch and others take the `else` branch; reconvergence
-// occurs when threads exit the `then` and `else` branches.
-// SPIRV encodes this as: OpSelectionMerge <merge-block> None,
-// followed by OpBranchConditional targeting the two arms.
+// Verifies that an `if`/`else` producing divergence emits SPIR-V structured control
+// flow for reconvergence. The shader branches on an odd/even condition; CHECK asserts
+// SPIR-V contains `OpSelectionMerge` (naming the reconvergence merge block) and
+// `OpBranchConditional` (encoding the two diverging arms).
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

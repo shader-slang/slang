@@ -9,9 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "if `[Flags]` is specified for the enumeration,
-// the provided value is the previous enumerator's value left-
-// shifted by 1, and the default value for the first enumerator is 1."
+// Verifies that `[Flags]` assigns auto-values as a power-of-two sequence
+// starting at 1. An enum with four unspecified enumerators is cast to int
+// and printed; CHECK on `1 2 4 8` proves each auto-value is the previous
+// one left-shifted by 1.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

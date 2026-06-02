@@ -9,9 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "The interface member functions may be static or non-static."
-// Verifies that a static method requirement in an interface is satisfied
-// by a matching static method on the conforming struct.
+// Verifies that a static method requirement in an interface is satisfied by
+// a matching static method on the conforming struct. WidgetFactory.create()
+// returns 99; CHECK asserts this value, confirming the static conformance path
+// compiles and dispatches correctly.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

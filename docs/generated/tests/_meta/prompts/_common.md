@@ -371,8 +371,45 @@ Optional keys:
 //META: requires-tool=<comma-separated list>
 ```
 
-After the `//META` block, add 1–3 short comment lines in plain English
-describing the test in human terms. Then the test directive(s).
+After the `//META` block, add a short comment (1–4 lines) that says
+**what claim the test verifies and how it verifies it** — in your own
+words. Then the test directive(s).
+
+**Do not quote or paraphrase-as-quote the doc.** Comments like
+`// The doc says: "..."` / `// The doc states: ...` / `// The spec
+says ...` are an anti-pattern: the doc anchor already lives in
+`//META: doc_ref` and the claim is already paraphrased in
+`//META: purpose`. The body comment must add what those don't — the
+test's reasoning: the claim under test, plus the mechanism (what the
+test computes/emits and what the `CHECK` asserts, and why that
+observation proves the claim).
+
+Shape (adapt the wording; don't follow it mechanically):
+
+```slang
+// Verifies <the claim, in plain words>.
+// <How: what the test does and what CHECK asserts; why that proves it.>
+```
+
+Before (anti-pattern — verbatim doc quote):
+
+```slang
+// The doc states: if T has a conformance constraint T : U, type T is
+// considered to conform to U, meaning T implements all requirements of U.
+```
+
+After (claim + mechanism):
+
+```slang
+// Verifies a `T : IStringable` constraint lets the generic body call the
+// interface's methods on T. Two distinct conformers are passed through
+// getCode<T>(); CHECK asserts each returns its own code(), which is only
+// reachable if the constraint admits the interface method.
+```
+
+Inline comments next to a specific `// CHECK` line (explaining one
+assertion) are fine and should be kept — this rule is about the
+descriptive block, not about banning all commentary.
 
 `doc_section_digest` is the SHA-256 of the text of the cited doc
 section, computed as the body lines from the heading whose id is the

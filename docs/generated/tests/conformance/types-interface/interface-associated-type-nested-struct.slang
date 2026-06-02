@@ -9,9 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "An associated named type may be provided by:
-// Declaring a nested structure with the same name."
-// Verifies that a nested struct satisfies an associatedtype requirement.
+// Verifies that an associatedtype requirement is satisfied by a nested struct
+// with the same name. The test declares ContainerWithNested : IHasNestedType,
+// whose inner Item struct stands in for the associated type; CHECK confirms
+// the struct fields are set and returned correctly.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

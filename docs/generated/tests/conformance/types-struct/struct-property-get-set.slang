@@ -9,10 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "reading a property is directed to the `get` accessor of the property and
-// writes are directed to the `set` accessor."
-// "In case the parameter is not specified in the declaration, parameter `newValue` with the same
-// type as the property is provided to the `set` body."
+// Verifies that property reads dispatch to `get` and writes dispatch to `set` with `newValue`.
+// The set body updates both m_val and m_valIsPositive; CHECK confirms the side effects and
+// the get-returned value are consistent across positive and negative assignments.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

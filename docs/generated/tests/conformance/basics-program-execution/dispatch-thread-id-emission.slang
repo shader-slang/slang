@@ -9,12 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states that for a compute dispatch the entry point invocation
-// receives thread coordinates that identify the invocation within the
-// 3D grid (grid point g and thread-group point b).
-// We verify this by checking that the compiler emits a compute entry
-// point that accepts SV_DispatchThreadID (= global thread position)
-// and SV_GroupID (= grid point g) in HLSL and SPIR-V.
+// Verifies that a compute entry point emits all three thread-coordinate semantics.
+// The shader declares SV_DispatchThreadID, SV_GroupID, and SV_GroupThreadID parameters;
+// CHECK confirms HLSL emits those semantic names and SPIR-V uses GlobalInvocationId,
+// WorkgroupId, and LocalInvocationId, proving the coordinate bindings survive lowering.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPIRV):-target spirv-asm -entry main -stage compute

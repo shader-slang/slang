@@ -9,9 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "a `cbuffer Name { F field; }` is equivalent to a declaration
-// of… `struct AnonType { F field; } __transparent ConstantBuffer<AnonType> anonVar;`"
-// The emitted HLSL must contain a cbuffer block with the fields accessible.
+// Verifies that a `cbuffer` block emits as a named HLSL cbuffer with its fields accessible.
+// The compute shader reads `count` from `MyParams`; CHECK asserts the emitted HLSL contains
+// the cbuffer keyword, the block name, and the field name.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

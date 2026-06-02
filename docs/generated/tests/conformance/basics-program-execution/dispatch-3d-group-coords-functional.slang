@@ -9,15 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: for a compute dispatch, grid points g satisfy
-// 0 <= g.x < grid_dim.x, 0 <= g.y < grid_dim.y, 0 <= g.z < grid_dim.z;
-// and within the thread group, thread positions b satisfy
-// 0 <= b.x < group_dim.x, 0 <= b.y < group_dim.y, 0 <= b.z < group_dim.z.
-//
-// With numthreads(2,3,1) and dispatch 1x1x1:
-//   SV_GroupID is always (0,0,0) (only one group).
-//   SV_GroupThreadID.x in {0,1}, .y in {0,1,2}, .z = 0.
-// We store 1 if each axis is in range, 0 otherwise, and check the output.
+// Verifies that SV_GroupID and SV_GroupThreadID stay within their documented 3D bounds.
+// A numthreads(2,3,1) kernel dispatched 1x1x1 writes 1 per thread if its GroupID is
+// (0,0,0) and its GroupThreadID fits within [0,2)x[0,3)x{0}; CHECK-buffer asserts
+// all six output slots are 1, proving no thread escapes the declared extents.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 

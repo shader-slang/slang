@@ -9,10 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "When a pointer points to an array element, an integer
-// value may be added to or subtracted from it. The resulting pointer
-// points to an element offset by that value."
-// Verify that p + 2 advances by 2 elements.
+// Verifies that adding an integer to a pointer-to-array-element advances by that many elements.
+// Sets up a 5-element array, points to index 0, adds 2, then dereferences;
+// CHECK asserts the value at the new position, proving the offset is element-wise.
 //TEST:INTERPRET(filecheck=CHECK):
 
 void main()

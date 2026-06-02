@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "Parameters may be given a _default value_ by including an
-// initial-value-expression clause."
+// Verifies that a parameter with a default value uses that default when the caller omits it.
+// `add(5)` must produce 6 (5 + default 1.0) and `add(5, 2.0)` must produce 7;
+// both CHECK lines confirm the correct dispatch for omitted vs. supplied arguments.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

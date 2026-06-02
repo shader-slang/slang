@@ -9,9 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "The no-body declaration specifies an existence of a structure type.
-// The declaration simply specifies that a structure type with the specified name exists.
-// This enables its use in type expressions without the member declarations."
+// Verifies that a no-body (forward) struct declaration followed by a full definition compiles.
+// ForwardDeclared is declared without a body then defined with `int x`; CHECK confirms both
+// the type name and field appear in HLSL output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

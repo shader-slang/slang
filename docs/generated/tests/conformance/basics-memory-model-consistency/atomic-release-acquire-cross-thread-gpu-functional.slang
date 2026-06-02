@@ -9,13 +9,11 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "If thread A performs an atomic store-release X to memory location M,
-// and thread B performs an atomic load-acquire from M and observes the modification X,
-// then thread B will also observe all side effects by thread A prior to modification X."
-// Thread 0 writes payload[0]=42 then stores 1 with Release to flag.
-// Thread 1 spins until flag load-acquire returns 1, then reads payload[0] expecting 42.
-// This verifies the release-acquire synchronization promise.
-// GPU-only (requires actual concurrent GPU threads); CI nightly validates.
+// Verifies the release-acquire cross-thread synchronization guarantee: thread A writes
+// a payload value then performs a store-release on a flag; thread B spin-waits with
+// load-acquire on the flag and, once it observes the flag set, reads the payload.
+// CHECK asserts the payload value is 42 — observable only if the memory ordering
+// guarantee propagated thread A's write to thread B. GPU-only; CI nightly validates.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -output-using-type
 

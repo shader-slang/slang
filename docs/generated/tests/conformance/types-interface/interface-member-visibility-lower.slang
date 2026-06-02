@@ -9,10 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "When a structure implements an interface member
-// requirement, the visibility of the member may not be higher than
-// the requirement. However, it can be lower."
-// Verifies that lower visibility compiles without error.
+// Verifies that implementing an interface member with lower visibility than
+// the requirement is accepted. LowerVisImpl marks getValue() as `internal`
+// (lower than the default public requirement); CHECK confirms the file
+// compiles and emits a valid entry point.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

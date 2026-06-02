@@ -9,10 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: it is undefined behavior to pass the same variable as an
-// argument to two parameters of a function if at least one parameter is
-// out/inout. The compiler diagnoses this case with W30051.
-// Example taken verbatim from the doc (Example 1).
+// Verifies that passing the same variable to two `inout` parameters of one call
+// triggers diagnostic W30051. The call site passes `a` as both the first and third
+// argument to a function with three `inout` parameters; CHECK asserts the
+// caret-anchored W30051 alias warning fires on that argument position.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry computeMain -stage compute
 

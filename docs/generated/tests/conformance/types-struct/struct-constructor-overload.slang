@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "More than one constructors may be defined in which case overload resolution is
-// performed to select the most appropriate constructor given the initialization parameters."
-// TestClass has __init(), __init(int), and __init(int,int); each should be selected by overload resolution.
+// Verifies that constructor overload resolution picks the matching `__init` by argument count.
+// Three instantiations use zero, one, and two-argument initializer lists; CHECK confirms each
+// object's fields reflect the values assigned by the selected overload.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

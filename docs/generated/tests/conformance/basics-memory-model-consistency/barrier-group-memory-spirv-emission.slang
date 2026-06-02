@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "Thread group — applies to thread group memory accesses."
-// GroupMemoryBarrier() covers only groupshared memory.
-// SPIRV: OpMemoryBarrier Workgroup scope (2), semantics 264
-// (= SeqCst(8) | WorkgroupMemory(256)). UniformMemory and ImageMemory absent.
+// Verifies that `GroupMemoryBarrier()` emits `OpMemoryBarrier` with Workgroup scope (2)
+// and semantics 264 (SeqCst | WorkgroupMemory), covering only groupshared memory.
+// CHECK-SAME chains pin %uint_2 (Workgroup scope) and %uint_264; the absence of
+// UniformMemory and ImageMemory bits distinguishes this from device-memory barriers.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute

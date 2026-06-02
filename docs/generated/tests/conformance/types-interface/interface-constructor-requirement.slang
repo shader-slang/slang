@@ -9,10 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states interface members include "constructor declarations" and
-// the example shows "__init(float f)" as a constructor requirement.
-// Verifies that a constructor declared in an interface is satisfied by
-// a matching __init on the conforming struct.
+// Verifies that a constructor requirement (`__init(int v)`) declared in an
+// interface is satisfied by a matching `__init` on the conforming struct.
+// InitStruct doubles the supplied value; CHECK asserts getValue() returns 10,
+// confirming the constructor ran through the interface contract.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

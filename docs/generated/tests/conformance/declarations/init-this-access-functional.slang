@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "An initializer has access to an implicit `this` variable that
-// is the instance being initialized… The `this` variable of an initializer is
-// always mutable."
+// Verifies that an `__init` body can write fields via the implicit mutable `this`.
+// `Point(7, 13)` assigns through `this.x` and `this.y`; CHECK lines assert 7 and 13,
+// confirming that `this` was writable and the assignments persisted to the caller.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

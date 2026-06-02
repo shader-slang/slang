@@ -4,14 +4,14 @@
 //META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
 //META: doc_ref=docs/language-reference/types-struct.md#description
 //META: doc_section_digest=0b091f4f0ba7cb2a07817dc55025aaaaadee5292438bfc88fba1ab02ee5d3878
-//META: purpose=Members declared with `public` visibility are accessible from outside the struct; the doc says default member visibility is `internal`.
+//META: purpose=Members declared with `public` visibility are accessible from outside the struct; default member visibility is `internal`.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "struct members may be declared with access control specifiers `public`, `internal`,
-// or `private`. The default member visibility is `internal`."
-// A public field is accessible from outside the struct; verifying it emits to HLSL.
+// Verifies that `public` members are accessible from outside the struct and appear in emitted HLSL.
+// Both the explicit `public` field and the default-visibility field are written and summed in the
+// entry point; CHECK confirms both field names survive to HLSL output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

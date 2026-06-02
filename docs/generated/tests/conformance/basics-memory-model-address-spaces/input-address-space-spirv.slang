@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Input" states: entry point input parameters (non-uniform)
-// are in the Input address space, instance scope = thread.
-// "Entry point inputs to a graphics shader stage come from the system and the previous stage."
-// SPIRV: SV_DispatchThreadID maps to gl_GlobalInvocationID built-in with `Input` storage class.
+// Verifies that entry-point input parameters in the non-uniform (per-thread) Input address
+// space map to SPIRV `Input` storage class. `SV_DispatchThreadID` is a system-supplied
+// per-thread value; CHECK asserts the SPIRV emits an `OpVariable ... Input` with a
+// `BuiltIn GlobalInvocationId` decoration, confirming the Input address-space mapping.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

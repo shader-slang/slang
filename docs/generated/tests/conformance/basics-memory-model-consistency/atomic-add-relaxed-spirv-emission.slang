@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "The relaxed memory ordering with atomic memory access does
-// not provide any ordering relationship with other memory accesses." The Slang
-// standard library provides relaxed atomic operations via global-decl atomics
-// (InterlockedAdd, etc.). In SPIRV, these emit as OpAtomicIAdd with memory
-// semantics operand 0 (None = relaxed).
+// Verifies that `InterlockedAdd` (a relaxed global-decl atomic) emits `OpAtomicIAdd`
+// with memory semantics operand 0 (None) in SPIRV, confirming atomicity with no
+// ordering constraint beyond the atomic operation itself. CHECK pins %uint_0 on
+// OpAtomicIAdd; the HLSL CHECK confirms the intrinsic name is preserved.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute

@@ -9,10 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "The parentheses and the parameter in the set accessor declaration are optional.
-// In case the parameter is not specified in the declaration, parameter `newValue` with the same
-// type as the property is provided to the set body."
-// This test uses an explicit parameter name in the set accessor.
+// Verifies that a `set` accessor with an explicitly named parameter compiles and functions correctly.
+// ExplicitSet.someProp uses `set(float newVal)`; assigning 5.0 then reading back via `get` lets
+// CHECK confirm the named parameter received and stored the value.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

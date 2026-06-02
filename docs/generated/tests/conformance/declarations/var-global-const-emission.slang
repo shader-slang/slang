@@ -9,9 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A variable declared at global scope and marked with `static`
-// and `const` is a _global constant_."  The value must be a compile-time
-// constant expression, and the compiler folds it when emitting.
+// Verifies that a `static const` global folds its value into the emitted HLSL output.
+// `LIMIT` is declared as 256 at global scope; 256 in the HLSL confirms the
+// constant was folded at compile time and the value appears in the output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

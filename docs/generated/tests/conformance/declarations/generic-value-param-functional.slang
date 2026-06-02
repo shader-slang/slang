@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A clause like `let N : int` is used to introduce a generic
-// value parameter `N`, which takes on values of type `int`."
+// Verifies that a `let N : int` generic value parameter is usable as a compile-time array size and loop bound.
+// `sumArray<3>` sums a 3-element array using N in the loop; 6 confirms the
+// value parameter resolved correctly to size the iteration.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -9,14 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "Memory accesses before and after a barrier cannot be reordered
-// across the barrier, matching the acquire-release memory order for the barrier.
-// That is, memory accesses before the barrier happen before memory accesses after
-// the barrier."
-// In SPIRV, this is encoded via SequentiallyConsistent memory semantics (bit 8)
-// on OpMemoryBarrier, which subsumes acquire-release.
-// Both the store before and the load after the barrier must appear on the correct
-// side of OpMemoryBarrier in the SPIRV instruction stream.
+// Verifies that `AllMemoryBarrier()` emits `OpMemoryBarrier` with semantics operand 2376
+// (SequentiallyConsistent | UniformMemory | WorkgroupMemory | ImageMemory), encoding the
+// acquire-release ordering guarantee at SPIRV level. CHECK-SAME pins %uint_2376, confirming
+// the SeqCst bit is present — which subsumes acquire-release for all memory spaces.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

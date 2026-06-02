@@ -9,9 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "If a [mutating] instance is being called, the argument for the implicit
-// `this` parameter must be an l-value." A named variable is an l-value, so the call
-// must be accepted and the field update must be visible after the call returns.
+// Verifies that calling a `[mutating]` method on a named variable (l-value) succeeds
+// and that the mutation is visible on the original instance after the call returns.
+// `c.increment()` writes through the implicit `this` l-value; CHECK asserts c.value
+// is 11, which is only reachable if the mutation propagated back to the caller.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

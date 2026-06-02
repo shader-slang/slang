@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "If a generic function/type/etc. is used where a non-generic
-// function/type/etc. is expected, the compiler attempts _implicit specialization_.
-// Implicit specialization infers generic arguments from the context at the use site."
+// Verifies that generic arguments are inferred from call-site argument types without explicit `<>`.
+// Calling `myIdentityGeneric(77)` with no angle brackets must bind T=int;
+// the printed 77 (asserted below) proves implicit specialization fired.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

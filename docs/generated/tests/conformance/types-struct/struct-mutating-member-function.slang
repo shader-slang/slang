@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "If write access is required, the member function must be declared with the `[mutating]` attribute."
-// incrementAndReturnA() uses [mutating] and increments a; the new value is returned and observed.
+// Verifies that `[mutating]` grants write access to non-static fields inside a member function.
+// incrementAndReturnA() adds 1 to `a` and returns the result; CHECK asserts both the return value
+// and the field itself reflect the mutation, confirming the write persisted.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

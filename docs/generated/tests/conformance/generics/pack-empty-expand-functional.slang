@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: when a generic construct is specialized, a (possibly empty) sequence
-// of type arguments is bound to the parameter pack. This tests the empty case (0 args).
+// Verifies that a type parameter pack accepts zero arguments (the empty boundary case).
+// `sumInts()` is called with no arguments; CHECK asserts the output is 0, proving the
+// pack-expand loop body is simply skipped when the pack is empty.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 

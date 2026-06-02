@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "Traditional variable declarations are immutable if they are
-// declared with the `const` modifier, and are otherwise mutable."
+// Verifies that traditional-syntax `const` gives an immutable binding while a plain declaration is mutable.
+// `const int MAX = 100` holds its value; `float y` is reassigned to 3.14; CHECK lines
+// assert 100 and 3.14, confirming immutability for const and mutability for plain vars.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

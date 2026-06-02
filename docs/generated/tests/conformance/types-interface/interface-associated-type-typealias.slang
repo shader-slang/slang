@@ -9,9 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "An associated named type may be provided by:
-// Defining a type alias for the name with typealias or typedef declarations."
-// Verifies that typealias satisfies an associatedtype requirement.
+// Verifies that a `typealias` declaration satisfies an associatedtype requirement.
+// IntContainer aliases ElementType = int; CHECK confirms getDefault() returns 0,
+// which is only reachable if the compiler accepted the alias as the conformance witness.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

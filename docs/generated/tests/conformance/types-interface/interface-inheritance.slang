@@ -9,10 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "An interface may also inherit from another interface.
-// The inherited members add to the inheriting interface."
-// Verifies that a struct conforming to a child interface satisfies
-// both child and inherited parent requirements.
+// Verifies that conforming to a child interface requires satisfying all
+// inherited parent requirements as well. Impl conforms to IDerived : IBase
+// and must supply getA() (from IBase) and getB() (from IDerived); CHECK
+// asserts both accessors return correct values.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

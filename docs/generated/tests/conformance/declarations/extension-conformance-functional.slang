@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "When an extension declaration lists an interface in its
-// inheritance clause, it asserts that the extension introduces a new
-// conformance."
+// Verifies that an extension with an inheritance clause adds a new interface conformance.
+// `MyVec` gains `IPrintable` through an extension; passing it to the generic `print<T : IPrintable>`
+// and checking the output "(1, 2)" proves the conformance is resolved at the call site.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

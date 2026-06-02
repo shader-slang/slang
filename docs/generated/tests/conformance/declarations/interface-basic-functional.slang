@@ -9,11 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "The body of an interface declaration may contain function,
-// initializer, subscript, and associated type declarations. Each declaration
-// in the body of an interface introduces a _requirement_ of the interface.
-// Types that declare conformance to the interface must provide matching
-// implementations of the requirements."
+// Verifies that a struct conforming to an interface must implement all interface requirements.
+// `ConstRNG : IRandom` provides `next()`; calling it and checking 42 proves the
+// conformance was accepted and the implementation dispatched.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: when wave-tangled functions are supported on divergent paths,
-// they apply only between the mutually convergent thread set. In GLSL emission,
-// WaveActiveMin -> subgroupMin and WaveActiveMax -> subgroupMax; they appear
-// inside the respective if arms and require the subgroup_arithmetic extension.
+// Verifies that wave ops inside a divergent `if` lower to GLSL subgroup intrinsics
+// scoped to their respective arms. Each arm holds mutually-convergent threads only;
+// CHECK asserts the `GL_KHR_shader_subgroup_arithmetic` extension is enabled and
+// that `subgroupMin` and `subgroupMax` appear in the emitted GLSL.
 
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry computeMain -stage compute
 

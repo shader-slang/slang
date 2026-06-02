@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Storage buffer" states: `StructuredBuffer<T>` and
-// `RWStructuredBuffer<T>` are in the Storage buffer address space, shared between
-// the host and Slang programs.
-// HLSL register mapping: StructuredBuffer<T> -> t register (SRV);
-//                        RWStructuredBuffer<T> -> u register (UAV).
+// Verifies the HLSL register-binding distinction between read-only and read-write Storage
+// buffer variants. `StructuredBuffer<T>` (read-only) and `RWStructuredBuffer<T>` (read-write)
+// both occupy the Storage buffer address space; CHECK asserts the emitted HLSL binds the
+// read-only form to a `t` register (SRV) and the read-write form to a `u` register (UAV).
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

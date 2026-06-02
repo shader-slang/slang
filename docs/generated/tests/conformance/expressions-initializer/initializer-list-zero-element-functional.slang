@@ -4,13 +4,15 @@
 //META: source_commit=273e29cb6cac600f70da7245a506bae6689e0e23
 //META: doc_ref=docs/language-reference/expressions-initializer.md#initializer-list-expression
 //META: doc_section_digest=68be737ab4b8adb6374f77514e63e2dd70ca264c5b4d8f7ff4cffa68f75e41dc
-//META: purpose=A zero-element initializer list {} is a valid initializer list expression (the doc says "zero or more expressions").
+//META: purpose=A zero-element initializer list {} is a valid initializer list expression (zero or more expressions).
 //META: intent=boundary
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// C4 corner case: "zero or more expressions" — the lower boundary (zero elements).
-// An empty struct initialized with {} should compile and produce an instance.
+// Verifies the lower boundary of the initializer list element count: zero elements.
+// An empty struct initialized with `{}` must compile and produce a usable instance.
+// CHECK asserts "ok" is printed, confirming the zero-element initializer list was
+// accepted and execution reached past the declaration.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

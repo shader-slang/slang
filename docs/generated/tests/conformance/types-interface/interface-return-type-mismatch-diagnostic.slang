@@ -9,9 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "the implementation function return type can be
-// converted to the interface function return type." When it cannot,
-// E38106 fires.
+// Verifies that an implementation whose return type is not convertible to
+// the interface requirement's return type is rejected with E38106.
+// BadConvert returns float4 where float is required; CHECK pins the
+// caret-aligned "return type mismatch" message and E38106.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
 

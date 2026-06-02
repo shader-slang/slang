@@ -9,8 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc names both cbuffer and tbuffer as sources of implicit field lookup.
-// This test verifies the tbuffer case: bare 'multiplier' resolves to TParams.multiplier.
+// Verifies that a bare identifier inside a compute shader resolves to a field of
+// a global-scope `tbuffer` via implicit tbuffer lookup. The bare name `multiplier`
+// must resolve to `TParams.multiplier` without qualification. CHECK asserts the
+// emitted HLSL contains `tbuffer` and `multiplier`, confirming the lookup and emission.
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 
 tbuffer TParams

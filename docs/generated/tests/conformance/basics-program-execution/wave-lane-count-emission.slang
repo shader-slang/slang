@@ -9,12 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "In both graphics launches and compute dispatches, individual
-// invocations are grouped into waves. The wave size is a power-of-two in the
-// range [4, 128] and is defined by the target."
-//
-// WaveGetLaneCount() queries the wave (subgroup) size at runtime. We verify
-// that the intrinsic compiles and emits the correct target-specific representation.
+// Verifies that `WaveGetLaneCount()` compiles in a compute entry point and lowers
+// to the correct target intrinsic. CHECK asserts HLSL emits `WaveGetLaneCount` and
+// SPIR-V emits `SubgroupSize`, confirming the wave-size query is mapped to the
+// target-defined built-in rather than being folded away.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry computeMain -stage compute

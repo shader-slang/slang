@@ -9,8 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A `let` declaration introduces an immutable variable, which
-// may not be assigned to".  Assigning must be a compile error.
+// Verifies that assigning to a `let` variable is rejected as not an l-value.
+// `x = 10` after `let x = 5` must produce E30011; CHECK-DAG lines assert both
+// the error severity, the code, and the "l-value" message fragment.
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 

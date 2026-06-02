@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "When no user-provided constructor is defined, an aggregate initialization is performed.
-// An initializer list contains values for the struct non-static data members.
-// If the initializer list does not contain enough values, the remaining data members are default-initialized."
+// Verifies aggregate initialization fills fields in declaration order and default-initializes
+// fields omitted from the list. p1 uses a full three-element list; p2 uses a two-element list
+// leaving z unspecified. CHECK confirms the interpreter prints the assigned values.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

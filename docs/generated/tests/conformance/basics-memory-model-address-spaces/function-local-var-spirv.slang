@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Function" states: function parameters and non-static local
-// variable declarations are in the Function address space, instance scope = thread.
-// Visible only to the function invocation.
-// SPIRV: mutable locals that cannot be trivially SSA-folded emit as
-// OpVariable with `Function` storage class inside the function body.
+// Verifies that non-static local variables land in the Function address space.
+// A `Counter` struct local that gets written through `inout` cannot be SSA-folded away;
+// CHECK asserts the SPIRV output contains an OpVariable with `Function` storage class,
+// confirming the per-thread-invocation scope mapping.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

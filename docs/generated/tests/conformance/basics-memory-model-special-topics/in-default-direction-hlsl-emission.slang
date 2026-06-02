@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: `in` is the default direction.
-// In HLSL emission, a plain parameter (no direction) and a parameter
-// explicitly marked `in` both emit without `inout` or `out` keywords.
-// We verify both functions emit equivalent value-parameter signatures.
+// Verifies that a parameter with no direction modifier is treated identically to one
+// marked `in`. Both `readImplicit(int val)` and `readExplicit(in int val)` are compiled;
+// CHECK asserts both emit plain value parameters (no `inout` or `out` in the signature),
+// and CHECK-NOT confirms neither modifier appears in the HLSL output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

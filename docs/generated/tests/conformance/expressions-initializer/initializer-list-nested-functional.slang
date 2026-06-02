@@ -9,9 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// C4 combination: the doc says "zero or more expressions" — those expressions
-// may themselves be initializer lists (nested structs).
-// Verify that nested {} braces assign inner fields correctly.
+// Verifies that initializer list elements may themselves be initializer lists,
+// enabling nested struct initialization. `{ {1,2}, {3,4} }` must populate the
+// `first` and `second` fields of `Outer` in declaration order. CHECK asserts
+// all four inner field values match the positions in the nested literal.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

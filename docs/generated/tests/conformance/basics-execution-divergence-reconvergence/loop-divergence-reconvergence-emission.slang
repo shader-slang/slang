@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: in a loop, divergence occurs when some threads exit while
-// others continue; reconvergence occurs when all threads have exited the loop.
-// SPIRV encodes loop structure with OpLoopMerge, which identifies the merge
-// (reconvergence) block that all threads reach after exiting.
+// Verifies that a loop that runs different iteration counts per thread emits SPIR-V
+// structured loop control. Threads loop 2 or 3 times (divergence); CHECK asserts
+// `OpLoopMerge` is present, which names the block where all threads reconverge once
+// every thread has exited its last loop iteration.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

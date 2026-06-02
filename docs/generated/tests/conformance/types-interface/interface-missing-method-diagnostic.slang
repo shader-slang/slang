@@ -9,9 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "A concrete type inheriting from the interface must
-// provide compatible member function implementations with the same names."
-// Verifies that omitting a required method produces E38100.
+// Verifies that a struct declaring conformance but omitting a required method
+// produces E38100. Fails provides `something()` but not `mustProvide()`; CHECK
+// pins the caret-aligned "missing interface member" message and E38100.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
 

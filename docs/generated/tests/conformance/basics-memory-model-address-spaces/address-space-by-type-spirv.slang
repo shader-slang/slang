@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc opening states: "the address space for a variable is determined by its type,
-// modifiers, and attributes." This means different variables in the same shader can
-// simultaneously occupy different address spaces, each mapped to its SPIRV storage class.
-// This test exercises Uniform, StorageBuffer, Workgroup, and Input address spaces
-// together in a single shader, verifying each maps to a distinct storage class.
+// Verifies that type, modifiers, and attributes jointly determine address space, so a single
+// shader can hold variables in four distinct address spaces at once. A ConstantBuffer (Uniform),
+// RWStructuredBuffer (StorageBuffer), groupshared array (Workgroup), and dispatch-thread-ID
+// parameter (Input) all coexist; CHECK-DAG asserts each maps to its own SPIRV storage class.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

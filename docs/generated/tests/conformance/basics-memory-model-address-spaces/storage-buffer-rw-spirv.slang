@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Storage buffer" states: `StructuredBuffer<T>` (read-only) and
-// `RWStructuredBuffer<T>` (read-write) belong to the Storage buffer address space,
-// visible to all threads, shared between host and shader.
-// SPIRV: both variables must use `StorageBuffer` storage class; read-only buffer
-// additionally gets the `NonWritable` decoration.
+// Verifies that both `RWStructuredBuffer<T>` and `StructuredBuffer<T>` belong to the
+// Storage buffer address space and share the `StorageBuffer` SPIRV storage class.
+// CHECK-DAG asserts `%rwbuf` emits as `OpVariable ... StorageBuffer` and `%robuf` emits
+// similarly with a `NonWritable` decoration, distinguishing read-write from read-only.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

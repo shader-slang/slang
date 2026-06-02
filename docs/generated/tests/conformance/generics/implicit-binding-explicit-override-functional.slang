@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: mixing explicit and implicit parameter binding is allowed.
-// The leftmost generic parameters use the provided generic arguments and the rest are inferred.
+// Verifies that supplying the first generic argument explicitly while letting the rest be inferred works.
+// `castTo<int32_t>(src)` fixes `Ret` to `int32_t` and infers `T` as `int16_t` from the argument;
+// CHECK asserts the output value 500, proving both parameters resolved correctly.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 

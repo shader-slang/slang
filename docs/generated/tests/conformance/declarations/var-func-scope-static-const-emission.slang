@@ -9,10 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A variable declared at function scope and marked with both
-// `static` and `const` is a _function-scope constant_.  Semantically, a
-// function-scope constant behaves like a global constant except that its name
-// is only visible in the local scope."
+// Verifies that a function-scope `static const` is folded to a compile-time constant in emitted HLSL.
+// `LOCAL_K * 2.0` is computed from the constant 2.71828; 5.43656 in the emitted
+// HLSL confirms the value was folded at compile time.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

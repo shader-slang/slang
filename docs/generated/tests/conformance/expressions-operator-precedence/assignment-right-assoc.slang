@@ -9,9 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc example shows `a = b = c` => `a = (b = c)` (right associativity).
-// Right-assoc: `a = b = 5` = `a = (b=5)`. Both a and b end up as 5.
-// Compound assignments `+=`, `-=`, etc. are also at level 14 (right-assoc).
+// Verifies that `=` at precedence level 14 is right-associative.
+// `a = b = 5` must group as `a = (b = 5)`, leaving both variables equal to 5.
+// A left-associative reading `(a = b) = 5` would also produce a=5, b=0, which
+// CHECK-DAG rules out by asserting both a=5 and b=5.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

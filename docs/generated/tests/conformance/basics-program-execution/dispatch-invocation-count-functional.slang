@@ -9,11 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states total invocations per dispatch = grid_dim.x * grid_dim.y * grid_dim.z
-// * group_dim.x * group_dim.y * group_dim.z.
-// With numthreads(4,1,1) and a 1x1x1 grid, there are 4 total threads.
-// Each thread writes its flat dispatch thread ID (x component) to its output slot.
-// We verify thread IDs 0, 1, 2, 3 are assigned: tid.x is in [0, group_dim.x).
+// Verifies that a 1x1x1 dispatch of numthreads(4,1,1) produces exactly 4 invocations,
+// each receiving a unique SV_DispatchThreadID.x in [0, 4).
+// Each thread writes tid.x to its output slot; CHECK-buffer asserts values 0–3 appear,
+// confirming total invocation count and unique ID assignment.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 

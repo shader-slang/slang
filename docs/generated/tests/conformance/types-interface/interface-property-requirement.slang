@@ -9,10 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states that properties may be declared in interfaces with
-// "get; set;" without implementation bodies, and the conforming type
-// provides implementations. Also covers the alternative: a property
-// may be implemented by a matching-name variable.
+// Verifies that a property requirement declared with bodyless `get; set;`
+// in an interface is satisfied by a conforming struct supplying accessor
+// implementations. PropWithAccessors stores the value via `_val`; CHECK
+// asserts the round-trip set/get returns 55.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

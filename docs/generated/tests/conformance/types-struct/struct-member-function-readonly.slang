@@ -9,8 +9,8 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "By default, only a read access to the object members is allowed by a member function."
-// getA() reads this.a and returns it; the test verifies the read happens correctly.
+// Verifies that a non-static member function can read `this` fields without `[mutating]`.
+// getA() returns this.a; CHECK confirms the returned value matches the assigned field.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

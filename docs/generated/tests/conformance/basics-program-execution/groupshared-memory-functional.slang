@@ -9,13 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "All threads within a thread group execute on the same set
-// of execution resources. This allows a thread group to share local memory
-// allocated with the `groupshared` attribute."
-//
-// We verify that a variable declared with groupshared in a compute entry point
-// is emitted as a groupshared variable in HLSL and as a Workgroup storage
-// class variable in SPIR-V.
+// Verifies that `groupshared` variables are shared among all threads in a group.
+// Thread 0 writes to a groupshared array, all threads barrier and read back; CHECK
+// asserts HLSL emits the `groupshared` keyword and SPIR-V emits `Workgroup` storage
+// class, confirming the intra-group shared-memory mechanism is correctly lowered.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry computeMain -stage compute

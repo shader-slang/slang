@@ -9,10 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "For non-static member functions, `this` is the
-// value of the enumeration object." Verify by writing a member fn
-// that returns `int(this) * 2` and calling it on different
-// enumerators.
+// Verifies that inside a non-static method added via an enum extension,
+// `this` holds the enumerator's integer value. `times2()` returns
+// `int(this) * 2`; calling it on V1 and V3 produces 2 and 6, which
+// CHECK asserts — only possible if `this` resolved to the correct value.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

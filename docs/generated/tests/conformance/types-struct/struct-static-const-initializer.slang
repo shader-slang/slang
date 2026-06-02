@@ -9,9 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "`static const` data members must have a default initializer."
-// A static const int with value 6 should be accessible via type name and
-// produce the constant in emitted code.
+// Verifies that `static const` members require a default initializer and fold to a literal
+// when accessed via the type name. TestStruct.c = 6 is accessed in the entry point;
+// CHECK confirms the emitted HLSL contains the folded literal int(6).
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

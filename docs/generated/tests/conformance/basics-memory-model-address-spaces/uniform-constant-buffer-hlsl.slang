@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Uniform" states: Slang construct `ConstantBuffer<T>` is in
-// the Uniform address space, visible to all threads, constant over a dispatch.
-// On HLSL, ConstantBuffer<T> maps to a `cbuffer` with a `b` register binding,
-// reflecting the Uniform (read-only, all-threads) semantics.
+// Verifies that `ConstantBuffer<T>` belongs to the Uniform address space on HLSL.
+// The shader reads two fields from the buffer; CHECK asserts the emitted HLSL declares a
+// `cbuffer` bound to a `b` register, confirming the all-threads, constant-over-dispatch
+// semantics produce the expected HLSL register class.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

@@ -9,8 +9,8 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A nested type is a regular type enclosed within the scope of the outer struct."
-// TestStruct.NestedStruct is accessed via "TestStruct.NestedStruct" using the dot operator.
+// Verifies that a type nested inside a struct is accessed by chaining the outer struct name
+// with the dot operator. obj2 is declared as TestStruct.NestedStruct; CHECK confirms d=55.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

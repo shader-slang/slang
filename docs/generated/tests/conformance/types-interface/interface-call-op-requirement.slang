@@ -9,9 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists "function-call-op-decl" as an allowed interface member,
-// and the example shows "float operator () (uint x, uint y);"
-// Verifies that a call-operator requirement is satisfied by the struct.
+// Verifies that a call-operator (`operator()`) declared in an interface is
+// satisfied by a matching implementation on the conforming struct. Multiplier
+// implements `operator()(int x)` and is invoked as `m(5)`; CHECK asserts the
+// result 15, proving the operator routes through the conformance correctly.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

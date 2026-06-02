@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "`in out` or `inout` indicates pass-by-value-result (copy-in
-// and copy-out) semantics."
+// Verifies copy-in-copy-out semantics for `inout` parameters.
+// `accumulate` is called twice on `total`; the caller's variable must reflect each
+// accumulated increment, and 8 confirms the final value was written back.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

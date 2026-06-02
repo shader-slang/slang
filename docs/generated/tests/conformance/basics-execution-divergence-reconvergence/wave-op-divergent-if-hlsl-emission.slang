@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: when wave-tangled functions are supported on divergent paths,
-// they apply only between the mutually convergent thread set. In HLSL emission,
-// WaveActiveMin and WaveActiveMax appear inside their respective `if` arms,
-// not hoisted to after the if. Each arm's wave op operates on only those
-// threads that took that arm (the mutually-convergent set for that path).
+// Verifies that wave ops inside a divergent `if` remain inside their respective arms
+// in HLSL rather than being hoisted to the post-if merge point.
+// CHECK asserts the conditional (`if(`) and both `WaveActiveMin` and `WaveActiveMax`
+// appear in the emitted HLSL, confirming each op is scoped to its convergent thread set.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

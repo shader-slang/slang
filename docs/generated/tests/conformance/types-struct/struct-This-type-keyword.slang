@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "Within the body of a structure or interface declaration, the keyword `This` may
-// be used to refer to the enclosing type. Inside of a structure type declaration, `This` refers
-// to the structure type itself."
+// Verifies that `This` inside a struct body resolves to the enclosing struct type.
+// withValue() declares its return type and local variable as `This`; the interpreter
+// executes the call and CHECK confirms the returned instance carries the expected value.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

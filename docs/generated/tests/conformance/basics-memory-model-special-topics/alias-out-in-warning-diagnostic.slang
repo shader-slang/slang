@@ -4,15 +4,15 @@
 //META: source_commit=57fb63455095efe1465661001ad147b24b968932
 //META: doc_ref=docs/language-reference/basics-memory-model-special-topics.md#function-parameters-with-inout-inout-modifiers
 //META: doc_section_digest=50b3040fe642ee135f57002e37f20cd9b949f33677eec525295c406b3b231822
-//META: purpose=Passing the same variable as both an `in` parameter and an `out` parameter is undefined behavior and elicits W30051; the doc says "at least one parameter is out/inout".
+//META: purpose=Passing the same variable as both an `in` parameter and an `out` parameter is undefined behavior and elicits W30051 when at least one parameter is `out`/`inout`.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: it is UB to pass the same variable to two parameters of a
-// function if at least one parameter is out/inout.
-// This test covers the case where one parameter is `in` and the other is `out`
-// (not inout+inout as in Example 1 of the doc). W30051 must still fire.
+// Verifies that passing the same variable to an `in` parameter and an `out` parameter
+// also triggers W30051, not only the inout+inout case.
+// The call passes `x` as both arguments to `combine(in int a, out int b)`; CHECK
+// asserts the alias warning fires with the caret pointing at the `out` argument.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry computeMain -stage compute
 

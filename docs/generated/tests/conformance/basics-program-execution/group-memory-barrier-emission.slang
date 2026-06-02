@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "Related barriers include `GroupMemoryBarrier()` and
-// `GroupMemoryBarrierWithGroupSync()`."
-// We verify these two barriers are available in a compute entry point
-// and emit recognizable patterns in HLSL (the literal function names)
-// and in SPIR-V (ControlBarrier or MemoryBarrier).
+// Verifies that `GroupMemoryBarrier` and `GroupMemoryBarrierWithGroupSync` are
+// available in a compute entry point and lower to the correct backend ops.
+// CHECK asserts the HLSL output contains both function names; CHECK-SPV asserts
+// SPIR-V emits OpControlBarrier, proving the barrier instructions survive emit.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry computeMain -stage compute

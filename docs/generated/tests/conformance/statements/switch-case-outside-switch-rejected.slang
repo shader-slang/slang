@@ -9,8 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that `case` outside a switch statement is rejected by the compiler with E39999.
-// The doc states: "It is an error for a case label ... to appear anywhere other than the body of a switch statement."
+// Verifies that a `case` label placed outside any switch body is rejected
+// with E39999. The test puts `case 1:` directly inside a function body;
+// CHECK asserts E39999 under the `case` token, proving the placement
+// restriction is enforced.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 void main()

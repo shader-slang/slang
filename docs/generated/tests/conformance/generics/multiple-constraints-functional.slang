@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states conformance constraints can be expressed inline (T : IFace) or
-// via `where` clauses. Multiple constraints are cumulative.
+// Verifies that an inline constraint and a `where` clause constraint on the same type parameter
+// are both enforced simultaneously. `sumAB<T : IHasA>(T x) where T : IHasB` calls both
+// `getA()` and `getB()`; CHECK asserts the sum 8, reachable only if both interfaces are satisfied.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

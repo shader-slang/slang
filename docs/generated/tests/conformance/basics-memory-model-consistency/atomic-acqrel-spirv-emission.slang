@@ -9,12 +9,11 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "Acquire-Release memory order — memory accesses cannot cross
-// an acquire-release operation."
-// Note: emitted semantics (72 = AcquireRelease|UniformMemory) violates SPIRV spec
-// (VUID-10868: AtomicLoad must not use AcquireRelease). Finding filed:
-// docs/generated/tests/_meta/findings/atomic-load-acqrel-invalid-spirv-semantics.yaml
-// Test uses -skip-spirv-validation to observe actual compiler output despite SPIRV invalidity.
+// Verifies that `Atomic<T>.load` with `MemoryOrder.AcquireRelease` emits `OpAtomicLoad`
+// with the AcquireRelease memory semantics bit set (value 72 = AcquireRelease|UniformMemory).
+// CHECK pins %uint_72 on the OpAtomicLoad operand, confirming the compiler encodes
+// acquire-release ordering on the load — even though SPIRV validity rules disallow it
+// (tracked separately; -skip-spirv-validation lets the CHECK observation proceed).
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute -skip-spirv-validation
 

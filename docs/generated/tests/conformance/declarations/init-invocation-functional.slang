@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "An initializer is invoked by calling the enclosing type as if
-// it were a function."
+// Verifies that an `__init` is invoked by calling the type as a function, e.g. `MyVector(3.0)`.
+// The initializer broadcasts its scalar argument to both fields; CHECK lines assert x and y
+// both printed as 3, confirming the initializer ran and set the fields.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

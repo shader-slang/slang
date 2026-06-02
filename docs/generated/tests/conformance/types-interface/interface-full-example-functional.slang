@@ -9,8 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Direct exercise of the doc's ITest/TestClass full-featured interface example.
-// Tests all requirement types from the description section.
+// Verifies that all requirement kinds an interface may declare — static const,
+// static method, property, constructor, instance method, default method, call
+// operator, subscript, and associated types — are simultaneously satisfiable
+// and callable on a single conforming struct. CHECK asserts all computed values.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -9,12 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "Threads in a wave can synchronize and share data efficiently
-// using wave-tangled functions such as ballots, reductions, shuffling, control
-// flow barriers with the wave scope, and similar operations."
-//
-// WaveActiveBallot is the canonical ballot intrinsic. We verify it compiles
-// and emits the target-appropriate representation.
+// Verifies that `WaveActiveBallot` is available as a wave-tangled ballot intrinsic.
+// The compute shader calls WaveActiveBallot(true) and writes the result; CHECK asserts
+// HLSL emits `WaveActiveBallot` and SPIR-V emits `GroupNonUniformBallot`, proving
+// the ballot operation lowers to the correct per-target subgroup instruction.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry computeMain -stage compute

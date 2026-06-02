@@ -9,12 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "A thread can be inactive for one of the following reasons:
-// ... The thread has executed a `discard` statement, which disables the thread
-// (fragment shaders only)."
-//
-// We verify that `discard` in a fragment entry point compiles and emits
-// the target-specific discard/kill instruction.
+// Verifies that `discard` in a fragment entry point marks the thread inactive.
+// The test compiles a fragment shader with a conditional discard; CHECK confirms
+// HLSL emits the `discard` keyword and SPIR-V emits `OpKill`, which are the
+// target-specific representations of the thread-deactivation instruction.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry fragMain -stage fragment
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry fragMain -stage fragment

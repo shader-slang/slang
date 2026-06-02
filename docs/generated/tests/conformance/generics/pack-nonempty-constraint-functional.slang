@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: `where nonempty(T)` makes `__first(T)` well-formed.
-// This test verifies the nonempty constraint is accepted and the pack-expanded function
-// executes when called with a non-empty argument list.
+// Verifies that `where nonempty(T)` is accepted by the compiler and that pack expansion
+// works correctly when the pack is non-empty. Calls `sumIntsNonempty(10, 20, 30)`;
+// CHECK asserts 60, confirming all three elements were processed.
 // NOTE: `__first` crashes the compiler (see finding: pack-query-first-last-compiler-crash).
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type

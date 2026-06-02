@@ -9,9 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "The body of an extension may *not* include variable
-// declarations. An extension cannot introduce members that would change the
-// in-memory layout of the type being extended."
+// Verifies that adding a non-static member variable inside an extension is rejected.
+// Extensions cannot change a type's in-memory layout; declaring `extraField` inside
+// `extension MyVec` must trigger E31400, confirmed by CHECK-DAG.
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 

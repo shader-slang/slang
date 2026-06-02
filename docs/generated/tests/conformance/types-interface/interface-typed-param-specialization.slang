@@ -9,10 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc illustrates getValSquared(ITest i) being specialized for
-// ConcreteInt32 and ConcreteInt16 at the call site.
-// Verifies that an interface-typed parameter function works correctly
-// with two different concrete types.
+// Verifies that a function with an interface-typed parameter is correctly
+// specialized for two distinct concrete types at their call sites.
+// getValSquared is called with ConcreteInt32(a=4) and ConcreteInt16(a=3);
+// CHECK asserts sq32=16 and sq16=9, confirming each specialization computes independently.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "The Slang standard library provides atomic memory access
-// primitives as follows: Atomic<T> type."
-// Verify that RWStructuredBuffer<Atomic<uint>> can be declared and that store/load
-// round-trips compile to OpAtomicStore + OpAtomicLoad in SPIRV.
+// Verifies that `Atomic<T>` is usable as a structured-buffer element type and that
+// a store/load round-trip on it emits `OpAtomicStore` + `OpAtomicLoad` in SPIRV.
+// Both CHECKs must fire for the test to pass, confirming both operations lower
+// to atomic SPIRV instructions rather than plain loads or stores.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute

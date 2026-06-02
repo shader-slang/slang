@@ -9,10 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "Any number of member functions ... with the
-// implementation body, which are added to the inheriting type".
-// Verifies that a concrete struct inherits a default method from
-// the interface without needing to override it.
+// Verifies that a concrete struct inherits a default method from its interface
+// without needing to override it. MyStruct only supplies base(); the interface
+// default doubled() delegates to base(). CHECK asserts doubled=14, which is
+// only reachable if the default body executes on the concrete type.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

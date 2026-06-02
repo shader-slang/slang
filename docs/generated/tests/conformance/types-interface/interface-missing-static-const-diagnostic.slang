@@ -9,9 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "A concrete inheriting type must provide compatible
-// static data members with the same names and types."
-// Verifies that omitting a required static const int fires E38100.
+// Verifies that omitting a required `static const int` member from a conforming
+// struct fires E38100. FailsStatic supplies no `width`; CHECK pins the
+// caret-aligned "missing interface member" message on the struct declaration.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
 

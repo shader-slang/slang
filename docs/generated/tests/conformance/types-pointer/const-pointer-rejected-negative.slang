@@ -9,8 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "Slang does not currently support const pointers."
-// Verify the compiler rejects `const T*` with diagnostic E20017.
+// Verifies that `const T*` C-style const pointer syntax is rejected.
+// Declares a `const int*` and checks that E20017 fires; proves the
+// compiler enforces the language restriction rather than silently accepting it.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target cpp
 
 void main()

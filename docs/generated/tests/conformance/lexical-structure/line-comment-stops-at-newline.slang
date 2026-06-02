@@ -9,9 +9,10 @@
 //META: pipeline_stage=lex
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "A line comment extends up to, but does not
-// include, a subsequent line break or the end of the source unit."
-// Place tokens on the line AFTER a line comment; they must parse.
+// Verifies that a line comment ends at the newline, leaving the next
+// line's tokens available to the parser. Two variables declared on
+// lines with trailing `//` comments are summed; CHECK on `sum=3`
+// proves neither declaration was consumed by the comment.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

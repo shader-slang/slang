@@ -9,12 +9,10 @@
 //META: pipeline_stage=lex
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: identifier "begins with an uppercase or lowercase
-// ASCII letter (`A` through `Z`, `a` through `z`), or an underscore
-// (`_`). After the first character, ASCII digits (`0` through `9`)
-// may also be used in an identifier." Verify a `_`-prefixed name
-// with internal digits and underscores compiles and assigns the
-// expected value.
+// Verifies that identifiers may start with `_` and contain letters,
+// digits, and underscores in subsequent positions. Three variables
+// with `_`-led, digit-embedded, and trailing-underscore names are
+// declared and summed; CHECK on `sum=6` confirms all three bound.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

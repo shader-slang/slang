@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "`out` indicates copy-out semantics. The callee writes to the
-// parameter and then a copy of that value is assigned to the argument of the
-// caller after the call returns."
+// Verifies copy-out semantics: the callee writes to `out` parameters and values appear in the caller.
+// `getValues` assigns 10 and 20 to uninitialized locals via `out`; `10 20`
+// confirms both values were copied back to the call site correctly.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

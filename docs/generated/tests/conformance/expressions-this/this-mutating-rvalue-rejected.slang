@@ -9,9 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "If a [mutating] instance is being called, the argument for the implicit
-// `this` parameter must be an l-value."  A call expression returning a struct is an r-value,
-// so invoking a [mutating] method on it must be rejected at compile time (E30050).
+// Verifies that calling a `[mutating]` method on a temporary (r-value) is rejected.
+// `Counter.make(5)` returns a temporary; chaining `.increment()` on it passes an
+// r-value as the implicit `this`. CHECK asserts E30050 fires, confirming the
+// compiler enforces the l-value requirement for `[mutating]` receivers.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 

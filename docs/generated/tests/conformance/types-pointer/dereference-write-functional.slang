@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "To access the pointed-to object, the pointer
-// dereference operator * is used." Verify that the dereference is an
-// l-value: assigning through *p mutates the original variable.
+// Verifies that `*p` is a writable l-value: assigning to it mutates the original object.
+// Takes `&x`, writes a new value through the pointer, then reads `x` directly;
+// CHECK asserts the original variable reflects the write.
 //TEST:INTERPRET(filecheck=CHECK):
 
 void main()

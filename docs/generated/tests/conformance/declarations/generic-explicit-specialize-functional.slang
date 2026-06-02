@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A generic is _specialized_ by applying it to _generic arguments_
-// listed inside angle brackets `<>`. Specialization produces a reference to the
-// declaration with all generic parameters bound to concrete arguments."
+// Verifies that explicit angle-bracket specialization `sumVec<3>(v)` binds the value parameter.
+// The generic uses `N` to bound the loop; passing a float3 with explicit `<3>` and checking
+// output 6 proves the specialization resolved the correct loop count.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

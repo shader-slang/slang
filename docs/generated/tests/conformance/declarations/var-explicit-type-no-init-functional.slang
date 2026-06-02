@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A variable declared with `var` may be declared without an
-// initial-value expression if it has an explicit type specifier."
+// Verifies that `var x : int` (explicit type, no initializer) compiles and is writable.
+// After declaring without an initializer, `x` is assigned 55; 55 confirms the
+// variable was live and held the assigned value.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

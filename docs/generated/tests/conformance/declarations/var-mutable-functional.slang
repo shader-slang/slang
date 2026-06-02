@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A `var` declaration introduces a mutable variable."
-// Verify that the variable can be written and re-read with the new value.
+// Verifies that `var` introduces a mutable variable that can be reassigned after declaration.
+// Both `x` and `y` are assigned new values after initial declaration; CHECK lines assert
+// the updated values 42 and 3, confirming mutability for both inferred and explicit types.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -9,10 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "If the pointed-to type is a structure or a class type,
-// the member access operators . or -> may be used to dereference the
-// pointer and access a member."
-// Verify that -> and (*p). are both accepted and refer to the same field.
+// Verifies that `p->member` and `(*p).member` both access the same struct field.
+// Takes a pointer to a `Vec2`, mutates `p->x`, then reads both fields via both
+// syntaxes; CHECK asserts the updated and untouched fields have the expected values,
+// confirming arrow-access and dot-dereference are equivalent.
 //TEST:INTERPRET(filecheck=CHECK):
 
 struct Vec2

@@ -9,9 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verify that T* pointer declarations are accepted by the compiler and
-// reach the CPP and CUDA code-generation backends.
-// The -target cpp emit uses int32_t* in the prelude.
+// Verifies that `T*` pointer declarations survive to CPP and CUDA codegen.
+// Compiles a compute shader that takes an `int*` local, increments through
+// it, and writes the result; CHECK confirms CPP output contains `int32_t`
+// and CUDA output contains the expected kernel marker.
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECKCUDA):-target cuda -entry main -stage compute
 

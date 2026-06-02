@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Uniform" states: Slang construct `ConstantBuffer<T>`
-// places data in the Uniform address space, visible to all threads.
-// SPIRV Remark 3: address spaces are roughly equivalent to SPIRV storage classes.
-// Expected: the cbuffer variable uses the SPIRV `Uniform` storage class.
+// Verifies that `ConstantBuffer<T>` belongs to the Uniform address space in SPIRV.
+// The shader reads `scale` and `offset` from the buffer and writes the sum to an output so
+// the resource is not DCE'd; CHECK asserts the SPIRV assembly contains an
+// `OpVariable ... Uniform`, confirming the Uniform address-space-to-storage-class mapping.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

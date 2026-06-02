@@ -9,10 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// C5 (positive path): the doc says init lists are permitted as initial-value
-// expressions in parameter declarations (not just variable declarations).
-// Verify a struct parameter with a default {} initializer produces the
-// expected field values when the function is called without that argument.
+// Verifies that an initializer list can appear as the default-value expression
+// in a parameter declaration (not just a variable declaration).
+// `process()` is called without an argument; the default `{ 0.5f, 1.5f }` must
+// initialize both fields. CHECK asserts the printf output matches those values.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

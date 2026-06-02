@@ -4,14 +4,15 @@
 //META: source_commit=273e29cb6cac600f70da7245a506bae6689e0e23
 //META: doc_ref=docs/language-reference/expressions-this.md#mutability
 //META: doc_section_digest=2822c7f6b30708a773dbe170117103457227a510de3a625a9ca4bed55f2b62fe
-//META: purpose=Passing an r-value expression as an `out` parameter argument is rejected because the doc states `out` arguments must be l-values.
+//META: purpose=Passing an r-value expression as an `out` parameter argument is rejected: `out` arguments must be l-values.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "The argument expressions corresponding to any `out` or `in out` parameters
-// of the callee must be l-values." A call-expression result is an r-value; passing it to
-// an `out` parameter must be rejected at compile time (E30047).
+// Verifies that an r-value expression cannot be passed to an `out` parameter.
+// `makeVal()` returns a temporary (r-value); passing it to `fill(out int x)` must
+// be rejected at compile time. CHECK confirms E30047 fires at the call site,
+// proving the l-value requirement for `out` arguments is enforced.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 

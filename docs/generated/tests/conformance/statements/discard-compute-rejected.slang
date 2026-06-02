@@ -9,8 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that discard in a compute shader is rejected.
-// The doc states: "A discard statement can only be used in the context of a fragment shader."
+// Verifies that `discard` in a compute entry point is rejected with E36107.
+// The test compiles a compute kernel containing `discard`; CHECK asserts
+// E36107 fires, proving the compiler enforces the fragment-only restriction.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;

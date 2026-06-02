@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: in a `switch` statement, divergence occurs when threads
-// jump to different case groups; reconvergence occurs when threads exit the
-// switch. SPIRV encodes this as: OpSelectionMerge <merge-block> None,
-// followed by OpSwitch with one branch per case-label group.
+// Verifies that a `switch` with multiple case groups emits SPIR-V structured
+// selection. Threads fan out to case 0, 1, or default based on tid.x % 3;
+// CHECK asserts `OpSelectionMerge` (marking the reconvergence block) and `OpSwitch`
+// (dispatching to per-case blocks) both appear in the emitted assembly.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

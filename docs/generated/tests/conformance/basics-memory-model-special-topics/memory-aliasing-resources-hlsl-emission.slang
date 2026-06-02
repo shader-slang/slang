@@ -9,11 +9,11 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: if the same underlying memory is bound to multiple resources
-// such as ConstantBuffer<T>, RWStructuredBuffer<T>, or Texture2D<T>, it is aliased.
-// At the compiler level, these resource types emit as independent declarations with
-// separate register assignments. The aliasing is a runtime client-API concern;
-// the compiler produces valid independent bindings for each.
+// Verifies that `ConstantBuffer<T>` and `RWStructuredBuffer<T>` emit as independent
+// resource declarations in HLSL. CHECK asserts a `cbuffer` block for the constant
+// buffer and an `RWStructuredBuffer` UAV declaration for the structured buffer;
+// two independent bindings confirm the compiler does not merge them even when the
+// client might bind both to the same underlying memory.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

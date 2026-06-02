@@ -9,8 +9,8 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "It is an error to declare a variable that has neither a type
-// specifier or an initial-value expression."
+// Verifies that `var x;` with neither a type nor an initializer is a compile error.
+// The compiler must emit E30620; CHECK-DAG lines assert the error severity and code.
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 

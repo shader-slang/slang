@@ -9,11 +9,10 @@
 //META: pipeline_stage=lex
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "A block comment contains all characters between
-// where it begins and where it terminates, including any line
-// breaks." Verify the lexer treats a multi-line block as a single
-// whitespace token equivalent and that code after the closing
-// `*/` parses normally.
+// Verifies that a block comment may span multiple lines, including
+// arbitrary tokens, without disturbing the surrounding expression.
+// `int a = /* ... multi-line ... */ 7;` must compile and assign 7;
+// CHECK on `a=7` proves the block was treated as whitespace.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

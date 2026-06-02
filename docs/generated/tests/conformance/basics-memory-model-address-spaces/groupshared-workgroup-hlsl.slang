@@ -9,9 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Group-shared" states: `static groupshared` (global scope)
-// is in the Group-shared address space, visible to all threads in the thread group.
-// On HLSL, the equivalent qualifier is `groupshared` on the variable declaration.
+// Verifies that `static groupshared` at global scope maps to the Group-shared address space
+// on HLSL. CHECK asserts the emitted HLSL retains the `groupshared` qualifier on the variable
+// declaration, confirming all threads in the group share the same storage instance.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

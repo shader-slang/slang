@@ -9,9 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states that subscript operator declarations may be declared
-// in interfaces with get/set without bodies. The conforming type provides
-// implementations. Verified with __subscript get/set.
+// Verifies that a `__subscript` requirement declared with bodyless `get; set;`
+// is satisfied by a conforming struct providing accessor implementations.
+// FixedArray writes via fa[0]/fa[1] and reads back; CHECK asserts elem0=10
+// and elem1=20, confirming both accessors route correctly.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

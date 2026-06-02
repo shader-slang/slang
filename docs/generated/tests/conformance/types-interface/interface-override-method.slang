@@ -9,10 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states "Inheriting types may override member functions by
-// using the `override` modifier with a compatible member function
-// declaration."
-// Verifies that an overriding struct method replaces the default.
+// Verifies that the `override` modifier causes a struct's method to replace
+// the interface default. DefaultUser inherits compute() as base()+100=105;
+// OverrideUser replaces it with base()*3=15. CHECK asserts both values,
+// confirming the override takes precedence for OverrideUser only.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

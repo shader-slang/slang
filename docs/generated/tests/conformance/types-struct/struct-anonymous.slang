@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "When the identifier is specified, it is the name of the structure.
-// Otherwise, the structure is anonymous, which means that it is assigned an unspecified unique name."
-// "The main use of anonymous structures is in inline type definition expressions."
+// Verifies that an anonymous struct declared inline as a variable type compiles and its fields
+// are accessible via dot notation. The interpreter prints obj.a and obj.b; CHECK confirms
+// both values match what was assigned.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

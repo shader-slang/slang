@@ -9,9 +9,9 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// From the doc Examples section (Implicit parameter binding, ambiguous value argument).
-// The doc states: "It is an error when inference yields multiple options for a
-// generic value argument."
+// Verifies that conflicting inferences for a generic value parameter are a compile-time error.
+// Two arrays of different lengths (7 and 6) are passed where both bind to `let N : uint`;
+// the ambiguity cannot be resolved, so CHECK asserts E39999 is emitted.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 

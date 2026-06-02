@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "A generic declaration introduces a _generic parameter list_
-// enclosed in angle brackets `<>`."
+// Verifies that a generic type parameter `T` can be instantiated with both `int` and `float`.
+// `myIdentity` is called once per type; CHECK lines assert 42 and 3.14, confirming
+// independent monomorphization for each instantiation.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

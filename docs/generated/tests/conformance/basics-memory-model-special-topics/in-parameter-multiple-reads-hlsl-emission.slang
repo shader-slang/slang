@@ -9,10 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: the function may read the argument passed to the
-// in-parameter any number of times during the function call.
-// In HLSL, `in` (or default) parameters emit as value parameters;
-// the body may reference them multiple times (multiple reads are valid).
+// Verifies that an `in` parameter may be read multiple times inside the callee.
+// `sumOfReads` reads `val` three times to compute a sum; CHECK asserts the HLSL
+// output contains a plain value parameter signature and that `val` appears more
+// than once in an addition expression, proving multiple reads are preserved.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

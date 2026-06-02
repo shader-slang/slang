@@ -9,8 +9,9 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "The keyword `tbuffer` uses an equivalent expansion, but with
-// `TextureBuffer<T>` used instead of `ConstantBuffer<T>`."
+// Verifies that a `tbuffer` block emits as a `tbuffer` (not `cbuffer`) keyword in HLSL.
+// The compute shader reads `texData.x` from `MyTex`; CHECK lines assert the emitted
+// HLSL contains the `tbuffer` keyword and the block name, distinguishing it from cbuffer.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 

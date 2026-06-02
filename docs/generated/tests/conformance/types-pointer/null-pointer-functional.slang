@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc enumerates valid pointer values: "a null pointer, which is a
-// special pointer value that points to nothing."
-// Verify that nullptr is accepted and that pointer-null comparison works.
+// Verifies that `nullptr` is a valid pointer value and that null/non-null comparison
+// produces the right boolean. Compares a null pointer and a real pointer each
+// against nullptr; CHECK asserts the results are 1 and 0 respectively.
 //TEST:INTERPRET(filecheck=CHECK):
 
 void main()

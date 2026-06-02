@@ -9,8 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states that in the body of a method, a name resolves to this.name via implicit this.
-// This covers the extension-method dimension: extension bodies are also methods with implicit this.
+// Verifies that implicit `this` lookup works inside an extension method body.
+// Bare `width` and `height` in `Box.area()` must resolve to `this.width` and
+// `this.height` without explicit qualification. CHECK asserts the result is 24
+// (4*6), proving both names resolved through implicit `this` in the extension.
 //TEST:INTERPRET(filecheck=CHECK):
 
 struct Box { int width; int height; }

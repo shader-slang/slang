@@ -9,9 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Remark 2 states "An interface can also be parameterized using generics."
-// and shows "interface ITypedReq<T> { T someFunc(T param); }".
-// Verifies that a struct conforms to a generic interface with a concrete type.
+// Verifies that a struct can conform to a generic interface instantiated with
+// a concrete type argument. TestClass conforms to ITypedReq<uint> and its
+// someFunc adds 123 to the parameter; CHECK asserts result=130, proving the
+// generic interface was correctly specialised and dispatched.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

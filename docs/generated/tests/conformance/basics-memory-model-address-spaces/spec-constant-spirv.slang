@@ -9,11 +9,11 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table row for "Specialization constant" states:
-// `[SpecializationConstant]` / `[vk::specialization_constant]` annotated variables
-// are in the Specialization constant address space, visible to all threads.
-// "Values are fixed at pipeline creation time."
-// SPIRV: emits as `OpSpecConstant` with a `SpecId` decoration (not an OpVariable).
+// Verifies that constants annotated with `[[vk::specialization_constant]]` or
+// `[[SpecializationConstant]]` land in the Specialization constant address space.
+// Unlike Uniform variables, specialization constants emit as `OpSpecConstant` (not `OpVariable`)
+// each with a `SpecId` decoration; CHECK-DAG confirms both opcodes are present for both
+// attribute spellings.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: if T has a conformance constraint T : U, type T is considered
-// to conform to U, meaning T implements all requirements of U.
+// Verifies that a `T : IStringable` constraint lets the generic body call the interface's methods on T.
+// Two conformers (Alpha, Beta) are passed through `getCode<T>()`; CHECK asserts each returns its
+// own code(), which is only reachable if the constraint admits the interface method dispatch.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

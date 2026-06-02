@@ -9,10 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc example shows:
-//   "associatedtype AssocTypeWithRequirement : IReq;"
-// Verifies that an associatedtype with a conformance constraint forces the
-// provided type to also satisfy IReq.
+// Verifies that a constrained associatedtype (`Elem : IReq`) requires the
+// provided concrete type to itself conform to IReq. Owner supplies ElemImpl
+// which implements reqValue(); CHECK asserts the call returns 77, proving
+// the constraint was satisfied and the method is reachable through the association.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -9,9 +9,10 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "The argument expressions corresponding to any `out` or `in out` parameters
-// of the callee must be l-values." A named local variable is an l-value, so passing it to
-// `out` must be accepted, and the callee's write must be observable.
+// Verifies that a named local variable (l-value) can be passed to an `out` parameter
+// and that the callee's write is visible to the caller. `fill(v)` sets v to 42;
+// CHECK asserts the printf prints 42, which is only reachable if the `out` write
+// propagated back through the l-value argument.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -9,11 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: "Threads in a wave can synchronize and share data efficiently
-// using wave-tangled functions such as ballots, reductions, shuffling, ..."
-//
-// WaveActiveSum is the canonical reduction intrinsic. We verify it compiles
-// and emits the correct target-specific representation.
+// Verifies that `WaveActiveSum` is available as a wave-tangled reduction intrinsic.
+// The compute shader sums tid.x across the wave; CHECK asserts HLSL emits `WaveActiveSum`
+// and SPIR-V emits `GroupNonUniformIAdd`, confirming the reduction maps to the correct
+// subgroup arithmetic instruction on each target.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry computeMain -stage compute

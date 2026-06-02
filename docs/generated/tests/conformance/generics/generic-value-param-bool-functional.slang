@@ -9,8 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: a generic parameter can be a Boolean value.
-// This verifies a bool value parameter is accepted and works correctly.
+// Verifies that a `let B : bool` value parameter is accepted and distinguishes specializations.
+// Two instances — `FlaggedInt<true>` and `FlaggedInt<false>` — are created and their fields
+// printed; CHECK asserts distinct outputs, proving each specialization is independently usable.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

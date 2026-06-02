@@ -9,13 +9,10 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states: when wave-tangled functions are supported on divergent paths,
-// they apply only between the mutually convergent thread set. Each arm of the
-// divergent `if` has its own set of convergent threads. In SPIRV this appears
-// as GroupNonUniform ops (OpGroupNonUniformUMin, OpGroupNonUniformUMax)
-// placed inside distinct SPIRV basic blocks (the `then` and `else` arms),
-// not in the merge block where all threads have reconverged.
-// Requires GroupNonUniformArithmetic capability.
+// Verifies that wave ops inside a divergent `if` appear in the SPIR-V basic blocks
+// for their respective arms, not in the post-merge block.
+// CHECK asserts `GroupNonUniformArithmetic` capability, `OpSelectionMerge` for the
+// if-divergence, and per-arm `OpGroupNonUniformUMin`/`OpGroupNonUniformUMax` ops.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 

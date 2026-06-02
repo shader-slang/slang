@@ -9,9 +9,9 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "If an interface `I` lists another interface `J` in its
-// inheritance clause, then `J` is a _base interface_ of `I`. In order to
-// conform to `I`, a type must also conform to `J`."
+// Verifies that conforming to a derived interface also satisfies its base interface.
+// `Impl : IDerived` must provide both `getBase()` and `getDerived()`; the generic
+// `sumInterface<T : IDerived>` calls both, and 30 proves both methods resolved.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
