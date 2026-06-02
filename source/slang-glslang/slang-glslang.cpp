@@ -317,8 +317,10 @@ static int glslang_optimizeSPIRV(
 
 #if 0
             // This is the previous 'default optimization' passes setting for glslang
+#if SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+#endif
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
