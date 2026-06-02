@@ -1346,7 +1346,7 @@ struct ByteAddressBufferLegalizationContext
                 }
             }
         }
-        else if (auto descriptorHandleType = as<IRDescriptorHandleType>(type))
+        else if (as<IRDescriptorHandleType>(type))
         {
             if (auto storageType = getDescriptorHandleStorageType())
             {
