@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly -entry computeMain -stage compute -capability cooperative_matrix
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly -entry computeMain -stage compute -capability cooperative_matrix -O0
 
 // Check that cooperative matrix StructuredBuffer overloads preserve the
 // StructuredBuffer data layout on the element pointer used by load/store.
@@ -8,18 +8,39 @@
 // CHECK-DAG: %[[COOP_MAT:[A-Za-z0-9_]+]] = OpTypeCooperativeMatrixKHR %float
 // CHECK-DAG: %[[PTR_140]] = OpTypePointer StorageBuffer %float
 // CHECK-DAG: %[[PTR_430]] = OpTypePointer StorageBuffer %float
-// The trailing access-chain index and store operand are temporarily wildcarded:
-// disabling the MergeReturn/InlineExhaustive pair for #11146 can spell those
-// values differently while preserving the layout-sensitive pointer and load/store
-// coverage. Restore strict checks when the optimizer workaround is removed.
-// CHECK: %[[INPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_140]] %input140 %int_0 %{{[A-Za-z0-9_]+}}
-// CHECK: %[[MAT_140:[A-Za-z0-9_]+]] = OpCooperativeMatrixLoadKHR %[[COOP_MAT]] %[[INPUT_140]]
-// CHECK: %[[OUTPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_140]] %output140 %int_0 %{{[A-Za-z0-9_]+}}
-// CHECK: OpCooperativeMatrixStoreKHR %[[OUTPUT_140]] %{{[A-Za-z0-9_]+}}
-// CHECK: %[[INPUT_430:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_430]] %input430 %int_0 %{{[A-Za-z0-9_]+}}
-// CHECK: %[[MAT_430:[A-Za-z0-9_]+]] = OpCooperativeMatrixLoadKHR %[[COOP_MAT]] %[[INPUT_430]]
-// CHECK: %[[OUTPUT_430:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_430]] %output430 %int_0 %{{[A-Za-z0-9_]+}}
-// CHECK: OpCooperativeMatrixStoreKHR %[[OUTPUT_430]] %{{[A-Za-z0-9_]+}}
+// Keep the helper-call shape at -O0 so this temporary #11146 coverage can
+// verify the zero element index and load-to-store value flow under both
+// MergeReturn/InlineExhaustive settings.
+// CHECK: %[[CALL_MAT_140:[A-Za-z0-9_]+]] = OpFunctionCall %[[COOP_MAT]] %{{[A-Za-z0-9_]+}} %uint_0 %uint_16
+// CHECK: OpFunctionCall %void %{{[A-Za-z0-9_]+}} %[[CALL_MAT_140]] %uint_0 %uint_16
+// CHECK: %[[CALL_MAT_430:[A-Za-z0-9_]+]] = OpFunctionCall %[[COOP_MAT]] %{{[A-Za-z0-9_]+}} %uint_0 %uint_16
+// CHECK: OpFunctionCall %void %{{[A-Za-z0-9_]+}} %[[CALL_MAT_430]] %uint_0 %uint_16
+// CHECK: %[[INPUT_INDEX_140:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK: %[[LOAD_STRIDE_140:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK: %[[INPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_140]] %input140 %int_0 %[[INPUT_INDEX_140]]
+// CHECK: OpCooperativeMatrixLoadKHR %[[COOP_MAT]] %[[INPUT_140]] %int_0 %[[LOAD_STRIDE_140]]
+// CHECK: %[[WRAP_STORE_MAT_140:[A-Za-z0-9_]+]] = OpFunctionParameter %[[COOP_MAT]]
+// CHECK: %[[WRAP_OUTPUT_INDEX_140:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK: %[[WRAP_STORE_STRIDE_140:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK: OpFunctionCall %void %{{[A-Za-z0-9_]+}} %[[WRAP_STORE_MAT_140]] %[[WRAP_OUTPUT_INDEX_140]] %[[WRAP_STORE_STRIDE_140]]
+// CHECK: %[[STORE_MAT_140:[A-Za-z0-9_]+]] = OpFunctionParameter %[[COOP_MAT]]
+// CHECK: %[[OUTPUT_INDEX_140:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK: %[[STORE_STRIDE_140:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK: %[[OUTPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_140]] %output140 %int_0 %[[OUTPUT_INDEX_140]]
+// CHECK: OpCooperativeMatrixStoreKHR %[[OUTPUT_140]] %[[STORE_MAT_140]] %int_0 %[[STORE_STRIDE_140]]
+// CHECK: %[[INPUT_INDEX_430:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK: %[[LOAD_STRIDE_430:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK: %[[INPUT_430:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_430]] %input430 %int_0 %[[INPUT_INDEX_430]]
+// CHECK: OpCooperativeMatrixLoadKHR %[[COOP_MAT]] %[[INPUT_430]] %int_0 %[[LOAD_STRIDE_430]]
+// CHECK: %[[WRAP_STORE_MAT_430:[A-Za-z0-9_]+]] = OpFunctionParameter %[[COOP_MAT]]
+// CHECK: %[[WRAP_OUTPUT_INDEX_430:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK: %[[WRAP_STORE_STRIDE_430:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK: OpFunctionCall %void %{{[A-Za-z0-9_]+}} %[[WRAP_STORE_MAT_430]] %[[WRAP_OUTPUT_INDEX_430]] %[[WRAP_STORE_STRIDE_430]]
+// CHECK: %[[STORE_MAT_430:[A-Za-z0-9_]+]] = OpFunctionParameter %[[COOP_MAT]]
+// CHECK: %[[OUTPUT_INDEX_430:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK: %[[STORE_STRIDE_430:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK: %[[OUTPUT_430:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_430]] %output430 %int_0 %[[OUTPUT_INDEX_430]]
+// CHECK: OpCooperativeMatrixStoreKHR %[[OUTPUT_430]] %[[STORE_MAT_430]] %int_0 %[[STORE_STRIDE_430]]
 
 // The scalar float element type has the same size in both layouts, but the
 // StructuredBuffer element stride differs: std140 rounds up to 16, std430 stays at 4.
