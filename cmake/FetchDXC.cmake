@@ -465,8 +465,9 @@ endif()
 # ---------------------------------------------------------------------------
 
 if(_dxc_build_from_source)
+    set(_dxc_forwarded_config_args "")
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-        set(_dxc_warning_flags "")
+        set(_dxc_forwarded_config_args "")
     elseif(
         CMAKE_SYSTEM_NAME STREQUAL "Linux"
         OR CMAKE_SYSTEM_NAME STREQUAL "Darwin"
@@ -479,10 +480,28 @@ if(_dxc_build_from_source)
         string(APPEND _dxc_c_flags " -w")
         string(APPEND _dxc_cxx_flags " -w")
         set(
-            _dxc_warning_flags
+            _dxc_forwarded_config_args
             "-DCMAKE_C_FLAGS=${_dxc_c_flags}"
             "-DCMAKE_CXX_FLAGS=${_dxc_cxx_flags}"
         )
+        if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+            foreach(
+                _dxc_osx_var
+                CMAKE_OSX_ARCHITECTURES
+                CMAKE_OSX_SYSROOT
+                CMAKE_OSX_DEPLOYMENT_TARGET
+            )
+                if(DEFINED ${_dxc_osx_var})
+                    set(_dxc_osx_value "${${_dxc_osx_var}}")
+                    string(REPLACE ";" "\\;" _dxc_osx_value "${_dxc_osx_value}")
+                    list(
+                        APPEND
+                        _dxc_forwarded_config_args
+                        "-D${_dxc_osx_var}=${_dxc_osx_value}"
+                    )
+                endif()
+            endforeach()
+        endif()
     endif()
 
     # DXC's build (PredefinedParams.cmake) is designed for a single-config
@@ -564,13 +583,13 @@ if(_dxc_build_from_source)
 
     # Step 2: Configure DXC at Slang configure time.
     # The stamp content is keyed on resolved source commit, generator, platform,
-    # toolset, and both compilers so that switching any of these invalidates the
-    # cached configure. A SHA256 hash keeps the content short regardless of
-    # lengths.
+    # toolset, both compilers, and forwarded configure arguments so switching any
+    # of these invalidates the cached configure. A SHA256 hash keeps the content
+    # short regardless of lengths.
     string(
         SHA256
         _dxc_config_hash
-        "${_dxc_expected_git_commit}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_PLATFORM}_${CMAKE_GENERATOR_TOOLSET}_${CMAKE_C_COMPILER}_${CMAKE_CXX_COMPILER}"
+        "${_dxc_expected_git_commit}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_PLATFORM}_${CMAKE_GENERATOR_TOOLSET}_${CMAKE_C_COMPILER}_${CMAKE_CXX_COMPILER}_${_dxc_forwarded_config_args}"
     )
     set(_dxc_configure_stamp "${_dxc_build_dir}/.slang_dxc_configured")
     set(_dxc_configure_is_current OFF)
@@ -607,7 +626,7 @@ if(_dxc_build_from_source)
                 # command. Passing it here covers single-config generators (Ninja).
                 -DCMAKE_BUILD_TYPE=MinSizeRel -DHLSL_COPY_GENERATED_SOURCES=OFF
                 -DLLVM_INCLUDE_TESTS=OFF -DCLANG_INCLUDE_TESTS=OFF
-                -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_warning_flags} -Wno-dev
+                -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_forwarded_config_args} -Wno-dev
             RESULT_VARIABLE _dxc_configure_result
             OUTPUT_VARIABLE _dxc_configure_output
             ERROR_VARIABLE _dxc_configure_error
