@@ -165,18 +165,35 @@ else
       "-test-dir" "docs/generated/tests"
       "-expected-failure-list" "docs/generated/tests/_meta/expected-failures.txt"
     )
+    # Walk TEST_ARGS one token at a time and classify each:
+    #   - Agentic-overridden value-taking flags (-test-dir,
+    #     -expected-failure-list): skip flag + value.
+    #   - Other known value-taking flags: inherit flag + value.
+    #   - Lone option flags ("-*"): inherit as-is.
+    #   - Bare positional tokens (test selectors): drop. The agentic
+    #     pass runs over its own -test-dir; inheriting positionals
+    #     from the main pass would silently narrow the agentic run.
+    #     CI doesn't pass bare positionals here today, so this only
+    #     guards local-dev `run-coverage.sh --with-agentic-tests foo`.
     i=0
     while [ "$i" -lt "${#TEST_ARGS[@]}" ]; do
       arg="${TEST_ARGS[i]}"
       case "$arg" in
       -test-dir | -expected-failure-list)
-        # Skip the flag and its value — agentic overrides these.
         i=$((i + 2))
-        continue
+        ;;
+      -enable-debug-layers | -synthesizedTestApi | -server-count)
+        AGENTIC_TEST_ARGS+=("$arg" "${TEST_ARGS[i + 1]}")
+        i=$((i + 2))
+        ;;
+      -*)
+        AGENTIC_TEST_ARGS+=("$arg")
+        i=$((i + 1))
+        ;;
+      *)
+        i=$((i + 1))
         ;;
       esac
-      AGENTIC_TEST_ARGS+=("$arg")
-      i=$((i + 1))
     done
     # Retry once on crash (exit > 128 = killed by signal). The suite
     # is long (~2680 bundles); a single SIGSEGV in slang-test mid-run
