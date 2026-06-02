@@ -113,50 +113,63 @@ jobs:
       - name: Run agentic test suite
         id: run-tests
         env:
+          # Validate emitted SPIR-V (catches modules the compiler
+          # produced but that don't satisfy the spec — e.g. invalid
+          # storage-class combinations).
           SLANG_RUN_SPIRV_VALIDATION: "1"
-          SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN: "1"
+          # Intentionally NOT setting SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN:
+          # regular CI sets it to pin provenance for tests/ that CHECK
+          # `OpSource Unknown`. The agentic suite was generated against
+          # default compiler behavior and CHECKs `OpSource Slang`, so
+          # inheriting that env var here produces spurious failures.
         run: |
-          # The agentic suite is doc-anchored, text-emit-focused, and
-          # designed to surface compiler bugs (see
-          # docs/generated/tests/README.md). Some failures are expected
-          # while the suite is being de-bugged — they're tracked under
-          # docs/generated/tests/_meta/findings/. We still want to fail
-          # the job on net new failures; `regenerate.py verify` handles
-          # this by bucketing failures listed in
-          # docs/generated/tests/_meta/expected-failures.txt as
-          # "expected-fail" and exiting non-zero only on FAILED entries
-          # outside that list.
-
-          # Run via the regenerate.py wrapper so the pass/ignored/FAILED
-          # bucketing matches what agents see locally. server-count 4
-          # matches the suite's documented invocation.
+          # Invoke slang-test directly with -expected-failure-list.
+          # slang-test reclassifies failures listed in the file as
+          # `failed(expected)` (TestResult::ExpectedFail), keeps them
+          # out of the unexpected-failure exit code, and emits a
+          # `passing tests that are expected to fail` section when an
+          # entry has been fixed and should be removed.
           #
-          # `tee` swallows the upstream exit code under default bash
-          # semantics, so we enable `pipefail` and read `PIPESTATUS[0]`
-          # to get the actual verify exit code (not tee's).
+          # server-count 4 matches the suite's documented invocation
+          # (regenerate.md § CI integration).
+          #
+          # tee preserves the upstream exit code via PIPESTATUS[0].
           set +e
           set -o pipefail
-          python3 docs/generated/tests/_meta/regenerate.py verify \
-            --server-count 4 \
-            | tee verify-output.log
+          "$bin_dir/slang-test" \
+            -test-dir docs/generated/tests \
+            -use-test-server -server-count 4 \
+            -expected-failure-list docs/generated/tests/_meta/expected-failures.txt \
+            | tee slang-test-output.log
           rc=${PIPESTATUS[0]}
           set +o pipefail
           set -e
 
-          # Extract counts for the job summary.
-          passed=$(grep -E '^  passed:' verify-output.log | awk '{print $2}' || echo 0)
-          ignored=$(grep -E '^  ignored:' verify-output.log | awk '{print $2}' || echo 0)
-          ignored_tool=$(grep -E '^  ignored-tool:' verify-output.log | awk '{print $2}' || echo 0)
-          expected_fail=$(grep -E '^  expected-fail:' verify-output.log | awk '{print $2}' || echo 0)
-          failed=$(grep -E '^  FAILED:' verify-output.log | awk '{print $2}' || echo 0)
-          # `awk` exits 0 even when grep matches nothing, so the `|| echo 0`
-          # fallbacks above never fire; ${var:-0} is what actually rescues
-          # a missing bucket line from rendering as a blank cell.
+          # Parse slang-test's summary line for the step-summary table.
+          # Format (see tools/slang-test/test-reporter.cpp ~line 713):
+          #   X% of tests passed (Y/Z)[, W tests ignored][, K tests failed expectedly]
+          # where Z = passed + truly-failed + expected-failed.
+          summary_line=$(grep -E '% of tests passed \([0-9]+/[0-9]+\)' slang-test-output.log | tail -1)
+          passed=$(echo "$summary_line" | sed -E 's@.*\(([0-9]+)/[0-9]+\).*@\1@')
+          total=$(echo "$summary_line" | sed -E 's@.*\([0-9]+/([0-9]+)\).*@\1@')
+          ignored=$(echo "$summary_line" | sed -nE 's@.*, ([0-9]+) tests ignored.*@\1@p')
+          expected_fail=$(echo "$summary_line" | sed -nE 's@.*, ([0-9]+) tests failed expectedly.*@\1@p')
           passed=${passed:-0}
+          total=${total:-0}
           ignored=${ignored:-0}
-          ignored_tool=${ignored_tool:-0}
           expected_fail=${expected_fail:-0}
-          failed=${failed:-0}
+          failed=$(( total - passed - expected_fail ))
+          if [ "$failed" -lt 0 ]; then failed=0; fi
+
+          # Lines listed under "passing tests that are expected to
+          # fail:" are entries that should be removed from
+          # expected-failures.txt.
+          unexpected_pass=$(awk '
+            /^passing tests that are expected to fail:/ { in_block = 1; next }
+            in_block && /^---/ { sep++; if (sep == 2) in_block = 0; next }
+            in_block && sep == 1 { count++ }
+            END { print count + 0 }
+          ' slang-test-output.log)
 
           {
             echo "# Agentic Test Suite"
@@ -165,11 +178,11 @@ jobs:
             echo "| --- | --- |"
             echo "| Passed | ${passed} |"
             echo "| Ignored (backend missing in slang-test) | ${ignored} |"
-            if [ "${ignored_tool}" -gt 0 ]; then
-              echo "| Ignored (requires-tool missing on PATH) | ${ignored_tool} |"
-            fi
             if [ "${expected_fail}" -gt 0 ]; then
-              echo "| Expected-fail (filed compiler bug) | ${expected_fail} |"
+              echo "| Expected-fail (listed in expected-failures.txt) | ${expected_fail} |"
+            fi
+            if [ "${unexpected_pass}" -gt 0 ]; then
+              echo "| Unexpectedly-passing (remove from expected-failures.txt) | ${unexpected_pass} |"
             fi
             echo "| **FAILED** | **${failed}** |"
             echo ""
@@ -182,23 +195,22 @@ jobs:
               echo "Unexpected failing tests:"
               echo ""
               echo '```'
-              sed -n '/^Failing tests:/,/^Fix every/p' verify-output.log | grep '^  docs/' || true
+              awk '
+                /^[0-9]+ failing tests:/ { in_block = 1; next }
+                in_block && /^---/ { sep++; if (sep == 2) in_block = 0; next }
+                in_block && sep == 1 { print }
+              ' slang-test-output.log
               echo '```'
-              echo ""
-              echo "See docs/generated/tests/_meta/prompts/_common.md § Verify before committing."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # Job result is the slang-test exit code, but verify already
-          # bucketed expected-failures away from the FAILED count, so
-          # the exit code is non-zero only on UNEXPECTED failures.
           exit $rc
 
-      - name: Upload verify output
+      - name: Upload slang-test output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agentic-verify-log
-          path: verify-output.log
+          name: agentic-slang-test-output
+          path: slang-test-output.log
           retention-days: 14
           if-no-files-found: ignore
