@@ -5128,6 +5128,46 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             testName << ")";
         }
 
+        // Per-subtest exclusion: an exact match against the expanded
+        // testName / outputStem allows skipping a single synthesized subtest
+        // (e.g. "tests/foo.slang.6 syn (llvm)") that crashes the worker before
+        // -expected-failure-list can reclassify it. File-level prefix entries
+        // are already handled by shouldRunTest(); this is exact-match only to
+        // avoid e.g. "foo.slang.6" also matching "foo.slang.60".
+        {
+            bool subtestExcluded = false;
+            for (auto& entry : context->options.excludePrefixes)
+            {
+                if (testName == entry || outputStem == entry)
+                {
+                    subtestExcluded = true;
+                    break;
+                }
+            }
+            if (!subtestExcluded)
+            {
+                for (auto& entry : context->options.skipList)
+                {
+                    if (testName == entry || outputStem == entry)
+                    {
+                        subtestExcluded = true;
+                        break;
+                    }
+                }
+            }
+            if (subtestExcluded)
+            {
+                if (context->options.verbosity == VerbosityLevel::Verbose)
+                {
+                    context->getTestReporter()->messageFormat(
+                        TestMessageType::Info,
+                        "%s subtest excluded by -exclude-prefix / -skip-list\n",
+                        testName.getBuffer());
+                }
+                continue;
+            }
+        }
+
         // Check if any prefix is more specific than the file path (has subtest index).
         // If so, filter to only run tests whose outputStem matches the prefix.
         if (context->options.testPrefixes.getCount() > 0)
