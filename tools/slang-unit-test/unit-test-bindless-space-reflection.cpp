@@ -11,28 +11,11 @@ using namespace Slang;
 
 // Test that the reflection API correctly returns the bindless space index.
 
-SLANG_UNIT_TEST(bindlessSpaceReflection)
+static void _checkBindlessSpaceReflection(
+    const char* userSource,
+    SlangInt expectedBindlessSpaceIndex,
+    bool expectedUsesBindlessResourceHeap)
 {
-    const char* userSource = R"(
-        RWStructuredBuffer<float> gInput;
-        RWStructuredBuffer<float> gOutput;
-
-        struct P
-        {
-            Texture2D.Handle t;
-        };
-
-        ParameterBlock<P> p1;
-
-        [Shader("compute")]
-        [NumThreads(4, 1, 1)]
-        void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
-        {
-            uint tid = dispatchThreadID.x;
-            gOutput[tid] = gInput[tid] + p1.t.Load(int3(0,0,0)).x;
-        }
-    )";
-
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
@@ -75,10 +58,73 @@ SLANG_UNIT_TEST(bindlessSpaceReflection)
     auto programLayout = linkedProgram->getLayout();
     SLANG_CHECK(programLayout != nullptr);
 
+    auto bindlessSpaceIndex = programLayout->getBindlessSpaceIndex();
+    if (expectedBindlessSpaceIndex >= 0)
+    {
+        SLANG_CHECK(bindlessSpaceIndex == expectedBindlessSpaceIndex);
+    }
+    else
+    {
+        SLANG_CHECK(bindlessSpaceIndex >= 0);
+    }
+
+    ComPtr<slang::IMetadata> metadata;
+    SLANG_CHECK(
+        linkedProgram->getTargetMetadata(0, metadata.writeRef(), diagnosticBlob.writeRef()) ==
+        SLANG_OK);
+    SLANG_CHECK(metadata != nullptr);
+
+    auto bindlessMetadata = static_cast<slang::IBindlessResourceMetadata*>(
+        metadata->castAs(slang::IBindlessResourceMetadata::getTypeGuid()));
+    SLANG_CHECK(bindlessMetadata != nullptr);
+    SLANG_CHECK(bindlessMetadata->usesBindlessResourceHeap() == expectedUsesBindlessResourceHeap);
+}
+
+SLANG_UNIT_TEST(bindlessSpaceReflection)
+{
+    const char* userSource = R"(
+        RWStructuredBuffer<float> gInput;
+        RWStructuredBuffer<float> gOutput;
+
+        struct P
+        {
+            Texture2D.Handle t;
+        };
+
+        ParameterBlock<P> p1;
+
+        [Shader("compute")]
+        [NumThreads(4, 1, 1)]
+        void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            uint tid = dispatchThreadID.x;
+            gOutput[tid] = gInput[tid] + p1.t.Load(int3(0,0,0)).x;
+        }
+    )";
+
     // The shader has:
     // - gInput and gOutput at space 0 (default)
     // - ParameterBlock<P> p1 at space 1
-    // So the bindless space should be allocated at space 2
-    auto bindlessSpaceIndex = programLayout->getBindlessSpaceIndex();
-    SLANG_CHECK(bindlessSpaceIndex == 2);
+    // So the bindless space should be allocated at space 2.
+    _checkBindlessSpaceReflection(userSource, 2, true);
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandle)
+{
+    const char* userSource = R"(
+        RWStructuredBuffer<float> gInput;
+        RWStructuredBuffer<float> gOutput;
+
+        [Shader("compute")]
+        [NumThreads(4, 1, 1)]
+        void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            uint tid = dispatchThreadID.x;
+            gOutput[tid] = gInput[tid] + 1.0f;
+        }
+    )";
+
+    // Reflection still reserves a stable bindless space for descriptor-handle-capable
+    // targets, but post-emit metadata reports that no bindless heap path survived.
+    _checkBindlessSpaceReflection(userSource, -1, false);
 }

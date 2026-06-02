@@ -118,6 +118,50 @@ static void _insertBinding(
     ranges.add(newRange);
 }
 
+static bool _isBindlessResourceHeapGlobalParam(IRInst* inst)
+{
+    if (inst->getOp() != kIROp_GlobalParam)
+        return false;
+
+    auto nameHint = inst->findDecoration<IRNameHintDecoration>();
+    return nameHint && nameHint->getName() == "__slang_resource_heap";
+}
+
+static bool _instUsesBindlessResourceHeap(IRInst* inst)
+{
+    if (_isBindlessResourceHeapGlobalParam(inst))
+        return true;
+
+    switch (inst->getOp())
+    {
+    case kIROp_GetDynamicResourceHeap:
+    case kIROp_LoadResourceDescriptorFromHeap:
+    case kIROp_LoadSamplerDescriptorFromHeap:
+    case kIROp_SPIRVLoadDescriptorFromHeap:
+    case kIROp_SPIRVResourceHeap:
+    case kIROp_SPIRVSamplerHeap:
+    case kIROp_MakeCombinedTextureSamplerFromHandle:
+    case kIROp_CastDescriptorHandleToResource:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool _subtreeUsesBindlessResourceHeap(IRInst* inst)
+{
+    if (_instUsesBindlessResourceHeap(inst))
+        return true;
+
+    for (auto child : inst->getChildren())
+    {
+        if (_subtreeUsesBindlessResourceHeap(child))
+            return true;
+    }
+
+    return false;
+}
+
 void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadata)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
@@ -194,8 +238,12 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
 {
     // Scan the instructions looking for global resource declarations
     // and exported functions.
+    bool usesBindlessResourceHeap = false;
     for (const auto& inst : irModule->getGlobalInsts())
     {
+        if (!usesBindlessResourceHeap && _subtreeUsesBindlessResourceHeap(inst))
+            usesBindlessResourceHeap = true;
+
         if (auto func = as<IRFunc>(inst))
         {
             if (func->findDecoration<IRDownstreamModuleExportDecoration>())
@@ -216,6 +264,7 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
             continue;
         collectMetadataFromInst(param, outMetadata);
     }
+    outMetadata.m_usesBindlessResourceHeap = usesBindlessResourceHeap;
 }
 
 static SlangScalarType _getScalarTypeFromIRType(IRType* type)
