@@ -4,6 +4,7 @@
 
 // The tests disable warning 30056 so the DEFAULT checks can intentionally assert that
 // pre-SM6 HLSL still emits the deprecated non-short-circuiting `?:` form instead of select().
+// E41026 reports switch fall-through restructuring, expected only for the SM5.1 fallback.
 
 // DEFAULT: warning[E41026]
 // DEFAULT-NOT: {{^export$}}
