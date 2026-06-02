@@ -672,6 +672,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             {
                 // Can support no entry points on DXC because we can build libraries
                 profile = getEffectiveTargetProfile(targetReq, getTargetProgram()->getOptionSet());
+                profile.setStage(Stage::Unknown);
             }
             else
             {

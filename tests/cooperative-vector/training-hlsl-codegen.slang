@@ -7,7 +7,6 @@
 // CHECK609-DAG: __slang_linalg_OuterProductAccumulate<
 // CHECK609-DAG: __builtin_VectorAccumulate(
 // CHECK609-DAG: __slang_linalg_VectorAccumulate<
-// m_sm610OrAbove is derived from the effective profile, so pin both sides of the boundary.
 // CHECK609-NOT: dx::linalg::ComponentType::F16
 
 // CHECK610-DAG: dx::linalg::OuterProduct<

@@ -123,13 +123,10 @@ Profile getEffectiveTargetProfile(TargetRequest* target, CompilerOptionSet& opti
 
             if (optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))
             {
-                // Whole-program DXIL uses a lib_* profile. DXC validation rejects lib_6_1 and
-                // lib_6_2, so default DXIL libraries to the first accepted library profile. This
-                // intentionally passes a library profile to DXC even when the user supplied a
-                // stage-bound profile with -whole-program; individual entry point stages are still
-                // tracked separately when emitting entry point code.
+                // DXC validation rejects lib_6_1 and lib_6_2, so floor whole-program DXIL to
+                // the first accepted DXIL library shader-model version. Preserve the stage here;
+                // callers that must pass a lib_* profile to DXC clear the stage at that boundary.
                 minVersion = ProfileVersion::DX_6_3;
-                targetProfile.setStage(Stage::Unknown);
             }
 
             if (targetProfile.getFamily() != ProfileFamily::DX ||

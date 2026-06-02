@@ -170,7 +170,7 @@ Profile getEffectiveTargetProfile(TargetRequest* target);
 // Same as the single-argument form, but `optionSet` provides:
 // - a profile fallback when the target request's profile family is Unknown, and
 // - CompilerOptionName::GenerateWholeProgram, which selects between the entry-point SM 6.0
-//   floor and the whole-program lib_6_3 floor for DXIL.
+//   floor and the whole-program DX 6.3 floor for DXIL.
 // Pass the merged target-program option set when whole-program or inherited options matter.
 Profile getEffectiveTargetProfile(TargetRequest* target, CompilerOptionSet& optionSet);
 
