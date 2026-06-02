@@ -4,10 +4,14 @@
 
 // CHECK-DAG: %[[UINT:[A-Za-z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: %[[V2UINT:[A-Za-z0-9_]+]] = OpTypeVector %[[UINT]] 2
+// CHECK-DAG: %[[ULONG:[A-Za-z0-9_]+]] = OpTypeInt 64 0
 // CHECK-NOT: OpTypeRuntimeArray %[[V2UINT]]
 // CHECK-NOT: OpTypePointer StorageBuffer %[[V2UINT]]
 // CHECK-NOT: OpStore %_ptr_StorageBuffer_v2uint
+// CHECK-NOT: OpTypeRuntimeArray %[[ULONG]]
+// CHECK-NOT: OpTypePointer StorageBuffer %[[ULONG]]
 // CHECK: OpCompositeConstruct %[[V2UINT]]
+// CHECK: OpBitwiseOr %[[ULONG]]
 
 // CHECK_NV-DAG: %[[ULONG:[A-Za-z0-9_]+]] = OpTypeInt 64 0
 // CHECK_NV-NOT: OpTypeRuntimeArray %[[ULONG]]
@@ -31,11 +35,11 @@ struct HandleStruct
 ByteAddressBuffer inputBuffer;
 
 [[vk::binding(1, 0)]]
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 [[vk::binding(2, 0)]]
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputByteBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputByteBuffer
 RWByteAddressBuffer outputByteBuffer;
 
 #if defined(NV_HANDLE)
@@ -67,8 +71,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     HandleStruct hAligned = inputBuffer.LoadAligned<HandleStruct>(0, 8);
     uint dynamicOffset = dispatchThreadID.x;
     HandleStruct hDynamic = inputBuffer.LoadAligned<HandleStruct>(dynamicOffset, 8);
+    uint64_t u64 = inputBuffer.Load<uint64_t>(4);
 
     outputByteBuffer.Store<HandleStruct>(dynamicOffset, h, 8);
+    outputByteBuffer.Store<uint64_t>(20, u64);
 
     uint2 handleBits = reinterpret<uint2>(h.handle);
     uint2 alignedHandleBits = reinterpret<uint2>(hAligned.handle);
@@ -88,6 +94,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[11] = outputByteBuffer.Load<uint>(0);
     outputBuffer[12] = outputByteBuffer.Load<uint>(4);
     outputBuffer[13] = outputByteBuffer.Load<uint>(8);
+    outputBuffer[14] = uint(u64);
+    outputBuffer[15] = uint(u64 >> 32);
+    outputBuffer[16] = outputByteBuffer.Load<uint>(20);
+    outputBuffer[17] = outputByteBuffer.Load<uint>(24);
 }
 
 #endif
@@ -104,5 +114,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // RESULT-NEXT: 1
 // RESULT-NEXT: 2
 // RESULT-NEXT: 0
+// RESULT-NEXT: 1
+// RESULT-NEXT: 2
+// RESULT-NEXT: 1
+// RESULT-NEXT: 2
 // RESULT-NEXT: 1
 // RESULT-NEXT: 2
