@@ -4249,6 +4249,10 @@ void legalizeEntryPointParameterForGLSL(
         if (!isRayTracingPrimitiveIDSystemValueParam)
             return;
         break;
+    case Stage::Callable:
+    case Stage::Miss:
+    case Stage::RayGeneration:
+        return;
     }
 
     // Is the parameter type a special pointer type
