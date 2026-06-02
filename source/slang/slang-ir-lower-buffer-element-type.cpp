@@ -1772,11 +1772,10 @@ struct LoweredElementTypeContext
 
             // Types already decorated with [PhysicalType] were processed
             // by an earlier invocation of this pass. Most policies skip
-            // them to avoid double-lowering. The Metal pointer policy
-            // overrides this to false so it can lower pointer fields in
-            // types that MetalParameterBlock already decorated (those
-            // types had their resource fields converted but pointer
-            // fields left untouched).
+            // them to avoid double-lowering. Policies that need to
+            // further process already-decorated types override
+            // shouldSkipPhysicalTypes() to false — see the policy's
+            // override for which predecessors it re-processes.
             //
             if (elementType->findDecoration<IRPhysicalTypeDecoration>() &&
                 leafTypeLoweringPolicy->shouldSkipPhysicalTypes())
@@ -2967,6 +2966,11 @@ struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
 //     fields. Single-level T* is valid as `device int*` inside a
 //     `constant MyStruct*` binding — Metal accepts one level of pointer
 //     indirection in buffer-bound structs.
+//
+// Note: top-level `uniform T**` globals are packed into a GlobalParams
+// struct inside a ConstantBuffer, so the multi-level rule fires through
+// the ConstantBuffer element-type path — they do not go through the
+// IRPtrTypeBase discovery path as bare pointers.
 struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
 {
 

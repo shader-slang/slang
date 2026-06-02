@@ -23,6 +23,11 @@ namespace gfx_test
 // Single-level int* fields should be preserved as typed device pointers since
 // Metal accepts one level of pointer indirection in argument-buffer-bound structs.
 // This test validates that the preserved pointer actually works at runtime.
+//
+// Multi-level pointer runtime validation (int** in a ParameterBlock) is
+// deferred: the Uniform/Constant address-space rule is the same as the
+// ConstantBuffer path validated by pointer-in-buffer-compute-roundtrip.slang,
+// and the shouldSkipPhysicalTypes interaction is covered by filecheck + metallib.
 void pointerInParamBlockRoundtripTestImpl(IDevice* device, UnitTestContext* context)
 {
     if (!device->hasFeature(Feature::ParameterBlock))
