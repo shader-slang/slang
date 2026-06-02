@@ -7,11 +7,13 @@
 
 using namespace Slang;
 
+/// Returns true if `text` contains the substring `expected`.
 static bool _contains(const String& text, const char* expected)
 {
     return text.getUnownedSlice().indexOf(UnownedStringSlice(expected)) >= 0;
 }
 
+/// RAII wrapper that deletes a temporary file on destruction.
 struct TempFile
 {
     String path;
@@ -23,12 +25,14 @@ struct TempFile
     }
 };
 
+/// Creates a temporary file and stores its path in `out`.
 static SlangResult _makeTempFile(const char* prefix, TempFile& out)
 {
     SLANG_RETURN_ON_FAIL(File::generateTemporary(UnownedStringSlice(prefix), out.path));
     return SLANG_OK;
 }
 
+/// Runs slangc with the given arguments and captures stdout/stderr into `outResult`.
 static SlangResult _runSlangc(
     UnitTestContext* context,
     const List<String>& args,
