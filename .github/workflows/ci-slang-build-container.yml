@@ -9,6 +9,11 @@ on:
       runs-on:
         required: true
         type: string
+      spirv-opt-merge-return:
+        description: "Value for SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN in this build"
+        required: false
+        type: string
+        default: "ON"
 
 jobs:
   # Uses nvidia/cuda container for CUDA support.
@@ -141,7 +146,7 @@ jobs:
             -DSLANG_ENABLE_CUDA=ON \
             -DSLANG_ENABLE_PCH=OFF \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-            -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=OFF \
+            -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=${{ inputs.spirv-opt-merge-return }} \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}"
 
