@@ -142,11 +142,16 @@ else
   if [[ "$WITH_AGENTIC_TESTS" == "true" ]]; then
     echo
     echo "Running agentic test suite (docs/generated/tests/) for coverage..."
-    # Use the agentic suite's own expected-failure list (matches what
-    # ci-agentic-tests-nightly.yml passes). slang-test reclassifies
-    # listed failures as `failed(expected)` and exits 0 when only
-    # those occur, so this call only fails on UNEXPECTED failures —
-    # the same gate the nightly enforces.
+    # Use the agentic suite's own expected-failure list.
+    # `slang-test -expected-failure-list` does EXACT-STRING matching:
+    # listed paths get reclassified to `failed(expected)` (slang-test's
+    # TestResult::ExpectedFail), the run exits 0 when only those
+    # occur, and any entry that has started passing is reported under
+    # "passing tests that are expected to fail" so it can be removed.
+    # Caveat: multi-//TEST tests are named per sub-test
+    # (`foo.slang`, `foo.slang.1`, …), so if a specific sub-test
+    # needs suppression, the entry must include the `.N` suffix —
+    # there is no canonicalization on this path.
     # Build the agentic invocation: start with the agentic-specific
     # overrides (test-dir and expected-failure-list — those are what
     # differ from the main pass), then inherit every other flag from
@@ -178,9 +183,13 @@ else
     # loses the rest of the pass and produces minimal coverage uplift.
     # Profraws from the first attempt are kept on disk and accumulate
     # with the retry's so coverage from both runs merges into the
-    # report. Retries only fire on crashes, not on unexpected test
-    # failures (those repeat deterministically and would just waste
-    # runner time).
+    # report.
+    #
+    # Retries only fire on crashes, not on unexpected test failures
+    # (those repeat deterministically and would just waste runner
+    # time). The retry helps *flaky* crashes — for a reproducible
+    # SIGSEGV the second attempt is pure overhead and will crash at
+    # the same point. The 2-attempt cap bounds that cost.
     AGENTIC_MAX_ATTEMPTS=2
     AGENTIC_EXIT=0
     for attempt in $(seq 1 $AGENTIC_MAX_ATTEMPTS); do
