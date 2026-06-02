@@ -78,21 +78,20 @@ void main()
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in any integer type
 
     //
-    // Errors: decimal value in [INTPTR_MAX + 1, UINT64_MAX] for 'Z' suffix.
-    // The spec defines 'Z' dec only for [0, INTPTR_MAX]; no row falls back to
-    // uintptr_t/uint64_t for a 'Z' (signed) suffix, so this is an error.
+    // Warnings: decimal value in [INTPTR_MAX + 1, UINTPTR_MAX] for 'Z' suffix
+    // falls back to uintptr_t per the (*)-marked rows of the spec table.
     //
 
-    getType(9223372036854775808Z); // "dec, 'Z' suffix: intptr_t overflow (error)");
+    getType(9223372036854775808Z); // "dec, 'Z' suffix: intptr_t overflow (warning)");
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    getType(+9223372036854775808Z); // "dec, 'Z' suffix: intptr_t overflow (error)");
+    getType(+9223372036854775808Z); // "dec, 'Z' suffix: intptr_t overflow (warning)");
 //CHECK:     ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    getType(~9223372036854775808Z); // "dec, 'Z' suffix: intptr_t overflow (error)");
+    getType(~9223372036854775808Z); // "dec, 'Z' suffix: intptr_t overflow (warning)");
 //CHECK:     ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
-    getType(18446744073709551615Z); // "dec, 'Z' suffix: intptr_t overflow (error)");
+    getType(18446744073709551615Z); // "dec, 'Z' suffix: intptr_t overflow (warning)");
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     //
