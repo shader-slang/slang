@@ -8,14 +8,14 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 ## Suite totals
 
-- **Bundles:** 65
-- **Total `.slang` tests:** 3020
+- **Bundles:** 68
+- **Total `.slang` tests:** 3069
 
 | Intent       | Count |
 | ------------ | ----- |
-| `functional` | 1172  |
-| `boundary`   | 679   |
-| `negative`   | 620   |
+| `functional` | 1214  |
+| `boundary`   | 684   |
+| `negative`   | 622   |
 | `expansion`  | 437   |
 | `stress`     | 111   |
 | `regression` | 1     |
@@ -27,6 +27,9 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | Bundle                                                                                                                     | Tests | Source doc                                                                                                                                      |
 | -------------------------------------------------------------------------------------------------------------------------- | ----: | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`conformance/basics-execution-divergence-reconvergence`](conformance/basics-execution-divergence-reconvergence/README.md) |     8 | [`docs/language-reference/basics-execution-divergence-reconvergence.md`](../../language-reference/basics-execution-divergence-reconvergence.md) |
+| [`conformance/basics-memory-model-address-spaces`](conformance/basics-memory-model-address-spaces/README.md)               |    20 | [`docs/language-reference/basics-memory-model-address-spaces.md`](../../language-reference/basics-memory-model-address-spaces.md)               |
+| [`conformance/basics-memory-model-consistency`](conformance/basics-memory-model-consistency/README.md)                     |    20 | [`docs/language-reference/basics-memory-model-consistency.md`](../../language-reference/basics-memory-model-consistency.md)                     |
+| [`conformance/basics-memory-model-special-topics`](conformance/basics-memory-model-special-topics/README.md)               |     9 | [`docs/language-reference/basics-memory-model-special-topics.md`](../../language-reference/basics-memory-model-special-topics.md)               |
 | [`conformance/basics-program-execution`](conformance/basics-program-execution/README.md)                                   |    10 | [`docs/language-reference/basics-program-execution.md`](../../language-reference/basics-program-execution.md)                                   |
 | [`conformance/declarations`](conformance/declarations/README.md)                                                           |    43 | [`docs/language-reference/declarations.md`](../../language-reference/declarations.md)                                                           |
 | [`conformance/expressions-identifier`](conformance/expressions-identifier/README.md)                                       |    10 | [`docs/language-reference/expressions-identifier.md`](../../language-reference/expressions-identifier.md)                                       |

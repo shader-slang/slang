@@ -970,4 +970,36 @@ bundles:
       - source/slang/slang-check-expr.cpp
     size_cap_files: 20
 
+  conformance/basics-memory-model-consistency:
+    source_doc: docs/language-reference/basics-memory-model-consistency.md
+    watched_paths:
+      - docs/language-reference/basics-memory-model-consistency.md
+      - source/slang/slang-emit-spirv.cpp
+      - source/slang/slang-emit.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-emit-spirv.cpp
+    size_cap_files: 40
+
+  conformance/basics-memory-model-address-spaces:
+    source_doc: docs/language-reference/basics-memory-model-address-spaces.md
+    watched_paths:
+      - docs/language-reference/basics-memory-model-address-spaces.md
+      - source/slang/slang-emit-spirv.cpp
+      - source/slang/slang-ir-spirv-legalize.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-emit-spirv.cpp
+    size_cap_files: 30
+
+  conformance/basics-memory-model-special-topics:
+    source_doc: docs/language-reference/basics-memory-model-special-topics.md
+    watched_paths:
+      - docs/language-reference/basics-memory-model-special-topics.md
+      - source/slang/slang-emit-spirv.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-emit-spirv.cpp
+    size_cap_files: 30
+
   # --- top-level reference -----------------------------------------------

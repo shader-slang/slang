@@ -1,0 +1,29 @@
+//META: generated=true
+//META: model=claude-sonnet-4-6
+//META: generated_at=2026-06-02T09:58:38+00:00
+//META: source_commit=57fb63455095efe1465661001ad147b24b968932
+//META: doc_ref=docs/language-reference/basics-memory-model-address-spaces.md#address-spaces
+//META: doc_section_digest=3851dfb34bba532778d07931eed37a5ffb7720f62c8acf95efe83c116ec49a46
+//META: purpose=The `uniform` keyword on entry-point parameters also belongs to the Uniform address space; SPIRV emits it in a PushConstant block (single-element uniform parameters collapse to push-constant blocks on SPIRV).
+//META: intent=functional
+//META: pipeline_stage=emit
+//META: warning=Auto-generated. May drift from source. Do not edit by hand.
+
+// The doc table row for "Uniform" names TWO Slang constructs: `uniform` keyword AND
+// `ConstantBuffer<T>`. This test exercises the `uniform` keyword form.
+// On SPIRV, a single `uniform` entry-point parameter typically lowers to a
+// PushConstant block (the implementation packs small uniform entry-point params there).
+
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+
+[numthreads(4, 1, 1)]
+void computeMain(uint3           tid    : SV_DispatchThreadID,
+                 uniform float   scale,
+                 RWStructuredBuffer<float> output)
+{
+    output[tid.x] = float(tid.x) * scale;
+}
+
+// The uniform parameter is expected to land in a Uniform or PushConstant block
+// (both are "Uniform address space" semantics: all threads, constant over dispatch).
+// CHECK: OpVariable {{.*}} PushConstant
