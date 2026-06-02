@@ -337,17 +337,18 @@ struct BufferElementTypeLoweringPolicy : public RefObject
     /// Discovery filter: returns true if the given buffer element type
     /// may contain fields that this policy wants to lower.
     ///
-    /// This is called by processModule on the top-level element type of
-    /// each buffer or pointer global (ConstantBuffer<T>, StructuredBuffer<T>,
-    /// UserPointer T*, etc.). If it returns false, that buffer is skipped
-    /// entirely — no lowered type is computed and no IR is modified. A false
-    /// negative means the buffer keeps its original element type even if it
-    /// contains fields that should have been lowered.
+    /// IMPORTANT: A false return that should have been true is a silent
+    /// correctness bug — the buffer retains its original element type
+    /// and the target compiler may reject it. When in doubt, return true.
     ///
-    /// False positives are harmless: processModule computes the lowered type
+    /// False positives are safe: processModule computes the lowered type
     /// via getLoweredTypeInfo and compares it to the original. If they match
     /// (no fields were actually changed by lowerLeafLogicalType), the buffer
     /// is silently skipped with no behavioral effect.
+    ///
+    /// This is called by processModule on the top-level element type of
+    /// each buffer or pointer global (ConstantBuffer<T>, StructuredBuffer<T>,
+    /// UserPointer T*, etc.).
     ///
     /// Implementations should look through composite types that can contain
     /// lowerable leaf types by value — arrays and structs. They do NOT need
@@ -1745,6 +1746,11 @@ struct LoweredElementTypeContext
             if (as<IRTextureBufferType>(globalInst))
                 continue;
 
+            // elementType is null when globalInst doesn't match any
+            // buffer or pointer category above.
+            if (!elementType)
+                continue;
+
             // Ask the policy whether this element type contains fields
             // it wants to lower. This is a virtual call so that policies
             // can define their own discovery criteria (e.g., the Metal
@@ -2983,9 +2989,16 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
     // be address-space-aware (shared base-class signature change),
     // since the discovery filter can't currently distinguish
     // StorageBuffer (lower all pointers) from Uniform/Constant (lower
-    // only multi-level).
+    // only multi-level). In practice this triggers for ParameterBlock
+    // structs with single-level pointers in Uniform/Constant context.
+    // The extra helpers are eliminated by simplifyNonSSAIR — the cost
+    // is compile-time IR churn only, no runtime impact.
     bool needsElementLowering(IRType* elementType) override
     {
+        // We match IRPtrType specifically, not IRPtrTypeBase (which
+        // also includes IRRefType). Metal's device T* device*
+        // restriction applies to address-taking pointers; references
+        // are not stored as data in buffer element types.
         if (as<IRPtrType>(elementType))
             return true;
         if (auto arrType = as<IRArrayTypeBase>(elementType))
@@ -2996,14 +3009,18 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
                 if (needsElementLowering(field->getFieldType()))
                     return true;
         }
+        // All other leaf types (scalars, vectors, DescriptorHandle after
+        // MetalParameterBlock lowering, etc.) do not contain pointers
+        // and correctly fall through.
         return false;
     }
 
     // The early MetalParameterBlock policy already processed ParameterBlock
     // structs, converting resource fields to DescriptorHandle and decorating
     // the storage type with [PhysicalType]. Pointer fields were left
-    // untouched. We must re-process these types to lower their pointer
-    // fields — hence overriding to false.
+    // untouched — IRPtrType is not a resource type, and the default
+    // policy's lowerLeafLogicalType does not lower pointers. We must
+    // re-process these types to lower their pointer fields.
     bool shouldSkipPhysicalTypes() override { return false; }
 
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
@@ -3049,8 +3066,9 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
         }
 
         // Not a pointer, or a single-level pointer in a non-StorageBuffer
-        // context (which Metal allows). Return identity so the framework
-        // leaves this field unchanged.
+        // context (which Metal allows). Identity: loweredType == originalType
+        // tells the framework no conversion is needed. Conversion methods
+        // are left default-constructed (unused when types match).
         //
         LoweredElementTypeInfo info;
         info.originalType = type;

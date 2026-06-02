@@ -2412,7 +2412,8 @@ Result linkAndOptimizeIR(
         // Liveness is disabled because liveness markers serve downstream
         // GLSL targets via applyGLSLLiveness; Metal does not consume them,
         // and the markers were already finalized before the main
-        // eliminatePhis.
+        // eliminatePhis. LivenessMode::Disabled skips marker insertion;
+        // it does not strip or invalidate markers placed by earlier passes.
         PhiEliminationOptions phiEliminationOptions;
         SLANG_PASS(eliminatePhis, LivenessMode::Disabled, phiEliminationOptions);
 
