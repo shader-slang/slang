@@ -240,16 +240,19 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    // Helper function to check if the alignment value passed is
-    // divisible by the offset at which the resource is indexed into
-    // in order to ensure if the load or store can be vectorized.
-    bool isAligned(IRInst* offset, IRInst* unknownOffsetAlignment, IRIntegerValue alignmentVal)
+    // Helper function to check if the offset at which the resource is indexed into
+    // is aligned enough to allow a vectorized load or store.
+    bool isAligned(
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* unknownOffsetAlignment,
+        IRIntegerValue alignmentVal)
     {
-        if (auto baseOffsetVal = as<IRIntLit>(offset))
+        if (auto baseOffsetVal = as<IRIntLit>(baseOffset))
         {
             // If the offset is a constant known at compile time, simply check if it aligned to
             // the elementsize of the underlying resource.
-            return (baseOffsetVal->getValue() % alignmentVal) == 0;
+            return ((baseOffsetVal->getValue() + immediateOffset) % alignmentVal) == 0;
         }
         else if (auto alignInst = as<IRIntLit>(unknownOffsetAlignment))
         {
@@ -262,6 +265,9 @@ struct ByteAddressBufferLegalizationContext
             if (!alignInst->getValue())
                 return false;
 
+            if ((immediateOffset % alignmentVal) != 0)
+                return false;
+
             if ((alignInst->getValue() % alignmentVal) == 0)
             {
                 return true;
@@ -269,10 +275,35 @@ struct ByteAddressBufferLegalizationContext
             m_sink->diagnose(Diagnostics::ByteAddressBufferUnaligned{
                 .alignment = alignInst->getValue(),
                 .elementSize = alignmentVal,
-                .location = offset->sourceLoc,
+                .location = baseOffset->sourceLoc,
             });
         }
         return false;
+    }
+
+    IRType* getDescriptorHandleStorageType()
+    {
+        if (!m_options.translateToStructuredBufferOps)
+            return nullptr;
+
+        if (m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+            return m_builder.getUInt64Type();
+
+        return m_builder.getVectorType(m_builder.getUIntType(), 2);
+    }
+
+    IROp getCastDescriptorHandleToStorageOp()
+    {
+        return m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV)
+                   ? kIROp_CastDescriptorHandleToUInt64
+                   : kIROp_CastDescriptorHandleToUInt2;
+    }
+
+    IROp getCastStorageToDescriptorHandleOp()
+    {
+        return m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV)
+                   ? kIROp_CastUInt64ToDescriptorHandle
+                   : kIROp_CastUInt2ToDescriptorHandle;
     }
 
     SlangResult getOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
@@ -408,10 +439,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isAligned(
-                        emitOffsetAddIfNeeded(baseOffset, immediateOffset),
-                        alignment,
-                        alignmentVal))
+                if (!isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -427,6 +455,22 @@ struct ByteAddressBufferLegalizationContext
                 {
                     return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
                 }
+            }
+        }
+        else if (auto descriptorHandleType = as<IRDescriptorHandleType>(type))
+        {
+            if (auto storageType = getDescriptorHandleStorageType())
+            {
+                auto storageVal =
+                    emitLegalLoad(storageType, buffer, baseOffset, immediateOffset, alignment);
+                if (!storageVal)
+                    return nullptr;
+                IRInst* args[] = {storageVal};
+                return m_builder.emitIntrinsicInst(
+                    descriptorHandleType,
+                    getCastStorageToDescriptorHandleOp(),
+                    1,
+                    args);
             }
         }
         else if (auto matType = as<IRMatrixType>(type))
@@ -507,10 +551,7 @@ struct ByteAddressBufferLegalizationContext
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
                 if (m_options.scalarizeVectorLoadStore ||
-                    !isAligned(
-                        emitOffsetAddIfNeeded(baseOffset, immediateOffset),
-                        alignment,
-                        alignmentVal))
+                    !isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -1280,10 +1321,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isAligned(
-                        emitOffsetAddIfNeeded(baseOffset, immediateOffset),
-                        alignment,
-                        alignmentVal))
+                if (!isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1303,6 +1341,25 @@ struct ByteAddressBufferLegalizationContext
                         immediateOffset,
                         value);
                 }
+            }
+        }
+        else if (auto descriptorHandleType = as<IRDescriptorHandleType>(type))
+        {
+            if (auto storageType = getDescriptorHandleStorageType())
+            {
+                IRInst* args[] = {value};
+                auto storageVal = m_builder.emitIntrinsicInst(
+                    storageType,
+                    getCastDescriptorHandleToStorageOp(),
+                    1,
+                    args);
+                return emitLegalStore(
+                    storageType,
+                    buffer,
+                    baseOffset,
+                    immediateOffset,
+                    alignment,
+                    storageVal);
             }
         }
         else if (auto matType = as<IRMatrixType>(type))
@@ -1374,10 +1431,7 @@ struct ByteAddressBufferLegalizationContext
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
                 if (m_options.scalarizeVectorLoadStore ||
-                    !isAligned(
-                        emitOffsetAddIfNeeded(baseOffset, immediateOffset),
-                        alignment,
-                        alignmentVal))
+                    !isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceStore(
                         buffer,
