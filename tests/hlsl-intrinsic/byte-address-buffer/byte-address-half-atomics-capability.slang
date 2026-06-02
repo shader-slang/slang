@@ -1,11 +1,13 @@
 // Scalar fp16 add checks. `NO_FP16_ATOMIC` has no fp16 atomic capability; `VECTOR_ONLY`
 // has the vector capability but intentionally lacks the scalar spvAtomicFloat16AddEXT.
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_SCALAR):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16AddEXT -output-using-type -xslang -DTEST_RUNTIME_SCALAR
 //TEST:SIMPLE(filecheck=SCALAR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT
 //DIAGNOSTIC_TEST:SIMPLE(diag=NO_FP16_ATOMIC,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spirv_1_5
 //DIAGNOSTIC_TEST:SIMPLE(diag=VECTOR_ONLY,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16VectorNV
 
 // Direct half-vector `__atomic_*` checks. `DIRECT` selects direct structured-buffer
 // atomics; `NO_VECTOR` means only the scalar fp16 atomic capability is enabled.
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_ATOMIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_MIN_MAX
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_EXCHANGE_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_EXCHANGE
@@ -13,6 +15,8 @@
 
 // Pointer-form fp16 vector checks. These paths are emitted as vector atomics, so
 // they must diagnose missing spvAtomicFloat16VectorNV when only scalar fp16 add is enabled.
+// Runtime coverage for these pointer-form helpers would require SPIR-V variable pointers,
+// which existing tests keep disabled on current GCP runners.
 //DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_EMULATED
 //DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_F16X2_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_F16X2
 
@@ -27,17 +31,85 @@
 //TEST:SIMPLE(filecheck=EMULATED): -target spirv -entry computeMain -stage compute -emit-spirv-directly -DTEST_EMULATED
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -capability cuda_sm_7_0
 
+//TEST_INPUT:ubuffer(stride=4, count=8):name=tmpBuffer
 RWByteAddressBuffer tmpBuffer;
+//TEST_INPUT:ubuffer(stride=4, count=32):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
+//TEST_INPUT:ubuffer(stride=2, count=4):name=halfBuffer
 RWStructuredBuffer<half> halfBuffer;
+//TEST_INPUT:ubuffer(stride=4, count=4):name=vectorBuffer
 RWStructuredBuffer<half2> vectorBuffer;
+#ifdef TEST_UNSUPPORTED_VECTOR_WIDTH
 RWStructuredBuffer<half3> unsupportedVectorBuffer;
+#endif
+//TEST_INPUT:ubuffer(stride=4, count=1):name=uintBuffer
 RWStructuredBuffer<uint> uintBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-#ifdef TEST_DIRECT_VECTOR_ATOMIC
+#ifdef TEST_RUNTIME_SCALAR
+    half originalLow;
+    half originalHigh;
+    tmpBuffer.Store<half>(0, 2.0h);
+    tmpBuffer.Store<half>(2, 4.0h);
+    tmpBuffer.InterlockedAddF16(0, 1.0h, originalLow);
+    tmpBuffer.InterlockedAddF16(2, 3.0h, originalHigh);
+
+    outputBuffer[0] = float(originalLow);
+    outputBuffer[1] = float(originalHigh);
+    outputBuffer[2] = float(tmpBuffer.Load<half>(0));
+    outputBuffer[3] = float(tmpBuffer.Load<half>(2));
+    // RUNTIME_SCALAR: type: float
+    // RUNTIME_SCALAR-NEXT: 2.000000
+    // RUNTIME_SCALAR-NEXT: 4.000000
+    // RUNTIME_SCALAR-NEXT: 3.000000
+    // RUNTIME_SCALAR-NEXT: 7.000000
+#elif defined(TEST_RUNTIME_DIRECT)
+    vectorBuffer[0] = half2(2.0h, 4.0h);
+    vectorBuffer[1] = half2(5.0h, 1.0h);
+    vectorBuffer[2] = half2(5.0h, 1.0h);
+    vectorBuffer[3] = half2(8.0h, 9.0h);
+
+    half2 originalAdd = __atomic_add(vectorBuffer[0], half2(1.0h, 3.0h));
+    half2 originalMin = __atomic_min(vectorBuffer[1], half2(3.0h, 2.0h));
+    half2 originalMax = __atomic_max(vectorBuffer[2], half2(3.0h, 2.0h));
+    half2 originalExchange = __atomic_exchange(vectorBuffer[3], half2(6.0h, 7.0h));
+
+    outputBuffer[0] = float(originalAdd.x);
+    outputBuffer[1] = float(originalAdd.y);
+    outputBuffer[2] = float(vectorBuffer[0].x);
+    outputBuffer[3] = float(vectorBuffer[0].y);
+    outputBuffer[4] = float(originalMin.x);
+    outputBuffer[5] = float(originalMin.y);
+    outputBuffer[6] = float(vectorBuffer[1].x);
+    outputBuffer[7] = float(vectorBuffer[1].y);
+    outputBuffer[8] = float(originalMax.x);
+    outputBuffer[9] = float(originalMax.y);
+    outputBuffer[10] = float(vectorBuffer[2].x);
+    outputBuffer[11] = float(vectorBuffer[2].y);
+    outputBuffer[12] = float(originalExchange.x);
+    outputBuffer[13] = float(originalExchange.y);
+    outputBuffer[14] = float(vectorBuffer[3].x);
+    outputBuffer[15] = float(vectorBuffer[3].y);
+    // RUNTIME_DIRECT: type: float
+    // RUNTIME_DIRECT-NEXT: 2.000000
+    // RUNTIME_DIRECT-NEXT: 4.000000
+    // RUNTIME_DIRECT-NEXT: 3.000000
+    // RUNTIME_DIRECT-NEXT: 7.000000
+    // RUNTIME_DIRECT-NEXT: 5.000000
+    // RUNTIME_DIRECT-NEXT: 1.000000
+    // RUNTIME_DIRECT-NEXT: 3.000000
+    // RUNTIME_DIRECT-NEXT: 1.000000
+    // RUNTIME_DIRECT-NEXT: 5.000000
+    // RUNTIME_DIRECT-NEXT: 1.000000
+    // RUNTIME_DIRECT-NEXT: 5.000000
+    // RUNTIME_DIRECT-NEXT: 2.000000
+    // RUNTIME_DIRECT-NEXT: 8.000000
+    // RUNTIME_DIRECT-NEXT: 9.000000
+    // RUNTIME_DIRECT-NEXT: 6.000000
+    // RUNTIME_DIRECT-NEXT: 7.000000
+#elif defined(TEST_DIRECT_VECTOR_ATOMIC)
     __atomic_add(vectorBuffer[0], half2(1.0h, 2.0h));
 // DIRECT_NO_VECTOR: entry point uses capabilities not in specified profile
 // DIRECT_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'

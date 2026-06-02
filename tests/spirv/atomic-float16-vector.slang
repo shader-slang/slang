@@ -1,15 +1,27 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(stride=4, count=8):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):name=workBuffer
+//TEST_INPUT:ubuffer(stride=4, count=4):name=workBuffer
 RWStructuredBuffer<half2> workBuffer;
+//TEST_INPUT:ubuffer(stride=8, count=4):name=workBuffer4
 RWStructuredBuffer<half4> workBuffer4;
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+    workBuffer[0] = half2(2.0h, 4.0h);
+    workBuffer[1] = half2(5.0h, 1.0h);
+    workBuffer[2] = half2(5.0h, 1.0h);
+    workBuffer[3] = half2(8.0h, 9.0h);
+
+    workBuffer4[0] = half4(1.0h, 2.0h, 3.0h, 4.0h);
+    workBuffer4[1] = half4(5.0h, 1.0h, 7.0h, 2.0h);
+    workBuffer4[2] = half4(5.0h, 1.0h, 7.0h, 2.0h);
+    workBuffer4[3] = half4(8.0h, 9.0h, 10.0h, 11.0h);
+
     half2 originalAdd;
     half2 originalMin;
     half2 originalMax;
@@ -33,6 +45,20 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[1] = float(originalAdd.y + originalMin.y + originalMax.y + originalExchange.y);
     outputBuffer[2] = float(originalAdd4.x + originalMin4.x + originalMax4.x + originalExchange4.x);
     outputBuffer[3] = float(originalAdd4.w + originalMin4.w + originalMax4.w + originalExchange4.w);
+    outputBuffer[4] = float(workBuffer[0].x + workBuffer[1].x + workBuffer[2].x + workBuffer[3].x);
+    outputBuffer[5] = float(workBuffer[0].y + workBuffer[1].y + workBuffer[2].y + workBuffer[3].y);
+    outputBuffer[6] = float(workBuffer4[0].x + workBuffer4[1].x + workBuffer4[2].x + workBuffer4[3].x);
+    outputBuffer[7] = float(workBuffer4[0].w + workBuffer4[1].w + workBuffer4[2].w + workBuffer4[3].w);
+
+    // RUNTIME: type: float
+    // RUNTIME-NEXT: 20.000000
+    // RUNTIME-NEXT: 15.000000
+    // RUNTIME-NEXT: 19.000000
+    // RUNTIME-NEXT: 19.000000
+    // RUNTIME-NEXT: 12.000000
+    // RUNTIME-NEXT: 13.000000
+    // RUNTIME-NEXT: 13.000000
+    // RUNTIME-NEXT: 22.000000
 }
 
 // CHECK-NOT: OpCapability AtomicFloat16AddEXT
