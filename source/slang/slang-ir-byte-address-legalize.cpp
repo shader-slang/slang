@@ -979,6 +979,21 @@ struct ByteAddressBufferLegalizationContext
                 loadDescriptor->getHeap(),
                 loadDescriptor->getIndex());
         }
+        else if (auto resourceDescriptor = as<IRLoadResourceDescriptorFromHeap>(byteAddressBuffer))
+        {
+            auto structuredBufferType = getEquivalentStructuredBufferParamType(
+                elementType,
+                resourceDescriptor->getDataType());
+            if (!structuredBufferType)
+                return nullptr;
+
+            auto index = resourceDescriptor->getIndex();
+            return m_builder.emitIntrinsicInst(
+                structuredBufferType,
+                kIROp_LoadResourceDescriptorFromHeap,
+                1,
+                &index);
+        }
 
         if (byteAddressBuffer->getOp() == kIROp_GetElement)
         {
