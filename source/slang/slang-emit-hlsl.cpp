@@ -1575,8 +1575,8 @@ static bool _canEmitExport(const Profile& profile)
 {
     const auto family = profile.getFamily();
     const auto version = profile.getVersion();
-    // Is ita late enough version of shader model to output with 'export'
-    return (family == ProfileFamily::DX && version >= ProfileVersion::DX_6_1);
+    // DXC rejects pre-SM6.3 library profiles for whole-program DXIL output.
+    return (family == ProfileFamily::DX && version >= ProfileVersion::DX_6_3);
 }
 
 /* virtual */ void HLSLSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
