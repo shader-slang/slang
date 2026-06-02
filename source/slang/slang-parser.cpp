@@ -9527,12 +9527,18 @@ static Expr* parsePrefixExpr(Parser* parser)
                     // Check if we need to diagnose the signed minimum int special case here. This
                     // won't be detected by SemanticsExprVisitor, because the literal value is no
                     // longer INT64_MIN after folding.
-                    if (newLiteral->signedMinimumIntException)
+                    //
+                    // Diagnostics are not triggered when the base type is Int64, which is a
+                    // legitimate type. (Diagnostics are triggered for Uint64 and UIntPtr after
+                    // signed-to-unsigned fallback.)
+                    if (newLiteral->signedMinimumIntException &&
+                        newLiteral->suffixType != BaseType::Int64)
                     {
                         parser->sink->diagnose(
                             Diagnostics::IntegerLiteralTooLarge{.location = intLit->loc});
-                        newLiteral->signedMinimumIntException = false;
                     }
+
+                    newLiteral->signedMinimumIntException = false;
 
                     // Need to get the basic type, so we can fit to underlying type
                     if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))

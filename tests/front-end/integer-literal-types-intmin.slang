@@ -37,4 +37,10 @@ void main()
     static_assert(IntegerLiteralType.INT64   == getType(-9223372036854775808LL), "minimum value of int64_t 'LL'");
 
     static_assert(IntegerLiteralType.INTPTR  == getType(-9223372036854775808Z),  "minimum value of intptr_t 'Z'");
+
+    // Special values related to folding prefix + (INT_MAX+1)
+    static_assert(IntegerLiteralType.INT64   == getType(2147483648),                        "dec, no suffix: int64_t low bound");
+    static_assert(IntegerLiteralType.INT32   == getType(-2147483648),                       "dec, no suffix: neg + int64_t low bound");
+    static_assert(IntegerLiteralType.INT64   == getType(+2147483648),                       "dec, no suffix: plus + int64_t low bound");
+    static_assert(IntegerLiteralType.INT64   == getType(~2147483648),                       "dec, no suffix: not + int64_t low bound");
 }

@@ -33,6 +33,12 @@ void main()
     getType(9223372036854775808); //               "dec, no suffix: uint64_t low bound (warning)");
 //CHECK:    ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
+    getType(+9223372036854775808); //               "dec, no suffix: uint64_t low bound (warning)");
+//CHECK:     ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+
+    getType(~9223372036854775808); //               "dec, no suffix: uint64_t low bound (warning)");
+//CHECK:     ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+
     getType(18446744073709551615); //              "dec, no suffix: uint64_t high bound (warning)");
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
@@ -79,6 +85,12 @@ void main()
 
     getType(9223372036854775808Z); // "dec, 'Z' suffix: intptr_t overflow (error)");
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+
+    getType(+9223372036854775808Z); // "dec, 'Z' suffix: intptr_t overflow (error)");
+//CHECK:     ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+
+    getType(~9223372036854775808Z); // "dec, 'Z' suffix: intptr_t overflow (error)");
+//CHECK:     ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     getType(18446744073709551615Z); // "dec, 'Z' suffix: intptr_t overflow (error)");
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned

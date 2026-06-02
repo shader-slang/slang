@@ -2,7 +2,7 @@
 //
 // This test assumes 64-bit pointers.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:INTERPRET(filecheck=CHECK):  -warnings-as-errors all
 void main()
 {
     int32_t i32;
@@ -88,4 +88,17 @@ void main()
     uptr = 18446744073709551615UZ;
     printf("'uptr=0x%llx'\n", uptr);
     //CHECK: 'uptr=0xffffffffffffffff'
+
+    // special values related to folding code in parser
+    i64 = 2147483648;
+    printf("'i64=0x%llx'\n", i64);
+    //CHECK: 'i64=0x80000000'
+
+    i64 = +2147483648;
+    printf("'i64=0x%llx'\n", i64);
+    //CHECK: 'i64=0x80000000'
+
+    i64 = ~2147483648;
+    printf("'i64=0x%llx'\n", i64);
+    //CHECK: 'i64=0xffffffff7fffffff'
 }
