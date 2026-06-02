@@ -1,4 +1,3 @@
-// The filecheck=FOO,BAR syntax gives LLVM FileCheck multiple check prefixes for one run.
 // SM60 is intentional for pre-SM6 DX profiles: DXIL output is floored to Shader Model 6.0.
 //TEST:SIMPLE(filecheck=CS,SM60): -target dxil -entry computeMain
 //TEST:SIMPLE(filecheck=CS,SM60): -target dxil-assembly -entry computeMain
