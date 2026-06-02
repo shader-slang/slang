@@ -10081,7 +10081,21 @@ top:
         break;
 
     default:
-        SLANG_UNIMPLEMENTED_X("assignment");
+        {
+            SourceLoc loc;
+            for (auto locInfo = context->irBuilder->getSourceLocInfo(); locInfo;
+                 locInfo = locInfo->next)
+            {
+                if (locInfo->sourceLoc.getRaw() != 0)
+                {
+                    loc = locInfo->sourceLoc;
+                    break;
+                }
+            }
+            context->getSink()->diagnose(Diagnostics::UnsupportedAssignmentTarget{
+                .location = loc,
+            });
+        }
         break;
     }
 }

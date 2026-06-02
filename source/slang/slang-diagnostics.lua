@@ -4475,6 +4475,13 @@ err(
 )
 
 err(
+    "unsupported-assignment-target",
+    40017,
+    "assignment target is not supported",
+    span { loc = "location", message = "this form of assignment is not currently supported; consider assigning to the whole value instead of an individual element" }
+)
+
+err(
     "cannot-unroll-loop",
     40020,
     "loop unrolling failed",
