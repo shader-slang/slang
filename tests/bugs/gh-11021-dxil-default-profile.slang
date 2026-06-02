@@ -17,6 +17,7 @@
 //TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -whole-program
 //TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -profile lib_6_2 -whole-program
 //TEST:SIMPLE(filecheck=LIB68): -target dxil-assembly -profile lib_6_8 -whole-program
+//TEST(windows):COMPILE: tests/bugs/gh-11021-dxil-default-profile.slang -target dxil -whole-program -o tests/bugs/gh-11021-dxil-default-profile-whole-program.dxil
 //TEST(windows):COMPILE: tests/bugs/gh-11021-dxil-default-profile.slang -target dxil -o tests/bugs/gh-11021-dxil-default-profile.dxil
 //TEST(windows):COMPILE: tests/bugs/gh-11021-dxil-default-profile.slang -target dxil -entry computeMain -profile cs_5_1 -whole-program -o tests/bugs/gh-11021-dxil-whole-program-profile.dxil
 
