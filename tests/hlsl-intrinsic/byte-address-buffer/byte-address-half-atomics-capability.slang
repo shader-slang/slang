@@ -8,6 +8,7 @@
 // Direct half-vector `__atomic_*` checks. `DIRECT` selects direct structured-buffer
 // atomics; `NO_VECTOR` means only the scalar fp16 atomic capability is enabled.
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT4):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT_VECTOR4
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_ATOMIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_VECTOR4_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR4_ATOMIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_MIN_MAX
@@ -113,6 +114,28 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // RUNTIME_DIRECT-NEXT: 9.000000
     // RUNTIME_DIRECT-NEXT: 6.000000
     // RUNTIME_DIRECT-NEXT: 7.000000
+#elif defined(TEST_RUNTIME_DIRECT_VECTOR4)
+    vector4Buffer[0] = half4(2.0h, 4.0h, 6.0h, 8.0h);
+
+    half4 originalAdd = __atomic_add(vector4Buffer[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
+
+    outputBuffer[0] = float(originalAdd.x);
+    outputBuffer[1] = float(originalAdd.y);
+    outputBuffer[2] = float(originalAdd.z);
+    outputBuffer[3] = float(originalAdd.w);
+    outputBuffer[4] = float(vector4Buffer[0].x);
+    outputBuffer[5] = float(vector4Buffer[0].y);
+    outputBuffer[6] = float(vector4Buffer[0].z);
+    outputBuffer[7] = float(vector4Buffer[0].w);
+    // RUNTIME_DIRECT4: type: float
+    // RUNTIME_DIRECT4-NEXT: 2.000000
+    // RUNTIME_DIRECT4-NEXT: 4.000000
+    // RUNTIME_DIRECT4-NEXT: 6.000000
+    // RUNTIME_DIRECT4-NEXT: 8.000000
+    // RUNTIME_DIRECT4-NEXT: 3.000000
+    // RUNTIME_DIRECT4-NEXT: 6.000000
+    // RUNTIME_DIRECT4-NEXT: 9.000000
+    // RUNTIME_DIRECT4-NEXT: 12.000000
 #elif defined(TEST_DIRECT_VECTOR_ATOMIC)
     __atomic_add(vectorBuffer[0], half2(1.0h, 2.0h));
 // DIRECT_NO_VECTOR: entry point uses capabilities not in specified profile
