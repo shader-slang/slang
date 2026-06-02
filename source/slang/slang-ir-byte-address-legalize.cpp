@@ -969,6 +969,9 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto loadDescriptor = as<IRSPIRVLoadDescriptorFromHeap>(byteAddressBuffer))
         {
+            // Under spvDescriptorHeapEXT, DescriptorHandle<T> dereferences lower to a heap load.
+            // Reinterpret that heap-sourced ByteAddressBuffer as the equivalent StructuredBuffer
+            // before replacing byte-address loads/stores with structured-buffer operations.
             auto structuredBufferType =
                 getEquivalentStructuredBufferParamType(elementType, loadDescriptor->getDataType());
             if (!structuredBufferType)

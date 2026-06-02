@@ -26997,6 +26997,9 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
     __intrinsic_op($(kIROp_CastUInt2ToDescriptorHandle))
     __init(uint2 handleValue);
 
+    // Under spvDescriptorHeapEXT, a scalar handle is a resource-heap index.
+    // Keep this distinct from the uint64_t constructors used by CUDA and
+    // spvBindlessTextureNV so integer literals do not select the wrong layout.
     [ForceInline]
     [require(spvDescriptorHeapEXT, descriptor_handle)]
     __init(uint handleValue)
