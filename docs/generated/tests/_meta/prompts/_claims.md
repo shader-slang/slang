@@ -4,8 +4,8 @@ How to turn a source doc into a complete test bundle. This is the
 shared methodology referenced by [`CAMPAIGN.md`](../CAMPAIGN.md) and
 the per-bundle `_prompt.md` files. It is **tree-agnostic**: it applies
 identically whether the bundle's `source_doc` is a `docs/language-reference/`
-file (the `spec/` tree) or a `docs/generated/design/` file (the
-`regression/` tree). The only difference is the source-of-truth weight
+file (the `conformance/` tree) or a `docs/generated/design/` file (the
+`design/` tree). The only difference is the source-of-truth weight
 of the doc — see [`_common.md` § Source-of-truth hierarchy](_common.md).
 
 The campaign is **claim-driven, not count-driven**. A doc is decomposed

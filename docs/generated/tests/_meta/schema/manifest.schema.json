@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/shader-slang/slang/docs/generated/tests/_meta/schema/manifest.schema.json",
   "title": "docs/generated/tests manifest",
-  "description": "Schema for docs/generated/tests/_meta/manifest.yaml. Bundle keys are role-rooted (spec/<doc> for language-reference-anchored bundles, regression/<area>/<doc> for generated-design-anchored bundles). Tests in each bundle derive their claims from the bundle's source_doc and are never written against source-line gaps.",
+  "description": "Schema for docs/generated/tests/_meta/manifest.yaml. Bundle keys are role-rooted (conformance/<doc> for language-reference-anchored bundles, design/<area>/<doc> for generated-design-anchored bundles). Tests in each bundle derive their claims from the bundle's source_doc and are never written against source-line gaps.",
   "type": "object",
   "required": ["version", "bundles"],
   "additionalProperties": false,
@@ -18,7 +18,7 @@
     },
     "bundles": {
       "type": "object",
-      "description": "Map of bundle key -> bundle spec. The bundle key is the role-rooted path of the bundle: spec/<doc> for language-reference-anchored bundles, regression/<area>/<doc> for generated-design-anchored bundles. The bundle directory is docs/generated/tests/<key>/, and the per-bundle prompt is co-located there as _prompt.md (derived, not stored here).",
+      "description": "Map of bundle key -> bundle spec. The bundle key is the role-rooted path of the bundle: conformance/<doc> for language-reference-anchored bundles, design/<area>/<doc> for generated-design-anchored bundles. The bundle directory is docs/generated/tests/<key>/, and the per-bundle prompt is co-located there as _prompt.md (derived, not stored here).",
       "propertyNames": {
         "pattern": "^[a-z0-9]+(/[a-z0-9][a-z0-9-]*)*$"
       },
@@ -30,7 +30,7 @@
           "source_doc": {
             "type": "string",
             "pattern": "^docs/(generated/design|language-reference)/.+\\.md$",
-            "description": "Workspace-relative path to the documentation file this bundle's tests are anchored to. spec/ bundles cite docs/language-reference/; regression/ bundles cite docs/generated/design/."
+            "description": "Workspace-relative path to the documentation file this bundle's tests are anchored to. conformance/ bundles cite docs/language-reference/; design/ bundles cite docs/generated/design/."
           },
           "watched_paths": {
             "type": "array",

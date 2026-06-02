@@ -6,10 +6,10 @@
 #
 # Conventions:
 #   - Bundle keys are role-rooted:
-#       spec/<doc>              — anchored to the authoritative human-written
-#                                 spec at docs/language-reference/.
-#       regression/<area>/<doc> — anchored to the reverse-engineered design
-#                                 docs at docs/generated/design/.
+#       conformance/<doc>     — anchored to the authoritative human-written
+#                               spec at docs/language-reference/.
+#       design/<area>/<doc>   — anchored to the reverse-engineered design
+#                               docs at docs/generated/design/.
 #     See _meta/prompts/_common.md § Source-of-truth hierarchy.
 #   - The bundle directory is docs/generated/tests/<key>/.
 #   - The per-bundle prompt is co-located with the bundle as
@@ -17,8 +17,8 @@
 #   - watched_paths globs are workspace-relative. When the watched source
 #     changes, the bundle becomes stale (mirrors the docs manifest).
 #   - source_doc is the file this bundle's tests derive their claims from
-#     (docs/language-reference/ for spec/, docs/generated/design/ for
-#     regression/). Its sha256 is tracked separately so doc edits
+#     (docs/language-reference/ for conformance/, docs/generated/design/
+#     for design/). Its sha256 is tracked separately so doc edits
 #     invalidate the bundle.
 #   - depends_on lists other bundle keys whose README.md is provided as
 #     context to the agent (Phase C cross-link pass).
@@ -37,7 +37,7 @@ bundles:
   # describe the system rather than specify behavior, so their "claims"
   # are already exercised by behaviorally-anchored bundles below.
 
-  regression/pipeline/overview:
+  design/pipeline/overview:
     source_doc: docs/generated/design/pipeline/overview.md
     watched_paths:
       - source/slang/slang-compile-request.cpp
@@ -52,7 +52,7 @@ bundles:
       - source/slang/slang-emit.cpp
     size_cap_files: 20
 
-  regression/pipeline/01-lex-preprocess:
+  design/pipeline/01-lex-preprocess:
     source_doc: docs/generated/design/pipeline/01-lex-preprocess.md
     watched_paths:
       - source/compiler-core/slang-lexer.h
@@ -63,13 +63,13 @@ bundles:
       - source/slang/slang-preprocessor.h
       - source/slang/slang-preprocessor.cpp
     depends_on:
-      - regression/pipeline/overview
+      - design/pipeline/overview
     coverage_targets:
       - source/compiler-core/slang-lexer.cpp
       - source/slang/slang-preprocessor.cpp
     size_cap_files: 75
 
-  regression/pipeline/02-parse-ast:
+  design/pipeline/02-parse-ast:
     source_doc: docs/generated/design/pipeline/02-parse-ast.md
     watched_paths:
       - source/slang/slang-parser.h
@@ -81,12 +81,12 @@ bundles:
       - source/slang/slang-ast-type.h
       - source/slang/slang-ast-modifier.h
     depends_on:
-      - regression/pipeline/01-lex-preprocess
+      - design/pipeline/01-lex-preprocess
     coverage_targets:
       - source/slang/slang-parser.cpp
     size_cap_files: 60
 
-  regression/pipeline/03-semantic-check:
+  design/pipeline/03-semantic-check:
     source_doc: docs/generated/design/pipeline/03-semantic-check.md
     watched_paths:
       - source/slang/slang-check.h
@@ -103,7 +103,7 @@ bundles:
       - source/slang/slang-check-modifier.cpp
       - source/slang/slang-check-shader.cpp
     depends_on:
-      - regression/pipeline/02-parse-ast
+      - design/pipeline/02-parse-ast
     coverage_targets:
       - source/slang/slang-check.cpp
       - source/slang/slang-check-decl.cpp
@@ -113,7 +113,7 @@ bundles:
       - source/slang/slang-check-overload.cpp
     size_cap_files: 80
 
-  regression/pipeline/04-ast-to-ir:
+  design/pipeline/04-ast-to-ir:
     source_doc: docs/generated/design/pipeline/04-ast-to-ir.md
     watched_paths:
       - source/slang/slang-lower-to-ir.h
@@ -121,8 +121,8 @@ bundles:
       - source/slang/slang-ir.h
       - source/slang/slang-ir.cpp
     depends_on:
-      - regression/pipeline/03-semantic-check
-      - regression/cross-cutting/ir-instructions
+      - design/pipeline/03-semantic-check
+      - design/cross-cutting/ir-instructions
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
       - source/slang/slang-ast-builder.cpp
@@ -130,45 +130,45 @@ bundles:
       - source/slang/slang-ast-val.cpp
     size_cap_files: 150
 
-  regression/pipeline/04b-pre-link-passes:
+  design/pipeline/04b-pre-link-passes:
     source_doc: docs/generated/design/pipeline/04b-pre-link-passes.md
     watched_paths:
       - source/slang/slang-lower-to-ir.cpp
       - source/slang/slang-ir-link.cpp
     depends_on:
-      - regression/pipeline/03-semantic-check
-      - regression/pipeline/04-ast-to-ir
-      - regression/pipeline/05-ir-passes
-      - regression/ir-reference/index
+      - design/pipeline/03-semantic-check
+      - design/pipeline/04-ast-to-ir
+      - design/pipeline/05-ir-passes
+      - design/ir-reference/index
     coverage_targets:
       - source/slang/slang-ir-link.cpp
       - source/slang/slang-ir-legalize-types.cpp
     size_cap_files: 75
 
-  regression/pipeline/04c-layout-ir:
+  design/pipeline/04c-layout-ir:
     source_doc: docs/generated/design/pipeline/04c-layout-ir.md
     watched_paths:
       - source/slang/slang-lower-to-ir.cpp
       - source/slang/slang-target-program.h
       - source/slang/slang-parameter-binding.cpp
     depends_on:
-      - regression/pipeline/04-ast-to-ir
-      - regression/pipeline/04b-pre-link-passes
-      - regression/cross-cutting/targets
-      - regression/ir-reference/index
+      - design/pipeline/04-ast-to-ir
+      - design/pipeline/04b-pre-link-passes
+      - design/cross-cutting/targets
+      - design/ir-reference/index
     coverage_targets:
       - source/slang/slang-parameter-binding.cpp
       - source/slang/slang-type-layout.cpp
     size_cap_files: 50
 
-  regression/pipeline/05-ir-passes:
+  design/pipeline/05-ir-passes:
     source_doc: docs/generated/design/pipeline/05-ir-passes.md
     watched_paths:
       - source/slang/slang-ir-*.h
       - source/slang/slang-ir-*.cpp
       - source/slang/slang-emit.cpp
     depends_on:
-      - regression/pipeline/04-ast-to-ir
+      - design/pipeline/04-ast-to-ir
     coverage_targets:
       - source/slang/slang-emit.cpp
       - source/slang/slang-ir-typeflow-specialize.cpp
@@ -185,21 +185,21 @@ bundles:
       - source/slang/slang-ir-lower-cuda-builtin-types.cpp
     size_cap_files: 150
 
-  regression/pipeline/06-emit:
+  design/pipeline/06-emit:
     source_doc: docs/generated/design/pipeline/06-emit.md
     watched_paths:
       - source/slang/slang-emit.cpp
       - source/slang/slang-emit-*.h
       - source/slang/slang-emit-*.cpp
     depends_on:
-      - regression/pipeline/05-ir-passes
+      - design/pipeline/05-ir-passes
     coverage_targets:
       - source/slang/slang-emit.cpp
     size_cap_files: 40
 
   # --- syntax-reference/ ------------------------------------------------
 
-  regression/syntax-reference/tokens:
+  design/syntax-reference/tokens:
     source_doc: docs/generated/design/syntax-reference/tokens.md
     watched_paths:
       - source/compiler-core/slang-lexer.h
@@ -212,35 +212,35 @@ bundles:
       - source/compiler-core/slang-lexer.cpp
     size_cap_files: 50
 
-  regression/syntax-reference/keywords-and-builtins:
+  design/syntax-reference/keywords-and-builtins:
     source_doc: docs/generated/design/syntax-reference/keywords-and-builtins.md
     watched_paths:
       - source/slang/slang-parser.cpp
       - source/slang/slang-syntax.cpp
       - source/slang/slang-syntax.h
     depends_on:
-      - regression/syntax-reference/tokens
+      - design/syntax-reference/tokens
     coverage_targets:
       - source/slang/slang-parser.cpp
       - source/slang/slang-syntax.cpp
     size_cap_files: 60
 
-  regression/syntax-reference/grammar:
+  design/syntax-reference/grammar:
     source_doc: docs/generated/design/syntax-reference/grammar.md
     watched_paths:
       - source/slang/slang-parser.h
       - source/slang/slang-parser.cpp
       - source/compiler-core/slang-lexer.cpp
     depends_on:
-      - regression/syntax-reference/tokens
-      - regression/syntax-reference/keywords-and-builtins
+      - design/syntax-reference/tokens
+      - design/syntax-reference/keywords-and-builtins
     coverage_targets:
       - source/slang/slang-parser.cpp
     size_cap_files: 80
 
   # --- cross-cutting/ ---------------------------------------------------
 
-  regression/cross-cutting/diagnostics:
+  design/cross-cutting/diagnostics:
     source_doc: docs/generated/design/cross-cutting/diagnostics.md
     watched_paths:
       - source/compiler-core/slang-diagnostic-sink.h
@@ -257,7 +257,7 @@ bundles:
       - source/slang/slang-diagnostics.cpp
     size_cap_files: 60
 
-  regression/cross-cutting/ir-instructions:
+  design/cross-cutting/ir-instructions:
     source_doc: docs/generated/design/cross-cutting/ir-instructions.md
     watched_paths:
       - source/slang/slang-ir-insts.lua
@@ -270,7 +270,7 @@ bundles:
       - source/slang/slang-ir-insts.h
     size_cap_files: 150
 
-  regression/cross-cutting/targets:
+  design/cross-cutting/targets:
     source_doc: docs/generated/design/cross-cutting/targets.md
     watched_paths:
       - source/slang/slang-emit-*.h
@@ -280,13 +280,13 @@ bundles:
       - source/slang/slang-profile.h
       - source/slang/slang-profile.cpp
     depends_on:
-      - regression/pipeline/06-emit
+      - design/pipeline/06-emit
     coverage_targets:
       - source/slang/slang-capability.cpp
       - source/slang/slang-profile.cpp
     size_cap_files: 40
 
-  regression/cross-cutting/core-module:
+  design/cross-cutting/core-module:
     source_doc: docs/generated/design/cross-cutting/core-module.md
     watched_paths:
       - source/slang-core-module/*
@@ -297,7 +297,7 @@ bundles:
     coverage_targets: []
     size_cap_files: 100
 
-  regression/cross-cutting/serialization:
+  design/cross-cutting/serialization:
     source_doc: docs/generated/design/cross-cutting/serialization.md
     watched_paths:
       - source/slang/slang-serialize.h
@@ -312,7 +312,7 @@ bundles:
       - source/slang/slang-serialize-ast.cpp
     size_cap_files: 30
 
-  regression/cross-cutting/diagnostics-catalog:
+  design/cross-cutting/diagnostics-catalog:
     source_doc: docs/generated/design/cross-cutting/diagnostics.md
     watched_paths:
       - source/slang/slang-diagnostics.lua
@@ -320,7 +320,7 @@ bundles:
       - source/compiler-core/slang-misc-diagnostic-defs.h
       - source/compiler-core/slang-json-diagnostic-defs.h
     depends_on:
-      - regression/cross-cutting/diagnostics
+      - design/cross-cutting/diagnostics
     coverage_targets:
       - source/slang/slang-diagnostics.cpp
       - source/compiler-core/slang-diagnostic-sink.cpp
@@ -328,93 +328,93 @@ bundles:
 
   # --- ast-reference/ ----------------------------------------------------
 
-  regression/ast-reference/base:
+  design/ast-reference/base:
     source_doc: docs/generated/design/ast-reference/base.md
     watched_paths:
       - source/slang/slang-ast-base.h
       - source/slang/slang-ast-support-types.h
     depends_on:
-      - regression/pipeline/02-parse-ast
+      - design/pipeline/02-parse-ast
     coverage_targets: []
     size_cap_files: 30
 
-  regression/ast-reference/declarations:
+  design/ast-reference/declarations:
     source_doc: docs/generated/design/ast-reference/declarations.md
     watched_paths:
       - source/slang/slang-ast-decl.h
       - source/slang/slang-ast-base.h
       - source/slang/slang-parser.cpp
     depends_on:
-      - regression/ast-reference/base
-      - regression/syntax-reference/grammar
+      - design/ast-reference/base
+      - design/syntax-reference/grammar
     coverage_targets:
       - source/slang/slang-parser.cpp
     size_cap_files: 80
 
-  regression/ast-reference/expressions:
+  design/ast-reference/expressions:
     source_doc: docs/generated/design/ast-reference/expressions.md
     watched_paths:
       - source/slang/slang-ast-expr.h
       - source/slang/slang-ast-base.h
       - source/slang/slang-parser.cpp
     depends_on:
-      - regression/ast-reference/base
-      - regression/syntax-reference/grammar
+      - design/ast-reference/base
+      - design/syntax-reference/grammar
     coverage_targets:
       - source/slang/slang-parser.cpp
     size_cap_files: 150
 
-  regression/ast-reference/statements:
+  design/ast-reference/statements:
     source_doc: docs/generated/design/ast-reference/statements.md
     watched_paths:
       - source/slang/slang-ast-stmt.h
       - source/slang/slang-ast-base.h
       - source/slang/slang-parser.cpp
     depends_on:
-      - regression/ast-reference/base
-      - regression/syntax-reference/grammar
+      - design/ast-reference/base
+      - design/syntax-reference/grammar
     coverage_targets:
       - source/slang/slang-parser.cpp
     size_cap_files: 80
 
-  regression/ast-reference/types:
+  design/ast-reference/types:
     source_doc: docs/generated/design/ast-reference/types.md
     watched_paths:
       - source/slang/slang-ast-type.h
       - source/slang/slang-ast-base.h
       - source/slang/slang-ast-val.h
     depends_on:
-      - regression/ast-reference/base
-      - regression/ast-reference/values
+      - design/ast-reference/base
+      - design/ast-reference/values
     coverage_targets: []
     size_cap_files: 120
 
-  regression/ast-reference/modifiers:
+  design/ast-reference/modifiers:
     source_doc: docs/generated/design/ast-reference/modifiers.md
     watched_paths:
       - source/slang/slang-ast-modifier.h
       - source/slang/slang-ast-base.h
       - source/slang/slang-parser.cpp
     depends_on:
-      - regression/ast-reference/base
-      - regression/syntax-reference/grammar
+      - design/ast-reference/base
+      - design/syntax-reference/grammar
     coverage_targets:
       - source/slang/slang-parser.cpp
     size_cap_files: 60
 
-  regression/ast-reference/values:
+  design/ast-reference/values:
     source_doc: docs/generated/design/ast-reference/values.md
     watched_paths:
       - source/slang/slang-ast-val.h
       - source/slang/slang-ast-base.h
     depends_on:
-      - regression/ast-reference/base
+      - design/ast-reference/base
     coverage_targets: []
     size_cap_files: 40
 
   # --- name-resolution/ --------------------------------------------------
 
-  regression/name-resolution/scopes:
+  design/name-resolution/scopes:
     source_doc: docs/generated/design/name-resolution/scopes.md
     watched_paths:
       - source/slang/slang-check-decl.cpp
@@ -423,14 +423,14 @@ bundles:
       - source/slang/slang-session.cpp
       - source/slang/slang-lookup.cpp
     depends_on:
-      - regression/ast-reference/base
-      - regression/ast-reference/declarations
-      - regression/ast-reference/statements
+      - design/ast-reference/base
+      - design/ast-reference/declarations
+      - design/ast-reference/statements
     coverage_targets:
       - source/slang/slang-lookup.cpp
     size_cap_files: 50
 
-  regression/name-resolution/lookup:
+  design/name-resolution/lookup:
     source_doc: docs/generated/design/name-resolution/lookup.md
     watched_paths:
       - source/slang/slang-lookup.h
@@ -439,15 +439,15 @@ bundles:
       - source/slang/slang-check-inheritance.cpp
       - source/slang/slang-check-stmt.cpp
     depends_on:
-      - regression/name-resolution/scopes
-      - regression/ast-reference/values
+      - design/name-resolution/scopes
+      - design/ast-reference/values
       - glossary
     coverage_targets:
       - source/slang/slang-lookup.cpp
       - source/slang/slang-check-inheritance.cpp
     size_cap_files: 70
 
-  regression/name-resolution/visibility:
+  design/name-resolution/visibility:
     source_doc: docs/generated/design/name-resolution/visibility.md
     watched_paths:
       - source/slang/slang-ast-modifier.h
@@ -456,24 +456,24 @@ bundles:
       - source/slang/slang-check-expr.cpp
       - source/slang/slang-lookup.cpp
     depends_on:
-      - regression/ast-reference/modifiers
-      - regression/ast-reference/declarations
-      - regression/name-resolution/scopes
+      - design/ast-reference/modifiers
+      - design/ast-reference/declarations
+      - design/name-resolution/scopes
     coverage_targets:
       - source/slang/slang-check-modifier.cpp
     size_cap_files: 40
 
-  regression/name-resolution/overload-resolution:
+  design/name-resolution/overload-resolution:
     source_doc: docs/generated/design/name-resolution/overload-resolution.md
     watched_paths:
       - source/slang/slang-check-overload.cpp
       - source/slang/slang-check-impl.h
       - source/slang/slang-check-conversion.cpp
     depends_on:
-      - regression/name-resolution/lookup
-      - regression/name-resolution/visibility
-      - regression/ast-reference/expressions
-      - regression/ast-reference/values
+      - design/name-resolution/lookup
+      - design/name-resolution/visibility
+      - design/ast-reference/expressions
+      - design/ast-reference/values
       - glossary
     coverage_targets:
       - source/slang/slang-check-overload.cpp
@@ -482,7 +482,7 @@ bundles:
 
   # --- ir-reference/ -----------------------------------------------------
 
-  regression/ir-reference/types:
+  design/ir-reference/types:
     source_doc: docs/generated/design/ir-reference/types.md
     watched_paths:
       - source/slang/slang-ir-insts.lua
@@ -491,14 +491,14 @@ bundles:
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
     depends_on:
-      - regression/cross-cutting/ir-instructions
-      - regression/pipeline/04-ast-to-ir
-      - regression/ast-reference/types
+      - design/cross-cutting/ir-instructions
+      - design/pipeline/04-ast-to-ir
+      - design/ast-reference/types
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
     size_cap_files: 150
 
-  regression/ir-reference/values:
+  design/ir-reference/values:
     source_doc: docs/generated/design/ir-reference/values.md
     watched_paths:
       - source/slang/slang-ir-insts.lua
@@ -507,15 +507,15 @@ bundles:
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
     depends_on:
-      - regression/cross-cutting/ir-instructions
-      - regression/pipeline/04-ast-to-ir
-      - regression/ast-reference/expressions
-      - regression/ir-reference/types
+      - design/cross-cutting/ir-instructions
+      - design/pipeline/04-ast-to-ir
+      - design/ast-reference/expressions
+      - design/ir-reference/types
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
     size_cap_files: 150
 
-  regression/ir-reference/control-flow:
+  design/ir-reference/control-flow:
     source_doc: docs/generated/design/ir-reference/control-flow.md
     watched_paths:
       - source/slang/slang-ir-insts.lua
@@ -524,14 +524,14 @@ bundles:
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
     depends_on:
-      - regression/cross-cutting/ir-instructions
-      - regression/pipeline/04-ast-to-ir
-      - regression/ast-reference/statements
+      - design/cross-cutting/ir-instructions
+      - design/pipeline/04-ast-to-ir
+      - design/ast-reference/statements
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
     size_cap_files: 60
 
-  regression/ir-reference/structure:
+  design/ir-reference/structure:
     source_doc: docs/generated/design/ir-reference/structure.md
     watched_paths:
       - source/slang/slang-ir-insts.lua
@@ -540,14 +540,14 @@ bundles:
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
     depends_on:
-      - regression/cross-cutting/ir-instructions
-      - regression/pipeline/04-ast-to-ir
-      - regression/ast-reference/declarations
+      - design/cross-cutting/ir-instructions
+      - design/pipeline/04-ast-to-ir
+      - design/ast-reference/declarations
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
     size_cap_files: 60
 
-  regression/ir-reference/generics-and-existentials:
+  design/ir-reference/generics-and-existentials:
     source_doc: docs/generated/design/ir-reference/generics-and-existentials.md
     watched_paths:
       - source/slang/slang-ir-insts.lua
@@ -556,16 +556,16 @@ bundles:
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
     depends_on:
-      - regression/cross-cutting/ir-instructions
-      - regression/pipeline/04-ast-to-ir
-      - regression/ast-reference/declarations
-      - regression/ir-reference/types
-      - regression/ir-reference/structure
+      - design/cross-cutting/ir-instructions
+      - design/pipeline/04-ast-to-ir
+      - design/ast-reference/declarations
+      - design/ir-reference/types
+      - design/ir-reference/structure
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
     size_cap_files: 60
 
-  regression/ir-reference/resources-and-atomics:
+  design/ir-reference/resources-and-atomics:
     source_doc: docs/generated/design/ir-reference/resources-and-atomics.md
     watched_paths:
       - source/slang/slang-ir-insts.lua
@@ -574,15 +574,15 @@ bundles:
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
     depends_on:
-      - regression/cross-cutting/ir-instructions
-      - regression/pipeline/04-ast-to-ir
-      - regression/ast-reference/expressions
-      - regression/ir-reference/types
+      - design/cross-cutting/ir-instructions
+      - design/pipeline/04-ast-to-ir
+      - design/ast-reference/expressions
+      - design/ir-reference/types
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
     size_cap_files: 100
 
-  regression/ir-reference/differentiation:
+  design/ir-reference/differentiation:
     source_doc: docs/generated/design/ir-reference/differentiation.md
     watched_paths:
       - source/slang/slang-ir-insts.lua
@@ -591,15 +591,15 @@ bundles:
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
     depends_on:
-      - regression/cross-cutting/ir-instructions
-      - regression/pipeline/04-ast-to-ir
-      - regression/ir-reference/types
-      - regression/ir-reference/values
+      - design/cross-cutting/ir-instructions
+      - design/pipeline/04-ast-to-ir
+      - design/ir-reference/types
+      - design/ir-reference/values
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
     size_cap_files: 60
 
-  regression/ir-reference/decorations:
+  design/ir-reference/decorations:
     source_doc: docs/generated/design/ir-reference/decorations.md
     watched_paths:
       - source/slang/slang-ir-insts.lua
@@ -609,14 +609,14 @@ bundles:
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
     depends_on:
-      - regression/cross-cutting/ir-instructions
-      - regression/pipeline/04-ast-to-ir
-      - regression/ast-reference/modifiers
+      - design/cross-cutting/ir-instructions
+      - design/pipeline/04-ast-to-ir
+      - design/ast-reference/modifiers
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
     size_cap_files: 80
 
-  regression/ir-reference/metadata:
+  design/ir-reference/metadata:
     source_doc: docs/generated/design/ir-reference/metadata.md
     watched_paths:
       - source/slang/slang-ir-insts.lua
@@ -626,13 +626,13 @@ bundles:
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
     depends_on:
-      - regression/cross-cutting/ir-instructions
-      - regression/pipeline/04-ast-to-ir
+      - design/cross-cutting/ir-instructions
+      - design/pipeline/04-ast-to-ir
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
     size_cap_files: 50
 
-  regression/ir-reference/misc:
+  design/ir-reference/misc:
     source_doc: docs/generated/design/ir-reference/misc.md
     watched_paths:
       - source/slang/slang-ir-insts.lua
@@ -641,15 +641,15 @@ bundles:
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
     depends_on:
-      - regression/cross-cutting/ir-instructions
-      - regression/pipeline/04-ast-to-ir
+      - design/cross-cutting/ir-instructions
+      - design/pipeline/04-ast-to-ir
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
     size_cap_files: 30
 
   # --- target-pipelines/ -------------------------------------------------
 
-  regression/target-pipelines/spirv:
+  design/target-pipelines/spirv:
     source_doc: docs/generated/design/target-pipelines/spirv.md
     watched_paths:
       - source/slang/slang-emit.cpp
@@ -657,11 +657,11 @@ bundles:
       - source/slang/slang-ir-spirv-legalize.cpp
       - source/slang/slang-ir-glsl-legalize.cpp
     depends_on:
-      - regression/pipeline/04-ast-to-ir
-      - regression/pipeline/05-ir-passes
-      - regression/pipeline/06-emit
-      - regression/ir-reference/index
-      - regression/cross-cutting/targets
+      - design/pipeline/04-ast-to-ir
+      - design/pipeline/05-ir-passes
+      - design/pipeline/06-emit
+      - design/ir-reference/index
+      - design/cross-cutting/targets
     coverage_targets:
       - source/slang/slang-emit-spirv.cpp
       - source/slang/slang-ir-spirv-legalize.cpp
@@ -669,7 +669,7 @@ bundles:
       - source/slang/slang-emit-c-like.cpp
     size_cap_files: 150
 
-  regression/target-pipelines/hlsl:
+  design/target-pipelines/hlsl:
     source_doc: docs/generated/design/target-pipelines/hlsl.md
     watched_paths:
       - source/slang/slang-emit.cpp
@@ -677,18 +677,18 @@ bundles:
       - source/slang/slang-emit-c-like.cpp
       - source/slang/slang-ir-hlsl-legalize.cpp
     depends_on:
-      - regression/pipeline/04-ast-to-ir
-      - regression/pipeline/05-ir-passes
-      - regression/pipeline/06-emit
-      - regression/ir-reference/index
-      - regression/cross-cutting/targets
+      - design/pipeline/04-ast-to-ir
+      - design/pipeline/05-ir-passes
+      - design/pipeline/06-emit
+      - design/ir-reference/index
+      - design/cross-cutting/targets
     coverage_targets:
       - source/slang/slang-emit-hlsl.cpp
       - source/slang/slang-ir-hlsl-legalize.cpp
       - source/slang/slang-emit-c-like.cpp
     size_cap_files: 150
 
-  regression/target-pipelines/metal:
+  design/target-pipelines/metal:
     source_doc: docs/generated/design/target-pipelines/metal.md
     watched_paths:
       - source/slang/slang-emit.cpp
@@ -696,18 +696,18 @@ bundles:
       - source/slang/slang-emit-c-like.cpp
       - source/slang/slang-ir-metal-legalize.cpp
     depends_on:
-      - regression/pipeline/04-ast-to-ir
-      - regression/pipeline/05-ir-passes
-      - regression/pipeline/06-emit
-      - regression/ir-reference/index
-      - regression/cross-cutting/targets
+      - design/pipeline/04-ast-to-ir
+      - design/pipeline/05-ir-passes
+      - design/pipeline/06-emit
+      - design/ir-reference/index
+      - design/cross-cutting/targets
     coverage_targets:
       - source/slang/slang-emit-metal.cpp
       - source/slang/slang-ir-metal-legalize.cpp
       - source/slang/slang-emit-c-like.cpp
     size_cap_files: 100
 
-  regression/target-pipelines/wgsl:
+  design/target-pipelines/wgsl:
     source_doc: docs/generated/design/target-pipelines/wgsl.md
     watched_paths:
       - source/slang/slang-emit.cpp
@@ -715,18 +715,18 @@ bundles:
       - source/slang/slang-emit-c-like.cpp
       - source/slang/slang-ir-wgsl-legalize.cpp
     depends_on:
-      - regression/pipeline/04-ast-to-ir
-      - regression/pipeline/05-ir-passes
-      - regression/pipeline/06-emit
-      - regression/ir-reference/index
-      - regression/cross-cutting/targets
+      - design/pipeline/04-ast-to-ir
+      - design/pipeline/05-ir-passes
+      - design/pipeline/06-emit
+      - design/ir-reference/index
+      - design/cross-cutting/targets
     coverage_targets:
       - source/slang/slang-emit-wgsl.cpp
       - source/slang/slang-ir-wgsl-legalize.cpp
       - source/slang/slang-emit-c-like.cpp
     size_cap_files: 100
 
-  regression/target-pipelines/cuda:
+  design/target-pipelines/cuda:
     source_doc: docs/generated/design/target-pipelines/cuda.md
     watched_paths:
       - source/slang/slang-emit.cpp
@@ -735,11 +735,11 @@ bundles:
       - source/slang/slang-emit-c-like.cpp
       - source/slang/slang-ir-cuda-immutable-load.cpp
     depends_on:
-      - regression/pipeline/04-ast-to-ir
-      - regression/pipeline/05-ir-passes
-      - regression/pipeline/06-emit
-      - regression/ir-reference/index
-      - regression/cross-cutting/targets
+      - design/pipeline/04-ast-to-ir
+      - design/pipeline/05-ir-passes
+      - design/pipeline/06-emit
+      - design/ir-reference/index
+      - design/cross-cutting/targets
     coverage_targets:
       - source/slang/slang-emit-cuda.cpp
       - source/slang/slang-ir-cuda-immutable-load.cpp
@@ -752,7 +752,7 @@ bundles:
   # See _meta/prompts/_common.md § Source-of-truth hierarchy for why
   # these outrank docs/generated/design/* when both cover the same claim.
 
-  spec/expressions-literal:
+  conformance/expressions-literal:
     source_doc: docs/language-reference/expressions-literal.md
     watched_paths:
       - docs/language-reference/expressions-literal.md
@@ -763,7 +763,7 @@ bundles:
       - source/compiler-core/slang-lexer.cpp
     size_cap_files: 40
 
-  spec/types-fundamental-integer:
+  conformance/types-fundamental-integer:
     source_doc: docs/language-reference/types-fundamental.md
     watched_paths:
       - docs/language-reference/types-fundamental.md
@@ -773,7 +773,7 @@ bundles:
       - source/slang/slang-check-expr.cpp
     size_cap_files: 30
 
-  spec/expressions-operators:
+  conformance/expressions-operators:
     source_doc: docs/language-reference/expressions-operators.md
     watched_paths:
       - docs/language-reference/expressions-operators.md
@@ -784,7 +784,7 @@ bundles:
       - source/slang/slang-check-expr.cpp
     size_cap_files: 40
 
-  spec/lexical-structure:
+  conformance/lexical-structure:
     source_doc: docs/language-reference/lexical-structure.md
     watched_paths:
       - docs/language-reference/lexical-structure.md
@@ -794,7 +794,7 @@ bundles:
       - source/compiler-core/slang-lexer.cpp
     size_cap_files: 30
 
-  spec/types-vector-and-matrix:
+  conformance/types-vector-and-matrix:
     source_doc: docs/language-reference/types-vector-and-matrix.md
     watched_paths:
       - docs/language-reference/types-vector-and-matrix.md
@@ -804,7 +804,7 @@ bundles:
       - source/slang/slang-check-expr.cpp
     size_cap_files: 40
 
-  spec/types-array:
+  conformance/types-array:
     source_doc: docs/language-reference/types-array.md
     watched_paths:
       - docs/language-reference/types-array.md
@@ -814,7 +814,7 @@ bundles:
       - source/slang/slang-check-decl.cpp
     size_cap_files: 30
 
-  spec/types-enum:
+  conformance/types-enum:
     source_doc: docs/language-reference/types-enum.md
     watched_paths:
       - docs/language-reference/types-enum.md
@@ -824,7 +824,7 @@ bundles:
       - source/slang/slang-check-decl.cpp
     size_cap_files: 20
 
-  spec/expressions-member-access:
+  conformance/expressions-member-access:
     source_doc: docs/language-reference/expressions-member-access.md
     watched_paths:
       - docs/language-reference/expressions-member-access.md
@@ -834,7 +834,7 @@ bundles:
       - source/slang/slang-check-expr.cpp
     size_cap_files: 25
 
-  spec/types-extension:
+  conformance/types-extension:
     source_doc: docs/language-reference/types-extension.md
     watched_paths:
       - docs/language-reference/types-extension.md

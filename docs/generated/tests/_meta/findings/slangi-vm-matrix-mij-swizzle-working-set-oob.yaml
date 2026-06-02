@@ -1,6 +1,6 @@
 schema_version: 1
 id: slangi-vm-matrix-mij-swizzle-working-set-oob
-bundle: spec/expressions-member-access
+bundle: conformance/expressions-member-access
 suspected_kind: wrong-codegen
 title: "[slangi] matrix `_mij` swizzle triggers working-set OOB"
 observed_at: 2026-06-01T17:00:00+00:00

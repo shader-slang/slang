@@ -4,9 +4,9 @@ This directory contains an agent-generated, agent-maintained test suite.
 Each test is anchored to a documentation claim, and the suite is rebuilt
 when the docs change. Bundles are organised by **role**:
 
-- **`spec/`** — anchored to the authoritative human-written spec at
-  [`docs/language-reference/`](../../language-reference/).
-- **`regression/`** — anchored to the reverse-engineered architectural
+- **`conformance/`** — anchored to the authoritative human-written spec
+  at [`docs/language-reference/`](../../language-reference/).
+- **`design/`** — anchored to the reverse-engineered architectural
   documentation in [`../design/`](../design/).
 
 The suite is **additive** — it does not replace the hand-written
@@ -20,23 +20,23 @@ The suite is **additive** — it does not replace the hand-written
 
 ## Layout
 
-| Subtree                        | Purpose                                                                                                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `spec/`                        | Tests anchored to the **authoritative human-written spec** at `docs/language-reference/`. Outranks the `regression/` bundles when both cover the same claim. |
-| `regression/pipeline/`         | Tests anchored to the compilation-pipeline docs (lex → emit)                                                                                                 |
-| `regression/syntax-reference/` | Tests anchored to the syntax / grammar / keywords docs                                                                                                       |
-| `regression/ast-reference/`    | Tests anchored to the AST node reference                                                                                                                     |
-| `regression/ir-reference/`     | Tests anchored to the IR opcode reference                                                                                                                    |
-| `regression/name-resolution/`  | Tests anchored to scoping / lookup / overload-resolution docs                                                                                                |
-| `regression/cross-cutting/`    | Tests anchored to diagnostics, IR instruction set, targets, etc.                                                                                             |
-| `regression/target-pipelines/` | Tests anchored to per-target (SPIR-V/HLSL/Metal/WGSL/CUDA) end-to-end docs                                                                                   |
-| `_meta/`                       | Pipeline infrastructure: manifest, prompts, schemas, freshness + findings state, driver                                                                      |
+| Subtree                    | Purpose                                                                                                                                                  |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `conformance/`             | Tests anchored to the **authoritative human-written spec** at `docs/language-reference/`. Outranks the `design/` bundles when both cover the same claim. |
+| `design/pipeline/`         | Tests anchored to the compilation-pipeline docs (lex → emit)                                                                                             |
+| `design/syntax-reference/` | Tests anchored to the syntax / grammar / keywords docs                                                                                                   |
+| `design/ast-reference/`    | Tests anchored to the AST node reference                                                                                                                 |
+| `design/ir-reference/`     | Tests anchored to the IR opcode reference                                                                                                                |
+| `design/name-resolution/`  | Tests anchored to scoping / lookup / overload-resolution docs                                                                                            |
+| `design/cross-cutting/`    | Tests anchored to diagnostics, IR instruction set, targets, etc.                                                                                         |
+| `design/target-pipelines/` | Tests anchored to per-target (SPIR-V/HLSL/Metal/WGSL/CUDA) end-to-end docs                                                                               |
+| `_meta/`                   | Pipeline infrastructure: manifest, prompts, schemas, freshness + findings state, driver                                                                  |
 
-The `regression/` subtree mirrors `docs/generated/design/` for every
+The `design/` subtree mirrors `docs/generated/design/` for every
 **behaviorally normative** doc: each `docs/generated/design/<section>/<doc>.md`
 that specifies compiler behavior has a corresponding bundle at
-`docs/generated/tests/regression/<section>/<doc>/` (no `.md` suffix on
-the directory). The `spec/` subtree similarly mirrors
+`docs/generated/tests/design/<section>/<doc>/` (no `.md` suffix on
+the directory). The `conformance/` subtree similarly mirrors
 `docs/language-reference/` one bundle per normative doc.
 
 Descriptive / architectural docs are exempt — `docs/generated/design/architecture/*.md`,
@@ -104,18 +104,18 @@ what is implemented today versus what is scaffolded or planned:
 
 - **`docs/language-reference/`** is the authoritative spec — the
   human-written description of what Slang behaviour _should be_.
-  Bundles under `spec/` anchor to this. When the language reference
-  and the compiler disagree, the test is the honest signal; the human
-  triage step decides which side is wrong.
+  Bundles under `conformance/` anchor to this. When the language
+  reference and the compiler disagree, the test is the honest signal;
+  the human triage step decides which side is wrong.
 - **`docs/generated/design/`** is reverse-engineered from the actual
-  compiler source and may codify bugs. Bundles under `regression/`
+  compiler source and may codify bugs. Bundles under `design/`
   anchor to it. A failing test there is most likely a regression in
   already-known behaviour.
 - The hand-written `tests/` suite is authoritative for the behaviours
   it covers (separate from this suite).
 - A failing agentic test means one of: doc says X but compiler does
   not-X (compiler bug **or** doc bug), or the test is wrong
-  (regenerate). When the cited doc is under `spec/`, a real
+  (regenerate). When the cited doc is under `conformance/`, a real
   spec/compiler disagreement should be filed as a finding.
 
 ## Running the suite

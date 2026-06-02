@@ -9,13 +9,13 @@ been covered yet, and drives each bundle to 100% claim coverage.
 
 The campaign is parameterized by which tree it runs against:
 
-| Campaign       | Source-doc tree            | Bundle root                        | Source-of-truth weight                                                                  |
-| -------------- | -------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------- |
-| **spec**       | `docs/language-reference/` | `docs/generated/tests/spec/`       | Authoritative human-written spec.                                                       |
-| **regression** | `docs/generated/design/`   | `docs/generated/tests/regression/` | Reverse-engineered from (possibly buggy) source; defers to the spec when they disagree. |
+| Campaign        | Source-doc tree            | Bundle root                         | Source-of-truth weight                                                                  |
+| --------------- | -------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------- |
+| **conformance** | `docs/language-reference/` | `docs/generated/tests/conformance/` | Authoritative human-written spec.                                                       |
+| **design**      | `docs/generated/design/`   | `docs/generated/tests/design/`      | Reverse-engineered from (possibly buggy) source; defers to the spec when they disagree. |
 
 See [`prompts/_common.md` § Source-of-truth hierarchy](prompts/_common.md)
-for why `spec/` outranks `regression/` when both cover the same claim,
+for why `conformance/` outranks `design/` when both cover the same claim,
 and [`prompts/_common.md` § Where the test lives](prompts/_common.md)
 for the B-tree/A-tree placement policy.
 
@@ -31,7 +31,7 @@ Before starting a campaign session:
 1. Build slang locally (`cmake --build --preset release --target slang-test slangi slangc`).
 2. Confirm `regenerate.py verify --help` is callable (the verify
    subcommand must be on the branch).
-3. For a **spec** campaign, confirm `regenerate.py lang-ref-coverage`
+3. For a **conformance** campaign, confirm `regenerate.py lang-ref-coverage`
    returns the current baseline. This is the campaign's odometer.
 
 ## Per-document workflow
@@ -50,8 +50,8 @@ For each doc in the source-doc tree, in priority order:
    claim list is the bundle's target; test count falls out of it.
 3. **Create the bundle.**
    - Manifest entry under `_meta/manifest.yaml`, keyed
-     `spec/<doc>` or `regression/<area>/<doc>` (alphabetical within its
-     group). `source_doc` = the doc path; `watched_paths` includes the
+     `conformance/<doc>` or `design/<area>/<doc>` (alphabetical within
+     its group). `source_doc` = the doc path; `watched_paths` includes the
      doc plus 1–2 most-relevant compiler source files.
    - Bundle directory: `docs/generated/tests/<key>/`.
    - Co-located `_prompt.md` in the bundle directory. Document the
@@ -74,7 +74,7 @@ For each doc in the source-doc tree, in priority order:
    - **Do NOT** run `regenerate.py findings file <id>` in campaign mode.
    - Write the structured finding YAML under
      `_meta/findings/<id>.yaml` (not `/filed/`). Its `bundle:` field is
-     the bundle key (`spec/<doc>` or `regression/<area>/<doc>`).
+     the bundle key (`conformance/<doc>` or `design/<area>/<doc>`).
    - Add the affected test to `_meta/expected-failures.txt` with a
      comment naming the pending-finding YAML path. The
      expected-failures lint accepts `_meta/findings/<id>.yaml` as a
@@ -94,7 +94,7 @@ For each doc in the source-doc tree, in priority order:
    be in `expected-failures.txt`).
 9. **Commit per bundle.** One commit per bundle keeps the history
    reviewable. Suggested message: `<key>: <N> tests + <K> findings`
-   (e.g. `spec/types-array: 6 tests`).
+   (e.g. `conformance/types-array: 6 tests`).
 
 ## Stopping criteria
 
@@ -132,10 +132,10 @@ A human review pass:
 
 ## Coverage odometer
 
-For a **spec** campaign, run `regenerate.py lang-ref-coverage` at the
-start and end of every session. The campaign's goal is
+For a **conformance** campaign, run `regenerate.py lang-ref-coverage` at
+the start and end of every session. The campaign's goal is
 monotonic-increasing per-file coverage% across `docs/language-reference/`.
-(A **regression** campaign uses the `coverage-targets` /
+(A **design** campaign uses the `coverage-targets` /
 `expansion-candidates` reports against `docs/generated/design/` instead.)
 
 Two coverage measures:

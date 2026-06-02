@@ -66,29 +66,30 @@ The path must exist; the lint pass validates this. If the anchor
 fragment does not match a heading in the file, the test still passes
 lint but the citation is fragile and reviewers will catch it.
 
-### Where the test lives — role-based trees (`spec/` + `regression/`)
+### Where the test lives — role-based trees (`conformance/` + `design/`)
 
 The framework uses **two parallel test trees** with distinct roles.
 Each bundle's `_prompt.md` is co-located in the bundle directory.
 
-| Tree                                                                                                                                                                              | Bundles' `source_doc` points at                         | Role                                                                                             |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `docs/generated/tests/spec/`                                                                                                                                                      | `docs/language-reference/*.md` (the human-written spec) | **Spec conformance.** A failing test is a spec-vs-compiler signal.                               |
-| `docs/generated/tests/regression/<area>/` (areas: `pipeline/`, `ast-reference/`, `ir-reference/`, `syntax-reference/`, `name-resolution/`, `cross-cutting/`, `target-pipelines/`) | `docs/generated/design/*.md` (LLM-derived design docs)  | **Regression coverage.** A failing test is a behavioural regression in known-codified behaviour. |
+| Tree                                                                                                                                                                          | Bundles' `source_doc` points at                         | Role                                                                                             |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `docs/generated/tests/conformance/`                                                                                                                                           | `docs/language-reference/*.md` (the human-written spec) | **Spec conformance.** A failing test is a spec-vs-compiler signal.                               |
+| `docs/generated/tests/design/<area>/` (areas: `pipeline/`, `ast-reference/`, `ir-reference/`, `syntax-reference/`, `name-resolution/`, `cross-cutting/`, `target-pipelines/`) | `docs/generated/design/*.md` (LLM-derived design docs)  | **Regression coverage.** A failing test is a behavioural regression in known-codified behaviour. |
 
 The two trees are intentionally allowed to overlap on the same
 compiler surface — they verify _different_ properties (spec
-conformance vs. behavioural regression). When a `spec/` test fails and
-its `regression/` counterpart passes, that IS the spec-vs-compiler
-drift signal the suite is designed to surface; file a finding.
+conformance vs. behavioural regression). When a `conformance/` test
+fails and its `design/` counterpart passes, that IS the
+spec-vs-compiler drift signal the suite is designed to surface; file a
+finding.
 
 **Where to write a new test:**
 
 1. If the language reference describes the claim → put the test in
-   `docs/generated/tests/spec/<doc-name>/` (creating the bundle if
-   absent). `<doc-name>` mirrors the lang-ref filename without the
+   `docs/generated/tests/conformance/<doc-name>/` (creating the bundle
+   if absent). `<doc-name>` mirrors the lang-ref filename without the
    `.md` suffix.
-2. Otherwise → put the test in the appropriate existing `regression/`
+2. Otherwise → put the test in the appropriate existing `design/`
    bundle.
 3. If you find the same surface described in both, write a test in
    **both** trees. They are doing different jobs.
@@ -124,7 +125,7 @@ with the pending finding's filename:
 ```
 # Pending: docs/generated/tests/_meta/findings/slangi-foo-bar.yaml
 # (will become a tracking issue at human-triage time)
-docs/generated/tests/spec/.../some-test.slang
+docs/generated/tests/conformance/.../some-test.slang
 ```
 
 For the full claim-driven generation methodology a campaign session
@@ -925,8 +926,8 @@ the nightly job stays green while the fix is in flight. Format:
 # Remove the entry when the underlying bug is fixed.
 
 # https://github.com/shader-slang/slang/issues/11375 — slangi VM constants OOB
-docs/generated/tests/regression/ast-reference/expressions/logic-and-short-circuit.slang
-docs/generated/tests/regression/ast-reference/expressions/logic-or-short-circuit.slang
+docs/generated/tests/design/ast-reference/expressions/logic-and-short-circuit.slang
+docs/generated/tests/design/ast-reference/expressions/logic-or-short-circuit.slang
 ```
 
 `regenerate.py verify` honors this file: matching tests are reported

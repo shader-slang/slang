@@ -1658,17 +1658,17 @@ def cmd_index(args: argparse.Namespace) -> int:
 
     # Section assignment by path prefix.
     section_for = {
-        "spec/": "Spec (language reference)",
-        "regression/pipeline/": "Pipeline",
-        "regression/syntax-reference/": "Syntax reference",
-        "regression/cross-cutting/": "Cross-cutting",
-        "regression/ast-reference/": "AST reference",
-        "regression/name-resolution/": "Name resolution",
-        "regression/ir-reference/": "IR reference",
-        "regression/target-pipelines/": "Target pipelines",
+        "conformance/": "Conformance (language reference)",
+        "design/pipeline/": "Pipeline",
+        "design/syntax-reference/": "Syntax reference",
+        "design/cross-cutting/": "Cross-cutting",
+        "design/ast-reference/": "AST reference",
+        "design/name-resolution/": "Name resolution",
+        "design/ir-reference/": "IR reference",
+        "design/target-pipelines/": "Target pipelines",
     }
     section_order = [
-        "Spec (language reference)",
+        "Conformance (language reference)",
         "Pipeline",
         "Syntax reference",
         "Cross-cutting",

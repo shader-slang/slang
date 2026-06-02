@@ -1,6 +1,6 @@
 schema_version: 1
 id: slangi-vm-global-var-bytecode-unsupported
-bundle: spec/types-extension
+bundle: conformance/types-extension
 suspected_kind: regression
 title: "[slangi] module-scope global variables not supported in VM bytecode"
 observed_at: 2026-06-01T17:30:00+00:00
