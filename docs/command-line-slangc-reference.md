@@ -60,7 +60,9 @@ The space between - D and &lt;name&gt; is optional. If no &lt;value&gt; is speci
 
 **-depfile &lt;path&gt;**
 
-Save the source file dependency list in a file. 
+Save the source file dependency list in a file.
+
+The file uses Makefile dependency syntax: `<target>: <dep1> <dep2> ...`. When no output file is specified via `-o` (output goes to stdout), `-` is used as the make target placeholder — following the Unix convention where `-` denotes stdin/stdout.
 
 
 <a id="entry"></a>
