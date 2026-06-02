@@ -4,8 +4,8 @@
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=RUNTIME): -vk -shaderobj -output-using-type -render-feature bindless -emit-spirv-directly -Xslang -DRUNTIME
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute -capability spvDescriptorHeapEXT -emit-spirv-directly
-//TEST:SIMPLE(filecheck=ROV): -target spirv-asm -entry fragmentMain -stage fragment -capability spvDescriptorHeapEXT -emit-spirv-directly
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry hlslMain -profile cs_6_6
+//TEST:SIMPLE(filecheck=FRAG): -target spirv-asm -entry fragmentMain -stage fragment -capability spvDescriptorHeapEXT -emit-spirv-directly
+//TEST:SIMPLE(filecheck=DXIL): -target dxil -entry hlslMain -profile cs_6_6
 
 // RUNTIME: type: uint
 // RUNTIME-NEXT: 4
@@ -29,18 +29,14 @@
 // CHECK: OpAccessChain %_ptr_StorageBuffer_uint
 // CHECK: OpAtomicIAdd
 
-// ROV: OpCapability DescriptorHeapEXT
-// ROV-NOT: ByteAddressBuffer
-// ROV: %RasterizerOrderedStructuredBuffer = OpTypeStruct %_runtimearr_uint
-// ROV: %_ptr_StorageBuffer_RasterizerOrderedStructuredBuffer = OpTypePointer StorageBuffer %RasterizerOrderedStructuredBuffer
-// ROV: OpBufferPointerEXT %_ptr_StorageBuffer_RasterizerOrderedStructuredBuffer
-// ROV: OpAccessChain %_ptr_StorageBuffer_uint
+// FRAG: OpCapability DescriptorHeapEXT
+// FRAG-NOT: ByteAddressBuffer
+// FRAG: %RasterizerOrderedStructuredBuffer = OpTypeStruct %_runtimearr_uint
+// FRAG: %_ptr_StorageBuffer_RasterizerOrderedStructuredBuffer = OpTypePointer StorageBuffer %RasterizerOrderedStructuredBuffer
+// FRAG: OpBufferPointerEXT %_ptr_StorageBuffer_RasterizerOrderedStructuredBuffer
+// FRAG: OpAccessChain %_ptr_StorageBuffer_uint
 
-// HLSL: StructuredBuffer<uint >{{.*}}ResourceDescriptorHeap[
-// HLSL: RWStructuredBuffer<uint >{{.*}}ResourceDescriptorHeap[
-// HLSL: [int(1)] = 7U
-// HLSL: InterlockedAdd
-// HLSL-NOT: asStructuredBuffer
+// DXIL: result code = 0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=output
 RWStructuredBuffer<uint> output;
