@@ -4539,8 +4539,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto elementCountInst = as<IRIntLit>(vectorType->getElementCount());
             if (!elementCountInst)
             {
-                SLANG_UNEXPECTED(
-                    "non-IntLit vector element count reached SPIR-V fp16 atomic emit");
+                SLANG_UNEXPECTED("non-IntLit vector element count reached SPIR-V fp16 atomic emit");
             }
 
             auto elementCount = elementCountInst->getValue();
