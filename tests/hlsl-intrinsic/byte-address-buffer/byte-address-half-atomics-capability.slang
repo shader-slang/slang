@@ -18,10 +18,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED_VECTOR_WIDTH,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_UNSUPPORTED_VECTOR_WIDTH
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED_VECTOR_COMPARE_EXCHANGE,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_UNSUPPORTED_VECTOR_COMPARE_EXCHANGE
 
-// Pointer-form fp16 vector checks. These paths are emitted as vector atomics, so
+// Emulated fp16 vector checks. These paths are emitted as vector atomics, so
 // they must diagnose missing spvAtomicFloat16VectorNV when only scalar fp16 add is enabled.
-// Runtime coverage for these pointer-form helpers would require SPIR-V variable pointers,
+// Runtime coverage for the pointer-form helpers would require SPIR-V variable pointers,
 // which existing tests keep disabled on current GCP runners.
+//DIAGNOSTIC_TEST:SIMPLE(diag=BUFFER_EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability cuda_hlsl_spirv+sm_5_0+spvAtomicFloat16AddEXT -DTEST_BUFFER_EMULATED_NO_VECTOR
 //DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_EMULATED
 //DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_F16X2_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_F16X2
 
@@ -175,6 +176,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // UNSUPPORTED_VECTOR_COMPARE_EXCHANGE: error[E50014]: invalid SPIR-V fp16 vector atomic operation
 // UNSUPPORTED_VECTOR_COMPARE_EXCHANGE: SPIR-V fp16 vector atomics only support add, min, max, and exchange operations.
     outputBuffer[0] = float(originalValue.x + originalValue.y);
+#elif defined(TEST_BUFFER_EMULATED_NO_VECTOR)
+    half originalValue;
+    tmpBuffer.InterlockedAddF16Emulated(0, 1.0h, originalValue);
+// BUFFER_EMULATED_NO_VECTOR: entry point uses capabilities not in specified profile
+// BUFFER_EMULATED_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
+    outputBuffer[0] = float(originalValue);
 #elif defined(TEST_EMULATED)
     half originalValue;
     tmpBuffer.InterlockedAddF16Emulated(0, 1.0h, originalValue);
@@ -292,4 +299,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // EMULATED: OpCompositeExtract %half [[HIGH_ATOMIC]] 1
 // EMULATED-NOT: OpAtomicFAddEXT
 
-// CUDA-COUNT-5: atomicAdd(
+// CUDA-NOT: atomicAdd((half2 *
+// CUDA-NOT: atomicAdd((__half2 *
+// CUDA-COUNT-5: atomicAdd((&{{.*}}), __half(1.0))
+// CUDA-NOT: atomicAdd((half2 *
+// CUDA-NOT: atomicAdd((__half2 *
