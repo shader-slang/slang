@@ -38,7 +38,9 @@ float4 fragmentMain(FragmentInput input) : SV_Target
 #endif
 }
 
-// CHECK: OpConstantComposite
+// CHECK-DAG: %[[F3:[A-Za-z0-9_]+]] = OpConstant %float {{3\.000[0-9]*e-06}}
+// CHECK-DAG: %[[F4:[A-Za-z0-9_]+]] = OpConstant %float {{3\.999[0-9]*e-06}}
+// CHECK-DAG: OpConstantComposite %v2float %[[F3]] %[[F4]]
 // CHECK: OpImageSampleImplicitLod
 
 // CHECK_BINDLESS: OpCapability BindlessTextureNV
