@@ -57,19 +57,29 @@ docs/generated/tests/ast-reference/statements/ifstmt-predicate-evaluated-once.sl
 docs/generated/tests/target-pipelines/spirv/vector-logical-or.slang
 docs/generated/tests/target-pipelines/spirv/vector-logical-and-or.slang
 
-# Surfaced on the same nightly run as Cluster A:
-# https://github.com/shader-slang/slang/actions/runs/26800499333
+# Surfaced on nightly runs
+# https://github.com/shader-slang/slang/actions/runs/26800499333 and
+# https://github.com/shader-slang/slang/actions/runs/26803788699
+# (no tracking issue filed yet; pending user triage).
 #
-# Cluster C — 6 tests pass locally on macOS (even with the nightly's
-# env vars set) but fail in the slang-linux-clang-ci container.
-# Suspected causes vary by test (glibc-vs-libc printf NaN formatting;
-# stricter Linux spirv-val on OpTypeRuntimeArray / negative GEP indices;
-# `-dump-ir` text differences; multi-target text-emit). Re-investigate
-# after the next nightly run shows full per-test stderr (this PR drops
-# the wrapper that was truncating it).
+# Cluster C — tests that pass locally on macOS (even with the
+# nightly's env vars set) but fail in the slang-linux-clang-ci
+# container. Suspected causes vary by test: glibc-vs-libc printf NaN
+# formatting; stricter Linux spirv-val on OpTypeRuntimeArray /
+# negative GEP indices; `-dump-ir` text differences; multi-target
+# text-emit; and one test-server JSON RPC crash (load with negative
+# literal index — suggests a slangc crash in the Linux build).
+#
+# Observed flakiness: between runs 26800499333 and 26803788699 (same
+# day, ~1.5h apart, same checkout), 4 of these tests flipped from
+# FAILED to PASS, surfacing as "passing tests that are expected to
+# fail" in the second run. Entries are KEPT in the list (conservative)
+# because they have failed at least once; let multiple consecutive
+# clean runs drive removal, not a single observed pass.
 docs/generated/tests/cross-cutting/core-module/printf-float-nan.slang
 docs/generated/tests/ir-reference/metadata/unorm-attr-on-buffer-element.slang
 docs/generated/tests/ir-reference/resources-and-atomics/rwstructured-buffer-getelementptr-negative-index-literal.slang
+docs/generated/tests/ir-reference/resources-and-atomics/rwstructured-buffer-load-negative-index-literal.slang
 docs/generated/tests/ir-reference/types/array-unsized.slang
 docs/generated/tests/pipeline/06-emit/preludes-included-by-c-and-cuda.slang
 docs/generated/tests/target-pipelines/hlsl/nvapi-guard-with-wave-intrinsic.slang
