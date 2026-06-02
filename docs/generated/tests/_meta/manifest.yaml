@@ -939,4 +939,35 @@ bundles:
       - source/slang/slang-parser.cpp
     size_cap_files: 40
 
+  conformance/expressions-initializer:
+    source_doc: docs/language-reference/expressions-initializer.md
+    watched_paths:
+      - docs/language-reference/expressions-initializer.md
+      - source/slang/slang-check-expr.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-check-expr.cpp
+    size_cap_files: 25
+
+  conformance/expressions-identifier:
+    source_doc: docs/language-reference/expressions-identifier.md
+    watched_paths:
+      - docs/language-reference/expressions-identifier.md
+      - source/slang/slang-check-expr.cpp
+      - source/slang/slang-lookup.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-lookup.cpp
+    size_cap_files: 25
+
+  conformance/expressions-this:
+    source_doc: docs/language-reference/expressions-this.md
+    watched_paths:
+      - docs/language-reference/expressions-this.md
+      - source/slang/slang-check-expr.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-check-expr.cpp
+    size_cap_files: 20
+
   # --- top-level reference -----------------------------------------------

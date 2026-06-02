@@ -8,14 +8,14 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 ## Suite totals
 
-- **Bundles:** 62
-- **Total `.slang` tests:** 2995
+- **Bundles:** 65
+- **Total `.slang` tests:** 3020
 
 | Intent       | Count |
 | ------------ | ----- |
-| `functional` | 1154  |
-| `boundary`   | 677   |
-| `negative`   | 615   |
+| `functional` | 1172  |
+| `boundary`   | 679   |
+| `negative`   | 620   |
 | `expansion`  | 437   |
 | `stress`     | 111   |
 | `regression` | 1     |
@@ -29,10 +29,13 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | [`conformance/basics-execution-divergence-reconvergence`](conformance/basics-execution-divergence-reconvergence/README.md) |     8 | [`docs/language-reference/basics-execution-divergence-reconvergence.md`](../../language-reference/basics-execution-divergence-reconvergence.md) |
 | [`conformance/basics-program-execution`](conformance/basics-program-execution/README.md)                                   |    10 | [`docs/language-reference/basics-program-execution.md`](../../language-reference/basics-program-execution.md)                                   |
 | [`conformance/declarations`](conformance/declarations/README.md)                                                           |    43 | [`docs/language-reference/declarations.md`](../../language-reference/declarations.md)                                                           |
+| [`conformance/expressions-identifier`](conformance/expressions-identifier/README.md)                                       |    10 | [`docs/language-reference/expressions-identifier.md`](../../language-reference/expressions-identifier.md)                                       |
+| [`conformance/expressions-initializer`](conformance/expressions-initializer/README.md)                                     |     9 | [`docs/language-reference/expressions-initializer.md`](../../language-reference/expressions-initializer.md)                                     |
 | [`conformance/expressions-literal`](conformance/expressions-literal/README.md)                                             |    12 | [`docs/language-reference/expressions-literal.md`](../../language-reference/expressions-literal.md)                                             |
 | [`conformance/expressions-member-access`](conformance/expressions-member-access/README.md)                                 |     5 | [`docs/language-reference/expressions-member-access.md`](../../language-reference/expressions-member-access.md)                                 |
 | [`conformance/expressions-operator-precedence`](conformance/expressions-operator-precedence/README.md)                     |    25 | [`docs/language-reference/expressions-operator-precedence.md`](../../language-reference/expressions-operator-precedence.md)                     |
 | [`conformance/expressions-operators`](conformance/expressions-operators/README.md)                                         |    10 | [`docs/language-reference/expressions-operators.md`](../../language-reference/expressions-operators.md)                                         |
+| [`conformance/expressions-this`](conformance/expressions-this/README.md)                                                   |     6 | [`docs/language-reference/expressions-this.md`](../../language-reference/expressions-this.md)                                                   |
 | [`conformance/generics`](conformance/generics/README.md)                                                                   |    45 | [`docs/language-reference/generics.md`](../../language-reference/generics.md)                                                                   |
 | [`conformance/lexical-structure`](conformance/lexical-structure/README.md)                                                 |     8 | [`docs/language-reference/lexical-structure.md`](../../language-reference/lexical-structure.md)                                                 |
 | [`conformance/statements`](conformance/statements/README.md)                                                               |    36 | [`docs/language-reference/statements.md`](../../language-reference/statements.md)                                                               |
