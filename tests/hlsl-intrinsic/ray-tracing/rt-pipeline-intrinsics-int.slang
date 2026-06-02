@@ -2,8 +2,8 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage intersection
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage intersection -profile sm_6_5 -DNOMOTION
-//TEST:SIMPLE(filecheck=SVPID_SPIRV):-target spirv-assembly -entry main_sv_primitiveid -stage intersection
-//TEST:SIMPLE(filecheck=SVPID_DXIL):-target dxil-assembly -entry main_sv_primitiveid -stage intersection -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_SPIRV):-target spirv-assembly -entry main_sv_primitiveid_uint -stage intersection
+//TEST:SIMPLE(filecheck=SVPID_DXIL):-target dxil-assembly -entry main_sv_primitiveid_uint -stage intersection -profile sm_6_5 -DNOMOTION
 //TEST:SIMPLE(filecheck=SVPID_INT_DXIL):-target dxil-assembly -entry main_sv_primitiveid_int -stage intersection -profile sm_6_5 -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
@@ -210,7 +210,7 @@ void main()
 }
 
 [shader("intersection")]
-void main_sv_primitiveid(uint primitiveID : SV_PrimitiveID)
+void main_sv_primitiveid_uint(uint primitiveID : SV_PrimitiveID)
 {
     MyAttributes IDs;
     IDs.attr = float(primitiveID);

@@ -2,8 +2,8 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage closesthit
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage closesthit -profile sm_6_5 -DNOMOTION
-//TEST:SIMPLE(filecheck=SVPID_SPIRV):-target spirv-assembly -entry main_sv_primitiveid -stage closesthit
-//TEST:SIMPLE(filecheck=SVPID_DXIL):-target dxil-assembly -entry main_sv_primitiveid -stage closesthit -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_SPIRV):-target spirv-assembly -entry main_sv_primitiveid_uint -stage closesthit
+//TEST:SIMPLE(filecheck=SVPID_DXIL):-target dxil-assembly -entry main_sv_primitiveid_uint -stage closesthit -profile sm_6_5 -DNOMOTION
 //TEST:SIMPLE(filecheck=SVPID_INT_DXIL):-target dxil-assembly -entry main_sv_primitiveid_int -stage closesthit -profile sm_6_5 -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
@@ -298,7 +298,7 @@ void main( inout RayPayload payload, in BuiltInTriangleIntersectionAttributes at
 }
 
 [shader("closesthit")]
-void main_sv_primitiveid(
+void main_sv_primitiveid_uint(
     inout RayPayload payload,
     in BuiltInTriangleIntersectionAttributes attribs,
     uint primitiveID : SV_PrimitiveID)

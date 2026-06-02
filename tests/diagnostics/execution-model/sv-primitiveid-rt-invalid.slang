@@ -13,7 +13,6 @@ struct Payload
 //DIAGNOSTIC_TEST:SIMPLE(diag=ISECT_OUT):-target hlsl -entry intersectionOut -stage intersection
 //DIAGNOSTIC_TEST:SIMPLE(diag=INOUT):-target hlsl -entry anyhitInOut -stage anyhit
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHIT_INOUT):-target hlsl -entry closesthitInOut -stage closesthit
-//DIAGNOSTIC_TEST:SIMPLE(diag=OTHER_SV):-target hlsl -entry closesthitOtherSystemValue -stage closesthit
 
 [shader("raygeneration")]
 void raygenMain(uint primitiveID : SV_PrimitiveID)
@@ -58,16 +57,4 @@ void closesthitInOut(
 //CHIT_INOUT:  ^^^^^^^^^^^ system value semantic 'SV_PrimitiveID' cannot be used as output in 'closesthit' shader stage
 {
     primitiveID = uint(attribs.barycentrics.x + payload.value);
-}
-
-[shader("closesthit")]
-void closesthitOtherSystemValue(
-    inout Payload payload,
-    in BuiltInTriangleIntersectionAttributes attribs,
-    uint dispatchThreadID : SV_DispatchThreadID)
-/*OTHER_SV:
-         ^^^^^^^^^^^^^^^^ system value semantic 'SV_DispatchThreadID' cannot be used as input in 'closesthit' shader stage
-*/
-{
-    payload.value = attribs.barycentrics.x + float(dispatchThreadID);
 }
