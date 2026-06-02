@@ -11,10 +11,22 @@
 // RUNTIME-NEXT: 8
 
 // CHECK: OpCapability DescriptorHeapEXT
-// CHECK: OpUntypedAccessChainKHR
+// CHECK-NOT: ByteAddressBuffer
+// CHECK: %StructuredBuffer = OpTypeStruct %_runtimearr_uint
+// CHECK: %_ptr_StorageBuffer_StructuredBuffer = OpTypePointer StorageBuffer %StructuredBuffer
+// CHECK: %RWStructuredBuffer = OpTypeStruct %_runtimearr_uint
+// CHECK: %_ptr_StorageBuffer_RWStructuredBuffer = OpTypePointer StorageBuffer %RWStructuredBuffer
+// CHECK: OpBufferPointerEXT %_ptr_StorageBuffer_StructuredBuffer
+// CHECK: OpAccessChain %_ptr_StorageBuffer_uint
+// CHECK: OpBufferPointerEXT %_ptr_StorageBuffer_RWStructuredBuffer
+// CHECK: OpAccessChain %_ptr_StorageBuffer_uint
 
 // ROV: OpCapability DescriptorHeapEXT
-// ROV: OpUntypedAccessChainKHR
+// ROV-NOT: ByteAddressBuffer
+// ROV: %RasterizerOrderedStructuredBuffer = OpTypeStruct %_runtimearr_uint
+// ROV: %_ptr_StorageBuffer_RasterizerOrderedStructuredBuffer = OpTypePointer StorageBuffer %RasterizerOrderedStructuredBuffer
+// ROV: OpBufferPointerEXT %_ptr_StorageBuffer_RasterizerOrderedStructuredBuffer
+// ROV: OpAccessChain %_ptr_StorageBuffer_uint
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=output
 RWStructuredBuffer<uint> output;
@@ -25,6 +37,7 @@ uniform ByteAddressBuffer.Handle readOnlyBuffer;
 //TEST_INPUT: set readWriteBuffer = ubuffer(data=[0 0], stride=4)
 uniform RWByteAddressBuffer.Handle readWriteBuffer;
 
+//TEST_INPUT: set rasterOrderedBuffer = ubuffer(data=[0 0 0], stride=4)
 uniform RasterizerOrderedByteAddressBuffer.Handle rasterOrderedBuffer;
 
 [numthreads(1, 1, 1)]
