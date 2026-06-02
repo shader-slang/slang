@@ -289,6 +289,23 @@ source-build path. On macOS, Microsoft does not publish a prebuilt DXC package;
 set `-DSLANG_DXC_BUILD_FROM_SOURCE=ON` to build DXC locally. The default macOS
 configuration leaves DXC unavailable to avoid the large clone and build cost.
 
+```mermaid
+flowchart TD
+    Start["Configure DXC support"] --> BuildFromSource{"SLANG_DXC_BUILD_FROM_SOURCE"}
+    BuildFromSource -->|ON| Source["Build DXC from source"]
+    BuildFromSource -->|OFF| Prebuilt["Use a prebuilt binary when available"]
+    BuildFromSource -->|unset| CustomUrl{"SLANG_DXC_BINARY_URL set?"}
+    CustomUrl -->|yes| CustomPrebuilt["Use custom prebuilt URL and skip GLIBC detection"]
+    CustomUrl -->|no| NativeLinux{"Native Linux x86_64?"}
+    NativeLinux -->|yes| Probe["Download Linux prebuilt and inspect GLIBC requirements"]
+    Probe --> Compatible{"Detected requirements are compatible with host GLIBC?"}
+    Compatible -->|yes| LinuxPrebuilt["Use Linux prebuilt binary"]
+    Compatible -->|no or unknown| Source
+    NativeLinux -->|no| OfficialPrebuilt{"Official prebuilt exists for platform?"}
+    OfficialPrebuilt -->|yes| Prebuilt
+    OfficialPrebuilt -->|no| Unavailable["DXC unavailable unless built from source"]
+```
+
 - `ON`: build DXC from source on Windows, Linux, and macOS; on other platforms, DXC is unavailable.
 - `OFF`: use the prebuilt binary when one is available and skip the GLIBC check; on
   non-x86_64 Linux and macOS, DXC is unavailable unless `SLANG_DXC_BINARY_URL`
@@ -300,6 +317,8 @@ configuration leaves DXC unavailable to avoid the large clone and build cost.
 The source-build path clones DXC plus LLVM/Clang submodules on the first run
 and can take tens of minutes to configure and build; later reconfigures and
 incremental builds use stamp files and build outputs to skip repeated work.
+
+#### Optional backend and test dependencies
 
 The following options relate to optional dependencies for additional backends
 and running additional tests. Left unchanged they are auto detected, however
