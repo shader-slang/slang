@@ -167,7 +167,7 @@ else
     )
     # Walk TEST_ARGS one token at a time and classify each:
     #   - Agentic-overridden value-taking flags (-test-dir,
-    #     -expected-failure-list): skip flag + value.
+    #     -expected-failure-list, -server-count): skip flag + value.
     #   - Other known value-taking flags: inherit flag + value.
     #   - Lone option flags ("-*"): inherit as-is.
     #   - Bare positional tokens (test selectors): drop. The agentic
@@ -179,10 +179,10 @@ else
     while [ "$i" -lt "${#TEST_ARGS[@]}" ]; do
       arg="${TEST_ARGS[i]}"
       case "$arg" in
-      -test-dir | -expected-failure-list)
+      -test-dir | -expected-failure-list | -server-count)
         i=$((i + 2))
         ;;
-      -enable-debug-layers | -synthesizedTestApi | -server-count)
+      -enable-debug-layers | -synthesizedTestApi)
         AGENTIC_TEST_ARGS+=("$arg" "${TEST_ARGS[i + 1]}")
         i=$((i + 2))
         ;;
@@ -195,6 +195,15 @@ else
         ;;
       esac
     done
+    # Force sequential execution for the agentic pass under coverage.
+    # On Linux coverage we hit a deterministic SIGSEGV in slang-test
+    # (see run 26810699621) that kills the orchestrator and loses the
+    # tail of the suite. With -server-count 1 the crashing test is
+    # unambiguously the last one printed before the segfault, so we
+    # can identify it and exclude it (or fix it) on the next iter.
+    # Sequential adds wall time but is once-a-day and coverage data
+    # quality > runner-minute savings.
+    AGENTIC_TEST_ARGS+=("-server-count" "1")
     # Retry once on crash (exit > 128 = killed by signal). The suite
     # is long (~2680 bundles); a single SIGSEGV in slang-test mid-run
     # loses the rest of the pass and produces minimal coverage uplift.
