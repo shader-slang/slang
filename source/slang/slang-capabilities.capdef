@@ -391,6 +391,10 @@ alias cpp_hlsl = cpp | hlsl;
 /// [Compound]
 alias cuda_glsl_hlsl = cuda | glsl | hlsl;
 
+/// CUDA, GLSL, and NVAPI code-gen targets
+/// [Compound]
+alias cuda_glsl_nvapi = cuda | glsl | hlsl_nvapi;
+
 /// CUDA, HLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias cuda_hlsl_metal_spirv = cuda | hlsl | metal | spirv;
@@ -1319,9 +1323,10 @@ def ser_hlsl_native : _sm_6_9;
 alias ser_dxr = raytracing + ser_hlsl_native;
 
 /// Capabilities needed for shader-execution-reordering (all paths)
-/// Includes NVIDIA-specific (NV), cross-vendor standard (EXT), DXR 1.3 native, and CUDA paths
+/// Defaults SPIR-V/GLSL to the cross-vendor standard EXT path; explicit NV still satisfies this
+/// through the NV-to-EXT capability hierarchy. Use ser_nv for APIs that require NV opcodes.
 /// [Compound]
-alias ser = raytracing + GL_NV_shader_invocation_reorder | raytracing + GL_EXT_shader_invocation_reorder | ser_nvapi | ser_dxr | cuda;
+alias ser = raytracing + GL_EXT_shader_invocation_reorder | ser_nvapi | ser_dxr | cuda;
 
 /// NVIDIA-specific SER capabilities (excludes cross-vendor EXT)
 /// Includes GL_NV_shader_invocation_reorder (GLSL/SPIRV) and CUDA paths
