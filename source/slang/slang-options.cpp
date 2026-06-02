@@ -460,7 +460,20 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::DepFile,
          "-depfile",
          "-depfile <path>",
-         "Save the source file dependency list in a file."},
+         "Save the source file dependency list in a file.\n"
+         "The file uses Makefile dependency syntax: <target>: <dep1> <dep2> ...\n"
+         "Each compiled output produces one line where <target> is the output file path.\n"
+         "When no -o flag is given for a target (output goes to stdout), - is used as the\n"
+         "Make target placeholder, following the Unix convention where - denotes stdin/stdout.\n"
+         "This keeps the depfile syntactically valid so tools that only care about the\n"
+         "dependency list still work. Build systems that match on the target name will not\n"
+         "find a rule for -; pass -o explicitly or filter out -: lines if needed.\n"
+         "Slang uses - rather than the input filename (GCC -MD style) because the output\n"
+         "format is not derived from the input name.\n"
+         "When some targets have an explicit -o path and others do not, each target gets its\n"
+         "own depfile line; named targets produce <path>: <deps> and unnamed ones produce\n"
+         "-: <deps>. When several targets all lack -o, only one -: <deps> line is written;\n"
+         "a deduplication guard suppresses the redundant identical lines."},
         {OptionKind::EntryPointName,
          "-entry",
          "-entry <name>",

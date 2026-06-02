@@ -62,14 +62,6 @@ The space between - D and &lt;name&gt; is optional. If no &lt;value&gt; is speci
 
 Save the source file dependency list in a file.
 
-The file uses Makefile dependency syntax: `<target>: <dep1> <dep2> ...`. Each compiled output produces one line, where `<target>` is the output file path and `<dep1> <dep2> ...` are the source files read during compilation.
-
-**Stdout output (`-` sentinel):** When no `-o` flag is given for a target (output goes to stdout), `-` is used as the Make target placeholder. This follows the Unix convention where `-` denotes stdin/stdout and keeps the depfile syntactically valid so tools that only care about the dependency list (right of `:`) still work. Build systems that do match on the target name will not find a rule for `-`; they should either always pass `-o` or filter out `-:` lines. This is intentional: Slang does not fall back to the input filename (GCC `-MD` style) because the output format is not derived from the input name.
-
-**Mixed `-o` presence:** When some targets have an explicit `-o` path and others do not, each target gets its own depfile line — named targets produce `<path>: <deps>` and unnamed ones produce `-: <deps>`. The dependency list is identical for all lines in a single invocation since all targets share the same source inputs.
-
-**Multiple stdout-bound targets:** When several targets all lack a `-o` flag, only one `-: <deps>` line is written. A deduplication guard suppresses the redundant identical lines that would otherwise appear.
-
 
 <a id="entry"></a>
 ### -entry
