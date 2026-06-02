@@ -388,7 +388,6 @@ class _MiniYaml:
 @dataclass
 class BundleSpec:
     key: str
-    prompt: str  # path relative to _meta/
     source_doc: str  # workspace-relative
     watched_paths: list[str]
     depends_on: list[str] = field(default_factory=list)
@@ -399,6 +398,13 @@ class BundleSpec:
     def dir(self) -> str:
         """Workspace-relative bundle directory."""
         return f"docs/generated/tests/{self.key}"
+
+    @property
+    def prompt(self) -> str:
+        """Workspace-relative per-bundle prompt path. Co-located with the
+        bundle as `_prompt.md` (derived from `dir`, not stored in the
+        manifest)."""
+        return f"{self.dir}/_prompt.md"
 
 
 @dataclass
@@ -429,7 +435,6 @@ def load_manifest() -> Manifest:
             raise SystemExit(f"bundle {key!r} has no source_doc")
         spec = BundleSpec(
             key=key,
-            prompt=str(entry["prompt"]),
             source_doc=str(source_doc),
             watched_paths=[str(p) for p in watched],
             depends_on=[str(d) for d in entry.get("depends_on") or []],
@@ -1574,7 +1579,7 @@ def cmd_show(args: argparse.Namespace) -> int:
         raise SystemExit(f"unknown bundle: {args.bundle}")
     print(f"bundle:          {spec.key}")
     print(f"dir:             {spec.dir}")
-    print(f"prompt:          _meta/{spec.prompt}")
+    print(f"prompt:          {spec.prompt}")
     print(f"source_doc:      {spec.source_doc}")
     doc_path = REPO_ROOT / spec.source_doc
     print(
@@ -1653,17 +1658,17 @@ def cmd_index(args: argparse.Namespace) -> int:
 
     # Section assignment by path prefix.
     section_for = {
-        "architecture/": "Architecture",
-        "pipeline/": "Pipeline",
-        "syntax-reference/": "Syntax reference",
-        "cross-cutting/": "Cross-cutting",
-        "ast-reference/": "AST reference",
-        "name-resolution/": "Name resolution",
-        "ir-reference/": "IR reference",
-        "target-pipelines/": "Target pipelines",
+        "spec/": "Spec (language reference)",
+        "regression/pipeline/": "Pipeline",
+        "regression/syntax-reference/": "Syntax reference",
+        "regression/cross-cutting/": "Cross-cutting",
+        "regression/ast-reference/": "AST reference",
+        "regression/name-resolution/": "Name resolution",
+        "regression/ir-reference/": "IR reference",
+        "regression/target-pipelines/": "Target pipelines",
     }
     section_order = [
-        "Architecture",
+        "Spec (language reference)",
         "Pipeline",
         "Syntax reference",
         "Cross-cutting",
@@ -1721,11 +1726,11 @@ def cmd_index(args: argparse.Namespace) -> int:
         out.append("| --- | ---: | --- |")
         for spec in grouped[section]:
             count = bundle_counts.get(spec.key, 0)
-            # Relative link from INDEX.md (at docs/generated/tests/INDEX.md)
-            # to source_doc (workspace-relative path under docs/generated/design/).
-            # Strip the shared `docs/generated/` prefix and prepend `../`:
-            #   docs/generated/tests/INDEX.md -> ../design/<...>.md
-            doc_link = "../" + spec.source_doc.removeprefix("docs/generated/")
+            # Relative link from INDEX.md (in docs/generated/tests/) to the
+            # source_doc (workspace-relative). Handles both source roots:
+            #   docs/generated/design/<...>  -> ../design/<...>
+            #   docs/language-reference/<...> -> ../../language-reference/<...>
+            doc_link = os.path.relpath(spec.source_doc, "docs/generated/tests")
             out.append(
                 f"| [`{spec.key}`]({spec.key}/README.md) | {count} |"
                 f" [`{spec.source_doc}`]({doc_link}) |"

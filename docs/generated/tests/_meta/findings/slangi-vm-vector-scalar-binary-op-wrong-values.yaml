@@ -1,6 +1,6 @@
 schema_version: 1
 id: slangi-vm-vector-scalar-binary-op-wrong-values
-bundle: language-reference/types-vector-and-matrix
+bundle: spec/types-vector-and-matrix
 suspected_kind: wrong-codegen
 title: "[slangi] vector-scalar binary op (v - 1 etc.) returns wrong values"
 observed_at: 2026-06-01T15:30:00+00:00

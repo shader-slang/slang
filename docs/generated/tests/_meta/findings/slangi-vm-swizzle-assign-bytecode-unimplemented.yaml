@@ -1,6 +1,6 @@
 schema_version: 1
 id: slangi-vm-swizzle-assign-bytecode-unimplemented
-bundle: language-reference/types-vector-and-matrix
+bundle: spec/types-vector-and-matrix
 suspected_kind: regression
 title: "[slangi] vector swizzle-assign aborts: VM bytecode gen unimplemented"
 observed_at: 2026-06-01T15:30:00+00:00

@@ -2,12 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/shader-slang/slang/docs/generated/tests/_meta/schema/manifest.schema.json",
   "title": "docs/generated/tests manifest",
-  "description": "Schema for docs/generated/tests/_meta/manifest.yaml. One bundle per file in docs/generated/design/. Tests in each bundle derive their claims from the bundle's source_doc and are never written against source-line gaps.",
+  "description": "Schema for docs/generated/tests/_meta/manifest.yaml. Bundle keys are role-rooted (spec/<doc> for language-reference-anchored bundles, regression/<area>/<doc> for generated-design-anchored bundles). Tests in each bundle derive their claims from the bundle's source_doc and are never written against source-line gaps.",
   "type": "object",
-  "required": [
-    "version",
-    "bundles"
-  ],
+  "required": ["version", "bundles"],
   "additionalProperties": false,
   "properties": {
     "version": {
@@ -21,27 +18,19 @@
     },
     "bundles": {
       "type": "object",
-      "description": "Map of bundle key -> bundle spec. The bundle key matches the doc path under docs/generated/design/ (without the .md suffix). The bundle directory is docs/generated/tests/<key>/.",
+      "description": "Map of bundle key -> bundle spec. The bundle key is the role-rooted path of the bundle: spec/<doc> for language-reference-anchored bundles, regression/<area>/<doc> for generated-design-anchored bundles. The bundle directory is docs/generated/tests/<key>/, and the per-bundle prompt is co-located there as _prompt.md (derived, not stored here).",
       "propertyNames": {
         "pattern": "^[a-z0-9]+(/[a-z0-9][a-z0-9-]*)*$"
       },
       "additionalProperties": {
         "type": "object",
-        "required": [
-          "prompt",
-          "source_doc",
-          "watched_paths"
-        ],
+        "required": ["source_doc", "watched_paths"],
         "additionalProperties": false,
         "properties": {
-          "prompt": {
-            "type": "string",
-            "description": "Path to the bundle prompt template, relative to _meta/."
-          },
           "source_doc": {
             "type": "string",
-            "pattern": "^docs/generated/design/.+\\.md$",
-            "description": "Workspace-relative path to the documentation file this bundle's tests are anchored to."
+            "pattern": "^docs/(generated/design|language-reference)/.+\\.md$",
+            "description": "Workspace-relative path to the documentation file this bundle's tests are anchored to. spec/ bundles cite docs/language-reference/; regression/ bundles cite docs/generated/design/."
           },
           "watched_paths": {
             "type": "array",

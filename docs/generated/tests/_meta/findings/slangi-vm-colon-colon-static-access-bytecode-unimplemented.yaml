@@ -1,6 +1,6 @@
 schema_version: 1
 id: slangi-vm-colon-colon-static-access-bytecode-unimplemented
-bundle: language-reference/expressions-member-access
+bundle: spec/expressions-member-access
 suspected_kind: regression
 title: "[slangi] `EnumType::Name` static access aborts: VM bytecode unimplemented"
 observed_at: 2026-06-01T17:00:00+00:00
