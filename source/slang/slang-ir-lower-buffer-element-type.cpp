@@ -365,9 +365,14 @@ struct BufferElementTypeLoweringPolicy : public RefObject
                as<IRArrayType>(elementType) || as<IRBoolType>(elementType);
     }
 
-    /// Returns true if buffer element types with [PhysicalType] decoration should
-    /// be skipped. Override to false when running a late pass that needs to further
-    /// lower fields in types that were already partially processed by an earlier run.
+    /// Controls whether a pass invocation re-processes types that a prior
+    /// invocation already decorated with [PhysicalType]. This is a pass-level
+    /// policy decision, not a type-level predicate — it governs the
+    /// relationship between multiple invocations of lowerBufferElementTypeToStorageType.
+    ///
+    /// The default (true) skips already-processed types to avoid double-lowering.
+    /// Override to false when running a late pass that needs to further lower
+    /// fields in types that were already partially processed by an earlier run.
     virtual bool shouldSkipPhysicalTypes() { return true; }
 };
 
@@ -2941,6 +2946,13 @@ struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
 // integer that communicates the value holds an address, unlike UInt64
 // which could be confused with plain data by future optimization passes).
 //
+// Inherits directly from BufferElementTypeLoweringPolicy rather than
+// DefaultBufferElementTypeLoweringPolicy. This policy only handles
+// pointer-to-UIntPtr lowering; matrix, bool, and other leaf-type
+// lowering was already completed by the earlier invocation of this
+// pass, so the identity fallback in lowerLeafLogicalType is
+// intentionally correct for all non-pointer leaf types.
+//
 // Two address-space rules:
 //   - StorageBuffer (RWStructuredBuffer<T*>): lower ALL pointers, because
 //     the buffer binding itself is a device*, making any T* element into
@@ -2955,12 +2967,23 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
     // Conservative over-approximation: returns true if the element type
     // contains ANY pointer (including single-level). The actual lowering
     // decision is narrower (lowerLeafLogicalType uses the address-space
-    // rule). False positives are harmless — the framework skips buffers
-    // where the lowered type equals the original (no fields changed).
+    // rule to skip single-level pointers in non-StorageBuffer contexts).
     //
-    // Recursion through arrays/structs is needed because processModule asks
-    // about the TOP-LEVEL element type (e.g. the struct), not individual
-    // fields. We must drill in to detect nested pointer fields.
+    // Recursion through arrays/structs is needed because processModule
+    // asks about the TOP-LEVEL element type (e.g. the struct), not
+    // individual fields. We must drill in to detect nested pointers.
+    //
+    // TODO: False positives are NOT free for already-[PhysicalType]-
+    // decorated types (re-processed via shouldSkipPhysicalTypes = false).
+    // When all field lowerings are identity, the non-Natural layout
+    // rule in getLoweredTypeInfoImpl still forces creation of a
+    // structurally new type, triggering unnecessary pack/unpack helper
+    // generation. Output is correct after simplification, but it's
+    // wasteful IR churn. Fixing this requires needsElementLowering to
+    // be address-space-aware (shared base-class signature change),
+    // since the discovery filter can't currently distinguish
+    // StorageBuffer (lower all pointers) from Uniform/Constant (lower
+    // only multi-level).
     bool needsElementLowering(IRType* elementType) override
     {
         if (as<IRPtrType>(elementType))
@@ -2985,6 +3008,10 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
 
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
     {
+        // The invariant: lower any pointer field that would produce a
+        // pointer-to-pointer type in Metal output. The two rules below
+        // are its decomposition by source of the extra indirection.
+        //
         if (auto ptrType = as<IRPtrType>(type))
         {
             // Two independent rules determine whether this pointer

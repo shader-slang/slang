@@ -2368,8 +2368,13 @@ Result linkAndOptimizeIR(
 
     // Metal rejects pointer-to-pointer types in buffer pointee types (e.g.
     // `device int* device*` as a struct field in a [[buffer(N)]] binding).
-    // This runs after the main pipeline so that specializeAddressSpaceForMetal
-    // sees real pointer types for device/constant qualification.
+    //
+    // Required predecessors:
+    //   (a) specializeAddressSpaceForMetal — needs real pointer types
+    //   (b) the main lowerBufferElementTypeToStorageType — matrix/bool
+    //       fields must already be lowered
+    //   (c) the main eliminatePhis — so the late eliminatePhis below
+    //       only processes phis introduced by this pass
     //
     // This does not conflict with the earlier MetalParameterBlock run
     // because they target orthogonal field kinds within the same types:

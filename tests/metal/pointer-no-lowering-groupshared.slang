@@ -3,11 +3,16 @@
 
 // Verify that a struct with int** fields used in groupshared context is NOT
 // lowered, even when the same struct type is also used in a ConstantBuffer
-// (which IS lowered). The in-place field mutation for the buffer-bound path
-// must not corrupt the groupshared usage.
+// (which IS lowered).
 //
-// Metal allows pointer-to-pointer in threadgroup memory — the restriction
-// only applies to buffer pointee types.
+// Mechanism: processModule only discovers types used as buffer element types
+// (ConstantBuffer, StructuredBuffer, etc.) and specific pointer address
+// spaces (UserPointer, Input, Output) — groupshared variables don't match
+// any discovery category. The framework creates a separate lowered type for
+// the buffer path, leaving the original (used by groupshared) intact.
+//
+// The device T* device* restriction only arises from buffer bindings, not
+// threadgroup memory — Metal allows pointer-to-pointer in threadgroup.
 //
 // See: https://github.com/shader-slang/slang/issues/10841
 
