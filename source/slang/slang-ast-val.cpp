@@ -1486,6 +1486,23 @@ Val* NoDiffModifierVal::_substituteImplOverride(
     return this;
 }
 
+// GloballyCoherentModifierVal
+void GloballyCoherentModifierVal::_toTextOverride(StringBuilder& out)
+{
+    out.append("globallycoherent");
+}
+
+Val* GloballyCoherentModifierVal::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    SLANG_UNUSED(astBuilder);
+    SLANG_UNUSED(subst);
+    SLANG_UNUSED(ioDiff);
+    return this;
+}
+
 // PolynomialIntVal
 
 void PolynomialIntVal::_toTextOverride(StringBuilder& out)

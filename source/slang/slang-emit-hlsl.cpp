@@ -2217,6 +2217,14 @@ void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
     case kIROp_SNormAttr:
         m_writer->emit("snorm ");
         break;
+    case kIROp_MemoryQualifierSetAttr:
+        {
+            auto memoryQualifierAttr = cast<IRMemoryQualifierSetAttr>(attr);
+            IRIntegerValue flags = getIntVal(memoryQualifierAttr->getMemoryQualifierBit());
+            if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                m_writer->emit("globallycoherent ");
+        }
+        break;
     }
 }
 

@@ -1717,12 +1717,61 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    bool hasCoherentMemoryQualifierDecoration(IRInst* inst)
+    {
+        if (!inst)
+            return false;
+
+        for (auto decoration : inst->getDecorations())
+        {
+            if (auto collection = as<IRMemoryQualifierSetDecoration>(decoration))
+            {
+                IRIntegerValue flags = collection->getMemoryQualifierBit();
+                if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    bool hasCoherentMemoryQualifierAttr(IRInst* type)
+    {
+        while (auto attributedType = as<IRAttributedType>(type))
+        {
+            for (auto attr : attributedType->getAllAttrs())
+            {
+                if (auto collection = as<IRMemoryQualifierSetAttr>(attr))
+                {
+                    IRIntegerValue flags = getIntVal(collection->getMemoryQualifierBit());
+                    if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                        return true;
+                }
+            }
+            type = attributedType->getBaseType();
+        }
+        return false;
+    }
+
+    bool hasCoherentMemoryQualifier(IRInst* inst)
+    {
+        if (!inst)
+            return false;
+
+        if (hasCoherentMemoryQualifierDecoration(inst))
+            return true;
+
+        if (hasCoherentMemoryQualifierAttr(inst->getDataType()))
+            return true;
+
+        return hasCoherentMemoryQualifierAttr(inst->getFullType());
+    }
+
     bool NeedToUseCoherentLoadOrStore(IRInst* pointer)
     {
         if (m_memoryModel != SpvMemoryModelVulkan)
             return false;
 
-        auto ptrType = as<IRPtrTypeBase>(pointer->getFullType());
+        auto ptrType = as<IRPtrTypeBase>(unwrapAttributedType(pointer->getFullType()));
         if (!ptrType)
             return false;
 
@@ -1763,19 +1812,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (baseObj == nullptr)
             return false;
 
-        for (auto decoration : baseObj->getDecorations())
-        {
-            if (decoration->getOp() == kIROp_MemoryQualifierSetDecoration)
-            {
-                auto collection = as<IRMemoryQualifierSetDecoration>(decoration);
-                IRIntegerValue flags = collection->getMemoryQualifierBit();
-                if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return hasCoherentMemoryQualifier(baseObj) ||
+               hasCoherentMemoryQualifierAttr(ptrType->getValueType());
     }
 
     bool NeedToUseCoherentImageLoadOrStore(IRInst* image)
@@ -1783,21 +1821,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (m_memoryModel != SpvMemoryModelVulkan)
             return false;
 
-        if (auto opLoad = as<IRLoad>(image->getOperand(0)))
+        auto imageValue = image;
+        if (as<IRImageLoad>(image) || as<IRImageStore>(image))
+            imageValue = image->getOperand(0);
+        else if (auto asmOperand = as<IRSPIRVAsmOperand>(image))
+            imageValue = asmOperand->getValue();
+
+        if (hasCoherentMemoryQualifier(imageValue))
+            return true;
+
+        if (auto opLoad = as<IRLoad>(imageValue))
         {
             auto texPtr = opLoad->getPtr();
-            for (auto decoration : texPtr->getDecorations())
-            {
-                if (decoration->getOp() == kIROp_MemoryQualifierSetDecoration)
-                {
-                    auto collection = as<IRMemoryQualifierSetDecoration>(decoration);
-                    IRIntegerValue flags = collection->getMemoryQualifierBit();
-                    if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
-                    {
-                        return true;
-                    }
-                }
-            }
+            return hasCoherentMemoryQualifier(texPtr);
         }
         return false;
     }
@@ -7083,6 +7119,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvStorageClass getDescriptorHeapBufferStorageClass(IRType* valueType)
     {
+        valueType = (IRType*)unwrapAttributedType(valueType);
         auto ptrType = as<IRPtrTypeBase>(valueType);
         if (!ptrType)
         {
@@ -7167,6 +7204,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* getDescriptorHeapBaseType(IRType* valueType, bool* outIsBufferResource = nullptr)
     {
+        valueType = (IRType*)unwrapAttributedType(valueType);
         SpvInst* descriptorElementType = nullptr;
         bool isBufferResource = false;
         switch (valueType->getOp())

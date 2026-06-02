@@ -2945,6 +2945,16 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(getBuilder()->getAttr(kIROp_NoDiffAttr));
     }
 
+    LoweredValInfo visitGloballyCoherentModifierVal(GloballyCoherentModifierVal* astVal)
+    {
+        SLANG_UNUSED(astVal);
+        IRInst* memoryQualifierBit = getBuilder()->getIntValue(
+            getBuilder()->getIntType(),
+            MemoryQualifierSetModifier::Flags::kCoherent);
+        return LoweredValInfo::simple(
+            getBuilder()->getAttr(kIROp_MemoryQualifierSetAttr, memoryQualifierBit));
+    }
+
     // We do not expect to encounter the following types in ASTs that have
     // passed front-end semantic checking.
 #define UNEXPECTED_CASE(NAME)        \
