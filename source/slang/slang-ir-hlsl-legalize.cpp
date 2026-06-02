@@ -363,14 +363,26 @@ void legalizeRayTracingPrimitiveIDParam(IRModule* module)
                     0,
                     nullptr);
 
-                IRInst* replacement = primitiveIndexCall;
+                IRInst* valueReplacement = primitiveIndexCall;
                 auto paramType = param->getFullType();
                 auto valueType = paramType;
-                if (auto borrowInParamType = as<IRBorrowInParamType>(valueType))
+                auto borrowInParamType = as<IRBorrowInParamType>(valueType);
+                if (borrowInParamType)
                     valueType = borrowInParamType->getValueType();
 
                 if (valueType != builder.getUIntType())
-                    replacement = builder.emitCast(valueType, primitiveIndexCall);
+                    valueReplacement = builder.emitCast(valueType, primitiveIndexCall);
+
+                IRInst* addressReplacement = nullptr;
+                auto getAddressReplacement = [&]()
+                {
+                    if (!addressReplacement)
+                    {
+                        addressReplacement = builder.emitVar(valueType);
+                        builder.emitStore(addressReplacement, valueReplacement);
+                    }
+                    return addressReplacement;
+                };
 
                 traverseUses(
                     param,
@@ -381,13 +393,15 @@ void legalizeRayTracingPrimitiveIDParam(IRModule* module)
                         {
                             if (load->getPtr() == param)
                             {
-                                load->replaceUsesWith(replacement);
+                                load->replaceUsesWith(valueReplacement);
                                 load->removeAndDeallocate();
                                 return;
                             }
                         }
 
-                        builder.replaceOperand(use, replacement);
+                        builder.replaceOperand(
+                            use,
+                            borrowInParamType ? getAddressReplacement() : valueReplacement);
                     });
             }
 
