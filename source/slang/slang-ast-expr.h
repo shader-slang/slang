@@ -119,7 +119,7 @@ class IntegerLiteralExpr : public LiteralExpr
     // -2147483648 back from Int64 to Int).
     //
     // See also docs/language-reference/expressions-literal.md
-    FIDDLE() bool signedMinimumIntException{false};
+    FIDDLE() bool signedMinimumIntException;
 };
 
 FIDDLE()
