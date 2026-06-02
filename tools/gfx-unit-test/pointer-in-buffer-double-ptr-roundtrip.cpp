@@ -74,15 +74,12 @@ void pointerInBufferDoublePtrRoundtripTestImpl(IDevice* device, UnitTestContext*
     // Level 2: holds the address of midBuffer (the int** value).
     // This is what the shader reads from StructuredBuffer<int**>.
     uint64_t midAddr = midBuffer->getDeviceAddress();
-    BufferDesc ptrDesc = {};
-    ptrDesc.size = sizeof(uint64_t);
-    ptrDesc.elementSize = sizeof(uint64_t);
-    ptrDesc.format = Format::Undefined;
-    ptrDesc.usage = BufferUsage::ShaderResource | BufferUsage::CopyDestination;
-    ptrDesc.defaultState = ResourceState::ShaderResource;
-    ptrDesc.memoryType = MemoryType::DeviceLocal;
-    ComPtr<IBuffer> ptrBuffer;
-    GFX_CHECK_CALL_ABORT(device->createBuffer(ptrDesc, &midAddr, ptrBuffer.writeRef()));
+    auto ptrBuffer = makeBuffer(
+        sizeof(uint64_t),
+        sizeof(uint64_t),
+        &midAddr,
+        BufferUsage::ShaderResource,
+        ResourceState::ShaderResource);
 
     // Output buffer.
     int32_t outputInit[] = {0};

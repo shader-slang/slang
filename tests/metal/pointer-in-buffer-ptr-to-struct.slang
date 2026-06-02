@@ -2,9 +2,10 @@
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Pointer-to-struct where the pointed-to struct contains multi-level pointers.
-// Metal's rejection is transitive through pointer fields: if Outer contains
-// `Inner*` and Inner contains `int**`, Outer cannot be a buffer pointee type.
-// The pass must follow pointer-to-struct fields during recursion.
+// Inner is discovered separately by processModule via IRPtrTypeBase global
+// processing (address space UserPointer), which extracts the pointee struct
+// as its own element type. The pass then lowers Inner.deep independently
+// of Outer — needsElementLowering does NOT recurse through pointer pointees.
 //
 // See: https://github.com/shader-slang/slang/issues/10841
 

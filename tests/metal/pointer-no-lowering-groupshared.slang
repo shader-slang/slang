@@ -31,10 +31,15 @@ RWStructuredBuffer<int> output;
 // CHECK: ulong
 // CHECK: };
 
-// The groupshared variable should still compile correctly (Metal accepts
-// pointer-to-pointer in threadgroup memory).
+// The original (un-lowered) struct is preserved for the groupshared path.
+// Its pointer field must remain as a typed device pointer, not ulong.
+// CHECK-LABEL: struct SharedData_0
+// CHECK: device* device* ptr
+// CHECK: };
+
+// The groupshared variable uses the un-lowered struct type.
 // CHECK-LABEL: computeMain
-// CHECK: threadgroup
+// CHECK: threadgroup SharedData_0
 
 // METALLIB: computeMain
 

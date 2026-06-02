@@ -44,7 +44,7 @@ RWStructuredBuffer<int> output;
 // Single-level pointers preserved as typed device pointers.
 // CHECK-LABEL: struct SinglePtr
 // CHECK: int device* data
-// CHECK: float device* weights
+// CHECK-NEXT: float device* weights
 // CHECK-NOT: ulong
 // CHECK: };
 

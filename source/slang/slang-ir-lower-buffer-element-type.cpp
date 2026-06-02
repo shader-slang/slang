@@ -2974,6 +2974,8 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
     // contains ANY pointer (including single-level). The actual lowering
     // decision is narrower (lowerLeafLogicalType uses the address-space
     // rule to skip single-level pointers in non-StorageBuffer contexts).
+    // False positives are safe for Natural layout (the framework detects
+    // identity and skips), but not free for non-Natural layout — see TODO.
     //
     // Recursion through arrays/structs is needed because processModule
     // asks about the TOP-LEVEL element type (e.g. the struct), not
@@ -3015,12 +3017,13 @@ struct MetalPointerBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPo
         return false;
     }
 
-    // The early MetalParameterBlock policy already processed ParameterBlock
-    // structs, converting resource fields to DescriptorHandle and decorating
-    // the storage type with [PhysicalType]. Pointer fields were left
-    // untouched — IRPtrType is not a resource type, and the default
-    // policy's lowerLeafLogicalType does not lower pointers. We must
-    // re-process these types to lower their pointer fields.
+    // Both the early MetalParameterBlock pass (resource -> DescriptorHandle
+    // in ParameterBlocks) and the main Default pass (matrix/bool lowering
+    // in all buffer types) decorate their output types with [PhysicalType].
+    // Pointer fields were left untouched by both — IRPtrType is not a
+    // resource type, and the default policy's lowerLeafLogicalType does
+    // not lower pointers. We must re-process these types to lower their
+    // pointer fields.
     bool shouldSkipPhysicalTypes() override { return false; }
 
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override

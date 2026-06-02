@@ -11,11 +11,14 @@ namespace gfx_test
 
 // Runtime validation of pointer fields inside a ParameterBlock on Metal.
 //
-// ParameterBlock structs go through two lowering passes on Metal:
+// ParameterBlock structs go through three lowering passes on Metal:
 // 1. MetalParameterBlock (early) — converts resource fields to DescriptorHandle,
 //    decorates the storage type with [PhysicalType].
-// 2. MetalPointerLowering (late) — re-processes [PhysicalType]-decorated types
+// 2. Default (main) — lowers matrix/bool fields in all buffer types.
+//    Also decorates with [PhysicalType].
+// 3. MetalPointerLowering (late) — re-processes [PhysicalType]-decorated types
 //    (via shouldSkipPhysicalTypes() override) to lower multi-level pointer fields.
+// This test's struct has only pointer and scalar fields, so pass 2 is a no-op.
 //
 // Single-level int* fields should be preserved as typed device pointers since
 // Metal accepts one level of pointer indirection in argument-buffer-bound structs.

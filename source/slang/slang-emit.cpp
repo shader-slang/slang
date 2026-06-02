@@ -2378,6 +2378,14 @@ Result linkAndOptimizeIR(
     //   (c) the main eliminatePhis — so the late eliminatePhis below
     //       only processes phis introduced by this pass
     //
+    // Metal buffer element types go through three lowerBufferElementTypeToStorageType
+    // invocations:
+    //   1. MetalParameterBlock (~line 1606): resource fields -> DescriptorHandle
+    //   2. Default/Khronos (~line 2225): matrix/bool -> lowered representations
+    //   3. MetalPointerLowering (here): pointer fields -> UIntPtr
+    // Each can decorate types with [PhysicalType]; pass 3 uses
+    // shouldSkipPhysicalTypes = false to re-process types from passes 1 and 2.
+    //
     // This does not conflict with the earlier MetalParameterBlock run
     // because they target orthogonal field kinds within the same types:
     // that pass converts resource fields to DescriptorHandle; this one
