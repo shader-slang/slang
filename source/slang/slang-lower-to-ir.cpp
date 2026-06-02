@@ -1692,29 +1692,34 @@ IRInst* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
     else if (auto constraint = as<GenericTypeConstraintDecl>(requirementDecl);
              constraint && !constraint->isEqualityConstraint)
     {
-        if (auto subDeclRefType = as<DeclRefType>(constraint->sub.type))
+        // This is the conformance requirement of a built-in associated type
+        // (e.g. the relocated `Differential : IDifferentiable`). The built-in
+        // *role* tag lives on the constrained associated type itself --
+        // `IDifferentiable.Differential` carries `BuiltinRequirementModifier`
+        // with kind `DifferentialType` -- so we read that tag off `sub` (which
+        // must be the associated type) and map it to the corresponding *witness*
+        // role. A non-associated-type `sub` carries no such tag and is not a
+        // built-in requirement.
+        if (auto assoc = isDeclRefTypeOf<AssocTypeDecl>(constraint->sub.type))
         {
-            if (auto assoc = as<AssocTypeDecl>(subDeclRefType->getDeclRef().getDecl()))
+            if (auto assocReq = assoc.getDecl()->findModifier<BuiltinRequirementModifier>())
             {
-                if (auto assocReq = assoc->findModifier<BuiltinRequirementModifier>())
+                switch (assocReq->kind)
                 {
-                    switch (assocReq->kind)
-                    {
-                    case BuiltinRequirementKind::DifferentialType:
-                        builtinRole = BuiltinRequirementKind::DifferentialWitness;
-                        hasBuiltinRole = true;
-                        break;
-                    case BuiltinRequirementKind::DifferentialPtrType:
-                        builtinRole = BuiltinRequirementKind::DifferentialPtrWitness;
-                        hasBuiltinRole = true;
-                        break;
-                    case BuiltinRequirementKind::BwdCallableContextType:
-                        builtinRole = BuiltinRequirementKind::BwdCallableContextWitness;
-                        hasBuiltinRole = true;
-                        break;
-                    default:
-                        break;
-                    }
+                case BuiltinRequirementKind::DifferentialType:
+                    builtinRole = BuiltinRequirementKind::DifferentialWitness;
+                    hasBuiltinRole = true;
+                    break;
+                case BuiltinRequirementKind::DifferentialPtrType:
+                    builtinRole = BuiltinRequirementKind::DifferentialPtrWitness;
+                    hasBuiltinRole = true;
+                    break;
+                case BuiltinRequirementKind::BwdCallableContextType:
+                    builtinRole = BuiltinRequirementKind::BwdCallableContextWitness;
+                    hasBuiltinRole = true;
+                    break;
+                default:
+                    break;
                 }
             }
         }

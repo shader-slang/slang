@@ -418,9 +418,8 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
             // resolve identically.
             auto builtinReqFromExp = [](TypeExp const& exp) -> BuiltinRequirementModifier*
             {
-                if (auto declRefType = as<DeclRefType>(exp.type))
-                    if (auto assoc = as<AssocTypeDecl>(declRefType->getDeclRef().getDecl()))
-                        return assoc->findModifier<BuiltinRequirementModifier>();
+                if (auto assoc = isDeclRefTypeOf<AssocTypeDecl>(exp.type))
+                    return assoc.getDecl()->findModifier<BuiltinRequirementModifier>();
                 return nullptr;
             };
             builtinReq = builtinReqFromExp(constraintDecl->sub);

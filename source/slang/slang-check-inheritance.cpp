@@ -705,6 +705,26 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     // `selfType`. The opposite endpoint of a matching constraint is added as a
     // base of `selfType`.
     //
+    // Worked example:
+    //
+    //     interface IBase  { associatedtype D; }
+    //     interface IDeriv : IBase { __constraint D == This; }
+    //     // for some `T : IDeriv`, consider the access `T.D`
+    //
+    // Computing the inheritance of `T.D`: the anchor `T` conforms to `IDeriv`,
+    // whose member constraint `D == This` has subject `This.D` -- matching the
+    // chain `[D]` leading from anchor `T` down to `T.D`. The other endpoint,
+    // `This`, re-expressed through the witness `T : IDeriv`, is `T`. So `T` is
+    // added as a base of `T.D`, which is what lets a `T.D` value be used where a
+    // `T` is expected. A subtype constraint such as `__constraint D : IFoo`
+    // works the same way but only matches on its `sub` endpoint, adding `IFoo`
+    // as the base.
+    //
+    // The constraints are discovered purely from the interfaces each anchor type
+    // conforms to (via `getInheritanceInfo(anchor.type).facets`); the relocation
+    // pass guarantees an `associatedtype`'s trailing bound and `where` clauses
+    // also appear as such interface-member `GenericTypeConstraintDecl`s.
+    //
     if (declRef.as<AssocTypeDecl>())
     {
         // Decompose an associated-type access into the ordered list of
@@ -739,6 +759,16 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             return false;
         };
 
+        // Match two access chains *structurally* (by the exact sequence of
+        // associated-type decls), not by type equality.
+        //
+        // Type equality is intentionally avoided here: the differential rules
+        // make `T.Differential.Differential` equal to `T.Differential`, so an
+        // equality-based match would treat the constraint subject
+        // `This.Differential.Differential` as matching the access `T.Differential`
+        // and re-expand without bound -- exactly the self-referential case the
+        // `selfChainDepth` guard below exists to stop. Comparing the raw chains
+        // keeps the match purely syntactic and terminating.
         auto chainsEqual = [](List<Decl*> const& a, List<Decl*> const& b) -> bool
         {
             if (a.getCount() != b.getCount())
@@ -763,12 +793,22 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         // Collect the ancestor anchors along `selfType`'s lookup chain, pairing
         // each anchor type with the chain of associated types leading from it
         // down to `selfType`.
-        struct Anchor
+        // An `AccessChainAnchor` is one ancestor type along `selfType`'s
+        // associated-type lookup chain, paired with the chain of associated
+        // types leading from that ancestor down to `selfType`. For
+        // `selfType == T.TA.TB` the anchors are
+        // `{ type: T.TA, chainToSelf: [TB] }` and
+        // `{ type: T,    chainToSelf: [TA, TB] }`.
+        //
+        // Note `type` is a *conforming type* (e.g. `T`), not an interface -- we
+        // scan the interfaces it conforms to for constraints below. (So this is
+        // deliberately not named after an interface type.)
+        struct AccessChainAnchor
         {
             Type* type;
             List<Decl*> chainToSelf;
         };
-        List<Anchor> anchors;
+        List<AccessChainAnchor> anchors;
         {
             List<Decl*> trailing;
             Type* cur = selfType;
@@ -786,7 +826,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 chainToSelf.add(assocDeclRef.getDecl());
                 chainToSelf.addRange(trailing);
 
-                Anchor anchor;
+                AccessChainAnchor anchor;
                 anchor.type = lookupDeclRef->getLookupSource();
                 anchor.chainToSelf = chainToSelf;
                 anchors.add(anchor);

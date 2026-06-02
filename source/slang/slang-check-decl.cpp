@@ -9920,9 +9920,17 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // If `requiredMemberDeclRef` is a lookup decl ref for an interface requirement
     // we attempt to do the loopkup through witness tables.
     //
-    // As a first pass, lets check if we already have a
-    // witness in the table for the requirement, so
-    // that we can bail out early.
+    // As a first pass, check whether the witness table already provides a
+    // witness for this requirement, and if so reuse it and bail out early.
+    //
+    // This applies to *every* kind of requirement (methods, associated types,
+    // constraints, ...). In particular it covers the cases where conformance
+    // synthesis deliberately supplied a witness that a fresh re-derivation below
+    // would reject -- e.g. an `enum`'s automatic `__EnumType` conformance
+    // supplies the `__Tag : __BuiltinIntegerType` witness directly, including for
+    // a `bool`-tagged `enum` where `bool` is a permitted tag type yet does not
+    // actually conform to `__BuiltinIntegerType`. Respecting a synthesis-provided
+    // witness here is therefore the contract, not a constraint-specific quirk.
     //
     if (witnessTable->getRequirementDictionary().containsKey(requiredMemberDeclRef.getDecl()))
     {
@@ -9945,18 +9953,10 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     //
     if (auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
     {
-        // If a witness for this constraint was already provided when the
-        // conformance was synthesized (e.g. an `enum`'s automatic `__EnumType`
-        // conformance supplies the `__Tag : __BuiltinIntegerType` witness
-        // directly), respect it rather than re-deriving the constraint here.
-        // This is required for cases the conformance synthesis trusts but a fresh
-        // subtype check would reject -- e.g. a `bool`-tagged `enum`, where `bool`
-        // is a permitted tag type yet does not conform to `__BuiltinIntegerType`.
-        if (witnessTable->m_requirementDictionary.containsKey(requiredConstraintDeclRef.getDecl()))
-        {
-            return true;
-        }
-
+        // Note: a witness already provided by conformance synthesis (e.g. an
+        // `enum`'s `__Tag : __BuiltinIntegerType`, including the `bool`-tagged
+        // case) is handled uniformly by the early-out at the top of this function
+        // and never reaches here.
         auto constraintSub = getSub(m_astBuilder, requiredConstraintDeclRef);
         auto constraintSup = getSup(m_astBuilder, requiredConstraintDeclRef);
 
