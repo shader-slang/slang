@@ -8,14 +8,14 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 ## Suite totals
 
-- **Bundles:** 53
-- **Total `.slang` tests:** 2748
+- **Bundles:** 59
+- **Total `.slang` tests:** 2891
 
 | Intent       | Count |
 | ------------ | ----- |
-| `functional` | 945   |
-| `boundary`   | 663   |
-| `negative`   | 591   |
+| `functional` | 1066  |
+| `boundary`   | 672   |
+| `negative`   | 604   |
 | `expansion`  | 437   |
 | `stress`     | 111   |
 | `regression` | 1     |
@@ -24,17 +24,23 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 ### Conformance (language reference)
 
-| Bundle                                                                                     | Tests | Source doc                                                                                                      |
-| ------------------------------------------------------------------------------------------ | ----: | --------------------------------------------------------------------------------------------------------------- |
-| [`conformance/expressions-literal`](conformance/expressions-literal/README.md)             |    12 | [`docs/language-reference/expressions-literal.md`](../../language-reference/expressions-literal.md)             |
-| [`conformance/expressions-member-access`](conformance/expressions-member-access/README.md) |     5 | [`docs/language-reference/expressions-member-access.md`](../../language-reference/expressions-member-access.md) |
-| [`conformance/expressions-operators`](conformance/expressions-operators/README.md)         |    10 | [`docs/language-reference/expressions-operators.md`](../../language-reference/expressions-operators.md)         |
-| [`conformance/lexical-structure`](conformance/lexical-structure/README.md)                 |     8 | [`docs/language-reference/lexical-structure.md`](../../language-reference/lexical-structure.md)                 |
-| [`conformance/types-array`](conformance/types-array/README.md)                             |     6 | [`docs/language-reference/types-array.md`](../../language-reference/types-array.md)                             |
-| [`conformance/types-enum`](conformance/types-enum/README.md)                               |     5 | [`docs/language-reference/types-enum.md`](../../language-reference/types-enum.md)                               |
-| [`conformance/types-extension`](conformance/types-extension/README.md)                     |     5 | [`docs/language-reference/types-extension.md`](../../language-reference/types-extension.md)                     |
-| [`conformance/types-fundamental-integer`](conformance/types-fundamental-integer/README.md) |     8 | [`docs/language-reference/types-fundamental.md`](../../language-reference/types-fundamental.md)                 |
-| [`conformance/types-vector-and-matrix`](conformance/types-vector-and-matrix/README.md)     |     9 | [`docs/language-reference/types-vector-and-matrix.md`](../../language-reference/types-vector-and-matrix.md)     |
+| Bundle                                                                                                                     | Tests | Source doc                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------- | ----: | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`conformance/basics-execution-divergence-reconvergence`](conformance/basics-execution-divergence-reconvergence/README.md) |     8 | [`docs/language-reference/basics-execution-divergence-reconvergence.md`](../../language-reference/basics-execution-divergence-reconvergence.md) |
+| [`conformance/basics-program-execution`](conformance/basics-program-execution/README.md)                                   |    10 | [`docs/language-reference/basics-program-execution.md`](../../language-reference/basics-program-execution.md)                                   |
+| [`conformance/expressions-literal`](conformance/expressions-literal/README.md)                                             |    12 | [`docs/language-reference/expressions-literal.md`](../../language-reference/expressions-literal.md)                                             |
+| [`conformance/expressions-member-access`](conformance/expressions-member-access/README.md)                                 |     5 | [`docs/language-reference/expressions-member-access.md`](../../language-reference/expressions-member-access.md)                                 |
+| [`conformance/expressions-operators`](conformance/expressions-operators/README.md)                                         |    10 | [`docs/language-reference/expressions-operators.md`](../../language-reference/expressions-operators.md)                                         |
+| [`conformance/generics`](conformance/generics/README.md)                                                                   |    45 | [`docs/language-reference/generics.md`](../../language-reference/generics.md)                                                                   |
+| [`conformance/lexical-structure`](conformance/lexical-structure/README.md)                                                 |     8 | [`docs/language-reference/lexical-structure.md`](../../language-reference/lexical-structure.md)                                                 |
+| [`conformance/types-array`](conformance/types-array/README.md)                                                             |     6 | [`docs/language-reference/types-array.md`](../../language-reference/types-array.md)                                                             |
+| [`conformance/types-enum`](conformance/types-enum/README.md)                                                               |     5 | [`docs/language-reference/types-enum.md`](../../language-reference/types-enum.md)                                                               |
+| [`conformance/types-extension`](conformance/types-extension/README.md)                                                     |     5 | [`docs/language-reference/types-extension.md`](../../language-reference/types-extension.md)                                                     |
+| [`conformance/types-fundamental-integer`](conformance/types-fundamental-integer/README.md)                                 |     8 | [`docs/language-reference/types-fundamental.md`](../../language-reference/types-fundamental.md)                                                 |
+| [`conformance/types-interface`](conformance/types-interface/README.md)                                                     |    30 | [`docs/language-reference/types-interface.md`](../../language-reference/types-interface.md)                                                     |
+| [`conformance/types-pointer`](conformance/types-pointer/README.md)                                                         |    19 | [`docs/language-reference/types-pointer.md`](../../language-reference/types-pointer.md)                                                         |
+| [`conformance/types-struct`](conformance/types-struct/README.md)                                                           |    31 | [`docs/language-reference/types-struct.md`](../../language-reference/types-struct.md)                                                           |
+| [`conformance/types-vector-and-matrix`](conformance/types-vector-and-matrix/README.md)                                     |     9 | [`docs/language-reference/types-vector-and-matrix.md`](../../language-reference/types-vector-and-matrix.md)                                     |
 
 ### Pipeline
 
