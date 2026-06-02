@@ -176,12 +176,6 @@ option(
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
 
-option(
-    SLANG_GITHUB_TOKEN
-    "Use a given token value for accessing Github REST API"
-    ""
-)
-
 advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
 advanced_option(
@@ -376,7 +370,7 @@ enum_option(
 if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     # If the user didn't specify a URL, find the best one now
     if(NOT SLANG_SLANG_LLVM_BINARY_URL)
-        get_best_slang_binary_release_url("${SLANG_GITHUB_TOKEN}" url)
+        get_best_slang_binary_release_url(url)
         if(NOT DEFINED url)
             if(SLANG_SLANG_LLVM_FLAVOR STREQUAL FETCH_BINARY_IF_POSSIBLE)
                 message(
@@ -564,7 +558,6 @@ if(SLANG_WEBGPU_DAWN_BINARY_URL)
         "webgpu_dawn"
         "${SLANG_WEBGPU_DAWN_BINARY_URL}"
         IGNORE_FAILURE
-        SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
     )
 endif()
 
@@ -577,7 +570,6 @@ if(SLANG_SLANG_TINT_BINARY_URL)
         "slang-tint"
         "${SLANG_SLANG_TINT_BINARY_URL}"
         IGNORE_FAILURE
-        SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
     )
 endif()
 
@@ -598,6 +590,14 @@ add_subdirectory(source/slang-core-module)
 add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
+if(TARGET slangc)
+    # Keep DXC runtime artifacts and headers staged for targeted slangc builds.
+    foreach(_dxc_stage_target copy-dxcompiler copy-dxil stage-dxc-headers)
+        if(TARGET ${_dxc_stage_target})
+            add_dependencies(slangc ${_dxc_stage_target})
+        endif()
+    endforeach()
+endif()
 add_subdirectory(source/slang-dispatcher)
 add_subdirectory(source/standard-modules)
 add_subdirectory(examples)
