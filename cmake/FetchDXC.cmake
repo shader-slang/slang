@@ -25,7 +25,7 @@
 #
 # Requires the following variables to be set by the caller (set in SlangTarget.cmake):
 #   runtime_subdir   - Destination for Windows DLLs (e.g. "bin")
-#   library_subdir   - Destination for Linux .so files (e.g. "lib")
+#   library_subdir   - Destination for Linux/macOS shared libraries (e.g. "lib")
 
 include(FetchContent)
 
@@ -117,6 +117,7 @@ if(SLANG_DXC_BUILD_FROM_SOURCE)
     if(
         CMAKE_SYSTEM_NAME STREQUAL "Windows"
         OR CMAKE_SYSTEM_NAME STREQUAL "Linux"
+        OR CMAKE_SYSTEM_NAME STREQUAL "Darwin"
     )
         set(_dxc_build_from_source ON)
     else()
@@ -466,7 +467,8 @@ endif()
 if(_dxc_build_from_source)
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         set(_dxc_warning_flags "")
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    else()
+        # Linux and macOS (only platforms reaching here besides Windows).
         # LLVM_ENABLE_WARNINGS=OFF prevents adding warning flags but does not
         # actively suppress existing ones. Pass -w via CMAKE_*_FLAGS to silence
         # all GCC/Clang warnings from DXC's source.
@@ -618,7 +620,7 @@ if(_dxc_build_from_source)
 
     # Step 3: Build DXC at Slang build time.
     # The DXIL validator target is named 'dxildll' in DXC's CMake (it produces
-    # libdxil.so on Linux / dxil.dll on Windows).
+    # libdxil.so on Linux / libdxil.dylib on macOS / dxil.dll on Windows).
     if(CMAKE_GENERATOR MATCHES "Ninja")
         set(_dxc_build_cmd
             ${CMAKE_COMMAND}
@@ -650,9 +652,11 @@ if(_dxc_build_from_source)
             "${_dxc_build_dir}/${_dxc_dll_subdir}/dxil.dll"
         )
     else()
+        # Linux produces .so, macOS produces .dylib; derive the file name from
+        # the platform's shared-library prefix/suffix so both resolve.
         set(_dxc_src_byproducts
-            "${_dxc_build_dir}/lib/libdxcompiler.so"
-            "${_dxc_build_dir}/lib/libdxil.so"
+            "${_dxc_build_dir}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}dxcompiler${CMAKE_SHARED_LIBRARY_SUFFIX}"
+            "${_dxc_build_dir}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}dxil${CMAKE_SHARED_LIBRARY_SUFFIX}"
         )
     endif()
 
@@ -687,9 +691,12 @@ if(_dxc_build_from_source)
         endforeach()
     else()
         foreach(_lib dxcompiler dxil)
-            set(_src "${_dxc_build_dir}/lib/lib${_lib}.so")
+            set(_libname
+                "${CMAKE_SHARED_LIBRARY_PREFIX}${_lib}${CMAKE_SHARED_LIBRARY_SUFFIX}"
+            )
+            set(_src "${_dxc_build_dir}/lib/${_libname}")
             set(_dst
-                "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/lib${_lib}.so"
+                "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${_libname}"
             )
             add_custom_command(
                 OUTPUT "${_dst}"
