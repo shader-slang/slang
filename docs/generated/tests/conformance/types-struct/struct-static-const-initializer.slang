@@ -14,6 +14,12 @@
 // CHECK confirms the emitted HLSL contains the folded literal int(6).
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
 
 struct TestStruct
 {
@@ -29,3 +35,21 @@ void main()
 }
 
 // CHECK: int(6)
+
+// GLSL folds the static const to its literal value 6 at the store site.
+// GLSL: = 6
+
+// SPIRV emits the static const value as an OpConstant.
+// SPV: %int_6 = OpConstant
+
+// Metal folds the static const to int(6).
+// METAL: int(6)
+
+// WGSL folds the static const to i32(6).
+// WGSL: i32(6)
+
+// CUDA folds the static const to int(6).
+// CUDA: int(6)
+
+// CPP folds the static const to int(6).
+// CPP: int(6)

@@ -14,6 +14,11 @@
 // proving the get accessor wired through correctly.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
 
 struct ReadOnlyProp
 {
@@ -35,3 +40,28 @@ void main()
 }
 
 // CHECK: m_x
+
+// GLSL emits struct ReadOnlyProp with field and get accessor function.
+// GLSL: struct ReadOnlyProp_{{[0-9]+}}
+// GLSL: m_x_{{[0-9]+}}
+// GLSL: ReadOnlyProp_xVal_get_{{[0-9]+}}
+
+// Metal emits struct ReadOnlyProp with field and get accessor function.
+// METAL: struct ReadOnlyProp_{{[0-9]+}}
+// METAL: m_x_{{[0-9]+}}
+// METAL: ReadOnlyProp_xVal_get_{{[0-9]+}}
+
+// WGSL emits struct ReadOnlyProp with field and get accessor function.
+// WGSL: struct ReadOnlyProp_{{[0-9]+}}
+// WGSL: m_x_{{[0-9]+}}
+// WGSL: ReadOnlyProp_xVal_get_{{[0-9]+}}
+
+// CUDA emits struct ReadOnlyProp with field and get accessor function.
+// CUDA: struct ReadOnlyProp_{{[0-9]+}}
+// CUDA: m_x_{{[0-9]+}}
+// CUDA: ReadOnlyProp_xVal_get_{{[0-9]+}}
+
+// CPP emits struct ReadOnlyProp with field and get accessor function.
+// CPP: struct ReadOnlyProp_{{[0-9]+}}
+// CPP: m_x_{{[0-9]+}}
+// CPP: ReadOnlyProp_xVal_get_{{[0-9]+}}

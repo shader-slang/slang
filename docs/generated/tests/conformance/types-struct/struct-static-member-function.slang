@@ -14,6 +14,11 @@
 // name and a return statement appear in the emitted output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
 
 struct TestStruct
 {
@@ -35,3 +40,23 @@ void main()
 
 // CHECK: getB
 // CHECK: return
+
+// GLSL emits the static member function as a module-scope function with the mangled name.
+// GLSL: TestStruct_getB_{{[0-9]+}}
+// GLSL: return
+
+// Metal emits the static member function taking a KernelContext pointer.
+// METAL: TestStruct_getB_{{[0-9]+}}
+// METAL: return
+
+// WGSL emits the static member function as a module-scope fn.
+// WGSL: fn TestStruct_getB_{{[0-9]+}}
+// WGSL: return
+
+// CUDA emits the static member function as a __device__ function.
+// CUDA: TestStruct_getB_{{[0-9]+}}
+// CUDA: return
+
+// CPP emits the static member function as a static C++ function.
+// CPP: TestStruct_getB_{{[0-9]+}}
+// CPP: return

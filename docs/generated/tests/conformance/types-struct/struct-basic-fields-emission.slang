@@ -14,6 +14,10 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL_CHECK):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
 
 struct Point
 {
@@ -36,4 +40,24 @@ void main()
 // CHECK: int x
 // CHECK: int y
 
-// GLSL_CHECK: struct Point
+// GLSL_CHECK: struct Point_{{[0-9]+}}
+
+// Metal emits struct Point with mangled field names.
+// METAL: struct Point_{{[0-9]+}}
+// METAL: x_{{[0-9]+}}
+// METAL: y_{{[0-9]+}}
+
+// WGSL emits struct Point with WGSL field syntax.
+// WGSL: struct Point_{{[0-9]+}}
+// WGSL: x_{{[0-9]+}}
+// WGSL: y_{{[0-9]+}}
+
+// CUDA emits struct Point with int fields.
+// CUDA: struct Point_{{[0-9]+}}
+// CUDA: int x_{{[0-9]+}}
+// CUDA: int y_{{[0-9]+}}
+
+// CPP emits struct Point with int32_t fields.
+// CPP: struct Point_{{[0-9]+}}
+// CPP: x_{{[0-9]+}}
+// CPP: y_{{[0-9]+}}

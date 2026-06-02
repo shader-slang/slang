@@ -23,6 +23,17 @@
 //                           = [[19, 22], [43, 50]]
 
 //TEST:INTERPRET(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
+
+// `*` is element-wise; `mul()` is matrix multiplication. The claim is
+// pinned by checking both operations appear and differ in emitted code.
+// Target HLSL emits m1_0 * m2_0 (element-wise) and mul(m1_0, m2_0) (builtin).
+// Targets CUDA and CPP emit m1_0 * m2_0 and a lowered mul_0 helper.
+// Target GLSL decomposes matrices to row-arrays; not checked (fragile).
+// Target SPIRV is very large (loop expanded); not checked.
+// Targets Metal and WGSL reject printf in compute; untested for emission.
 
 void main()
 {
@@ -34,6 +45,12 @@ void main()
 
     //CHECK: ew=5 12 21 32
     //CHECK: mm=19 22 43 50
+    //HLSL-DAG: ew_0 = m1_0 * m2_0
+    //HLSL-DAG: mm_0 = mul(m1_0, m2_0)
+    //CUDA-DAG: ew_0 = m1_0 * m2_0
+    //CUDA-DAG: mm_0 = mul_0(m1_0, m2_0)
+    //CPP-DAG: ew_0 = m1_0 * m2_0
+    //CPP-DAG: mm_0 = mul_0(m1_0, m2_0)
     printf("ew=%d %d %d %d\n", ew[0][0], ew[0][1], ew[1][0], ew[1][1]);
     printf("mm=%d %d %d %d\n", mm[0][0], mm[0][1], mm[1][0], mm[1][1]);
 }

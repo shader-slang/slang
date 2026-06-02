@@ -12,6 +12,15 @@
 // Direct port of the doc's example matrix into INTERPRET form.
 
 //TEST:INTERPRET(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
+
+// Matrix subscript access `m[r][c]`, row-vector access `m[r]`, and `.yx`
+// swizzle on a row. HLSL preserves the matrix type `int3x4` and uses
+// `m_0[int(r)][int(c)]` / `m_0[int(r)].w` notation. GLSL/SPIRV fully
+// constant-fold (not checked). CUDA/CPP use `m_0.rows[r].component`.
+// Metal/WGSL: printf unsupported in compute; untested for emission.
 
 void main()
 {
@@ -25,6 +34,18 @@ void main()
     int4 t3 = m[2];   // row 2        = { 9, 10, 11, 12 }
     int2 t4 = m[0].yx;// { m[0].y=2, m[0].x=1 } = { 2, 1 }
     //CHECK: t1=7 t2=8 t3=9 10 11 12 t4=2 1
+    // On HLSL, matrix type is int3x4; element access uses m_0[r][c] and .w notation.
+    //HLSL-DAG: int3x4
+    //HLSL-DAG: m_0[int(1)][int(2)]
+    //HLSL-DAG: m_0[int(0)].yx
+    // On CUDA, rows array with component swizzle.
+    //CUDA-DAG: Matrix<int, 3, 4>
+    //CUDA-DAG: m_0.rows[int(1)].z
+    //CUDA-DAG: m_0.rows[int(0)].y, m_0.rows[int(0)].x
+    // On CPP, same Matrix template with rows.
+    //CPP-DAG: Matrix<int32_t, 3, 4>
+    //CPP-DAG: m_0.rows[int(1)].z
+    //CPP-DAG: m_0.rows[int(0)].y, m_0.rows[int(0)].x
     printf("t1=%d t2=%d t3=%d %d %d %d t4=%d %d\n",
            t1, t2, t3.x, t3.y, t3.z, t3.w, t4.x, t4.y);
 }

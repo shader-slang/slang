@@ -14,6 +14,11 @@
 // in the emitted struct in that order.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
 
 struct Mixed
 {
@@ -38,3 +43,33 @@ void main()
 // CHECK: int x
 // CHECK: float y
 // CHECK: int z
+
+// GLSL emits struct Mixed with int x, float y, int z in declaration order.
+// GLSL: struct Mixed_{{[0-9]+}}
+// GLSL: x_{{[0-9]+}}
+// GLSL: y_{{[0-9]+}}
+// GLSL: z_{{[0-9]+}}
+
+// Metal emits struct Mixed with all three fields in order.
+// METAL: struct Mixed_{{[0-9]+}}
+// METAL: x_{{[0-9]+}}
+// METAL: y_{{[0-9]+}}
+// METAL: z_{{[0-9]+}}
+
+// WGSL emits struct Mixed with all three fields.
+// WGSL: struct Mixed_{{[0-9]+}}
+// WGSL: x_{{[0-9]+}}
+// WGSL: y_{{[0-9]+}}
+// WGSL: z_{{[0-9]+}}
+
+// CUDA emits struct Mixed with int x, float y, int z.
+// CUDA: struct Mixed_{{[0-9]+}}
+// CUDA: x_{{[0-9]+}}
+// CUDA: y_{{[0-9]+}}
+// CUDA: z_{{[0-9]+}}
+
+// CPP emits struct Mixed with all three fields.
+// CPP: struct Mixed_{{[0-9]+}}
+// CPP: x_{{[0-9]+}}
+// CPP: y_{{[0-9]+}}
+// CPP: z_{{[0-9]+}}

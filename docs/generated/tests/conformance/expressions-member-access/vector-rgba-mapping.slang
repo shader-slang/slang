@@ -15,6 +15,11 @@
 // and the equality flag is 1, ruling out any index permutation.
 
 //TEST:INTERPRET(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=VHLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=VGLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=VSPV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=VCUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=VCPP):-target cpp -entry main -stage compute
 
 void main()
 {
@@ -25,3 +30,17 @@ void main()
     printf("r=%d g=%d b=%d a=%d eq=%d\n",
            v.r, v.g, v.b, v.a, eq ? 1 : 0);
 }
+
+// Emission checks: the compiler constant-folds rgba swizzles on a literal int4.
+// Correct rgba→0123 mapping is proved by the folded constants appearing as 11,22,33,44
+// (in that order) and the equality flag 1 in the emitted printf/DebugPrintf call.
+// Metal and WGSL do not support printf in compute; those targets are unsupported-on-target.
+
+// VHLSL: printf({{.*}}11{{.*}}22{{.*}}33{{.*}}44{{.*}}1
+// VGLSL: debugPrintfEXT({{.*}}11{{.*}}22{{.*}}33{{.*}}44{{.*}}1
+// VSPV: %int_11 = OpConstant %int 11
+// VSPV-DAG: %int_22 = OpConstant %int 22
+// VSPV-DAG: %int_33 = OpConstant %int 33
+// VSPV-DAG: %int_44 = OpConstant %int 44
+// VCUDA: printf({{.*}}11{{.*}}22{{.*}}33{{.*}}44{{.*}}1
+// VCPP: printf({{.*}}11{{.*}}22{{.*}}33{{.*}}44{{.*}}1

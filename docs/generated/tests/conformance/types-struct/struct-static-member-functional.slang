@@ -14,6 +14,10 @@
 // entry point; CHECK confirms a static variable with value int(5) appears in the output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
 
 struct TestStruct
 {
@@ -30,3 +34,19 @@ void main()
 }
 
 // CHECK: static int b_{{[0-9]+}} = int(5)
+
+// GLSL emits the static data member as a module-scope int variable initialized to 5.
+// GLSL: int b_{{[0-9]+}}
+// GLSL: b_{{[0-9]+}} = 5
+
+// Metal folds the static into a KernelContext struct field initialized to int(5).
+// METAL: b_{{[0-9]+}}
+// METAL: int(5)
+
+// WGSL emits the static data member as a module-scope var<private> initialized to i32(5).
+// WGSL: var<private> b_{{[0-9]+}}
+// WGSL: i32(5)
+
+// CPP emits the static data member inside a KernelContext struct initialized to int(5).
+// CPP: b_{{[0-9]+}}
+// CPP: int(5)

@@ -14,6 +14,12 @@
 // member function (read-only and mutating), and static member functions.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
 
 struct TestStruct
 {
@@ -66,3 +72,34 @@ void main()
 // CHECK: TestStruct
 // CHECK: getA
 // CHECK: incrementAndReturnA
+
+// GLSL emits TestStruct with member function names.
+// GLSL: struct TestStruct_{{[0-9]+}}
+// GLSL: TestStruct_getA_{{[0-9]+}}
+// GLSL: TestStruct_incrementAndReturnA_{{[0-9]+}}
+
+// SPIRV inlines function bodies; the struct is not emitted as a type but
+// we can assert that the result values (int_42 stored at index 0, OpIAdd for
+// incrementAndReturn) appear in the module.
+// SPV: %int_42
+// SPV: OpIAdd
+
+// Metal emits TestStruct with member function names.
+// METAL: struct TestStruct_{{[0-9]+}}
+// METAL: TestStruct_getA_{{[0-9]+}}
+// METAL: TestStruct_incrementAndReturnA_{{[0-9]+}}
+
+// WGSL emits TestStruct with member function names.
+// WGSL: struct TestStruct_{{[0-9]+}}
+// WGSL: TestStruct_getA_{{[0-9]+}}
+// WGSL: TestStruct_incrementAndReturnA_{{[0-9]+}}
+
+// CUDA emits TestStruct with member function names.
+// CUDA: struct TestStruct_{{[0-9]+}}
+// CUDA: TestStruct_getA_{{[0-9]+}}
+// CUDA: TestStruct_incrementAndReturnA_{{[0-9]+}}
+
+// CPP emits TestStruct with member function names.
+// CPP: struct TestStruct_{{[0-9]+}}
+// CPP: TestStruct_getA_{{[0-9]+}}
+// CPP: TestStruct_incrementAndReturnA_{{[0-9]+}}

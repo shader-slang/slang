@@ -10,6 +10,11 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 //TEST:INTERPRET(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=SWHLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SWGLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SWSPV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=SWCUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=SWCPP):-target cpp -entry main -stage compute
 
 struct Point { int x; int y; }
 
@@ -21,3 +26,22 @@ void main()
     //CHECK: x=100 y=200
     printf("x=%d y=%d\n", p.x, p.y);
 }
+
+// Emission checks: struct field l-value write appears as `p_N.x_N = ...` in HLSL/GLSL,
+// `(&p_N)->x_N = ...` in CUDA/CPP. SPIRV constant-folds the assigns away; the written
+// values 100/200 are still visible as OpConstant. Metal/WGSL unsupported-on-target (no printf).
+
+// SWHLSL: p_{{[0-9]+}}.x_{{[0-9]+}} = {{.*}}100
+// SWHLSL-DAG: p_{{[0-9]+}}.y_{{[0-9]+}} = {{.*}}200
+
+// SWGLSL: p_{{[0-9]+}}.x_{{[0-9]+}} = 100
+// SWGLSL-DAG: p_{{[0-9]+}}.y_{{[0-9]+}} = 200
+
+// SWSPV: %int_100 = OpConstant %int 100
+// SWSPV-DAG: %int_200 = OpConstant %int 200
+
+// SWCUDA: x_{{[0-9]+}} = int(100)
+// SWCUDA-DAG: y_{{[0-9]+}} = int(200)
+
+// SWCPP: x_{{[0-9]+}} = int(100)
+// SWCPP-DAG: y_{{[0-9]+}} = int(200)

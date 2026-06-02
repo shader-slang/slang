@@ -14,6 +14,11 @@
 // entry point; CHECK confirms both field names survive to HLSL output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
 
 public struct MyStruct
 {
@@ -34,3 +39,28 @@ void main()
 
 // CHECK: publicField
 // CHECK: defaultField
+
+// GLSL emits struct MyStruct with both fields.
+// GLSL: struct MyStruct_{{[0-9]+}}
+// GLSL: publicField_{{[0-9]+}}
+// GLSL: defaultField_{{[0-9]+}}
+
+// Metal emits struct MyStruct with both fields.
+// METAL: struct MyStruct_{{[0-9]+}}
+// METAL: publicField_{{[0-9]+}}
+// METAL: defaultField_{{[0-9]+}}
+
+// WGSL emits struct MyStruct with both fields.
+// WGSL: struct MyStruct_{{[0-9]+}}
+// WGSL: publicField_{{[0-9]+}}
+// WGSL: defaultField_{{[0-9]+}}
+
+// CUDA emits struct MyStruct with both fields.
+// CUDA: struct MyStruct_{{[0-9]+}}
+// CUDA: publicField_{{[0-9]+}}
+// CUDA: defaultField_{{[0-9]+}}
+
+// CPP emits struct MyStruct with both fields.
+// CPP: struct MyStruct_{{[0-9]+}}
+// CPP: publicField_{{[0-9]+}}
+// CPP: defaultField_{{[0-9]+}}

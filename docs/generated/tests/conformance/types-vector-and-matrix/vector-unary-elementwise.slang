@@ -10,6 +10,18 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 //TEST:INTERPRET(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
+
+// Unary `-` on a vector lowers to per-target negation on the vector type.
+// The neg() wrapper prevents constant-folding so the operation survives emit.
+// HLSL/GLSL preserve the `return - v_0` inside the emitted function body.
+// CUDA emits `__device__ int4 neg_0(int4 v_0) { return - v_0; }`.
+// CPP emits `Vector<int32_t, 4> neg_0(...) { return - v_0; }`.
+// SPIRV constant-folds the negation (no observable opcode); not checked.
+// Metal/WGSL: printf unsupported in compute; untested for emission.
 
 int4 neg(int4 v) { return -v; }
 
@@ -17,5 +29,9 @@ void main()
 {
     int4 v = neg(int4(1, 2, 3, 4));
     //CHECK: -1 -2 -3 -4
+    //HLSL: return - v_0
+    //GLSL: return - v_0
+    //CUDA: return - v_0
+    //CPP: return - v_0
     printf("%d %d %d %d\n", v.x, v.y, v.z, v.w);
 }
