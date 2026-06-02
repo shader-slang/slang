@@ -71,6 +71,8 @@ void computeMain()
 [numthreads(1, 1, 1)]
 void hlslMain()
 {
+    // Public HLSL ByteAddressBuffer APIs emit native methods, so this entry
+    // directly exercises equivalent-structured-buffer descriptor-heap lowering.
     let readOnlyStructured = __getEquivalentStructuredBuffer<uint>(readOnlyBuffer);
     let readWriteStructured = __getEquivalentStructuredBuffer<uint>(readWriteBuffer);
 
