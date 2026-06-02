@@ -179,10 +179,10 @@ void ASTPrinter::addExpr(Expr* expr)
             sb << "u";
             break;
         case BaseType::Int64:
-            sb << "l";
+            sb << "ll";
             break;
         case BaseType::UInt64:
-            sb << "ul";
+            sb << "ull";
             break;
         case BaseType::Int16:
             sb << "s";
