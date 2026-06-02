@@ -153,14 +153,19 @@ else
     # needs suppression, the entry must include the `.N` suffix —
     # there is no canonicalization on this path.
     # Build the agentic invocation: start with the agentic-specific
-    # overrides (test-dir and expected-failure-list — those are what
-    # differ from the main pass), then inherit every other flag from
-    # the main pass's TEST_ARGS so settings like -use-test-server,
-    # -server-count, -synthesizedTestApi, -skip-reference-image-
-    # generation, -enable-debug-layers, etc. apply uniformly. This
-    # keeps the agentic pass running in the same slang-test mode as
-    # the main pass; the only differences are which tests run and
-    # which list of failures to expect.
+    # overrides (test-dir and expected-failure-list — those are
+    # what differ from the main pass), then inherit every other
+    # flag from the main pass's TEST_ARGS so settings like
+    # -use-test-server, -synthesizedTestApi,
+    # -skip-reference-image-generation, -enable-debug-layers, etc.
+    # apply uniformly. -server-count is also overridden, but in a
+    # dedicated block further down (the value gets forced to 1 for
+    # sequential execution under coverage instrumentation; see the
+    # comment at the `AGENTIC_TEST_ARGS+=("-server-count" "1")`
+    # line for the rationale). This keeps the agentic pass running
+    # in the same slang-test mode as the main pass; the only
+    # differences are which tests run, which list of failures to
+    # expect, and forced sequential execution.
     AGENTIC_TEST_ARGS=(
       "-test-dir" "docs/generated/tests"
       "-expected-failure-list" "docs/generated/tests/_meta/expected-failures.txt"
