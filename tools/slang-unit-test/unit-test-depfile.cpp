@@ -151,6 +151,9 @@ SLANG_UNIT_TEST(DepfileOutput)
             depContent.startsWith("-: "),
             "depfile target line must start with '-: ' (stdout sentinel + space)");
         SLANG_CHECK_MSG(
+            !_contains(depContent, "\n-:"),
+            "depfile must contain only one '-:' sentinel line");
+        SLANG_CHECK_MSG(
             _contains(depContent, Path::getFileName(slangPath).getBuffer()),
             "depfile missing input file dependency");
     }
@@ -309,5 +312,69 @@ SLANG_UNIT_TEST(DepfileOutput)
         SLANG_CHECK_MSG(
             !depContent.startsWith("-:") && !_contains(depContent, "\n-:"),
             "depfile must not contain '-:' sentinel for whole-program output");
+    }
+
+    // --- Test 5: per-entry-point output path branch (-emit-spirv-via-glsl) ---
+    //
+    // The per-entry-point branch in writeDependencyFile (the else arm that iterates
+    // entryPointOutputPaths) is only reached for SPIRV when -emit-spirv-via-glsl is
+    // specified; the default SPIRV path (shouldEmitSPIRVDirectly() == true) sets
+    // SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM and routes through wholeTargetOutputPath
+    // instead.  Tests 1-4 therefore all exercise the whole-program branch; this test
+    // covers the per-entry-point branch by forcing via-GLSL lowering.
+    {
+        TempFile inputBase;
+        SLANG_CHECK(SLANG_SUCCEEDED(_makeTempFile("slangc-df-viaglsl-in", inputBase)));
+        const String slangPath = inputBase.path + ".slang";
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            File::writeAllText(slangPath, "[shader(\"compute\")] void main() {}\n")));
+        TempFile slangGuard;
+        slangGuard.path = slangPath;
+
+        TempFile outputBase;
+        SLANG_CHECK(SLANG_SUCCEEDED(_makeTempFile("slangc-df-viaglsl-out", outputBase)));
+        const String spvPath = outputBase.path + ".spv";
+        TempFile spvGuard;
+        spvGuard.path = spvPath;
+
+        TempFile depFile;
+        SLANG_CHECK(SLANG_SUCCEEDED(_makeTempFile("slangc-df-viaglsl-dep", depFile)));
+
+        List<String> args;
+        args.add("-lang");
+        args.add("slang");
+        args.add("-target");
+        args.add("spirv");
+        args.add("-emit-spirv-via-glsl");
+        args.add("-entry");
+        args.add("main");
+        args.add("-stage");
+        args.add("compute");
+        args.add("-o");
+        args.add(spvPath);
+        args.add("-depfile");
+        args.add(depFile.path);
+        args.add(slangPath);
+
+        ExecuteResult result;
+        SLANG_CHECK(SLANG_SUCCEEDED(_runSlangc(unitTestContext, args, result)));
+        if (result.resultCode != 0)
+            getTestReporter()->message(TestMessageType::Info, result.standardError.getBuffer());
+        SLANG_CHECK(result.resultCode == 0);
+
+        String depContent;
+        SLANG_CHECK(SLANG_SUCCEEDED(File::readAllText(depFile.path, depContent)));
+        getTestReporter()->message(TestMessageType::Info, depContent.getBuffer());
+
+        // Per-entry-point output: the depfile target is the .spv file, not "-:".
+        SLANG_CHECK_MSG(
+            _contains(depContent, Path::getFileName(spvPath).getBuffer()),
+            "depfile missing per-entry-point output path target");
+        SLANG_CHECK_MSG(
+            _contains(depContent, Path::getFileName(slangPath).getBuffer()),
+            "depfile missing input file dependency");
+        SLANG_CHECK_MSG(
+            !depContent.startsWith("-:") && !_contains(depContent, "\n-:"),
+            "depfile must not contain '-:' sentinel for named per-entry-point output");
     }
 }

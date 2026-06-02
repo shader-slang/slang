@@ -46,9 +46,11 @@ static void _escapeDependencyString(const char* string, StringBuilder& outBuilde
 // syntactically valid so tools that only care about the dependency list (right of ":") still work.
 //
 // writtenStdoutSentinel deduplicates the "-: ..." line when this function is called more than
-// once with an empty path (e.g. if a future code path creates TargetInfo entries with empty
-// wholeTargetOutputPath for multiple targets). Without the guard each such call would emit an
-// identical "-: <deps>" line, producing a depfile that make tolerates but that is misleading.
+// once with an empty path. This happens today when a SlangModule-container compile runs without
+// an explicit container output path: the whole-target call site emits the "-: <deps>" line,
+// then the SlangModule branch in writeDependencyFile would emit an identical line — the guard
+// suppresses the duplicate. The same suppression covers any future call site that also passes
+// an empty path.
 static void _writeDependencyStatement(
     Stream& stream,
     EndToEndCompileRequest* compileRequest,
