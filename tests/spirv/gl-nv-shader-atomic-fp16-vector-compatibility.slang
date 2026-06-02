@@ -4,8 +4,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=POSITIVE_WARN,non-exhaustive): -target spirv -profile spirv_1_5 -entry computeMain -stage compute -emit-spirv-directly -DPOSITIVE_VECTOR_ATOMIC
 //TEST:SIMPLE(filecheck=POSITIVE_IGNORE_CAPS): -target spirv -profile spirv_1_5 -entry computeMain -stage compute -emit-spirv-directly -ignore-capabilities -DPOSITIVE_VECTOR_ATOMIC
 
-// Requiring the GLSL extension should preserve the old SPIR-V 1.0 compatibility path and
-// should not declare the NV vector capability until a vector atomic operation needs it.
+// Requiring the GLSL extension should not declare the NV vector capability until a vector
+// atomic operation needs it.
 RWStructuredBuffer<half2> vectorBuffer;
 
 [require(GL_NV_shader_atomic_fp16_vector)]

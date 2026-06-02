@@ -6628,8 +6628,7 @@ $}
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_hlsl, sm_5_0)]
-    [require(spirv, spvAtomicFloat16VectorNV)]
+    [require(cuda_hlsl_spirv, sm_5_0)]
     void InterlockedAddF16Emulated(uint byteAddress, half value, out half originalValue)
     {
         __target_switch

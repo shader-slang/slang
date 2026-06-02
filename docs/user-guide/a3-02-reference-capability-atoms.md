@@ -576,9 +576,6 @@ Extensions
 
 `GL_NV_shader_atomic_fp16_vector`
 > Represents the GL_NV_shader_atomic_fp16_vector extension.
-> The SPIR-V 1.0 fallback preserves compatibility for shaders that only require the
-> GLSL extension; emitted fp16 vector atomic operations still require
-> spvAtomicFloat16VectorNV.
 
 `GL_NV_shader_invocation_reorder`
 > Represents the GL_NV_shader_invocation_reorder extension (NVIDIA-specific).
