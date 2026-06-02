@@ -1618,9 +1618,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
                 if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
                     return SpvStorageClassHitObjectAttributeNV;
-                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
-                    return SpvStorageClassHitObjectAttributeEXT;
-                return SpvStorageClassHitObjectAttributeNV;
+                return SpvStorageClassHitObjectAttributeEXT;
             }
         case AddressSpace::HitAttribute:
             return SpvStorageClassHitAttributeKHR;
@@ -2734,9 +2732,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_HitObjectType:
             {
                 // Check NV first (more specific) since NV derives from EXT in the
-                // capability hierarchy. If we checked EXT first, it would always
-                // match when NV is specified, causing a type/op mismatch
-                // (OpTypeHitObjectEXT=5313 vs OpTypeHitObjectNV=5281).
+                // capability hierarchy. If no SER capability was explicitly requested,
+                // default to EXT to match capability inference and target-switch fallback.
                 auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
                 if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
                 {
@@ -2755,9 +2752,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else
                 {
                     ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
-                    return emitOpTypeHitObject(inst);
+                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
+                    return emitOpTypeHitObjectEXT(inst);
                 }
             }
 
@@ -6383,8 +6380,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else
                 {
                     ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
                 }
                 isRayTracingObject = true;
                 break;
@@ -9683,7 +9680,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     visited);
             break;
 
-        case kIROp_PtrType:
         case kIROp_RefParamType:
         case kIROp_BorrowInParamType:
         case kIROp_OutParamType:
@@ -9694,6 +9690,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     targets,
                     found,
                     visited);
+            break;
+
+        case kIROp_PtrType:
+            // A pointer's pointee is not stored inline in the outer container;
+            // it lives in whatever storage class the pointer's address space
+            // names.  Do not recurse through pointers when deciding whether
+            // the outer container needs 8/16-bit-storage capabilities --
+            // otherwise a `uint16_t*` BDA argument in a push-constant block
+            // would spuriously require `StoragePushConstant16` (issue #11096).
+            // The pointee's own storage-class requirements are handled when
+            // that storage class is emitted.
             break;
 
         case kIROp_RateQualifiedType:
