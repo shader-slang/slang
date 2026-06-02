@@ -18,6 +18,12 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -profile lib_6_6 -stage closesthit -entry main
 
+// The legalizeEmptyRayPayloadsForHLSL pass keys on
+// `IRRayPayloadDecoration`, attached via the `[raypayload]` attribute
+// in Slang surface syntax. Without the attribute the struct is not
+// recognised as a payload and the legalization pass does not fire,
+// so the payload + closesthit signature are dropped during lowering.
+[raypayload]
 struct EmptyPayload
 {
 }
@@ -29,5 +35,5 @@ void main(
 {
 }
 
-// CHECK: struct EmptyPayload
-// CHECK: void main(
+// CHECK-DAG: struct EmptyPayload
+// CHECK-DAG: void main(

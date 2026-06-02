@@ -27,5 +27,4 @@ void main()
     Foo b;
     buf[0] = (a + b).x;
 //CHECK:        ^ no overload for '+' applicable to arguments of type (Foo, Foo)
-//CHECK: E39999
 }

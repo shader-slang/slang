@@ -58,7 +58,7 @@ which equals the bundle directory under `docs/generated/tests/`.
 | A | Framework scaffold (driver, schemas, base prompts, manifest) | implemented |
 | B1 | Bootstrap generation across 44 behaviorally-normative bundles | implemented |
 | B1.5 / B1.6 / B1.7 / B1.8 | Boundary expansion, coverage-driven metadata refinement, catalog sweep, GPU-target expansion | implemented |
-| B2 | `slang-test` nightly job runs the suite via `-test-dir docs/generated/tests/` | planned |
+| B2 | `slang-test` nightly job runs the suite via `-test-dir docs/generated/tests/` | implemented |
 | C | Cross-link pass — bundles consume each other's READMEs | planned |
 | D | Review + remediation against a non-Claude model | scaffolded (schemas + prompts + state file in place) |
 | E | Coverage-driven expansion loop | scaffolded (`coverage-gaps`, `expansion-candidates` stubs the data flow) |
@@ -103,12 +103,12 @@ files as additional context):
 
 ## Phase B2 — Slang-test wiring
 
-A separate PR. The nightly job invokes `slang-test` with
-`-test-dir docs/generated/tests/`, which selects exactly this suite
-without any category filter on the `.slang` files themselves. Add
-`.github/workflows/agentic-tests-nightly.yml` modeled on
-`coverage-nightly.yml`. The nightly is advisory: it does not gate
-PR merges.
+Landed via
+`.github/workflows/ci-agentic-tests-nightly.yml`. The nightly job
+invokes `regenerate.py verify`, which wraps `slang-test` with
+`-test-dir docs/generated/tests` and applies the suite-level
+expected-failures list + `requires-tool` filtering. The nightly is
+advisory: it does not gate PR merges.
 
 ## Phase C — Cross-link pass
 
@@ -185,8 +185,9 @@ Then `regenerate.py mark-fresh <bundle>`.
 
 The intended attachment points:
 
-- **Nightly run.** `agentic-tests-nightly.yml`, scheduled
-  ~`0 4 * * *` (after `coverage-nightly`), runs
+- **Nightly run.** `ci-agentic-tests-nightly.yml`, scheduled
+  `0 4 * * *` (after `coverage-nightly`'s `02:00` slot), runs
+  `regenerate.py verify` which wraps
   `slang-test -test-dir docs/generated/tests`. Advisory only; never
   blocks PRs.
 - **Lint on PR.** A check workflow that runs

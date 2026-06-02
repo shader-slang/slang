@@ -11,11 +11,19 @@
 
 // The doc's raytracing-payload table lists `getOptiXPayloadRegister`,
 // `setOptiXPayloadRegister`, and `getOptiXSbtDataPointer` as OptiX-side
-// IR opcodes. Small payloads (<= 8 registers) use the register-based
-// access path; entry-point-uniform parameters lower to the SBT-data
-// pointer.
+// IR opcodes synthesized for closesthit lowering on CUDA. These are
+// created inside `slang-ir-legalize-varying-params.cpp` during target
+// legalization — AFTER the `-dump-ir` snapshot point, so they are
+// not observable via IR dump. The user-visible artifact is the CUDA
+// text emit calling `optixGetPayload_*` / `optixSetPayload_*`; we
+// check for both forms here. The `getOptiXSbtDataPointer` opcode
+// fires only when an entry-point-uniform parameter actually requires
+// SBT lookup; for this small payload + scalar uniform the CUDA emit
+// folds the value rather than emitting an SBT lookup, so that claim
+// is not exercised by this test (see ## Doc gaps observed in the
+// bundle README).
 
-//TEST:SIMPLE(filecheck=IR):-target cuda -dump-ir -o /dev/null -stage closesthit -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target cuda -stage closesthit -entry main
 
 struct SmallPayload
 {
@@ -37,6 +45,5 @@ void main(inout SmallPayload payload, BuiltInTriangleIntersectionAttributes attr
     payload.color = float3(attribs.barycentrics, 1.0);
 }
 
-// IR-DAG: getOptiXPayloadRegister
-// IR-DAG: setOptiXPayloadRegister
-// IR-DAG: getOptiXSbtDataPointer
+// CHECK-DAG: optixGetPayload_
+// CHECK-DAG: optixSetPayload_

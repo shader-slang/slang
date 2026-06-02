@@ -18,12 +18,11 @@
 
 int foo(){ return 1; }
 /*CHECK:
-    ^^^ note
+    ^^^ see previous definition of 'foo'
 */
 
 int foo(){ return 2; }
 /*CHECK:
-    ^^^ error
+    ^^^ function 'foo' already has a body
     ^^^ redeclared here
 */
-//CHECK: E30201

@@ -20,8 +20,10 @@
 [vk::binding(0, 0)]
 __DynamicResource handle;
 
-//CHECK: layout(binding = 0, set = 0)
-//CHECK: texture2D
+// GLSL emit drops `set = 0` for the default descriptor set; only
+// `binding = 0` appears in the layout qualifier here.
+//CHECK-DAG: layout(binding = 0)
+//CHECK-DAG: texture2D
 float4 main() : SV_Target
 {
     let tex = handle.as<Texture2D<float4>>();

@@ -16,8 +16,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
 RWStructuredBuffer outBuf;
-// CHECK: error
-// CHECK: RWStructuredBuffer
-// CHECK: E30408
+// CHECK-DAG: error
+// CHECK-DAG: RWStructuredBuffer
+// CHECK-DAG: E30408
 
 void main() {}

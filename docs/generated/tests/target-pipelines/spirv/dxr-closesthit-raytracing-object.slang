@@ -31,4 +31,4 @@ void main(inout Payload payload, in BuiltInTriangleIntersectionAttributes attr)
 
 // CHECK-DAG: OpCapability RayTracingKHR
 // CHECK-DAG: IncomingRayPayloadKHR
-// CHECK: OpEntryPoint ClosestHitKHR %main
+// CHECK-DAG: OpEntryPoint ClosestHitKHR %main

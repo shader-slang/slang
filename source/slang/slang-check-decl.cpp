@@ -7679,18 +7679,67 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                     }
                 }
 
+                // The synthesized wrapper initially inherits differentiability modifiers from the
+                // interface requirement, so overload resolution can build any derivative
+                // associations it needs while checking the call.  If the resolved callee cannot
+                // provide the same differentiability, a hard [ForwardDifferentiable] or
+                // [Differentiable]/[BackwardDifferentiable] requirement cannot be satisfied by
+                // this wrapper.  For [MaybeDifferentiable], however, the modifiers were only
+                // provisional, so we can drop them and still use the wrapper as a
+                // non-differentiable witness.
+                //
+                // More generally, this is the part where we are trying to derive synthesized
+                // wrapper conformances from the callee's conformances. For now, it's
+                // differentiability specific but can be generalized later if we add more function
+                // conformance kinds.
+                //
                 if (!doesCalleeHaveFwdDiff(callee))
                 {
                     if (auto fwdDiffModifier =
                             synFuncDecl->findModifier<ForwardDifferentiableAttribute>())
+                    {
+                        // A non-optional forward-differentiable requirement cannot be fulfilled
+                        // by forwarding to a callee with no forward derivative.
+                        if (requiredMemberDeclRef.getDecl()
+                                ->findModifier<ForwardDifferentiableAttribute>())
+                        {
+                            if (outFailureDetails)
+                            {
+                                outFailureDetails->reason =
+                                    WitnessSynthesisFailureReason::DifferentiabilityMismatch;
+                                outFailureDetails->candidateMethod = declRefExpr->declRef;
+                            }
+                            return false;
+                        }
+
+                        // If the requirement has [ForwardDifferentiable], the wrapper will already
+                        // have the same modifier. We'll remove it since we know we can't derive a
+                        // forward derivative, but may still want to use this for a
+                        // [MaybeDifferentiable] (i.e. optional) requirement.
+                        //
                         removeModifier(synFuncDecl, fwdDiffModifier);
+                    }
                 }
 
+                // Similar to the ForwardDifferentiable case, but for backward differentiability.
                 if (!doesCalleeHaveBwdDiff(callee))
                 {
                     if (auto bwdDiffModifier =
                             synFuncDecl->findModifier<BackwardDifferentiableAttribute>())
+                    {
+                        if (requiredMemberDeclRef.getDecl()
+                                ->findModifier<BackwardDifferentiableAttribute>())
+                        {
+                            if (outFailureDetails)
+                            {
+                                outFailureDetails->reason =
+                                    WitnessSynthesisFailureReason::DifferentiabilityMismatch;
+                                outFailureDetails->candidateMethod = declRefExpr->declRef;
+                            }
+                            return false;
+                        }
                         removeModifier(synFuncDecl, bwdDiffModifier);
+                    }
                 }
 
                 markOverridingDecl(context, callee.getDecl(), requiredMemberDeclRef);
@@ -8480,11 +8529,16 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
             {
             case BuiltinRequirementKind::DAddFunc:
             case BuiltinRequirementKind::DZeroFunc:
-                return trySynthesizeDifferentialMethodRequirementWitness(
-                    context,
-                    requiredFuncDeclRef,
-                    witnessTable,
-                    SynthesisPattern::AllInductive);
+                // We'll only synthesize a new requirement, if there wasn't anything
+                // of the same name available.
+                //
+                if (!lookupResult.isValid())
+                    return trySynthesizeDifferentialMethodRequirementWitness(
+                        context,
+                        requiredFuncDeclRef,
+                        witnessTable,
+                        SynthesisPattern::AllInductive);
+                break;
             case BuiltinRequirementKind::And:
             case BuiltinRequirementKind::Or:
             case BuiltinRequirementKind::Not:
@@ -10108,6 +10162,14 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     {
         getSink()->diagnose(Diagnostics::GenericSignatureDoesNotMatchRequirement{
             .member = requiredMemberDeclRef.getDecl()->getName()});
+    }
+    else if (failureDetails.reason == WitnessSynthesisFailureReason::DifferentiabilityMismatch)
+    {
+        getSink()->diagnose(Diagnostics::MemberDoesNotMatchRequirementSignature{
+            .member = failureDetails.candidateMethod.getDecl()});
+        getSink()->diagnose(Diagnostics::DifferentiableRequirementNeedsDifferentiableMember{
+            .requirement = requiredMemberDeclRef.getDecl(),
+            .member = failureDetails.candidateMethod.getDecl()});
     }
     else
     {

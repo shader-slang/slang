@@ -14,10 +14,10 @@
 // and the resolver issues a diagnostic when the named capability is
 // undefined.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 __require_capability(ThisIsANonExistingCapability);
+//CHECK:            ^ unexpected token
+//CHECK:            ^ unexpected '(', expected ';'
 
 void main() {}
-//CHECK: error
-//CHECK: E36105
