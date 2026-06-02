@@ -151,12 +151,21 @@ else
       "-test-dir" "docs/generated/tests"
       "-expected-failure-list" "docs/generated/tests/_meta/expected-failures.txt"
     )
-    # Inherit server-count from the main pass when in use.
+    # Inherit a few flags from the main pass:
+    #   -use-test-server / -server-count: match the main-pass
+    #     parallelism so the test-server pool is reused.
+    #   -synthesizedTestApi: the macOS coverage step disables
+    #     `-llvm`-synthesized variants via this flag (see
+    #     ci-slang-coverage.yml; coverage instrumentation crashes
+    #     in those tests). Forward it so the agentic pass on macOS
+    #     skips the same variants instead of replaying the crash.
     for ((i = 0; i < ${#TEST_ARGS[@]}; i++)); do
       if [[ "${TEST_ARGS[i]}" == "-use-test-server" ]]; then
         AGENTIC_TEST_ARGS+=("-use-test-server")
       elif [[ "${TEST_ARGS[i]}" == "-server-count" ]]; then
         AGENTIC_TEST_ARGS+=("-server-count" "${TEST_ARGS[i + 1]}")
+      elif [[ "${TEST_ARGS[i]}" == "-synthesizedTestApi" ]]; then
+        AGENTIC_TEST_ARGS+=("-synthesizedTestApi" "${TEST_ARGS[i + 1]}")
       fi
     done
     AGENTIC_EXIT=0
