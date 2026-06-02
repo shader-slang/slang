@@ -8,6 +8,10 @@
 // CHECK-DAG: %[[COOP_MAT:[A-Za-z0-9_]+]] = OpTypeCooperativeMatrixKHR %float
 // CHECK-DAG: %[[PTR_140]] = OpTypePointer StorageBuffer %float
 // CHECK-DAG: %[[PTR_430]] = OpTypePointer StorageBuffer %float
+// The trailing access-chain index and store operand are temporarily wildcarded:
+// disabling the MergeReturn/InlineExhaustive pair for #11146 can spell those
+// values differently while preserving the layout-sensitive pointer and load/store
+// coverage. Restore strict checks when the optimizer workaround is removed.
 // CHECK: %[[INPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_140]] %input140 %int_0 %{{[A-Za-z0-9_]+}}
 // CHECK: %[[MAT_140:[A-Za-z0-9_]+]] = OpCooperativeMatrixLoadKHR %[[COOP_MAT]] %[[INPUT_140]]
 // CHECK: %[[OUTPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_140]] %output140 %int_0 %{{[A-Za-z0-9_]+}}
