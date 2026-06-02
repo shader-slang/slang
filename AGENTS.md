@@ -118,6 +118,14 @@ Conventions:
 - Use `SLANG_`-prefixed `SCREAMING_SNAKE_CASE` for macros.
 - Prefer comments that explain why code exists.
 
+## Shell Scripts
+
+Scripts under `extras/` (and other repository shell scripts) must run on bash 3.2, the version
+Apple ships as `/bin/bash` on macOS. Avoid bash 4+ only features such as `${var,,}`/`${var^^}`
+case conversion, associative arrays (`declare -A`), `mapfile`/`readarray`, and namerefs
+(`local -n`). Prefer portable equivalents (for example, lowercase with
+`tr '[:upper:]' '[:lower:]'`). Validate with `bash -n script.sh` under the system bash.
+
 ## Testing Guidelines
 
 Add tests near related coverage in `tests/`.
