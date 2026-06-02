@@ -1,5 +1,6 @@
 // unit-test-file-system.cpp
 
+#include "../../source/core/slang-blob.h"
 #include "../../source/core/slang-castable.h"
 #include "../../source/core/slang-deflate-compression-system.h"
 #include "../../source/core/slang-file-system.h"
@@ -9,6 +10,8 @@
 #include "../../source/core/slang-riff-file-system.h"
 #include "../../source/core/slang-zip-file-system.h"
 #include "unit-test/slang-unit-test.h"
+
+#include <limits>
 
 using namespace Slang;
 
@@ -388,6 +391,233 @@ static SlangResult _createFileSystem(
     return outFileSystem ? SLANG_OK : SLANG_FAIL;
 }
 
+// The ZIP and RIFF patchers below write legacy 32-bit uncompressed-size fields. If the
+// configured cap cannot be exceeded with those fields, the end-to-end rejection tests report
+// as ignored instead of silently passing.
+#define SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE \
+    (SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE < 0xffffffffull)
+
+#if SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE
+static uint32_t _readUInt32LE(const uint8_t* data)
+{
+    return uint32_t(data[0]) | (uint32_t(data[1]) << 8) | (uint32_t(data[2]) << 16) |
+           (uint32_t(data[3]) << 24);
+}
+
+static void _writeUInt32LE(uint8_t* data, uint32_t value)
+{
+    data[0] = uint8_t(value);
+    data[1] = uint8_t(value >> 8);
+    data[2] = uint8_t(value >> 16);
+    data[3] = uint8_t(value >> 24);
+}
+
+static SlangResult _setZipEntryUncompressedSize(List<uint8_t>& archiveData, uint32_t size)
+{
+    static const uint32_t kLocalFileHeaderSignature = 0x04034b50;
+    static const uint32_t kCentralDirectoryHeaderSignature = 0x02014b50;
+
+    Index localHeaderCount = 0;
+    Index centralDirectoryHeaderCount = 0;
+
+    uint8_t* data = archiveData.getBuffer();
+    const Index count = archiveData.getCount();
+    if (count < 4)
+    {
+        return SLANG_FAIL;
+    }
+
+    for (Index i = 0; i <= count - 4; ++i)
+    {
+        const uint32_t signature = _readUInt32LE(data + i);
+        if (signature == kLocalFileHeaderSignature && i + 26 <= count)
+        {
+            _writeUInt32LE(data + i + 22, size);
+            ++localHeaderCount;
+        }
+        else if (signature == kCentralDirectoryHeaderSignature && i + 28 <= count)
+        {
+            _writeUInt32LE(data + i + 24, size);
+            ++centralDirectoryHeaderCount;
+        }
+    }
+
+    return localHeaderCount == 1 && centralDirectoryHeaderCount == 1 ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _setRiffEntryUncompressedSize(List<uint8_t>& archiveData, uint32_t size)
+{
+    auto rootList =
+        RIFF::RootChunk::getFromBlob(archiveData.getBuffer(), size_t(archiveData.getCount()));
+    if (!rootList || rootList->getType() != RiffFileSystemBinary::kContainerFourCC)
+    {
+        return SLANG_FAIL;
+    }
+
+    Index entryCount = 0;
+    for (auto chunk : rootList->getChildren())
+    {
+        auto dataChunk = as<RIFF::DataChunk>(chunk);
+        if (!dataChunk || dataChunk->getType() != RiffFileSystemBinary::kEntryFourCC)
+        {
+            continue;
+        }
+
+        if (dataChunk->getPayloadSize() < sizeof(RiffFileSystemBinary::Entry))
+        {
+            return SLANG_FAIL;
+        }
+
+        RiffFileSystemBinary::Entry entry;
+        dataChunk->writePayloadInto(entry);
+        entry.uncompressedSize = size;
+        ::memcpy(
+            const_cast<void*>(dataChunk->getPayload()),
+            &entry,
+            sizeof(RiffFileSystemBinary::Entry));
+        ++entryCount;
+    }
+
+    return entryCount == 1 ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _testZipRejectsOversizedUncompressedEntry()
+{
+    ComPtr<ISlangMutableFileSystem> fileSystem;
+    SLANG_RETURN_ON_FAIL(ZipFileSystem::create(fileSystem));
+
+    const char contents[] = "small";
+    SLANG_RETURN_ON_FAIL(fileSystem->saveFile("bomb.txt", contents, sizeof(contents) - 1));
+
+    IArchiveFileSystem* archiveFileSystem = as<IArchiveFileSystem>(fileSystem);
+    if (!archiveFileSystem)
+    {
+        return SLANG_FAIL;
+    }
+
+    ComPtr<ISlangBlob> archiveBlob;
+    SLANG_RETURN_ON_FAIL(archiveFileSystem->storeArchive(false, archiveBlob.writeRef()));
+
+    List<uint8_t> archiveData;
+    archiveData.setCount(Index(archiveBlob->getBufferSize()));
+    ::memcpy(
+        archiveData.getBuffer(),
+        archiveBlob->getBufferPointer(),
+        archiveBlob->getBufferSize());
+
+    const uint32_t oversizedUncompressedSize =
+        uint32_t(SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE + 1);
+    SLANG_RETURN_ON_FAIL(_setZipEntryUncompressedSize(archiveData, oversizedUncompressedSize));
+
+    ComPtr<ISlangFileSystemExt> loadedFileSystem;
+    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(
+        archiveData.getBuffer(),
+        size_t(archiveData.getCount()),
+        loadedFileSystem));
+
+    SlangPathType pathType;
+    SLANG_RETURN_ON_FAIL(loadedFileSystem->getPathType("bomb.txt", &pathType));
+    SLANG_CHECK(pathType == SLANG_PATH_TYPE_FILE);
+
+    ComPtr<ISlangBlob> blob;
+    SLANG_CHECK(loadedFileSystem->loadFile("bomb.txt", blob.writeRef()) == SLANG_E_OUT_OF_MEMORY);
+
+    return SLANG_OK;
+}
+
+static SlangResult _testRiffRejectsOversizedUncompressedEntry()
+{
+    ComPtr<ISlangMutableFileSystem> fileSystem(
+        new RiffFileSystem(DeflateCompressionSystem::getSingleton()));
+
+    const char contents[] = "small";
+    SLANG_RETURN_ON_FAIL(fileSystem->saveFile("bomb.txt", contents, sizeof(contents) - 1));
+
+    IArchiveFileSystem* archiveFileSystem = as<IArchiveFileSystem>(fileSystem);
+    if (!archiveFileSystem)
+    {
+        return SLANG_FAIL;
+    }
+
+    ComPtr<ISlangBlob> archiveBlob;
+    SLANG_RETURN_ON_FAIL(archiveFileSystem->storeArchive(false, archiveBlob.writeRef()));
+
+    List<uint8_t> archiveData;
+    archiveData.setCount(Index(archiveBlob->getBufferSize()));
+    ::memcpy(
+        archiveData.getBuffer(),
+        archiveBlob->getBufferPointer(),
+        archiveBlob->getBufferSize());
+
+    const uint32_t oversizedUncompressedSize =
+        uint32_t(SLANG_ARCHIVE_FILE_SYSTEM_MAX_UNCOMPRESSED_FILE_SIZE + 1);
+    SLANG_RETURN_ON_FAIL(_setRiffEntryUncompressedSize(archiveData, oversizedUncompressedSize));
+
+    ComPtr<ISlangFileSystemExt> loadedFileSystem;
+    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(
+        archiveData.getBuffer(),
+        size_t(archiveData.getCount()),
+        loadedFileSystem));
+
+    SlangPathType pathType;
+    SLANG_RETURN_ON_FAIL(loadedFileSystem->getPathType("bomb.txt", &pathType));
+    SLANG_CHECK(pathType == SLANG_PATH_TYPE_FILE);
+
+    ComPtr<ISlangBlob> blob;
+    SLANG_CHECK(loadedFileSystem->loadFile("bomb.txt", blob.writeRef()) == SLANG_E_OUT_OF_MEMORY);
+
+    return SLANG_OK;
+}
+#endif
+
+static SlangResult _testArchiveUncompressedSizeBounds()
+{
+    const UInt64 maxTerminatedAllocationSize = UInt64(~size_t(0) - 1);
+    const UInt64 effectiveMaxSize = kMaxArchiveFileUncompressedSize < maxTerminatedAllocationSize
+                                        ? kMaxArchiveFileUncompressedSize
+                                        : maxTerminatedAllocationSize;
+
+    // Keep the exact-cap check at the predicate level. An end-to-end success case at the
+    // default cap would allocate the full cap-sized output buffer, while patching a small
+    // archive's metadata to the cap is not a valid positive decompression fixture.
+    SLANG_CHECK(isArchiveFileUncompressedSizeInBounds(effectiveMaxSize));
+    SLANG_CHECK(!isArchiveFileUncompressedSizeInBounds(effectiveMaxSize + 1));
+    return SLANG_OK;
+}
+
+static SlangResult _testScopedAllocationRejectsMaxTerminatedSize()
+{
+    ScopedAllocation alloc;
+    SLANG_CHECK(!alloc.allocateTerminated(std::numeric_limits<size_t>::max()));
+    SLANG_CHECK(alloc.getData() == nullptr);
+    SLANG_CHECK(alloc.getSizeInBytes() == 0);
+    SLANG_CHECK(alloc.getCapacityInBytes() == 0);
+
+    const char contents[] = "small";
+    ComPtr<ISlangBlob> blob = RawBlob::create(contents, std::numeric_limits<size_t>::max());
+    SLANG_CHECK(!blob);
+
+    SLANG_CHECK(RawBlob::tryCreate(nullptr, 1, blob) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(!blob);
+
+    const char replacementContents[] = "replacement";
+    SLANG_RETURN_ON_FAIL(
+        RawBlob::tryCreate(replacementContents, sizeof(replacementContents) - 1, blob));
+    SLANG_RETURN_ON_FAIL(RawBlob::tryCreate(blob->getBufferPointer(), blob->getBufferSize(), blob));
+    SLANG_CHECK(blob->getBufferSize() == sizeof(replacementContents) - 1);
+    SLANG_CHECK(
+        ::memcmp(blob->getBufferPointer(), replacementContents, blob->getBufferSize()) == 0);
+
+    return SLANG_OK;
+}
+
+static SlangResult _testMemoryFileSystemRejectsNullNonEmptySave()
+{
+    ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
+    SLANG_CHECK(fileSystem->saveFile("foo", nullptr, 1) == SLANG_E_INVALID_ARG);
+    return SLANG_OK;
+}
+
 static SlangResult _testImplicitDirectory(FileSystemType type)
 {
     ComPtr<ISlangMutableFileSystem> fileSystem;
@@ -574,4 +804,37 @@ SLANG_UNIT_TEST(fileSystem)
             SLANG_CHECK(SLANG_SUCCEEDED(_testImplicitDirectory(type)));
         }
     }
+}
+
+SLANG_UNIT_TEST(zipRejectsOversizedUncompressedEntry)
+{
+#if SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE
+    SLANG_CHECK(SLANG_SUCCEEDED(_testZipRejectsOversizedUncompressedEntry()));
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
+SLANG_UNIT_TEST(riffRejectsOversizedUncompressedEntry)
+{
+#if SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE
+    SLANG_CHECK(SLANG_SUCCEEDED(_testRiffRejectsOversizedUncompressedEntry()));
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
+SLANG_UNIT_TEST(archiveUncompressedSizeBounds)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_testArchiveUncompressedSizeBounds()));
+}
+
+SLANG_UNIT_TEST(scopedAllocationRejectsMaxTerminatedSize)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_testScopedAllocationRejectsMaxTerminatedSize()));
+}
+
+SLANG_UNIT_TEST(memoryFileSystemRejectsNullNonEmptySave)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_testMemoryFileSystemRejectsNullNonEmptySave()));
 }

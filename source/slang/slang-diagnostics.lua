@@ -157,6 +157,12 @@ err(
 
 err("cannot-deduce-source-language", 12, "can't deduce language for input file '~path'")
 
+err("cannot-read-from-stdin", 106, "failed to read source from stdin")
+
+err("stdin-input-too-large", 107, "stdin input exceeds the maximum allowed size")
+
+err("stdin-input-already-used", 108, "standard input can only be used once")
+
 err(
     "unknown-code-generation-target",
     13,
@@ -373,6 +379,12 @@ err("kind-not-linkable", 96, "not a known linkable kind '~kind'")
 err("library-does-not-exist", 97, "library '~path' does not exist")
 
 err("cannot-access-as-blob", 98, "cannot access as a blob")
+
+err(
+    "invalid-repro-state",
+    99,
+    "repro file contains malformed offsets, missing required fields, or out-of-range indices and cannot be loaded"
+)
 
 err("failed-to-load-downstream-compiler", 100, "failed to load downstream compiler '~compiler'")
 
@@ -1132,6 +1144,13 @@ err(
 )
 
 standalone_note(
+    "note-synthesizing-method",
+    30022,
+    "some of the above errors may have been produced while synthesizing method '~methodName:Name' of '~typeName:Name'",
+    span { loc = "location" }
+)
+
+standalone_note(
     "this-type-mismatch-after-erasure",
     30021,
     "the concrete 'This' type identity is lost after type erasure into interface type '~interfaceType:Type'; consider using a generic function with a type constraint instead",
@@ -1209,6 +1228,13 @@ standalone_note(
     30049,
     "attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification",
     span { loc = "expr:Expr" }
+)
+
+warning(
+    "potentially-aliased-out-parameter",
+    30051,
+    "potentially aliased argument to 'out'/'inout'/'ref' parameter",
+    span { loc = "firstArg:Expr", message = "argument for '~direction1' parameter '~param1:Name' may alias argument for '~direction2' parameter '~param2:Name'; passing the same value to both may produce unexpected results" }
 )
 
 err(
@@ -1852,6 +1878,62 @@ err(
     span { loc = "location", message = "differentiable member '~member:Name' should have a corresponding field in '~diffType:Type'. Use [DerivativeMember(...)] or mark as no_diff" }
 )
 
+err(
+    "synthesized-differential-method-missing-field",
+    30125,
+    "synthesized IDifferentiable method will not include differentiable field",
+    span { loc = "field:Decl", message = "field '~field' of type '~fieldType:Type' is differentiable but will not be included in the synthesized 'dzero'/'dadd' methods because the 'IDifferentiable' conformance is provided via extension. Provide explicit 'dzero()' and 'dadd()' implementations, or mark the field 'no_diff'." }
+)
+
+err(
+    "func-extension-unsupported-target",
+    30126,
+    "unsupported target expression in __func_extension",
+    span { loc = "location", message = "__func_extension target must be fwd_diff(...), bwd_diff(...), or __apply(...)." }
+)
+
+err(
+    "func-extension-apply-return-type",
+    30127,
+    "invalid __func_extension __apply return type",
+    span { loc = "location", message = "return type of __func_extension __apply must be Tuple<RetType, CtxType>." }
+)
+
+err(
+    "func-extension-unresolved-function",
+    30128,
+    "could not resolve target function in __func_extension",
+    span { loc = "location", message = "could not resolve target function in __func_extension." }
+)
+
+err(
+    "func-extension-unsupported-operator",
+    30129,
+    "unsupported operator in __func_extension",
+    span { loc = "location", message = "__func_extension target must use fwd_diff, bwd_diff, or __apply." }
+)
+
+err(
+    "apply-for-bwd-expression-requires-invocation",
+    30130,
+    "__apply must be invoked directly",
+    span { loc = "expr:Expr", message = "__apply expressions must be invoked directly so they can resolve to apply_bwd." }
+)
+
+warning(
+    "func-extension-requires-experimental-feature",
+    30131,
+    "__func_extension is experimental and requires '-experimental-feature'",
+    span { loc = "location", message = "__func_extension declarations are rejected unless '-experimental-feature' is enabled." }
+)
+
+warning(
+    "apply-for-bwd-requires-experimental-feature",
+    30132,
+    "__apply is experimental and requires '-experimental-feature'",
+    span { loc = "expr:Expr", message = "__apply expressions are rejected unless '-experimental-feature' is enabled." }
+)
+
 -- type pack diagnostics
 
 err(
@@ -1970,6 +2052,13 @@ err(
     30118,
     "cannot mix differentiable value types with differentiable pointer outputs",
     span { loc = "location", message = "function has both IDifferentiable value types and IDifferentiablePtrType outputs, which is not currently supported. Please split the function so that differentiable value parameters and pointer differentiable outputs are in separate functions." }
+)
+
+warning(
+    "cannot-synthesize-dadd-dzero-for-custom-differential",
+    30123,
+    "cannot synthesize complete differential method",
+    span { loc = "typeDecl:Decl", message = "cannot synthesize a complete '~methodName:Name' for type '~typeDecl' because its 'Differential' type contains fields that are not differentiable. Provide a user-defined '~methodName:Name' implementation." }
 )
 
 err(
@@ -2826,6 +2915,13 @@ err(
     32000,
     "invalid enum tag type",
     span { loc = "location", message = "invalid tag type for 'enum': '~type:Type'" }
+)
+
+err(
+    "anonymous-scoped-enum",
+    32001,
+    "anonymous scoped enum is not allowed",
+    span { loc = "classLocation", message = "'class' keyword specifies a scoped enumeration" }
 )
 
 err(
@@ -3870,6 +3966,13 @@ err(
     span { loc = "param:Decl", message = "parameter '~param' direction '~actualDirection:ParamPassingMode' does not match interface requirement '~expectedDirection:ParamPassingMode'." }
 )
 
+standalone_note(
+    "differentiable-requirement-needs-differentiable-member",
+    -1,
+    "member '~member:Decl' cannot satisfy differentiable interface requirement '~requirement:Decl' because it does not provide the required differentiability; it may be missing an appropriate differentiability attribute, such as [Differentiable]",
+    span { loc = "member:Decl" }
+)
+
 warning(
     "non-copyable-type-cannot-conform-to-interface",
     38109,
@@ -4642,11 +4745,11 @@ err(
 
 -- 451xx - Coverage instrumentation (-trace-coverage)
 
-warning(
+err(
     "coverage-buffer-reserved-name",
     45100,
-    "`__slang_coverage` is reserved by `-trace-coverage`",
-    span { loc = "location", message = "the global parameter name `__slang_coverage` is reserved by the `-trace-coverage` instrumentation. The IR coverage pass synthesizes its own buffer with this name; the user declaration here is silently shadowed and will not receive any counter writes. Either rename the user declaration or remove `-trace-coverage` from the compile." }
+    "`__slang_coverage` is reserved by coverage tracing",
+    span { loc = "location", message = "the global parameter name `__slang_coverage` is reserved by coverage tracing instrumentation (`-trace-coverage`, `-trace-function-coverage`, `-trace-branch-coverage`). The IR coverage pass synthesizes a global parameter with this name, so a user declaration of `__slang_coverage` conflicts with the synthesized buffer. Either rename the user declaration or remove the coverage tracing option from the compile." }
 )
 
 err(
@@ -4659,7 +4762,7 @@ err(
 warning(
     "coverage-target-not-supported",
     45102,
-    "`-trace-coverage` is not supported on this target; coverage instrumentation skipped"
+    "coverage tracing options (`-trace-coverage`, `-trace-function-coverage`, `-trace-branch-coverage`) are not supported on this target; coverage instrumentation skipped"
 )
 
 err(
@@ -4671,7 +4774,26 @@ err(
 err(
     "coverage-pass-through-incompatible",
     45104,
-    "`-trace-coverage` cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation"
+    "coverage tracing options (`-trace-coverage`, `-trace-function-coverage`, `-trace-branch-coverage`) cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation"
+)
+
+err(
+    "coverage-uniform-layout-unavailable",
+    45105,
+    "could not resolve the CPU/CUDA uniform layout for `__slang_coverage`"
+)
+
+err(
+    "coverage-binding-option-out-of-range",
+    45106,
+    "coverage binding option value is out of range",
+    span { loc = "location", message = "option '~option' expects a value in range 0..2147483647, but got '~parsedValue:Int'." }
+)
+
+warning(
+    "coverage-reserved-space-ignored",
+    45107,
+    "`-trace-coverage-reserved-space` does not apply to this target; ignoring reserved spaces"
 )
 
 -- 41xxx - Semantic checking (continued)
@@ -5489,4 +5611,3 @@ if #validation_errors > 0 then
 end
 
 return processed_diagnostics
-

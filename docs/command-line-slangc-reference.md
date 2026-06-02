@@ -121,7 +121,7 @@ Add a path to be used in resolving '#include' and 'import' operations.
 
 **-lang &lt;[language](#language)&gt;**
 
-Set the language for the following input files. 
+Set the language for the following input files. Required when an input is '-' (standard input), because stdin has no file extension. 
 
 
 <a id="matrix-layout-column-major"></a>
@@ -277,7 +277,7 @@ Dump to output list of warning diagnostic numeric and name ids.
 
 <a id="id"></a>
 ### --
-Treat the rest of the command line as input files. 
+Treat the rest of the command line as input files. Use '-' once to read from standard input; [-lang](#lang) is required, stdin is limited to 256 MiB, and diagnostics use `&lt;stdin&gt;`. 
 
 
 <a id="report-downstream-time"></a>
@@ -302,7 +302,17 @@ Reports information about checkpoint contexts used for reverse-mode automatic di
 
 <a id="trace-coverage"></a>
 ### -trace-coverage
-Instrument the shader with per-statement execution counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping counter slots to source positions. 
+Instrument the shader with per-statement line coverage counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping source coverage entries to counters. 
+
+
+<a id="trace-function-coverage"></a>
+### -trace-function-coverage
+Instrument the shader with per-function-entry coverage counters. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
+
+
+<a id="trace-branch-coverage"></a>
+### -trace-branch-coverage
+Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths. Expression-level short-circuit and ternary branches are not instrumented by this mode yet. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
 
 
 <a id="trace-coverage-binding"></a>
@@ -310,7 +320,15 @@ Instrument the shader with per-statement execution counters. When writing compil
 
 **-trace-coverage-binding &lt;index&gt; &lt;space&gt;**
 
-Bind the synthesized `__slang_coverage` buffer at an explicit (register index, space) instead of auto-allocating a slot. Useful when the host needs the binding fixed at compile time (e.g. for a pre-built D3D12 root signature). Implies `-trace-coverage`. 
+Bind the synthesized `__slang_coverage` buffer at an explicit (register index, space) instead of auto-allocating a slot. Useful when the host needs the binding fixed at compile time before any host metadata reads run. Implies `-trace-coverage`. 
+
+
+<a id="trace-coverage-reserved-space"></a>
+### -trace-coverage-reserved-space
+
+**-trace-coverage-reserved-space &lt;space&gt;**
+
+Reserve a descriptor set when auto-allocating the synthesized `__slang_coverage` buffer. Use this when the host pipeline layout owns descriptor sets that are not visible in the compiled shader IR. Repeat for multiple spaces; duplicates are idempotent. Applies to Khronos descriptor-set targets. 
 
 
 <a id="report-dynamic-dispatch-sites"></a>
@@ -360,7 +378,7 @@ Disable short-circuiting for "&amp;&amp;" and "||" operations
 
 <a id="unscoped-enum"></a>
 ### -unscoped-enum
-Treat enums types as unscoped by default. 
+Treat enum types as unscoped by default. (Note: enum class remains scoped.) 
 
 
 <a id="preserve-params"></a>
@@ -913,7 +931,7 @@ Embed downstream IR into emitted slang IR
 
 <a id="experimental-feature"></a>
 ### -experimental-feature
-Enable experimental features (loading builtin neural module) 
+Enable experimental language and module features 
 
 
 <a id="enable-experimental-rich-diagnostics"></a>
@@ -1437,6 +1455,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cpp_glsl_hlsl_metal_spirv_wgsl` 
 * `cpp_hlsl` 
 * `cuda_glsl_hlsl` 
+* `cuda_glsl_nvapi` 
 * `cuda_hlsl_metal_spirv` 
 * `cuda_glsl_hlsl_spirv` 
 * `cuda_glsl_hlsl_spirv_llvm` 
@@ -1707,6 +1726,7 @@ A capability describes an optional feature that a target may or may not support.
 * `texture_querylod` 
 * `texture_querylevels` 
 * `texture_shadowlod` 
+* `texture_shadowlod_ext` 
 * `texture_shadowgrad` 
 * `atomic_glsl_float1` 
 * `atomic_glsl_float2` 

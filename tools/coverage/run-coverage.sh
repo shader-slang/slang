@@ -6,12 +6,15 @@ set -e
 # Parse arguments
 REPORT_ONLY=false
 WITH_SYNTHESIS=false
+WITH_AGENTIC_TESTS=false
 TEST_ARGS=()
 for arg in "$@"; do
   if [[ "$arg" == "--report-only" ]]; then
     REPORT_ONLY=true
   elif [[ "$arg" == "--with-synthesis" ]]; then
     WITH_SYNTHESIS=true
+  elif [[ "$arg" == "--with-agentic-tests" ]]; then
+    WITH_AGENTIC_TESTS=true
   else
     TEST_ARGS+=("$arg")
   fi
@@ -125,6 +128,38 @@ else
     fi
   fi
 
+  # Optional: run the agentic test suite under docs/generated/tests/ for
+  # additional coverage. This is the LLM-generated, doc-anchored bundle
+  # set (see docs/generated/tests/README.md). It exercises text-emit
+  # paths and diagnostics that the hand-written tests/ suite doesn't
+  # always reach. profraw files from these runs accumulate into the
+  # same merged profdata as the main pass.
+  #
+  # Failures are tolerated — the suite is still being de-bugged (see
+  # docs/generated/tests/_meta/findings/) and ci-agentic-tests-nightly.yml
+  # is the authoritative pass/fail gate. We're here for the coverage
+  # numbers, not the verdict.
+  if [[ "$WITH_AGENTIC_TESTS" == "true" ]]; then
+    echo
+    echo "Running agentic test suite (docs/generated/tests/) for coverage..."
+    AGENTIC_TEST_ARGS=("-test-dir" "docs/generated/tests")
+    # Inherit server-count from the main pass when in use.
+    for ((i = 0; i < ${#TEST_ARGS[@]}; i++)); do
+      if [[ "${TEST_ARGS[i]}" == "-use-test-server" ]]; then
+        AGENTIC_TEST_ARGS+=("-use-test-server")
+      elif [[ "${TEST_ARGS[i]}" == "-server-count" ]]; then
+        AGENTIC_TEST_ARGS+=("-server-count" "${TEST_ARGS[i + 1]}")
+      fi
+    done
+    AGENTIC_EXIT=0
+    "$SLANG_TEST" "${AGENTIC_TEST_ARGS[@]}" || AGENTIC_EXIT=$?
+    if [ "$AGENTIC_EXIT" -gt 128 ]; then
+      echo "Warning: agentic-test pass crashed (signal $((AGENTIC_EXIT - 128)))"
+    elif [ "$AGENTIC_EXIT" -ne 0 ]; then
+      echo "Note: agentic-test pass had test failures (exit code $AGENTIC_EXIT). Coverage data still collected."
+    fi
+  fi
+
   # Check if any profraw files were generated
   if ! ls "$COVERAGE_DIR"/slang-test-*.profraw >/dev/null 2>&1; then
     echo
@@ -194,6 +229,19 @@ if [[ "$COVERAGE_LCOV" = "1" ]]; then
   echo "LCOV report generated: $LCOV_FILE"
 fi
 
+# Generate llvm-cov JSON export (optional). The JSON form is the
+# preferred input to slang-coverage-html for the LLVM-coverage path
+# because it carries regions natively and matches `llvm-cov report`
+# without the LCOV+--auth-summary patching dance.
+if [[ "$COVERAGE_JSON" = "1" ]]; then
+  JSON_FILE="${COVERAGE_JSON_FILE:-$REPO_ROOT/coverage.json}"
+  echo
+  echo "Generating llvm-cov JSON export..."
+  $LLVM_COV export "$LIBSLANG" \
+    -instr-profile="$COVERAGE_DIR"/slang-test.profdata >"$JSON_FILE"
+  echo "JSON report generated: $JSON_FILE"
+fi
+
 echo
 echo "Coverage data files:"
 echo "  - $COVERAGE_DIR/slang-test.profdata (merged profile data)"
@@ -204,6 +252,9 @@ if [[ "$COVERAGE_HTML" = "1" ]]; then
 fi
 if [[ "$COVERAGE_LCOV" = "1" ]]; then
   echo "  - ${COVERAGE_LCOV_FILE:-$REPO_ROOT/coverage.lcov} (LCOV format for CI tools)"
+fi
+if [[ "$COVERAGE_JSON" = "1" ]]; then
+  echo "  - ${COVERAGE_JSON_FILE:-$REPO_ROOT/coverage.json} (llvm-cov JSON export)"
 fi
 
 # Clean up raw profraw files to save space (only in normal mode)

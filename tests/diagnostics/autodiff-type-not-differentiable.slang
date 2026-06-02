@@ -8,9 +8,11 @@ struct MyDiff : IDifferentiable
     typealias Differential = MyDiff;
     float dx;
 
+    [Differentiable]
     static MyDiff dzero() { return { 0.0 }; }
+
+    [Differentiable]
     static MyDiff dadd(MyDiff a, MyDiff b) { return { a.dx + b.dx }; }
-    static MyDiff dmul(float a, MyDiff b) { return { a * b.dx }; }
 }
 
 struct MyType : IDifferentiable
@@ -27,7 +29,9 @@ struct MyType : IDifferentiable
 */
     int notDiff;
 
+    [Differentiable]
     static MyDiff dzero() { return MyDiff.dzero(); }
+
+    [Differentiable]
     static MyDiff dadd(MyDiff a, MyDiff b) { return MyDiff.dadd(a, b); }
-    static MyDiff dmul(float a, MyDiff b) { return MyDiff.dmul(a, b); }
 }

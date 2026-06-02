@@ -127,6 +127,7 @@ option(
 option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
+option(SLANG_ENABLE_VALIDATION_VM_BYTECODE "Enable VM bytecode validation" ON)
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(
     SLANG_IGNORE_ABORT_MSG
@@ -174,12 +175,6 @@ option(
     ON
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
-
-option(
-    SLANG_GITHUB_TOKEN
-    "Use a given token value for accessing Github REST API"
-    ""
-)
 
 advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
@@ -304,11 +299,19 @@ advanced_option(
     OFF
 )
 
+set(SLANG_EXCLUDE_DAWN_DEFAULT ON)
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(SLANG_EXCLUDE_DAWN_DEFAULT OFF)
+endif()
 advanced_option(
     SLANG_EXCLUDE_DAWN
-    "Optionally exclude webgpu_dawn from the build"
-    OFF
+    "Optionally exclude Dawn WebGPU support from the build"
+    ${SLANG_EXCLUDE_DAWN_DEFAULT}
 )
+set(SLANG_HAS_WEBGPU_SUPPORT OFF)
+if(NOT SLANG_EXCLUDE_DAWN)
+    set(SLANG_HAS_WEBGPU_SUPPORT ON)
+endif()
 
 advanced_option(
     SLANG_EXCLUDE_TINT
@@ -367,7 +370,7 @@ enum_option(
 if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     # If the user didn't specify a URL, find the best one now
     if(NOT SLANG_SLANG_LLVM_BINARY_URL)
-        get_best_slang_binary_release_url("${SLANG_GITHUB_TOKEN}" url)
+        get_best_slang_binary_release_url(url)
         if(NOT DEFINED url)
             if(SLANG_SLANG_LLVM_FLAVOR STREQUAL FETCH_BINARY_IF_POSSIBLE)
                 message(
@@ -389,7 +392,7 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     )
 endif()
 
-if(NOT SLANG_EXCLUDE_DAWN)
+if(SLANG_HAS_WEBGPU_SUPPORT)
     if(NOT DEFINED SLANG_WEBGPU_DAWN_BINARY_URL)
         set(webgpu_dawn_release_tag "webgpu_dawn-0")
         if(
@@ -555,7 +558,6 @@ if(SLANG_WEBGPU_DAWN_BINARY_URL)
         "webgpu_dawn"
         "${SLANG_WEBGPU_DAWN_BINARY_URL}"
         IGNORE_FAILURE
-        SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
     )
 endif()
 
@@ -568,7 +570,6 @@ if(SLANG_SLANG_TINT_BINARY_URL)
         "slang-tint"
         "${SLANG_SLANG_TINT_BINARY_URL}"
         IGNORE_FAILURE
-        SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
     )
 endif()
 

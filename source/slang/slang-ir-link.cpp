@@ -196,6 +196,13 @@ IRInst* cloneInst(
 static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
     SLANG_UNUSED(clonedInst);
+
+    // Local annotations will be cloned normally as part of cloning their parent function/generic
+    // body. Only explicitly chase use-list annotations for module-scope instructions, where the
+    // annotations are not children of the cloned instruction itself.
+    if (!originalInst->getParent() || originalInst->getParent()->getOp() != kIROp_ModuleInst)
+        return;
+
     traverseUsers<IRAnnotation>(
         originalInst,
         [&](IRAnnotation* annotation)
@@ -2452,7 +2459,7 @@ struct IRPrelinkContext : IRSpecContext
         case kIROp_WitnessTable:
             {
                 auto witnessTable = as<IRWitnessTable>(originalVal);
-                clonedInst = builder->createWitnessTable(
+                clonedInst = builderForClone->createWitnessTable(
                     cloneType(this, (IRType*)witnessTable->getConformanceType()),
                     cloneType(this, witnessTable->getConcreteType()));
                 break;

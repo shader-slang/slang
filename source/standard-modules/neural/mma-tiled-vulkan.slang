@@ -343,6 +343,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
 
         // 3. Outer product: dW += dOut ⊗ input — reuses dOutA
         outerProductAccumulate<Address, PaddedK>(dOutA, input.data, weightGradAddress, shBase);
+        AllMemoryBarrierWithGroupSync();
 
         return bit_cast<WaveTangledVector<T.Differential, ShMemSize, InputSize, SubgroupSize, SubgroupCount>>(dInput);
     }
