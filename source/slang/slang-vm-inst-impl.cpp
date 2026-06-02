@@ -1037,9 +1037,13 @@ void printHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void* userData
     for (uint32_t i = 1; i < inst->operandCount; ++i)
     {
         auto& arg = inst->getOperand(i);
+        // String-literal operands are emitted with size 0 but point at a `const char*` slot; copy
+        // the pointer. Match the section, not getType(): working-set operands have no set type.
+        const bool isStringLiteral = (arg.section == (uint8_t**)&ctx->m_stringLitsPtr);
+        const uint32_t argSize = isStringLiteral ? (uint32_t)sizeof(const char*) : arg.size;
         List<uint8_t> data;
-        data.setCount(arg.size);
-        memcpy(data.getBuffer(), arg.getPtr(), arg.size);
+        data.setCount(argSize);
+        memcpy(data.getBuffer(), arg.getPtr(), argSize);
         args.add(data);
     }
     for (auto& arg : args)
