@@ -3091,6 +3091,10 @@ void consolidateRayTracingParameters(
     List<IRParam*> outParams;
     List<IRParam*> params;
 
+    auto stage = context->getStage();
+    const bool isRayTracingHitStage =
+        stage == Stage::Intersection || stage == Stage::AnyHit || stage == Stage::ClosestHit;
+
     for (auto param = firstBlock->getFirstParam(); param; param = param->getNextParam())
     {
         auto paramLayout = findVarLayout(param);
@@ -3100,7 +3104,7 @@ void consolidateRayTracingParameters(
         // Direct SPIR-V also reaches this pass for ray-tracing entry points.
         // Only the GLSL/glslang path needs SV_PrimitiveID kept out of payload
         // and hit-attribute consolidation so it can lower through gl_PrimitiveID.
-        if (!codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
+        if (isRayTracingHitStage && !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
         {
             if (auto systemValueAttr = paramLayout->findSystemValueSemanticAttr())
             {
@@ -4240,11 +4244,8 @@ void legalizeEntryPointParameterForGLSL(
         break;
 
     case Stage::AnyHit:
-    case Stage::Callable:
     case Stage::ClosestHit:
     case Stage::Intersection:
-    case Stage::Miss:
-    case Stage::RayGeneration:
         if (!isRayTracingPrimitiveIDSystemValueParam)
             return;
         break;

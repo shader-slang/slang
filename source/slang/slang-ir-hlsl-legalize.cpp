@@ -361,10 +361,30 @@ void legalizeRayTracingPrimitiveIDParamForHLSL(IRModule* module)
 
                 IRInst* replacement = primitiveIndexCall;
                 auto paramType = param->getFullType();
-                if (paramType != builder.getUIntType())
-                    replacement = builder.emitCast(paramType, primitiveIndexCall);
+                auto valueType = paramType;
+                if (auto borrowInParamType = as<IRBorrowInParamType>(valueType))
+                    valueType = borrowInParamType->getValueType();
 
-                param->replaceUsesWith(replacement);
+                if (valueType != builder.getUIntType())
+                    replacement = builder.emitCast(valueType, primitiveIndexCall);
+
+                traverseUses(
+                    param,
+                    [&](IRUse* use)
+                    {
+                        auto user = use->getUser();
+                        if (auto load = as<IRLoad>(user))
+                        {
+                            if (load->getPtr() == param)
+                            {
+                                load->replaceUsesWith(replacement);
+                                load->removeAndDeallocate();
+                                return;
+                            }
+                        }
+
+                        builder.replaceOperand(use, replacement);
+                    });
             }
 
             param->removeAndDeallocate();
