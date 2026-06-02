@@ -14,10 +14,12 @@
 // different sibling scopes), the checker emits diagnostic
 // `ambiguous-reference`". Verify the diagnostic fires.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 namespace A { struct X {}; }
+//CHECK:             ^ candidate: struct A::X
 namespace B { struct X {}; }
+//CHECK:             ^ candidate: struct B::X
 
 using namespace A;
 using namespace B;
@@ -28,5 +30,4 @@ void main()
 /*CHECK:
     ^ ambiguous reference to 'X'
 */
-//CHECK: E39999
 }

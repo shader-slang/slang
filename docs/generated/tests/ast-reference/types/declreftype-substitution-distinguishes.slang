@@ -15,7 +15,7 @@
 // `DeclRefType` instances and the checker enforces the distinction:
 // a `Pair<int>` cannot be assigned to a `Pair<float>`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 struct Pair<T> { T first; T second; }
 

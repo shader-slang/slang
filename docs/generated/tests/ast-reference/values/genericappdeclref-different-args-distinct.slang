@@ -14,7 +14,7 @@
 // produce distinct decl-refs and therefore distinct types; the
 // checker rejects cross-instantiation assignment.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 struct Box<T> { T v; }
 

@@ -17,6 +17,25 @@ Key directories:
 - `cmake/`: CMake helpers.
 - `external/`: vendored dependencies.
 
+## Repository-Local Skills
+
+This repository stores local agent skills under `.claude/skills/`. Codex and other non-Claude
+harnesses should still consult those `SKILL.md` files when a user asks for the workflow they
+describe.
+
+Review-related skills:
+- `slang-review-clarity-workflow`: coordinate the end-to-end clarity review workflow.
+- `slang-review-clarity`: generate high-level clarity and explainability review candidates.
+- `slang-review-fine-grained-clarity`: generate line-by-line name/comment/type/function
+  consistency review candidates.
+- `slang-review-consolidate-candidates`: merge candidate files and resolve duplicates,
+  overlap, and superseded comments.
+- `slang-review-scope-filter`: conservatively filter candidate comments to issues the PR
+  author can reasonably own before posting.
+- `slang-review-resolve-judgment-calls`: resolve uncertain candidates with focused follow-up
+  analysis before posting.
+- `slang-review-post-github`: post filtered candidates as one proper GitHub PR review.
+
 ## WSL and Windows Tooling
 
 When working in this repository from WSL on Windows, use Windows-native developer tools by
@@ -98,6 +117,14 @@ Conventions:
 - Use `UpperCamelCase` for types and `lowerCamelCase` for values.
 - Use `SLANG_`-prefixed `SCREAMING_SNAKE_CASE` for macros.
 - Prefer comments that explain why code exists.
+
+## Shell Scripts
+
+Scripts under `extras/` (and other repository shell scripts) must run on bash 3.2, the version
+Apple ships as `/bin/bash` on macOS. Avoid bash 4+ only features such as `${var,,}`/`${var^^}`
+case conversion, associative arrays (`declare -A`), `mapfile`/`readarray`, and namerefs
+(`local -n`). Prefer portable equivalents (for example, lowercase with
+`tr '[:upper:]' '[:lower:]'`). Validate with `bash -n script.sh` under the system bash.
 
 ## Testing Guidelines
 
