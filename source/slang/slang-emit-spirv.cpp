@@ -7094,6 +7094,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_SamplerComparisonStateType:
             descriptorElementType = ensureInst(valueType);
             break;
+        case kIROp_UInt64Type:
+            descriptorElementType = ensureInst(valueType);
+            break;
         default:
             isBufferResource = true;
             descriptorElementType = ensureDescriptorHeapBufferDescriptorType(

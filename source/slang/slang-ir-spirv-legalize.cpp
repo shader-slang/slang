@@ -28,6 +28,8 @@
 #include "slang-legalize-types.h"
 #include "slang-rich-diagnostics.h"
 
+#include <spirv/unified1/spirv.h>
+
 namespace Slang
 {
 
@@ -1634,6 +1636,45 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         inst->removeAndDeallocate();
     }
 
+    void processSPIRVLoadDescriptorFromHeap(IRSPIRVLoadDescriptorFromHeap* inst)
+    {
+        if (inst->getDataType()->getOp() != kIROp_RaytracingAccelerationStructureType)
+            return;
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto address = builder.emitLoadDescriptorFromHeap(
+            builder.getUInt64Type(),
+            inst->getHeap(),
+            inst->getIndex());
+
+        auto asmInst = builder.emitSPIRVAsm(inst->getDataType());
+        {
+            IRBuilderInsertLocScope insertScope(&builder);
+            builder.setInsertInto(asmInst);
+
+            auto extensionOp = builder.emitSPIRVAsmOperandEnum(
+                builder.getIntValue(builder.getUIntType(), SpvOpExtension));
+            List<IRInst*> extensionOperands;
+            extensionOperands.add(builder.emitSPIRVAsmOperandLiteral(
+                builder.getStringValue(UnownedStringSlice::fromLiteral("SPV_KHR_ray_tracing"))));
+            builder.emitSPIRVAsmInst(extensionOp, extensionOperands);
+
+            auto convertOp = builder.emitSPIRVAsmOperandEnum(builder.getIntValue(
+                builder.getUIntType(),
+                SpvOpConvertUToAccelerationStructureKHR));
+            List<IRInst*> convertOperands;
+            convertOperands.add(builder.emitSPIRVAsmOperandInst(inst->getDataType()));
+            convertOperands.add(builder.emitSPIRVAsmOperandResult());
+            convertOperands.add(builder.emitSPIRVAsmOperandInst(address));
+            builder.emitSPIRVAsmInst(convertOp, convertOperands);
+        }
+
+        inst->replaceUsesWith(asmInst);
+        inst->removeAndDeallocate();
+        addUsersToWorkList(asmInst);
+    }
+
     static bool isAsmInst(IRInst* inst)
     {
         return (as<IRSPIRVAsmInst>(inst) || as<IRSPIRVAsmOperand>(inst));
@@ -2071,6 +2112,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             case kIROp_MakeCombinedTextureSamplerFromHandle:
                 processMakeCombinedTextureSamplerFromHandle(inst);
+                break;
+            case kIROp_SPIRVLoadDescriptorFromHeap:
+                processSPIRVLoadDescriptorFromHeap(cast<IRSPIRVLoadDescriptorFromHeap>(inst));
                 break;
             case kIROp_PtrLit:
                 processPtrLit(inst);
