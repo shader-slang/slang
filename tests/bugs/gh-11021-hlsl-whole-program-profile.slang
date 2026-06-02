@@ -19,6 +19,8 @@
 // SM62: x_{{.*}} = int(100)
 // SM62-NOT: break
 // SM62: case int(1):
+// SM62: result_{{.*}} = x_{{.*}} + value_{{.*}}
+// SM62: break
 
 // SM63-NOT: warning[E41026]
 // SM63: {{^export$}}
@@ -27,6 +29,8 @@
 // SM63: x_{{.*}} = int(100)
 // SM63-NOT: break
 // SM63: case int(1):
+// SM63: result_{{.*}} = x_{{.*}} + value_{{.*}}
+// SM63: break
 
 export int exportedSwitch(int value)
 {
