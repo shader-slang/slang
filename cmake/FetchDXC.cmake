@@ -474,7 +474,15 @@ if(_dxc_build_from_source)
         # LLVM_ENABLE_WARNINGS=OFF prevents adding warning flags but does not
         # actively suppress existing ones. Pass -w via CMAKE_*_FLAGS to silence
         # all compiler warnings from DXC's source.
-        set(_dxc_warning_flags "-DCMAKE_C_FLAGS=-w" "-DCMAKE_CXX_FLAGS=-w")
+        set(_dxc_c_flags "${CMAKE_C_FLAGS}")
+        set(_dxc_cxx_flags "${CMAKE_CXX_FLAGS}")
+        string(APPEND _dxc_c_flags " -w")
+        string(APPEND _dxc_cxx_flags " -w")
+        set(
+            _dxc_warning_flags
+            "-DCMAKE_C_FLAGS=${_dxc_c_flags}"
+            "-DCMAKE_CXX_FLAGS=${_dxc_cxx_flags}"
+        )
     endif()
 
     # DXC's build (PredefinedParams.cmake) is designed for a single-config
