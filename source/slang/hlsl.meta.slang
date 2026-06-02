@@ -28799,6 +28799,7 @@ $}
         };
     }
 
+    [ForceInline]
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,
@@ -28932,6 +28933,7 @@ $}
         };
     }
 
+    [ForceInline]
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,
@@ -28965,6 +28967,7 @@ $}
         return __loadView<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(buffer, element, tensorLayout, tensorView);
     }
 
+    [ForceInline]
     [require(cooperative_matrix_tensor_addressing)]
     static This __loadView<
         let Dim : uint32_t,
@@ -28992,6 +28995,7 @@ $}
         };
     }
 
+    [ForceInline]
     [require(cooperative_matrix_block_load)]
     static This Load<
         U,
@@ -29006,6 +29010,7 @@ $}
         return __loadLayoutDecode<U, Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, decodeFunc);
     }
 
+    [ForceInline]
     [require(cooperative_matrix_block_load)]
     static This Load<
         U,
@@ -29021,6 +29026,7 @@ $}
         return __loadLayoutDecode<U, Dim, ClampMode>(buffer, element, tensorLayout, decodeFunc);
     }
 
+    [ForceInline]
     [require(cooperative_matrix_block_load)]
     static This __loadLayoutDecode<
         U,
@@ -29046,6 +29052,7 @@ $}
         };
     }
 
+    [ForceInline]
     [require(cooperative_matrix_block_load)]
     static This Load<
         U,
@@ -29064,6 +29071,7 @@ $}
         return __loadViewDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView, decodeFunc);
     }
 
+    [ForceInline]
     [require(cooperative_matrix_block_load)]
     static This Load<
         U,
@@ -29083,6 +29091,7 @@ $}
         return __loadViewDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(buffer, element, tensorLayout, tensorView, decodeFunc);
     }
 
+    [ForceInline]
     [require(cooperative_matrix_block_load)]
     static This __loadViewDecode<
         U,
@@ -29179,6 +29188,7 @@ $}
         }
     }
 
+    [ForceInline]
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
         let Dim : uint32_t,
@@ -29195,6 +29205,7 @@ $}
         Store(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView);
     }
 
+    [ForceInline]
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
         let Dim : uint32_t,
@@ -29224,6 +29235,7 @@ $}
         }
     }
 
+    [ForceInline]
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
         let Dim : uint32_t,

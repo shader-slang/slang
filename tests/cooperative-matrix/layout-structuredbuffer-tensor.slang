@@ -10,10 +10,14 @@
 // CHECK-DAG: %[[PTR_430]] = OpTypePointer StorageBuffer %float
 // CHECK: %[[INPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_140]] %input140 %int_0 %uint_0
 // CHECK: %[[MAT_140:[A-Za-z0-9_]+]] = OpCooperativeMatrixLoadTensorNV %[[COOP_MAT]] %[[INPUT_140]]
+// CHECK-NOT: OpStore {{.*}} %[[MAT_140]]
+// CHECK-NOT: OpLoad %[[COOP_MAT]]
 // CHECK: %[[OUTPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_140]] %output140 %int_0 %uint_0
 // CHECK: OpCooperativeMatrixStoreTensorNV %[[OUTPUT_140]] %[[MAT_140]]
 // CHECK: %[[INPUT_430:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_430]] %input430 %int_0 %uint_0
 // CHECK: %[[MAT_430:[A-Za-z0-9_]+]] = OpCooperativeMatrixLoadTensorNV %[[COOP_MAT]] %[[INPUT_430]]
+// CHECK-NOT: OpStore {{.*}} %[[MAT_430]]
+// CHECK-NOT: OpLoad %[[COOP_MAT]]
 // CHECK: %[[OUTPUT_430:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_430]] %output430 %int_0 %uint_0
 // CHECK: OpCooperativeMatrixStoreTensorNV %[[OUTPUT_430]] %[[MAT_430]]
 
