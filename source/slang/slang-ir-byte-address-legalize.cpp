@@ -248,6 +248,9 @@ struct ByteAddressBufferLegalizationContext
         IRInst* unknownOffsetAlignment,
         IRIntegerValue alignmentVal)
     {
+        if (alignmentVal <= 0)
+            return false;
+
         if (auto baseOffsetVal = as<IRIntLit>(baseOffset))
         {
             // If the offset is a constant known at compile time, simply check if it aligned to

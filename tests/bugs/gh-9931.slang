@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute -bindless-space-index 2 -O0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=RESULT): -vk -compute -shaderobj -xslang -bindless-space-index -xslang 2
 
 // CHECK-DAG: %[[UINT:[A-Za-z0-9_]+]] = OpTypeInt 32 0
 // CHECK-DAG: %[[V2UINT:[A-Za-z0-9_]+]] = OpTypeVector %[[UINT]] 2
@@ -19,9 +20,11 @@ struct HandleStruct
 };
 
 [[vk::binding(0, 0)]]
+//TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7], stride=4):name=inputBuffer
 ByteAddressBuffer inputBuffer;
 
 [[vk::binding(1, 0)]]
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 [shader("compute")]
@@ -44,3 +47,12 @@ void computeMain()
     outputBuffer[6] = alignedHandleBits.x;
     outputBuffer[7] = alignedHandleBits.y;
 }
+
+// RESULT: 0
+// RESULT-NEXT: 1
+// RESULT-NEXT: 2
+// RESULT-NEXT: 0
+// RESULT-NEXT: 1
+// RESULT-NEXT: 2
+// RESULT-NEXT: 1
+// RESULT-NEXT: 2
