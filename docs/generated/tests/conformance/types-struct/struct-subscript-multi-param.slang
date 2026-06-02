@@ -11,9 +11,16 @@
 
 // Verifies that multiple `__subscript` overloads with different parameter counts coexist and
 // that overload resolution dispatches each call correctly. m[] exercises the zero-parameter
-// overload and m[1] the one-parameter overload; CHECK confirms both read and write paths.
+// overload and m[1] the one-parameter overload; buffer output confirms both read and write paths.
+// Emission tests confirm the struct and overloads are emitted on all backends.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 struct MultiSubscript
 {
@@ -34,7 +41,11 @@ struct MultiSubscript
     }
 }
 
-void main()
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1,1,1)]
+void computeMain()
 {
     MultiSubscript m = { };
 
@@ -44,8 +55,27 @@ void main()
     float r0 = m[];
     float r1 = m[1];
 
-    // CHECK: 100
-    printf("%.0f\n", r0);
-    // CHECK: 200
-    printf("%.0f\n", r1);
+    outputBuffer[0] = (int)r0;
+    outputBuffer[1] = (int)r1;
 }
+
+// CHECK: 100
+// CHECK: 200
+
+// HLSL: struct MultiSubscript_{{[0-9_]*}}
+// HLSL: float arr_{{[0-9_]*}}
+
+// GLSL: struct MultiSubscript_{{[0-9_]*}}
+// GLSL: float arr_{{[0-9_]*}}
+
+// METAL: struct MultiSubscript_{{[0-9_]*}}
+// METAL: arr_{{[0-9_]*}}
+
+// WGSL: struct MultiSubscript_{{[0-9_]*}}
+// WGSL: arr_{{[0-9_]*}}
+
+// CUDA: struct MultiSubscript_{{[0-9_]*}}
+// CUDA: arr_{{[0-9_]*}}
+
+// CPP: struct MultiSubscript_{{[0-9_]*}}
+// CPP: arr_{{[0-9_]*}}

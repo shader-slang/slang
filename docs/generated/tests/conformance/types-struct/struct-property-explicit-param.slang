@@ -11,9 +11,16 @@
 
 // Verifies that a `set` accessor with an explicitly named parameter compiles and functions correctly.
 // ExplicitSet.someProp uses `set(float newVal)`; assigning 5.0 then reading back via `get` lets
-// CHECK confirm the named parameter received and stored the value.
+// buffer output confirm the named parameter received and stored the value. Emission tests confirm
+// the get accessor and struct are emitted on all backends.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 struct ExplicitSet
 {
@@ -26,11 +33,38 @@ struct ExplicitSet
     }
 }
 
-void main()
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1,1,1)]
+void computeMain()
 {
     ExplicitSet obj = { };
     obj.someProp = 5.0f;
     float v = obj.someProp;
-    // CHECK: 5
-    printf("%.0f\n", v);
+    outputBuffer[0] = (int)v;
 }
+
+// CHECK: 5
+
+// HLSL: struct ExplicitSet_{{[0-9_]*}}
+// HLSL: float m_val_{{[0-9_]*}}
+// HLSL: ExplicitSet_someProp_get_{{[0-9_]*}}
+
+// GLSL: struct ExplicitSet_{{[0-9_]*}}
+// GLSL: float m_val_{{[0-9_]*}}
+// GLSL: ExplicitSet_someProp_get_{{[0-9_]*}}
+
+// METAL: struct ExplicitSet_{{[0-9_]*}}
+// METAL: float m_val_{{[0-9_]*}}
+// METAL: ExplicitSet_someProp_get_{{[0-9_]*}}
+
+// WGSL: struct ExplicitSet_{{[0-9_]*}}
+// WGSL: m_val_{{[0-9_]*}}
+// WGSL: fn ExplicitSet_someProp_get_{{[0-9_]*}}
+
+// CUDA: struct ExplicitSet_{{[0-9_]*}}
+// CUDA: ExplicitSet_someProp_get_{{[0-9_]*}}
+
+// CPP: struct ExplicitSet_{{[0-9_]*}}
+// CPP: ExplicitSet_someProp_get_{{[0-9_]*}}

@@ -15,6 +15,8 @@
 // confirming the Output address-space-to-storage-class mapping for stage outputs.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry vsMain -stage vertex
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry vsMain -stage vertex
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry vsMain -stage vertex
 
 struct VSOutput {
     float4 pos : SV_Position;
@@ -31,3 +33,9 @@ VSOutput vsMain(float3 pos : POSITION, float2 uv : TEXCOORD0)
 
 // Vertex shader output (SV_Position and TEXCOORD0 output) use Output storage class.
 // CHECK: OpVariable {{.*}} Output
+// Metal emits the vertex entry point with the [[vertex]] attribute and output fields with [[position]].
+// METAL-DAG: vertex
+// METAL-DAG: position
+// WGSL emits @vertex and output struct field with @builtin(position).
+// WGSL-DAG: @vertex
+// WGSL-DAG: @builtin(position)

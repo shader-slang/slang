@@ -18,6 +18,14 @@
 
 //TEST:SIMPLE(filecheck=MEMCHECK):-target spirv-asm -entry computeMemMain -stage compute
 //TEST:SIMPLE(filecheck=CTRLCHECK):-target spirv-asm -entry computeCtrlMain -stage compute
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMemMain -stage compute
+//TEST:SIMPLE(filecheck=METALCTRLCHECK):-target metal -entry computeCtrlMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLMEMCHECK):-target wgsl -entry computeMemMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLCTRLCHECK):-target wgsl -entry computeCtrlMain -stage compute
+//TEST:SIMPLE(filecheck=CUDAMEMCHECK):-target cuda -entry computeMemMain -stage compute
+//TEST:SIMPLE(filecheck=CUDACTRLCHECK):-target cuda -entry computeCtrlMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLMEMCHECK):-target glsl -entry computeMemMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLCTRLCHECK):-target glsl -entry computeCtrlMain -stage compute
 
 RWStructuredBuffer<uint> buf;
 
@@ -44,3 +52,26 @@ void computeCtrlMain(uint3 tid : SV_DispatchThreadID)
 // GroupSync variant emits OpControlBarrier (not just OpMemoryBarrier).
 // CTRLCHECK: OpControlBarrier
 // CTRLCHECK-NOT: OpMemoryBarrier
+
+// Metal: both variants emit threadgroup_barrier (Metal has no distinction between memory-only
+// and execution-barrier for all-memory scope; both lower to the same intrinsic).
+// METALCHECK: threadgroup_barrier
+// METALCTRLCHECK: threadgroup_barrier
+
+// WGSL non-sync: emits storageBarrier+textureBarrier+workgroupBarrier (memory only, no execution sync).
+// WGSLMEMCHECK: storageBarrier
+// WGSL groupsync: emits storageBarrier+textureBarrier+workgroupBarrier (WGSL workgroupBarrier provides both).
+// WGSLCTRLCHECK: workgroupBarrier
+
+// CUDA non-sync: emits __threadfence() (memory fence only, no thread sync).
+// CUDAMEMCHECK: __threadfence()
+// CUDA groupsync: emits __syncthreads() (thread-group barrier including memory fence).
+// CUDACTRLCHECK: __syncthreads()
+
+// GLSL non-sync: emits memoryBarrier (memory ordering only).
+// GLSLMEMCHECK: memoryBarrier
+// GLSL groupsync: emits controlBarrier (execution + memory).
+// GLSLCTRLCHECK: controlBarrier
+
+// Targets not covered by emission directives:
+//   cpp    - AllMemoryBarrier/AllMemoryBarrierWithGroupSync not available on cpp target (E36107 capability gate).

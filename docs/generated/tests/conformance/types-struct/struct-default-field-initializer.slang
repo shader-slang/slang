@@ -11,9 +11,16 @@
 
 // Verifies that a field's default initializer applies when the initializer list stops before that field.
 // Defaults has x=99, y (none), z=77; initializing with {1,2} supplies x and y but not z.
-// CHECK confirms z retains its default value of 77.
+// Buffer output confirms z retains its default value of 77. Emission tests confirm the struct
+// and its initializer are emitted on all backends.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 struct Defaults
 {
@@ -22,14 +29,49 @@ struct Defaults
     int z = 77;
 }
 
-void main()
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1,1,1)]
+void computeMain()
 {
     // Initializer list provides x and y but not z; z should fall back to 77
     Defaults d = { 1, 2 };
-    // CHECK: 1
-    printf("%d\n", d.x);
-    // CHECK: 2
-    printf("%d\n", d.y);
-    // CHECK: 77
-    printf("%d\n", d.z);
+    outputBuffer[0] = d.x;
+    outputBuffer[1] = d.y;
+    outputBuffer[2] = d.z;
 }
+
+// CHECK: 1
+// CHECK: 2
+// CHECK: 77
+
+// HLSL: struct Defaults_{{[0-9_]*}}
+// HLSL: int x_{{[0-9_]*}}
+// HLSL: int y_{{[0-9_]*}}
+// HLSL: int z_{{[0-9_]*}}
+
+// GLSL: struct Defaults_{{[0-9_]*}}
+// GLSL: int x_{{[0-9_]*}}
+// GLSL: int y_{{[0-9_]*}}
+// GLSL: int z_{{[0-9_]*}}
+
+// METAL: struct Defaults_{{[0-9_]*}}
+// METAL: int x_{{[0-9_]*}}
+// METAL: int y_{{[0-9_]*}}
+// METAL: int z_{{[0-9_]*}}
+
+// WGSL: struct Defaults_{{[0-9_]*}}
+// WGSL: x_{{[0-9_]*}}
+// WGSL: y_{{[0-9_]*}}
+// WGSL: z_{{[0-9_]*}}
+
+// CUDA: struct Defaults_{{[0-9_]*}}
+// CUDA: int x_{{[0-9_]*}}
+// CUDA: int y_{{[0-9_]*}}
+// CUDA: int z_{{[0-9_]*}}
+
+// CPP: struct Defaults_{{[0-9_]*}}
+// CPP: x_{{[0-9_]*}}
+// CPP: y_{{[0-9_]*}}
+// CPP: z_{{[0-9_]*}}

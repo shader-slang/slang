@@ -9,12 +9,16 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that an `if`/`else` producing divergence emits SPIR-V structured control
-// flow for reconvergence. The shader branches on an odd/even condition; CHECK asserts
-// SPIR-V contains `OpSelectionMerge` (naming the reconvergence merge block) and
-// `OpBranchConditional` (encoding the two diverging arms).
+// Verifies that an `if`/`else` producing divergence emits structured control
+// flow for reconvergence across multiple back-ends. The shader branches on an
+// odd/even condition. Emission tests pin the back-end-specific constructs that
+// encode the divergence point and the two arms.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CPP):-target cpp -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> output;
 
@@ -34,5 +38,26 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output[tid.x] = result;
 }
 
+// SPIRV: structured selection with merge block and conditional branch.
 // CHECK: OpSelectionMerge
 // CHECK: OpBranchConditional
+
+// Metal: if/else preserved with the two arms.
+// CHECK_METAL: if(
+// CHECK_METAL: result_0 = 1U
+// CHECK_METAL: result_0 = 2U
+
+// WGSL: if/else preserved; both arms visible.
+// CHECK_WGSL: if(
+// CHECK_WGSL: result_0 = u32(1)
+// CHECK_WGSL: result_0 = u32(2)
+
+// CUDA: if/else preserved; both arms visible.
+// CHECK_CUDA: if(
+// CHECK_CUDA: result_0 = 1U
+// CHECK_CUDA: result_0 = 2U
+
+// C++: if/else preserved; both arms visible.
+// CHECK_CPP: if(
+// CHECK_CPP: result_0 = 1U
+// CHECK_CPP: result_0 = 2U

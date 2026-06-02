@@ -16,6 +16,10 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLCHECK):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLCHECK):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDACHECK):-target cuda -entry computeMain -stage compute
 
 groupshared uint sharedBuf[64];
 RWStructuredBuffer<uint> buf;
@@ -35,3 +39,21 @@ void computeMain(uint3 tid : SV_DispatchThreadID, uint3 gid : SV_GroupThreadID)
 
 // HLSL: preserves GroupMemoryBarrier intrinsic name.
 // HLSLCHECK: GroupMemoryBarrier()
+
+// GLSL: emits memoryBarrier with gl_ScopeWorkgroup and shared-storage semantics.
+// GLSLCHECK: memoryBarrier
+// GLSLCHECK-SAME: gl_ScopeWorkgroup
+// GLSLCHECK-SAME: gl_StorageSemanticsShared
+
+// Metal: emits threadgroup_barrier with mem_threadgroup flag (group-shared memory only).
+// METALCHECK: threadgroup_barrier
+// METALCHECK-SAME: mem_threadgroup
+
+// WGSL: emits workgroupBarrier() (workgroup-scope shared memory barrier).
+// WGSLCHECK: workgroupBarrier
+
+// CUDA: emits __threadfence_block() (thread-block-scope shared memory fence).
+// CUDACHECK: __threadfence_block()
+
+// Targets not covered by emission directives:
+//   cpp    - GroupMemoryBarrier is not available on cpp target (E36107 capability gate).

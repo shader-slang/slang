@@ -17,6 +17,9 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLCHECK):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDACHECK):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> outputBuffer;
 RWStructuredBuffer<Atomic<uint>> syncBuffer;
@@ -42,3 +45,20 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // HLSL: emits WaveIsFirstLane() and AllMemoryBarrier (wave-sync not expressible in HLSL).
 // HLSLCHECK: AllMemoryBarrier
 // HLSLCHECK: WaveIsFirstLane
+
+// GLSL: emits subgroupBarrier (wave-sync), subgroupElect (first-lane), and a plain store for Relaxed Atomic.
+// GLSLCHECK-DAG: subgroupBarrier
+// GLSLCHECK-DAG: subgroupElect
+
+// Metal: emits simdgroup_barrier (wave-sync), simd_is_first (first-lane), and atomic_store_explicit (Relaxed store).
+// METALCHECK-DAG: simdgroup_barrier
+// METALCHECK-DAG: simd_is_first
+// METALCHECK-DAG: atomic_store_explicit
+
+// CUDA: emits __syncwarp (wave-sync), WaveIsFirstLane helper (first-lane), and plain pointer write for Relaxed store.
+// CUDACHECK-DAG: __syncwarp
+// CUDACHECK-DAG: WaveIsFirstLane
+
+// Targets not covered by emission directives:
+//   wgsl   - AllMemoryBarrierWithWaveSync is not available on wgsl target (E36107 capability gate; no wave-sync surface in WGSL).
+//   cpp    - AllMemoryBarrierWithWaveSync is not available on cpp target (E36107 capability gate).

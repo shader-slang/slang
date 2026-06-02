@@ -17,6 +17,10 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLCHECK):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLCHECK):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDACHECK):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> buf;
 
@@ -36,3 +40,22 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // HLSL: preserves AllMemoryBarrierWithGroupSync intrinsic name.
 // HLSLCHECK: AllMemoryBarrierWithGroupSync()
+
+// GLSL: emits controlBarrier with Workgroup execution scope, Device memory scope, and AcquireRelease semantics.
+// GLSLCHECK: controlBarrier
+// GLSLCHECK-SAME: gl_ScopeWorkgroup
+// GLSLCHECK-SAME: gl_ScopeDevice
+
+// Metal: emits threadgroup_barrier with all-memory flags (device, threadgroup, texture, imageblock).
+// METALCHECK: threadgroup_barrier
+// METALCHECK-SAME: mem_device
+
+// WGSL: emits storageBarrier, textureBarrier, and workgroupBarrier (all-memory+group-sync coverage).
+// WGSLCHECK: storageBarrier
+// WGSLCHECK: workgroupBarrier
+
+// CUDA: emits __syncthreads() (thread-group execution barrier + full memory fence).
+// CUDACHECK: __syncthreads()
+
+// Targets not covered by emission directives:
+//   cpp    - AllMemoryBarrierWithGroupSync is not available on cpp target (E36107 capability gate).

@@ -14,6 +14,8 @@
 // declaration, confirming all threads in the group share the same storage instance.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 static groupshared float sharedData[32];
 
@@ -26,3 +28,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 }
 
 // CHECK: groupshared {{.*}} sharedData{{.*}}
+// Metal emits groupshared as threadgroup address space.
+// METAL: threadgroup {{.*}} sharedData{{.*}}
+// WGSL emits groupshared as var<workgroup>.
+// WGSL: var<workgroup> sharedData{{.*}}

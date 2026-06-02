@@ -16,6 +16,10 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-CUDA):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> output;
 
@@ -31,3 +35,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // SPIR-V emits GroupNonUniformBallot (the Vulkan ballot extension opcode).
 // CHECK-SPV: GroupNonUniformBallot
+
+// GLSL emits subgroupBallot with the KHR_shader_subgroup_ballot extension.
+// CHECK-GLSL: subgroupBallot
+
+// Metal emits simd_ballot (Metal SIMD-group ballot intrinsic).
+// CHECK-METAL: simd_ballot
+
+// WGSL emits subgroupBallot with the subgroups enable directive.
+// CHECK-WGSL: subgroupBallot
+
+// CUDA emits __ballot_sync (CUDA warp ballot intrinsic).
+// CHECK-CUDA: __ballot_sync

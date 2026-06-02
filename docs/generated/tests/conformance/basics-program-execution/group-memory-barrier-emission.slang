@@ -16,6 +16,10 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-CUDA):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> outputBuffer;
 
@@ -36,3 +40,17 @@ void computeMain(uint3 tid : SV_GroupThreadID)
 
 // SPIR-V: barriers lower to OpControlBarrier or OpMemoryBarrier.
 // CHECK-SPV: OpControlBarrier
+
+// GLSL: GroupMemoryBarrier → memoryBarrier (shared scope); GroupMemoryBarrierWithGroupSync → controlBarrier.
+// CHECK-GLSL: memoryBarrier
+// CHECK-GLSL: controlBarrier
+
+// Metal: both barriers lower to threadgroup_barrier.
+// CHECK-METAL: threadgroup_barrier
+
+// WGSL: both barriers lower to workgroupBarrier.
+// CHECK-WGSL: workgroupBarrier
+
+// CUDA: GroupMemoryBarrier → __threadfence_block; GroupMemoryBarrierWithGroupSync → __syncthreads.
+// CHECK-CUDA: __threadfence_block
+// CHECK-CUDA: __syncthreads

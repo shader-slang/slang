@@ -15,6 +15,8 @@
 // semantics operand position — proving the relaxed encoding is used.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLCHECK):-target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<Atomic<uint>> atomicBuf;
 
@@ -26,3 +28,16 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // CHECK: OpAtomicStore
 // CHECK-SAME: %uint_0
+
+// Metal: Relaxed maps to memory_order_relaxed on atomic_store_explicit.
+// METALCHECK: atomic_store_explicit
+// METALCHECK-SAME: memory_order_relaxed
+
+// WGSL: atomicStore (no explicit order parameter in WGSL; all atomics are seq-cst by spec).
+// WGSLCHECK: atomicStore
+
+// Targets not covered by emission directives:
+//   hlsl   - Atomic<T>.store lowers to a plain RWStructuredBuffer assignment; no ordering operand surface.
+//   glsl   - Same as HLSL: plain store, no ordering parameter emitted.
+//   cuda   - Plain pointer write; CUDA codegen path does not emit ordering intrinsic for Atomic<T>.store.
+//   cpp    - Atomic<T>.store unavailable on cpp target (E36107 from core module capability gate).

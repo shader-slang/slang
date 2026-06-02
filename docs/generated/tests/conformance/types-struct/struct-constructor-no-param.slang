@@ -10,10 +10,16 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies that declaring an object without an initializer list invokes the no-parameter `__init`.
-// obj1 is declared bare; the constructor sets a=1 and b=2. CHECK confirms those values are
-// live after construction, proving the no-arg path ran.
+// obj1 is declared bare; the constructor sets a=1 and b=2. Buffer output confirms those values
+// are live after construction. Emission tests verify the constructor is emitted on all backends.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 struct TestClass
 {
@@ -26,10 +32,34 @@ struct TestClass
     }
 }
 
-void main()
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1,1,1)]
+void computeMain()
 {
     TestClass obj1;
-    // CHECK: 1
-    // CHECK: 2
-    printf("%d\n%d\n", obj1.a, obj1.b);
+    outputBuffer[0] = obj1.a;
+    outputBuffer[1] = obj1.b;
 }
+
+// CHECK: 1
+// CHECK: 2
+
+// HLSL: struct TestClass_{{[0-9_]*}}
+// HLSL: TestClass_{{[0-9_]*}} TestClass_x24init_{{[0-9_]*}}()
+
+// GLSL: struct TestClass_{{[0-9_]*}}
+// GLSL: TestClass_{{[0-9_]*}} TestClass_x24init_{{[0-9_]*}}()
+
+// METAL: struct TestClass_{{[0-9_]*}}
+// METAL: TestClass_{{[0-9_]*}} TestClass_x24init_{{[0-9_]*}}()
+
+// WGSL: struct TestClass_{{[0-9_]*}}
+// WGSL: fn TestClass_x24init_{{[0-9_]*}}() -> TestClass_{{[0-9_]*}}
+
+// CUDA: struct TestClass_{{[0-9_]*}}
+// CUDA: TestClass_x24init_{{[0-9_]*}}()
+
+// CPP: struct TestClass_{{[0-9_]*}}
+// CPP: TestClass_x24init_{{[0-9_]*}}()

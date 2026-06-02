@@ -15,6 +15,8 @@
 // similarly with a `NonWritable` decoration, distinguishing read-write from read-only.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<float> rwbuf;
 StructuredBuffer<float>   robuf;
@@ -30,3 +32,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 // Both read-write and read-only structured buffers map to StorageBuffer storage class.
 // CHECK-DAG: %rwbuf = OpVariable {{.*}} StorageBuffer
 // CHECK-DAG: %robuf = OpVariable {{.*}} StorageBuffer {{.*}} NonWritable
+// Metal maps both buffers to device* (device address space).
+// METAL: float device* robuf_
+// METAL-DAG: float device* rwbuf_
+// WGSL maps read-only to var<storage, read> and read-write to var<storage, read_write>.
+// WGSL: var<storage, read> robuf_
+// WGSL-DAG: var<storage, read_write> rwbuf_

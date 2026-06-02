@@ -19,6 +19,18 @@
 //TEST:SIMPLE(filecheck=ALLCHECK):-target spirv-asm -entry computeAllMain -stage compute
 //TEST:SIMPLE(filecheck=DEVCHECK):-target spirv-asm -entry computeDevMain -stage compute
 //TEST:SIMPLE(filecheck=GRPCHECK):-target spirv-asm -entry computeGrpMain -stage compute
+//TEST:SIMPLE(filecheck=METALALLCHECK):-target metal -entry computeAllMain -stage compute
+//TEST:SIMPLE(filecheck=METALDEVCHECK):-target metal -entry computeDevMain -stage compute
+//TEST:SIMPLE(filecheck=METALGRPCHECK):-target metal -entry computeGrpMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLALLCHECK):-target wgsl -entry computeAllMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLDEVCHECK):-target wgsl -entry computeDevMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLGRPCHECK):-target wgsl -entry computeGrpMain -stage compute
+//TEST:SIMPLE(filecheck=CUDAALLCHECK):-target cuda -entry computeAllMain -stage compute
+//TEST:SIMPLE(filecheck=CUDADEVCHECK):-target cuda -entry computeDevMain -stage compute
+//TEST:SIMPLE(filecheck=CUDAGRPCHECK):-target cuda -entry computeGrpMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLALLCHECK):-target glsl -entry computeAllMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLDEVCHECK):-target glsl -entry computeDevMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLGRPCHECK):-target glsl -entry computeGrpMain -stage compute
 
 RWStructuredBuffer<uint> buf;
 groupshared uint shared1[64];
@@ -58,3 +70,52 @@ void computeGrpMain(uint3 tid : SV_DispatchThreadID, uint3 gid : SV_GroupThreadI
 // ThreadGroup: semantics 264 = SeqCst|WorkgroupMemory (no UniformMemory or ImageMemory)
 // GRPCHECK: OpMemoryBarrier
 // GRPCHECK-SAME: %uint_264
+
+// Metal All: threadgroup_barrier with device+threadgroup+texture+imageblock flags.
+// METALALLCHECK: threadgroup_barrier
+// METALALLCHECK-SAME: mem_device
+
+// Metal Device: same threadgroup_barrier flags (Metal has no device-only barrier surface).
+// METALDEVCHECK: threadgroup_barrier
+// METALDEVCHECK-SAME: mem_device
+
+// Metal Group: threadgroup_barrier with mem_threadgroup flag only (shared memory scope).
+// METALGRPCHECK: threadgroup_barrier
+// METALGRPCHECK-SAME: mem_threadgroup
+
+// WGSL All: storageBarrier + workgroupBarrier (all-memory coverage).
+// WGSLALLCHECK: storageBarrier
+// WGSLALLCHECK: workgroupBarrier
+
+// WGSL Device: storageBarrier + workgroupBarrier (no device-only barrier in WGSL).
+// WGSLDEVCHECK: storageBarrier
+
+// WGSL Group: workgroupBarrier only (shared memory scope).
+// WGSLGRPCHECK: workgroupBarrier
+
+// CUDA All: __threadfence() (device-scope fence covering all memory).
+// CUDAALLCHECK: __threadfence()
+
+// CUDA Device: __threadfence() (device-scope fence for storage buffers and images).
+// CUDADEVCHECK: __threadfence()
+
+// CUDA Group: __threadfence_block() (block-scope shared memory fence).
+// CUDAGRPCHECK: __threadfence_block()
+
+// GLSL All: memoryBarrier with gl_ScopeDevice and shared+image+buffer semantics.
+// GLSLALLCHECK: memoryBarrier
+// GLSLALLCHECK-SAME: gl_ScopeDevice
+// GLSLALLCHECK-SAME: gl_StorageSemanticsBuffer
+
+// GLSL Device: memoryBarrier with gl_ScopeDevice and image+buffer semantics (no shared).
+// GLSLDEVCHECK: memoryBarrier
+// GLSLDEVCHECK-SAME: gl_ScopeDevice
+// GLSLDEVCHECK-SAME: gl_StorageSemanticsBuffer
+
+// GLSL Group: memoryBarrier with gl_ScopeWorkgroup and shared semantics only.
+// GLSLGRPCHECK: memoryBarrier
+// GLSLGRPCHECK-SAME: gl_ScopeWorkgroup
+// GLSLGRPCHECK-SAME: gl_StorageSemanticsShared
+
+// Targets not covered by emission directives:
+//   cpp    - AllMemoryBarrier/DeviceMemoryBarrier/GroupMemoryBarrier not available on cpp target (E36107 capability gate).

@@ -12,7 +12,13 @@
 // Pins the HLSL emission for a basic struct-interface conformance pattern:
 // struct method, static const data member.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CPUCHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=EMITHLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITSPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITMETAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITWGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITCUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITCPP):-target cpp -entry computeMain -stage compute
 
 interface IShape
 {
@@ -27,16 +33,29 @@ struct Square : IShape
     float area() { return side * side; }
 }
 
-[shader("compute")]
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
+RWStructuredBuffer<float> outputBuffer;
+
 [numthreads(1, 1, 1)]
-void main(RWStructuredBuffer<float> buf)
+void computeMain()
 {
     Square sq;
     sq.side = 3.0f;
-    buf[0] = sq.area();
-    buf[1] = float(Square.dims);
+    outputBuffer[0] = sq.area();
+    outputBuffer[1] = float(Square.dims);
 }
 
-// CHECK: struct Square
-// CHECK: Square_area
-// CHECK: numthreads
+// CPUCHECK: 9
+// CPUCHECK: 2
+// EMITHLSL: struct Square
+// EMITHLSL: Square_area
+// EMITHLSL: numthreads
+// EMITSPV: LocalSize
+// EMITSPV: OpFMul
+// EMITMETAL: Square_area
+// EMITMETAL: kernel
+// EMITWGSL: Square_area
+// EMITWGSL: @compute
+// EMITCUDA: Square_area
+// EMITCUDA: __global__
+// EMITCPP: Square_area

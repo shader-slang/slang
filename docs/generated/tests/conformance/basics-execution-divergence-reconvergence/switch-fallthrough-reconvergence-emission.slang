@@ -9,12 +9,16 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that fall-through between adjacent `switch` cases causes reconvergence at
-// the shared case body rather than at the switch exit. Case 0 falls through into
-// case 1; CHECK asserts a single `OpSelectionMerge` for the outer switch and `OpSwitch`
-// for dispatch, with no additional merge instruction between the two cases.
+// Verifies that fall-through between adjacent `switch` cases is handled across
+// back-ends. Case 0 falls through into case 1. SPIRV and C-family targets
+// (Metal, CUDA, C++) preserve the fall-through directly. WGSL does not support
+// fall-through and restructures it by duplicating the shared case body.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CPP):-target cpp -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> output;
 
@@ -35,7 +39,27 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output[tid.x] = result;
 }
 
-// Outer switch must have a single merge block (one OpSelectionMerge).
+// SPIRV: single OpSelectionMerge for the outer switch; OpSwitch for dispatch.
 // CHECK: OpSelectionMerge
-// The switch dispatch uses OpSwitch.
 // CHECK: OpSwitch
+
+// Metal: fall-through preserved — case 0 has no break before case 1.
+// CHECK_METAL: switch(
+// CHECK_METAL: case 0U
+// CHECK_METAL: case 1U
+
+// WGSL: fall-through restructured by duplicating the shared body into each arm.
+// The switch statement and both case arms must still be present.
+// CHECK_WGSL: switch(
+// CHECK_WGSL: case u32(0)
+// CHECK_WGSL: case u32(1)
+
+// CUDA: fall-through preserved — case 0 has no break before case 1.
+// CHECK_CUDA: switch(
+// CHECK_CUDA: case 0U
+// CHECK_CUDA: case 1U
+
+// C++: fall-through preserved — case 0 has no break before case 1.
+// CHECK_CPP: switch(
+// CHECK_CPP: case 0U
+// CHECK_CPP: case 1U

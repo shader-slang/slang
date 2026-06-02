@@ -15,6 +15,8 @@
 // confirming the per-thread-invocation scope mapping.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 struct Counter { int val; };
 
@@ -37,3 +39,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<int> output
 
 // The Counter struct local variable maps to OpVariable ... Function inside the entry point.
 // CHECK: OpVariable {{.*}} Function
+// Metal maps function-local structs to thread address space variables.
+// METAL: thread Counter_
+// WGSL passes function-local structs as ptr<function,...> arguments.
+// WGSL: ptr<function, Counter_

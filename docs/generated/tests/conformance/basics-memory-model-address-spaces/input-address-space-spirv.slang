@@ -15,6 +15,8 @@
 // `BuiltIn GlobalInvocationId` decoration, confirming the Input address-space mapping.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<uint> output)
@@ -25,3 +27,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<uint> outpu
 // SV_DispatchThreadID (a non-uniform per-thread input) emits as an Input storage class variable.
 // CHECK: OpVariable {{.*}} Input
 // CHECK-DAG: BuiltIn GlobalInvocationId
+// Metal maps SV_DispatchThreadID to thread_position_in_grid builtin attribute.
+// METAL: thread_position_in_grid
+// WGSL maps SV_DispatchThreadID to @builtin(global_invocation_id).
+// WGSL: @builtin(global_invocation_id)

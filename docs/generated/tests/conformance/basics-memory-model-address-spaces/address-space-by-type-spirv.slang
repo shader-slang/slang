@@ -15,6 +15,8 @@
 // parameter (Input) all coexist; CHECK-DAG asserts each maps to its own SPIRV storage class.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 // Uniform address space (ConstantBuffer<T> -> Uniform).
 ConstantBuffer<float> cbParam;
@@ -38,3 +40,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)  // Input address space -> Inp
 // CHECK-DAG: OpVariable {{.*}} StorageBuffer
 // CHECK-DAG: OpVariable {{.*}} Workgroup
 // CHECK-DAG: OpVariable {{.*}} Input
+// Metal emits each address space with its corresponding pointer qualifier (order-independent).
+// METAL-DAG: constant* cbParam_
+// METAL-DAG: device* rwbuf_
+// METAL-DAG: threadgroup {{.*}} lds_
+// WGSL emits each address space with its corresponding storage class (order-independent).
+// WGSL-DAG: var<uniform> cbParam_
+// WGSL-DAG: var<storage, read_write> rwbuf_
+// WGSL-DAG: var<workgroup> lds_

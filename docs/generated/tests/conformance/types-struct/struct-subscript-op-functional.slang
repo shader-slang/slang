@@ -10,10 +10,17 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies that a `__subscript` operator routes reads to `get` and writes to `set`.
-// Three elements are written via x[i] = v and read back via float v = x[i]; CHECK confirms
-// each element retains the assigned value, proving both accessors fired.
+// Three elements are written via x[i] = v and read back via float v = x[i]; buffer output
+// confirms each element retains the assigned value. Emission tests confirm the struct and
+// array field are emitted on all backends.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 struct Indexed
 {
@@ -26,7 +33,11 @@ struct Indexed
     }
 }
 
-void main()
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1,1,1)]
+void computeMain()
 {
     Indexed x = { };
     x[0] = 10.0f;
@@ -36,10 +47,29 @@ void main()
     float v0 = x[0];
     float v1 = x[1];
     float v2 = x[2];
-    // CHECK: 10
-    printf("%.0f\n", v0);
-    // CHECK: 20
-    printf("%.0f\n", v1);
-    // CHECK: 30
-    printf("%.0f\n", v2);
+    outputBuffer[0] = (int)v0;
+    outputBuffer[1] = (int)v1;
+    outputBuffer[2] = (int)v2;
 }
+
+// CHECK: 10
+// CHECK: 20
+// CHECK: 30
+
+// HLSL: struct Indexed_{{[0-9_]*}}
+// HLSL: float arr_{{[0-9_]*}}
+
+// GLSL: struct Indexed_{{[0-9_]*}}
+// GLSL: float arr_{{[0-9_]*}}
+
+// METAL: struct Indexed_{{[0-9_]*}}
+// METAL: arr_{{[0-9_]*}}
+
+// WGSL: struct Indexed_{{[0-9_]*}}
+// WGSL: arr_{{[0-9_]*}}
+
+// CUDA: struct Indexed_{{[0-9_]*}}
+// CUDA: arr_{{[0-9_]*}}
+
+// CPP: struct Indexed_{{[0-9_]*}}
+// CPP: arr_{{[0-9_]*}}

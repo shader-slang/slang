@@ -15,6 +15,8 @@
 // is present — distinguishing it from a relaxed (None/0) store.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLCHECK):-target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<Atomic<uint>> atomicBuf;
 
@@ -27,3 +29,16 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK: OpAtomicStore
 // Semantics operand for Release is 68 = UniformMemory(64) + Release(4).
 // CHECK-SAME: %uint_68
+
+// Metal: Release maps to memory_order_seq_cst (Metal has no separate release ordering;
+// the closest stronger ordering available is seq_cst).
+// METALCHECK: atomic_store_explicit
+// METALCHECK-SAME: memory_order_seq_cst
+
+// WGSL: atomicStore (WGSL has no per-operation ordering; all atomics are sequentially consistent).
+// WGSLCHECK: atomicStore
+
+// Targets not covered by emission directives:
+//   hlsl   - Atomic<T>.store(Release) lowers to a plain RWStructuredBuffer assignment; no release ordering surface.
+//   glsl   - Plain store to SSBO; no release-ordering parameter in GLSL atomic store path.
+//   cuda   - Plain pointer write; CUDA codegen path does not emit release intrinsic for Atomic<T>.store.

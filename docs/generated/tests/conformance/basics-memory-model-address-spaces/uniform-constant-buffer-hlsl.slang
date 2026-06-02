@@ -15,6 +15,8 @@
 // semantics produce the expected HLSL register class.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 struct Params {
     float scale;
@@ -31,3 +33,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 
 // CHECK: cbuffer
 // CHECK-DAG: register(b
+// Metal maps ConstantBuffer to a constant* pointer parameter (constant address space).
+// METAL: constant* cb_
+// WGSL maps ConstantBuffer to var<uniform>.
+// WGSL: var<uniform> cb_

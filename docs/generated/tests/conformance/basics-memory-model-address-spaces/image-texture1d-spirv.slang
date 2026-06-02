@@ -15,6 +15,8 @@
 // across texture dimensionalities, not only for 2-D textures.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 Texture1D<float>   tex1d;
 SamplerState       samp;
@@ -26,3 +28,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 }
 
 // CHECK: %tex1d = OpVariable {{.*}} UniformConstant
+// Metal emits Texture1D as a texture1d<float, access::sample> parameter.
+// METAL: texture1d<float, access::sample> tex1d_
+// WGSL emits Texture1D as a texture_1d<f32> variable.
+// WGSL: var tex1d_{{.*}} : texture_1d<

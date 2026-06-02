@@ -9,12 +9,15 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that a loop that runs different iteration counts per thread emits SPIR-V
-// structured loop control. Threads loop 2 or 3 times (divergence); CHECK asserts
-// `OpLoopMerge` is present, which names the block where all threads reconverge once
-// every thread has exited its last loop iteration.
+// Verifies that a loop that runs different iteration counts per thread emits
+// structured loop control on every back-end. Threads loop 2 or 3 times
+// (divergence); once every thread exits, all reconverge at the post-loop point.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CPP):-target cpp -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> output;
 
@@ -32,4 +35,21 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output[tid.x] = sum;
 }
 
+// SPIRV: OpLoopMerge marks the block where all threads reconverge after the loop.
 // CHECK: OpLoopMerge
+
+// Metal: for-loop lowered to a top-test infinite loop with a break.
+// CHECK_METAL: for(;;)
+// CHECK_METAL: break
+
+// WGSL: for-loop lowered to a top-test infinite loop with a break.
+// CHECK_WGSL: for(;;)
+// CHECK_WGSL: break
+
+// CUDA: for-loop lowered to a top-test infinite loop with a break.
+// CHECK_CUDA: for(;;)
+// CHECK_CUDA: break
+
+// C++: for-loop lowered to a top-test infinite loop with a break.
+// CHECK_CPP: for(;;)
+// CHECK_CPP: break

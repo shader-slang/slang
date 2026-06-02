@@ -16,6 +16,9 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLCHECK):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDACHECK):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> buf;
 
@@ -32,3 +35,17 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // HLSL: emits InterlockedAdd intrinsic preserving the relaxed semantics.
 // HLSLCHECK: InterlockedAdd
+
+// GLSL: emits atomicAdd (no ordering parameter; GLSL does not surface per-op ordering here).
+// GLSLCHECK: atomicAdd
+
+// Metal: emits atomic_fetch_add_explicit with memory_order_relaxed.
+// METALCHECK: atomic_fetch_add_explicit
+// METALCHECK-SAME: memory_order_relaxed
+
+// CUDA: emits atomicAdd (no ordering parameter; CUDA PTX default is relaxed for atomicAdd).
+// CUDACHECK: atomicAdd
+
+// Targets not covered by emission directives:
+//   wgsl   - InterlockedAdd is not available on wgsl target (E36107 capability gate).
+//   cpp    - InterlockedAdd is not available on cpp target (E36107 capability gate).

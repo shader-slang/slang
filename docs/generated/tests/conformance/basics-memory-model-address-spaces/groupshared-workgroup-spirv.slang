@@ -14,6 +14,8 @@
 // declares the array as `OpVariable ... Workgroup`, confirming the thread-group address space.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 static groupshared float sharedData[32];
 
@@ -26,3 +28,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 }
 
 // CHECK: %sharedData = OpVariable {{.*}} Workgroup
+// Metal maps Workgroup storage class to threadgroup address space.
+// METAL: threadgroup {{.*}} sharedData{{.*}}
+// WGSL maps Workgroup to var<workgroup>.
+// WGSL: var<workgroup> sharedData{{.*}}

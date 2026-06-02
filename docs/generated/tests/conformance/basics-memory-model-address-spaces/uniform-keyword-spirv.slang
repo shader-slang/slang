@@ -15,6 +15,8 @@
 // path from the `ConstantBuffer<T>` form tested in uniform-constant-buffer-spirv.slang.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3           tid    : SV_DispatchThreadID,
@@ -27,3 +29,7 @@ void computeMain(uint3           tid    : SV_DispatchThreadID,
 // The uniform parameter is expected to land in a Uniform or PushConstant block
 // (both are "Uniform address space" semantics: all threads, constant over dispatch).
 // CHECK: OpVariable {{.*}} PushConstant
+// Metal maps the uniform entry-point parameter to a constant* pointer (constant address space).
+// METAL: constant* entryPointParams_
+// WGSL maps the uniform entry-point parameter to var<uniform>.
+// WGSL: var<uniform> entryPointParams_

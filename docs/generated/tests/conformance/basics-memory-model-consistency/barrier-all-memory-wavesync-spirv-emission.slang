@@ -17,6 +17,10 @@
 // which uses Workgroup (2).
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLCHECK):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDACHECK):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> buf;
 
@@ -33,3 +37,19 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK-SAME: %uint_3
 // CHECK-SAME: %uint_3
 // CHECK-SAME: %uint_2376
+
+// HLSL: AllMemoryBarrierWithWaveSync has no direct HLSL equivalent; falls back to AllMemoryBarrier.
+// HLSLCHECK: AllMemoryBarrier
+
+// GLSL: emits subgroupBarrier() (subgroup-scope barrier covering all memory, matching wave/subgroup sync).
+// GLSLCHECK: subgroupBarrier
+
+// Metal: emits simdgroup_barrier with device and threadgroup memory flags (SIMD-group scope).
+// METALCHECK: simdgroup_barrier
+
+// CUDA: emits __syncwarp() (warp-scope execution and memory fence).
+// CUDACHECK: __syncwarp()
+
+// Targets not covered by emission directives:
+//   wgsl   - AllMemoryBarrierWithWaveSync is not available on wgsl target (E36107 capability gate; no wave-sync surface in WGSL).
+//   cpp    - AllMemoryBarrierWithWaveSync is not available on cpp target (E36107 capability gate).

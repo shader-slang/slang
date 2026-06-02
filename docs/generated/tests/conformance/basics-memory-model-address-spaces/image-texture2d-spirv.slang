@@ -15,6 +15,8 @@
 // confirming the Image address space maps to the UniformConstant storage class.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 Texture2D<float4>  myTexture;
 SamplerState       mySampler;
@@ -26,3 +28,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float4> out
 }
 
 // CHECK: %myTexture = OpVariable {{.*}} UniformConstant
+// Metal emits Texture2D as a texture2d<float, access::sample> parameter.
+// METAL: texture2d<float, access::sample> myTexture_
+// WGSL emits Texture2D as a texture_2d<f32> variable.
+// WGSL: var myTexture_{{.*}} : texture_2d<

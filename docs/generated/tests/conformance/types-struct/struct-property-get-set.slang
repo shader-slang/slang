@@ -10,10 +10,17 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies that property reads dispatch to `get` and writes dispatch to `set` with `newValue`.
-// The set body updates both m_val and m_valIsPositive; CHECK confirms the side effects and
-// the get-returned value are consistent across positive and negative assignments.
+// The set body updates both m_val and m_valIsPositive; buffer output confirms the side effects
+// and the get-returned value are consistent across positive and negative assignments.
+// Emission tests confirm the property get accessor and struct are emitted on all backends.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 struct TestClass
 {
@@ -34,20 +41,45 @@ struct TestClass
     }
 }
 
-void main()
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1,1,1)]
+void computeMain()
 {
     TestClass obj = { };
     obj.someProp = 3.0f;
-    // CHECK: 3
-    printf("%.0f\n", obj.m_val);
-    // CHECK: 1
-    printf("%d\n", (int)obj.m_valIsPositive);
-
+    outputBuffer[0] = (int)obj.m_val;
+    outputBuffer[1] = (int)obj.m_valIsPositive;
     obj.someProp = -1.0f;
-    // CHECK: 0
-    printf("%d\n", (int)obj.m_valIsPositive);
-
+    outputBuffer[2] = (int)obj.m_valIsPositive;
     float got = obj.someProp;
-    // CHECK: -1
-    printf("%.0f\n", got);
+    outputBuffer[3] = (int)got;
 }
+
+// CHECK: 3
+// CHECK: 1
+// CHECK: 0
+// CHECK: -1
+
+// HLSL: struct TestClass_{{[0-9_]*}}
+// HLSL: float m_val_{{[0-9_]*}}
+// HLSL: TestClass_someProp_get_{{[0-9_]*}}
+
+// GLSL: struct TestClass_{{[0-9_]*}}
+// GLSL: float m_val_{{[0-9_]*}}
+// GLSL: TestClass_someProp_get_{{[0-9_]*}}
+
+// METAL: struct TestClass_{{[0-9_]*}}
+// METAL: float m_val_{{[0-9_]*}}
+// METAL: TestClass_someProp_get_{{[0-9_]*}}
+
+// WGSL: struct TestClass_{{[0-9_]*}}
+// WGSL: m_val_{{[0-9_]*}}
+// WGSL: fn TestClass_someProp_get_{{[0-9_]*}}
+
+// CUDA: struct TestClass_{{[0-9_]*}}
+// CUDA: TestClass_someProp_get_{{[0-9_]*}}
+
+// CPP: struct TestClass_{{[0-9_]*}}
+// CPP: TestClass_someProp_get_{{[0-9_]*}}

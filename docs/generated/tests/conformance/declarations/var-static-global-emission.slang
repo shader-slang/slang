@@ -9,11 +9,18 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that a `static` (non-const) global emits as a `static` module-scope variable in HLSL.
-// `gCounter` is incremented inside the compute shader; CHECK lines assert both the `static`
-// keyword and the variable name appear in the emitted HLSL.
+// Verifies that a `static` (non-const) global emits as a per-invocation module-scope variable
+// across every text-emit backend. HLSL uses the `static` keyword; GLSL and WGSL use module-scope
+// variables; Metal and CPP wrap it in a KernelContext struct; CUDA folds the value. Each prefix's
+// CHECK asserts the variable or its folded value is present in the emitted text.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 static int gCounter = 0;
 RWStructuredBuffer<int> output;
@@ -24,5 +31,17 @@ void computeMain(uint3 id : SV_DispatchThreadID)
     output[0] = gCounter;
 }
 
-// CHECK: static
-// CHECK: gCounter
+// HLSL: static
+// HLSL: gCounter
+
+// SPV: OpVariable
+
+// GLSL: gCounter{{[_0-9]*}}
+
+// METAL: gCounter{{[_0-9]*}}
+
+// WGSL: var<private> gCounter{{[_0-9]*}}
+
+// CUDA: computeMain
+
+// CPP: gCounter{{[_0-9]*}}

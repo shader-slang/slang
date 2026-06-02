@@ -15,6 +15,8 @@
 // read-only form to a `t` register (SRV) and the read-write form to a `u` register (UAV).
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 StructuredBuffer<float>   robuf;
 RWStructuredBuffer<float> rwbuf;
@@ -31,3 +33,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 // CHECK: StructuredBuffer<float{{.*}}> {{.*}} : register(t
 // Read-write RWStructuredBuffer -> u register (unordered access view).
 // CHECK-DAG: RWStructuredBuffer<float{{.*}}> {{.*}} : register(u
+// Metal maps both structured buffers to device* (device address space).
+// METAL: float device* robuf_
+// METAL-DAG: float device* rwbuf_
+// WGSL maps read-only to var<storage, read> and read-write to var<storage, read_write>.
+// WGSL: var<storage, read> robuf_
+// WGSL-DAG: var<storage, read_write> rwbuf_

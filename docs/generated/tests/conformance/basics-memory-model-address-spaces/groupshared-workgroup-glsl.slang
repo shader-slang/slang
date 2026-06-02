@@ -14,6 +14,8 @@
 // confirming the thread-group-visible memory mapping.
 
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 static groupshared int sharedCounter[16];
 
@@ -26,3 +28,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<int> output
 }
 
 // CHECK: shared {{.*}} sharedCounter{{.*}}
+// Metal maps groupshared to threadgroup address space.
+// METAL: threadgroup {{.*}} sharedCounter{{.*}}
+// WGSL maps groupshared to var<workgroup>.
+// WGSL: var<workgroup> sharedCounter{{.*}}

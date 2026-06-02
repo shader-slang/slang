@@ -9,11 +9,15 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that a `tbuffer` block emits as a `tbuffer` (not `cbuffer`) keyword in HLSL.
-// The compute shader reads `texData.x` from `MyTex`; CHECK lines assert the emitted
-// HLSL contains the `tbuffer` keyword and the block name, distinguishing it from cbuffer.
+// Verifies that a `tbuffer` block emits correctly on every feasible text-emit backend.
+// HLSL uses the `tbuffer` keyword; GLSL emits a std140 uniform block; Metal emits a
+// texture_buffer<> parameter; WGSL emits a var<uniform> binding. SPIR-V, CUDA, and CPP
+// fail with an internal compiler error (compiler bug — see Untested claims in README).
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 tbuffer MyTex : register(t0)
 {
@@ -26,5 +30,14 @@ void computeMain(uint3 id : SV_DispatchThreadID)
     output[0] = texData.x;
 }
 
-// CHECK: tbuffer
-// CHECK: MyTex
+// HLSL: tbuffer
+// HLSL: MyTex
+
+// GLSL: MyTex{{[_0-9]*}}
+// GLSL: texData
+
+// METAL: texture_buffer
+// METAL: texData
+
+// WGSL: var<uniform> MyTex{{[_0-9]*}}
+// WGSL: texData

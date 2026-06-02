@@ -15,6 +15,8 @@
 // `OpVariable ... PushConstant`, confirming the attribute-to-storage-class mapping.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 struct PushData {
     float scale;
@@ -31,3 +33,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 }
 
 // CHECK: %pushConst = OpVariable {{.*}} PushConstant
+// Metal has no push-constant concept; [vk::push_constant] lowers to a constant* buffer parameter.
+// METAL: constant* pushConst_
+// WGSL has no push-constant concept; [vk::push_constant] lowers to var<uniform>.
+// WGSL: var<uniform> pushConst_

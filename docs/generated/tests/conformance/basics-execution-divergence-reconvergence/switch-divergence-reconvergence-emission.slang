@@ -9,12 +9,15 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that a `switch` with multiple case groups emits SPIR-V structured
-// selection. Threads fan out to case 0, 1, or default based on tid.x % 3;
-// CHECK asserts `OpSelectionMerge` (marking the reconvergence block) and `OpSwitch`
-// (dispatching to per-case blocks) both appear in the emitted assembly.
+// Verifies that a `switch` with multiple case groups emits structured selection
+// on every back-end. Threads fan out to case 0, 1, or default based on
+// tid.x % 3; all reconverge after the switch statement.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CPP):-target cpp -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> output;
 
@@ -38,5 +41,30 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output[tid.x] = result;
 }
 
+// SPIRV: OpSelectionMerge marks reconvergence; OpSwitch dispatches to case blocks.
 // CHECK: OpSelectionMerge
 // CHECK: OpSwitch
+
+// Metal: switch statement preserved with three case arms.
+// CHECK_METAL: switch(
+// CHECK_METAL: case 0U
+// CHECK_METAL: case 1U
+// CHECK_METAL: default
+
+// WGSL: switch statement preserved with three case arms.
+// CHECK_WGSL: switch(
+// CHECK_WGSL: case u32(0)
+// CHECK_WGSL: case u32(1)
+// CHECK_WGSL: default
+
+// CUDA: switch statement preserved with three case arms.
+// CHECK_CUDA: switch(
+// CHECK_CUDA: case 0U
+// CHECK_CUDA: case 1U
+// CHECK_CUDA: default
+
+// C++: switch statement preserved with three case arms.
+// CHECK_CPP: switch(
+// CHECK_CPP: case 0U
+// CHECK_CPP: case 1U
+// CHECK_CPP: default

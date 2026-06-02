@@ -15,6 +15,8 @@
 // `OpVariable ... Uniform`, confirming the Uniform address-space-to-storage-class mapping.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 struct Params {
     float scale;
@@ -30,3 +32,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 }
 
 // CHECK: OpVariable {{.*}} Uniform
+// Metal maps ConstantBuffer to constant address space pointer.
+// METAL: constant* cb_
+// WGSL maps ConstantBuffer to var<uniform>.
+// WGSL: var<uniform> cb_

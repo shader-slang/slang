@@ -16,6 +16,10 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-CUDA):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> output;
 
@@ -30,3 +34,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // SPIR-V emits OpGroupNonUniformIAdd with Reduce mode.
 // CHECK-SPV: GroupNonUniformIAdd
+
+// GLSL emits subgroupAdd with the KHR_shader_subgroup_arithmetic extension.
+// CHECK-GLSL: subgroupAdd
+
+// Metal emits simd_sum (Metal SIMD-group reduction intrinsic).
+// CHECK-METAL: simd_sum
+
+// WGSL emits subgroupAdd with the subgroups enable directive.
+// CHECK-WGSL: subgroupAdd
+
+// CUDA emits _waveSum (the Slang CUDA warp reduction helper).
+// CHECK-CUDA: _waveSum

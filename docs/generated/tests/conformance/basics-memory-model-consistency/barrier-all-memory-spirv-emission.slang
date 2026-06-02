@@ -16,6 +16,10 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLCHECK):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLCHECK):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDACHECK):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> buf;
 
@@ -34,3 +38,21 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // HLSL: preserves AllMemoryBarrier intrinsic name.
 // HLSLCHECK: AllMemoryBarrier()
+
+// GLSL: emits memoryBarrier with gl_ScopeDevice and AcquireRelease semantics covering shared+image+buffer.
+// GLSLCHECK: memoryBarrier
+// GLSLCHECK-SAME: gl_ScopeDevice
+
+// Metal: emits threadgroup_barrier covering device, threadgroup, texture, and threadgroup_imageblock memory.
+// METALCHECK: threadgroup_barrier
+// METALCHECK-SAME: mem_device
+
+// WGSL: emits storageBarrier, textureBarrier, and workgroupBarrier (all-memory coverage).
+// WGSLCHECK: storageBarrier
+// WGSLCHECK: workgroupBarrier
+
+// CUDA: emits __threadfence() (device-scope memory fence covering all memory).
+// CUDACHECK: __threadfence()
+
+// Targets not covered by emission directives:
+//   cpp    - AllMemoryBarrier is not available on cpp target (E36107 capability gate).

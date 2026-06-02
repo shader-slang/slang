@@ -10,10 +10,17 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies that `[mutating]` grants write access to non-static fields inside a member function.
-// incrementAndReturnA() adds 1 to `a` and returns the result; CHECK asserts both the return value
-// and the field itself reflect the mutation, confirming the write persisted.
+// incrementAndReturnA() adds 1 to `a` and returns the result; buffer output asserts both the
+// return value and the field itself reflect the mutation. Emission tests confirm the mutating
+// method is emitted with the correct inout/pointer qualifier on all backends.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 struct TestStruct
 {
@@ -26,13 +33,40 @@ struct TestStruct
     }
 }
 
-void main()
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1,1,1)]
+void computeMain()
 {
     TestStruct obj;
     obj.a = 10;
     int result = obj.incrementAndReturnA();
-    // CHECK: 11
-    printf("%d\n", result);
-    // CHECK: 11
-    printf("%d\n", obj.a);
+    outputBuffer[0] = result;
+    outputBuffer[1] = obj.a;
 }
+
+// CHECK: 11
+// CHECK: 11
+
+// HLSL emits mutating method with inout qualifier.
+// HLSL: struct TestStruct_{{[0-9_]*}}
+// HLSL: int TestStruct_incrementAndReturnA_{{[0-9_]*}}(inout TestStruct_{{[0-9_]*}} this_{{[0-9_]*}})
+
+// GLSL emits mutating method with inout qualifier.
+// GLSL: struct TestStruct_{{[0-9_]*}}
+// GLSL: int TestStruct_incrementAndReturnA_{{[0-9_]*}}(inout TestStruct_{{[0-9_]*}} this_{{[0-9_]*}})
+
+// Metal emits mutating method with pointer qualifier.
+// METAL: struct TestStruct_{{[0-9_]*}}
+// METAL: int TestStruct_incrementAndReturnA_{{[0-9_]*}}(TestStruct_{{[0-9_]*}} thread* this_{{[0-9_]*}})
+
+// WGSL emits mutating method with ptr<function,...> qualifier.
+// WGSL: struct TestStruct_{{[0-9_]*}}
+// WGSL: fn TestStruct_incrementAndReturnA_{{[0-9_]*}}( this_{{[0-9_]*}} : ptr<function, TestStruct_{{[0-9_]*}}>) -> i32
+
+// CUDA: struct TestStruct_{{[0-9_]*}}
+// CUDA: TestStruct_incrementAndReturnA_{{[0-9_]*}}(TestStruct_{{[0-9_]*}} * this_{{[0-9_]*}})
+
+// CPP: struct TestStruct_{{[0-9_]*}}
+// CPP: TestStruct_incrementAndReturnA_{{[0-9_]*}}(TestStruct_{{[0-9_]*}} * this_{{[0-9_]*}})

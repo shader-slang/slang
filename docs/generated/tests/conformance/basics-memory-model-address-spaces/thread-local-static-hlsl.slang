@@ -15,6 +15,8 @@
 // at module scope, confirming the per-thread storage class.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 static int g_perThread;
 
@@ -36,3 +38,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<int> output
 
 // HLSL thread-local static emits as `static` at module scope.
 // CHECK: static int g_perThread{{.*}}
+// Metal inlines the thread-local static into the kernel-context struct with thread address space.
+// METAL: thread KernelContext
+// METAL-DAG: g_perThread{{.*}}
+// WGSL maps thread-local static to var<private> (private address space = per-thread).
+// WGSL: var<private> g_perThread{{.*}}

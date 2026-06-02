@@ -9,11 +9,17 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that a `static const` global folds its value into the emitted HLSL output.
-// `LIMIT` is declared as 256 at global scope; 256 in the HLSL confirms the
-// constant was folded at compile time and the value appears in the output.
+// Verifies that a `static const` global folds its compile-time value into every text-emit
+// backend. `LIMIT = 256` is stored in an RWStructuredBuffer; each emitted-text CHECK asserts
+// the literal 256 appears in the output, confirming constant folding occurred before emit.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 static const int LIMIT = 256;
 RWStructuredBuffer<int> output;
@@ -23,4 +29,10 @@ void computeMain(uint3 id : SV_DispatchThreadID)
     output[0] = LIMIT;
 }
 
-// CHECK: 256
+// HLSL: 256
+// SPV: OpConstant {{.*}} 256
+// GLSL: 256
+// METAL: 256
+// WGSL: 256
+// CUDA: 256
+// CPP: 256

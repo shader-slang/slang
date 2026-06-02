@@ -9,11 +9,18 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that a function-scope `static const` is folded to a compile-time constant in emitted HLSL.
-// `LOCAL_K * 2.0` is computed from the constant 2.71828; 5.43656 in the emitted
-// HLSL confirms the value was folded at compile time.
+// Verifies that a function-scope `static const` folds its compile-time value into every
+// text-emit backend. `LOCAL_K * 2.0 = 5.43656...` is stored in an RWStructuredBuffer;
+// each emitted-text CHECK asserts the folded literal appears, confirming the constant
+// was resolved before target emission.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 RWStructuredBuffer<float> output;
 [numthreads(1, 1, 1)]
@@ -23,4 +30,10 @@ void computeMain(uint3 id : SV_DispatchThreadID)
     output[0] = LOCAL_K * 2.0;
 }
 
-// CHECK: 5.43656
+// HLSL: 5.43656
+// SPV: OpConstant {{.*}} 5.43656
+// GLSL: 5.43656
+// METAL: 5.43656
+// WGSL: 5.43656
+// CUDA: 5.43656
+// CPP: 5.43656

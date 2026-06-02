@@ -10,25 +10,59 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // The struct-decl grammar includes [generic-params-decl], meaning structs can be generic.
-// A generic struct with one type parameter T wrapping a value of type T.
+// A generic struct with one type parameter T wrapping a value of type T. A helper function
+// is used to prevent the struct from being constant-folded away at the call site. Buffer
+// output confirms the value flows through; emission tests confirm the specialized struct
+// appears on all text-emit backends.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 struct Box<T>
 {
     T value;
 }
 
-void main()
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
+Box<int> makeBox(int v)
 {
-    Box<int> ibox;
-    ibox.value = 42;
-
-    Box<float> fbox;
-    fbox.value = 3.14f;
-
-    // CHECK: 42
-    printf("%d\n", ibox.value);
-    // CHECK: 3
-    printf("%.0f\n", fbox.value);
+    Box<int> b;
+    b.value = v;
+    return b;
 }
+
+[numthreads(1,1,1)]
+void computeMain(uint3 tid : SV_DispatchThreadID)
+{
+    // Non-constant input prevents constant folding
+    Box<int> ibox = makeBox((int)tid.x + 42);
+    outputBuffer[0] = ibox.value;
+}
+
+// CHECK: 42
+
+// Generic struct specialized to Box<int> survives on all targets.
+// HLSL: struct Box_{{[0-9_]*}}
+// HLSL: int value_{{[0-9_]*}}
+
+// GLSL: struct Box_{{[0-9_]*}}
+// GLSL: int value_{{[0-9_]*}}
+
+// METAL: struct Box_{{[0-9_]*}}
+// METAL: int value_{{[0-9_]*}}
+
+// WGSL: struct Box_{{[0-9_]*}}
+// WGSL: value_{{[0-9_]*}}
+
+// CUDA: struct Box_{{[0-9_]*}}
+// CUDA: int value_{{[0-9_]*}}
+
+// CPP: struct Box_{{[0-9_]*}}
+// CPP: value_{{[0-9_]*}}

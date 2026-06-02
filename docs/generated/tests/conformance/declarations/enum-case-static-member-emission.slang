@@ -9,11 +9,17 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that enum cases are accessible via dot-notation as static members of the enum type.
-// `Color.Red` and `Color.Green` are assigned to ints and written to a buffer; CHECK-DAG
-// confirms the expected tag values 0 and 3 reach the output.
+// Verifies that enum cases accessed via dot-notation (`Color.Red`, `Color.Green`) fold to their
+// tag integer values (0 and 3) across every text-emit backend. Writing both values to a buffer
+// prevents DCE; each prefix's CHECK-DAG asserts both folded constants appear in the emitted text.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 enum Color { Red = 0, Green = 3, Blue = 4 }
 RWStructuredBuffer<int> output;
@@ -26,5 +32,23 @@ void computeMain(uint3 id : SV_DispatchThreadID)
     output[1] = g;
 }
 
-// CHECK-DAG: 0
-// CHECK-DAG: 3
+// HLSL-DAG: 0
+// HLSL-DAG: 3
+
+// SPV-DAG: OpConstant {{.*}} 0
+// SPV-DAG: OpConstant {{.*}} 3
+
+// GLSL-DAG: = 0
+// GLSL-DAG: = 3
+
+// METAL-DAG: int(0)
+// METAL-DAG: int(3)
+
+// WGSL-DAG: i32(0)
+// WGSL-DAG: i32(3)
+
+// CUDA-DAG: int(0)
+// CUDA-DAG: int(3)
+
+// CPP-DAG: int(0)
+// CPP-DAG: int(3)

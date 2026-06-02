@@ -10,37 +10,81 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies that `.r`/`.g`/`.b`/`.a` swizzle characters map to vector elements
-// 0/1/2/3 exactly like `.x`/`.y`/`.z`/`.w`. An `int4` initialized with distinct
-// values is compared component-by-component; CHECK asserts all four pairs match
-// and the equality flag is 1, ruling out any index permutation.
+// 0/1/2/3. An int4 read from a non-constant input buffer is swizzled via .r/.g/.b/.a
+// and written to an output buffer; non-constant input defeats constant folding so
+// the swizzle survives in emitted code. Each SIMPLE directive checks the index
+// sequence (0→r, 1→g, 2→b, 3→a) in the target's emitted text, covering all
+// text-emit back-ends including Metal and WGSL.
 
-//TEST:INTERPRET(filecheck=CHECK):
-//TEST:SIMPLE(filecheck=VHLSL):-target hlsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=VGLSL):-target glsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=VSPV):-target spirv-asm -entry main -stage compute
-//TEST:SIMPLE(filecheck=VCUDA):-target cuda -entry main -stage compute
-//TEST:SIMPLE(filecheck=VCPP):-target cpp -entry main -stage compute
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=VHLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=VGLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=VSPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=VMTL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=VWGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=VCUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=VCPP):-target cpp -entry computeMain -stage compute
 
-void main()
+//TEST_INPUT: set inputBuffer = ubuffer(data=[11 22 33 44], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+RWStructuredBuffer<int> inputBuffer;
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain()
 {
-    int4 v = int4(11, 22, 33, 44);
-    //CHECK: r=11 g=22 b=33 a=44 eq=1
-    bool eq = (v.r == v.x) && (v.g == v.y)
-           && (v.b == v.z) && (v.a == v.w);
-    printf("r=%d g=%d b=%d a=%d eq=%d\n",
-           v.r, v.g, v.b, v.a, eq ? 1 : 0);
+    int4 v = int4(inputBuffer[0], inputBuffer[1], inputBuffer[2], inputBuffer[3]);
+    outputBuffer[0] = v.r;
+    outputBuffer[1] = v.g;
+    outputBuffer[2] = v.b;
+    outputBuffer[3] = v.a;
 }
 
-// Emission checks: the compiler constant-folds rgba swizzles on a literal int4.
-// Correct rgba→0123 mapping is proved by the folded constants appearing as 11,22,33,44
-// (in that order) and the equality flag 1 in the emitted printf/DebugPrintf call.
-// Metal and WGSL do not support printf in compute; those targets are unsupported-on-target.
+// CHECK: type: int32_t
+// CHECK-NEXT: 11
+// CHECK-NEXT: 22
+// CHECK-NEXT: 33
+// CHECK-NEXT: 44
 
-// VHLSL: printf({{.*}}11{{.*}}22{{.*}}33{{.*}}44{{.*}}1
-// VGLSL: debugPrintfEXT({{.*}}11{{.*}}22{{.*}}33{{.*}}44{{.*}}1
-// VSPV: %int_11 = OpConstant %int 11
-// VSPV-DAG: %int_22 = OpConstant %int 22
-// VSPV-DAG: %int_33 = OpConstant %int 33
-// VSPV-DAG: %int_44 = OpConstant %int 44
-// VCUDA: printf({{.*}}11{{.*}}22{{.*}}33{{.*}}44{{.*}}1
-// VCPP: printf({{.*}}11{{.*}}22{{.*}}33{{.*}}44{{.*}}1
+// HLSL: .r maps to index 0, .g to 1, .b to 2, .a to 3; the swizzle lowers
+// to individual buffer reads. Indices 1..3 load into temporaries _S1.._S3;
+// index 0 is read directly. All four loads are present somewhere in the output.
+// VHLSL-DAG: inputBuffer_{{[0-9]+}}[int(0)]
+// VHLSL-DAG: inputBuffer_{{[0-9]+}}[int(1)]
+// VHLSL-DAG: inputBuffer_{{[0-9]+}}[int(2)]
+// VHLSL-DAG: inputBuffer_{{[0-9]+}}[int(3)]
+
+// VGLSL-DAG: inputBuffer_{{[0-9]+}}._data[uint(0)]
+// VGLSL-DAG: inputBuffer_{{[0-9]+}}._data[uint(1)]
+// VGLSL-DAG: inputBuffer_{{[0-9]+}}._data[uint(2)]
+// VGLSL-DAG: inputBuffer_{{[0-9]+}}._data[uint(3)]
+
+// SPIRV: loads from indices 0,1,2,3 of inputBuffer then stores to outputBuffer.
+// VSPV-DAG: %int_0 = OpConstant %int 0
+// VSPV-DAG: %int_1 = OpConstant %int 1
+// VSPV-DAG: %int_2 = OpConstant %int 2
+// VSPV-DAG: %int_3 = OpConstant %int 3
+
+// Metal: swizzle indices 0..3 appear as +int(0)..+int(3) pointer arithmetic.
+// VMTL-DAG: inputBuffer_{{[0-9]+}}+int(0)
+// VMTL-DAG: inputBuffer_{{[0-9]+}}+int(1)
+// VMTL-DAG: inputBuffer_{{[0-9]+}}+int(2)
+// VMTL-DAG: inputBuffer_{{[0-9]+}}+int(3)
+
+// WGSL: swizzle indices 0..3 appear as i32(0)..i32(3) array subscripts.
+// VWGSL-DAG: inputBuffer_{{[0-9]+}}[i32(0)]
+// VWGSL-DAG: inputBuffer_{{[0-9]+}}[i32(1)]
+// VWGSL-DAG: inputBuffer_{{[0-9]+}}[i32(2)]
+// VWGSL-DAG: inputBuffer_{{[0-9]+}}[i32(3)]
+
+// CUDA: swizzle indices 0..3 appear as int(0)..int(3) subscripts.
+// VCUDA-DAG: inputBuffer_{{[0-9]+}})[int(0)]
+// VCUDA-DAG: inputBuffer_{{[0-9]+}})[int(1)]
+// VCUDA-DAG: inputBuffer_{{[0-9]+}})[int(2)]
+// VCUDA-DAG: inputBuffer_{{[0-9]+}})[int(3)]
+
+// CPP: swizzle indices 0..3 appear as int(0)..int(3) subscripts.
+// VCPP-DAG: inputBuffer_{{[0-9]+}})[int(0)]
+// VCPP-DAG: inputBuffer_{{[0-9]+}})[int(1)]
+// VCPP-DAG: inputBuffer_{{[0-9]+}})[int(2)]
+// VCPP-DAG: inputBuffer_{{[0-9]+}})[int(3)]

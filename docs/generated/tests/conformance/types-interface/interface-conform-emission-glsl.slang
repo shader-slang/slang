@@ -12,7 +12,13 @@
 // Pins the GLSL emission for an interface-typed parameter that is
 // specialized for a concrete type at the call site.
 
-//TEST:SIMPLE(filecheck=CHECK):-target glsl -entry main -stage compute
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CPUCHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=CHECK):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITSPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITMETAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITWGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITCUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITCPP):-target cpp -entry computeMain -stage compute
 
 interface IProcessor
 {
@@ -29,13 +35,29 @@ int applyProc(IProcessor p, int x)
     return p.process(x);
 }
 
-[shader("compute")]
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
 [numthreads(1, 1, 1)]
-void main(uniform RWStructuredBuffer<int> buf, uint3 id : SV_DispatchThreadID)
+void computeMain(uint3 id : SV_DispatchThreadID)
 {
     Tripler t;
-    buf[id.x] = applyProc(t, int(id.x));
+    outputBuffer[0] = applyProc(t, int(id.x) + 5);
 }
 
+// CPUCHECK: 15
 // CHECK: Tripler_process
 // CHECK: applyProc
+// EMITSPV: LocalSize
+// EMITSPV: OpIMul
+// EMITMETAL: Tripler_process
+// EMITMETAL: applyProc
+// EMITMETAL: kernel
+// EMITWGSL: Tripler_process
+// EMITWGSL: applyProc
+// EMITWGSL: @compute
+// EMITCUDA: Tripler_process
+// EMITCUDA: applyProc
+// EMITCUDA: __global__
+// EMITCPP: Tripler_process
+// EMITCPP: applyProc

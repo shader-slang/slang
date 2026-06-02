@@ -16,6 +16,8 @@
 // attribute spellings.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 [[vk::specialization_constant]]
 const int WORK_SIZE = 4;
@@ -33,3 +35,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 // CHECK-DAG: OpSpecConstant %int {{.*}}
 // CHECK-DAG: OpSpecConstant %float {{.*}}
 // CHECK-DAG: OpDecorate {{.*}} SpecId
+// Metal maps specialization constants to function_constant with a fallback.
+// METAL: function_constant(
+// METAL-DAG: is_function_constant_defined(
+// WGSL maps specialization constants to override declarations with @id.
+// WGSL: @id(
+// WGSL-DAG: override WORK_SIZE_
+// WGSL-DAG: override SCALE_FACTOR_

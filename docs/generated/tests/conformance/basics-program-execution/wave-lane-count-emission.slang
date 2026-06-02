@@ -16,6 +16,10 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-CUDA):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> output;
 
@@ -30,3 +34,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // SPIR-V emits SubgroupSize built-in (the SPIR-V representation of wave/subgroup size).
 // CHECK-SPV: SubgroupSize
+
+// GLSL emits gl_SubgroupSize built-in with the subgroup_basic extension.
+// CHECK-GLSL: gl_SubgroupSize
+
+// Metal emits threads_per_simdgroup built-in parameter.
+// CHECK-METAL: threads_per_simdgroup
+
+// WGSL emits subgroup_size built-in with the subgroups enable directive.
+// CHECK-WGSL: subgroup_size
+
+// CUDA emits warpSize built-in constant.
+// CHECK-CUDA: warpSize

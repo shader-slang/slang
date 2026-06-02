@@ -10,10 +10,17 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies that `.` accesses non-static fields, static fields, nested types, and member functions.
-// Four CHECK lines confirm instance field, type-qualified static, chained-dot nested static, and
-// method return all resolve correctly under the interpreter.
+// Four buffer slots confirm instance field, type-qualified static, chained-dot nested static, and
+// method return all resolve correctly. Emission tests confirm the struct and method survive on
+// all text-emit backends.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 struct TestStruct
 {
@@ -31,24 +38,50 @@ struct TestStruct
     }
 }
 
-void main()
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1,1,1)]
+void computeMain()
 {
     TestStruct obj = { };
     obj.a = 42;
 
     // Non-static field via dot
-    // CHECK: 42
-    printf("%d\n", obj.a);
-
+    outputBuffer[0] = obj.a;
     // Static const via type name dot
-    // CHECK: 5
-    printf("%d\n", TestStruct.b);
-
+    outputBuffer[1] = TestStruct.b;
     // Nested static via chained dots
-    // CHECK: 6
-    printf("%d\n", TestStruct.NestedStruct.c);
-
+    outputBuffer[2] = TestStruct.NestedStruct.c;
     // Member function via dot
-    // CHECK: 42
-    printf("%d\n", obj.getA());
+    outputBuffer[3] = obj.getA();
 }
+
+// CHECK: 42
+// CHECK: 5
+// CHECK: 6
+// CHECK: 42
+
+// HLSL: struct TestStruct_{{[0-9_]*}}
+// HLSL: int a_{{[0-9_]*}}
+// HLSL: TestStruct_getA_{{[0-9_]*}}
+
+// GLSL: struct TestStruct_{{[0-9_]*}}
+// GLSL: int a_{{[0-9_]*}}
+// GLSL: TestStruct_getA_{{[0-9_]*}}
+
+// METAL: struct TestStruct_{{[0-9_]*}}
+// METAL: int a_{{[0-9_]*}}
+// METAL: TestStruct_getA_{{[0-9_]*}}
+
+// WGSL: struct TestStruct_{{[0-9_]*}}
+// WGSL: a_{{[0-9_]*}}
+// WGSL: fn TestStruct_getA_{{[0-9_]*}}
+
+// CUDA: struct TestStruct_{{[0-9_]*}}
+// CUDA: int a_{{[0-9_]*}}
+// CUDA: TestStruct_getA_{{[0-9_]*}}
+
+// CPP: struct TestStruct_{{[0-9_]*}}
+// CPP: a_{{[0-9_]*}}
+// CPP: TestStruct_getA_{{[0-9_]*}}

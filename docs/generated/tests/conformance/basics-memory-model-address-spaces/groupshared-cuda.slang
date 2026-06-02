@@ -14,6 +14,8 @@
 // the emitted CUDA text carries the `__shared__` qualifier, confirming the thread-group scope.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 static groupshared float sharedArr[8];
 
@@ -28,3 +30,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 // CUDA group-shared maps to __shared__ device memory.
 // CHECK: __shared__
 // CHECK-DAG: sharedArr{{.*}}
+// Metal maps groupshared to threadgroup address space.
+// METAL: threadgroup {{.*}} sharedArr{{.*}}
+// WGSL maps groupshared to var<workgroup>.
+// WGSL: var<workgroup> sharedArr{{.*}}

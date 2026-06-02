@@ -15,6 +15,8 @@
 // storage-class mapping as the `[[vk::push_constant]]` form tested in push-constant-spirv.slang.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 struct SmallData {
     float x;
@@ -31,3 +33,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 }
 
 // CHECK: %pc = OpVariable {{.*}} PushConstant
+// Metal has no push-constant concept; [[push_constant]] lowers to a constant* buffer parameter.
+// METAL: constant* pc_
+// WGSL has no push-constant concept; [[push_constant]] lowers to var<uniform>.
+// WGSL: var<uniform> pc_

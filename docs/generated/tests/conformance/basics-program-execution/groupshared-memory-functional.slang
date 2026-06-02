@@ -16,6 +16,10 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK-CUDA):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> outputBuffer;
 
@@ -37,3 +41,15 @@ void computeMain(uint3 tid : SV_GroupThreadID)
 
 // SPIR-V emits Workgroup storage class for the shared variable.
 // CHECK-SPV: Workgroup
+
+// GLSL emits shared storage qualifier.
+// CHECK-GLSL: shared
+
+// Metal emits threadgroup storage qualifier.
+// CHECK-METAL: threadgroup
+
+// WGSL emits var<workgroup> for the shared variable.
+// CHECK-WGSL: var<workgroup>
+
+// CUDA emits __shared__ for the shared variable.
+// CHECK-CUDA: __shared__

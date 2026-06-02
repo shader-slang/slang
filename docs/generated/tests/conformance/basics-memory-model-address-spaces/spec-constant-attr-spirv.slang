@@ -15,6 +15,8 @@
 // proving both attribute spellings produce the same encoding as `[[vk::specialization_constant]]`.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 [[SpecializationConstant]]
 const int TILE_SIZE = 8;
@@ -28,3 +30,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<int> output
 // Both OpDecorate SpecId and OpSpecConstant must appear (order-independent).
 // CHECK-DAG: OpSpecConstant %int {{.*}}
 // CHECK-DAG: OpDecorate {{.*}} SpecId
+// Metal maps [SpecializationConstant] to function_constant with a default fallback.
+// METAL: function_constant(
+// METAL-DAG: is_function_constant_defined(
+// WGSL maps [SpecializationConstant] to an override declaration with @id.
+// WGSL: @id(
+// WGSL-DAG: override TILE_SIZE_

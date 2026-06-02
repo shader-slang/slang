@@ -9,12 +9,16 @@
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that wave ops inside a divergent `if` appear in the SPIR-V basic blocks
-// for their respective arms, not in the post-merge block.
-// CHECK asserts `GroupNonUniformArithmetic` capability, `OpSelectionMerge` for the
-// if-divergence, and per-arm `OpGroupNonUniformUMin`/`OpGroupNonUniformUMax` ops.
+// Verifies that wave ops inside a divergent `if` appear in the per-arm basic blocks,
+// not hoisted to the post-merge block, across SPIRV and other GPU-capable back-ends.
+// SPIRV pins GroupNonUniform capability + OpSelectionMerge + per-arm ops.
+// Metal, CUDA, and WGSL confirm the if structure is preserved with wave intrinsics
+// inside the respective arms.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> output;
 
@@ -35,10 +39,23 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output[tid.x] = result;
 }
 
-// Wave ops require the GroupNonUniformArithmetic capability in SPIRV.
+// SPIRV: GroupNonUniformArithmetic capability; OpSelectionMerge for the if; per-arm ops.
 // CHECK: OpCapability GroupNonUniformArithmetic
-// The if-divergence emits OpSelectionMerge + OpBranchConditional.
 // CHECK: OpSelectionMerge
-// Each arm contains its own GroupNonUniform reduction op.
 // CHECK: OpGroupNonUniformUMin
 // CHECK: OpGroupNonUniformUMax
+
+// Metal: if preserved; simd_min in the then-arm, simd_max in the else-arm.
+// CHECK_METAL: if(
+// CHECK_METAL: simd_min
+// CHECK_METAL: simd_max
+
+// CUDA: if preserved; prelude WaveActiveMin_0/WaveActiveMax_0 in their arms.
+// CHECK_CUDA: if(
+// CHECK_CUDA: WaveActiveMin_0
+// CHECK_CUDA: WaveActiveMax_0
+
+// WGSL: if preserved; subgroupMin in the then-arm, subgroupMax in the else-arm.
+// CHECK_WGSL: if(
+// CHECK_WGSL: subgroupMin
+// CHECK_WGSL: subgroupMax

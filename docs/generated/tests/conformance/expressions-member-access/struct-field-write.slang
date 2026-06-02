@@ -9,27 +9,38 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-//TEST:INTERPRET(filecheck=CHECK):
-//TEST:SIMPLE(filecheck=SWHLSL):-target hlsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=SWGLSL):-target glsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=SWSPV):-target spirv-asm -entry main -stage compute
-//TEST:SIMPLE(filecheck=SWCUDA):-target cuda -entry main -stage compute
-//TEST:SIMPLE(filecheck=SWCPP):-target cpp -entry main -stage compute
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=SWHLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SWGLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SWSPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SWMTL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SWWGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SWCUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SWCPP):-target cpp -entry computeMain -stage compute
+
+// Verifies that a member ref is an l-value when the base is an l-value and the member is mutable.
+// Two struct fields are written after construction and the results are read back into the
+// output buffer; CHECK asserts both written values arrive, proving the l-value write round-trip.
+// Emission directives cover every text-emit back-end including Metal and WGSL.
+
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
 
 struct Point { int x; int y; }
 
-void main()
+[numthreads(1, 1, 1)]
+void computeMain()
 {
     Point p = { 1, 2 };
     p.x = 100;
     p.y = 200;
-    //CHECK: x=100 y=200
-    printf("x=%d y=%d\n", p.x, p.y);
+    outputBuffer[0] = p.x;
+    outputBuffer[1] = p.y;
 }
 
-// Emission checks: struct field l-value write appears as `p_N.x_N = ...` in HLSL/GLSL,
-// `(&p_N)->x_N = ...` in CUDA/CPP. SPIRV constant-folds the assigns away; the written
-// values 100/200 are still visible as OpConstant. Metal/WGSL unsupported-on-target (no printf).
+// CHECK: type: int32_t
+// CHECK-NEXT: 100
+// CHECK-NEXT: 200
 
 // SWHLSL: p_{{[0-9]+}}.x_{{[0-9]+}} = {{.*}}100
 // SWHLSL-DAG: p_{{[0-9]+}}.y_{{[0-9]+}} = {{.*}}200
@@ -39,6 +50,12 @@ void main()
 
 // SWSPV: %int_100 = OpConstant %int 100
 // SWSPV-DAG: %int_200 = OpConstant %int 200
+
+// SWMTL: x_{{[0-9]+}} = int(100)
+// SWMTL-DAG: y_{{[0-9]+}} = int(200)
+
+// SWWGSL: x_{{[0-9]+}} = i32(100)
+// SWWGSL-DAG: y_{{[0-9]+}} = i32(200)
 
 // SWCUDA: x_{{[0-9]+}} = int(100)
 // SWCUDA-DAG: y_{{[0-9]+}} = int(200)

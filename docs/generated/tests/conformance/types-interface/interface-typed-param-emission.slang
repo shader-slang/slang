@@ -14,7 +14,13 @@
 // CHECK scans the HLSL output for `Doubler_process` and `callProcess`, proving
 // the concrete method name — not a virtual dispatch table — is emitted.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CPUCHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITSPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITMETAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITWGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITCUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITCPP):-target cpp -entry computeMain -stage compute
 
 interface IProc
 {
@@ -31,13 +37,29 @@ int callProcess(IProc p, int x)
     return p.process(x);
 }
 
-[shader("compute")]
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
 [numthreads(1, 1, 1)]
-void main(RWStructuredBuffer<int> buf)
+void computeMain(uint3 id : SV_DispatchThreadID)
 {
     Doubler d;
-    buf[0] = callProcess(d, 7);
+    outputBuffer[0] = callProcess(d, int(id.x) + 7);
 }
 
+// CPUCHECK: 14
 // CHECK: Doubler_process
 // CHECK: callProcess
+// EMITSPV: LocalSize
+// EMITSPV: OpIMul
+// EMITMETAL: Doubler_process
+// EMITMETAL: callProcess
+// EMITMETAL: kernel
+// EMITWGSL: Doubler_process
+// EMITWGSL: callProcess
+// EMITWGSL: @compute
+// EMITCUDA: Doubler_process
+// EMITCUDA: callProcess
+// EMITCUDA: __global__
+// EMITCPP: Doubler_process
+// EMITCPP: callProcess

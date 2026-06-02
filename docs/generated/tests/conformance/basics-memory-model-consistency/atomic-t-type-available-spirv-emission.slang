@@ -16,6 +16,8 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLCHECK):-target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<Atomic<uint>> atomicBuf;
 RWStructuredBuffer<uint> outBuf;
@@ -33,3 +35,16 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // HLSL: Atomic<T> elements are accessed via interlocked-style assignment; output
 // for the store and load should include the buffer variable.
 // HLSLCHECK: atomicBuf
+
+// Metal: Atomic<T> maps to metal atomic<T>; store/load use atomic_store_explicit / atomic_load_explicit.
+// METALCHECK-DAG: atomic_store_explicit
+// METALCHECK-DAG: atomic_load_explicit
+
+// WGSL: Atomic<T> maps to WGSL atomic<u32>; store/load use atomicStore / atomicLoad.
+// WGSLCHECK-DAG: atomicStore
+// WGSLCHECK-DAG: atomicLoad
+
+// Targets not covered by emission directives:
+//   glsl   - Atomic<T> lowers to plain SSBO field; store/load emit as plain assignments (no GLSL atomicStore/atomicLoad surface).
+//   cuda   - Atomic<T> lowers to plain pointer field; store/load emit as plain pointer dereferences.
+//   cpp    - Atomic<T>.store/.load unavailable on cpp target (E36107 from core module capability gate).

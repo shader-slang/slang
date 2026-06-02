@@ -11,9 +11,16 @@
 
 // Verifies aggregate initialization fills fields in declaration order and default-initializes
 // fields omitted from the list. p1 uses a full three-element list; p2 uses a two-element list
-// leaving z unspecified. CHECK confirms the interpreter prints the assigned values.
+// leaving z unspecified. Buffer output confirms the assigned values; emission tests confirm
+// the struct is preserved across all text-emit backends.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 struct Plain
 {
@@ -22,15 +29,55 @@ struct Plain
     int z;
 }
 
-void main()
-{
-    // Aggregate with full list
-    Plain p1 = { 10, 20, 30 };
-    // CHECK: 10 20 30
-    printf("%d %d %d\n", p1.x, p1.y, p1.z);
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
 
-    // Aggregate with partial list; z gets default initialized
+[numthreads(1,1,1)]
+void computeMain()
+{
+    Plain p1 = { 10, 20, 30 };
     Plain p2 = { 5, 6 };
-    // CHECK: 5 6
-    printf("%d %d\n", p2.x, p2.y);
+    outputBuffer[0] = p1.x;
+    outputBuffer[1] = p1.y;
+    outputBuffer[2] = p1.z;
+    outputBuffer[3] = p2.x;
+    outputBuffer[4] = p2.y;
+    outputBuffer[5] = p2.z; // default-initialized to 0
 }
+
+// CHECK: 10
+// CHECK: 20
+// CHECK: 30
+// CHECK: 5
+// CHECK: 6
+// CHECK: 0
+
+// HLSL: struct Plain_{{[0-9_]*}}
+// HLSL: int x_{{[0-9_]*}}
+// HLSL: int y_{{[0-9_]*}}
+// HLSL: int z_{{[0-9_]*}}
+
+// GLSL: struct Plain_{{[0-9_]*}}
+// GLSL: int x_{{[0-9_]*}}
+// GLSL: int y_{{[0-9_]*}}
+// GLSL: int z_{{[0-9_]*}}
+
+// METAL: struct Plain_{{[0-9_]*}}
+// METAL: int x_{{[0-9_]*}}
+// METAL: int y_{{[0-9_]*}}
+// METAL: int z_{{[0-9_]*}}
+
+// WGSL: struct Plain_{{[0-9_]*}}
+// WGSL: x_{{[0-9_]*}}
+// WGSL: y_{{[0-9_]*}}
+// WGSL: z_{{[0-9_]*}}
+
+// CUDA: struct Plain_{{[0-9_]*}}
+// CUDA: int x_{{[0-9_]*}}
+// CUDA: int y_{{[0-9_]*}}
+// CUDA: int z_{{[0-9_]*}}
+
+// CPP: struct Plain_{{[0-9_]*}}
+// CPP: x_{{[0-9_]*}}
+// CPP: y_{{[0-9_]*}}
+// CPP: z_{{[0-9_]*}}

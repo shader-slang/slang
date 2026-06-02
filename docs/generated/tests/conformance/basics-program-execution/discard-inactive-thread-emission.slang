@@ -16,6 +16,9 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry fragMain -stage fragment
 //TEST:SIMPLE(filecheck=CHECK-SPV):-target spirv-asm -entry fragMain -stage fragment
+//TEST:SIMPLE(filecheck=CHECK-GLSL):-target glsl -entry fragMain -stage fragment
+//TEST:SIMPLE(filecheck=CHECK-METAL):-target metal -entry fragMain -stage fragment
+//TEST:SIMPLE(filecheck=CHECK-WGSL):-target wgsl -entry fragMain -stage fragment
 
 float4 fragMain(float4 pos : SV_Position) : SV_Target
 {
@@ -29,3 +32,12 @@ float4 fragMain(float4 pos : SV_Position) : SV_Target
 
 // SPIR-V emits OpKill (the SPIR-V discard operation for fragment shaders).
 // CHECK-SPV: OpKill
+
+// GLSL emits the discard keyword in the fragment shader.
+// CHECK-GLSL: discard
+
+// Metal emits discard_fragment() (the Metal fragment-discard intrinsic).
+// CHECK-METAL: discard_fragment
+
+// WGSL emits the discard statement in the fragment shader.
+// CHECK-WGSL: discard

@@ -10,10 +10,16 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies that a constructor's explicit assignment overrides a field's default initializer.
-// WithDefault.x has default 99, but __init(int) overwrites it; CHECK confirms the constructed
-// value is 42, not 99.
+// WithDefault.x has default 99, but __init(int) overwrites it; buffer output confirms the
+// constructed value is 42, not 99. Emission tests verify the constructor is emitted everywhere.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 
 struct WithDefault
 {
@@ -25,9 +31,32 @@ struct WithDefault
     }
 }
 
-void main()
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1,1,1)]
+void computeMain()
 {
     WithDefault obj = { 42 };
-    // CHECK: 42
-    printf("%d\n", obj.x);
+    outputBuffer[0] = obj.x;
 }
+
+// CHECK: 42
+
+// HLSL: struct WithDefault_{{[0-9_]*}}
+// HLSL: WithDefault_{{[0-9_]*}} WithDefault_x24init_{{[0-9_]*}}(int
+
+// GLSL: struct WithDefault_{{[0-9_]*}}
+// GLSL: WithDefault_{{[0-9_]*}} WithDefault_x24init_{{[0-9_]*}}(int
+
+// METAL: struct WithDefault_{{[0-9_]*}}
+// METAL: WithDefault_{{[0-9_]*}} WithDefault_x24init_{{[0-9_]*}}(int
+
+// WGSL: struct WithDefault_{{[0-9_]*}}
+// WGSL: fn WithDefault_x24init_{{[0-9_]*}}( {{.*}} : i32) -> WithDefault_{{[0-9_]*}}
+
+// CUDA: struct WithDefault_{{[0-9_]*}}
+// CUDA: WithDefault_x24init_{{[0-9_]*}}(int
+
+// CPP: struct WithDefault_{{[0-9_]*}}
+// CPP: WithDefault_x24init_{{[0-9_]*}}(int

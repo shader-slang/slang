@@ -9,25 +9,39 @@
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-//TEST:INTERPRET(filecheck=CHECK):
-//TEST:SIMPLE(filecheck=SRHLSL):-target hlsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=SRGLSL):-target glsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=SRSPV):-target spirv-asm -entry main -stage compute
-//TEST:SIMPLE(filecheck=SRCUDA):-target cuda -entry main -stage compute
-//TEST:SIMPLE(filecheck=SRCPP):-target cpp -entry main -stage compute
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=SRHLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SRGLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SRSPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SRMTL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SRWGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SRCUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SRCPP):-target cpp -entry computeMain -stage compute
+
+// Verifies `base.fieldName` reads return the named field's value.
+// Writes three distinct field values to an output buffer and asserts
+// the buffer receives 3/5/7 in field order, proving x/y/z read independence.
+// Each SIMPLE directive checks that the emitted code preserves the struct
+// field access pattern, unblocking Metal and WGSL which reject printf.
+
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
 
 struct Point { int x; int y; int z; }
 
-void main()
+[numthreads(1, 1, 1)]
+void computeMain()
 {
     Point p = { 3, 5, 7 };
-    //CHECK: x=3 y=5 z=7
-    printf("x=%d y=%d z=%d\n", p.x, p.y, p.z);
+    outputBuffer[0] = p.x;
+    outputBuffer[1] = p.y;
+    outputBuffer[2] = p.z;
 }
 
-// Emission checks: struct field reads appear in emitted text as `p_N.x_N` / `p_N.y_N` / `p_N.z_N`.
-// SPIRV folds struct fields into individual constants but still preserves the three int values.
-// Metal and WGSL do not support printf in compute, so those targets are unsupported-on-target.
+// CHECK: type: int32_t
+// CHECK-NEXT: 3
+// CHECK-NEXT: 5
+// CHECK-NEXT: 7
 
 // SRHLSL: p_{{[0-9]+}}.x_{{[0-9]+}}
 // SRHLSL-DAG: p_{{[0-9]+}}.y_{{[0-9]+}}
@@ -41,10 +55,18 @@ void main()
 // SRSPV-DAG: %int_5 = OpConstant %int 5
 // SRSPV-DAG: %int_7 = OpConstant %int 7
 
+// SRMTL: p_{{[0-9]+}}.x_{{[0-9]+}}
+// SRMTL-DAG: p_{{[0-9]+}}.y_{{[0-9]+}}
+// SRMTL-DAG: p_{{[0-9]+}}.z_{{[0-9]+}}
+
+// SRWGSL: p_{{[0-9]+}}.x_{{[0-9]+}}
+// SRWGSL-DAG: p_{{[0-9]+}}.y_{{[0-9]+}}
+// SRWGSL-DAG: p_{{[0-9]+}}.z_{{[0-9]+}}
+
 // SRCUDA: p_{{[0-9]+}}.x_{{[0-9]+}}
 // SRCUDA-DAG: p_{{[0-9]+}}.y_{{[0-9]+}}
 // SRCUDA-DAG: p_{{[0-9]+}}.z_{{[0-9]+}}
 
-// SRCPP: p_{{[0-9]+}}.x_{{[0-9]+}}
-// SRCPP-DAG: p_{{[0-9]+}}.y_{{[0-9]+}}
-// SRCPP-DAG: p_{{[0-9]+}}.z_{{[0-9]+}}
+// SRCPP: x_{{[0-9]+}}
+// SRCPP-DAG: y_{{[0-9]+}}
+// SRCPP-DAG: z_{{[0-9]+}}

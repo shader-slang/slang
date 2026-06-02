@@ -15,6 +15,11 @@
 // the SeqCst bit is present — which subsumes acquire-release for all memory spaces.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLCHECK):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLCHECK):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDACHECK):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> buf;
 
@@ -31,3 +36,22 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // The OpMemoryBarrier must be present (any semantics including SeqCst).
 // CHECK: OpMemoryBarrier
 // CHECK-SAME: %uint_2376
+
+// HLSL: AllMemoryBarrier() is the acquire-release barrier surface; name is preserved.
+// HLSLCHECK: AllMemoryBarrier()
+
+// GLSL: emits memoryBarrier with gl_ScopeDevice and AcquireRelease semantics.
+// GLSLCHECK: memoryBarrier
+// GLSLCHECK-SAME: gl_SemanticsAcquireRelease
+
+// Metal: emits threadgroup_barrier covering all memory spaces (acquire-release at hardware level).
+// METALCHECK: threadgroup_barrier
+
+// WGSL: emits storageBarrier, textureBarrier, and workgroupBarrier (no explicit AcquireRelease ordering in WGSL barrier API).
+// WGSLCHECK: storageBarrier
+
+// CUDA: emits __threadfence() (device-scope memory fence providing acquire-release semantics).
+// CUDACHECK: __threadfence()
+
+// Targets not covered by emission directives:
+//   cpp    - AllMemoryBarrier is not available on cpp target (E36107 capability gate).

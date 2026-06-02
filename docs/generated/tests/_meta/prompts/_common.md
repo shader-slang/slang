@@ -559,6 +559,33 @@ FileCheck matches, so a `-target metal/wgsl/cuda/glsl/spirv-asm/hlsl`
 emission directive runs locally without that tool; only genuinely
 tool-gated steps are reported `ignored` (CI validates them).
 
+#### Make functional tests back-end-portable (buffer output, not `printf`)
+
+`printf` exists only on slangi (`INTERPRET`) and the CPU target; it is
+**not** in the Metal or WGSL compute capability set, so a `printf`-based
+shader fails to emit there (E36107) and contributes **zero**
+Metal/WGSL coverage. When a target-dependent claim should also be
+emitted on every back-end, write the result to an `RWStructuredBuffer`
+and observe it with `COMPARE_COMPUTE`, not `printf`:
+
+```slang
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+// ... one SIMPLE directive per feasible target ...
+RWStructuredBuffer<int> outputBuffer;
+[numthreads(1, 1, 1)]
+void computeMain() { outputBuffer[0] = /* result */; }
+// CHECK: /* expected value */
+```
+
+This single buffer-output shader is functional on CPU **and** emits on
+all text targets. Keep a separate `INTERPRET` + `printf` companion only
+when you specifically want slangi-VM value coverage (it has surfaced
+real VM bugs). For a target-independent value claim, `printf`/INTERPRET
+alone is still fine — don't rework it; the buffer form is for claims you
+want exercised across back-ends.
+
 ### Pressure the compiler — boundary coverage is mandatory
 
 **One smoke test per claim is the floor, not the ceiling.** For

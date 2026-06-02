@@ -16,6 +16,11 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK-SPIRV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK-GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK-METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK-WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK-CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK-CPP):-target cpp -entry main -stage compute
 
 RWStructuredBuffer<uint> result;
 
@@ -34,3 +39,26 @@ void main(uint3 dispatchID : SV_DispatchThreadID,
 // CHECK-SPIRV: GlobalInvocationId
 // CHECK-SPIRV: WorkgroupId
 // CHECK-SPIRV: LocalInvocationId
+
+// GLSL uses gl_GlobalInvocationID, gl_WorkGroupID, gl_LocalInvocationID.
+// CHECK-GLSL: gl_GlobalInvocationID
+// CHECK-GLSL: gl_WorkGroupID
+// CHECK-GLSL: gl_LocalInvocationID
+
+// Metal uses thread_position_in_grid, threadgroup_position_in_grid, thread_position_in_threadgroup.
+// CHECK-METAL: thread_position_in_grid
+// CHECK-METAL: threadgroup_position_in_grid
+// CHECK-METAL: thread_position_in_threadgroup
+
+// WGSL uses builtin(global_invocation_id), builtin(workgroup_id), builtin(local_invocation_id).
+// CHECK-WGSL: global_invocation_id
+// CHECK-WGSL: workgroup_id
+// CHECK-WGSL: local_invocation_id
+
+// CUDA uses blockIdx*blockDim+threadIdx for dispatch ID, blockIdx for group ID, threadIdx for group thread.
+// CHECK-CUDA: blockIdx
+// CHECK-CUDA: threadIdx
+
+// CPP uses groupID and groupThreadID from ComputeThreadVaryingInput.
+// CHECK-CPP: groupID
+// CHECK-CPP: groupThreadID

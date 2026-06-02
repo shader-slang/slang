@@ -16,6 +16,9 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSLCHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSLCHECK):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDACHECK):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> buf;
 
@@ -46,3 +49,31 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // HLSLCHECK: InterlockedOr
 // HLSLCHECK: InterlockedXor
 // HLSLCHECK: InterlockedExchange
+
+// GLSL: each maps to corresponding atomic built-in (atomicMin/Max/And/Or/Xor/Exchange).
+// GLSLCHECK-DAG: atomicMin
+// GLSLCHECK-DAG: atomicMax
+// GLSLCHECK-DAG: atomicAnd
+// GLSLCHECK-DAG: atomicOr
+// GLSLCHECK-DAG: atomicXor
+// GLSLCHECK-DAG: atomicExchange
+
+// Metal: each maps to metal atomic_fetch_*_explicit with memory_order_relaxed.
+// METALCHECK-DAG: atomic_fetch_min_explicit
+// METALCHECK-DAG: atomic_fetch_max_explicit
+// METALCHECK-DAG: atomic_fetch_and_explicit
+// METALCHECK-DAG: atomic_fetch_or_explicit
+// METALCHECK-DAG: atomic_fetch_xor_explicit
+// METALCHECK-DAG: atomic_exchange_explicit
+
+// CUDA: each maps to CUDA atomicMin/Max/And/Or/Xor/Exch.
+// CUDACHECK-DAG: atomicMin
+// CUDACHECK-DAG: atomicMax
+// CUDACHECK-DAG: atomicAnd
+// CUDACHECK-DAG: atomicOr
+// CUDACHECK-DAG: atomicXor
+// CUDACHECK-DAG: atomicExch
+
+// Targets not covered by emission directives:
+//   wgsl   - Interlocked* intrinsics are not available on wgsl target (E36107 capability gate).
+//   cpp    - Interlocked* intrinsics are not available on cpp target (E36107 capability gate).

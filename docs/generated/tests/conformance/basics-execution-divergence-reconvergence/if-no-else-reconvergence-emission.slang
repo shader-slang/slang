@@ -11,11 +11,14 @@
 
 // The doc's Example 2 shows a plain `if (cond) { ... }` without an else clause.
 // Reconvergence occurs when threads exit the `then` branch, at the point
-// immediately after the if statement. SPIRV still encodes this with
-// OpSelectionMerge + OpBranchConditional; one branch targets the then-body
-// and both paths lead to the same merge block.
+// immediately after the if statement. Each back-end must encode both paths
+// (then-arm and implicit skip) and converge to a single continuation.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CPP):-target cpp -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> output;
 
@@ -32,6 +35,22 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output[tid.x] = result;
 }
 
-// Both the then-path and the implicit fall-through converge at the merge block.
+// SPIRV: both paths (then + skip) converge at the merge block.
 // CHECK: OpSelectionMerge
 // CHECK: OpBranchConditional
+
+// Metal: single if, both initializer value and then-arm value present.
+// CHECK_METAL: if(
+// CHECK_METAL: result_0 = 1U
+
+// WGSL: single if, both initializer value and then-arm value present.
+// CHECK_WGSL: if(
+// CHECK_WGSL: result_0 = u32(1)
+
+// CUDA: single if, both initializer value and then-arm value present.
+// CHECK_CUDA: if(
+// CHECK_CUDA: result_0 = 1U
+
+// C++: single if, both initializer value and then-arm value present.
+// CHECK_CPP: if(
+// CHECK_CPP: result_0 = 1U
