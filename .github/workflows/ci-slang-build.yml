@@ -35,11 +35,6 @@ on:
         required: false
         type: boolean
         default: false
-      spirv-opt-merge-return:
-        description: "Value for SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN in this build"
-        required: false
-        type: string
-        default: "ON"
 
 jobs:
   build:
@@ -71,20 +66,6 @@ jobs:
           submodules: "recursive"
           fetch-depth: "250"
           fetch-tags: true
-
-      - name: Validate spirv-opt-merge-return input
-        env:
-          INPUT_SPIRV_OPT_MERGE_RETURN: ${{ inputs.spirv-opt-merge-return }}
-        run: |
-          case "$INPUT_SPIRV_OPT_MERGE_RETURN" in
-            ON|OFF|on|off|1|0|TRUE|FALSE|true|false)
-              echo "SLANG_SPIRV_OPT_MERGE_RETURN=$INPUT_SPIRV_OPT_MERGE_RETURN" >> "$GITHUB_ENV"
-              ;;
-            *)
-              echo "::error::Invalid spirv-opt-merge-return value. Must be ON, OFF, or a CMake boolean equivalent."
-              exit 1
-              ;;
-          esac
 
       # Restore sccache local cache from master
       - name: Restore sccache cache
@@ -222,7 +203,7 @@ jobs:
                 "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}" \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
-                "-DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=${SLANG_SPIRV_OPT_MERGE_RETURN}" \
+                -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
@@ -231,7 +212,7 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
-                "-DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=${SLANG_SPIRV_OPT_MERGE_RETURN}" \
+                -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             else
@@ -241,7 +222,7 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
-                "-DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=${SLANG_SPIRV_OPT_MERGE_RETURN}" \
+                -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             fi
