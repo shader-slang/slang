@@ -45,12 +45,17 @@ static void _writeDependencyStatement(
     EndToEndCompileRequest* compileRequest,
     const String& outputPath)
 {
-    if (outputPath.getLength() == 0)
-        return;
-
     StringBuilder builder;
-    _escapeDependencyString(outputPath.begin(), builder);
-    _writeString(stream, builder.begin());
+    if (outputPath.getLength() == 0)
+    {        
+        _writeString(stream, "-");
+    }
+    else
+    {
+        _escapeDependencyString(outputPath.begin(), builder);
+        _writeString(stream, builder.begin());
+        builder.clear();
+    }
     _writeString(stream, ": ");
 
     int dependencyCount = compileRequest->getDependencyFileCount();
