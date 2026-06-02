@@ -168,10 +168,32 @@ else
         AGENTIC_TEST_ARGS+=("-synthesizedTestApi" "${TEST_ARGS[i + 1]}")
       fi
     done
+    # Retry once on crash (exit > 128 = killed by signal). The suite
+    # is long (~2680 bundles); a single SIGSEGV in slang-test mid-run
+    # loses the rest of the pass and produces minimal coverage uplift.
+    # Profraws from the first attempt are kept on disk and accumulate
+    # with the retry's so coverage from both runs merges into the
+    # report. Retries only fire on crashes, not on unexpected test
+    # failures (those repeat deterministically and would just waste
+    # runner time).
+    AGENTIC_MAX_ATTEMPTS=2
     AGENTIC_EXIT=0
-    "$SLANG_TEST" "${AGENTIC_TEST_ARGS[@]}" || AGENTIC_EXIT=$?
+    for attempt in $(seq 1 $AGENTIC_MAX_ATTEMPTS); do
+      if [ "$attempt" -gt 1 ]; then
+        echo "Retrying agentic-test pass (attempt $attempt of $AGENTIC_MAX_ATTEMPTS)..."
+      fi
+      AGENTIC_EXIT=0
+      "$SLANG_TEST" "${AGENTIC_TEST_ARGS[@]}" || AGENTIC_EXIT=$?
+      if [ "$AGENTIC_EXIT" -le 128 ]; then
+        # Not a crash — passed, or had expected/unexpected failures.
+        # Don't retry; those don't change on a re-run.
+        break
+      fi
+      echo "Warning: agentic-test pass crashed (signal $((AGENTIC_EXIT - 128))) on attempt $attempt of $AGENTIC_MAX_ATTEMPTS"
+    done
+
     if [ "$AGENTIC_EXIT" -gt 128 ]; then
-      echo "Warning: agentic-test pass crashed (signal $((AGENTIC_EXIT - 128)))"
+      echo "Warning: agentic-test pass crashed on all $AGENTIC_MAX_ATTEMPTS attempts (signal $((AGENTIC_EXIT - 128))). Partial coverage data still collected."
     elif [ "$AGENTIC_EXIT" -ne 0 ]; then
       echo "Note: agentic-test pass had unexpected test failures (exit code $AGENTIC_EXIT). Coverage data still collected; see ci-agentic-tests-nightly.yml for the authoritative pass/fail gate."
     fi
