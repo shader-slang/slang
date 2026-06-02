@@ -1110,21 +1110,25 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
                 getSink(),
                 disassemblyArtifact.writeRef()));
 
-            // Preserve metadata sidecars, including coverage manifests, when the
-            // primary artifact is converted to disassembly output. This used to
-            // live inside the debug-info guard below and stopped after the first
-            // match, which elided coverage sidecars for non-debug builds.
-            for (auto associated : intermediateArtifact->getAssociated())
+            auto debugArtifact = getSeparateDbgArtifact(intermediateArtifact);
+            if (debugArtifact ||
+                findAssociatedRepresentation<slang::ICoverageTracingMetadata>(intermediateArtifact))
             {
-                if (associated->getDesc().payload == ArtifactPayload::Metadata ||
-                    associated->getDesc().payload == ArtifactPayload::PostEmitMetadata)
+                // Preserve metadata sidecars when disassembly output still needs
+                // them: separate debug info historically used this association,
+                // and coverage manifests need the coverage metadata on the
+                // final disassembly artifact.
+                for (auto associated : intermediateArtifact->getAssociated())
                 {
-                    disassemblyArtifact->addAssociated(associated);
+                    if (associated->getDesc().payload == ArtifactPayload::Metadata ||
+                        associated->getDesc().payload == ArtifactPayload::PostEmitMetadata)
+                    {
+                        disassemblyArtifact->addAssociated(associated);
+                    }
                 }
             }
 
             // Also disassemble the debug artifact if one exists.
-            auto debugArtifact = getSeparateDbgArtifact(intermediateArtifact);
             ComPtr<IArtifact> disassemblyDebugArtifact;
             if (debugArtifact)
             {
