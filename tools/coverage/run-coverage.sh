@@ -142,7 +142,15 @@ else
   if [[ "$WITH_AGENTIC_TESTS" == "true" ]]; then
     echo
     echo "Running agentic test suite (docs/generated/tests/) for coverage..."
-    AGENTIC_TEST_ARGS=("-test-dir" "docs/generated/tests")
+    # Use the agentic suite's own expected-failure list (matches what
+    # ci-agentic-tests-nightly.yml passes). slang-test reclassifies
+    # listed failures as `failed(expected)` and exits 0 when only
+    # those occur, so this call only fails on UNEXPECTED failures —
+    # the same gate the nightly enforces.
+    AGENTIC_TEST_ARGS=(
+      "-test-dir" "docs/generated/tests"
+      "-expected-failure-list" "docs/generated/tests/_meta/expected-failures.txt"
+    )
     # Inherit server-count from the main pass when in use.
     for ((i = 0; i < ${#TEST_ARGS[@]}; i++)); do
       if [[ "${TEST_ARGS[i]}" == "-use-test-server" ]]; then
@@ -156,7 +164,7 @@ else
     if [ "$AGENTIC_EXIT" -gt 128 ]; then
       echo "Warning: agentic-test pass crashed (signal $((AGENTIC_EXIT - 128)))"
     elif [ "$AGENTIC_EXIT" -ne 0 ]; then
-      echo "Note: agentic-test pass had test failures (exit code $AGENTIC_EXIT). Coverage data still collected."
+      echo "Note: agentic-test pass had unexpected test failures (exit code $AGENTIC_EXIT). Coverage data still collected; see ci-agentic-tests-nightly.yml for the authoritative pass/fail gate."
     fi
   fi
 
