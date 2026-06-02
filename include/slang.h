@@ -1179,7 +1179,12 @@ typedef uint32_t SlangSizeT;
         CoverageMappingOutput =
             150, // stringValue0: explicit path for the slangc coverage mapping sidecar.
                  //   When unset, slangc writes <output>.coverage-mapping.json next to
-                 //   file outputs that carry coverage metadata.
+                 //   file outputs that carry coverage metadata. This option is output
+                 //   policy only and is excluded from compiler cache keys. It requires
+                 //   at least one coverage tracing mode, is rejected for container
+                 //   outputs, and errors if the selected outputs produce no coverage
+                 //   metadata. Explicit paths are valid only when exactly one compiled
+                 //   artifact carries coverage metadata.
 
         CountOf,
     };

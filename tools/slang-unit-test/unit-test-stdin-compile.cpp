@@ -606,6 +606,7 @@ struct TempCoverageCliFiles
     String autoManifestPath;
     String disassemblyOutputPath;
     String disassemblyManifestPath;
+    String wgslOutputPath;
     String explicitManifestPath;
     String containerOutputPath;
 
@@ -617,6 +618,7 @@ struct TempCoverageCliFiles
         File::remove(autoManifestPath);
         File::remove(disassemblyOutputPath);
         File::remove(disassemblyManifestPath);
+        File::remove(wgslOutputPath);
         File::remove(explicitManifestPath);
         File::remove(containerOutputPath);
     }
@@ -632,6 +634,7 @@ static SlangResult _createTempCoverageCliFiles(
     out.autoManifestPath = out.outputPath + ".coverage-mapping.json";
     out.disassemblyOutputPath = out.basePath + ".spv-asm";
     out.disassemblyManifestPath = out.disassemblyOutputPath + ".coverage-mapping.json";
+    out.wgslOutputPath = out.basePath + ".wgsl";
     out.explicitManifestPath = out.basePath + ".coverage-mapping.json";
     out.containerOutputPath = out.basePath + ".slang-module";
     return File::writeAllText(out.sourcePath, source);
@@ -1246,6 +1249,44 @@ static SlangResult _testCoverageExplicitSidecarRejectsUnsupportedCoverageTarget(
     return SLANG_OK;
 }
 
+static SlangResult _testCoverageExplicitSidecarAllowsUnsupportedTargetWithSupportedTarget(
+    UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    args.add(files.sourcePath);
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("-trace-coverage");
+    args.add("-trace-function-coverage");
+    args.add("-trace-branch-coverage");
+    args.add("-target");
+    args.add("wgsl");
+    args.add("-o");
+    args.add(files.wgslOutputPath);
+    args.add("-target");
+    args.add("spirv");
+    args.add("-o");
+    args.add(files.outputPath);
+    args.add("-coverage-mapping-output");
+    args.add(files.explicitManifestPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (!File::exists(files.outputPath))
+        return SLANG_FAIL;
+    if (File::exists(files.autoManifestPath))
+        return SLANG_FAIL;
+
+    return _checkCoverageManifest(files.explicitManifestPath);
+}
+
 static SlangResult _testCoverageExplicitSidecarRequiresCoverage(UnitTestContext* context)
 {
     TempCoverageCliFiles files;
@@ -1452,6 +1493,8 @@ SLANG_UNIT_TEST(SlangcCoverageMappingOutput)
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsMultipleArtifacts(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(
         _testCoverageExplicitSidecarRejectsUnsupportedCoverageTarget(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testCoverageExplicitSidecarAllowsUnsupportedTargetWithSupportedTarget(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarRequiresCoverage(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsContainerOutput(unitTestContext)));

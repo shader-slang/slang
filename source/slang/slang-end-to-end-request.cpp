@@ -121,7 +121,6 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 SlangResult EndToEndCompileRequest::executeActionsInner()
 {
     SLANG_PROFILE_SECTION(endToEndActions);
-    m_didWriteExplicitCoverageMapping = false;
 
     // If no code-generation target was specified, then try to infer one from the source language,
     // just to make sure we can do something reasonable when invoked from the command line.
@@ -498,20 +497,6 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
     String sidecarPath;
     if (explicitSidecarPath.getLength() != 0)
     {
-        // Explicit sidecar uniqueness is preflighted before any artifact writes.
-        // Keep this guard as a defensive check for future call paths.
-        if (m_didWriteExplicitCoverageMapping)
-        {
-            getSink()->diagnose(
-                Diagnostics::CoverageMappingOutputMultipleArtifacts{.path = explicitSidecarPath});
-            return SLANG_FAIL;
-        }
-        if (path.getLength() != 0 && _areOutputPathsEquivalent(explicitSidecarPath, path))
-        {
-            getSink()->diagnose(Diagnostics::CoverageMappingOutputCollidesWithArtifact{
-                .path = explicitSidecarPath});
-            return SLANG_FAIL;
-        }
         sidecarPath = explicitSidecarPath;
     }
     else
@@ -528,10 +513,6 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
     if (SLANG_FAILED(writeResult))
     {
         getSink()->diagnose(Diagnostics::UnableToWriteFile{.path = sidecarPath});
-    }
-    else if (explicitSidecarPath.getLength() != 0)
-    {
-        m_didWriteExplicitCoverageMapping = true;
     }
     return writeResult;
 }
