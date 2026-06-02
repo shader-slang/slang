@@ -1296,6 +1296,8 @@ Result ComputeCommandEncoderImpl::bindRootObjectAsCompute(
     auto rootLayoutImpl = programImpl->m_rootObjectLayout.Ptr();
     if (!rootLayoutImpl || !rootLayoutImpl->m_rootSignature)
         return SLANG_FAIL;
+    if (rootObjectImpl->getLayout() != rootLayoutImpl)
+        return SLANG_E_INVALID_ARG;
 
     ComputeSubmitter submitter(m_d3dCmdList);
     submitter.setRootSignature(rootLayoutImpl->m_rootSignature);

@@ -9972,6 +9972,7 @@ bool isMovableInst(IRInst* inst)
     case kIROp_FieldAddress:
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
+    case kIROp_NodeOutputRecordGetElementPtr:
     case kIROp_GetOffsetPtr:
     case kIROp_UpdateElement:
     case kIROp_Specialize:

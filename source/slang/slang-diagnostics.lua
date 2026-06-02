@@ -2588,6 +2588,13 @@ err(
     span { loc = "location", message = "unrecognized BarrierSemanticFlags value '~value:String'; expected a combination of GroupSync (0x1), GroupScope (0x2), DeviceScope (0x4), or Reorder (0x0)" }
 )
 
+err(
+    "invalid-barrier-memory-type-flags-value",
+    31405,
+    "invalid 'BarrierMemoryTypeFlags' value",
+    span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected a combination of UavMemory (0x1), GroupSharedMemory (0x2), NodeInputMemory (0x4), OutputMemory (0x8), or AllMemory (0xf)" }
+)
+
 warning(
     "explicit-uniform-location",
     31104,

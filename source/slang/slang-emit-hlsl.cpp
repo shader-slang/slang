@@ -1146,11 +1146,23 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             SLANG_UNUSED(inOuterPrec);
             auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
+            const uint32_t knownFlags =
+                BarrierMemoryTypeFlags::UavMemory | BarrierMemoryTypeFlags::GroupSharedMemory |
+                BarrierMemoryTypeFlags::NodeInputMemory | BarrierMemoryTypeFlags::OutputMemory;
             m_writer->emit("(");
             // ALL_MEMORY has its own named constant; otherwise decompose into individual flags.
             if (flagVal == BarrierMemoryTypeFlags::AllMemory)
             {
                 m_writer->emit("ALL_MEMORY");
+            }
+            else if (flagVal & ~knownFlags)
+            {
+                StringBuilder sb;
+                sb << "0x" << String(flagVal, 16);
+                getSink()->diagnose(Diagnostics::InvalidBarrierMemoryTypeFlagsValue{
+                    .value = sb.produceString(),
+                    .location = inst->sourceLoc});
+                m_writer->emit("0");
             }
             else
             {
@@ -1180,10 +1192,22 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             SLANG_UNUSED(inOuterPrec);
             auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
+            const uint32_t knownFlags = BarrierSemanticFlags::GroupSync |
+                                        BarrierSemanticFlags::GroupScope |
+                                        BarrierSemanticFlags::DeviceScope;
             m_writer->emit("(");
             if (flagVal == BarrierSemanticFlags::Reorder)
             {
                 m_writer->emit("REORDER");
+            }
+            else if (flagVal & ~knownFlags)
+            {
+                StringBuilder sb;
+                sb << "0x" << String(flagVal, 16);
+                getSink()->diagnose(Diagnostics::InvalidBarrierSemanticFlagsValue{
+                    .value = sb.produceString(),
+                    .location = inst->sourceLoc});
+                m_writer->emit("0");
             }
             else
             {

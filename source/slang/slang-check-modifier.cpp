@@ -522,27 +522,50 @@ Modifier* SemanticsVisitor::validateAttribute(
     else if (auto maxRecAttr = as<MaxRecordsAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
-        maxRecAttr->value = checkConstantIntVal(attr->args[0]);
-        if (!maxRecAttr->value)
+        auto value = checkConstantIntVal(attr->args[0]);
+        if (!value)
             return nullptr;
+        if (value->getValue() < 0)
+        {
+            getSink()->diagnose(Diagnostics::InvalidArraySize{.location = attr->args[0]->loc});
+            return nullptr;
+        }
+        maxRecAttr->value = value;
     }
     else if (auto nodeIDAttr = as<NodeIDAttribute>(attr))
     {
-        SLANG_ASSERT(attr->args.getCount() == 2);
+        auto argCount = attr->args.getCount();
+        SLANG_ASSERT(argCount >= 1 && argCount <= 2);
+        if (argCount < 1 || argCount > 2)
+            return nullptr;
+
         String name;
         if (!checkLiteralStringVal(attr->args[0], &name))
             return nullptr;
         nodeIDAttr->name = name;
-        nodeIDAttr->arrayIndex = checkConstantIntVal(attr->args[1]);
-        if (!nodeIDAttr->arrayIndex)
-            return nullptr;
+        if (argCount == 2)
+        {
+            nodeIDAttr->arrayIndex = checkConstantIntVal(attr->args[1]);
+            if (!nodeIDAttr->arrayIndex)
+                return nullptr;
+        }
+        else
+        {
+            nodeIDAttr->arrayIndex = nullptr;
+        }
     }
     else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
-        nodeArraySizeAttr->count = checkConstantIntVal(attr->args[0]);
-        if (!nodeArraySizeAttr->count)
+        auto count = checkConstantIntVal(attr->args[0]);
+        if (!count)
             return nullptr;
+        if (count->getValue() < 0)
+        {
+            getSink()->diagnose(Diagnostics::InvalidArraySize{.location = attr->args[0]->loc});
+            return nullptr;
+        }
+        nodeArraySizeAttr->count = count;
     }
     else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
     {

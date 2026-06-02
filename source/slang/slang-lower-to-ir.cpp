@@ -3185,7 +3185,10 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         else if (auto nodeIDAttr = as<NodeIDAttribute>(mod))
         {
             IRStringLit* nameLit = builder->getStringValue(nodeIDAttr->name.getUnownedSlice());
-            IRInst* indexVal = getSimpleVal(context, lowerVal(context, nodeIDAttr->arrayIndex));
+            IRInst* indexVal =
+                nodeIDAttr->arrayIndex
+                    ? getSimpleVal(context, lowerVal(context, nodeIDAttr->arrayIndex))
+                    : builder->getIntValue(builder->getIntType(), 0);
             IRInst* ops[2] = {nameLit, indexVal};
             builder->addDecoration(inst, kIROp_NodeIDDecoration, ops, 2);
         }
@@ -14366,10 +14369,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto nodeIDAttr = as<NodeIDAttribute>(modifier))
             {
+                subContext->irBuilder->setInsertBefore(irFunc);
                 IRStringLit* nameLit =
                     getBuilder()->getStringValue(nodeIDAttr->name.getUnownedSlice());
                 IRInst* indexVal =
-                    getSimpleVal(subContext, lowerVal(subContext, nodeIDAttr->arrayIndex));
+                    nodeIDAttr->arrayIndex
+                        ? getSimpleVal(subContext, lowerVal(subContext, nodeIDAttr->arrayIndex))
+                        : getBuilder()->getIntValue(getBuilder()->getIntType(), 0);
                 IRInst* ops[2] = {nameLit, indexVal};
                 getBuilder()->addDecoration(irFunc, kIROp_NodeIDDecoration, ops, 2);
             }
@@ -14379,6 +14385,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(modifier))
             {
+                subContext->irBuilder->setInsertBefore(irFunc);
                 IRInst* ops[3] = {
                     getSimpleVal(subContext, lowerVal(subContext, gridAttr->x)),
                     getSimpleVal(subContext, lowerVal(subContext, gridAttr->y)),
@@ -14388,6 +14395,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(modifier))
             {
+                subContext->irBuilder->setInsertBefore(irFunc);
                 IRInst* ops[3] = {
                     getSimpleVal(subContext, lowerVal(subContext, fixedGridAttr->x)),
                     getSimpleVal(subContext, lowerVal(subContext, fixedGridAttr->y)),
@@ -14397,6 +14405,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto maxRecAttr = as<MaxRecordsAttribute>(modifier))
             {
+                subContext->irBuilder->setInsertBefore(irFunc);
                 IRInst* val = getSimpleVal(subContext, lowerVal(subContext, maxRecAttr->value));
                 getBuilder()->addDecoration(irFunc, kIROp_MaxRecordsDecoration, val);
             }

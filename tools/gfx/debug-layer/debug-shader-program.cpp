@@ -28,6 +28,10 @@ void* DebugShaderProgram::getInterface(const Slang::Guid& guid)
 
 Result DebugShaderProgram::getRootSignature(void** outRootSignature)
 {
+    if (!outRootSignature)
+        return SLANG_E_INVALID_ARG;
+
+    *outRootSignature = nullptr;
     IShaderProgramD3D12* baseD3D12Program = nullptr;
     SLANG_RETURN_ON_FAIL(
         baseObject->queryInterface(GfxGUID::IID_IShaderProgramD3D12, (void**)&baseD3D12Program));

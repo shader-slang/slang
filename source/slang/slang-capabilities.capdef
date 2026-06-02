@@ -1569,7 +1569,7 @@ alias raytracingstages_fragment = raytracing_stages | fragment;
 
 /// Collection of shader stages
 /// [Compound]
-alias raytracingstages_compute = raytracing_stages | compute;
+alias raytracingstages_compute = raytracing_stages | compute | node;
 
 /// Collection of shader stages
 /// [Compound]

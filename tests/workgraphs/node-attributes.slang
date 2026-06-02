@@ -10,7 +10,7 @@ struct OutputRecord { int value; };
 [NodeLaunch("broadcasting")]
 [NodeDispatchGrid(1, 1, 1)]
 [numthreads(1, 1, 1)]
-[NodeID("MyNode", 2)]
+[NodeID("MyNode")]
 [NodeIsProgramEntry]
 void main(
     [MaxRecords(4)]
@@ -22,6 +22,6 @@ void main(
 {
 }
 
-//CHK_DXIL: !"MyNode", i32 2
+//CHK_DXIL: !"MyNode", i32 0
 //CHK_DXIL: !"TargetNode", i32 0
 //CHK_SPIRV: OpFunction
