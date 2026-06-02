@@ -1,0 +1,26 @@
+//META: generated=true
+//META: model=claude-sonnet-4-6
+//META: generated_at=2026-06-02T09:20:02+00:00
+//META: source_commit=54bb48e67c3a4fdd4c0f4bd8085f5dc0bd8ffc99
+//META: doc_ref=docs/language-reference/expressions-operator-precedence.md#operator-precedence
+//META: doc_section_digest=2c43dea5ca69ca0e9d2a792df3b8f164e2487c75e25ef796f78839c678589fa1
+//META: purpose=Level-14 compound assignments `+=`, `-=`, etc. are right-associative like `=`: the RHS of `a += b = 3` is fully evaluated (b=3) before `a` is updated.
+//META: intent=functional
+//META: pipeline_stage=runtime
+//META: warning=Auto-generated. May drift from source. Do not edit by hand.
+
+// The doc lists `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `<<=`, `>>=`, `&=`, `|=`, `^=`
+// all at level 14 with right associativity.
+// `a += b = 3` groups as `a += (b = 3)`.
+// If a=10, b=0: after the expression, b=3 and a=10+3=13.
+
+//TEST:INTERPRET(filecheck=CHECK):
+
+void main()
+{
+    int a = 10;
+    int b = 0;
+    a += b = 3;
+    // CHECK: compound-assign-right-assoc: a=13 b=3
+    printf("compound-assign-right-assoc: a=%d b=%d\n", a, b);
+}

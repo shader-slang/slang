@@ -929,4 +929,14 @@ bundles:
       - source/slang/slang-check-stmt.cpp
     size_cap_files: 60
 
+  conformance/expressions-operator-precedence:
+    source_doc: docs/language-reference/expressions-operator-precedence.md
+    watched_paths:
+      - docs/language-reference/expressions-operator-precedence.md
+      - source/slang/slang-parser.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-parser.cpp
+    size_cap_files: 40
+
   # --- top-level reference -----------------------------------------------

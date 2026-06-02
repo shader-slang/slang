@@ -8,12 +8,12 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 ## Suite totals
 
-- **Bundles:** 61
-- **Total `.slang` tests:** 2970
+- **Bundles:** 62
+- **Total `.slang` tests:** 2995
 
 | Intent       | Count |
 | ------------ | ----- |
-| `functional` | 1129  |
+| `functional` | 1154  |
 | `boundary`   | 677   |
 | `negative`   | 615   |
 | `expansion`  | 437   |
@@ -31,6 +31,7 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | [`conformance/declarations`](conformance/declarations/README.md)                                                           |    43 | [`docs/language-reference/declarations.md`](../../language-reference/declarations.md)                                                           |
 | [`conformance/expressions-literal`](conformance/expressions-literal/README.md)                                             |    12 | [`docs/language-reference/expressions-literal.md`](../../language-reference/expressions-literal.md)                                             |
 | [`conformance/expressions-member-access`](conformance/expressions-member-access/README.md)                                 |     5 | [`docs/language-reference/expressions-member-access.md`](../../language-reference/expressions-member-access.md)                                 |
+| [`conformance/expressions-operator-precedence`](conformance/expressions-operator-precedence/README.md)                     |    25 | [`docs/language-reference/expressions-operator-precedence.md`](../../language-reference/expressions-operator-precedence.md)                     |
 | [`conformance/expressions-operators`](conformance/expressions-operators/README.md)                                         |    10 | [`docs/language-reference/expressions-operators.md`](../../language-reference/expressions-operators.md)                                         |
 | [`conformance/generics`](conformance/generics/README.md)                                                                   |    45 | [`docs/language-reference/generics.md`](../../language-reference/generics.md)                                                                   |
 | [`conformance/lexical-structure`](conformance/lexical-structure/README.md)                                                 |     8 | [`docs/language-reference/lexical-structure.md`](../../language-reference/lexical-structure.md)                                                 |
