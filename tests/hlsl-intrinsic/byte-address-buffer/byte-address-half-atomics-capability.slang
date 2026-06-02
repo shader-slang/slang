@@ -13,6 +13,7 @@
 //TEST:SIMPLE(filecheck=VECTOR_MIN_MAX): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_MIN_MAX
 //TEST:SIMPLE(filecheck=VECTOR_EXCHANGE): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_EXCHANGE
 //TEST:SIMPLE(filecheck=SCALAR_EXCHANGE): -target spirv -entry computeMain -stage compute -emit-spirv-directly -DTEST_DIRECT_SCALAR_EXCHANGE
+//TEST:SIMPLE(filecheck=SCALAR_HALF_EXCHANGE): -target spirv -entry computeMain -stage compute -emit-spirv-directly -DTEST_DIRECT_SCALAR_HALF_EXCHANGE
 //TEST:SIMPLE(filecheck=EMULATED): -target spirv -entry computeMain -stage compute -emit-spirv-directly -DTEST_EMULATED
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -capability cuda_sm_7_0
 
@@ -42,6 +43,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = float(originalValue.x + originalValue.y);
 #elif defined(TEST_DIRECT_SCALAR_EXCHANGE)
     uint originalValue = __atomic_exchange(uintBuffer[0], 1u);
+    outputBuffer[0] = float(originalValue);
+#elif defined(TEST_DIRECT_SCALAR_HALF_EXCHANGE)
+    half originalValue = __atomic_exchange(halfBuffer[0], 1.0h);
     outputBuffer[0] = float(originalValue);
 #elif defined(TEST_UNSUPPORTED_VECTOR_WIDTH)
     __atomic_add(unsupportedVectorBuffer[0], half3(1.0h, 2.0h, 3.0h));
@@ -136,6 +140,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // SCALAR_EXCHANGE: OpAtomicExchange %uint
 // SCALAR_EXCHANGE-NOT: OpCapability AtomicFloat16VectorNV
 // SCALAR_EXCHANGE-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+
+// SCALAR_HALF_EXCHANGE-NOT: OpCapability AtomicFloat16VectorNV
+// SCALAR_HALF_EXCHANGE-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// SCALAR_HALF_EXCHANGE: OpAtomicExchange %half
+// SCALAR_HALF_EXCHANGE-NOT: OpCapability AtomicFloat16VectorNV
+// SCALAR_HALF_EXCHANGE-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 
 // EMULATED-NOT: OpCapability AtomicFloat16AddEXT
 // EMULATED-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
