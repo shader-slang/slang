@@ -18,6 +18,21 @@ on:
         required: false
         type: number
         default: 120
+      ref:
+        description: "Git ref to check out. Empty = use github.sha (default)."
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository to check out. Empty = use github.repository (default)."
+        required: false
+        type: string
+        default: ""
+      is-fork-pr:
+        description: "Force fork-PR secret gating. Set true by /ci when the PR is from a fork."
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   sanitizer:
@@ -36,7 +51,9 @@ jobs:
       options: --user root
 
     env:
-      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+      IS_FORK_PR: >-
+        ${{ inputs.is-fork-pr
+            || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true) }}
 
     defaults:
       run:
@@ -48,6 +65,9 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
+          persist-credentials: ${{ inputs.repository == '' }}
           submodules: "recursive"
           # Need full history to diff PR changes against the base branch
           # for classifying sanitizer findings as PR-related vs pre-existing.
@@ -160,8 +180,13 @@ jobs:
             sccache --show-stats || true
           fi
 
+      # Three guards: master ref + not-a-fork-PR + default checkout path.
+      # The (inputs.ref == '' && inputs.repository == '') clause prevents a
+      # same-repo /ci on a draft branch from writing the master cache key —
+      # under repository_dispatch github.ref is still the default branch
+      # even though the checked-out code is a PR branch.
       - name: Save sccache cache
-        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && env.IS_FORK_PR != 'true' && inputs.ref == '' && inputs.repository == ''
         uses: actions/cache/save@v4
         with:
           path: /tmp/.cache/sccache

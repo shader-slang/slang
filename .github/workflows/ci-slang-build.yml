@@ -35,6 +35,21 @@ on:
         required: false
         type: boolean
         default: false
+      ref:
+        description: "Git ref to check out. Empty = use github.sha (default)."
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository to check out. Empty = use github.repository (default)."
+        required: false
+        type: string
+        default: ""
+      is-fork-pr:
+        description: "Force fork-PR secret gating. Set true by /ci when the PR is from a fork."
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -45,7 +60,9 @@ jobs:
       contents: read
 
     env:
-      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+      IS_FORK_PR: >-
+        ${{ inputs.is-fork-pr
+            || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true) }}
 
     defaults:
       run:
@@ -63,6 +80,9 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
+          persist-credentials: ${{ inputs.repository == '' }}
           submodules: "recursive"
           fetch-depth: "250"
           fetch-tags: true
@@ -312,9 +332,13 @@ jobs:
           path: artifacts-staging/
           retention-days: 1
 
-      # Save sccache cache (only when explicitly requested, e.g. from populate-sccache on master)
+      # Save sccache cache (only when explicitly requested, e.g. from populate-sccache on master).
+      # IS_FORK_PR + default-checkout-path guards are belt-and-braces:
+      # inputs.save-sccache is only set by populate-sccache.yml which runs on
+      # master with default inputs, but the extra guards prevent any future
+      # caller from accidentally enabling fork-driven or /ci-driven cache writes.
       - name: Save sccache cache
-        if: inputs.save-sccache && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: inputs.save-sccache && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && env.IS_FORK_PR != 'true' && inputs.ref == '' && inputs.repository == ''
         uses: actions/cache/save@v4
         with:
           path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}

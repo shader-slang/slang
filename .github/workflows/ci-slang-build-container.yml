@@ -9,6 +9,21 @@ on:
       runs-on:
         required: true
         type: string
+      ref:
+        description: "Git ref to check out. Empty = use github.sha (default)."
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository to check out. Empty = use github.repository (default)."
+        required: false
+        type: string
+        default: ""
+      is-fork-pr:
+        description: "Force fork-PR secret gating. Set true by /ci when the PR is from a fork."
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   # Uses nvidia/cuda container for CUDA support.
@@ -26,7 +41,9 @@ jobs:
       options: --user root -v /:/host_root
 
     env:
-      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+      IS_FORK_PR: >-
+        ${{ inputs.is-fork-pr
+            || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true) }}
 
     defaults:
       run:
@@ -64,6 +81,8 @@ jobs:
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
           persist-credentials: false
           submodules: "recursive"
           fetch-depth: "2"
@@ -205,9 +224,18 @@ jobs:
             exit 1
           fi
 
-      # Save sccache cache (master only, for populate-sccache workflow)
+      # Save sccache cache (master only, for populate-sccache workflow).
+      #
+      # Two guards beyond the master-ref check:
+      #   - env.IS_FORK_PR != 'true' — fork PRs (via pull_request or /ci)
+      #     must never write the trusted cache.
+      #   - inputs.ref == '' && inputs.repository == '' — only save when we
+      #     took the default checkout path. /ci forwards a fork or same-repo
+      #     PR SHA via these inputs, but under repository_dispatch github.ref
+      #     is still the default branch (master), so without this guard a
+      #     same-repo draft PR's /ci run would poison master cache keys.
       - name: Save sccache cache (master only)
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' && env.IS_FORK_PR != 'true' && inputs.ref == '' && inputs.repository == ''
         uses: actions/cache/save@v4
         with:
           path: /tmp/.cache/sccache

@@ -26,6 +26,16 @@ on:
         required: false
         type: boolean
         default: true
+      ref:
+        description: "Git ref to check out. Empty = use github.sha (default)."
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository to check out. Empty = use github.repository (default)."
+        required: false
+        type: string
+        default: ""
 
 jobs:
   # Run GPU tests in container with Vulkan and CUDA support.
@@ -79,6 +89,9 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
+          persist-credentials: ${{ inputs.repository == '' }}
           submodules: "recursive"
           fetch-depth: "1"
 
@@ -174,7 +187,8 @@ jobs:
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
 
       - name: Test Slang via glsl
-        if: inputs.gpu-tier == 't4' && inputs.config == 'release' && github.event_name == 'pull_request'
+        # Run on pull_request and /ci dispatches; skip on merge_group to reduce CI load.
+        if: inputs.gpu-tier == 't4' && inputs.config == 'release' && (github.event_name == 'pull_request' || github.event_name == 'repository_dispatch')
         run: |
           ulimit -c unlimited
           export SLANG_RUN_SPIRV_VALIDATION=1
@@ -321,6 +335,9 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
+          persist-credentials: ${{ inputs.repository == '' }}
           submodules: "recursive"
           fetch-depth: "1"
 
