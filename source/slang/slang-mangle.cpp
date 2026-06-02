@@ -620,6 +620,28 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
     {
         emit(context, "I");
         emitType(context, getSup(context->astBuilder, inheritanceDeclRef));
+
+        // An interface-level constraint that is a direct member of an interface
+        // (a `GenericTypeConstraintDecl` produced by relocating an associated
+        // type's bound -- `associatedtype A : IFoo`, an `associatedtype ...
+        // where` clause, or an explicit `__constraint`) is not uniquely
+        // identified by the parent interface and the bound `sup` alone: a single
+        // interface may constrain several associated types to the *same* bound,
+        // e.g. `associatedtype A : IFoo; associatedtype B : IFoo;`. Without
+        // encoding the constrained type these would mangle to the same
+        // requirement-key name and collide (e.g. in the witness-table cloning
+        // dictionary during linking). Emit the constrained `sub` type so each
+        // such constraint gets a distinct name. Ordinary inheritance
+        // (`InheritanceDecl`) and generic `where` constraints (whose parent is a
+        // generic, not an interface) are unaffected.
+        if (auto genConstraintDeclRef = declRef.as<GenericTypeConstraintDecl>())
+        {
+            if (as<InterfaceDecl>(genConstraintDeclRef.getDecl()->parentDecl))
+            {
+                emitType(context, getSub(context->astBuilder, genConstraintDeclRef));
+            }
+        }
+
         if (parentGenericDeclRef)
         {
             ignoreName = true;
