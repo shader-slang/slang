@@ -4539,20 +4539,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto elementCountInst = as<IRIntLit>(vectorType->getElementCount());
             if (!elementCountInst)
             {
-                SLANG_DIAGNOSE_UNEXPECTED(
-                    m_sink,
-                    atomicInst,
-                    "SPIR-V fp16 vector atomics require a constant half2 or half4 type.");
+                m_sink->diagnose(Diagnostics::SpirvFp16VectorAtomicNonConstantSize{
+                    .location = atomicInst->sourceLoc});
                 return true;
             }
 
             auto elementCount = elementCountInst->getValue();
             if (elementCount != 2 && elementCount != 4)
             {
-                SLANG_DIAGNOSE_UNEXPECTED(
-                    m_sink,
-                    atomicInst,
-                    "SPIR-V fp16 vector atomics only support half2 and half4.");
+                m_sink->diagnose(Diagnostics::SpirvFp16VectorAtomicUnsupportedWidth{
+                    .location = atomicInst->sourceLoc});
                 return true;
             }
 

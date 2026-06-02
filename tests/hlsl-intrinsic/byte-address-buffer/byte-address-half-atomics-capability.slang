@@ -45,6 +45,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = float(originalValue);
 #elif defined(TEST_UNSUPPORTED_VECTOR_WIDTH)
     __atomic_add(unsupportedVectorBuffer[0], half3(1.0h, 2.0h, 3.0h));
+// UNSUPPORTED_VECTOR_WIDTH: error[E50013]: invalid SPIR-V fp16 vector atomic width
 // UNSUPPORTED_VECTOR_WIDTH: SPIR-V fp16 vector atomics only support half2 and half4.
 #elif defined(TEST_EMULATED)
     half originalValue;
