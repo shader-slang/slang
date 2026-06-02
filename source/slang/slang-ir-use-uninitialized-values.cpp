@@ -534,10 +534,19 @@ static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, Di
             printDiagnosticArg(fieldNameSb, field->getKey());
             if (synthesized)
             {
+                // A field key's sourceLoc is set when its decl is lowered, but
+                // a key deserialized from a precompiled module carries no
+                // location that resolves in this compile, which left E41021
+                // with no file:line. Fall back to the constructor's use site
+                // for that case. This fallback branch is reached only for
+                // imported structs and is not currently test-covered: the
+                // equivalent module case errors with E39999 before E41021 is
+                // emitted.
+                SourceLoc fieldLoc = field->getKey()->sourceLoc;
                 sink->diagnose(Diagnostics::FieldNotDefaultInitialized{
                     .typeName = typeNameSb.produceString(),
                     .fieldName = fieldNameSb.produceString(),
-                    .location = field->getKey()->sourceLoc,
+                    .location = fieldLoc.isValid() ? fieldLoc : findFirstUseLoc(func),
                 });
             }
             else

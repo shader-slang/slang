@@ -2368,7 +2368,7 @@ warning(
     "special-type-member-leaks-from-parameter-group",
     31107,
     "This member cannot be included in the same binding as some other parts of this struct, and will be moved into another parameter binding slot.",
-    span { loc = "member:IRInst", message = "This member will leak into a separate binding slot." }
+    span { loc = "location", message = "This member will leak into a separate binding slot." }
 )
 
 err(

@@ -1237,8 +1237,11 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
             if (legalElementType.flavor == LegalType::Flavor::pair &&
                 as<IRConstantBufferType>(type))
             {
-                context->m_sink->diagnose(Diagnostics::SpecialTypeLeaksFromParameterGroup{
-                    .location = findFirstUseLoc(type)});
+                // findFirstUseLoc gives the parameter group's first use site; it is
+                // reused below as the fallback location for the per-member warning.
+                SourceLoc groupLoc = findFirstUseLoc(type);
+                context->m_sink->diagnose(
+                    Diagnostics::SpecialTypeLeaksFromParameterGroup{.location = groupLoc});
 
                 // indicate which elements cannot be part of the parameter group
                 auto& specialType = legalElementType.getPair()->specialType;
@@ -1247,9 +1250,17 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
                     auto specialTuple = specialType.getTuple();
                     for (auto specialElement : specialTuple->elements)
                     {
+                        // A member key deserialized from a precompiled module
+                        // carries no source location that resolves in this
+                        // compile, which left the per-member warning with no
+                        // file:line. Fall back to the parameter group's use
+                        // site (groupLoc, the ConstantBuffer<> declaration in
+                        // the consuming module), which recovers a location in
+                        // that case.
+                        SourceLoc memberLoc = specialElement.key->sourceLoc;
                         context->m_sink->diagnose(
                             Diagnostics::SpecialTypeMemberLeaksFromParameterGroup{
-                                .member = specialElement.key});
+                                .location = memberLoc.isValid() ? memberLoc : groupLoc});
                     }
                 }
             }
