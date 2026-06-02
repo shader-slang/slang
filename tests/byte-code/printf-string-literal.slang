@@ -17,12 +17,19 @@ void main()
     printf("%s\n", s);
     NativeString n = "nat";
     printf("%s\n", n);
+    // Mix a string-literal %s with a non-string %d in one printf so both copy-size
+    // branches fire in a single Print: the literal must resolve and the int must not
+    // be over-copied as a pointer. Also place a literal in a non-first vararg slot.
+    printf("%s=%d\n", "k", 5);
+    printf("%d %s\n", 1, "x");
 }
 
 // CHECK: lit
 // CHECK: tern
 // CHECK: str
 // CHECK: nat
+// CHECK: k=5
+// CHECK: 1 x
 
 // BC: func main
 // BC: print {{.*}}str:"lit"
