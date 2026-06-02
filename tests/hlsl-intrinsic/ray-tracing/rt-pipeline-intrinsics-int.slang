@@ -4,6 +4,7 @@
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage intersection -profile sm_6_5 -DNOMOTION
 //TEST:SIMPLE(filecheck=SVPID_SPIRV):-target spirv-assembly -entry main_sv_primitiveid -stage intersection
 //TEST:SIMPLE(filecheck=SVPID_DXIL):-target dxil-assembly -entry main_sv_primitiveid -stage intersection -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_INT_DXIL):-target dxil-assembly -entry main_sv_primitiveid_int -stage intersection -profile sm_6_5 -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
 // SPIRV-DAG: OpCapability RayTracingKHR
@@ -60,6 +61,10 @@
 
 // SVPID_DXIL: call i32 @dx.op.primitiveIndex.i32
 // SVPID_DXIL: call i1 @dx.op.reportHit.struct.MyAttributes_0
+
+// SVPID_INT_DXIL: call i32 @dx.op.primitiveIndex.i32
+// SVPID_INT_DXIL: sitofp i32
+// SVPID_INT_DXIL: call i1 @dx.op.reportHit.struct.MyAttributes_0
 
 float CheckRayDispatchValues() // all
 {
@@ -206,6 +211,14 @@ void main()
 
 [shader("intersection")]
 void main_sv_primitiveid(uint primitiveID : SV_PrimitiveID)
+{
+    MyAttributes IDs;
+    IDs.attr = float(primitiveID);
+    ReportHit(1.0f, 0, IDs);
+}
+
+[shader("intersection")]
+void main_sv_primitiveid_int(int primitiveID : SV_PrimitiveID)
 {
     MyAttributes IDs;
     IDs.attr = float(primitiveID);

@@ -27,23 +27,29 @@ void main_isect(int pid : SV_PrimitiveID)
 // ISECT_SPIRV: %{{.*}} = OpVariable %_ptr_Input_int Input
 
 [shader("anyhit")]
-void main_ahit(inout Payload payload, int pid : SV_PrimitiveID)
+void main_ahit(
+    inout Payload payload,
+    in BuiltInTriangleIntersectionAttributes attribs : SV_IntersectionAttributes,
+    int pid : SV_PrimitiveID)
 {
-    payload.val = float(pid);
+    payload.val = float(pid) + attribs.barycentrics.x + attribs.barycentrics.y;
 }
 
 // AHIT_SPIRV: OpEntryPoint AnyHitKHR
 // AHIT_SPIRV: BuiltIn PrimitiveId
+// AHIT_SPIRV-DAG: OpTypePointer HitAttribute{{NV|KHR}}
 // AHIT_SPIRV: %{{.*}} = OpVariable %_ptr_Input_int Input
-// AHIT_SPIRV-NOT: OpTypePointer HitAttribute
 
 [shader("closesthit")]
-void main_chit(inout Payload payload, int pid : SV_PrimitiveID)
+void main_chit(
+    inout Payload payload,
+    in BuiltInTriangleIntersectionAttributes attribs,
+    int pid : SV_PrimitiveID)
 {
-    payload.val = float(pid);
+    payload.val = float(pid) + attribs.barycentrics.x + attribs.barycentrics.y;
 }
 
 // CHIT_SPIRV: OpEntryPoint ClosestHitKHR
 // CHIT_SPIRV: BuiltIn PrimitiveId
+// CHIT_SPIRV-DAG: OpTypePointer HitAttribute{{NV|KHR}}
 // CHIT_SPIRV: %{{.*}} = OpVariable %_ptr_Input_int Input
-// CHIT_SPIRV-NOT: OpTypePointer HitAttribute
