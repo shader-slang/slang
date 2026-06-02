@@ -4955,6 +4955,13 @@ err(
 )
 
 err(
+    "spirv-fp16-vector-atomic-unsupported-operation",
+    50014,
+    "invalid SPIR-V fp16 vector atomic operation",
+    span { loc = "location", message = "SPIR-V fp16 vector atomics only support add, min, max, and exchange operations." }
+)
+
+err(
     "invalid-mesh-stage-output-topology",
     50060,
     "invalid mesh output topology",

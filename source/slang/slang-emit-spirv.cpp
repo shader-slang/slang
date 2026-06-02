@@ -4530,16 +4530,37 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         }
 
-        auto maybeRequireFp16VectorAtomicCapability = [&](IRType* valueType)
+        auto isFp16VectorAtomicType = [](IRType* valueType)
         {
             auto vectorType = as<IRVectorType>(valueType);
             if (!vectorType || vectorType->getElementType()->getOp() != kIROp_HalfType)
                 return false;
 
+            return true;
+        };
+
+        auto maybeDiagnoseUnsupportedFp16VectorAtomicOperation = [&](IRType* valueType)
+        {
+            if (!isFp16VectorAtomicType(valueType))
+                return false;
+
+            m_sink->diagnose(Diagnostics::SpirvFp16VectorAtomicUnsupportedOperation{
+                .location = atomicInst->sourceLoc});
+            return true;
+        };
+
+        auto maybeRequireFp16VectorAtomicCapability = [&](IRType* valueType)
+        {
+            if (!isFp16VectorAtomicType(valueType))
+                return false;
+
+            auto vectorType = as<IRVectorType>(valueType);
             auto elementCountInst = as<IRIntLit>(vectorType->getElementCount());
             if (!elementCountInst)
             {
-                SLANG_UNEXPECTED("non-IntLit vector element count reached SPIR-V fp16 atomic emit");
+                m_sink->diagnose(Diagnostics::SpirvFp16VectorAtomicUnsupportedWidth{
+                    .location = atomicInst->sourceLoc});
+                return true;
             }
 
             auto elementCount = elementCountInst->getValue();
@@ -4558,6 +4579,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         switch (op)
         {
+        case SpvOpAtomicLoad:
+        case SpvOpAtomicStore:
+        case SpvOpAtomicCompareExchange:
+        case SpvOpAtomicCompareExchangeWeak:
+            maybeDiagnoseUnsupportedFp16VectorAtomicOperation(atomicValueType);
+            break;
         case SpvOpAtomicExchange:
             maybeRequireFp16VectorAtomicCapability(atomicValueType);
             break;

@@ -16,6 +16,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_MIN_MAX
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_EXCHANGE_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_EXCHANGE
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED_VECTOR_WIDTH,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_UNSUPPORTED_VECTOR_WIDTH
+//DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED_VECTOR_COMPARE_EXCHANGE,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_UNSUPPORTED_VECTOR_COMPARE_EXCHANGE
 
 // Pointer-form fp16 vector checks. These paths are emitted as vector atomics, so
 // they must diagnose missing spvAtomicFloat16VectorNV when only scalar fp16 add is enabled.
@@ -166,6 +167,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     __atomic_add(unsupportedVectorBuffer[0], half3(1.0h, 2.0h, 3.0h));
 // UNSUPPORTED_VECTOR_WIDTH: error[E50013]: invalid SPIR-V fp16 vector atomic width
 // UNSUPPORTED_VECTOR_WIDTH: SPIR-V fp16 vector atomics only support half2 and half4.
+#elif defined(TEST_UNSUPPORTED_VECTOR_COMPARE_EXCHANGE)
+    half2 originalValue = __atomic_compare_exchange(
+        vectorBuffer[0],
+        half2(1.0h, 2.0h),
+        half2(3.0h, 4.0h));
+// UNSUPPORTED_VECTOR_COMPARE_EXCHANGE: error[E50014]: invalid SPIR-V fp16 vector atomic operation
+// UNSUPPORTED_VECTOR_COMPARE_EXCHANGE: SPIR-V fp16 vector atomics only support add, min, max, and exchange operations.
+    outputBuffer[0] = float(originalValue.x + originalValue.y);
 #elif defined(TEST_EMULATED)
     half originalValue;
     tmpBuffer.InterlockedAddF16Emulated(0, 1.0h, originalValue);
