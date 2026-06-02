@@ -16,10 +16,12 @@ struct Block {
 [numthreads(1,1,1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
+    uint address = threadId.x;
+
     // CHECK: error[E41300]: invalid byte address buffer alignment
     // CHECK: error[E41300]: invalid byte address buffer alignment
-    buffer.Store<Block>(0, buffer.LoadAligned<Block>(1, 5));
-    buffer.Store<Block>(1, buffer.Load<Block>(0), 3);
+    buffer.Store<Block>(address, buffer.LoadAligned<Block>(address, 5));
+    buffer.Store<Block>(address, buffer.Load<Block>(address), 3);
 
 }
 

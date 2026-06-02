@@ -243,6 +243,10 @@ struct ByteAddressBufferLegalizationContext
     // Returns true if a vectorized load or store of `alignmentVal` bytes at
     // `baseOffset + immediateOffset` is known to be sufficiently aligned.
     //
+    // As a side effect, this emits `ByteAddressBufferUnaligned` for a dynamic
+    // base offset when an explicit nonzero alignment is known but insufficient
+    // for `alignmentVal`.
+    //
     // Keep the dynamic base offset and constant nested-field offset separate:
     // a synthesized add is not an integer literal, so pre-summing them would
     // hide constant immediate-offset misalignment from this check.
@@ -623,6 +627,9 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto basicType = as<IRBasicType>(type))
         {
+            // Only split misaligned 8-byte scalar loads for targets that translate
+            // byte-address buffers into typed structured buffers. Targets that keep
+            // byte-address-buffer operations use the simple/lowerBasicTypeOps paths.
             if (m_options.translateToStructuredBufferOps)
             {
                 IRSizeAndAlignment sizeAlignment;
@@ -1520,6 +1527,8 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto basicType = as<IRBasicType>(type))
         {
+            // Match the load path: this split is only needed when byte-address buffers
+            // are translated into typed structured buffers.
             if (m_options.translateToStructuredBufferOps)
             {
                 IRSizeAndAlignment sizeAlignment;
