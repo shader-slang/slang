@@ -3097,6 +3097,9 @@ void consolidateRayTracingParameters(
         if (!isVaryingParameter(paramLayout))
             continue;
 
+        // Direct SPIR-V also reaches this pass for ray-tracing entry points.
+        // Only the GLSL/glslang path needs SV_PrimitiveID kept out of payload
+        // and hit-attribute consolidation so it can lower through gl_PrimitiveID.
         if (!codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
         {
             if (auto systemValueAttr = paramLayout->findSystemValueSemanticAttr())

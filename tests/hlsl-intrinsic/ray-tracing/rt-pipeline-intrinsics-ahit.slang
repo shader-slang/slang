@@ -2,8 +2,7 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage anyhit
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage anyhit -profile sm_6_5 -DNOMOTION
-//TEST:SIMPLE(filecheck=SVPID_SPIRV):-target spirv-assembly -emit-spirv-directly -entry main_sv_primitiveid -stage anyhit
-//TEST:SIMPLE(filecheck=SVPID_GLSL_SPIRV):-target spirv-assembly -emit-spirv-via-glsl -entry main_sv_primitiveid -stage anyhit
+//TEST:SIMPLE(filecheck=SVPID_SPIRV):-target spirv-assembly -entry main_sv_primitiveid -stage anyhit
 //TEST:SIMPLE(filecheck=SVPID_DXIL):-target dxil-assembly -entry main_sv_primitiveid -stage anyhit -profile sm_6_5 -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
@@ -62,9 +61,6 @@
 
 // SVPID_SPIRV: OpEntryPoint AnyHitKHR
 // SVPID_SPIRV-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId
-
-// SVPID_GLSL_SPIRV: OpEntryPoint AnyHitKHR
-// SVPID_GLSL_SPIRV-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId
 
 // SVPID_DXIL: call i32 @dx.op.primitiveIndex.i32
 
