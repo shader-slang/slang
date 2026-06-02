@@ -4948,13 +4948,6 @@ warning(
 )
 
 err(
-    "spirv-fp16-vector-atomic-non-constant-size",
-    50012,
-    "invalid SPIR-V fp16 vector atomic type",
-    span { loc = "location", message = "SPIR-V fp16 vector atomics require a constant half2 or half4 type." }
-)
-
-err(
     "spirv-fp16-vector-atomic-unsupported-width",
     50013,
     "invalid SPIR-V fp16 vector atomic width",

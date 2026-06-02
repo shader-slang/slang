@@ -4539,9 +4539,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto elementCountInst = as<IRIntLit>(vectorType->getElementCount());
             if (!elementCountInst)
             {
-                m_sink->diagnose(Diagnostics::SpirvFp16VectorAtomicNonConstantSize{
-                    .location = atomicInst->sourceLoc});
-                return true;
+                SLANG_UNEXPECTED(
+                    "non-IntLit vector element count reached SPIR-V fp16 atomic emit");
             }
 
             auto elementCount = elementCountInst->getValue();
