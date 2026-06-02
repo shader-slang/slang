@@ -26997,6 +26997,20 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
     __intrinsic_op($(kIROp_CastUInt2ToDescriptorHandle))
     __init(uint2 handleValue);
 
+    [ForceInline]
+    [require(spvDescriptorHeapEXT, descriptor_handle)]
+    __init(uint handleValue)
+    {
+        return DescriptorHandle<T>(uint2(handleValue, 0));
+    }
+
+    [ForceInline]
+    [require(spvDescriptorHeapEXT, descriptor_handle)]
+    __init(int handleValue)
+    {
+        return DescriptorHandle<T>(uint(handleValue));
+    }
+
     /// Constructor for uint64_t handles
     [ForceInline]
     [require(spvBindlessTextureNV, descriptor_handle)]
