@@ -1,14 +1,16 @@
 // Scalar fp16 add checks. `NO_FP16_ATOMIC` has no fp16 atomic capability; `VECTOR_ONLY`
 // has the vector capability but intentionally lacks the scalar spvAtomicFloat16AddEXT.
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_SCALAR):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16AddEXT -output-using-type -xslang -DTEST_RUNTIME_SCALAR
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_SCALAR):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16AddEXT -render-feature atomic-half -output-using-type -xslang -DTEST_RUNTIME_SCALAR
 //TEST:SIMPLE(filecheck=SCALAR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT
 //DIAGNOSTIC_TEST:SIMPLE(diag=NO_FP16_ATOMIC,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spirv_1_5
 //DIAGNOSTIC_TEST:SIMPLE(diag=VECTOR_ONLY,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16VectorNV
 
 // Direct half-vector `__atomic_*` checks. `DIRECT` selects direct structured-buffer
 // atomics; `NO_VECTOR` means only the scalar fp16 atomic capability is enabled.
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT4):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT_VECTOR4
+// RHI does not yet expose a feature gate for VK_NV_shader_atomic_float16_vector, so these
+// runtime checks stay disabled while the active tests below cover SPIR-V codegen/diagnostics.
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT4):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT_VECTOR4
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_ATOMIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_VECTOR4_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR4_ATOMIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_MIN_MAX

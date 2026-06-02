@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -emit-spirv-directly
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type
+// RHI does not yet expose a feature gate for VK_NV_shader_atomic_float16_vector, so this runtime
+// check stays disabled while the active SIMPLE test verifies SPIR-V capability and instruction use.
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type
 
 //TEST_INPUT:ubuffer(stride=4, count=12):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
