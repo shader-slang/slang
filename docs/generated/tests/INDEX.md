@@ -8,14 +8,14 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 ## Suite totals
 
-- **Bundles:** 59
-- **Total `.slang` tests:** 2891
+- **Bundles:** 61
+- **Total `.slang` tests:** 2970
 
 | Intent       | Count |
 | ------------ | ----- |
-| `functional` | 1066  |
-| `boundary`   | 672   |
-| `negative`   | 604   |
+| `functional` | 1129  |
+| `boundary`   | 677   |
+| `negative`   | 615   |
 | `expansion`  | 437   |
 | `stress`     | 111   |
 | `regression` | 1     |
@@ -28,11 +28,13 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 | -------------------------------------------------------------------------------------------------------------------------- | ----: | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`conformance/basics-execution-divergence-reconvergence`](conformance/basics-execution-divergence-reconvergence/README.md) |     8 | [`docs/language-reference/basics-execution-divergence-reconvergence.md`](../../language-reference/basics-execution-divergence-reconvergence.md) |
 | [`conformance/basics-program-execution`](conformance/basics-program-execution/README.md)                                   |    10 | [`docs/language-reference/basics-program-execution.md`](../../language-reference/basics-program-execution.md)                                   |
+| [`conformance/declarations`](conformance/declarations/README.md)                                                           |    43 | [`docs/language-reference/declarations.md`](../../language-reference/declarations.md)                                                           |
 | [`conformance/expressions-literal`](conformance/expressions-literal/README.md)                                             |    12 | [`docs/language-reference/expressions-literal.md`](../../language-reference/expressions-literal.md)                                             |
 | [`conformance/expressions-member-access`](conformance/expressions-member-access/README.md)                                 |     5 | [`docs/language-reference/expressions-member-access.md`](../../language-reference/expressions-member-access.md)                                 |
 | [`conformance/expressions-operators`](conformance/expressions-operators/README.md)                                         |    10 | [`docs/language-reference/expressions-operators.md`](../../language-reference/expressions-operators.md)                                         |
 | [`conformance/generics`](conformance/generics/README.md)                                                                   |    45 | [`docs/language-reference/generics.md`](../../language-reference/generics.md)                                                                   |
 | [`conformance/lexical-structure`](conformance/lexical-structure/README.md)                                                 |     8 | [`docs/language-reference/lexical-structure.md`](../../language-reference/lexical-structure.md)                                                 |
+| [`conformance/statements`](conformance/statements/README.md)                                                               |    36 | [`docs/language-reference/statements.md`](../../language-reference/statements.md)                                                               |
 | [`conformance/types-array`](conformance/types-array/README.md)                                                             |     6 | [`docs/language-reference/types-array.md`](../../language-reference/types-array.md)                                                             |
 | [`conformance/types-enum`](conformance/types-enum/README.md)                                                               |     5 | [`docs/language-reference/types-enum.md`](../../language-reference/types-enum.md)                                                               |
 | [`conformance/types-extension`](conformance/types-extension/README.md)                                                     |     5 | [`docs/language-reference/types-extension.md`](../../language-reference/types-extension.md)                                                     |

@@ -907,4 +907,26 @@ bundles:
       - source/slang/slang-ir-uniformity.cpp
     size_cap_files: 30
 
+  conformance/declarations:
+    source_doc: docs/language-reference/declarations.md
+    watched_paths:
+      - docs/language-reference/declarations.md
+      - source/slang/slang-check-decl.cpp
+      - source/slang/slang-parser.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-check-decl.cpp
+    size_cap_files: 80
+
+  conformance/statements:
+    source_doc: docs/language-reference/statements.md
+    watched_paths:
+      - docs/language-reference/statements.md
+      - source/slang/slang-check-stmt.cpp
+      - source/slang/slang-parser.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-check-stmt.cpp
+    size_cap_files: 60
+
   # --- top-level reference -----------------------------------------------
