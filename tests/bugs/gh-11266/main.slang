@@ -1,7 +1,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 333 0 0], stride=4):name=sys.entries
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=output
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=output
 
 //TEST_INPUT: type_conformance m.ConcreteA:m.IFoo = 0
 
@@ -53,3 +53,4 @@ void computeMain()
 // BUF-NEXT: 333
 // BUF-NEXT: 0
 // BUF-NEXT: -999
+// BUF-NEXT: 0
