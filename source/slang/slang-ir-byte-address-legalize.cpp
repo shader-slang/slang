@@ -240,8 +240,12 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    // Helper function to check if the offset at which the resource is indexed into
-    // is aligned enough to allow a vectorized load or store.
+    // Returns true if a vectorized load or store of `alignmentVal` bytes at
+    // `baseOffset + immediateOffset` is known to be sufficiently aligned.
+    //
+    // Keep the dynamic base offset and constant nested-field offset separate:
+    // a synthesized add is not an integer literal, so pre-summing them would
+    // hide constant immediate-offset misalignment from this check.
     bool isAligned(
         IRInst* baseOffset,
         IRIntegerValue immediateOffset,
@@ -619,6 +623,18 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto basicType = as<IRBasicType>(type))
         {
+            if (m_options.translateToStructuredBufferOps)
+            {
+                IRSizeAndAlignment sizeAlignment;
+                SLANG_RETURN_NULL_ON_FAIL(
+                    getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
+                if (sizeAlignment.size == 8 &&
+                    !isAligned(baseOffset, immediateOffset, alignment, sizeAlignment.getStride()))
+                {
+                    return emitLegal64BitLoad(type, buffer, baseOffset, immediateOffset, alignment);
+                }
+            }
+
             // Most basic scalar types can be handled directly on targets,
             // but as described above for vectors, the D3D11/DXBC target
             // only support loading `uint` values, so we need to emulate
@@ -693,6 +709,34 @@ struct ByteAddressBufferLegalizationContext
         //
         return m_builder
             .emitIntrinsicInst(type, op, elementVals.getCount(), elementVals.getBuffer());
+    }
+
+    IRInst* emitLegal64BitLoad(
+        IRType* type,
+        IRInst* buffer,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* alignment)
+    {
+        auto uintType = m_builder.getUIntType();
+        auto uint64Type = m_builder.getUInt64Type();
+
+        auto loLoad = emitLegalLoad(uintType, buffer, baseOffset, immediateOffset, alignment);
+        if (!loLoad)
+            return nullptr;
+
+        auto hiLoad = emitLegalLoad(uintType, buffer, baseOffset, immediateOffset + 4, alignment);
+        if (!hiLoad)
+            return nullptr;
+
+        auto lo64 = m_builder.emitCast(uint64Type, loLoad);
+        auto hi64 = m_builder.emitCast(uint64Type, hiLoad);
+        auto shift = m_builder.emitShl(
+            uint64Type,
+            hi64,
+            m_builder.getIntValue(uint64Type, 32));
+        auto fullValue = m_builder.emitBitOr(uint64Type, lo64, shift);
+        return m_builder.emitBitCast(type, fullValue);
     }
 
     // All of the loading operations above eventually bottom out at `emitSimpleLoad`,
@@ -1479,6 +1523,17 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto basicType = as<IRBasicType>(type))
         {
+            if (m_options.translateToStructuredBufferOps)
+            {
+                IRSizeAndAlignment sizeAlignment;
+                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
+                if (sizeAlignment.size == 8 &&
+                    !isAligned(baseOffset, immediateOffset, alignment, sizeAlignment.getStride()))
+                {
+                    return emitLegal64BitStore(buffer, baseOffset, immediateOffset, alignment, value);
+                }
+            }
+
             if (m_options.useBitCastFromUInt)
             {
                 if (auto unsignedType = getSameSizeUIntType(basicType))
@@ -1495,6 +1550,32 @@ struct ByteAddressBufferLegalizationContext
         }
 
         return emitSimpleStore(type, buffer, baseOffset, immediateOffset, value);
+    }
+
+    Result emitLegal64BitStore(
+        IRInst* buffer,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* alignment,
+        IRInst* value)
+    {
+        auto uintType = m_builder.getUIntType();
+        auto uint64Type = m_builder.getUInt64Type();
+
+        auto uint64Val = m_builder.emitBitCast(uint64Type, value);
+        auto loVal = m_builder.emitCast(uintType, uint64Val);
+        auto hiVal = m_builder.emitCast(
+            uintType,
+            m_builder.emitShr(
+                uint64Type,
+                uint64Val,
+                m_builder.getIntValue(uint64Type, 32)));
+
+        SLANG_RETURN_ON_FAIL(
+            emitLegalStore(uintType, buffer, baseOffset, immediateOffset, alignment, loVal));
+        SLANG_RETURN_ON_FAIL(
+            emitLegalStore(uintType, buffer, baseOffset, immediateOffset + 4, alignment, hiVal));
+        return SLANG_OK;
     }
 
     Result emitSimpleStore(
