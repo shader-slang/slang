@@ -206,23 +206,24 @@ else
     # runs once a day; data quality > runner-minute savings.
     AGENTIC_TEST_ARGS+=("-server-count" "1")
 
-    # Tests that crash slang-test under coverage instrumentation. The
-    # orchestrator dies (SIGSEGV) on these and takes the rest of the
-    # suite down, so they're excluded from the coverage agentic pass
-    # via -exclude-prefix. They still run in ci-agentic-tests-nightly
-    # where the binary has no coverage instrumentation and the
-    # failures just bucket as expected-fail.
-    AGENTIC_COVERAGE_EXCLUDES=(
-      # Run 26813684019 (sequential reproducer): crashes immediately
-      # after metadata/type-layout-base.slang passes. Already a known
-      # Linux failure on the uninstrumented nightly (Cluster C in
-      # docs/generated/tests/_meta/expected-failures.txt); coverage
-      # instrumentation escalates the failure to SIGSEGV.
-      "docs/generated/tests/ir-reference/metadata/unorm-attr-on-buffer-element.slang"
-    )
-    for excl in "${AGENTIC_COVERAGE_EXCLUDES[@]}"; do
-      AGENTIC_TEST_ARGS+=("-exclude-prefix" "$excl")
-    done
+    # Read coverage-only exclude list from
+    # docs/generated/tests/_meta/agentic-coverage-excludes.txt and add
+    # one -exclude-prefix flag per entry. These are tests that crash
+    # slang-test under coverage instrumentation (the orchestrator dies
+    # SIGSEGV and loses the tail of the suite); they still run in
+    # ci-agentic-tests-nightly against the uninstrumented binary.
+    AGENTIC_COVERAGE_EXCLUDES_FILE="$REPO_ROOT/docs/generated/tests/_meta/agentic-coverage-excludes.txt"
+    if [ -f "$AGENTIC_COVERAGE_EXCLUDES_FILE" ]; then
+      while IFS= read -r line || [ -n "$line" ]; do
+        # Strip trailing comment, then trim whitespace.
+        line="${line%%#*}"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        if [ -n "$line" ]; then
+          AGENTIC_TEST_ARGS+=("-exclude-prefix" "$line")
+        fi
+      done <"$AGENTIC_COVERAGE_EXCLUDES_FILE"
+    fi
     # Retry once on crash (exit > 128 = killed by signal). The suite
     # is long (~2680 bundles); a single SIGSEGV in slang-test mid-run
     # loses the rest of the pass and produces minimal coverage uplift.
