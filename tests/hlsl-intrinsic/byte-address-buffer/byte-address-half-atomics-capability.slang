@@ -9,6 +9,7 @@
 // atomics; `NO_VECTOR` means only the scalar fp16 atomic capability is enabled.
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_ATOMIC
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_VECTOR4_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR4_ATOMIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_MIN_MAX
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_EXCHANGE_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_EXCHANGE
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED_VECTOR_WIDTH,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_UNSUPPORTED_VECTOR_WIDTH
@@ -24,6 +25,7 @@
 //TEST:SIMPLE(filecheck=IGNORE_CAPS): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -ignore-capabilities -capability spirv_1_5
 //TEST:SIMPLE(filecheck=BOTH): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT -capability spvAtomicFloat16VectorNV
 //TEST:SIMPLE(filecheck=VECTOR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_ATOMIC
+//TEST:SIMPLE(filecheck=VECTOR4): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR4_ATOMIC
 //TEST:SIMPLE(filecheck=VECTOR_MIN_MAX): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_MIN_MAX
 //TEST:SIMPLE(filecheck=VECTOR_EXCHANGE): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_EXCHANGE
 //TEST:SIMPLE(filecheck=SCALAR_EXCHANGE): -target spirv -entry computeMain -stage compute -emit-spirv-directly -DTEST_DIRECT_SCALAR_EXCHANGE
@@ -39,6 +41,8 @@ RWStructuredBuffer<float> outputBuffer;
 RWStructuredBuffer<half> halfBuffer;
 //TEST_INPUT:ubuffer(stride=4, count=4):name=vectorBuffer
 RWStructuredBuffer<half2> vectorBuffer;
+//TEST_INPUT:ubuffer(stride=8, count=4):name=vector4Buffer
+RWStructuredBuffer<half4> vector4Buffer;
 #ifdef TEST_UNSUPPORTED_VECTOR_WIDTH
 RWStructuredBuffer<half3> unsupportedVectorBuffer;
 #endif
@@ -113,6 +117,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     __atomic_add(vectorBuffer[0], half2(1.0h, 2.0h));
 // DIRECT_NO_VECTOR: entry point uses capabilities not in specified profile
 // DIRECT_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
+#elif defined(TEST_DIRECT_VECTOR4_ATOMIC)
+    __atomic_add(vector4Buffer[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
+// DIRECT_VECTOR4_NO_VECTOR: entry point uses capabilities not in specified profile
+// DIRECT_VECTOR4_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
 #elif defined(TEST_DIRECT_VECTOR_MIN_MAX)
     __atomic_min(vectorBuffer[0], half2(1.0h, 2.0h));
 // DIRECT_MIN_MAX_NO_VECTOR: entry point uses capabilities not in specified profile
@@ -199,6 +207,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // VECTOR: OpCapability AtomicFloat16VectorNV
 // VECTOR: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 // VECTOR: OpAtomicFAddEXT %v2half
+
+// VECTOR4-NOT: OpCapability AtomicFloat16AddEXT
+// VECTOR4-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
+// VECTOR4: OpCapability AtomicFloat16VectorNV
+// VECTOR4: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// VECTOR4: OpAtomicFAddEXT %v4half
+// VECTOR4-NOT: OpCapability AtomicFloat16AddEXT
+// VECTOR4-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
 
 // VECTOR_MIN_MAX-NOT: OpCapability AtomicFloat16AddEXT
 // VECTOR_MIN_MAX-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
