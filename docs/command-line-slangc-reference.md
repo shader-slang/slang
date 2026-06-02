@@ -1,5 +1,3 @@
-Compiling core module on debug build, this can take a while.
-Compiling core module took 54.00 seconds.
 # Slang Command Line Options
 
 *Usage:*
