@@ -377,4 +377,69 @@ SLANG_UNIT_TEST(DepfileOutput)
             !depContent.startsWith("-:") && !_contains(depContent, "\n-:"),
             "depfile must not contain '-:' sentinel for named per-entry-point output");
     }
+
+    // --- Test 6: multi-entry-point per-entry-point path, no -o — exactly one "-:" line ---
+    //
+    // With two entry points, no -o, and -emit-spirv-via-glsl (which routes through the
+    // per-entry-point branch of writeDependencyFile), only the last entry point gets an empty
+    // path in entryPointOutputPaths (auto-rawOutput targets the last -entry). The loop
+    // therefore calls _writeDependencyStatement once with an empty path, producing exactly
+    // one "-: <deps>" line. A regression that, for example, reset writtenStdoutSentinel
+    // between entry points would still produce only one line here (since there is only one
+    // call), but this test pins down the correct single-sentinel shape for the most common
+    // multi-entry-point / no-output CLI invocation.
+    {
+        TempFile inputBase;
+        SLANG_CHECK(SLANG_SUCCEEDED(_makeTempFile("slangc-df-multi-ep-in", inputBase)));
+        const String slangPath = inputBase.path + ".slang";
+        SLANG_CHECK(SLANG_SUCCEEDED(File::writeAllText(
+            slangPath,
+            "[shader(\"compute\")] void main1() {}\n"
+            "[shader(\"compute\")] void main2() {}\n")));
+        TempFile slangGuard;
+        slangGuard.path = slangPath;
+
+        TempFile depFile;
+        SLANG_CHECK(SLANG_SUCCEEDED(_makeTempFile("slangc-df-multi-ep-dep", depFile)));
+
+        List<String> args;
+        args.add("-lang");
+        args.add("slang");
+        args.add("-target");
+        args.add("spirv");
+        args.add("-emit-spirv-via-glsl");
+        args.add("-entry");
+        args.add("main1");
+        args.add("-stage");
+        args.add("compute");
+        args.add("-entry");
+        args.add("main2");
+        args.add("-stage");
+        args.add("compute");
+        // Deliberately no -o — output goes to stdout.
+        args.add("-depfile");
+        args.add(depFile.path);
+        args.add(slangPath);
+
+        ExecuteResult result;
+        SLANG_CHECK(SLANG_SUCCEEDED(_runSlangc(unitTestContext, args, result)));
+        if (result.resultCode != 0)
+            getTestReporter()->message(TestMessageType::Info, result.standardError.getBuffer());
+        SLANG_CHECK(result.resultCode == 0);
+
+        String depContent;
+        SLANG_CHECK(SLANG_SUCCEEDED(File::readAllText(depFile.path, depContent)));
+        getTestReporter()->message(TestMessageType::Info, depContent.getBuffer());
+
+        // Exactly one "-: <deps>" line — not zero, not two.
+        SLANG_CHECK_MSG(
+            depContent.startsWith("-: "),
+            "depfile must start with '-: ' sentinel for multi-entry stdout output");
+        SLANG_CHECK_MSG(
+            !_contains(depContent, "\n-:"),
+            "depfile must not contain a second '-:' sentinel line");
+        SLANG_CHECK_MSG(
+            _contains(depContent, Path::getFileName(slangPath).getBuffer()),
+            "depfile missing input file dependency");
+    }
 }
