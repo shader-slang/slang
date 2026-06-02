@@ -24,11 +24,30 @@
 # documenting the symptom and how it was identified (CI run URL +
 # the last-printed test before the crash), so a future maintainer
 # can verify whether the underlying issue is still present.
+#
+# Staleness signal
+# ----------------
+# Unlike `-expected-failure-list`, `-exclude-prefix` has no
+# "passing tests that are expected to fail" reporter, so entries
+# here can rot silently once the underlying crash is fixed. To
+# audit the list periodically:
+#   1. Compile slang with coverage instrumentation locally.
+#   2. Remove an entry below and run
+#      `./tools/coverage/run-coverage.sh --with-agentic-tests`
+#      (or trigger the coverage workflow on a branch with the
+#      entry removed).
+#   3. If the run completes without a SIGSEGV in slang-test, the
+#      underlying crash has been fixed — drop the entry for real.
+# A green ci-agentic-tests-nightly run on the same test is a
+# necessary but NOT sufficient condition: the nightly uses an
+# uninstrumented binary, and the crash here is
+# coverage-instrumentation-specific.
 
 # Run 26813684019 (sequential reproducer with -server-count 1):
 # SIGSEGV in slang-test immediately after
-# ir-reference/metadata/type-layout-base.slang passes. Already a
-# known Linux failure on the uninstrumented nightly (Cluster C in
-# expected-failures.txt); coverage instrumentation escalates that
-# failure into a SIGSEGV inside the slang-test orchestrator.
+# ir-reference/metadata/type-layout-base.slang passes. The same
+# test is already listed in expected-failures.txt (it fails on the
+# uninstrumented Linux nightly); coverage instrumentation
+# escalates that failure into a SIGSEGV inside the slang-test
+# orchestrator, which kills the rest of the suite.
 docs/generated/tests/ir-reference/metadata/unorm-attr-on-buffer-element.slang

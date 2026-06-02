@@ -168,12 +168,20 @@ else
     # Walk TEST_ARGS one token at a time and classify each:
     #   - Agentic-overridden value-taking flags (-test-dir,
     #     -expected-failure-list, -server-count): skip flag + value.
-    #   - Other known value-taking flags: inherit flag + value.
-    #   - Lone option flags ("-*"): inherit as-is.
+    #   - Known no-value option flags (used in the coverage workflow's
+    #     test_args): inherit as a lone token.
+    #   - Any other "-*" flag: assume it takes a value and inherit
+    #     flag + value. Default-to-two-arg is the safer policy: if a
+    #     future maintainer adds e.g. `-capability spirv_1_5` to the
+    #     workflow's test_args, the value is preserved instead of
+    #     being silently dropped as a "bare positional." If a new
+    #     no-value flag is ever added to test_args, add it to the
+    #     explicit no-value case above so the next token isn't
+    #     swallowed as a phantom value.
     #   - Bare positional tokens (test selectors): drop. The agentic
     #     pass runs over its own -test-dir; inheriting positionals
     #     from the main pass would silently narrow the agentic run.
-    #     CI doesn't pass bare positionals here today, so this only
+    #     CI doesn't pass bare positionals here today; this only
     #     guards local-dev `run-coverage.sh --with-agentic-tests foo`.
     i=0
     while [ "$i" -lt "${#TEST_ARGS[@]}" ]; do
@@ -182,13 +190,18 @@ else
       -test-dir | -expected-failure-list | -server-count)
         i=$((i + 2))
         ;;
-      -enable-debug-layers | -synthesizedTestApi)
-        AGENTIC_TEST_ARGS+=("$arg" "${TEST_ARGS[i + 1]}")
-        i=$((i + 2))
-        ;;
-      -*)
+      -use-test-server | -skip-reference-image-generation | -show-adapter-info | -only-synthesized)
         AGENTIC_TEST_ARGS+=("$arg")
         i=$((i + 1))
+        ;;
+      -*)
+        if [ "$((i + 1))" -lt "${#TEST_ARGS[@]}" ]; then
+          AGENTIC_TEST_ARGS+=("$arg" "${TEST_ARGS[i + 1]}")
+          i=$((i + 2))
+        else
+          AGENTIC_TEST_ARGS+=("$arg")
+          i=$((i + 1))
+        fi
         ;;
       *)
         i=$((i + 1))
