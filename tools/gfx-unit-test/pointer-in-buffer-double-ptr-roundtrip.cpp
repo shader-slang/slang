@@ -35,8 +35,11 @@ void pointerInBufferDoublePtrRoundtripTestImpl(IDevice* device, UnitTestContext*
     ComPtr<IComputePipeline> pipeline;
     GFX_CHECK_CALL_ABORT(device->createComputePipeline(pipelineDesc, pipeline.writeRef()));
 
-    auto makeBuffer = [&](size_t size, uint32_t elementSize, const void* data,
-                          BufferUsage usage, ResourceState state) -> ComPtr<IBuffer>
+    auto makeBuffer = [&](size_t size,
+                          uint32_t elementSize,
+                          const void* data,
+                          BufferUsage usage,
+                          ResourceState state) -> ComPtr<IBuffer>
     {
         BufferDesc desc = {};
         desc.size = size;
@@ -79,8 +82,7 @@ void pointerInBufferDoublePtrRoundtripTestImpl(IDevice* device, UnitTestContext*
     ptrDesc.defaultState = ResourceState::ShaderResource;
     ptrDesc.memoryType = MemoryType::DeviceLocal;
     ComPtr<IBuffer> ptrBuffer;
-    GFX_CHECK_CALL_ABORT(
-        device->createBuffer(ptrDesc, &midAddr, ptrBuffer.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createBuffer(ptrDesc, &midAddr, ptrBuffer.writeRef()));
 
     // Output buffer.
     int32_t outputInit[] = {0};

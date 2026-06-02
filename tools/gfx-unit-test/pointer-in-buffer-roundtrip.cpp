@@ -44,8 +44,7 @@ void pointerInBufferRoundtripTestImpl(IDevice* device, UnitTestContext* context)
     dataDesc.memoryType = MemoryType::DeviceLocal;
 
     ComPtr<IBuffer> dataBuffer;
-    GFX_CHECK_CALL_ABORT(
-        device->createBuffer(dataDesc, (void*)dataValues, dataBuffer.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createBuffer(dataDesc, (void*)dataValues, dataBuffer.writeRef()));
 
     // Get the GPU address of dataBuffer and store it as a uint64_t.
     // This is the pointer value that the shader will interpret as `int*`.
@@ -62,8 +61,7 @@ void pointerInBufferRoundtripTestImpl(IDevice* device, UnitTestContext* context)
     ptrDesc.memoryType = MemoryType::DeviceLocal;
 
     ComPtr<IBuffer> ptrBuffer;
-    GFX_CHECK_CALL_ABORT(
-        device->createBuffer(ptrDesc, (void*)&ptrValue, ptrBuffer.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createBuffer(ptrDesc, (void*)&ptrValue, ptrBuffer.writeRef()));
 
     // Output buffer.
     int32_t outputInit[] = {0};

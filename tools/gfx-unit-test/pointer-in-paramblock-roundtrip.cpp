@@ -51,8 +51,7 @@ void pointerInParamBlockRoundtripTestImpl(IDevice* device, UnitTestContext* cont
     dataDesc.memoryType = MemoryType::DeviceLocal;
 
     ComPtr<IBuffer> dataBuffer;
-    GFX_CHECK_CALL_ABORT(
-        device->createBuffer(dataDesc, (void*)dataValues, dataBuffer.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createBuffer(dataDesc, (void*)dataValues, dataBuffer.writeRef()));
 
     // Output buffer.
     int32_t outputInit[] = {0};
@@ -70,8 +69,7 @@ void pointerInParamBlockRoundtripTestImpl(IDevice* device, UnitTestContext* cont
 
     // Create root shader object and ParameterBlock shader object.
     ComPtr<IShaderObject> rootObject;
-    GFX_CHECK_CALL_ABORT(
-        device->createRootShaderObject(shaderProgram, rootObject.writeRef()));
+    GFX_CHECK_CALL_ABORT(device->createRootShaderObject(shaderProgram, rootObject.writeRef()));
 
     ComPtr<IShaderObject> paramsObject;
     GFX_CHECK_CALL_ABORT(device->createShaderObject(
