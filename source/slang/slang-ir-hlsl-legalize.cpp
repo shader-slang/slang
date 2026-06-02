@@ -82,7 +82,7 @@ static bool isPrimitiveIDSystemValueParam(IRParam* param)
     return systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid"));
 }
 
-static IRFunc* getHLSLPrimitiveIndexFunc(IRModule* module, IRFunc*& primitiveIndexFunc)
+static IRFunc* getRayTracingPrimitiveIndexFunc(IRModule* module, IRFunc*& primitiveIndexFunc)
 {
     if (primitiveIndexFunc)
         return primitiveIndexFunc;
@@ -96,6 +96,10 @@ static IRFunc* getHLSLPrimitiveIndexFunc(IRModule* module, IRFunc*& primitiveInd
         primitiveIndexFunc,
         CapabilitySet(CapabilityName::hlsl),
         UnownedTerminatedStringSlice("PrimitiveIndex"));
+    builder.addTargetIntrinsicDecoration(
+        primitiveIndexFunc,
+        CapabilitySet(CapabilityName::cuda),
+        UnownedTerminatedStringSlice("optixGetPrimitiveIndex"));
     return primitiveIndexFunc;
 }
 
@@ -301,7 +305,7 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
     }
 }
 
-void legalizeRayTracingPrimitiveIDParamForHLSL(IRModule* module)
+void legalizeRayTracingPrimitiveIDParam(IRModule* module)
 {
     IRFunc* primitiveIndexFunc = nullptr;
     List<IRFunc*> entryPointsToProcess;
@@ -355,7 +359,7 @@ void legalizeRayTracingPrimitiveIDParamForHLSL(IRModule* module)
             {
                 auto primitiveIndexCall = builder.emitCallInst(
                     builder.getUIntType(),
-                    getHLSLPrimitiveIndexFunc(module, primitiveIndexFunc),
+                    getRayTracingPrimitiveIndexFunc(module, primitiveIndexFunc),
                     0,
                     nullptr);
 

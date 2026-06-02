@@ -4,6 +4,7 @@
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage closesthit -profile sm_6_5 -DNOMOTION
 //TEST:SIMPLE(filecheck=SVPID_SPIRV):-target spirv-assembly -entry main_sv_primitiveid -stage closesthit
 //TEST:SIMPLE(filecheck=SVPID_DXIL):-target dxil-assembly -entry main_sv_primitiveid -stage closesthit -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_INT_DXIL):-target dxil-assembly -entry main_sv_primitiveid_int -stage closesthit -profile sm_6_5 -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
 // SPIRV-DAG: RayTracingKHR
@@ -70,6 +71,9 @@
 // SVPID_SPIRV-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId
 
 // SVPID_DXIL: call i32 @dx.op.primitiveIndex.i32
+
+// SVPID_INT_DXIL: call i32 @dx.op.primitiveIndex.i32
+// SVPID_INT_DXIL: sitofp i32
 
 
 [[vk::binding(0)]]
@@ -298,6 +302,19 @@ void main_sv_primitiveid(
     inout RayPayload payload,
     in BuiltInTriangleIntersectionAttributes attribs,
     uint primitiveID : SV_PrimitiveID)
+{
+    float3 barycentrics = float3(
+        1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
+        attribs.barycentrics.x,
+        attribs.barycentrics.y);
+    payload.RayHitT = float(primitiveID) + barycentrics.x + barycentrics.y + barycentrics.z;
+}
+
+[shader("closesthit")]
+void main_sv_primitiveid_int(
+    inout RayPayload payload,
+    in BuiltInTriangleIntersectionAttributes attribs,
+    int primitiveID : SV_PrimitiveID)
 {
     float3 barycentrics = float3(
         1.0 - attribs.barycentrics.x - attribs.barycentrics.y,

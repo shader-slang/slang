@@ -2137,6 +2137,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         // [require(<stage>)] entry on the semantic declaration and a regression
         // test.
         bool isAllowedRaytracingSystemValueInput = false;
+        bool isRaytracingPrimitiveIDSystemValueInput = false;
         if (state.optSemanticName)
         {
             auto sn = state.optSemanticName->toLower();
@@ -2147,7 +2148,21 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 case Stage::Intersection:
                 case Stage::AnyHit:
                 case Stage::ClosestHit:
-                    isAllowedRaytracingSystemValueInput = true;
+                    isRaytracingPrimitiveIDSystemValueInput = true;
+                    if (isD3DTarget(context->getTargetRequest()) ||
+                        isKhronosTarget(context->getTargetRequest()) ||
+                        isCUDATarget(context->getTargetRequest()))
+                    {
+                        isAllowedRaytracingSystemValueInput = true;
+                    }
+                    else
+                    {
+                        getSink(context)->diagnose(Diagnostics::Unimplemented{
+                            .feature =
+                                "SV_PrimitiveID ray-tracing hit-stage inputs are not supported "
+                                "for this target",
+                            .location = state.loc});
+                    }
                     break;
                 default:
                     break;
@@ -2171,7 +2186,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             // an `in` parameter as indicating a payload that the
             // programmer doesn't intend to write to.
             //
-            if (!isAllowedRaytracingSystemValueInput)
+            if (!isAllowedRaytracingSystemValueInput && !isRaytracingPrimitiveIDSystemValueInput)
             {
                 getSink(context)->diagnose(Diagnostics::DontExpectInParametersForStage{
                     .stage = getStageName(state.stage),
@@ -2183,7 +2198,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::ClosestHit:
             // `in` parameter is hit attributes. Allowed system-value inputs fall
             // through to ordinary varying-input handling below.
-            if (!isAllowedRaytracingSystemValueInput)
+            if (!isAllowedRaytracingSystemValueInput && !isRaytracingPrimitiveIDSystemValueInput)
             {
                 return createTypeLayoutWith(
                     context->layoutContext,

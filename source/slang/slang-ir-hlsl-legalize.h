@@ -16,6 +16,6 @@ void legalizeNonStructParameterToStructForHLSL(IRModule* module);
 
 void legalizeEmptyRayPayloadsForHLSL(IRModule* module);
 
-void legalizeRayTracingPrimitiveIDParamForHLSL(IRModule* module);
+void legalizeRayTracingPrimitiveIDParam(IRModule* module);
 
 } // namespace Slang
