@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CS,SM60): -target dxil -entry computeMain
 //TEST:SIMPLE(filecheck=CS,SM60): -target dxil-assembly -entry computeMain
+//TEST:SIMPLE(filecheck=CS,SM60): -target dxil-assembly
 //TEST:SIMPLE(filecheck=CS,SM60): -target dxil-assembly -entry computeMain -profile cs_6_0
 //TEST:SIMPLE(filecheck=CS,SM65): -target dxil-assembly -entry computeMain -profile cs_6_5
 //TEST:SIMPLE(filecheck=LIB): -target dxil-assembly -entry computeMain -profile cs_6_3 -whole-program
