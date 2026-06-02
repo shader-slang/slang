@@ -147,26 +147,31 @@ else
     # listed failures as `failed(expected)` and exits 0 when only
     # those occur, so this call only fails on UNEXPECTED failures —
     # the same gate the nightly enforces.
+    # Build the agentic invocation: start with the agentic-specific
+    # overrides (test-dir and expected-failure-list — those are what
+    # differ from the main pass), then inherit every other flag from
+    # the main pass's TEST_ARGS so settings like -use-test-server,
+    # -server-count, -synthesizedTestApi, -skip-reference-image-
+    # generation, -enable-debug-layers, etc. apply uniformly. This
+    # keeps the agentic pass running in the same slang-test mode as
+    # the main pass; the only differences are which tests run and
+    # which list of failures to expect.
     AGENTIC_TEST_ARGS=(
       "-test-dir" "docs/generated/tests"
       "-expected-failure-list" "docs/generated/tests/_meta/expected-failures.txt"
     )
-    # Inherit a few flags from the main pass:
-    #   -use-test-server / -server-count: match the main-pass
-    #     parallelism so the test-server pool is reused.
-    #   -synthesizedTestApi: the macOS coverage step disables
-    #     `-llvm`-synthesized variants via this flag (see
-    #     ci-slang-coverage.yml; coverage instrumentation crashes
-    #     in those tests). Forward it so the agentic pass on macOS
-    #     skips the same variants instead of replaying the crash.
-    for ((i = 0; i < ${#TEST_ARGS[@]}; i++)); do
-      if [[ "${TEST_ARGS[i]}" == "-use-test-server" ]]; then
-        AGENTIC_TEST_ARGS+=("-use-test-server")
-      elif [[ "${TEST_ARGS[i]}" == "-server-count" ]]; then
-        AGENTIC_TEST_ARGS+=("-server-count" "${TEST_ARGS[i + 1]}")
-      elif [[ "${TEST_ARGS[i]}" == "-synthesizedTestApi" ]]; then
-        AGENTIC_TEST_ARGS+=("-synthesizedTestApi" "${TEST_ARGS[i + 1]}")
-      fi
+    i=0
+    while [ "$i" -lt "${#TEST_ARGS[@]}" ]; do
+      arg="${TEST_ARGS[i]}"
+      case "$arg" in
+      -test-dir | -expected-failure-list)
+        # Skip the flag and its value — agentic overrides these.
+        i=$((i + 2))
+        continue
+        ;;
+      esac
+      AGENTIC_TEST_ARGS+=("$arg")
+      i=$((i + 1))
     done
     # Retry once on crash (exit > 128 = killed by signal). The suite
     # is long (~2680 bundles); a single SIGSEGV in slang-test mid-run
