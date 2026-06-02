@@ -5,6 +5,7 @@
 //TEST:SIMPLE(filecheck=SVPID_SPIRV):-target spirv-assembly -entry main_sv_primitiveid_uint -stage anyhit
 //TEST:SIMPLE(filecheck=SVPID_DXIL):-target dxil-assembly -entry main_sv_primitiveid_uint -stage anyhit -profile sm_6_5 -DNOMOTION
 //TEST:SIMPLE(filecheck=SVPID_INT_DXIL):-target dxil-assembly -entry main_sv_primitiveid_int -stage anyhit -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_UNUSED_DXIL):-target dxil-assembly -entry main_sv_primitiveid_unused -stage anyhit -profile sm_6_5 -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
 // SPIRV-DAG: RayTracingKHR
@@ -67,6 +68,10 @@
 
 // SVPID_INT_DXIL: call i32 @dx.op.primitiveIndex.i32
 // SVPID_INT_DXIL: sitofp i32
+
+// SVPID_UNUSED_DXIL: define void @{{.*}}main_sv_primitiveid_unused
+// SVPID_UNUSED_DXIL-NOT: dx.op.primitiveIndex.i32
+// SVPID_UNUSED_DXIL: ret void
 
 
 struct RayPayload
@@ -242,4 +247,13 @@ void main_sv_primitiveid_int(
         attribs.barycentrics.x,
         attribs.barycentrics.y);
     payload.RayHitT = float(primitiveID) + barycentrics.x + barycentrics.y + barycentrics.z;
+}
+
+[shader("anyhit")]
+void main_sv_primitiveid_unused(
+    inout RayPayload payload,
+    in BuiltInTriangleIntersectionAttributes attribs: SV_IntersectionAttributes,
+    uint primitiveID : SV_PrimitiveID)
+{
+    payload.RayHitT = attribs.barycentrics.x + attribs.barycentrics.y;
 }
