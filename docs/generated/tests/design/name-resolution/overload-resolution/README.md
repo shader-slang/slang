@@ -81,7 +81,7 @@ NA
 
 ## Sibling-bundle overlap
 
-`docs/generated/tests/name-resolution/lookup/` covers how the **candidate set**
+`docs/generated/tests/design/name-resolution/lookup/` covers how the **candidate set**
 is built (lookup walks, container accumulation, inheritance, transparent
 members). This bundle covers **how the resolver narrows that set to a
 winner or to an ambiguity error**. Claims intentionally not duplicated

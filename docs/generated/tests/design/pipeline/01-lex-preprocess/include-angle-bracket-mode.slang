@@ -15,7 +15,7 @@
 // visible. The bundle directory is passed via `-I` so the
 // `<>`-form include resolves.
 
-//TEST:INTERPRET(filecheck=CHECK):-I docs/generated/tests/pipeline/01-lex-preprocess
+//TEST:INTERPRET(filecheck=CHECK):-I docs/generated/tests/design/pipeline/01-lex-preprocess
 
 #include <include-angle-bracket-mode.slang.h>
 

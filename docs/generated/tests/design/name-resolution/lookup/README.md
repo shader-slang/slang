@@ -87,7 +87,7 @@ NA
 
 ## Sibling-bundle overlap
 
-`docs/generated/tests/name-resolution/scopes/` covers the **boundaries** of
+`docs/generated/tests/design/name-resolution/scopes/` covers the **boundaries** of
 scopes (where a name is or is not visible). This bundle covers **how
 the lookup algorithm resolves** once started. Claims intentionally
 not duplicated here:

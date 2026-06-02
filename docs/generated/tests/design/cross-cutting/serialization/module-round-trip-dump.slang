@@ -15,8 +15,8 @@
 // the compiler can load back; here we round-trip via `-dump-module`
 // and FileCheck that the public symbol's IR survives the trip.
 
-//TEST:COMPILE: docs/generated/tests/cross-cutting/serialization/module-round-trip-dump.slang -o docs/generated/tests/cross-cutting/serialization/module-round-trip-dump.slang-module
-//TEST:SIMPLE(filecheck=CHECK): -dump-module docs/generated/tests/cross-cutting/serialization/module-round-trip-dump.slang-module
+//TEST:COMPILE: docs/generated/tests/design/cross-cutting/serialization/module-round-trip-dump.slang -o docs/generated/tests/design/cross-cutting/serialization/module-round-trip-dump.slang-module
+//TEST:SIMPLE(filecheck=CHECK): -dump-module docs/generated/tests/design/cross-cutting/serialization/module-round-trip-dump.slang-module
 
 module module_round_trip_dump;
 

@@ -16,8 +16,8 @@
 // the container gains a downstream-IR chunk; `-dump-module` surfaces
 // it with an `EmbeddedDownstreamIR(...)` marker.
 
-//TEST:COMPILE: docs/generated/tests/cross-cutting/serialization/embed-downstream-ir-spirv.slang -o docs/generated/tests/cross-cutting/serialization/embed-downstream-ir-spirv.slang-module -target spirv -embed-downstream-ir -skip-spirv-validation
-//TEST:SIMPLE(filecheck=CHECK): -dump-module docs/generated/tests/cross-cutting/serialization/embed-downstream-ir-spirv.slang-module
+//TEST:COMPILE: docs/generated/tests/design/cross-cutting/serialization/embed-downstream-ir-spirv.slang -o docs/generated/tests/design/cross-cutting/serialization/embed-downstream-ir-spirv.slang-module -target spirv -embed-downstream-ir -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHECK): -dump-module docs/generated/tests/design/cross-cutting/serialization/embed-downstream-ir-spirv.slang-module
 
 module embed_downstream_ir_spirv;
 

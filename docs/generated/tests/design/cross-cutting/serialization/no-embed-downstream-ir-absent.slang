@@ -14,8 +14,8 @@
 // chunk. The IR-module payload still records the function symbol
 // (which we check), but the EmbeddedDownstreamIR marker is absent.
 
-//TEST:COMPILE: docs/generated/tests/cross-cutting/serialization/no-embed-downstream-ir-absent.slang -o docs/generated/tests/cross-cutting/serialization/no-embed-downstream-ir-absent.slang-module
-//TEST:SIMPLE(filecheck=CHECK): -dump-module docs/generated/tests/cross-cutting/serialization/no-embed-downstream-ir-absent.slang-module
+//TEST:COMPILE: docs/generated/tests/design/cross-cutting/serialization/no-embed-downstream-ir-absent.slang -o docs/generated/tests/design/cross-cutting/serialization/no-embed-downstream-ir-absent.slang-module
+//TEST:SIMPLE(filecheck=CHECK): -dump-module docs/generated/tests/design/cross-cutting/serialization/no-embed-downstream-ir-absent.slang-module
 
 module no_embed_downstream_ir_absent;
 

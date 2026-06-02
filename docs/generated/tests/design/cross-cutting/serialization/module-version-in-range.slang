@@ -16,8 +16,8 @@
 // digit-only token (no wildcards across non-numeric characters), so
 // the version-gate plumbing the doc describes always writes a value.
 
-//TEST:COMPILE: docs/generated/tests/cross-cutting/serialization/module-version-in-range.slang -o docs/generated/tests/cross-cutting/serialization/module-version-in-range.slang-module
-//TEST:SIMPLE(filecheck=CHECK): -get-module-info docs/generated/tests/cross-cutting/serialization/module-version-in-range.slang-module
+//TEST:COMPILE: docs/generated/tests/design/cross-cutting/serialization/module-version-in-range.slang -o docs/generated/tests/design/cross-cutting/serialization/module-version-in-range.slang-module
+//TEST:SIMPLE(filecheck=CHECK): -get-module-info docs/generated/tests/design/cross-cutting/serialization/module-version-in-range.slang-module
 
 module module_version_in_range;
 

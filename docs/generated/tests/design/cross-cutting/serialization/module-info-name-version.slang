@@ -15,8 +15,8 @@
 // version integer; `-get-module-info` reads it back along with the
 // module name and the compiler version string.
 
-//TEST:COMPILE: docs/generated/tests/cross-cutting/serialization/module-info-name-version.slang -o docs/generated/tests/cross-cutting/serialization/module-info-name-version.slang-module
-//TEST:SIMPLE(filecheck=CHECK): -get-module-info docs/generated/tests/cross-cutting/serialization/module-info-name-version.slang-module
+//TEST:COMPILE: docs/generated/tests/design/cross-cutting/serialization/module-info-name-version.slang -o docs/generated/tests/design/cross-cutting/serialization/module-info-name-version.slang-module
+//TEST:SIMPLE(filecheck=CHECK): -get-module-info docs/generated/tests/design/cross-cutting/serialization/module-info-name-version.slang-module
 
 module module_info_name_version;
 

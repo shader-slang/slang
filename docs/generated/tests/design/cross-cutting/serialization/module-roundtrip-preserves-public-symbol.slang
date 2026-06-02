@@ -15,8 +15,8 @@
 // container with its mangled export name and parameter / return type
 // signature intact.
 
-//TEST:COMPILE: docs/generated/tests/cross-cutting/serialization/module-roundtrip-preserves-public-symbol.slang -o docs/generated/tests/cross-cutting/serialization/module-roundtrip-preserves-public-symbol.slang-module
-//TEST:SIMPLE(filecheck=CHECK): -dump-module docs/generated/tests/cross-cutting/serialization/module-roundtrip-preserves-public-symbol.slang-module
+//TEST:COMPILE: docs/generated/tests/design/cross-cutting/serialization/module-roundtrip-preserves-public-symbol.slang -o docs/generated/tests/design/cross-cutting/serialization/module-roundtrip-preserves-public-symbol.slang-module
+//TEST:SIMPLE(filecheck=CHECK): -dump-module docs/generated/tests/design/cross-cutting/serialization/module-roundtrip-preserves-public-symbol.slang-module
 
 module module_roundtrip_preserves_public_symbol;
 
