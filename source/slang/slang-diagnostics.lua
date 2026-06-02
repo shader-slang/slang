@@ -4797,33 +4797,33 @@ warning(
 )
 
 err(
-    "coverage-mapping-output-without-coverage",
+    "coverage-manifest-output-without-coverage",
     45108,
-    "`-coverage-mapping-output` requires a coverage tracing option; use `-trace-coverage`, `-trace-function-coverage`, or `-trace-branch-coverage`"
+    "`-coverage-manifest-output` requires a coverage tracing option; use `-trace-coverage`, `-trace-function-coverage`, or `-trace-branch-coverage`"
 )
 
 err(
-    "coverage-mapping-output-multiple-artifacts",
+    "coverage-manifest-output-multiple-artifacts",
     45109,
-    "`-coverage-mapping-output` path '~path' would be written by multiple coverage-instrumented artifacts; use per-artifact `<output>.coverage-mapping.json` sidecars instead"
+    "`-coverage-manifest-output` path '~path' is not supported for multiple coverage-instrumented artifacts; use per-artifact `<output>.coverage-manifest.json` sidecars or compile each target separately"
 )
 
 err(
-    "coverage-mapping-output-collides-with-artifact",
+    "coverage-manifest-output-collides-with-artifact",
     45110,
-    "`-coverage-mapping-output` path '~path' must differ from the compiled artifact output path"
+    "`-coverage-manifest-output` path '~path' must differ from any artifact output path emitted by this compile"
 )
 
 err(
-    "coverage-mapping-output-with-container",
+    "coverage-manifest-output-with-container",
     45111,
-    "`-coverage-mapping-output` is not supported when writing a container output"
+    "`-coverage-manifest-output` is not supported when writing a container output"
 )
 
 err(
-    "coverage-mapping-output-without-coverage-data",
+    "coverage-manifest-output-without-coverage-data",
     45112,
-    "`-coverage-mapping-output` path '~path' was requested, but the selected target did not produce coverage metadata"
+    "`-coverage-manifest-output` path '~path' was requested, but the selected target did not produce coverage metadata"
 )
 
 -- 41xxx - Semantic checking (continued)

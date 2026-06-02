@@ -618,7 +618,7 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Instrument the shader with per-statement line coverage counters. "
          "When writing compiled output to a file, slangc also emits "
-         "`<output>.coverage-mapping.json` mapping source coverage entries to counters."},
+         "`<output>.coverage-manifest.json` mapping source coverage entries to counters."},
         {OptionKind::TraceFunctionCoverage,
          "-trace-function-coverage",
          nullptr,
@@ -647,14 +647,15 @@ void initCommandOptions(CommandOptions& options)
          "pipeline layout owns descriptor sets that are "
          "not visible in the compiled shader IR. Repeat for multiple spaces; "
          "duplicates are idempotent. Applies to Khronos descriptor-set targets."},
-        {OptionKind::CoverageMappingOutput,
-         "-coverage-mapping-output",
-         "-coverage-mapping-output <path>",
-         "Write shader coverage mapping metadata to an explicit JSON sidecar path. "
+        {OptionKind::CoverageManifestOutput,
+         "-coverage-manifest-output",
+         "-coverage-manifest-output <path>",
+         "Write shader coverage manifest metadata to an explicit JSON sidecar path. "
          "Use this when compiled output is written to stdout or when the build needs "
          "a stable manifest path instead of the default "
-         "`<output>.coverage-mapping.json` sidecar. Requires at least one coverage tracing mode "
-         "and is not supported for container outputs."},
+         "`<output>.coverage-manifest.json` sidecar. Requires at least one coverage tracing mode, "
+         "is not supported for container outputs, and is valid only when exactly one compiled "
+         "artifact carries coverage metadata."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -3056,11 +3057,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 linkage->m_optionSet.add(OptionKind::TraceCoverageReservedSpace, (int)bindingSpace);
                 break;
             }
-        case OptionKind::CoverageMappingOutput:
+        case OptionKind::CoverageManifestOutput:
             {
                 CommandLineArg outputPath;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(outputPath));
-                linkage->m_optionSet.set(OptionKind::CoverageMappingOutput, outputPath.value);
+                linkage->m_optionSet.set(OptionKind::CoverageManifestOutput, outputPath.value);
                 break;
             }
         case OptionKind::Profile:

@@ -27,6 +27,9 @@ namespace Slang
 
 static bool _isCoverageTracingEnabled(CompilerOptionSet& optionSet)
 {
+    // Returns true only when one of the coverage trace mode booleans is set.
+    // Binding and reserved-space options are inert without a coverage mode, so
+    // they are intentionally not treated as enabling coverage tracing here.
     return optionSet.getBoolOption(CompilerOptionName::TraceCoverage) ||
            optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage) ||
            optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
@@ -165,16 +168,15 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         return SLANG_FAIL;
     }
 
-    if (optionSet.getStringOption(CompilerOptionName::CoverageMappingOutput).getLength() != 0 &&
-        !coverageTracingEnabled)
+    const bool hasExplicitCoverageManifestPath = _hasExplicitCoverageManifestPath();
+    if (hasExplicitCoverageManifestPath && !coverageTracingEnabled)
     {
-        getSink()->diagnose(Diagnostics::CoverageMappingOutputWithoutCoverage{});
+        getSink()->diagnose(Diagnostics::CoverageManifestOutputWithoutCoverage{});
         return SLANG_FAIL;
     }
-    if (optionSet.getStringOption(CompilerOptionName::CoverageMappingOutput).getLength() != 0 &&
-        m_containerFormat != ContainerFormat::None)
+    if (hasExplicitCoverageManifestPath && m_containerFormat != ContainerFormat::None)
     {
-        getSink()->diagnose(Diagnostics::CoverageMappingOutputWithContainer{});
+        getSink()->diagnose(Diagnostics::CoverageManifestOutputWithContainer{});
         return SLANG_FAIL;
     }
 
@@ -416,27 +418,46 @@ SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact
     return SLANG_OK;
 }
 
+String EndToEndCompileRequest::_getExplicitCoverageManifestPath()
+{
+    return getOptionSet().getStringOption(CompilerOptionName::CoverageManifestOutput);
+}
+
+bool EndToEndCompileRequest::_hasExplicitCoverageManifestPath()
+{
+    return _getExplicitCoverageManifestPath().getLength() != 0;
+}
+
 // If the artifact carries coverage tracing metadata, write its JSON
-// mapping sidecar. By default slangc writes `<path>.coverage-mapping.json`
-// alongside file outputs. `-coverage-mapping-output <path>` overrides
+// manifest sidecar. By default slangc writes `<path>.coverage-manifest.json`
+// alongside file outputs. `-coverage-manifest-output <path>` overrides
 // that location and also works for stdout artifact output. Hosts can
 // read this sidecar to attribute runtime counter values back to source
 // entries. The JSON content is produced by the public
 // `slang_writeCoverageManifestJson` API; both that API and this sidecar
 // writer emit byte-identical output, so customers working in-process can
 // pipe the API output through the same downstream tooling.
-static bool _hasCoverageMappingData(IArtifact* artifact)
+static slang::ICoverageTracingMetadata* _findCoverageTracingMetadata(IArtifact* artifact)
 {
     if (!artifact)
-        return false;
+        return nullptr;
     auto coverage = findAssociatedRepresentation<slang::ICoverageTracingMetadata>(artifact);
-    // Emit the sidecar if either dimension has data. Future coverage
-    // modes may record source entries without runtime counters, or
-    // runtime counter allocation before all source-entry metadata is
-    // populated; the sidecar is the persisted handoff for both.
-    return coverage && (coverage->getCounterCount() != 0 || coverage->getEntryCount() != 0);
+    // Return coverage metadata if either dimension has data. Future coverage
+    // modes may record source entries without runtime counters, or runtime
+    // counter allocation before all source-entry metadata is populated; either
+    // non-empty dimension is worth persisting.
+    return coverage && (coverage->getCounterCount() != 0 || coverage->getEntryCount() != 0)
+               ? coverage
+               : nullptr;
 }
 
+// Normalizes paths for preflight collision checks:
+// - Existing paths compare by their canonical filesystem path.
+// - Not-yet-created paths canonicalize their deepest existing ancestor, then
+//   append the original non-existent suffix.
+// - Paths with no canonicalizable ancestor fall back to absolutized, simplified
+//   text. Equality after this transform implies the paths would alias the same
+//   filesystem entity, modulo platform case-folding below.
 static String _normalizeOutputPathForCompare(const String& path)
 {
     if (path.getLength() == 0)
@@ -480,20 +501,22 @@ static bool _areOutputPathsEquivalent(const String& left, const String& right)
     return normalizedLeft.getUnownedSlice().caseInsensitiveEquals(
         normalizedRight.getUnownedSlice());
 #else
+    // Treat POSIX paths as case-sensitive even on case-folding mounts. The
+    // worst case is a missed collision diagnostic on those mounts; Windows is
+    // the platform where case aliases are expected and handled explicitly.
     return normalizedLeft == normalizedRight;
 #endif
 }
 
-SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
+SlangResult EndToEndCompileRequest::_maybeWriteCoverageManifest(
     const String& path,
     IArtifact* artifact)
 {
-    if (!_hasCoverageMappingData(artifact))
+    auto coverage = _findCoverageTracingMetadata(artifact);
+    if (!coverage)
         return SLANG_OK;
-    auto coverage = findAssociatedRepresentation<slang::ICoverageTracingMetadata>(artifact);
 
-    const String explicitSidecarPath =
-        getOptionSet().getStringOption(CompilerOptionName::CoverageMappingOutput);
+    const String explicitSidecarPath = _getExplicitCoverageManifestPath();
     String sidecarPath;
     if (explicitSidecarPath.getLength() != 0)
     {
@@ -503,7 +526,7 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
     {
         if (path.getLength() == 0)
             return SLANG_OK;
-        sidecarPath = path + ".coverage-mapping.json";
+        sidecarPath = path + ".coverage-manifest.json";
     }
 
     ComPtr<ISlangBlob> jsonBlob;
@@ -615,13 +638,15 @@ SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
     return SLANG_OK;
 }
 
-SlangResult EndToEndCompileRequest::_validateCoverageMappingOutputPaths()
+SlangResult EndToEndCompileRequest::_validateCoverageManifestOutputPaths()
 {
-    const String explicitSidecarPath =
-        getOptionSet().getStringOption(CompilerOptionName::CoverageMappingOutput);
+    const String explicitSidecarPath = _getExplicitCoverageManifestPath();
     if (explicitSidecarPath.getLength() == 0)
         return SLANG_OK;
 
+    // Container output is rejected earlier by E45111 when the option is set.
+    // Non-command-line requests do not use the slangc artifact-write path this
+    // preflight protects.
     if (!m_isCommandLineCompile || m_containerFormat != ContainerFormat::None)
         return SLANG_OK;
 
@@ -631,18 +656,24 @@ SlangResult EndToEndCompileRequest::_validateCoverageMappingOutputPaths()
     List<String> emittedArtifactPaths;
     Index coverageArtifactCount = 0;
 
-    auto recordArtifact = [&](TargetProgram* targetProgram, const String& path, IArtifact* artifact)
+    // Records paths slangc will emit for this target/artifact pair and counts
+    // coverage-bearing artifacts. The count rejects 0 or 2+ coverage artifacts;
+    // the path list rejects explicit-sidecar collisions.
+    auto recordArtifact =
+        [&](TargetProgram* targetProgram, const String& artifactPath, IArtifact* artifact)
     {
         if (!artifact)
             return;
-        if (path.getLength() != 0)
-            emittedArtifactPaths.add(path);
+        // Stdout artifacts have no file path to collide with.
+        if (artifactPath.getLength() != 0)
+            emittedArtifactPaths.add(artifactPath);
 
-        String dbgPath = _getDebugArtifactPath(targetProgram, path, artifact);
+        String dbgPath = _getDebugArtifactPath(targetProgram, artifactPath, artifact);
+        // Targets that did not emit separate debug info have no debug path to collide with.
         if (dbgPath.getLength() != 0)
             emittedArtifactPaths.add(dbgPath);
 
-        if (_hasCoverageMappingData(artifact))
+        if (_findCoverageTracingMetadata(artifact))
             coverageArtifactCount++;
     };
 
@@ -670,30 +701,29 @@ SlangResult EndToEndCompileRequest::_validateCoverageMappingOutputPaths()
         }
     }
 
+    // Exactly one coverage-instrumented artifact is allowed to claim an
+    // explicit sidecar path. Any other count is rejected before collision checks.
     if (coverageArtifactCount > 1)
     {
         getSink()->diagnose(
-            Diagnostics::CoverageMappingOutputMultipleArtifacts{.path = explicitSidecarPath});
+            Diagnostics::CoverageManifestOutputMultipleArtifacts{.path = explicitSidecarPath});
         return SLANG_FAIL;
     }
 
     if (coverageArtifactCount == 0)
     {
         getSink()->diagnose(
-            Diagnostics::CoverageMappingOutputWithoutCoverageData{.path = explicitSidecarPath});
+            Diagnostics::CoverageManifestOutputWithoutCoverageData{.path = explicitSidecarPath});
         return SLANG_FAIL;
     }
 
-    if (coverageArtifactCount != 0)
+    for (const auto& artifactPath : emittedArtifactPaths)
     {
-        for (const auto& artifactPath : emittedArtifactPaths)
+        if (_areOutputPathsEquivalent(explicitSidecarPath, artifactPath))
         {
-            if (_areOutputPathsEquivalent(explicitSidecarPath, artifactPath))
-            {
-                getSink()->diagnose(Diagnostics::CoverageMappingOutputCollidesWithArtifact{
-                    .path = explicitSidecarPath});
-                return SLANG_FAIL;
-            }
+            getSink()->diagnose(Diagnostics::CoverageManifestOutputCollidesWithArtifact{
+                .path = explicitSidecarPath});
+            return SLANG_FAIL;
         }
     }
 
@@ -974,7 +1004,7 @@ void EndToEndCompileRequest::generateOutput()
 
     if (m_isCommandLineCompile && m_containerFormat == ContainerFormat::None)
     {
-        if (SLANG_FAILED(_validateCoverageMappingOutputPaths()))
+        if (SLANG_FAILED(_validateCoverageManifestOutputPaths()))
             return;
 
         auto linkage = getLinkage();
@@ -997,7 +1027,7 @@ void EndToEndCompileRequest::generateOutput()
                     // SPIRV artifact and write that if needed.
                     _maybeWriteDebugArtifact(targetProgram, path, artifact);
 
-                    _maybeWriteCoverageMapping(path, artifact);
+                    _maybeWriteCoverageManifest(path, artifact);
                 }
             }
             else
@@ -1015,7 +1045,7 @@ void EndToEndCompileRequest::generateOutput()
                         // SPIRV artifact and write that if needed.
                         _maybeWriteDebugArtifact(targetProgram, path, artifact);
 
-                        _maybeWriteCoverageMapping(path, artifact);
+                        _maybeWriteCoverageManifest(path, artifact);
                     }
                 }
             }

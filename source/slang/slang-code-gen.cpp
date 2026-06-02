@@ -1054,6 +1054,8 @@ static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
         return CodeGenTarget::DXIL;
     case CodeGenTarget::SPIRVAssembly:
         return CodeGenTarget::SPIRV;
+    case CodeGenTarget::MetalLibAssembly:
+        return CodeGenTarget::MetalLib;
     case CodeGenTarget::WGSLSPIRVAssembly:
         return CodeGenTarget::WGSLSPIRV;
     default:
@@ -1108,8 +1110,10 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
                 getSink(),
                 disassemblyArtifact.writeRef()));
 
-            // Preserve metadata sidecars, including coverage mappings, when the
-            // primary artifact is converted to disassembly output.
+            // Preserve metadata sidecars, including coverage manifests, when the
+            // primary artifact is converted to disassembly output. This used to
+            // live inside the debug-info guard below and stopped after the first
+            // match, which elided coverage sidecars for non-debug builds.
             for (auto associated : intermediateArtifact->getAssociated())
             {
                 if (associated->getDesc().payload == ArtifactPayload::Metadata ||

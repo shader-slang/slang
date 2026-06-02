@@ -183,8 +183,10 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
 {
     for (auto& kv : options)
     {
-        // This is a slangc output-side path; it does not affect generated shader code.
-        if (kv.key == CompilerOptionName::CoverageMappingOutput)
+        // This is an output-policy knob (manifest sidecar path), not generated shader code.
+        // Locked by _testCoverageManifestOutputDoesNotAffectCompilerOptionHash; re-including it
+        // would invalidate persistent module caches on every sidecar-path change.
+        if (kv.key == CompilerOptionName::CoverageManifestOutput)
             continue;
 
         builder.append(kv.key);

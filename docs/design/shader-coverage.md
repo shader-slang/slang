@@ -50,7 +50,7 @@ primitive:
   side-channel that records the source-entry semantic intent for the
   current coverage mode.
   `ICoverageTracingMetadata` (and its on-disk twin
-  `.coverage-mapping.json`) is that channel.
+  `.coverage-manifest.json`) is that channel.
 
 The two channels carry complementary data — binding info answers
 "where" and attribution answers "what." A host needs both: without
@@ -61,6 +61,17 @@ coverage — some entries may not map to a real source file and line,
 and that fact is preserved in the metadata and JSON sidecar. The
 LCOV conversion step then applies gcov-style reporting rules by
 filtering those entries out of line-oriented output.
+
+Terminology:
+
+- **Coverage manifest** means the canonical JSON payload produced by
+  `slang_writeCoverageManifestJson`.
+- **Coverage manifest sidecar** means that JSON payload written to disk
+  next to a compiled artifact, normally as
+  `<output>.coverage-manifest.json`.
+- **`-coverage-manifest-output`** is the slangc option that overrides
+  the sidecar path; it controls output location only, not
+  instrumentation.
 
 Line, function, branch, and future source-region coverage should grow
 this attribution side of the design, not the binding side. In
@@ -219,7 +230,7 @@ Where each stage lives
 | `source/slang/slang-lower-to-ir.cpp` | Emits marker ops during AST lowering; filters structural statements for line coverage |
 | `source/slang/slang-emit.cpp` | Integrates the pass into the pipeline + allocates metadata + plumbs `-trace-coverage-binding` / `-trace-coverage-reserved-space` |
 | `source/slang/slang-options.cpp` | Registers the coverage tracing CLI flags |
-| `source/slang/slang-end-to-end-request.cpp` | Writes the `.coverage-mapping.json` sidecar from slangc |
+| `source/slang/slang-end-to-end-request.cpp` | Writes the `.coverage-manifest.json` sidecar from slangc |
 | `include/slang.h` | `slang::ICoverageTracingMetadata` public interface |
 | `source/compiler-core/slang-artifact-associated-impl.{h,cpp}` | `ArtifactPostEmitMetadata` implements the interface |
 | `prelude/slang-cpp-prelude.h` | CPU-target atomic helpers (`_slang_atomic_add_u32/i32`) |
@@ -251,7 +262,7 @@ binding.
 
 A companion free function — `slang_writeCoverageManifestJson` —
 serializes an `ICoverageTracingMetadata` to the canonical
-`.coverage-mapping.json` shape on demand. When the same metadata object
+`.coverage-manifest.json` shape on demand. When the same metadata object
 also supports `ISyntheticResourceMetadata` (the normal Slang artifact
 case), the serializer includes the buffer binding fields as well:
 `space` / `binding` for descriptor-backed targets and
@@ -263,10 +274,10 @@ hosts that consume the typed accessors don't need it.
 
 Today the in-tree consumer is:
 
-- **`slangc` itself** — its `_maybeWriteCoverageMapping` calls
+- **`slangc` itself** — its `_maybeWriteCoverageManifest` calls
   `slang_writeCoverageManifestJson` and writes the bytes to disk,
-  either as `<output>.coverage-mapping.json` for normal file outputs
-  or at the explicit `-coverage-mapping-output <path>`. This is what
+  either as `<output>.coverage-manifest.json` for normal file outputs
+  or at the explicit `-coverage-manifest-output <path>`. This is what
   makes the metadata API + manifest shape *one* contract, not two:
   `slangc` is its own first consumer of the public serializer.
 
@@ -279,7 +290,7 @@ don't exist in-tree today: slangpy bindings, in-engine compile
 pipelines, custom test runners that JIT-compile shaders. They're
 the audience the API shape is designed for.
 
-### Cross-process / offline consumers — `<output>.coverage-mapping.json`
+### Cross-process / offline consumers — `<output>.coverage-manifest.json`
 
 The other audience runs *later*, possibly on a different machine,
 without Slang linked: a runtime dispatching the precompiled shader;
@@ -288,7 +299,7 @@ LCOV; a custom dashboard. By the time these consumers run, the
 `slangc` invocation that produced the artifact has long since
 exited, so the in-process API is unreachable. They need the
 metadata frozen to disk in a language-agnostic format. The
-`<output>.coverage-mapping.json` sidecar is that disk form.
+`<output>.coverage-manifest.json` sidecar is that disk form.
 
 This is the pre-built-shader pattern: shaders are compiled offline,
 binaries plus sidecars ship with the game engine, DCC tool, or
@@ -351,7 +362,7 @@ the hidden resource binding from `ISyntheticResourceMetadata` and
 source-entry attribution from `ICoverageTracingMetadata`,
 and declares the slot in its own pipeline-layout / root-signature code.
 No file I/O is involved; the
-`.coverage-mapping.json` sidecar is not produced or read.
+`.coverage-manifest.json` sidecar is not produced or read.
 
 The host is free to consume the source-entry attribution in whatever
 shape suits it — write its own LCOV, feed an internal dashboard,
@@ -364,7 +375,7 @@ Audience: workflows that compile shaders offline (typically via
 or in a process where Slang isn't linked. Game engines shipping
 with prebuilt shaders, vendor runtimes, CI pipelines.
 
-`slangc` writes `<output>.coverage-mapping.json` next to each compiled
+`slangc` writes `<output>.coverage-manifest.json` next to each compiled
 artifact when any coverage mode emits source entries. The sidecar is
 the on-disk serialization of the coverage attribution plus synthetic
 resource binding metadata. The dispatching host reads the sidecar,
@@ -375,7 +386,7 @@ the same sidecar later when converting readback counters to LCOV.
 ### Convenience layers (planned follow-up)
 
 A helper library could provide a C ABI that handles
-`.coverage-mapping.json` parsing, counter accumulation across
+`.coverage-manifest.json` parsing, counter accumulation across
 dispatches, and LCOV serialization for hosts that want LCOV output
 without implementing the format themselves. It would not be required
 for either workflow above.
