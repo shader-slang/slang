@@ -4,6 +4,9 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1
 
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1
+
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
@@ -16,6 +19,10 @@ typealias DType = half;
 #else
 typealias DType = float;
 #endif
+
+
+// TEST_INPUT: set portableWeightBuffer = ubuffer(stride=4, count=4096)
+uniform RWStructuredBuffer<DType>.Handle portableWeightBuffer;
 
 // TEST_INPUT: set inputBuffer = ubuffer(stride=4, count=4096)
 uniform RWStructuredBuffer<DType>.Handle inputBuffer;
@@ -34,19 +41,52 @@ static const uint OffsetB = 256;
 
 void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedInputSize, int PaddedOutputSize, bool Clear>(uint tid)
 {
-    fillTransposeWeightTiled<DType, OutputSize, InputSize, BatchSize, Clear>(tid, inputBuffer);
-}
+    static const int PhysicalCount = PaddedInputSize * PaddedOutputSize + PaddedOutputSize;
 
+    if (Clear)
+    {
+        static const int NumIters = (PhysicalCount + BatchSize - 1) / BatchSize;
+        for (int iter = 0; iter < NumIters; iter++)
+        {
+            int index = iter * BatchSize + tid;
+            if (index < PhysicalCount)
+                inputBuffer[index] = DType(0);
+        }
+        return;
+    }
+
+    static const int LogicalCount = InputSize * OutputSize;
+    static const int NumLogicalIters = (LogicalCount + BatchSize - 1) / BatchSize;
+    for (int iter = 0; iter < NumLogicalIters; iter++)
+    {
+        int index = iter * BatchSize + tid;
+        if (index < LogicalCount)
+        {
+            int row = index / InputSize;
+            int col = index - row * InputSize;
+            int scaleFactor = (row % 3 == 0) ? -1 : ((row % 3 == 1) ? 0 : 1);
+            portableWeightBuffer[index] = DType(scaleFactor * (col + 1));
+        }
+    }
+
+    AllMemoryBarrierWithGroupSync();
+
+    let portable = BindlessAddress<DType>(portableWeightBuffer);
+    let optimal = BindlessAddress<DType>(inputBuffer);
+    NetworkParameterLayoutConverter<DType, 0, InputSize, OutputSize>.toOptimalLayout(portable, optimal, tid, BatchSize);
+    AllMemoryBarrierWithGroupSync();
+}
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
-    DType inputData[OutputSize];
+    typealias InputVec = WaveTangledVector<DType, TestShMemSize, PaddedOutputSize, SubgroupSize, 2>;
+    InputVec inputData = InputVec(DType(0));
     for (int i = 0; i < OutputSize; i++)
         inputData[i] = DType(tid + 1);
 
-    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 2, true>(
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedOutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 2, true>(
         inputData, inputBuffer, none);
 
     bool res = true;
@@ -69,7 +109,7 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 
 [numthreads(BatchSize, 1, 1)]
 [shader("compute")]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid : SV_GroupIndex)
 {
     {
         fillWeightMatrixTiled<16, 16, 16, 16, false>(tid);
@@ -95,7 +135,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
         AllMemoryBarrierWithGroupSync();
     }
 
-    // BUFFER: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
+    // BUFFER: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
 }

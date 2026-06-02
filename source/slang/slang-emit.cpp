@@ -545,6 +545,8 @@ void calcRequiredLoweringPassSet(
             result.nonVectorCompositeSelect = true;
         break;
     case kIROp_IncrementCoverageCounter:
+    case kIROp_IncrementFunctionCoverageCounter:
+    case kIROp_IncrementBranchCoverageCounter:
         result.coverageTracing = true;
         break;
     }
@@ -1020,12 +1022,12 @@ Result linkAndOptimizeIR(
     // Shader coverage instrumentation. The pass synthesizes
     // `__slang_coverage` as an `IRGlobalParam` directly in the
     // linked program IR, extends the program-scope var layout, and
-    // rewrites counter ops to atomic adds. Runs BEFORE
+    // rewrites coverage marker ops to atomic adds. Runs BEFORE
     // `collectGlobalUniformParameters` so the synthesized buffer
     // gets packed into `GlobalParams` alongside user globals on
     // targets that pack ordinary uniforms (CPU, CUDA).
     //
-    // Counter ops carry source position on their built-in `sourceLoc`,
+    // Coverage markers carry source position on their built-in `sourceLoc`,
     // so this pass is independent of debug-info state. It writes its
     // source-entry mapping into `metadata`, exposed to hosts via
     // ICoverageTracingMetadata.
@@ -1078,7 +1080,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(
             instrumentCoverage,
             sink,
-            codeGenContext->shouldTraceCoverage(),
+            codeGenContext->shouldTraceAnyCoverage(),
             explicitBinding,
             explicitSpace,
             reservedSpaces.getBuffer(),
@@ -1179,7 +1181,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(
             finalizeCoverageInstrumentationMetadata,
             sink,
-            codeGenContext->shouldTraceCoverage(),
+            codeGenContext->shouldTraceAnyCoverage(),
             outLinkedIR.globalScopeVarLayout,
             targetRequest,
             *metadata);

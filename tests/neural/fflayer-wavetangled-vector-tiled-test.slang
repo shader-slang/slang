@@ -5,10 +5,15 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -emit-spirv-directly
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0 -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DWARP_COUNT=1
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -xslang -DTEST_METAL=1
 
 #pragma warning(disable: 41017)
 import slang.neural;
 import common;
+
+#ifndef TEST_METAL
+#define TEST_METAL 0
+#endif
 
 #ifndef WARP_COUNT
 #define WARP_COUNT 1
@@ -20,26 +25,32 @@ import common;
 
 typealias ElementType = float;
 
-//TEST_INPUT: set parametersFloat = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4)
-uniform RWStructuredBuffer<float>.Handle parametersFloat;
-
-//TEST_INPUT: set parameters = ubuffer(stride=4, count=258)
-//TEST_INPUT: set dParameters = ubuffer(stride=4, count=258)
+//TEST_INPUT: set buffers.parameters = ubuffer(stride=4, count=272)
+//TEST_INPUT: set buffers.dParameters = ubuffer(stride=4, count=272)
 
 static const int BiasOffset = 256;
-static const int ParamBufferSize = 258;
+static const int ParamBufferSize = 272;
 typealias Layout = OptimalLayout;
 
 //TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
 
+struct TestBuffers
+{
 #if TEST_POINTER
-    uniform ElementType* parameters;
-    uniform ElementType* dParameters;
+    ElementType* parameters;
+    ElementType* dParameters;
+#else
+    RWStructuredBuffer<ElementType>.Handle parameters;
+    RWStructuredBuffer<ElementType>.Handle dParameters;
+#endif
+}
+
+ParameterBlock<TestBuffers> buffers;
+
+#if TEST_POINTER
     typealias Address = PointerAddress<ElementType>;
 #else
-    uniform RWStructuredBuffer<ElementType>.Handle parameters;
-    uniform RWStructuredBuffer<ElementType>.Handle dParameters;
     typealias Address = BindlessAddress<ElementType>;
 #endif
 
@@ -49,9 +60,15 @@ static const int SubgroupSize = 32;
 static const int WarpCount = WARP_COUNT;
 static const int BatchSize = WarpCount * SubgroupSize;
 
+#if TEST_METAL
+#define TEST_TARGET TargetEnum.Metal
+#else
+#define TEST_TARGET TargetEnum.CUDA
+#endif
+
 typealias ShMemSizeLayer1 = SharedMemorySize<
     ElementType,
-    TargetEnum.CUDA,
+    TEST_TARGET,
     ExecutionMode.Training,
     SubgroupSize,
     WarpCount,
@@ -61,6 +78,7 @@ typealias InVec = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, Sub
 typealias OutVec = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize, WarpCount>;
 
 typealias Layer = FFLayer<ElementType, InVec, OutVec, Layout, IdentityActivation<ElementType>, true>;
+typealias NoBiasLayer = FFLayer<ElementType, InVec, OutVec, Layout, IdentityActivation<ElementType>, false>;
 
 [Differentiable]
 OutVec computeLayerOutput(Address paramAddr, InVec input, Layer layer)
@@ -75,7 +93,7 @@ void testFFLayerForward(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVec input = InVec(inputData);
 
-    let baseAddr = Address(parameters);
+    let baseAddr = Address(buffers.parameters);
     let layer = Layer();
 
     let output = layer.eval<Address>(input, baseAddr);
@@ -96,8 +114,8 @@ void testFFLayerBackward(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVec input = InVec(inputData);
 
-    let baseAddr = Address(parameters);
-    let dBaseAddr = Address(dParameters);
+    let baseAddr = Address(buffers.parameters);
+    let dBaseAddr = Address(buffers.dParameters);
     let layer = Layer();
 
     var paramAddrPair = DifferentialPtrPair<Address>(baseAddr, dBaseAddr);
@@ -116,18 +134,18 @@ void testFFLayerBackward(int tid, int resIndex)
     // dW accumulated across BatchSize threads.
     // dW = BatchSize * [[1,2,3,4],[1,2,3,4]]
     ElementType scale = ElementType(BatchSize);
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(0, 0)], scale * ElementType(1.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(0, 1)], scale * ElementType(2.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(0, 2)], scale * ElementType(3.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(0, 3)], scale * ElementType(4.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(1, 0)], scale * ElementType(1.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(1, 1)], scale * ElementType(2.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(1, 2)], scale * ElementType(3.0));
-    isPassed = isPassed && equals(dParameters[tiledDWeightOffset(1, 3)], scale * ElementType(4.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 0)], scale * ElementType(1.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 1)], scale * ElementType(2.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 2)], scale * ElementType(3.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(0, 3)], scale * ElementType(4.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 0)], scale * ElementType(1.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 1)], scale * ElementType(2.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 2)], scale * ElementType(3.0));
+    isPassed = isPassed && equals(buffers.dParameters[tiledDWeightOffset<InputSize>(1, 3)], scale * ElementType(4.0));
 
     // dBias = [BatchSize, BatchSize]
-    isPassed = isPassed && equals(dParameters[BiasOffset], scale);
-    isPassed = isPassed && equals(dParameters[BiasOffset + 1], scale);
+    isPassed = isPassed && equals(buffers.dParameters[BiasOffset], scale);
+    isPassed = isPassed && equals(buffers.dParameters[BiasOffset + 1], scale);
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
@@ -141,8 +159,16 @@ void testFFLayerParameterCount(int tid, int resIndex)
     // For 4->2 layer with bias: 4*2 + 2 = 10
     bool isPassed = (Layer.ParameterCount == 10);
 
-    // OptimalLayout: ceil(2/16)*ceil(4/16)*256 + 2 = 1*1*256 + 2 = 258
-    isPassed = isPassed && (Layer.StorageSize == 258);
+    // OptimalLayout reserves a padded bias block after the physical weight matrix.
+    isPassed = isPassed && (Layer.StorageSize == 272);
+    isPassed = isPassed && (Layer.WeightStorageSize == 256);
+    isPassed = isPassed && (Layer.BiasStorageSize == 16);
+
+    // The logical no-bias layer has fewer parameters, but keeps the same physical
+    // optimal-layout envelope so layer offsets are independent of HasBias.
+    isPassed = isPassed && (NoBiasLayer.ParameterCount == 8);
+    isPassed = isPassed && (NoBiasLayer.StorageSize == 272);
+    isPassed = isPassed && (NoBiasLayer.BiasStorageSize == 16);
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
@@ -156,7 +182,7 @@ void cleanupDParameters(uint tid)
     if (tid == 0)
     {
         for (int i = 0; i < ParamBufferSize; i++)
-            dParameters[i] = ElementType(0.0);
+            buffers.dParameters[i] = ElementType(0.0);
     }
 }
 
@@ -165,34 +191,34 @@ void setupParameters(uint tid)
     if (tid == 0)
     {
         for (int i = 0; i < ParamBufferSize; i++)
-            parameters[i] = ElementType(0.0);
+            buffers.parameters[i] = ElementType(0.0);
 
         for (int col = 0; col < InputSize; col++)
-            parameters[tiledWeightOffset(0, col)] = ElementType(parametersFloat[col]);
+            buffers.parameters[tiledWeightOffset<InputSize>(0, col)] = ElementType(col + 1);
 
         for (int col = 0; col < InputSize; col++)
-            parameters[tiledWeightOffset(1, col)] = ElementType(parametersFloat[InputSize + col]);
+            buffers.parameters[tiledWeightOffset<InputSize>(1, col)] = ElementType(InputSize + col + 1);
 
-        parameters[256] = ElementType(parametersFloat[8]);
-        parameters[257] = ElementType(parametersFloat[9]);
+        buffers.parameters[256] = ElementType(9);
+        buffers.parameters[257] = ElementType(10);
     }
 }
 
 [shader("compute")]
 [numthreads(BatchSize, 1, 1)]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid : SV_GroupIndex)
 {
     setupParameters(tid);
     AllMemoryBarrierWithGroupSync();
 
     testFFLayerParameterCount(tid, 0);
-    // BUFFER: 1
+    // BUFFER: {{^}}1{{$}}
 
     testFFLayerForward(tid, 1);
-    // BUFFER: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 
     cleanupDParameters(tid);
     AllMemoryBarrierWithGroupSync();
     testFFLayerBackward(tid, 2);
-    // BUFFER: 1
+    // BUFFER-NEXT: {{^}}1{{$}}
 }

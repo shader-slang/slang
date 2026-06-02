@@ -3966,6 +3966,13 @@ err(
     span { loc = "param:Decl", message = "parameter '~param' direction '~actualDirection:ParamPassingMode' does not match interface requirement '~expectedDirection:ParamPassingMode'." }
 )
 
+standalone_note(
+    "differentiable-requirement-needs-differentiable-member",
+    -1,
+    "member '~member:Decl' cannot satisfy differentiable interface requirement '~requirement:Decl' because it does not provide the required differentiability; it may be missing an appropriate differentiability attribute, such as [Differentiable]",
+    span { loc = "member:Decl" }
+)
+
 warning(
     "non-copyable-type-cannot-conform-to-interface",
     38109,
@@ -4738,11 +4745,11 @@ err(
 
 -- 451xx - Coverage instrumentation (-trace-coverage)
 
-warning(
+err(
     "coverage-buffer-reserved-name",
     45100,
-    "`__slang_coverage` is reserved by `-trace-coverage`",
-    span { loc = "location", message = "the global parameter name `__slang_coverage` is reserved by the `-trace-coverage` instrumentation. The IR coverage pass synthesizes its own buffer with this name; the user declaration here is silently shadowed and will not receive any counter writes. Either rename the user declaration or remove `-trace-coverage` from the compile." }
+    "`__slang_coverage` is reserved by coverage tracing",
+    span { loc = "location", message = "the global parameter name `__slang_coverage` is reserved by coverage tracing instrumentation (`-trace-coverage`, `-trace-function-coverage`, `-trace-branch-coverage`). The IR coverage pass synthesizes a global parameter with this name, so a user declaration of `__slang_coverage` conflicts with the synthesized buffer. Either rename the user declaration or remove the coverage tracing option from the compile." }
 )
 
 err(
@@ -4755,7 +4762,7 @@ err(
 warning(
     "coverage-target-not-supported",
     45102,
-    "`-trace-coverage` is not supported on this target; coverage instrumentation skipped"
+    "coverage tracing options (`-trace-coverage`, `-trace-function-coverage`, `-trace-branch-coverage`) are not supported on this target; coverage instrumentation skipped"
 )
 
 err(
@@ -4767,7 +4774,7 @@ err(
 err(
     "coverage-pass-through-incompatible",
     45104,
-    "`-trace-coverage` cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation"
+    "coverage tracing options (`-trace-coverage`, `-trace-function-coverage`, `-trace-branch-coverage`) cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation"
 )
 
 err(
