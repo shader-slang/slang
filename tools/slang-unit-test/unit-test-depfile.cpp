@@ -99,6 +99,10 @@ SLANG_UNIT_TEST(DepfileOutput)
         SLANG_CHECK_MSG(
             _contains(depContent, Path::getFileName(slangPath).getBuffer()),
             "depfile missing input file dependency");
+        // Negative: a non-stdout compile must not emit the "-:" sentinel.
+        SLANG_CHECK_MSG(
+            !depContent.startsWith("-:") && !_contains(depContent, "\n-:"),
+            "depfile must not contain '-:' sentinel when -o is specified");
     }
 
     // --- Test 2: depfile without -o (output to stdout) ---
@@ -138,10 +142,13 @@ SLANG_UNIT_TEST(DepfileOutput)
         SLANG_CHECK(SLANG_SUCCEEDED(File::readAllText(depFile.path, depContent)));
         getTestReporter()->message(TestMessageType::Info, depContent.getBuffer());
 
-        // Without -o the target must be "-" (stdout sentinel).
-        SLANG_CHECK_MSG(_contains(depContent, "-:"), "depfile missing '-:' stdout target");
+        // Without -o the target must be "-" (stdout sentinel), anchored at line start.
+        SLANG_CHECK_MSG(
+            depContent.startsWith("-:") || _contains(depContent, "\n-:"),
+            "depfile target line must start with '-:' (stdout sentinel)");
         SLANG_CHECK_MSG(
             _contains(depContent, Path::getFileName(slangPath).getBuffer()),
             "depfile missing input file dependency");
     }
+
 }
