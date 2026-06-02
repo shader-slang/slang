@@ -1108,6 +1108,8 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
                 getSink(),
                 disassemblyArtifact.writeRef()));
 
+            // Preserve metadata sidecars, including coverage mappings, when the
+            // primary artifact is converted to disassembly output.
             for (auto associated : intermediateArtifact->getAssociated())
             {
                 if (associated->getDesc().payload == ArtifactPayload::Metadata ||
@@ -1129,8 +1131,7 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
                     disassemblyDebugArtifact.writeRef()));
                 disassemblyDebugArtifact->setName(debugArtifact->getName());
 
-                // The disassembly needs both the metadata for the debug build identifier
-                // and the debug spirv to be associated with is.
+                // Attach the disassembled debug artifact alongside the primary disassembly.
                 disassemblyArtifact->addAssociated(disassemblyDebugArtifact);
             }
 

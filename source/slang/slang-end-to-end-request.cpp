@@ -459,7 +459,18 @@ static String _normalizeOutputPathForCompare(const String& path)
         return canonicalPath;
     }
 
-    return absolutePath;
+    // Output files usually do not exist during preflight validation. Canonicalize
+    // the deepest existing prefix so symlinked output directories still compare
+    // correctly for not-yet-created artifacts and sidecars.
+    String parentPath = Path::getParentDirectory(absolutePath);
+    if (parentPath.getLength() == 0 || parentPath == absolutePath)
+        return absolutePath;
+
+    String canonicalParentPath = _normalizeOutputPathForCompare(parentPath);
+    if (canonicalParentPath.getLength() == 0)
+        return absolutePath;
+
+    return Path::combine(canonicalParentPath, Path::getFileName(absolutePath));
 }
 
 static bool _areOutputPathsEquivalent(const String& left, const String& right)
@@ -502,7 +513,6 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
             return SLANG_FAIL;
         }
         sidecarPath = explicitSidecarPath;
-        m_didWriteExplicitCoverageMapping = true;
     }
     else
     {
@@ -518,6 +528,10 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
     if (SLANG_FAILED(writeResult))
     {
         getSink()->diagnose(Diagnostics::UnableToWriteFile{.path = sidecarPath});
+    }
+    else if (explicitSidecarPath.getLength() != 0)
+    {
+        m_didWriteExplicitCoverageMapping = true;
     }
     return writeResult;
 }

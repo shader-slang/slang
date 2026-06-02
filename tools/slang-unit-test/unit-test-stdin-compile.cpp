@@ -671,6 +671,15 @@ static SlangResult _runSlangc(
     return ProcessUtil::execute(cmdLine, out);
 }
 
+static bool _containsDiagnostic(
+    const ExecuteResult& result,
+    const char* diagnosticId,
+    const char* expectedText)
+{
+    return _contains(result.standardError, diagnosticId) &&
+           _contains(result.standardError, expectedText);
+}
+
 static SlangResult _checkCoverageManifest(const String& path)
 {
     if (!File::exists(path))
@@ -809,7 +818,10 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteArtifact(UnitTestC
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_contains(result.standardError, "must differ from the compiled artifact output path"))
+    if (!_containsDiagnostic(
+            result,
+            "E45110",
+            "must differ from the compiled artifact output path"))
         return SLANG_FAIL;
     if (File::exists(files.outputPath))
         return SLANG_FAIL;
@@ -838,12 +850,50 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteArtifactAlias(
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_contains(result.standardError, "must differ from the compiled artifact output path"))
+    if (!_containsDiagnostic(
+            result,
+            "E45110",
+            "must differ from the compiled artifact output path"))
         return SLANG_FAIL;
     if (File::exists(files.outputPath))
         return SLANG_FAIL;
 
     return SLANG_OK;
+}
+
+static SlangResult _testCoverageExplicitSidecarCannotOverwriteArtifactCaseAlias(
+    UnitTestContext* context)
+{
+#if SLANG_WINDOWS_FAMILY
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    String outputCaseAlias = files.basePath + ".SPV";
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-coverage-mapping-output");
+    args.add(outputCaseAlias);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(
+            result,
+            "E45110",
+            "must differ from the compiled artifact output path"))
+        return SLANG_FAIL;
+    if (File::exists(files.outputPath))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+#else
+    SLANG_UNUSED(context);
+    return SLANG_OK;
+#endif
 }
 
 static SlangResult _testCoverageExplicitSidecarCannotOverwriteExistingArtifactSymlink(
@@ -887,11 +937,75 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteExistingArtifactSy
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_contains(result.standardError, "must differ from the compiled artifact output path"))
+    if (!_containsDiagnostic(
+            result,
+            "E45110",
+            "must differ from the compiled artifact output path"))
         return SLANG_FAIL;
     String outputText;
     SLANG_RETURN_ON_FAIL(File::readAllText(files.outputPath, outputText));
     if (outputText != originalOutput)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+#endif
+}
+
+static SlangResult _testCoverageExplicitSidecarCannotOverwriteArtifactSymlinkParent(
+    UnitTestContext* context)
+{
+#if SLANG_WINDOWS_FAMILY
+    // Symlink creation needs elevated privileges on some Windows configurations.
+    SLANG_UNUSED(context);
+    return SLANG_OK;
+#else
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    String realDir = files.basePath + "-real-dir";
+    String symlinkDir = files.basePath + "-link-dir";
+    if (!Path::createDirectory(realDir))
+        return SLANG_FAIL;
+
+    struct ScopedPathCleanup
+    {
+        String realDir;
+        String symlinkDir;
+
+        ~ScopedPathCleanup()
+        {
+            if (symlinkDir.getLength() != 0)
+                File::remove(symlinkDir);
+            if (realDir.getLength() != 0)
+                Path::removeNonEmpty(realDir);
+        }
+    } cleanup;
+    cleanup.realDir = realDir;
+    cleanup.symlinkDir = symlinkDir;
+
+    if (::symlink(realDir.getBuffer(), symlinkDir.getBuffer()) != 0)
+        return SLANG_FAIL;
+
+    String outputPath = Path::combine(realDir, "coverage.spv");
+    String sidecarAliasPath = Path::combine(symlinkDir, "coverage.spv");
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-coverage-mapping-output");
+    args.add(sidecarAliasPath);
+    args.add("-o");
+    args.add(outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(
+            result,
+            "E45110",
+            "must differ from the compiled artifact output path"))
+        return SLANG_FAIL;
+    if (File::exists(outputPath) || File::exists(sidecarAliasPath))
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -993,7 +1107,10 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_contains(result.standardError, "must differ from the compiled artifact output path"))
+    if (!_containsDiagnostic(
+            result,
+            "E45110",
+            "must differ from the compiled artifact output path"))
         return SLANG_FAIL;
     if (File::exists(files.outputPath) || File::exists(debugArtifactPath) ||
         File::exists(files.autoManifestPath))
@@ -1020,7 +1137,10 @@ static SlangResult _testCoverageExplicitSidecarRejectsWholeProgramCollision(
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_contains(result.standardError, "must differ from the compiled artifact output path"))
+    if (!_containsDiagnostic(
+            result,
+            "E45110",
+            "must differ from the compiled artifact output path"))
         return SLANG_FAIL;
     if (File::exists(files.outputPath))
         return SLANG_FAIL;
@@ -1091,8 +1211,9 @@ static SlangResult _testCoverageExplicitSidecarRejectsMultipleArtifacts(UnitTest
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_contains(
-            result.standardError,
+    if (!_containsDiagnostic(
+            result,
+            "E45109",
             "would be written by multiple coverage-instrumented artifacts"))
         return SLANG_FAIL;
     if (File::exists(files.outputPath) || File::exists(files.disassemblyOutputPath) ||
@@ -1117,7 +1238,7 @@ static SlangResult _testCoverageExplicitSidecarRejectsUnsupportedCoverageTarget(
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_contains(result.standardError, "did not produce coverage metadata"))
+    if (!_containsDiagnostic(result, "E45112", "did not produce coverage metadata"))
         return SLANG_FAIL;
     if (File::exists(files.explicitManifestPath))
         return SLANG_FAIL;
@@ -1139,7 +1260,7 @@ static SlangResult _testCoverageExplicitSidecarRequiresCoverage(UnitTestContext*
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_contains(result.standardError, "`-coverage-mapping-output` requires"))
+    if (!_containsDiagnostic(result, "E45108", "`-coverage-mapping-output` requires"))
         return SLANG_FAIL;
     if (File::exists(files.explicitManifestPath))
         return SLANG_FAIL;
@@ -1163,7 +1284,7 @@ static SlangResult _testCoverageExplicitSidecarRejectsContainerOutput(UnitTestCo
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_contains(result.standardError, "is not supported when writing a container output"))
+    if (!_containsDiagnostic(result, "E45111", "is not supported when writing a container output"))
         return SLANG_FAIL;
     if (File::exists(files.containerOutputPath) || File::exists(files.explicitManifestPath))
         return SLANG_FAIL;
@@ -1316,7 +1437,11 @@ SLANG_UNIT_TEST(SlangcCoverageMappingOutput)
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteArtifactAlias(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(
+        _testCoverageExplicitSidecarCannotOverwriteArtifactCaseAlias(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
         _testCoverageExplicitSidecarCannotOverwriteExistingArtifactSymlink(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testCoverageExplicitSidecarCannotOverwriteArtifactSymlinkParent(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteDebugArtifact(unitTestContext)));
     SLANG_CHECK(
