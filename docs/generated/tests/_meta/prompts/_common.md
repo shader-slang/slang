@@ -502,28 +502,62 @@ CI validates it. The `gpu-*` Reason tags in `## Untested claims` are
 used only when no test has been written for the claim yet; once a
 test exists, the claim moves to `## Functional coverage`.
 
-### Exercise as many backends as the claim allows
+### Exercise every feasible back-end for target-dependent claims
 
-A single test file may carry **multiple `//TEST` directives**, one per
-line at the top of the file. `slang-test` runs each directive
-independently and any failure fails the file. **The default is to test
-the claim against every feasible backend, not just one:**
+A single test file may carry **multiple `//TEST` directives** (one per
+line at the top). `slang-test` runs each independently; any failure
+fails the file. Use a **distinct FileCheck prefix per target** so each
+directive matches its own emitted text:
 
-- For a claim that is **target-independent** (lexer / parser /
-  early-semantic-check), one or two directives is enough — adding more
-  is repetition of identical pre-backend behavior. Use `INTERPRET` as
-  the primary.
-- For a claim that is **target-dependent** (IR passes, legalization,
-  emit behaviors, capability gates), add a `//TEST` directive for
-  _every_ feasible text-emit target where the claim is observable:
-  HLSL, GLSL, SPIR-V (asm), Metal, WGSL, CUDA, CPP. If different
-  targets produce different emitted text, use distinct `CHECK`
-  patterns per directive (see existing tests under `tests/` for
-  examples; slang-test selects the pattern block matching the
-  directive).
+```slang
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+// ...
+//HLSL: ...
+//SPV: ...
+//METAL: ...
+```
 
-This is how the suite gains backend coverage. A single-target test
-masks per-target regressions; a multi-target test catches them.
+**Classify the claim first — the classification decides the back-end count:**
+
+- **Target-independent** — resolved _before_ back-end codegen: lexing,
+  preprocessing, parsing, name lookup, overload resolution, generic
+  specialization _semantics_, constant-folded _values_, most
+  diagnostics, AST shape. **One or two directives** (INTERPRET primary,
+  or `COMPARE_COMPUTE -cpu`). Adding more back-ends here just repeats
+  identical pre-backend behavior — don't.
+
+- **Target-dependent** — observable in emitted/generated code or in
+  target-specific legalization / capability handling: codegen shape,
+  intrinsic lowering, type / struct / matrix layout, resource binding,
+  swizzles, capability gates, the emitted form of a construct.
+  **Mandatory: add a `//TEST:SIMPLE(filecheck=<PREFIX>):-target <T>`
+  directive for _every_ feasible text-emit target the claim is
+  observable on** — `hlsl`, `glsl`, `spirv-asm`, `metal`, `wgsl`,
+  `cuda`, `cpp`. This is where the suite earns its per-target
+  regression coverage; a single-target test silently masks
+  Metal / WGSL / CUDA / GLSL codegen bugs. Do **not** stop at HLSL +
+  SPIR-V.
+
+Pair with the functional check as usual (see § functional+emission): the
+runtime _value_ stays on INTERPRET / `COMPARE_COMPUTE -cpu`; the
+emission fan-out is the per-target `SIMPLE` directives.
+
+**When a target can't express the claim** (feature unsupported, needs a
+capability the target lacks, or only diagnoses): do **not** force a
+passing directive or weaken the `CHECK` to make it green. Either add a
+negative / `requires-capability` directive that pins the diagnostic, or
+record that target in `## Untested claims` with a reason
+(`unsupported-on-target` / `gpu-*`).
+
+Targets whose _downstream_ tool is absent locally (DXIL→dxc, CUDA
+PTX→nvrtc, Metal→metallib, WGSL→tint) still emit **source** text that
+FileCheck matches, so a `-target metal/wgsl/cuda/glsl/spirv-asm/hlsl`
+emission directive runs locally without that tool; only genuinely
+tool-gated steps are reported `ignored` (CI validates them).
 
 ### Pressure the compiler — boundary coverage is mandatory
 

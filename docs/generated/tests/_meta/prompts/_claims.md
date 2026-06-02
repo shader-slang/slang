@@ -70,12 +70,21 @@ invent claims):
   `uint64_t` / `float` / `double` / `half`), every documented shape
   (scalar / vector / matrix), every documented qualifier (`const` /
   `static` / `uniform` / `in` / `inout` / `out`).
-- **Meaningful back-ends.** Every back-end where the claim's observation
-  differs or where the doc names the back-end. For a runtime-value
-  claim: `INTERPRET` (slangi) **and** `COMPARE_COMPUTE -cpu`. For an
-  emission-pinning claim: `-target hlsl`, `-target spirv-asm`,
-  `-target glsl`, `-target cuda` — at least every one the doc cites by
-  name. See [`_common.md` § Exercise multiple backends](_common.md).
+- **Meaningful back-ends.** Classify the claim as target-independent or
+  target-dependent, then cover accordingly:
+  - _target-independent_ (value/semantics resolved before codegen):
+    `INTERPRET` (slangi) and/or `COMPARE_COMPUTE -cpu` — one or two
+    directives, no per-target fan-out.
+  - _target-dependent_ (emitted code / legalization / capability): a
+    `SIMPLE -target <T>` emission directive for **every feasible
+    text-emit target** the claim is observable on — `hlsl`, `glsl`,
+    `spirv-asm`, `metal`, `wgsl`, `cuda`, `cpp` — not just the ones the
+    doc names, and not just HLSL+SPIR-V. Pair with the functional check.
+
+  This is the mandatory fan-out; see
+  [`_common.md` § Exercise every feasible back-end](_common.md). Targets
+  that can't express the claim go in `## Untested claims`
+  (`unsupported-on-target`), never a weakened CHECK.
 
 One claim therefore typically yields several test files. The claim row
 in `## Functional coverage` lists them all. A claim with only a single
