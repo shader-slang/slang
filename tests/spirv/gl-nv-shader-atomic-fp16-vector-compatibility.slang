@@ -1,11 +1,6 @@
 //TEST:SIMPLE(filecheck=NEGATIVE): -target spirv -entry computeMain -stage compute -emit-spirv-directly
 //TEST:SIMPLE(filecheck=POSITIVE): -target spirv -entry computeMain -stage compute -emit-spirv-directly -DPOSITIVE_VECTOR_ATOMIC
 //TEST:SIMPLE(filecheck=POSITIVE_MIN_MAX): -target spirv -entry computeMain -stage compute -emit-spirv-directly -DPOSITIVE_VECTOR_MIN_MAX
-// DIAGNOSTIC_TEST is used here to check capability diagnostics, not just failures.
-// The vector atomic is compiled under spirv_1_5, which lacks spvAtomicFloat16VectorNV.
-// Without restrictive checking this produces a profile-upgrade warning; with
-// -restrictive-capability-check, the same missing capability is an error.
-// `non-exhaustive` keeps each check focused on that late capability diagnostic.
 //DIAGNOSTIC_TEST:SIMPLE(diag=POSITIVE_WARN,non-exhaustive): -target spirv -profile spirv_1_5 -entry computeMain -stage compute -emit-spirv-directly -DPOSITIVE_VECTOR_ATOMIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=POSITIVE_ERR,non-exhaustive): -target spirv -profile spirv_1_5 -restrictive-capability-check -entry computeMain -stage compute -emit-spirv-directly -DPOSITIVE_VECTOR_ATOMIC
 //TEST:SIMPLE(filecheck=POSITIVE_IGNORE_CAPS): -target spirv -profile spirv_1_5 -entry computeMain -stage compute -emit-spirv-directly -ignore-capabilities -DPOSITIVE_VECTOR_ATOMIC

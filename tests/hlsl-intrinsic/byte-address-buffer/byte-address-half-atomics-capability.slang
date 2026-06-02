@@ -1,12 +1,22 @@
+// Scalar fp16 add checks. `NO_FP16_ATOMIC` has no fp16 atomic capability; `VECTOR_ONLY`
+// has the vector capability but intentionally lacks the scalar spvAtomicFloat16AddEXT.
 //TEST:SIMPLE(filecheck=SCALAR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT
 //DIAGNOSTIC_TEST:SIMPLE(diag=NO_FP16_ATOMIC,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spirv_1_5
 //DIAGNOSTIC_TEST:SIMPLE(diag=VECTOR_ONLY,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16VectorNV
+
+// Direct half-vector `__atomic_*` checks. `DIRECT` selects direct structured-buffer
+// atomics; `NO_VECTOR` means only the scalar fp16 atomic capability is enabled.
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_ATOMIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_MIN_MAX
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_EXCHANGE_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_EXCHANGE
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED_VECTOR_WIDTH,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_UNSUPPORTED_VECTOR_WIDTH
+
+// Pointer-form fp16 vector checks. These paths are emitted as vector atomics, so
+// they must diagnose missing spvAtomicFloat16VectorNV when only scalar fp16 add is enabled.
 //DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_EMULATED
 //DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_F16X2_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_F16X2
+
+// Positive codegen checks for ignored capabilities, scalar/vector SPIR-V, and CUDA.
 //TEST:SIMPLE(filecheck=IGNORE_CAPS): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -ignore-capabilities -capability spirv_1_5
 //TEST:SIMPLE(filecheck=BOTH): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT -capability spvAtomicFloat16VectorNV
 //TEST:SIMPLE(filecheck=VECTOR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_ATOMIC
