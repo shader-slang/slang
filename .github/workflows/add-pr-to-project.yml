@@ -26,7 +26,7 @@ jobs:
           script: |
             const username = context.payload.pull_request.user.login;
             const BOT_LOGIN = 'nv-slang-bot';
-            
+
             let source;
             if (username === BOT_LOGIN) {
               source = 'Bot';
