@@ -1,4 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -experimental-feature
+import experimental.workgraph;
 
 // Test that an invalid NodeLaunch mode produces diagnostic E31401.
 

@@ -1,4 +1,5 @@
-//TEST:SIMPLE(filecheck=CHK): -target dxil-asm -stage node -entry main -profile lib_6_8
+//TEST:SIMPLE(filecheck=CHK): -target dxil-asm -stage node -entry main -profile lib_6_8 -experimental-feature
+import experimental.workgraph;
 
 // Test that ThreadNodeInputRecord<T> compiles as a thread-launch node shader parameter.
 

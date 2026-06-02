@@ -1,5 +1,6 @@
-//TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
-//TEST:SIMPLE(filecheck=CHK_SPIRV): -target spirv-asm -stage node -entry main
+//TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8 -experimental-feature
+//TEST:SIMPLE(filecheck=CHK_SPIRV): -target spirv-asm -stage node -entry main -experimental-feature
+import experimental.workgraph;
 
 // Test that [NodeMaxDispatchGrid(x, y, z)] compiles to dxil and spirv.
 // A broadcasting node with NodeMaxDispatchGrid must declare an input record with SV_DispatchGrid.

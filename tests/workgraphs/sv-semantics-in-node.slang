@@ -1,5 +1,6 @@
-//TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
-//TEST:SIMPLE(filecheck=CHK_SPIRV): -target spirv-asm -stage node -entry main
+//TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8 -experimental-feature
+//TEST:SIMPLE(filecheck=CHK_SPIRV): -target spirv-asm -stage node -entry main -experimental-feature
+import experimental.workgraph;
 
 // Test that SV_GroupIndex, SV_DispatchThreadID, SV_GroupID, SV_GroupThreadID
 // are accepted as inputs in broadcasting-launch node shaders.

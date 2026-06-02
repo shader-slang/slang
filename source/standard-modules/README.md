@@ -1,10 +1,10 @@
 # Standard Modules Configuration
 
-This document explains the centralized configuration system for Slang's standard modules (currently the neural module).
+This document explains the centralized configuration system for Slang's standard modules.
 
 ## Overview
 
-The standard modules configuration is centralized to avoid hardcoding paths in multiple locations. This makes it easier to maintain and add new standard modules in the future. Currently, the only standard module is the neural module, but this structure is designed to accommodate additional modules.
+The standard modules configuration is centralized to avoid hardcoding paths in multiple locations. This makes it easier to maintain and add new standard modules in the future.
 
 ## Configuration Variables
 
@@ -16,6 +16,9 @@ The following CMake variables control the standard modules configuration:
 
 - `SLANG_NEURAL_MODULE_FILE_NAME` (default: "neural.slang-module")
   - The file name for the compiled neural module
+
+- `SLANG_WORKGRAPH_MODULE_FILE_NAME` (default: "workgraph.slang-module")
+  - The file name for the compiled experimental workgraph module
 
 - `SLANG_STANDARD_MODULE_INSTALL_DIR`
   - **Windows**: `bin/slang-standard-module-${SLANG_VERSION_FULL}` (installed next to slang.dll)
@@ -29,10 +32,13 @@ source/standard-modules/
 ├── CMakeLists.txt                          # Central configuration for all modules
 ├── slang-standard-module-config.h.in      # Configuration template
 ├── README.md                               # This file
-└── neural/                                 # Neural module subdirectory
-    ├── CMakeLists.txt                      # Neural module build logic
-    ├── neural.slang                        # Neural module entry point
-    └── *.slang                             # Other neural module files
+├── neural/                                 # Neural module subdirectory
+│   ├── CMakeLists.txt                      # Neural module build logic
+│   ├── neural.slang                        # Neural module entry point
+│   └── *.slang                             # Other neural module files
+└── experimental/                           # Experimental module subdirectory
+    ├── CMakeLists.txt                      # Experimental module build logic
+    └── workgraph.slang                     # Workgraph module entry point
 ```
 
 ## Files Involved
@@ -46,6 +52,7 @@ source/standard-modules/
 ### CMake Files
 - `source/standard-modules/CMakeLists.txt` - Defines configuration variables for all standard modules and generates the header
 - `source/standard-modules/neural/CMakeLists.txt` - Neural module specific build logic
+- `source/standard-modules/experimental/CMakeLists.txt` - Experimental module specific build logic
 - `source/slang/CMakeLists.txt` - Uses the standard module config header internally for the slang library
 
 ### C++ Code
@@ -68,12 +75,19 @@ To change the standard module paths:
 3. C++ code includes `slang-standard-module-config.h` and uses the constants internally
 4. Each module's CMakeLists.txt uses the same variables for consistent paths
 5. Standard modules are compiled using `slangc` at build time
-6. Standard modules are placed under a `slang/` subdirectory next to libslang.so/slang.dll,
-   so that `import slang.<module>;` resolves correctly at runtime:
+6. Standard modules are placed under subdirectories next to libslang.so/slang.dll that match
+   their import paths:
    - **Build - Windows**: `build/Debug/bin/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
+   - **Build - Windows**: `build/Debug/bin/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
    - **Build - Linux/Mac**: `build/Debug/lib/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
+   - **Build - Linux/Mac**: `build/Debug/lib/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
    - **Install - Windows**: `<prefix>/bin/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
+   - **Install - Windows**: `<prefix>/bin/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
    - **Install - Linux/Mac**: `<prefix>/lib/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
+   - **Install - Linux/Mac**: `<prefix>/lib/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
+
+For example, `import slang.neural;` resolves to `slang/neural.slang-module`, and
+`import experimental.workgraph;` resolves to `experimental/workgraph.slang-module`.
 
 This ensures that both the C++ runtime search logic and the CMake build logic use exactly the same path configuration, while keeping the implementation details internal to the slang library.
 
