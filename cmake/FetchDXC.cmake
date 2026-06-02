@@ -25,7 +25,7 @@
 #
 # Requires the following variables to be set by the caller (set in SlangTarget.cmake):
 #   runtime_subdir   - Destination for Windows DLLs (e.g. "bin")
-#   library_subdir   - Destination for Linux .so files (e.g. "lib")
+#   library_subdir   - Destination for Unix shared libraries (e.g. "lib")
 
 include(FetchContent)
 
@@ -62,8 +62,8 @@ function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
 
     # Stage public DXC HLSL headers (e.g. dx/linalg.h) at a stable path so test
     # directives and local `slangc -Xdxc -Ibuild/dxc/include` invocations can
-    # resolve them. Done as a build-graph custom command, matching the DLL/.so
-    # copy pattern below.
+    # resolve them. Done as a build-graph custom command, matching the DXC
+    # runtime copy pattern below.
     if(EXISTS "${dxc_root}/include/hlsl/dx/linalg.h")
         set(_dxc_hlsl_include_dir "${dxc_root}/include/hlsl")
     elseif(EXISTS "${dxc_root}/inc/hlsl/dx/linalg.h")
@@ -117,6 +117,7 @@ if(SLANG_DXC_BUILD_FROM_SOURCE)
     if(
         CMAKE_SYSTEM_NAME STREQUAL "Windows"
         OR CMAKE_SYSTEM_NAME STREQUAL "Linux"
+        OR CMAKE_SYSTEM_NAME STREQUAL "Darwin"
     )
         set(_dxc_build_from_source ON)
     else()
@@ -466,10 +467,13 @@ endif()
 if(_dxc_build_from_source)
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         set(_dxc_warning_flags "")
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    elseif(
+        CMAKE_SYSTEM_NAME STREQUAL "Linux"
+        OR CMAKE_SYSTEM_NAME STREQUAL "Darwin"
+    )
         # LLVM_ENABLE_WARNINGS=OFF prevents adding warning flags but does not
         # actively suppress existing ones. Pass -w via CMAKE_*_FLAGS to silence
-        # all GCC/Clang warnings from DXC's source.
+        # all compiler warnings from DXC's source.
         set(_dxc_warning_flags "-DCMAKE_C_FLAGS=-w" "-DCMAKE_CXX_FLAGS=-w")
     endif()
 
@@ -618,7 +622,7 @@ if(_dxc_build_from_source)
 
     # Step 3: Build DXC at Slang build time.
     # The DXIL validator target is named 'dxildll' in DXC's CMake (it produces
-    # libdxil.so on Linux / dxil.dll on Windows).
+    # dxil.dll on Windows and a shared library on Unix-like systems).
     if(CMAKE_GENERATOR MATCHES "Ninja")
         set(_dxc_build_cmd
             ${CMAKE_COMMAND}
@@ -650,9 +654,19 @@ if(_dxc_build_from_source)
             "${_dxc_build_dir}/${_dxc_dll_subdir}/dxil.dll"
         )
     else()
+        set(_dxc_shared_library_prefix "${CMAKE_SHARED_LIBRARY_PREFIX}")
+        set(_dxc_shared_library_suffix "${CMAKE_SHARED_LIBRARY_SUFFIX}")
+        set(
+            _dxc_dxcompiler_library_name
+            "${_dxc_shared_library_prefix}dxcompiler${_dxc_shared_library_suffix}"
+        )
+        set(
+            _dxc_dxil_library_name
+            "${_dxc_shared_library_prefix}dxil${_dxc_shared_library_suffix}"
+        )
         set(_dxc_src_byproducts
-            "${_dxc_build_dir}/lib/libdxcompiler.so"
-            "${_dxc_build_dir}/lib/libdxil.so"
+            "${_dxc_build_dir}/lib/${_dxc_dxcompiler_library_name}"
+            "${_dxc_build_dir}/lib/${_dxc_dxil_library_name}"
         )
     endif()
 
@@ -687,9 +701,13 @@ if(_dxc_build_from_source)
         endforeach()
     else()
         foreach(_lib dxcompiler dxil)
-            set(_src "${_dxc_build_dir}/lib/lib${_lib}.so")
+            set(
+                _dxc_shared_library_name
+                "${_dxc_shared_library_prefix}${_lib}${_dxc_shared_library_suffix}"
+            )
+            set(_src "${_dxc_build_dir}/lib/${_dxc_shared_library_name}")
             set(_dst
-                "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/lib${_lib}.so"
+                "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${_dxc_shared_library_name}"
             )
             add_custom_command(
                 OUTPUT "${_dst}"
@@ -804,11 +822,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         add_custom_target(copy-${_dll} DEPENDS "${_dst}")
         set_target_properties(copy-${_dll} PROPERTIES FOLDER generated)
     endforeach()
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+elseif(
+    CMAKE_SYSTEM_NAME STREQUAL "Linux"
+    OR CMAKE_SYSTEM_NAME STREQUAL "Darwin"
+)
+    set(_dxc_shared_library_prefix "${CMAKE_SHARED_LIBRARY_PREFIX}")
+    set(_dxc_shared_library_suffix "${CMAKE_SHARED_LIBRARY_SUFFIX}")
     foreach(_lib dxcompiler dxil)
-        set(_src "${dxc_SOURCE_DIR}/lib/lib${_lib}.so")
+        set(
+            _dxc_shared_library_name
+            "${_dxc_shared_library_prefix}${_lib}${_dxc_shared_library_suffix}"
+        )
+        set(_src "${dxc_SOURCE_DIR}/lib/${_dxc_shared_library_name}")
         set(_dst
-            "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/lib${_lib}.so"
+            "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${_dxc_shared_library_name}"
         )
         add_custom_command(
             OUTPUT "${_dst}"
