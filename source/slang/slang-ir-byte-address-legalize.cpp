@@ -731,10 +731,7 @@ struct ByteAddressBufferLegalizationContext
 
         auto lo64 = m_builder.emitCast(uint64Type, loLoad);
         auto hi64 = m_builder.emitCast(uint64Type, hiLoad);
-        auto shift = m_builder.emitShl(
-            uint64Type,
-            hi64,
-            m_builder.getIntValue(uint64Type, 32));
+        auto shift = m_builder.emitShl(uint64Type, hi64, m_builder.getIntValue(uint64Type, 32));
         auto fullValue = m_builder.emitBitOr(uint64Type, lo64, shift);
         return m_builder.emitBitCast(type, fullValue);
     }
@@ -1530,7 +1527,12 @@ struct ByteAddressBufferLegalizationContext
                 if (sizeAlignment.size == 8 &&
                     !isAligned(baseOffset, immediateOffset, alignment, sizeAlignment.getStride()))
                 {
-                    return emitLegal64BitStore(buffer, baseOffset, immediateOffset, alignment, value);
+                    return emitLegal64BitStore(
+                        buffer,
+                        baseOffset,
+                        immediateOffset,
+                        alignment,
+                        value);
                 }
             }
 
@@ -1566,10 +1568,7 @@ struct ByteAddressBufferLegalizationContext
         auto loVal = m_builder.emitCast(uintType, uint64Val);
         auto hiVal = m_builder.emitCast(
             uintType,
-            m_builder.emitShr(
-                uint64Type,
-                uint64Val,
-                m_builder.getIntValue(uint64Type, 32)));
+            m_builder.emitShr(uint64Type, uint64Val, m_builder.getIntValue(uint64Type, 32)));
 
         SLANG_RETURN_ON_FAIL(
             emitLegalStore(uintType, buffer, baseOffset, immediateOffset, alignment, loVal));
