@@ -5,13 +5,13 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-[ForwardDifferentiable]
+[Differentiable]
 float mySqr(float x)
 {
     return x * x;
 }
 
-[ForwardDifferentiable]
+[Differentiable]
 float f(float x)
 {
     return mySqr(x * x);

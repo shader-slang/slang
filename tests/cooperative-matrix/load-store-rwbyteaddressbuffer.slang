@@ -3,6 +3,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -Xslang -DRWBAB
 
+//DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include
+//DXIL: result code = 0
+
 // CHECK: 1
 // CHECK-NEXT: 2
 // CHECK-NEXT: 3

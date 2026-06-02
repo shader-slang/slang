@@ -221,7 +221,7 @@ SLANG_UNIT_TEST(linkTimeTypeGenericD3D12)
     runTestImpl(linkTimeTypeGenericTestImpl, unitTestContext, DeviceType::D3D12);
 }
 
-SLANG_UNIT_TEST(linkTimeTypeGenerictVulkan)
+SLANG_UNIT_TEST(linkTimeTypeGenericVulkan)
 {
     runTestImpl(linkTimeTypeGenericTestImpl, unitTestContext, DeviceType::Vulkan);
 }

@@ -26,10 +26,10 @@ suitable for building multi-layer perceptrons (MLPs) and similar architectures.
 
 ## Parameter Layout
 
-Parameters are packed as a contiguous block in storage:
-
-- **weights:** `Out * In` scalars, row-major by output row: `W[row * In + col]`
-- **bias (optional):** `Out` scalars immediately following weights
+`ParameterCount` reports the logical parameter count: row-major weights plus `Out` bias
+scalars when `HasBias` is true. `StorageSize` reports the physical layer extent for the
+selected storage layout. For `OptimalLayout`, weights are padded to a 16x16 envelope and
+an aligned bias slot is reserved after the weights even when the layer has no logical bias.
 */
 public struct FFLayer<
     T,
@@ -50,6 +50,26 @@ public struct FFLayer<
     public static const int ParameterCount =
         OutputVector.Size * InputVector.Size + (HasBias ? OutputVector.Size : 0);
 
+    static const int PaddedOutputSize = ((OutputVector.Size + 15) / 16) * 16;
+    static const int PaddedInputSize = ((InputVector.Size + 15) / 16) * 16;
+
+    // OptimalLayout uses a target-independent physical envelope: weights are
+    // padded to 16x16 and the bias slot is padded to the output extent, even
+    // for no-bias layers. CUDA, Vulkan, and Metal may order elements
+    // differently inside this envelope, but they all reserve the same number
+    // of elements so layer offsets stay uniform.
+    public static const int WeightStorageSize =
+        (Layout.Layout == LayoutType.Optimal)
+            ? PaddedOutputSize * PaddedInputSize
+            : OutputVector.Size * InputVector.Size;
+
+    public static const int BiasStorageSize =
+        (Layout.Layout == LayoutType.Optimal)
+            ? PaddedOutputSize
+            : (HasBias ? OutputVector.Size : 0);
+
+    public static const int StorageSize = WeightStorageSize + BiasStorageSize;
+
     /// Activation function instance (stores any activation-specific parameters).
     internal Activation activation;
 
@@ -62,7 +82,7 @@ public struct FFLayer<
 
     public static int nextOffset(int baseOffset)
     {
-        return baseOffset + ParameterCount;
+        return baseOffset + StorageSize;
     }
 
     /// Forward evaluation: y = Activation(W*x + b).
@@ -73,12 +93,12 @@ public struct FFLayer<
     [ForceInline]
     public OutputVector eval<A>(InputVector input, A parameterAddr)
         where A : IPointerLikeAddress<T>
-        where A.Differential : IPointerLikeAddress<T.Differential>
+        where A.Differential : IPointerLikeAddress<T>
     {
         OutputVector y;
         if(HasBias)
         {
-            let biasAddr = parameterAddr.getOffset(OutputVector.Size * InputVector.Size);
+            let biasAddr = parameterAddr.getOffset(WeightStorageSize);
             y = input.linearTransform<A, Layout, OutputVector>(parameterAddr, biasAddr);
         }
         else

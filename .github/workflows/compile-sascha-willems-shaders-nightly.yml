@@ -27,6 +27,9 @@ jobs:
       - name: Checkout Slang repository
         uses: actions/checkout@v4
 
+      - name: Check disk space
+        uses: ./.github/actions/check-disk-space
+
       - name: Add bash to PATH
         shell: pwsh
         run: |
@@ -36,24 +39,46 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Finding latest successful merge queue CI run..."
-          RUN_INFO=$(gh run list --repo ${{ github.repository }} \
-            --workflow ci.yml --status success --event merge_group --limit 1 \
+          echo "Finding latest successful merge queue CI run with artifacts..."
+          ARTIFACT_NAME="slang-build-windows-x86_64-cl-release"
+
+          # Some CI runs skip builds (e.g. docs-only changes) and have no
+          # artifacts. Search through recent successful runs to find one that
+          # actually produced the artifact we need.
+          RUN_LIST=$(gh run list --repo ${{ github.repository }} \
+            --workflow ci.yml --status success --event merge_group --limit 10 \
             --json databaseId,headSha,createdAt)
 
-          RUN_ID=$(echo "$RUN_INFO" | jq -r '.[0].databaseId')
-          COMMIT=$(echo "$RUN_INFO" | jq -r '.[0].headSha')
-          CREATED=$(echo "$RUN_INFO" | jq -r '.[0].createdAt')
+          FOUND=false
+          COUNT=$(echo "$RUN_LIST" | jq length)
+          for i in $(seq 0 $((COUNT - 1))); do
+            RUN_ID=$(echo "$RUN_LIST" | jq -r ".[$i].databaseId")
+            COMMIT=$(echo "$RUN_LIST" | jq -r ".[$i].headSha")
+            CREATED=$(echo "$RUN_LIST" | jq -r ".[$i].createdAt")
 
-          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-            echo "No successful CI run found"
+            echo "Trying CI run $RUN_ID (commit: ${COMMIT:0:12}, created: $CREATED)..."
+            ERR_FILE=$(mktemp)
+            if gh run download "$RUN_ID" --repo ${{ github.repository }} \
+                --name "$ARTIFACT_NAME" --dir slang-build/ 2>"$ERR_FILE"; then
+              echo "Downloaded artifact from CI run $RUN_ID"
+              rm -f "$ERR_FILE"
+              FOUND=true
+              break
+            elif grep -qi "artifact" "$ERR_FILE"; then
+              echo "  No artifact '$ARTIFACT_NAME' in this run, trying next..."
+              rm -f "$ERR_FILE"
+            else
+              echo "  Artifact download failed for run $RUN_ID:"
+              cat "$ERR_FILE"
+              rm -f "$ERR_FILE"
+              exit 1
+            fi
+          done
+
+          if [ "$FOUND" != "true" ]; then
+            echo "No successful CI run with artifact '$ARTIFACT_NAME' found in last 10 runs"
             exit 1
           fi
-
-          echo "Downloading from CI run $RUN_ID (commit: ${COMMIT:0:12}, created: $CREATED)"
-          gh run download "$RUN_ID" --repo ${{ github.repository }} \
-            --name slang-build-windows-x86_64-cl-release \
-            --dir slang-build/
 
           slangcPath=$(find slang-build -name "slangc.exe" -type f | head -1)
           if [ -z "$slangcPath" ]; then

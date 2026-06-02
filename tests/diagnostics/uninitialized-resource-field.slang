@@ -18,7 +18,7 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     useStruct(s);
 }
 
-// CHECK: note{{.*}}E39999{{.*}}candidate: SomeStruct.init(int, Texture1D<float>)
+// CHECK: note{{.*}}E40011{{.*}}candidate: SomeStruct.init(int, Texture1D<float>)
 struct SomeStruct
 {
     int value;

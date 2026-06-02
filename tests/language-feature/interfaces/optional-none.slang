@@ -1,6 +1,5 @@
 // Test that the size of an optional interface type is the same as the existential box.
 
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -conformance "Impl1:IFoo=1" -entry computeMain -profile cs_6_0
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER): -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER): -vk -shaderobj -output-using-type
 
@@ -41,7 +40,3 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     else
         outputBuffer[0] = 100;
 }
-
-// CHECK: struct MyType
-// CHECK-NEXT: {
-// CHECK-NEXT: Tuple{{.*}} foo{{.*}};

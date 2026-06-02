@@ -1,6 +1,10 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-dx12 -compute -shaderobj -profile cs_6_6 -xslang -experimental-feature -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
+
+//TEST_INPUT: set storageBuffer = ubuffer(data=[0.0 0.0 0.0 0.0], stride=4)
+uniform RWStructuredBuffer<float>.Handle storageBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -10,7 +14,7 @@ struct MyPtrType : IDifferentiablePtrType
 {
     typealias Differential = MyPtrType;
 
-    RWStructuredBuffer<float> buffer;
+    RWStructuredBuffer<float>.Handle buffer;
     uint offset;
 
     float load(uint idx) { return buffer[offset + idx]; }
@@ -52,15 +56,23 @@ float test(MyPtrType b, uint num)
 [numthreads(1, 1, 1)]
 void computeMain(uint id : SV_DispatchThreadID)
 {
-    outputBuffer[0] = 1; // CHECK: 1
-    outputBuffer[1] = 2; // CHECK: 2
+    storageBuffer[0] = 1; // BUFFER: 1
+    storageBuffer[1] = 2; // BUFFER: 2
 
     // Denote the first two elements in the buffer as the primal buffer and the last two elements for the derivative.
-    var b = DifferentialPtrPair<MyPtrType>( { outputBuffer, 0 }, { outputBuffer, 2 } );
+    //
+    // Note that storageBuffer is a bindless handle, which is required to robustly
+    // pass buffers around as values, particularly with auto-diff which may create
+    // more intermediate values of the buffer type.
+    //
+    var b = DifferentialPtrPair<MyPtrType>( { storageBuffer, 0 }, { storageBuffer, 2 } );
 
     bwd_diff(test)(b, 2, 1.5f);
 
+    for (uint i = 0; i < 4; i++)
+        outputBuffer[i] = storageBuffer[i];
+
     // Check locations [2] and [3] in the buffer
-    // CHECK: 1.5
-    // CHECK: 1.5
+    // BUFFER: 1.5
+    // BUFFER: 1.5
 }

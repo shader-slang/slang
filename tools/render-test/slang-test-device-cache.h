@@ -20,7 +20,10 @@ public:
         bool enableValidation;
         bool enableRayTracingValidation;
         std::string profileName;
-        std::vector<std::string> requiredFeatures;
+        SlangTargetFlags targetFlags;
+        SlangMatrixLayoutMode defaultMatrixLayoutMode;
+        uint32_t nvapiExtUavSlot;
+        bool dx12ExperimentalFeatures;
 
         bool operator==(const DeviceCacheKey& other) const;
     };

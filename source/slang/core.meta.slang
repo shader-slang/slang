@@ -130,6 +130,12 @@ attribute_syntax [ExperimentalModule] : ExperimentalModuleAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
 
+__attributeTarget(DeclBase)
+attribute_syntax [HasTrivialForwardDerivative] : HasTrivialForwardDerivativeAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [MaybeDifferentiable] : MaybeDifferentiableAttribute;
+
 /// Represents types that provide arithmetic operations.
 interface IArithmetic : IComparable
 {
@@ -298,42 +304,42 @@ interface IInteger : IArithmetic, ILogical
 interface IFloat : IArithmetic, IDifferentiable
 {
     /// Initializes a value of the conforming type form a `float`.
-    [TreatAsDifferentiable]
+    [Differentiable]
     __init(float value);
 
     /// Converts a value of the conforming type into a `float`.
-    [TreatAsDifferentiable]
+    [Differentiable]
     float toFloat();
 
     /// Computes the arithmetic sum of two values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This add(This other);
 
     /// Computes the arithmetic subtraction from values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This sub(This other);
 
     /// Computes the arithmetic multiplication from values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This mul(This other);
 
     /// Computes the arithmetic division from values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This div(This other);
 
     /// Computes the arithmetic remainder from values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This mod(This other);
 
     /// Computes the arithmetic negation of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This neg();
 
-    [TreatAsDifferentiable]
+    [Differentiable]
     __init(This value);
 
     /// Multiplies a value of the conforming type by a floating point scale factor..
-    [TreatAsDifferentiable]
+    [Differentiable]
     This scale<T:__BuiltinFloatingPointType>(T scale);
 }
 
@@ -392,6 +398,9 @@ interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
 
 __attributeTarget(AggTypeDecl)
 attribute_syntax [__NonCopyableType] : NonCopyableTypeAttribute;
+
+__attributeTarget(InterfaceDecl)
+attribute_syntax [__FunctionInterface] : FunctionInterfaceAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__NoSideEffect] : NoSideEffectAttribute;
@@ -472,9 +481,9 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 ///     associatedtype Differential : IDifferentiable
 ///         where Differential.Differential == Differential;
 ///
-///     static Differential dzero();
+///     [Differentiable] static Differential dzero();
 ///
-///     static Differential dadd(Differential, Differential);
+///     [Differentiable] static Differential dadd(Differential, Differential);
 /// }
 /// ```
 ///
@@ -533,24 +542,26 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 ///     // Specify that `MyRay.Differential` is `MyRayDifferential`.
 ///     typealias Differential = MyRayDifferential;
 ///
-///     // Specify that the derivative for `origin` will be stored in `MayRayDifferential.d_origin`.
-///     [DerivativeMember(MayRayDifferential.d_origin)]
+///     // Specify that the derivative for `origin` will be stored in `MyRayDifferential.d_origin`.
+///     [DerivativeMember(MyRayDifferential.d_origin)]
 ///     float3 origin;
 ///
-///     // Specify that the derivative for `dir` will be stored in `MayRayDifferential.d_dir`.
-///     [DerivativeMember(MayRayDifferential.d_dir)]
+///     // Specify that the derivative for `dir` will be stored in `MyRayDifferential.d_dir`.
+///     [DerivativeMember(MyRayDifferential.d_dir)]
 ///     float3 dir;
 ///
 ///     // This is a non-differentiable field so we don't put any attributes on it.
 ///     int nonDifferentiablePayload;
 ///
 ///     // Define zero derivative.
+///     [Differentiable]
 ///     static MyRayDifferential dzero()
 ///     {
 ///         return {float3(0.0), float3(0.0)};
 ///     }
 ///
 ///     // Define the add operation of two derivatives.
+///     [Differentiable]
 ///     static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
 ///     {
 ///         MyRayDifferential result;
@@ -564,7 +575,11 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 /// Note that for each struct field that is differentiable, we need to use the `[DerivativeMember]` attribute to associate it with the
 /// corresponding field in the `Differential` type, so the compiler knows how to access the derivative for the field.
 ///
-/// However, there is still a missing piece in the above code: we also need to make `MyRayDifferential` conform to `IDifferentiable` because it is required that the `Differential` of a type must itself be `Differential`. Again we can use automatic fulfillment by simply adding `IDifferentiable` conformance to `MyRayDifferential`:
+/// However, there is still a missing piece in the above code: we also need to make
+/// `MyRayDifferential` conform to `IDifferentiable` because it is required that
+/// the `Differential` of a type must itself be `IDifferentiable`, and that
+/// `Differential.Differential == Differential`. Again we can use automatic
+/// fulfillment by simply adding `IDifferentiable` conformance to `MyRayDifferential`:
 /// ```csharp
 /// struct MyRayDifferential : IDifferentiable
 /// {
@@ -581,28 +596,31 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 /// {
 ///     typealias Differential = MyRayDifferential;
 ///
-///    [DerivativeMember(MyRayDifferential.d_origin)]
-///    float3 d_origin;
+///     [DerivativeMember(MyRayDifferential.d_origin)]
+///     float3 d_origin;
 ///
-///    [DerivativeMember(MyRayDifferential.d_dir)]
-///    float3 d_dir;
+///     [DerivativeMember(MyRayDifferential.d_dir)]
+///     float3 d_dir;
 ///
-///    static MyRayDifferential dzero()
-///    {
-///        return {float3(0.0), float3(0.0)};
-///    }
+///     [Differentiable]
+///     static MyRayDifferential dzero()
+///     {
+///         return {float3(0.0), float3(0.0)};
+///     }
 ///
-///    static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
-///    {
-///        MyRayDifferential result;
-///        result.d_origin = v1.d_origin + v2.d_origin;
+///     [Differentiable]
+///     static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
+///     {
+///         MyRayDifferential result;
+///         result.d_origin = v1.d_origin + v2.d_origin;
 ///         result.d_dir = v1.d_dir + v2.d_dir;
 ///         return result;
 ///     }
 /// }
 /// ```
-/// In this specific case, the automatically generated `IDifferentiable`
-/// implementation will be exactly the same as the manually written code listed above.
+/// In this specific case, the manually written `dzero` and `dadd` have the same
+/// value behavior as the automatically generated `IDifferentiable` implementation.
+/// When writing these requirements manually, include `[Differentiable]` as shown.
 ///
 ///
 __magic_type(DifferentiableType)
@@ -617,16 +635,11 @@ interface IDifferentiable
 
     /// Returns a zero-initialized value of the differential type.
     __builtin_requirement($((int)BuiltinRequirementKind::DZeroFunc))
-    static Differential dzero();
+    [Differentiable] static Differential dzero();
 
     /// Adds two differential values and returns the result.
     __builtin_requirement($((int)BuiltinRequirementKind::DAddFunc))
-    static Differential dadd(Differential, Differential);
-
-    /// Multiplies a scalar value of a built-in real type with a differential value and returns the result.
-    __builtin_requirement($((int)BuiltinRequirementKind::DMulFunc))
-    __generic<T : __BuiltinRealType>
-    static Differential dmul(T, Differential);
+    [Differentiable] static Differential dadd(Differential, Differential);
 };
 
 /// @experimental
@@ -656,6 +669,70 @@ interface IDifferentiablePtrType
     associatedtype Differential : IDifferentiablePtrType;
 };
 
+__magic_type(FwdDiffFuncType)
+__intrinsic_type($(kIROp_ForwardDiffFuncType))
+struct FwdDiffFuncType<FType> where __hasDiffTypeInfo(FType)
+{ };
+
+__magic_type(BwdCallableFuncType)
+__intrinsic_type($(kIROp_BwdCallableFuncType))
+struct BwdCallableFuncType<FType, CtxType> where __hasDiffTypeInfo(FType)
+{ };
+
+__magic_type(RematFuncType)
+__intrinsic_type($(kIROp_RematFuncType))
+struct RematFuncType<FType, MinimalCtxType, FullCtxType> where __hasDiffTypeInfo(FType)
+{ };
+
+__magic_type(ApplyForBwdFuncType)
+__intrinsic_type($(kIROp_ApplyForBwdFuncType))
+struct ApplyForBwdFuncType<FType, CtxType> where __hasDiffTypeInfo(FType)
+{ };
+
+__magic_type(BwdDiffFuncType)
+__intrinsic_type($(kIROp_BackwardDiffFuncType))
+struct BwdDiffFuncType<FType> where __hasDiffTypeInfo(FType)
+{ };
+
+__magic_type(ForwardDiffFuncInterfaceType)
+[KnownBuiltin($((int)KnownBuiltinDeclName::IForwardDifferentiable))]
+[__FunctionInterface]
+interface IForwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
+    [MaybeDifferentiable]
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff 
+};
+
+// Core library interfaces:
+__magic_type(BwdCallableBaseType)
+[KnownBuiltin($((int)KnownBuiltinDeclName::IBwdCallable))]
+interface IBwdCallable<FType> where __hasDiffTypeInfo(FType)
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallablePropFunc))
+    __associatedfunc BwdCallableFuncType<FType, This> operator(); // -> bwd_prop
+};
+
+__magic_type(BwdDiffFuncInterfaceType)
+[KnownBuiltin($((int)KnownBuiltinDeclName::IBackwardDifferentiable))]
+[__FunctionInterface]
+interface IBackwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
+    associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType)) 
+    associatedtype MinimalContext; // -> minimal_context_type
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
+    __associatedfunc ApplyForBwdFuncType<FType, This.MinimalContext> apply_bwd; // -> apply_bwd
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableRematFunc))
+    static __associatedfunc RematFuncType<FType, This.MinimalContext, This.BwdCallable> remat; // -> remat
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
+    static __associatedfunc BwdDiffFuncType<FType> bwd_diff; // -> bwd_diff
+};
 
 /// `DifferentialPair<T>` is a built-in type that carries both the original and derivative value of a term.
 /// It is defined as follows:
@@ -665,8 +742,8 @@ interface IDifferentiablePtrType
 ///     typealias Differential = DifferentialPair<T.Differential>;
 ///     property T p {get;}
 ///     property T.Differential d {get;}
-///     static Differential dzero();
-///     static Differential dadd(Differential a, Differential b);
+///     [Differentiable] static Differential dzero();
+///     [Differentiable] static Differential dadd(Differential a, Differential b);
 /// }
 /// ```
 ///
@@ -680,30 +757,30 @@ interface IDifferentiablePtrType
 ///
 __generic<T : IDifferentiable>
 __magic_type(DifferentialPairType)
-__intrinsic_type($(kIROp_DifferentialPairUserCodeType))
+__intrinsic_type($(kIROp_DifferentialPairType))
 struct DifferentialPair : IDifferentiable
 {
     typedef DifferentialPair<T.Differential> Differential;
     typedef T.Differential DifferentialElementType;
 
-    __intrinsic_op($(kIROp_MakeDifferentialPairUserCode))
-    __init(T _primal, T.Differential _differential);
+    __intrinsic_op($(kIROp_MakeDifferentialPair))
+    [Differentiable] __init(T _primal, T.Differential _differential);
 
     property p : T
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
         get;
     }
 
     property v : T
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
         get;
     }
 
     property d : T.Differential
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetDifferentialUserCode))
+        __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
         get;
     }
 
@@ -720,12 +797,14 @@ struct DifferentialPair : IDifferentiable
     }
 
     [__unsafeForceInlineEarly]
+    [Differentiable]
     static Differential dzero()
     {
         return Differential(T.dzero(), T.Differential.dzero());
     }
 
     [__unsafeForceInlineEarly]
+    [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {
         return Differential(
@@ -734,15 +813,6 @@ struct DifferentialPair : IDifferentiable
                 b.p
             ),
             T.Differential.dadd(a.d, b.d));
-    }
-
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    static Differential dmul(U a, Differential b)
-    {
-        return Differential(
-            T.dmul<U>(a, b.p),
-            T.Differential.dmul<U>(a, b.d));
     }
 };
 
@@ -833,6 +903,7 @@ interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat, IFloatingPoint
 {
         /// Get the value of the mathematical constant pi in this type.
     [Differentiable]
+    [__readNone]
     static This getPi();
 }
 
@@ -1126,7 +1197,7 @@ ${
 
         const char* attrib = "";
         if ((kBaseTypes[tt].flags & kBaseTypes[ss].flags & FLOAT_MASK) != 0)
-            attrib = "[TreatAsDifferentiable]";
+            attrib = "[Differentiable]";
 $}
     $(attrib)
     __intrinsic_op($(intrinsicOpCode))
@@ -1222,42 +1293,36 @@ ${
     case BaseType::Double:
 $}
         [Differentiable]
+        [__readNone]
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
 
          __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
          __intrinsic_op($(kIROp_Leq))  bool lessThanOrEquals(This other);
          __intrinsic_op($(kIROp_Eql))  bool equals(This other);
-         __intrinsic_op($(kIROp_Add))  This add(This other);
-         __intrinsic_op($(kIROp_Sub))  This sub(This other);
-         __intrinsic_op($(kIROp_Mul))  This mul(This other);
-         __intrinsic_op($(kIROp_Div))  This div(This other);
-         __intrinsic_op($(kIROp_FRem)) This mod(This other);
-         __intrinsic_op($(kIROp_Neg))  This neg();
-         __intrinsic_op($(kIROp_FloatCast)) float toFloat();
-         [__unsafeForceInlineEarly] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
+         __intrinsic_op($(kIROp_Add))  [Differentiable] This add(This other);
+         __intrinsic_op($(kIROp_Sub))  [Differentiable] This sub(This other);
+         __intrinsic_op($(kIROp_Mul))  [Differentiable] This mul(This other);
+         __intrinsic_op($(kIROp_Div))  [Differentiable] This div(This other);
+         __intrinsic_op($(kIROp_FRem)) [Differentiable] This mod(This other);
+         __intrinsic_op($(kIROp_Neg))  [Differentiable] This neg();
+         __intrinsic_op($(kIROp_FloatCast)) [Differentiable] float toFloat();
+         [__unsafeForceInlineEarly] [Differentiable] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
         typedef $(kBaseTypes[tt].name) Differential;
 
         [__unsafeForceInlineEarly]
-        [BackwardDifferentiable]
+        [Differentiable]
         static Differential dzero()
         {
             return Differential(0);
         }
 
         [__unsafeForceInlineEarly]
-        [BackwardDifferentiable]
+        [Differentiable]
         static Differential dadd(Differential a, Differential b)
         {
             return a + b;
         }
-
-        __generic<U : __BuiltinRealType>
-        [__unsafeForceInlineEarly]
-        [BackwardDifferentiable]
-        static Differential dmul(U a, Differential b)
-        {
-            return __realCast<Differential, U>(a) * b;
-        }
+        
 ${
         break;
     }
@@ -1619,7 +1684,7 @@ extension uintptr_t : IRangedValue
 
 /// Represent a 8-bit floating point value with 4 bits of exponent and 3 bits of mantissa.
 [require(spvFloat8EXT)]
-[require(cuda_sm_8_0)]
+[require(cuda_sm_8_9)]
 __intrinsic_type($(kIROp_FloatE4M3Type))
 __magic_type(FloatE4M3Type)
 struct FloatE4M3 : IFloatingPointCoopElement
@@ -1635,7 +1700,7 @@ struct FloatE4M3 : IFloatingPointCoopElement
 
 /// Represent a 8-bit floating point value with 5 bits of exponent and 2 bits of mantissa.
 [require(spvFloat8EXT)]
-[require(cuda_sm_8_0)]
+[require(cuda_sm_8_9)]
 __intrinsic_type($(kIROp_FloatE5M2Type))
 __magic_type(FloatE5M2Type)
 struct FloatE5M2 : IFloatingPointCoopElement
@@ -1788,20 +1853,25 @@ bool operator!=(__none_t noneVal, Optional<T> val)
 }
 
 __magic_type(ConditionalType)
+__intrinsic_type($(kIROp_ConditionalType))
 struct Conditional<T, bool hasValue>
 {
-    internal vector<T, hasValue ? 1 : 0> storage;
+    internal property T value
+    {
+        __intrinsic_op($(kIROp_GetConditionalValue))
+        get;
+    }
 
     __implicit_conversion($(kConversionCost_ValToOptional))
-    [__unsafeForceInlineEarly]
-    __init(T val) { if (hasValue) storage[0] = val;}
+    __intrinsic_op($(kIROp_MakeConditionalValue))
+    __init(T val);
 
     [__unsafeForceInlineEarly]
     public Optional<T> get()
     {
         if (hasValue)
         {
-            return Optional<T>(storage[0]);
+            return Optional<T>(value);
         }
         else
         {
@@ -1811,10 +1881,10 @@ struct Conditional<T, bool hasValue>
 
     [__unsafeForceInlineEarly]
     [mutating]
-    public void set(T value)
+    public void set(T newValue)
     {
         if (hasValue)
-            storage[0] = value;
+            this = Conditional<T, hasValue>(newValue);
     }
 }
 
@@ -1826,7 +1896,7 @@ extension<T> Optional<T>
     __init(Conditional<T, condHasValue> condVal)
     {
         if (condHasValue)
-            this = Optional<T>(condVal.storage[0]);
+            this = Optional<T>(condVal.value);
         else
             this = none;
     }
@@ -2183,7 +2253,6 @@ struct vector : IRWArray<T>
 
 
         /// Initialize a vector where all elements have the same scalar `value`.
-    [TreatAsDifferentiable]
     __implicit_conversion($(kConversionCost_ScalarToVector))
     __intrinsic_op($(kIROp_MakeVectorFromScalar))
     __init(T value);
@@ -2191,7 +2260,6 @@ struct vector : IRWArray<T>
     /// Initialize a vector from a value of the same type
     // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
     __intrinsic_op(0)
-    [TreatAsDifferentiable]
     __init(vector<T,N> value);
 
     [ForceInline]
@@ -2211,13 +2279,11 @@ struct matrix : IRWArray<vector<T,C>>
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
-    [TreatAsDifferentiable]
     __init(T val);
 
     /// Initialize a vector from a value of the same type
     // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
     __intrinsic_op(0)
-    [TreatAsDifferentiable]
     __init(This value);
 
     [ForceInline]
@@ -2305,14 +2371,21 @@ extension vector<T,N> : IFloat
     [__unsafeForceInlineEarly] bool lessThan(This other) { return this[0] < other[0]; }
     [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this[0] <= other[0]; }
     [__unsafeForceInlineEarly] bool equals(This other) { return all(__vectorEql(this, other)); }
-    __intrinsic_op($(kIROp_Add)) This add(This other);
-    __intrinsic_op($(kIROp_Sub)) This sub(This other);
-    __intrinsic_op($(kIROp_Mul)) This mul(This other);
-    __intrinsic_op($(kIROp_Div)) This div(This other);
-    __intrinsic_op($(kIROp_FRem)) This mod(This other);
-    __intrinsic_op($(kIROp_Neg)) This neg();
-    [__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
-    [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
+    __intrinsic_op($(kIROp_Add)) [Differentiable] This add(This other);
+    __intrinsic_op($(kIROp_Sub)) [Differentiable] This sub(This other);
+    __intrinsic_op($(kIROp_Mul)) [Differentiable] This mul(This other);
+    __intrinsic_op($(kIROp_Div)) [Differentiable] This div(This other);
+    __intrinsic_op($(kIROp_FRem)) [Differentiable] This mod(This other);
+    __intrinsic_op($(kIROp_Neg)) [Differentiable] This neg();
+    [Differentiable] [__unsafeForceInlineEarly]  This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
+    [Differentiable] [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
+
+    [OverloadRank(-1)]
+    [Differentiable]
+    __implicit_conversion($(kConversionCost_Default))
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:__BuiltinFloatingPointType>
+    __init(vector<U, N> other);
 
     [OverloadRank(-1)]
     __intrinsic_op($(kIROp_CastIntToFloat))
@@ -2322,7 +2395,7 @@ extension vector<T,N> : IFloat
     [OverloadRank(-1)]
     [__unsafeForceInlineEarly] __init(int v) { this = vector<T,N>(T(v)); }
     [OverloadRank(-1)]
-    [__unsafeForceInlineEarly] __init(float v) { this = vector<T,N>(T(v)); }
+    [__unsafeForceInlineEarly] [Differentiable] __init(float v) { this = vector<T,N>(T(v)); }
 
 }
 
@@ -2339,54 +2412,57 @@ extension vector<T,N> : IDifferentiable
     typedef vector<T, N> Differential;
 
     [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
+    [Differentiable]
     static Differential dzero()
     {
         return Differential(__slang_noop_cast<T>(T.dzero()));
     }
 
     [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
+    [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {
         return __internal_add(a, b);
-    }
-
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dmul(U a, Differential b)
-    {
-        return __internal_mul(__realCast<float>(a), b);
     }
 }
 
 __generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 extension matrix<T,N,M,L> : IFloat
 {
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] bool equals(This other) { return all(this == other); }
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Add)) This add(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Sub)) This sub(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Mul))This mul(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Div)) This div(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_FRem)) This mod(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Neg)) This neg();
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
+    // TODO(sai): not sure what's going on here? With the previous commit this was (this <= other)
+    // which is just self-recursive.
+    //
+    [__unsafeForceInlineEarly] bool lessThan(This other) { return this[0][0] < other[0][0]; }
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this[0][0] <= other[0][0]; }
+    [__unsafeForceInlineEarly] bool equals(This other) { return all(this[0][0] == other[0][0]); }
+    [Differentiable] __intrinsic_op($(kIROp_Add)) This add(This other);
+    [Differentiable] __intrinsic_op($(kIROp_Sub)) This sub(This other);
+    [Differentiable] __intrinsic_op($(kIROp_Mul))This mul(This other);
+    [Differentiable] __intrinsic_op($(kIROp_Div)) This div(This other);
+    [Differentiable] __intrinsic_op($(kIROp_FRem)) This mod(This other);
+    [Differentiable] __intrinsic_op($(kIROp_Neg)) This neg();
+    [Differentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
+    [Differentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
 
     [OverloadRank(-1)]
-    [TreatAsDifferentiable]
+    [Differentiable]
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarIntegerToFloatMatrix))
     __init(int v) { this = matrix<T,N,M>(T(v)); }
 
     [OverloadRank(-1)]
-    [TreatAsDifferentiable]
+    [Differentiable]
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
     __init(float v) { this = matrix<T,N,M>(T(v)); }
+    
+    /// Initialize a matrix where all elements have the same scalar `value`.
+    [OverloadRank(-1)]
+    [Differentiable]
+    __implicit_conversion($(kConversionCost_ScalarToMatrix))
+    __intrinsic_op($(kIROp_MakeMatrixFromScalar))
+    __init(T value);
+
 }
 
 __generic<T:IDifferentiable, let N : int, let M : int, let L : int>
@@ -2396,25 +2472,17 @@ extension matrix<T,N,M,L> : IDifferentiable
     typedef matrix<T, N,M,L> Differential;
 
     [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
+    [Differentiable]
     static Differential dzero()
     {
         return matrix<T, N,M,L>(__slang_noop_cast<T>(T.dzero()));
     }
 
     [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
+    [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {
         return __internal_add(a, b);
-    }
-
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dmul(U a, Differential b)
-    {
-        return __internal_mul(__realCast<float>(a), b);
     }
 }
 
@@ -3259,6 +3327,22 @@ __generic<T, U>
 __intrinsic_op($(kIROp_CreateExistentialObject))
 T createDynamicObject(uint typeId, U value);
 
+// One-argument shorthand for stateless dispatch: interfaces whose conforming
+// types have an empty any-value payload.  Forwards to the two-argument form
+// with a zero `uint` so the overload resolver has a concrete `U` to infer.
+// When the interface's any-value size is zero this byte is discarded.
+// When the interface's any-value size is non-zero this form is *not*
+// equivalent to calling the two-argument form with a real payload — the
+// packing path (`emitPackAnyValue` / `generatePackingFunc`) zero-initializes
+// the any-value buffer, so every byte of the payload is 0.  Callers that
+// need a specific payload must pass it explicitly via the two-argument form.
+__generic<T>
+[__unsafeForceInlineEarly]
+T createDynamicObject(uint typeId)
+{
+    return createDynamicObject<T, uint>(typeId, 0);
+}
+
 /// Reinterpret type `U` as type `T`. `T` and `U`
 /// can be any scalar, vector, matrix, struct or array types.
 /// @category conversion
@@ -3464,7 +3548,7 @@ bool operator !=(T v0, T v1)
 
 ${
 const char* arithmeticInterfaces[] = {"IArithmetic", "IFloat"};
-const char* attribs[] = {"", "[TreatAsDifferentiable]"};
+const char* attribs[] = {"", "[Differentiable]"};
 for (Index i = 0; i < 2; i++) {
     const auto interfaceName = arithmeticInterfaces[i];
     const auto attrib = attribs[i];
@@ -4628,8 +4712,35 @@ attribute_syntax [noinline] : NoInlineAttribute;
 
 /// Mark a declaration as deprecated.
 /// @param message The diagnostic message to show when the declaration is used.
+///
+/// @see `[RemovedSince]`.
 __attributeTarget(DeclBase)
 attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
+
+/// Mark a declaration as removed starting from the specified language version.
+///
+/// @param languageVersion  The first version from which the declaration is considered removed.
+/// @param message The diagnostic message to show when the declaration is used.
+///
+/// This attribute is used for a scheduled removal of a declaration.
+///
+/// An error is triggered when a declaration tagged with
+/// `[RemovedSince]` is referenced by a module that is compiled with
+/// language version `languageVersion` or higher.
+/// When an error is triggered due to removal, a possible
+/// `[deprecated]` attribute decoration for the same declaration is ignored.
+///
+/// It is not required that `languageVersion` match a version
+/// that is supported by `slangc`. This allows removal
+/// of declarations from future language versions. Value `-1`
+/// marks the declaration as removed from all language versions.
+///
+/// When a declaration is slated for removal, it is recommended to
+/// also tag it with the `[deprecated]` attribute.
+///
+/// @see `[deprecated]`.
+__attributeTarget(DeclBase)
+attribute_syntax [RemovedSince(languageVersion: int, message: String)] : RemovedSinceAttribute;
 
 /// Controls the behavior of the compiler when a differentiable function is detected to have side-effects.
 /// @category misc_types
@@ -5096,6 +5207,12 @@ semantic sv_wavelaneindex
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    get : uint;
+}
+
+semantic sv_waveindex
+{
+    [require(compute)]
     get : uint;
 }
 

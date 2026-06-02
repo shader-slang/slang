@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -profile ps_5_0 -entry main
+//TEST:COMPARE_HLSL: -profile ps_5_0 -entry main -warnings-disable 31106,31107
 
 // Ensure declaration order in output is correct
 

@@ -4,7 +4,6 @@
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-clone.h"
-#include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-float-non-uniform-resource-index.h"
@@ -53,6 +52,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         IRArrayTypeBase* runtimeArrayType;
     };
     Dictionary<IRType*, LoweredStructuredBufferTypeInfo> m_loweredStructuredBufferTypes;
+
+    struct WrappedCBufferElementInfo
+    {
+        IRStructType* structType;
+        IRStructKey* key;
+        IRParameterGroupType* parameterGroupType;
+    };
 
     IRInst* lowerTextureFootprintType(IRInst* footprintType)
     {
@@ -136,7 +142,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         const auto arrayType = builder.getUnsizedArrayType(
             inst->getElementType(),
-            builder.getIntValue(builder.getIntType(), elementSize.getStride()));
+            builder.getIntValue(builder.getUIntType(), elementSize.getStride()));
         const auto structType = builder.createStructType();
         builder.addPhysicalTypeDecoration(structType);
         const auto arrayKey = builder.createStructKey();
@@ -206,13 +212,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
     }
 
-    // Wraps the element type of a constant buffer or parameter block in a struct if it is not
-    // already a struct, returns the newly created struct type.
-    IRType* wrapConstantBufferElement(IRInst* cbParamInst)
+    // Creates the wrapper struct and matching parameter-group type for a non-struct constant
+    // buffer element, preserving layout operands and caching the wrapper layout decorations.
+    WrappedCBufferElementInfo createWrappedConstantBufferElementType(
+        IRParameterGroupType* parameterGroupType)
     {
-        auto innerType = as<IRParameterGroupType>(cbParamInst->getDataType())->getElementType();
-        IRBuilder builder(cbParamInst);
-        builder.setInsertBefore(cbParamInst);
+        auto innerType = parameterGroupType->getElementType();
+        IRBuilder builder(parameterGroupType);
+        builder.setInsertBefore(parameterGroupType);
         auto structType = builder.createStructType();
         builder.addPhysicalTypeDecoration(structType);
         addToWorkList(structType);
@@ -223,14 +230,30 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.addNameHintDecoration(structType, sb.produceString().getUnownedSlice());
         auto key = builder.createStructKey();
         builder.createStructField(structType, key, innerType);
-        builder.setInsertBefore(cbParamInst);
-        auto newCbType = builder.getType(cbParamInst->getDataType()->getOp(), structType);
-        cbParamInst->setFullType(newCbType);
-        auto rules = getTypeLayoutRuleForBuffer(
-            m_sharedContext->m_targetProgram,
-            cbParamInst->getDataType());
+
+        List<IRInst*> bufferTypeOperands;
+        bufferTypeOperands.add(structType);
+        for (UInt i = 1; i < parameterGroupType->getOperandCount(); i++)
+            bufferTypeOperands.add(parameterGroupType->getOperand(i));
+
+        auto newCbType = as<IRParameterGroupType>(builder.getType(
+            parameterGroupType->getOp(),
+            (UInt)bufferTypeOperands.getCount(),
+            bufferTypeOperands.getArrayView().getBuffer()));
+        auto rules = getTypeLayoutRuleForBuffer(m_sharedContext->m_targetProgram, newCbType);
         IRSizeAndAlignment sizeAlignment;
         getSizeAndAlignment(m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment);
+        return WrappedCBufferElementInfo{structType, key, newCbType};
+    }
+
+    // Rewrites value users of a constant-buffer value to read through the single field of the
+    // synthesized wrapper struct.
+    void replaceUsesWithWrappedConstantBufferElement(
+        IRInst* cbParamInst,
+        IRStructKey* key,
+        IRType* innerType)
+    {
+        IRBuilder builder(cbParamInst);
         traverseUses(
             cbParamInst,
             [&](IRUse* use)
@@ -249,7 +272,59 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     key);
                 use->set(addr);
             });
-        return structType;
+    }
+
+    // Wraps the element type of a non-array constant buffer or parameter block in a struct. This
+    // mutates cbParamInst in place by changing its full type to the wrapped parameter-group type
+    // and rewriting existing value uses to field addresses. Returns the wrapper struct type.
+    IRType* wrapConstantBufferElement(IRInst* cbParamInst)
+    {
+        auto parameterGroupType = as<IRParameterGroupType>(cbParamInst->getDataType());
+        auto innerType = parameterGroupType->getElementType();
+        auto wrapped = createWrappedConstantBufferElementType(parameterGroupType);
+        cbParamInst->setFullType(wrapped.parameterGroupType);
+        replaceUsesWithWrappedConstantBufferElement(cbParamInst, wrapped.key, innerType);
+        return wrapped.structType;
+    }
+
+    // Wraps used non-struct IRConstantBufferType globals before SPIR-V type translation. This
+    // handles descriptor-handle operands that refer to the type directly rather than going
+    // through processGlobalParam.
+    void wrapRemainingConstantBufferElementTypes()
+    {
+        List<IRConstantBufferType*> constantBufferTypes;
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto constantBufferType = as<IRConstantBufferType>(globalInst);
+            if (!constantBufferType)
+                continue;
+            if (!constantBufferType->hasUses())
+                continue;
+            if (as<IRStructType>(constantBufferType->getElementType()))
+                continue;
+            constantBufferTypes.add(constantBufferType);
+        }
+
+        for (auto constantBufferType : constantBufferTypes)
+        {
+            List<IRInst*> instsToUnwrap;
+            traverseUses(
+                constantBufferType,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    if (user->getFullType() == constantBufferType)
+                        instsToUnwrap.add(user);
+                });
+
+            auto innerType = constantBufferType->getElementType();
+            auto wrapped = createWrappedConstantBufferElementType(constantBufferType);
+            constantBufferType->replaceUsesWith(wrapped.parameterGroupType);
+            for (auto inst : instsToUnwrap)
+            {
+                replaceUsesWithWrappedConstantBufferElement(inst, wrapped.key, innerType);
+            }
+        }
     }
 
     static void insertLoadAtLatestLocation(
@@ -448,11 +523,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRType* dataLayout = builder.getDefaultBufferLayoutType();
             auto cbufferType = as<IRConstantBufferType>(innerType);
             auto paramBlockType = as<IRParameterBlockType>(innerType);
+            IRStructKey* wrappedArrayElementKey = nullptr;
+            IRType* wrappedArrayElementType = nullptr;
             if (cbufferType || paramBlockType)
             {
                 auto uniformParamGroupType = as<IRUniformParameterGroupType>(innerType);
                 innerType = uniformParamGroupType->getElementType();
                 dataLayout = uniformParamGroupType->getDataLayout();
+                if (!dataLayout)
+                    dataLayout = builder.getDefaultBufferLayoutType();
                 if (addressSpace == AddressSpace::ThreadLocal)
                     addressSpace = AddressSpace::Uniform;
                 // Constant buffer is already treated like a pointer type, and
@@ -464,7 +543,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // a struct.
                 if (!as<IRStructType>(innerType))
                 {
-                    innerType = wrapConstantBufferElement(inst);
+                    if (arrayType)
+                    {
+                        wrappedArrayElementType = innerType;
+                        auto wrapped =
+                            createWrappedConstantBufferElementType(uniformParamGroupType);
+                        innerType = wrapped.structType;
+                        wrappedArrayElementKey = wrapped.key;
+                    }
+                    else
+                    {
+                        innerType = wrapConstantBufferElement(inst);
+                    }
                 }
                 builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBlockDecoration);
 
@@ -586,7 +676,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                     dataLayout),
                                 inst,
                                 getElement->getIndex());
-                            user->replaceUsesWith(newAddr);
+                            IRInst* replacementAddr = newAddr;
+                            if (wrappedArrayElementKey)
+                            {
+                                replacementAddr = builder.emitFieldAddress(
+                                    builder.getPtrType(
+                                        wrappedArrayElementType,
+                                        AccessQualifier::Read,
+                                        addressSpace,
+                                        dataLayout),
+                                    newAddr,
+                                    wrappedArrayElementKey);
+                            }
+                            user->replaceUsesWith(replacementAddr);
                             user->removeAndDeallocate();
                             return;
                         }
@@ -1097,7 +1199,49 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processRWStructuredBufferGetElementPtr(IRRWStructuredBufferGetElementPtr* gepInst)
     {
-        processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
+        // If the base is already a Ptr, delegate to the generic path which
+        // propagates the base's address space.
+        auto base = gepInst->getBase();
+        if (as<IRPtrTypeBase>(base->getDataType()))
+        {
+            processGetElementPtrImpl(gepInst, base, gepInst->getIndex());
+            return;
+        }
+
+        // When the base is a structured-buffer resource type (e.g. the result
+        // of `SPIRVLoadDescriptorFromHeap`), the SPIR-V emit path forces the
+        // result pointer into the StorageBuffer (or Uniform, pre-1.4) storage
+        // class in `emitStructuredBufferGetElementPtr`.  Mirror that decision
+        // on the IR so downstream passes -- in particular processFieldAddress
+        // walking into a struct-typed element -- can propagate the address
+        // space to chained pointers.  Without this, a `things[i].field` chain
+        // on a `DescriptorHandle<RWStructuredBuffer<Struct>>` produces a
+        // `FieldAddress` whose result pointer still carries AddressSpace::Generic,
+        // which the emitter then treats as Function -- yielding invalid SPIR-V
+        // (issue #11027).
+        //
+        // The address-space choice here must stay in sync with the emitter's
+        // `emitStructuredBufferGetElementPtr` in slang-emit-spirv.cpp; both
+        // currently call `getStorageBufferAddressSpace()` (StorageBuffer on
+        // SPIR-V 1.4+, Uniform otherwise).
+        if (!as<IRHLSLStructuredBufferTypeBase>(base->getDataType()))
+            return;
+        auto oldResultType = as<IRPtrTypeBase>(gepInst->getDataType());
+        if (!oldResultType || oldResultType->hasAddressSpace())
+            return;
+        IRBuilder builder(m_sharedContext->m_irModule);
+        builder.setInsertBefore(gepInst);
+        auto newPtrType = builder.getPtrType(
+            oldResultType->getOp(),
+            oldResultType->getValueType(),
+            oldResultType->getAccessQualifier(),
+            getStorageBufferAddressSpace(),
+            oldResultType->getDataLayout());
+        IRInst* args[2] = {base, gepInst->getIndex()};
+        auto newInst = builder.emitIntrinsicInst(newPtrType, gepInst->getOp(), 2, args);
+        gepInst->replaceUsesWith(newInst);
+        gepInst->removeAndDeallocate();
+        addUsersToWorkList(newInst);
     }
 
     void processMeshOutputGetElementPtr(IRMeshOutputRef* gepInst)
@@ -1780,6 +1924,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         bool isLegalGlobalInstForTarget(IRInst* inst) override
         {
+            // Spec-const-rate instructions must stay at their current scope
+            // (module level or inside a generic) because SPIR-V requires
+            // OpSpecConstantOp results to appear outside function bodies.
+            // Only ops validated by canOperationBeSpecConst (via
+            // shouldHaveSpecConstRate in _createInst) acquire this rate.
+            if (isSpecConstRateType(inst->getFullType()))
+                return true;
             switch (inst->getOp())
             {
             case kIROp_MakeStruct:
@@ -1875,6 +2026,44 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             inst = builder.replaceOperand(inst->getOperands(), newOperand0);
             inst = builder.replaceOperand(inst->getOperands() + 1, newOperand1);
         }
+    }
+
+    void emitPerMemberDebugValue(IRBuilder& builder, IRInst* debugVar, IRInst* value)
+    {
+        auto valueType = as<IRType>(unwrapAttributedType(value->getDataType()));
+        if (auto structType = as<IRStructType>(valueType))
+        {
+            for (auto field : structType->getFields())
+            {
+                auto fieldDebugVar = builder.emitFieldAddress(debugVar, field->getKey());
+                auto fieldValue =
+                    builder.emitFieldExtract(field->getFieldType(), value, field->getKey());
+                emitPerMemberDebugValue(builder, fieldDebugVar, fieldValue);
+            }
+            return;
+        }
+
+        auto debugValue = builder.emitDebugValue(debugVar, value);
+        addToWorkList(debugValue);
+    }
+
+    void processDebugValue(IRDebugValue* inst)
+    {
+        auto valueType = as<IRType>(unwrapAttributedType(inst->getValue()->getDataType()));
+        if (as<IRStructType>(valueType))
+        {
+            // Decompose the struct into per-member DebugValue updates to help
+            // shader debuggers resolve the struct value.
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            emitPerMemberDebugValue(builder, inst->getDebugVar(), inst->getValue());
+            inst->removeAndDeallocate();
+            return;
+        }
+
+        // Unsupported type, remove the DebugValue.
+        if (!isSimpleDataType(valueType))
+            inst->removeAndDeallocate();
     }
 
     List<IRInst*> m_instsToRemove;
@@ -2009,8 +2198,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
 
             case kIROp_DebugValue:
-                if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
-                    inst->removeAndDeallocate();
+                processDebugValue(as<IRDebugValue>(inst));
                 break;
             case kIROp_DebugVar:
                 if (!isSimpleDataType(as<IRDebugVar>(inst)->getDataType()))
@@ -2476,8 +2664,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto inst : m_instsToRemove)
             inst->removeAndDeallocate();
 
+        wrapRemainingConstantBufferElementTypes();
+
         // Translate types.
-        List<IRHLSLStructuredBufferTypeBase*> instsToProcess;
+        List<IRType*> instsToProcess;
         List<IRInst*> textureFootprintTypes;
 
         for (auto globalInst : m_module->getGlobalInsts())
@@ -2486,6 +2676,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 instsToProcess.add(t);
             }
+            else if (auto constantBufferType = as<IRConstantBufferType>(globalInst))
+            {
+                if (constantBufferType->hasUses())
+                    instsToProcess.add(constantBufferType);
+            }
             else if (globalInst->getOp() == kIROp_TextureFootprintType)
             {
                 textureFootprintTypes.add(globalInst);
@@ -2493,20 +2688,37 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
         for (auto t : instsToProcess)
         {
-            auto lowered = lowerStructuredBufferType(t);
-
-            AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
-            if (as<IRHLSLStructuredBufferType>(t))
-                accessQualifier = AccessQualifier::Immutable;
-
             IRBuilder builder(t);
 
             builder.setInsertBefore(t);
-            t->replaceUsesWith(builder.getPtrType(
-                lowered.structType,
-                accessQualifier,
-                getStorageBufferAddressSpace(),
-                t->getDataLayout()));
+            if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(t))
+            {
+                auto lowered = lowerStructuredBufferType(structuredBufferType);
+
+                AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+                if (as<IRHLSLStructuredBufferType>(t))
+                    accessQualifier = AccessQualifier::Immutable;
+
+                t->replaceUsesWith(builder.getPtrType(
+                    lowered.structType,
+                    accessQualifier,
+                    getStorageBufferAddressSpace(),
+                    structuredBufferType->getDataLayout()));
+            }
+            else if (auto constantBufferType = as<IRConstantBufferType>(t))
+            {
+                auto elementType = constantBufferType->getElementType();
+                SLANG_ASSERT(as<IRStructType>(elementType));
+                builder.addDecorationIfNotExist(elementType, kIROp_SPIRVBlockDecoration);
+                auto dataLayout = constantBufferType->getDataLayout();
+                if (!dataLayout)
+                    dataLayout = builder.getDefaultBufferLayoutType();
+                t->replaceUsesWith(builder.getPtrType(
+                    elementType,
+                    AccessQualifier::Immutable,
+                    AddressSpace::Uniform,
+                    dataLayout));
+            }
         }
         for (auto t : textureFootprintTypes)
         {

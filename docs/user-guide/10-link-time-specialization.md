@@ -11,27 +11,27 @@ While functioning systems can be built around preprocessor macros, overusing the
   This means that the compiler must redo almost all work from scratch with every specialized variant, including parsing, type checking, IR generation
   and optimization, even when two specialized variants only differ in one constant value. The lack of reuse of compiler front-end work between
   different shader specializations contributes a significant portion to long shader compile times.
-- Reduced code readability and maintainability. The compiler cannot enforce any structures on preprocessor macros and cannot offer static checks to
+- Reduced code readability and maintainability. The compiler cannot enforce any structure on preprocessor macros and cannot offer static checks to
   guarantee that the preprocessor macros are used in an intended way. Macros don't blend well with the native language syntax, which leads to less
-  readable code, mystic diagnostic messages when things go wrong, and suboptimal intellisense experience.
+  readable code, cryptic diagnostic messages when things go wrong, and suboptimal IntelliSense experience.
 - Locked in with early specialization. Once the code is written using preprocessor macros for specialization, the application that uses the shader
   code has no choice but to provide the macro values during shader compilation and always opt-in to static specialization. If the developer changes
   their mind to move away from specialization, a lot of code needs to be rewritten. As a result, the application is locked out of opportunities to
   take advantage of different design decisions or future hardware features that allow more efficient execution of non-specialized code.
 
-Slang approaches the problem of shader specialization by supporting generics as a first class feature that allow most specializable code to be
+Slang approaches the problem of shader specialization by supporting generics as a first-class feature that allows most specializable code to be
 written in strongly typed code, and by allowing specialization to be triggered through link-time constants or types.
 
 As discussed in the [Compiling code with Slang](08-compiling.md) chapter, Slang provides a three-step compilation model: precompiling, linking and target code generation.
 Assuming the user shader is implemented as three Slang modules: `a.slang`, `b.slang`, and `c.slang`, the user can precompile all three modules to binary IR and store
-them as `a.slang-module`, `b.slang-module`, and `c.slang-module` in a complete offline process that is independent to any specialization arguments.
+them as `a.slang-module`, `b.slang-module`, and `c.slang-module` in a complete offline process that is independent of any specialization arguments.
 Next, these three IR modules are linked together to form a self-contained program that will then go through a set of compiler optimizations for target code generation.
 Slang's compilation model allows specialization arguments, in the form of constants or types to be provided during linking. This means that specialization happens at
 a much later stage of compilation, reusing all the work done during module precompilation.
 
 ## Link-time Constants
 
-The simplest form of link time specialization is done through link-time constants. See the following code for an example.
+The simplest form of link-time specialization is done through link-time constants. See the following code for an example.
 ```c++
 // main.slang
 
@@ -154,7 +154,7 @@ void main(uint tid : SV_DispatchThreadID)
 }
 ```
 
-Again, we can separately compile these modules into binary forms independently from how they will be specialized.
+Again, we can separately compile these modules into binary forms independently of how they will be specialized.
 To specialize the shader, we can author a third module that provides a definition for the `extern Sampler` type:
 
 ```csharp
@@ -163,7 +163,7 @@ import common;
 export struct Sampler : ISampler = FooSampler;
 ```
 
-The `=` syntax defines a typealias that allows `Sampler` to resolve to `FooSampler` at link-time.
+The `=` syntax defines a type alias that allows `Sampler` to resolve to `FooSampler` at link-time.
 Note that both the name and type conformance clauses must match exactly between an `export` and an `extern` declaration
 for link-time types to resolve correctly. Link-time types can also be generic, and may conform to generic interfaces.
 
@@ -172,7 +172,7 @@ When all these three modules are linked, we will produce a specialized shader th
 ## Providing Default Settings
 
 When defining an `extern` symbol as a link-time constant or type, it is allowed to provide a default value for that constant or type.
-When no other modules exists to `export` the same-named symbol, the default value will be used in the linked program.
+When no other module exists to `export` the same-named symbol, the default value will be used in the linked program.
 
 For example, the following code is considered complete at linking and can proceed to code generation without any issues:
 ```c++
@@ -189,7 +189,7 @@ void main(uint tid : SV_DispatchThreadID)
 }
 ```
 
-## Using Precompiling Modules with the API
+## Using Precompiled Modules with the API
 
 In addition to using `slangc` for precompiling Slang modules, the `IModule` class provides a method to serialize itself to disk:
 
@@ -201,7 +201,7 @@ SlangResult IModule::serialize(ISlangBlob** outSerializedBlob);
 SlangResult IModule::writeToFile(char const* fileName);
 ```
 
-These functions will write only the module itself to a file, which excludes the modules that it includes. To write all imported
+These functions will write only the module itself to a file, which excludes the modules that it imports. To write all imported
 modules, you can use methods from the `ISession` class to enumerate all currently loaded modules (including transitively imported modules)
 in the session:
 
@@ -221,11 +221,11 @@ bool ISession::isBinaryModuleUpToDate(
 
 If the compiler options or source files have been changed since the module was last compiled, the `isBinaryModuleUpToDate` will return false.
 
-The compiler can be setup to automatically use the precompiled modules when they exist and up-to-date. When loading a module,
+The compiler can be set up to automatically use the precompiled modules when they exist and up-to-date. When loading a module,
 either triggered via the `ISession::loadModule` call or via transitive `import`s in the modules being loaded, the compiler will look in the
 search paths for a `.slang-module` file first. If it exists, it will load the precompiled module instead of compiling from the source.
 If you wish the compiler to verify whether the `.slang-module` file is up-to-date before loading it, you can specify the `CompilerOptionName::UseUpToDateBinaryModule` to `1`
-when creating the session. When this option is set, the compiler will verify the precompiled module is still update, and will recompile the module
+when creating the session. When this option is set, the compiler will verify the precompiled module is still up-to-date, and will recompile the module
 from source if it is not up-to-date.
 
 

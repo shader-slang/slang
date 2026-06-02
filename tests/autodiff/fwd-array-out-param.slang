@@ -11,7 +11,7 @@ struct D : IDifferentiable
     float m;
 }
 
-[ForwardDifferentiable]
+[Differentiable]
 float f(D d, int i, out D outArray[1][2])
 {
     outArray[0][0].m = d.n;

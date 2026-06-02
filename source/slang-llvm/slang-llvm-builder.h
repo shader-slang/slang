@@ -155,6 +155,7 @@ public:
     virtual SLANG_NO_THROW LLVMType* SLANG_MCALL getPointerType() = 0;
     virtual SLANG_NO_THROW LLVMType* SLANG_MCALL
     getVectorType(int elementCount, LLVMType* elementType) = 0;
+    // TODO: REMOVE function on next ABI break, it's unused
     virtual SLANG_NO_THROW LLVMType* SLANG_MCALL getBufferType() = 0;
     virtual SLANG_NO_THROW LLVMType* SLANG_MCALL
     getFunctionType(LLVMType* returnType, Slice<LLVMType*> paramTypes, bool variadic = false) = 0;
@@ -262,8 +263,11 @@ public:
 
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL
     emitPrintf(LLVMInst* format, Slice<LLVMInst*> args, Slice<bool> argIsSigned) = 0;
+    // TODO: REMOVE function on next ABI break, it's unused
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetBufferPtr(LLVMInst* buffer) = 0;
+    // TODO: REMOVE function on next ABI break, it's unused
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL emitGetBufferSize(LLVMInst* buffer) = 0;
+    // TODO: REMOVE function on next ABI break, it's unused
     virtual SLANG_NO_THROW LLVMInst* SLANG_MCALL
     emitChangeBufferStride(LLVMInst* buffer, int64_t prevStride, int64_t newStride) = 0;
 
@@ -322,6 +326,12 @@ public:
         int64_t alignment,
         LLVMDebugNode* file,
         int line) = 0;
+
+    virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
+    getDebugForwardDeclareType(CharSlice name, LLVMDebugNode* file, int line) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    replaceDebugForwardDeclareType(LLVMDebugNode* replace, LLVMDebugNode* with) = 0;
+
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
     getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) = 0;
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunction(

@@ -1,0 +1,30 @@
+# expected-failures.txt — suite-level known-failing tests
+#
+# Format
+# ------
+# One path per line. Comments start with `#` and are mandatory for
+# documenting *why* the entry exists: each path must be preceded
+# somewhere above by a `#` comment containing a tracking-issue link
+# (or `issues/NNN`-style reference). Lint enforces this.
+#
+# Purpose
+# -------
+# Tests listed here fail because of a *filed compiler bug*, not because
+# the test itself is wrong. `regenerate.py verify` reads this file and
+# reports matching tests as `expected-fail` rather than `FAILED`, so
+# the nightly job stays green while the fix is in flight. Removing the
+# tracking-issue's fix must be paired with removing the matching line(s)
+# here.
+#
+# Not for: flakes, test-runner bugs, genuinely broken tests, or tests
+# that depend on an absent downstream binary. Those need real fixes
+# (or `//META: requires-tool=<name>` for the binary case), not silencing.
+
+# https://github.com/shader-slang/slang/issues/11375 — slangi VM
+# "operand access out of bounds in constants section" on the second
+# `printf` after a function call that took an `inout` parameter and
+# returned `bool`. Predates PR #11221.
+docs/generated/tests/ast-reference/expressions/logic-and-short-circuit.slang
+docs/generated/tests/ast-reference/expressions/logic-or-short-circuit.slang
+docs/generated/tests/ast-reference/expressions/bwd-differentiate-expr.slang
+docs/generated/tests/ast-reference/statements/ifstmt-predicate-evaluated-once.slang

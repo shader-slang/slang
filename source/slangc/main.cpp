@@ -1,12 +1,9 @@
 // main.cpp
 
-#include "slang.h"
-
-SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
-
 #include "../core/slang-io.h"
 #include "../core/slang-test-tool-util.h"
 #include "../slang/slang-internal.h"
+#include "slang.h"
 
 using namespace Slang;
 
@@ -128,6 +125,11 @@ int wmain(int argc, wchar_t** argv)
 {
     int result = 0;
 
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+
     {
         // Convert the wide-character Unicode arguments to UTF-8,
         // since that is what Slang expects on the API side.
@@ -136,17 +138,7 @@ int wmain(int argc, wchar_t** argv)
         for (int ii = 0; ii < argc; ++ii)
         {
             String arg = String::fromWString(argv[ii]);
-            if (arg == "-ignore-abort-msg" || arg == "--ignore-abort-msg")
-            {
-#ifdef _MSC_VER
-                // Suppress the modal abort() dialog in unattended/LLM-driven builds.
-                _set_abort_behavior(0, _WRITE_ABORT_MSG);
-#endif
-            }
-            else
-            {
-                args.add(arg);
-            }
+            args.add(arg);
         }
 
         // argBuffers holds raw pointers into the String buffers owned by args.

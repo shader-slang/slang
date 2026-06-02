@@ -24,14 +24,43 @@ from datetime import datetime, timezone, timedelta
 # Import the page template from ci_visualization
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ci_visualization import page_template, chart_section, DOWNLOAD_JS
+from ci_hosted_runner_usage import (
+    DEFAULT_HOSTED_RUNNER_CAP,
+    HOSTED_LABEL_PREFIXES,
+    sample_hosted_runner_usage,
+)
 
 
 DEFAULT_REPO = "shader-slang/slang"
 
-# GCP T4 GPU quota configuration
+# GCP GPU quota configuration
 GPU_QUOTA_PROJECT = "slang-runners"
-GPU_QUOTA_REGIONS = ["us-central1", "us-east1", "us-west1"]
 GPU_QUOTA_METRIC = "NVIDIA_T4_GPUS"
+GPU_QUOTA_REGIONS = ["us-central1", "us-east1", "us-west1"]
+DEFAULT_GPU_QUOTA_METRICS = [
+    {
+        "metric": GPU_QUOTA_METRIC,
+        "name": "T4",
+        "regions": GPU_QUOTA_REGIONS,
+    },
+    {
+        "metric": "NVIDIA_L4_GPUS",
+        "name": "L4",
+        "regions": ["us-central1", "us-east1", "us-west1", "us-west4", "europe-west1"],
+    },
+]
+GCP_VM_GROUPS = [
+    "Linux GPU (GCP)",
+    "Linux SM80Plus GPU (GCP)",
+    "Windows Build (GCP)",
+    "Windows GPU (GCP)",
+]
+GCP_VM_PALETTE = {
+    "Linux GPU (GCP)": "#0d6efd",
+    "Linux SM80Plus GPU (GCP)": "#6f42c1",
+    "Windows Build (GCP)": "#fd7e14",
+    "Windows GPU (GCP)": "#28a745",
+}
 
 
 def _esc(s):
@@ -56,17 +85,95 @@ SNAPSHOTS_FILE = "health_snapshots.jsonl"
 CHARTJS_CDN = "https://cdn.jsdelivr.net/npm/chart.js"
 
 
-def fetch_gpu_quota():
-    """Fetch T4 GPU usage and limits from GCP across all configured regions.
+def _copy_gpu_quota_metrics(metrics):
+    return [
+        {
+            "metric": m["metric"],
+            "name": m.get("name", m["metric"]),
+            "regions": list(m.get("regions", [])),
+        }
+        for m in metrics
+    ]
 
-    Returns a dict with 'usage', 'limit', and per-region breakdown,
-    or None if gcloud is unavailable.
+
+def _default_gpu_quota_metrics(reason=None):
+    if reason:
+        print(
+            f"Warning: invalid gpu_quota_metrics in runner_config.json: {reason}; using defaults",
+            file=sys.stderr,
+        )
+    return _copy_gpu_quota_metrics(DEFAULT_GPU_QUOTA_METRICS)
+
+
+def load_gpu_quota_metrics():
+    """Load GPU quota metrics from runner_config.json."""
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runner_config.json")
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return _default_gpu_quota_metrics()
+
+    if not isinstance(config, dict):
+        return _default_gpu_quota_metrics("root must be an object")
+
+    if "gpu_quota_metrics" not in config:
+        return _default_gpu_quota_metrics()
+
+    configured_metrics = config["gpu_quota_metrics"]
+    if not isinstance(configured_metrics, list):
+        return _default_gpu_quota_metrics("gpu_quota_metrics must be a list")
+
+    metrics = []
+    for index, entry in enumerate(configured_metrics):
+        if not isinstance(entry, dict):
+            return _default_gpu_quota_metrics(f"entry {index} must be an object")
+        metric = entry.get("metric")
+        regions = entry.get("regions", [])
+        name = entry.get("name", metric)
+        if not isinstance(metric, str) or not metric:
+            return _default_gpu_quota_metrics(f"entry {index} metric must be a non-empty string")
+        if not isinstance(name, str) or not name:
+            return _default_gpu_quota_metrics(f"entry {index} name must be a non-empty string")
+        if (
+            not isinstance(regions, list)
+            or not regions
+            or any(not isinstance(region, str) or not region for region in regions)
+        ):
+            return _default_gpu_quota_metrics(f"entry {index} regions must be a non-empty string list")
+        metrics.append({
+            "metric": metric,
+            "name": name,
+            "regions": list(dict.fromkeys(regions)),
+        })
+    return metrics
+
+
+def fetch_gpu_quota(metrics=None):
+    """Fetch GPU usage and limits from GCP across configured regions.
+
+    Returns a dict with a 'by_metric' breakdown plus legacy T4 'usage',
+    'limit', and 'regions' fields, or None if gcloud is unavailable.
     """
-    total_usage = 0
-    total_limit = 0
-    regions = {}
+    metric_configs = load_gpu_quota_metrics() if metrics is None else metrics
+    if not metric_configs:
+        return None
 
-    for region in GPU_QUOTA_REGIONS:
+    by_metric = {
+        config["metric"]: {
+            "name": config.get("name", config["metric"]),
+            "usage": 0,
+            "limit": 0,
+            "regions": {},
+        }
+        for config in metric_configs
+    }
+    metrics_by_region = {}
+    for config in metric_configs:
+        for region in config.get("regions", []):
+            metrics_by_region.setdefault(region, set()).add(config["metric"])
+
+    for region in metrics_by_region:
         cmd = [
             "gcloud", "compute", "regions", "describe", region,
             "--project", GPU_QUOTA_PROJECT,
@@ -93,18 +200,68 @@ def fetch_gpu_quota():
             print(f"Warning: invalid GPU quota JSON for {region}", file=sys.stderr)
             continue
 
+        wanted_metrics = metrics_by_region[region]
         for q in data.get("quotas", []):
-            if q.get("metric") == GPU_QUOTA_METRIC:
+            metric = q.get("metric")
+            if metric not in wanted_metrics:
+                continue
+            try:
                 usage = int(q.get("usage", 0))
                 limit = int(q.get("limit", 0))
-                regions[region] = {"usage": usage, "limit": limit}
-                total_usage += usage
-                total_limit += limit
-                break
+            except (TypeError, ValueError):
+                print(
+                    f"Warning: invalid quota values for {metric} in {region}",
+                    file=sys.stderr,
+                )
+                continue
+            bucket = by_metric[metric]
+            bucket["regions"][region] = {"usage": usage, "limit": limit}
+            bucket["usage"] += usage
+            bucket["limit"] += limit
 
-    if not regions:
+    by_metric = {
+        metric: quota
+        for metric, quota in by_metric.items()
+        if quota["regions"]
+    }
+    if not by_metric:
         return None
-    return {"usage": total_usage, "limit": total_limit, "regions": regions}
+
+    result = {"by_metric": by_metric}
+    legacy = by_metric.get(GPU_QUOTA_METRIC)
+    if legacy:
+        result.update({
+            "usage": legacy["usage"],
+            "limit": legacy["limit"],
+            "regions": legacy["regions"],
+        })
+    return result
+
+
+def _sum_region_quota(regions, key):
+    return sum(region.get(key, 0) for region in regions.values())
+
+
+def _normalize_gpu_quota_by_metric(gpu_quota):
+    """Normalize current and legacy quota payloads into a metric-keyed map."""
+    if not gpu_quota:
+        return {}
+
+    by_metric = gpu_quota.get("by_metric")
+    if isinstance(by_metric, dict) and by_metric:
+        return by_metric
+
+    legacy_regions = gpu_quota.get("regions", {})
+    if not legacy_regions:
+        return {}
+    return {
+        gpu_quota.get("metric", GPU_QUOTA_METRIC): {
+            "name": gpu_quota.get("name", "T4"),
+            "usage": gpu_quota.get("usage", _sum_region_quota(legacy_regions, "usage")),
+            "limit": gpu_quota.get("limit", _sum_region_quota(legacy_regions, "limit")),
+            "regions": legacy_regions,
+        }
+    }
 
 
 def parse_args():
@@ -220,9 +377,9 @@ def fetch_merge_queue_status(repo):
     return {"recent": recent, "summary": counts}
 
 
-def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None):
+def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None, hosted_runner_usage=None):
     """Append a runner status snapshot to the JSONL time-series file."""
-    if not queue_data and not gpu_quota:
+    if not queue_data and not gpu_quota and not mq_data and not hosted_runner_usage:
         return
 
     now = datetime.now(timezone.utc)
@@ -259,11 +416,19 @@ def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None):
 
     # GPU quota per region
     if gpu_quota:
-        snapshot["gpu_quota"] = gpu_quota.get("regions", {})
+        by_metric = _normalize_gpu_quota_by_metric(gpu_quota)
+        if by_metric:
+            snapshot["gpu_quota_by_metric"] = by_metric
+            legacy = by_metric.get(GPU_QUOTA_METRIC)
+            if legacy:
+                snapshot["gpu_quota"] = legacy.get("regions", {})
 
     # Merge queue summary
     if mq_data:
         snapshot["merge_queue"] = mq_data.get("summary", {})
+
+    if hosted_runner_usage:
+        snapshot["hosted_runner_usage"] = hosted_runner_usage
 
     # Append to JSONL file (kept indefinitely, ~55KB/day)
     os.makedirs(output_dir, exist_ok=True)
@@ -334,6 +499,210 @@ def _region_palette(regions):
     return {r: _REGION_COLORS[i % len(_REGION_COLORS)] for i, r in enumerate(regions)}
 
 
+def _gpu_quota_chart_id(metric):
+    if metric == GPU_QUOTA_METRIC:
+        return "gpuQuota"
+    suffix = "".join(ch if ch.isalnum() else "_" for ch in metric)
+    return f"gpuQuota_{suffix}"
+
+
+def _snapshot_gpu_quota_by_metric(snapshot):
+    by_metric = snapshot.get("gpu_quota_by_metric")
+    if isinstance(by_metric, dict) and by_metric:
+        return by_metric
+
+    legacy_regions = snapshot.get("gpu_quota", {})
+    if legacy_regions:
+        return {
+            GPU_QUOTA_METRIC: {
+                "name": "T4",
+                "usage": _sum_region_quota(legacy_regions, "usage"),
+                "limit": _sum_region_quota(legacy_regions, "limit"),
+                "regions": legacy_regions,
+            }
+        }
+    return {}
+
+
+def _quota_metric_display_order(snapshots):
+    ordered = []
+    seen = set()
+    for config in load_gpu_quota_metrics():
+        metric = config["metric"]
+        if metric not in seen:
+            ordered.append(metric)
+            seen.add(metric)
+    for snapshot in snapshots:
+        for metric in _snapshot_gpu_quota_by_metric(snapshot):
+            if metric not in seen:
+                ordered.append(metric)
+                seen.add(metric)
+    return ordered
+
+
+def _build_gpu_quota_charts(snapshots):
+    charts = []
+    for metric in _quota_metric_display_order(snapshots):
+        metric_snapshots = [
+            _snapshot_gpu_quota_by_metric(snapshot).get(metric, {})
+            for snapshot in snapshots
+        ]
+        regions = sorted({
+            region
+            for quota in metric_snapshots
+            for region in quota.get("regions", {})
+        })
+        if not regions:
+            continue
+
+        region_series = {
+            region: [
+                quota.get("regions", {}).get(region, {}).get("usage", 0)
+                for quota in metric_snapshots
+            ]
+            for region in regions
+        }
+        quota_limit = 0
+        name = metric
+        for quota in reversed(metric_snapshots):
+            if quota.get("regions"):
+                name = quota.get("name", metric)
+                quota_limit = sum(
+                    region.get("limit", 0)
+                    for region in quota.get("regions", {}).values()
+                )
+                break
+
+        charts.append({
+            "id": _gpu_quota_chart_id(metric),
+            "metric": metric,
+            "name": name,
+            "regionData": region_series,
+            "limit": quota_limit,
+            "regionColors": _region_palette(regions),
+        })
+    return charts
+
+
+def _build_hosted_runner_chart(snapshots):
+    """Build hosted-runner usage chart data, stacked by hosted label.
+
+    Returns None if no snapshot carries hosted_runner_usage data — the
+    field was added later and older snapshots won't have it. Older
+    snapshots are rendered as gaps (None) so the chart starts on the
+    first data point.
+    """
+    has_data = any(s.get("hosted_runner_usage") for s in snapshots)
+    if not has_data:
+        return None
+
+    # Collect every label observed across the window so the stacked
+    # series stay consistent.
+    labels_seen = set()
+    cap = DEFAULT_HOSTED_RUNNER_CAP
+    for s in snapshots:
+        usage = s.get("hosted_runner_usage") or {}
+        if usage.get("cap"):
+            cap = usage["cap"]
+        for row in usage.get("in_progress", {}).get("by_label", []):
+            labels_seen.add(row["label"])
+
+    # Stable ordering: ubuntu first, then macos, then windows, then alpha.
+    def _label_sort_key(lbl):
+        for i, prefix in enumerate(HOSTED_LABEL_ORDER):
+            if lbl.startswith(prefix):
+                return (i, lbl)
+        return (len(HOSTED_LABEL_ORDER), lbl)
+
+    sorted_labels = sorted(labels_seen, key=_label_sort_key)
+
+    label_series = {lbl: [] for lbl in sorted_labels}
+    queued_series = []
+    total_series = []
+    for s in snapshots:
+        usage = s.get("hosted_runner_usage")
+        # Partial samples are known undercounts; plot them as gaps so a
+        # transient Actions API failure doesn't render as a fake dip.
+        if not usage or usage.get("partial"):
+            for lbl in sorted_labels:
+                label_series[lbl].append(None)
+            queued_series.append(None)
+            total_series.append(None)
+            continue
+        by_label = {row["label"]: row["count"] for row in usage.get("in_progress", {}).get("by_label", [])}
+        for lbl in sorted_labels:
+            label_series[lbl].append(by_label.get(lbl, 0))
+        queued_series.append(usage.get("queued", {}).get("total", 0))
+        total_series.append(usage.get("in_progress", {}).get("total", 0))
+
+    palette = _hosted_label_palette(sorted_labels)
+    return {
+        "cap": cap,
+        "labels": sorted_labels,
+        "label_series": label_series,
+        "queued_series": queued_series,
+        "total_series": total_series,
+        "palette": palette,
+    }
+
+
+HOSTED_LABEL_ORDER = HOSTED_LABEL_PREFIXES
+
+HOSTED_LABEL_PALETTE = {
+    "ubuntu-": "#0d6efd",
+    "macos-": "#6f42c1",
+    "windows-": "#28a745",
+}
+
+
+def _hosted_label_palette(labels):
+    """Assign a stable color per hosted label based on its pool prefix.
+
+    Variant labels under the same pool (ubuntu-latest vs. ubuntu-22.04)
+    get progressively lighter shades of the same base color so they're
+    distinguishable but visibly related. The returned colors are always
+    6-digit `#RRGGBB` — alpha is applied at use time by the chart code.
+    """
+    palette = {}
+    counts_per_prefix = {}
+    for lbl in labels:
+        prefix = next((p for p in HOSTED_LABEL_ORDER if lbl.startswith(p)), None)
+        if prefix is None:
+            palette[lbl] = "#6c757d"
+            continue
+        base = HOSTED_LABEL_PALETTE.get(prefix, "#6c757d")
+        idx = counts_per_prefix.get(prefix, 0)
+        counts_per_prefix[prefix] = idx + 1
+        palette[lbl] = base if idx == 0 else _lighten_hex(base, _shade_factor(idx))
+    return palette
+
+
+def _shade_factor(idx):
+    """Return a 0..1 lightening factor that grows with idx (max ~0.8)."""
+    factors = [0.0, 0.30, 0.50, 0.65, 0.78]
+    return factors[idx] if idx < len(factors) else 0.85
+
+
+def _lighten_hex(color, factor):
+    """Lighten a `#RRGGBB` color toward white by `factor` in [0,1].
+
+    Returns a `#RRGGBB` string. Invalid input is returned unchanged.
+    """
+    if not (isinstance(color, str) and len(color) == 7 and color.startswith("#")):
+        return color
+    try:
+        r = int(color[1:3], 16)
+        g = int(color[3:5], 16)
+        b = int(color[5:7], 16)
+    except ValueError:
+        return color
+    factor = max(0.0, min(1.0, factor))
+    r = int(r + (255 - r) * factor)
+    g = int(g + (255 - g) * factor)
+    b = int(b + (255 - b) * factor)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
 def build_history_chart(snapshots):
     """Build Chart.js HTML for 24h runner load history."""
     if not snapshots:
@@ -342,9 +711,9 @@ def build_history_chart(snapshots):
     snapshots = _deduplicate_snapshots(snapshots)
     timestamps = [_round_time(s["timestamp"][11:16]) for s in snapshots]
 
-    # Only show GCP VM groups (Linux GPU and Windows GPU), exclude scaler host and test runners
-    gcp_vm_groups = ["Linux GPU (GCP)", "Windows Build (GCP)", "Windows GPU (GCP)"]
-    palette = {"Linux GPU (GCP)": "#0d6efd", "Windows Build (GCP)": "#fd7e14", "Windows GPU (GCP)": "#28a745"}
+    # Only show GCP VM groups, exclude scaler host and test runners
+    gcp_vm_groups = GCP_VM_GROUPS
+    palette = GCP_VM_PALETTE
 
     # Queue depth over time
     queued_data = [s.get("jobs_queued", 0) for s in snapshots]
@@ -359,26 +728,11 @@ def build_history_chart(snapshots):
     for g in gcp_vm_groups:
         group_series[g] = [s.get("runner_groups", {}).get(g, {}).get("total", 0) for s in snapshots]
 
-    # GPU quota per region (discover regions dynamically from snapshot data)
-    gpu_regions = sorted({
-        region
-        for s in snapshots
-        for region in s.get("gpu_quota", {})
-    })
-    gpu_region_series = {}
-    for region in gpu_regions:
-        gpu_region_series[region] = [
-            s.get("gpu_quota", {}).get(region, {}).get("usage", 0)
-            for s in snapshots
-        ]
-    # Total quota limit (use latest snapshot that has quota data)
-    gpu_quota_limit = 0
-    for s in reversed(snapshots):
-        quota = s.get("gpu_quota", {})
-        if quota:
-            gpu_quota_limit = sum(r.get("limit", 0) for r in quota.values())
-            break
-    has_gpu_quota = bool(gpu_regions)
+    gpu_quota_charts = _build_gpu_quota_charts(snapshots)
+
+    # Hosted-runner usage over time, with the per-org concurrency cap
+    # plotted as a horizontal limit line.
+    hosted_runner_chart = _build_hosted_runner_chart(snapshots)
 
     # Merge queue cumulative success/failure from snapshots
     # Each snapshot records the running 24h totals; we just plot them over time.
@@ -394,12 +748,23 @@ def build_history_chart(snapshots):
         + chart_section("queueHistory", "Job Queue Depth",
             "Individual jobs waiting in queue vs. actively running on runners.")
     )
-    if has_gpu_quota:
-        charts_html += chart_section("gpuQuota", "T4 GPU Usage vs. Quota",
-            "T4 GPUs in use per GCP region, stacked. Dashed line shows total quota limit.")
+    for quota_chart in gpu_quota_charts:
+        charts_html += chart_section(
+            quota_chart["id"],
+            f"{quota_chart['name']} GPU Usage vs. Quota",
+            f"{quota_chart['name']} GPUs in use per GCP region, stacked. "
+            "Dashed line shows total quota limit.",
+        )
     if has_mq_snapshots:
         charts_html += chart_section("mqHistory", "Merge Queue Checks (24h rolling)",
             "Rolling 24-hour count of merge queue CI check outcomes, sampled every 15 minutes.")
+    if hosted_runner_chart:
+        charts_html += chart_section(
+            "hostedRunnerHistory",
+            "GitHub-Hosted Runner Usage vs. Cap",
+            "Hosted runners in use (stacked by label) and queued hosted-runner jobs, "
+            "sampled every 15 minutes. Dashed line shows the per-org concurrency cap.",
+        )
 
     return f"""
 <div class="chart-section">
@@ -422,9 +787,9 @@ const allRunsQueued = {json.dumps(runs_queued)};
 const allJobsQueued = {json.dumps(queued_data)};
 const allJobsRunning = {json.dumps(running_data)};
 
-const gpuRegionData = {json.dumps(gpu_region_series)};
-const gpuQuotaLimit = {gpu_quota_limit};
-const gpuRegionColors = {json.dumps(_region_palette(gpu_regions))};
+const gpuQuotaCharts = {json.dumps(gpu_quota_charts)};
+
+const hostedRunnerChart = {json.dumps(hosted_runner_chart)};
 
 const mqSuccessData = {json.dumps(mq_success_data)};
 const mqFailureData = {json.dumps(mq_failure_data)};
@@ -505,13 +870,15 @@ function buildCharts(hours) {{
   }});
 
   // GPU quota (stacked by region + limit line)
-  const gpuCanvas = document.getElementById('gpuQuota_canvas');
-  if (gpuCanvas && Object.keys(gpuRegionData).length > 0) {{
+  for (const quotaChart of gpuQuotaCharts) {{
+    const gpuCanvas = document.getElementById(quotaChart.id + '_canvas');
+    if (!gpuCanvas || Object.keys(quotaChart.regionData).length === 0) continue;
+
     const gpuDatasets = [];
-    for (const [region, color] of Object.entries(gpuRegionColors)) {{
+    for (const [region, color] of Object.entries(quotaChart.regionColors)) {{
       gpuDatasets.push({{
         label: region,
-        data: sliceLast(gpuRegionData[region] || [], n),
+        data: sliceLast(quotaChart.regionData[region] || [], n),
         borderColor: color,
         backgroundColor: color + '55',
         fill: 'stack',
@@ -522,20 +889,20 @@ function buildCharts(hours) {{
     // Quota limit as a dashed line (not stacked)
     gpuDatasets.push({{
       label: 'Quota Limit',
-      data: Array(labels.length).fill(gpuQuotaLimit),
+      data: Array(labels.length).fill(quotaChart.limit),
       borderColor: '#dc3545',
       borderDash: [6, 3],
       borderWidth: 2,
       pointRadius: 0,
       fill: false,
     }});
-    charts.gpu = new Chart(gpuCanvas.getContext('2d'), {{
+    charts[quotaChart.id] = new Chart(gpuCanvas.getContext('2d'), {{
       type: 'line',
       data: {{ labels: displayLabels, datasets: gpuDatasets }},
       options: {{
         responsive: true,
         scales: {{
-          y: {{ min: 0, stacked: true, title: {{ display: true, text: 'T4 GPUs' }} }}
+          y: {{ min: 0, stacked: true, title: {{ display: true, text: quotaChart.name + ' GPUs' }} }}
         }},
         plugins: {{
           tooltip: {{
@@ -543,11 +910,72 @@ function buildCharts(hours) {{
               afterBody: function(items) {{
                 const idx = items[0].dataIndex;
                 let total = 0;
-                for (const region of Object.keys(gpuRegionColors)) {{
+                for (const region of Object.keys(quotaChart.regionColors)) {{
                   const ds = items[0].chart.data.datasets.find(d => d.label === region);
                   if (ds) total += ds.data[idx] || 0;
                 }}
-                return 'Total: ' + total + ' / ' + gpuQuotaLimit;
+                return 'Total: ' + total + ' / ' + quotaChart.limit;
+              }}
+            }}
+          }}
+        }}
+      }}
+    }});
+  }}
+
+  // Hosted-runner usage stacked by label, with the cap as a dashed line.
+  const hostedCanvas = document.getElementById('hostedRunnerHistory_canvas');
+  if (hostedCanvas && hostedRunnerChart) {{
+    const hostedDatasets = [];
+    for (const lbl of hostedRunnerChart.labels) {{
+      const color = hostedRunnerChart.palette[lbl] || '#6c757d';
+      hostedDatasets.push({{
+        label: lbl,
+        data: sliceLast(hostedRunnerChart.label_series[lbl] || [], n),
+        borderColor: color,
+        backgroundColor: color + '55',
+        fill: 'stack',
+        stack: 'in_use',
+        tension: 0.3,
+      }});
+    }}
+    hostedDatasets.push({{
+      label: 'Queued',
+      data: sliceLast(hostedRunnerChart.queued_series, n),
+      borderColor: '#ffc107',
+      borderDash: [2, 2],
+      backgroundColor: 'rgba(255,193,7,0.0)',
+      fill: false,
+      tension: 0.3,
+      stack: 'queued',
+    }});
+    hostedDatasets.push({{
+      label: 'Cap (' + hostedRunnerChart.cap + ')',
+      data: Array(labels.length).fill(hostedRunnerChart.cap),
+      borderColor: '#dc3545',
+      borderDash: [6, 3],
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: false,
+    }});
+    charts.hostedRunner = new Chart(hostedCanvas.getContext('2d'), {{
+      type: 'line',
+      data: {{ labels: displayLabels, datasets: hostedDatasets }},
+      options: {{
+        responsive: true,
+        scales: {{
+          y: {{ min: 0, stacked: true, title: {{ display: true, text: 'Hosted Runners' }} }}
+        }},
+        plugins: {{
+          tooltip: {{
+            callbacks: {{
+              afterBody: function(items) {{
+                const idx = items[0].dataIndex;
+                const total = sliceLast(
+                  hostedRunnerChart.total_series || [], n
+                )[idx];
+                if (total == null) return '';
+                return 'Total in use: ' + total + ' / ' + hostedRunnerChart.cap;
               }}
             }}
           }}
@@ -587,13 +1015,80 @@ buildCharts(24);
 """
 
 
-def generate_health_html(queue_data, failures, output_dir, mq_data=None):
+def render_hosted_runner_usage(hosted_runner_usage):
+    """Render the GitHub-hosted runner quota section."""
+    if not hosted_runner_usage:
+        return "<p>Hosted-runner usage unavailable.</p>"
+
+    cap = hosted_runner_usage.get("cap", DEFAULT_HOSTED_RUNNER_CAP)
+    in_progress = hosted_runner_usage.get("in_progress", {})
+    queued = hosted_runner_usage.get("queued", {})
+    in_use = in_progress.get("total", 0)
+    queued_total = queued.get("total", 0)
+    pct = (in_use / cap * 100) if cap else 0
+    partial = hosted_runner_usage.get("partial", False)
+
+    # Severity thresholds match shader-slang/slang#11142:
+    #   warn  at >=80% of cap
+    #   alarm at  100% of cap with queued > 0
+    # A partial sample is a known undercount; show PARTIAL instead of
+    # OK/HIGH/AT CAP so the dashboard doesn't reassure operators with a
+    # false-healthy banner during an Actions API failure.
+    if partial:
+        banner_fg, banner_bg = "#6c757d", "#e2e3e5"
+        banner_label = "PARTIAL"
+    elif in_use >= cap and queued_total > 0:
+        banner_fg, banner_bg = "#dc3545", "#f8d7da"
+        banner_label = "AT CAP"
+    elif in_use >= 0.8 * cap:
+        banner_fg, banner_bg = "#fd7e14", "#fff3cd"
+        banner_label = "HIGH"
+    else:
+        banner_fg, banner_bg = "#198754", "#d1e7dd"
+        banner_label = "OK"
+
+    html = f"""
+<div style="border-left:4px solid {banner_fg};background:{banner_bg};padding:12px 18px;margin-bottom:14px;border-radius:4px">
+  <span style="background:{banner_fg};color:white;padding:2px 8px;border-radius:3px;font-size:0.8em">{banner_label}</span>
+  <strong style="margin-left:8px">{in_use} / {cap} hosted runners in use ({pct:.0f}%)</strong>
+  &nbsp;&nbsp;<span style="color:#6c757d">queued jobs: {queued_total}</span>
+</div>
+"""
+    if partial:
+        html += (
+            '<p style="color:#6c757d;margin-top:-8px">'
+            "Sample is partial and may undercount usage "
+            "(GitHub Actions API failure during collection)."
+            "</p>\n"
+        )
+
+    def _render_table(rows, name_key, name_header):
+        out = f'<table><tr><th>{name_header}</th><th>Jobs</th></tr>\n'
+        for row in rows:
+            out += f"<tr><td>{_esc(row[name_key])}</td><td>{row['count']}</td></tr>\n"
+        out += "</table>\n"
+        return out
+
+    if in_progress.get("by_workflow"):
+        html += "<h3>In Use by Workflow</h3>\n"
+        html += _render_table(in_progress["by_workflow"], "name", "Workflow")
+    if in_progress.get("by_label"):
+        html += "<h3>In Use by Label</h3>\n"
+        html += _render_table(in_progress["by_label"], "label", "Hosted Label")
+    if queued.get("by_workflow"):
+        html += "<h3>Queued by Workflow</h3>\n"
+        html += _render_table(queued["by_workflow"], "name", "Workflow")
+
+    return html
+
+
+def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_runner_usage=None):
     """Generate health.html from live data."""
     now = datetime.now(timezone.utc)
     fetched_at = now.strftime("%Y-%m-%d %H:%M UTC")
 
-    # Runner status section — only online GCP GPU runners
-    GCP_GPU_GROUPS = {"Linux GPU (GCP)", "Windows Build (GCP)", "Windows GPU (GCP)"}
+    # Runner status section — only online GCP VM runners
+    GCP_GPU_GROUPS = set(GCP_VM_GROUPS)
     runners_html = ""
     if queue_data and "self_hosted_runners" in queue_data:
         runners = queue_data["self_hosted_runners"]
@@ -782,12 +1277,17 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None):
     snapshots = load_snapshots(output_dir, hours=24)
     history_html = build_history_chart(snapshots)
 
+    hosted_runner_html = render_hosted_runner_usage(hosted_runner_usage)
+
     body = f"""
 <h1>CI System Health</h1>
 <p style="color:#6c757d">Last updated: {fetched_at}</p>
 
 <h2>Queue Status</h2>
 {queue_html}
+
+<h2>GitHub-Hosted Runner Quota</h2>
+{hosted_runner_html}
 
 <h2>Merge Queue</h2>
 {mq_html}
@@ -815,7 +1315,8 @@ def main():
     print("Fetching GPU quota...")
     gpu_quota = fetch_gpu_quota()
     if gpu_quota:
-        print(f"  T4 GPUs: {gpu_quota['usage']}/{gpu_quota['limit']} in use")
+        for quota in _normalize_gpu_quota_by_metric(gpu_quota).values():
+            print(f"  {quota.get('name', 'GPU')} GPUs: {quota['usage']}/{quota['limit']} in use")
     else:
         print("  GPU quota unavailable (gcloud not configured or not accessible)")
 
@@ -827,14 +1328,46 @@ def main():
     else:
         print("  Merge queue data unavailable")
 
+    print("Sampling GitHub-hosted runner usage...")
+    try:
+        hosted_runner_usage = sample_hosted_runner_usage(args.repo)
+        cap = hosted_runner_usage["cap"]
+        in_use = hosted_runner_usage["in_progress"]["total"]
+        queued = hosted_runner_usage["queued"]["total"]
+        print(f"  Hosted runners in use: {in_use}/{cap}, queued: {queued}")
+        if hosted_runner_usage.get("partial"):
+            fetch_errs = hosted_runner_usage.get("fetch_errors", 0)
+            list_errs = hosted_runner_usage.get("list_errors", [])
+            print(
+                f"  Warning: hosted-runner sample is partial "
+                f"(fetch_errors={fetch_errs}, list_errors={len(list_errs)}); "
+                f"counts above may undercount real usage.",
+                file=sys.stderr,
+            )
+    except Exception as e:  # noqa: BLE001 — sampler must never break the health run
+        print(f"  Warning: hosted-runner sampler failed: {e}", file=sys.stderr)
+        hosted_runner_usage = None
+
     print("Recording snapshot...")
-    record_snapshot(queue_data, args.output, gpu_quota=gpu_quota, mq_data=mq_data)
+    record_snapshot(
+        queue_data,
+        args.output,
+        gpu_quota=gpu_quota,
+        mq_data=mq_data,
+        hosted_runner_usage=hosted_runner_usage,
+    )
 
     print("Fetching recent CI failures...")
     failures = fetch_recent_failures(args.repo)
 
     print(f"Generating health.html in {args.output}/...")
-    generate_health_html(queue_data, failures, args.output, mq_data=mq_data)
+    generate_health_html(
+        queue_data,
+        failures,
+        args.output,
+        mq_data=mq_data,
+        hosted_runner_usage=hosted_runner_usage,
+    )
 
     print("Done.")
 

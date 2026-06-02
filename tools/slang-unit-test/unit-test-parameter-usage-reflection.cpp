@@ -106,3 +106,99 @@ SLANG_UNIT_TEST(isParameterLocationUsedReflection)
     metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 0, 1, isUsed);
     SLANG_CHECK(isUsed);
 }
+
+SLANG_UNIT_TEST(isParameterLocationUsedParameterBlockConstantBuffer)
+{
+    const char* shaderSource = R"(
+        struct Foo {
+            float a;
+            Texture2D<float> b;
+        };
+
+        struct Bar {
+            Texture2D<float4> c;
+        };
+
+        [[vk::binding(0, 5)]]
+        ParameterBlock<Foo> foo;
+
+        [[vk::binding(0, 10)]]
+        ParameterBlock<Bar> bar;
+
+        [shader("fragment")]
+        float main(): SV_Target {
+            return foo.a;
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_3");
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "isParameterLocationUsedParameterBlockConstantBuffer",
+        "pb.slang",
+        shaderSource,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK(
+        module->findAndCheckEntryPoint(
+            "main",
+            SLANG_STAGE_FRAGMENT,
+            entryPoint.writeRef(),
+            diagnosticBlob.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IComponentType> compositeProgram;
+    slang::IComponentType* components[] = {module, entryPoint.get()};
+    SLANG_CHECK(
+        session->createCompositeComponentType(
+            components,
+            2,
+            compositeProgram.writeRef(),
+            diagnosticBlob.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    SLANG_CHECK(compositeProgram->link(linkedProgram.writeRef(), nullptr) == SLANG_OK);
+
+    ComPtr<slang::IMetadata> metadata;
+    SLANG_CHECK(linkedProgram->getTargetMetadata(0, metadata.writeRef(), nullptr) == SLANG_OK);
+
+    struct Expectation
+    {
+        SlangParameterCategory category;
+        SlangUInt spaceIndex;
+        SlangUInt registerIndex;
+        bool expectedUsed;
+    };
+
+    Expectation expectations[] = {
+        {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 5, 0, true},
+        {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 5, 1, false},
+        {SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 10, 0, false},
+    };
+
+    for (auto expectation : expectations)
+    {
+        bool isUsed = false;
+        SLANG_CHECK(
+            metadata->isParameterLocationUsed(
+                expectation.category,
+                expectation.spaceIndex,
+                expectation.registerIndex,
+                isUsed) == SLANG_OK);
+        SLANG_CHECK(isUsed == expectation.expectedUsed);
+    }
+}

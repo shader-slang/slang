@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cinttypes>
 #include <cstdio>
+#include <mutex>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -123,10 +124,37 @@ DataMismatchException::DataMismatchException(size_t offset, size_t size)
 // ReplayContext construction and low-level helpers
 // =============================================================================
 
+// Singleton pointer and its mutex. Using heap allocation instead of a
+// function-local static so that destroySingleton() can fully release the
+// instance (including its STL container internals) before _CrtDumpMemoryLeaks()
+// runs in wmain(), preventing false leak reports in MSVC Debug builds when
+// CMAKE_MSVC_RUNTIME_LIBRARY is the default MultiThreadedDebugDLL (/MDd).
+static std::mutex s_contextMutex;
+static ReplayContext* s_contextInstance = nullptr;
+
 ReplayContext& ReplayContext::get()
 {
-    static ReplayContext s_instance;
-    return s_instance;
+    std::lock_guard<std::mutex> lock(s_contextMutex);
+    if (!s_contextInstance)
+        s_contextInstance = new ReplayContext();
+    return *s_contextInstance;
+}
+
+ReplayContext* ReplayContext::tryGet()
+{
+    std::lock_guard<std::mutex> lock(s_contextMutex);
+    return s_contextInstance;
+}
+
+void ReplayContext::destroySingleton()
+{
+    ReplayContext* toDelete;
+    {
+        std::lock_guard<std::mutex> lock(s_contextMutex);
+        toDelete = s_contextInstance;
+        s_contextInstance = nullptr;
+    }
+    delete toDelete;
 }
 
 ReplayContext::ReplayContext()
@@ -189,6 +217,7 @@ void ReplayContext::reset()
     m_indexStream.reset();
     m_referenceStream.reset();
     m_arena.reset();
+    m_replayArenaAllocationSize = 0;
     m_mode = Mode::Idle;
     m_objectToHandle.clear();
     m_handleToObject.clear();
@@ -204,6 +233,7 @@ void ReplayContext::switchToPlayback()
     // Clear all local state
     m_referenceStream.reset();
     m_arena.reset();
+    m_replayArenaAllocationSize = 0;
     m_objectToHandle.clear();
     m_handleToObject.clear();
     m_nextHandle = kFirstValidHandle;
@@ -227,6 +257,7 @@ void ReplayContext::switchToSync()
 
     // Clear local state
     m_arena.reset();
+    m_replayArenaAllocationSize = 0;
     m_objectToHandle.clear();
     m_handleToObject.clear();
     m_nextHandle = kFirstValidHandle;
@@ -394,6 +425,29 @@ void ReplayContext::writeIndexEntry()
     m_indexStream.write(&entry, sizeof(entry));
 }
 
+static size_t getReplayArenaAllocationBudget(size_t streamSize)
+{
+    const size_t minBudget = size_t(kMaxReplayStringLength) + 1;
+    size_t budget = kMaxReplayTotalAllocationSize;
+    if (streamSize <= kMaxReplayTotalAllocationSize / kMaxReplayAllocationToStreamSizeRatio)
+        budget = streamSize * kMaxReplayAllocationToStreamSizeRatio;
+    if (budget < minBudget)
+        budget = minBudget;
+    return budget;
+}
+
+void ReplayContext::requireReplayArenaAllocation(size_t offset, size_t size)
+{
+    if (m_mode != Mode::Playback || size == 0)
+        return;
+
+    const size_t budget = getReplayArenaAllocationBudget(m_stream.getSize());
+    if (size > budget || m_replayArenaAllocationSize > budget - size)
+        throw DataMismatchException(offset, size);
+
+    m_replayArenaAllocationSize += size;
+}
+
 // =============================================================================
 // Call Index Access
 // =============================================================================
@@ -491,6 +545,8 @@ SlangResult ReplayContext::loadReplay(const char* folderPath)
         }
         m_currentReplayPath = folderPath;
 
+        m_arena.reset();
+        m_replayArenaAllocationSize = 0;
         m_mode = Mode::Playback;
         return SLANG_OK;
     }
@@ -762,6 +818,17 @@ ISlangUnknown* ReplayContext::getProxy(uint64_t handle) const
 void ReplayContext::registerHandler(const char* signature, PlaybackHandler handler)
 {
     m_handlers[String(signature)] = handler;
+}
+
+size_t ReplayContext::getHandlerCount() const
+{
+    return m_handlers.getCount();
+}
+
+void ReplayContext::resetHandlers()
+{
+    Dictionary<String, PlaybackHandler> empty;
+    m_handlers.swapWith(empty);
 }
 
 bool ReplayContext::executeNextCall()

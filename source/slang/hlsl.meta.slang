@@ -12,6 +12,8 @@ void __requireTargetExtension(constexpr String extensionName);
 in uint __builtinWaveLaneIndex : SV_WaveLaneIndex;
 in uint __builtinWaveLaneCount : SV_WaveLaneCount;
 in uint __builtinQuadLaneIndex : SV_QuadLaneIndex;
+in uint __builtinWaveIndex : SV_WaveIndex;
+in uint __builtinGroupIndex : SV_GroupIndex;
 
 //@public:
 /// Represents an interface for buffer data layout.
@@ -174,23 +176,12 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load a 32-bit unsigned integer or value with type of `T` from the buffer at the specified location.
-    ///@param T The type of the value to load from the buffer.
+    /// Load a 32-bit unsigned integer from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return The value loaded from the buffer.
-    ///
-    ///@remarks
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
+    ///@return The 32-bit unsigned integer loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint Load(int location)
     {
         __target_switch
@@ -201,6 +192,18 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load a 32-bit unsigned integer from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return The 32-bit unsigned integer loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
@@ -212,24 +215,12 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load two 32-bit unsigned integers from the buffer at the specified location
-    /// with additional alignment.
-    ///@param location The input address in bytes.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
+    /// Load two 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return Two 32-bit unsigned integers loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint2 Load2(uint location)
     {
         __target_switch
@@ -240,19 +231,40 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load2`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load2";
+        case hlsl:
+            return Load2(location);
         default:
             return __byteAddressBufferLoad<uint2>(this, location, alignment);
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
@@ -264,14 +276,12 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load two 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of stride of `uint2`, which is 8.
-    ///@param location The input address in bytes, which must be a multiple of alignment of 8. Invalid
-    /// value of location will cause undefined behavior.
-    ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 8.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint2 Load2Aligned(uint location)
     {
         __target_switch
@@ -284,21 +294,10 @@ struct ByteAddressBuffer
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint3 Load3(uint location)
     {
         __target_switch
@@ -309,19 +308,40 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load3`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load3";
+        case hlsl:
+            return Load3(location);
         default:
             return __byteAddressBufferLoad<uint3>(this, location, alignment);
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
@@ -333,13 +353,12 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load three 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of stride of `uint3`, which is 12.
-    ///@param location The input address in bytes which must be a multiple of alignment of 12.
-    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint3 Load3Aligned(uint location)
     {
         __target_switch
@@ -351,21 +370,11 @@ struct ByteAddressBuffer
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes which must be a multiple of alignment of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint4 Load4(uint location)
     {
         __target_switch
@@ -376,19 +385,40 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load4`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load4";
+        case hlsl:
+            return Load4(location);
         default:
             return __byteAddressBufferLoad<uint4>(this, location, alignment);
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
@@ -400,13 +430,12 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load four 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint4`, which is 16.
-    ///@param location The input address in bytes which must be a multiple of alignment of 16.
-    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 16.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint4 Load4Aligned(uint location)
     {
         __target_switch
@@ -417,27 +446,46 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load a value with type `T` from the buffer at the specified location.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@return The value loaded from the buffer.
+    ///@remarks
+    /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
+    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
     [__readNone]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
+    /// Load a value with type `T` from the buffer at the specified location with a known alignment.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@return The value loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
+    /// On other targets, `alignment` is forwarded to the lowered load instruction.
     [__readNone]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
 
-    /// Load an element with type `T` from the buffer at the specified location with alignment of `T`.
-    ///@param location The input address in bytes which must be a multiply of size of `T`.
-    ///@return T value with type `T` loaded from the buffer.
+    /// Load a value with type `T` from the buffer at the specified location with natural alignment.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of the natural stride of `T`.
+    ///@return The value loaded from the buffer.
     ///@remarks
-    ///Currently, this function only supports when `T` is scalar, vector or matrix type.
+    /// Currently, this function only supports when `T` is scalar, vector or matrix type.
     [__readNone]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
@@ -877,39 +925,59 @@ float __glsl_texture_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCo
     }
 }
 
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level<TSampler, TCoord>(TSampler s, TCoord value, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    }
+}
+
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_sm_4_1)]
-float __glsl_texture_level<TSampler, TCoord>(TSampler s, TCoord value, float level)
+float __glsl_shadow_lod_texture_level<TSampler, TCoord>(TSampler s, TCoord value, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod($0, $1, $2)";
     }
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float comparison, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod($0, $1, $2, $3)";
     }
 }
 
-__glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float comparison, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($0, $1, $2, $3)";
+    case glsl: __intrinsic_asm "textureLodOffset($0, $1, $2, $3)";
     }
 }
 
-__glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
@@ -918,12 +986,14 @@ float __glsl_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord 
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLodOffset($0, $1, $2, $3)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLodOffset($0, $1, $2, $3)";
     }
 }
 
@@ -976,7 +1046,16 @@ float __glsl_texture_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,Samp
 }
 
 [require(glsl, texture_sm_4_1)]
-float __glsl_texture_level<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float level)
+float __glsl150_texture_level<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($p, $2, $3)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_1d_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float level)
 {
     __target_switch
     {
@@ -985,28 +1064,40 @@ float __glsl_texture_level<TTexture, TCoord>(TTexture t,SamplerComparisonState s
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_1d_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($p, $2, $3)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod($p, $2, $3)";
     }
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_cube_array_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float compare, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_cube_array_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float compare, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($p, $2, $3, $4)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod($p, $2, $3, $4)";
     }
 }
 
-__glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLodOffset($p, $2, $3, $4)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
@@ -1015,12 +1106,14 @@ float __glsl_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerC
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLodOffset($p, $2, $3, $4)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLodOffset($p, $2, $3, $4)";
     }
 }
 
@@ -1616,23 +1709,47 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level)
     {
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLod(sampler1DShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler1DArrayShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler2DShadow sampler, vec3 P, float lod)
+            //
+            // The above list is not extended by later GLSL versions.
+            //
+            // GL_EXT_texture_shadow_lod adds the following variants:
+            // - float textureLod(sampler2DArrayShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeArrayShadow sampler, vec4 P, float compare, float lod)
+            //
+            // Anything else requires additional capabilities
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                if (isArray == 0)
+                    return __glsl150_texture_level_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                else
+                    return __glsl150_texture_level(this, __makeVector(location, compareValue), level);
             }
-            else if (Shape.dimensions == 3 && isArray == 1)
+            else if (Shape.dimensions == 2)
             {
-                return __glsl_texture_level_cube_array_shadow(this, location, compareValue, level);
+                if (isArray == 0)
+                    return __glsl150_texture_level(this, __makeVector(location, compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level(this, __makeVector(location, compareValue), level);
             }
             else
             {
-                return __glsl_texture_level(this, __makeVector(location, compareValue), level);
+                static_assert(Shape.dimensions == 3, "_Texture::SampleCmpLevel(location, compareValue, level): Unimplemented shape dimension");
+                if (isArray == 0)
+                    return __glsl_shadow_lod_texture_level(this, __makeVector(location, compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level_cube_array_shadow(this, location, compareValue, level);
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
@@ -1651,19 +1768,38 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLodOffset(sampler1DShadow sampler, vec3 P, float lod, int offset)
+            // - float textureLodOffset(sampler1DArrayShadow sampler, vec3 P, float lod, int offset)
+            // - float textureLodOffset(sampler2DShadow sampler, vec3 P, float lod, ivec2 offset)
+            //
+            // GL_EXT_texture_shadow_lod adds the following variant:
+            // - float textureLodOffset(sampler2DArrayShadow sampler, vec4 P, float lod, ivec2 offset)
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_offset_1d_shadow(this, __makeVector(__makeVector(location,0.0), compareValue), level, offset);
+                if (isArray == 0)
+                    return __glsl150_texture_level_offset_1d_shadow(this, __makeVector(__makeVector(location,0.0), compareValue), level, offset);
+                else
+                    return __glsl150_texture_level_offset(this, __makeVector(location, compareValue), level, offset);
+            }
+            else if (Shape.dimensions == 2)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_level_offset(this, __makeVector(location, compareValue), level, offset);
+                else
+                    return __glsl_shadow_lod_texture_level_offset(this, __makeVector(location, compareValue), level, offset);
             }
             else
             {
-                return __glsl_texture_level_offset(this, __makeVector(location, compareValue), level, offset);
+                static_assert(Shape.dimensions != 3, "_Texture::SampleCmpLevel with offset: cube shadow types do not support textureLodOffset in GLSL");
+                return 0.0;
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
@@ -2966,17 +3102,40 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLod(sampler1DShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler1DArrayShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler2DShadow sampler, vec3 P, float lod)
+            //
+            // The above list is not extended by later GLSL versions.
+            //
+            // GL_EXT_texture_shadow_lod adds the following variants:
+            // - float textureLod(sampler2DArrayShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeArrayShadow sampler, vec4 P, float compare, float lod)
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_1d_shadow(this, s, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                if (isArray == 0)
+                    return __glsl150_texture_level_1d_shadow(this, s, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                else
+                    return __glsl150_texture_level(this, s, __makeVector(location,compareValue), level);
             }
-            else if (Shape.dimensions == 3 && isArray == 1)
+            else if (Shape.dimensions == 2)
             {
-                return __glsl_texture_level_cube_array_shadow(this, s, location, compareValue, level);
+                if (isArray == 0)
+                    return __glsl150_texture_level(this, s, __makeVector(location,compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level(this, s, __makeVector(location, compareValue), level);
             }
             else
             {
-                return __glsl_texture_level(this, s, __makeVector(location,compareValue), level);
+                static_assert(Shape.dimensions == 3, "_Texture::SampleCmpLevel(location, compareValue, level): Unimplemented shape dimension");
+
+                if (isArray == 0)
+                    return __glsl_shadow_lod_texture_level(this, s, __makeVector(location, compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level_cube_array_shadow(this, s, location, compareValue, level);
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
@@ -2996,19 +3155,38 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
     float SampleCmpLevel(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLodOffset(sampler1DShadow sampler, vec3 P, float lod, int offset)
+            // - float textureLodOffset(sampler1DArrayShadow sampler, vec3 P, float lod, int offset)
+            // - float textureLodOffset(sampler2DShadow sampler, vec3 P, float lod, ivec2 offset)
+            //
+            // GL_EXT_texture_shadow_lod adds the following variant:
+            // - float textureLodOffset(sampler2DArrayShadow sampler, vec4 P, float lod, ivec2 offset)
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_offset_1d_shadow(this, s, __makeVector(__makeVector(location,0.0),compareValue), level, offset);
+                if (isArray == 0)
+                    return __glsl150_texture_level_offset_1d_shadow(this, s, __makeVector(__makeVector(location,0.0),compareValue), level, offset);
+                else
+                    return __glsl150_texture_level_offset(this, s, __makeVector(location, compareValue), level, offset);
+            }
+            else if (Shape.dimensions == 2)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_level_offset(this, s, __makeVector(location,compareValue), level, offset);
+                else
+                    return __glsl_shadow_lod_texture_level_offset(this, s, __makeVector(location, compareValue), level, offset);
             }
             else
             {
-                return __glsl_texture_level_offset(this, s, __makeVector(location,compareValue), level, offset);
+                static_assert(Shape.dimensions != 3, "_Texture::SampleCmpLevel with offset: cube shadow types do not support textureLodOffset in GLSL");
+                return 0.0;
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
@@ -5680,12 +5858,20 @@ __intrinsic_op($(kIROp_GetUntypedBufferPtr))
 Ptr<uint[]> __getByteAddressBufferPtr(RWByteAddressBuffer buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
-[require(cpp_cuda, structuredbuffer)]
+[require(cpp_cuda_spirv, structuredbuffer)]
 LayoutPtr<T[], L> __getStructuredBufferPtr<T, L:IBufferDataLayout>(StructuredBuffer<T, L> buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
-[require(cpp_cuda, structuredbuffer)]
+[require(cpp_cuda_spirv, structuredbuffer)]
 LayoutPtr<T[], L> __getStructuredBufferPtr<T, L:IBufferDataLayout>(RWStructuredBuffer<T, L> buffer);
+
+__intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
+[require(spirv, structuredbuffer)]
+LayoutPtr<T, L> __getStructuredBufferElementPtr<T, L:IBufferDataLayout>(StructuredBuffer<T, L> buffer, uint element);
+
+__intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
+[require(spirv, structuredbuffer)]
+LayoutPtr<T, L> __getStructuredBufferElementPtr<T, L:IBufferDataLayout>(RWStructuredBuffer<T, L> buffer, uint element);
 
 /**
 Represents an opaque handle to a read-only structured buffer allocated in global memory.
@@ -5722,28 +5908,33 @@ struct StructuredBuffer : IArray<T>
         stride = rs.y;
     }
 
-    /// Load a element from the buffer at the specified location.
+    /// Load an element from the buffer at the specified location.
+    /// @param TIndex Type of the index.
+    /// @param location The index of buffer.
+    /// @return The element at the specified index.
+    __intrinsic_op($(kIROp_StructuredBufferLoad))
+    [__readNone]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer)]
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
+
+    /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param location The index of buffer.
     /// @param[out] status The status of the operation.
     /// @return The element at the specified index.
     ///
     /// @remarks
+    /// This function is only supported when targeting HLSL.
     /// You can't access the output parameter `status` directly; instead,
     /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    __intrinsic_op($(kIROp_StructuredBufferLoad))
-    [__readNone]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer)]
-    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
-
     __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
     [require(hlsl, structuredbuffer)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
-    /// Load a element from the buffer at the specified location.
+    /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param index The index of buffer.
     /// @return The element at the specified index.
@@ -5752,7 +5943,7 @@ struct StructuredBuffer : IArray<T>
     {
         [__readNone]
         __intrinsic_op($(kIROp_StructuredBufferLoad))
-        [require(cpp_cuda_glsl_hlsl_spirv_llvm, structuredbuffer)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer)]
         get;
     };
 };
@@ -5901,23 +6092,12 @@ struct $(item.name)
         }
     }
 
-    /// Load a 32-bit unsigned integer or value with type of `T` from the buffer at the specified location.
-    ///@param T The type of the value to load from the buffer.
+    /// Load a 32-bit unsigned integer from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return The value loaded from the buffer.
-    ///
-    ///@remarks
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
+    ///@return The 32-bit unsigned integer loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint Load(int location)
     {
         __target_switch
@@ -5928,9 +6108,21 @@ struct $(item.name)
         }
     }
 
+    /// Load a 32-bit unsigned integer from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return The 32-bit unsigned integer loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl)]
+    [require(hlsl, byteaddressbuffer_rw)]
     uint Load(int location, out uint status)
     {
         __target_switch
@@ -5939,24 +6131,12 @@ struct $(item.name)
         }
     }
 
-    /// Load two 32-bit unsigned integers from the buffer at the specified location
-    /// with additional alignment.
-    ///@param location The input address in bytes.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
+    /// Load two 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return Two 32-bit unsigned integers loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint2 Load2(uint location)
     {
         __target_switch
@@ -5967,26 +6147,34 @@ struct $(item.name)
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load2`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load2";
+        case hlsl:
+            return Load2(location);
         default:
             return __byteAddressBufferLoad<uint2>(this, location, alignment);
         }
     }
 
-    /// Load two 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint2`, which is 8.
-    ///@param location The input address in bytes, which must be a multiple of alignment of 8.
-    ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 8.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint2 Load2Aligned(uint location)
     {
         __target_switch
@@ -5997,9 +6185,21 @@ struct $(item.name)
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl)]
+    [require(hlsl, byteaddressbuffer_rw)]
     uint2 Load2(uint location, out uint status)
     {
         __target_switch
@@ -6010,21 +6210,10 @@ struct $(item.name)
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint3 Load3(uint location)
     {
         __target_switch
@@ -6035,26 +6224,34 @@ struct $(item.name)
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load3`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load3";
+        case hlsl:
+            return Load3(location);
         default:
             return __byteAddressBufferLoad<uint3>(this, location, alignment);
         }
     }
 
-    /// Load three 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint3`, which is 12.
-    ///@param location The input address in bytes which must be a multiple of alignment of 12.
-    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint3 Load3Aligned(uint location)
     {
         __target_switch
@@ -6065,9 +6262,21 @@ struct $(item.name)
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl)]
+    [require(hlsl, byteaddressbuffer_rw)]
     uint3 Load3(uint location, out uint status)
     {
         __target_switch
@@ -6077,21 +6286,11 @@ struct $(item.name)
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes which must be a multiple of alignment of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint4 Load4(uint location)
     {
         __target_switch
@@ -6102,26 +6301,34 @@ struct $(item.name)
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load4`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load4";
+        case hlsl:
+            return Load4(location);
         default:
             return __byteAddressBufferLoad<uint4>(this, location, alignment);
         }
     }
 
-    /// Load four 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint4`, which is 16.
-    ///@param location The input address in bytes which must be a multiple of alignment of 16.
-    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 16.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint4 Load4Aligned(uint location)
     {
         __target_switch
@@ -6132,9 +6339,21 @@ struct $(item.name)
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl)]
+    [require(hlsl, byteaddressbuffer_rw)]
     uint4 Load4(uint location, out uint status)
     {
         __target_switch
@@ -6143,30 +6362,46 @@ struct $(item.name)
         }
     }
 
+    /// Load a value with type `T` from the buffer at the specified location.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@return The value loaded from the buffer.
+    ///@remarks
+    /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
+    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
+    /// Load a value with type `T` from the buffer at the specified location with a known alignment.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@return The value loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
+    /// On other targets, `alignment` is forwarded to the lowered load instruction.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
 
-    /// Load an element with type `T` from the buffer at the specified location with alignment of `T`.
-    ///@param location The input address in bytes which must be a multiple of size of `T`.
-    ///@return T value with type `T` loaded from the buffer.
+    /// Load a value with type `T` from the buffer at the specified location with natural alignment.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of the natural stride of `T`.
+    ///@return The value loaded from the buffer.
     ///@remarks
-    ///Currently, this function only supports when `T` is scalar, vector, or matrix type.
+    /// Currently, this function only supports when `T` is scalar, vector, or matrix type.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
@@ -6932,28 +7167,34 @@ struct $(item.name) : IRWArray<T>
     [require(hlsl)]
     uint IncrementCounter();
 
-    /// Load a element from the buffer at the specified location.
+    /// Load an element from the buffer at the specified location.
+    /// @param TIndex Type of the index.
+    /// @param location The index of buffer.
+    /// @return The element at the specified index.
+    [__NoSideEffect]
+    __intrinsic_op($(kIROp_RWStructuredBufferLoad))
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer_rw)]
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
+
+    /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param location The index of buffer.
     /// @param[out] status The status of the operation.
     /// @return The element at the specified index.
     ///
     /// @remarks
+    /// This function is only supported when targeting HLSL.
     /// You can't access the output parameter `status` directly; instead,
     /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
-    [__NoSideEffect]
-    __intrinsic_op($(kIROp_RWStructuredBufferLoad))
-    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
-
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoadStatus))
+    [require(hlsl, structuredbuffer_rw)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
-    /// Load a element from the buffer at the specified location.
+    /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param index The index of buffer.
     /// @return The element at the specified index.
@@ -6966,6 +7207,7 @@ struct $(item.name) : IRWArray<T>
         [__NoSideEffect]
         [nonmutating]
         __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer_rw)]
         ref;
     }
 };
@@ -15231,7 +15473,7 @@ bool WaveMaskIsFirstLane(WaveMask mask)
     case spirv:
         return spirv_asm
         {
-            OpCapability GroupNonUniformBallot;
+            OpCapability GroupNonUniform;
             OpGroupNonUniformElect $$bool result Subgroup
         };
     }
@@ -15332,7 +15574,7 @@ uint WaveMaskCountBits(WaveMask mask, bool value)
 // It seems this can only mean the active threads are the "threads the program flow would lead to". This implies a lockstep
 // "straight SIMD" style interpretation. That being the case this op on HLSL is just a memory barrier without any Sync.
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
 {
     __target_switch
@@ -15345,6 +15587,9 @@ void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
     case spirv:
         __subgroupBarrier();
         return;
+    case metal:
+        // Metal simdgroup_barrier always syncs all 32 lanes; mask is ignored.
+        __intrinsic_asm "simdgroup_barrier(metal::mem_flags::mem_device | metal::mem_flags::mem_threadgroup)";
     }
 }
 
@@ -15364,7 +15609,7 @@ void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
 // aspect of HLSL seems to make everything in lock step - but that's not quite so, it only has to apparently be that way as far as the programmers
 // model appears - divergence could perhaps potentially still happen.
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask)
 {
     __target_switch
@@ -15377,10 +15622,13 @@ void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask)
     case spirv:
         __subgroupBarrier();
         return;
+    case metal:
+        // Metal simdgroup_barrier always syncs all 32 lanes; mask is ignored.
+        __intrinsic_asm "simdgroup_barrier(metal::mem_flags::mem_threadgroup)";
     }
 }
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void AllMemoryBarrierWithWaveSync()
 {
     __target_switch
@@ -15393,10 +15641,12 @@ void AllMemoryBarrierWithWaveSync()
     case spirv:
         __subgroupBarrier();
         return;
+    case metal:
+        __intrinsic_asm "simdgroup_barrier(metal::mem_flags::mem_device | metal::mem_flags::mem_threadgroup)";
     }
 }
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void GroupMemoryBarrierWithWaveSync()
 {
     __target_switch
@@ -15409,6 +15659,8 @@ void GroupMemoryBarrierWithWaveSync()
     case spirv:
         __subgroupBarrier();
         return;
+    case metal:
+        __intrinsic_asm "simdgroup_barrier(metal::mem_flags::mem_threadgroup)";
     }
 }
 
@@ -16936,6 +17188,61 @@ uint WaveGetNumWaves()
     }
 }
 
+/// Returns the index of the current wave (subgroup) within the workgroup.
+/// Equivalent to GLSL gl_SubgroupID / Metal simdgroup_index_in_threadgroup.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+[NonUniformReturn]
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+uint WaveGetWaveIndex()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupID)";
+    case cuda:
+        {
+            uint3 tid = cudaThreadIdx();
+            uint3 blockDim = cudaBlockDim();
+            uint flattenedTid = tid.x + tid.y * blockDim.x + tid.z * blockDim.x * blockDim.y;
+            return flattenedTid / WaveGetLaneCount();
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniform;
+            result:$$uint = OpLoad builtin(SubgroupId:uint)
+        };
+    case metal:
+        return __builtinWaveIndex;
+    case wgsl:
+        __requireTargetExtension("subgroups");
+        __stage_switch
+        {
+        case compute:
+            return __builtinWaveIndex;
+        default:
+            static_assert(false, "WaveGetWaveIndex is only supported in compute shaders for WGSL");
+            return 0;
+        }
+    case hlsl:
+        __stage_switch
+        {
+        case compute:
+            {
+                uint groupIndex = __builtinGroupIndex;
+                uint waveSize = WaveGetLaneCount();
+                return groupIndex / waveSize;
+            }
+        default:
+            static_assert(false, "WaveGetWaveIndex is only supported in compute shaders for HLSL");
+            return 0;
+        }
+    }
+}
+
 /// Returns a mask with only the current lane's bit set.
 /// Equivalent to GLSL gl_SubgroupEqMask.
 /// @category wave
@@ -17152,7 +17459,7 @@ bool WaveIsFirstLane()
     case spirv:
         return spirv_asm
         {
-            OpCapability GroupNonUniformBallot;
+            OpCapability GroupNonUniform;
             OpGroupNonUniformElect $$bool result Subgroup
         };
     case wgsl: __intrinsic_asm "subgroupElect";
@@ -20696,8 +21003,7 @@ float3 HitTriangleVertexPosition(uint index)
                 OpCapability RayTracingPositionFetchKHR;
                 OpExtension "SPV_KHR_ray_tracing";
                 OpExtension "SPV_KHR_ray_tracing_position_fetch";
-                %_ptr_Input_v3float = OpTypePointer Input $$float3;
-                %addr : %_ptr_Input_v3float = OpAccessChain builtin(HitTriangleVertexPositionsKHR:float3[3]) $index;
+                %addr : $$Ptr<float3, Access::Read, AddressSpace::VaryingInput> = OpAccessChain builtin(HitTriangleVertexPositionsKHR:float3[3]) $index;
                 result:$$float3 = OpLoad %addr;
             };
     }
@@ -21936,7 +22242,7 @@ $}
 /// @category stage_io
 __magic_type(SubpassInputType)
 __intrinsic_type($(kIROp_SubpassInputType))
-[require(glsl_hlsl_spirv, subpass)]
+[require(glsl_hlsl_metal_spirv, subpass)]
 struct __SubpassImpl<T, let isMS:int>
 {
 }
@@ -21948,25 +22254,9 @@ typealias SubpassInput = __SubpassImpl<T, isMS>;
 __generic<T>
 extension __SubpassImpl<T, 0>
 {
-    [ForceInline]
-    [require(glsl_hlsl_spirv, subpass)]
-    T SubpassLoad()
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm "$0.SubpassLoad()";
-        case glsl: __intrinsic_asm "subpassLoad($0)";
-        case spirv:
-        {
-            let zeroVec = int2(0);
-            return spirv_asm
-            {
-                OpCapability StorageImageReadWithoutFormat;
-                result:$$T = OpImageRead $this $zeroVec
-            };
-        }
-        }
-    }
+    [require(glsl_hlsl_metal_spirv, subpass)]
+    __intrinsic_op($(kIROp_SubpassLoad))
+    T SubpassLoad();
 }
 
 /// @category stage_io
@@ -21976,25 +22266,9 @@ typealias SubpassInputMS = __SubpassImpl<T, isMS>;
 __generic<T>
 extension __SubpassImpl<T, 1>
 {
-    [ForceInline]
-    [require(glsl_hlsl_spirv, subpass)]
-    T SubpassLoad(int sample)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm "$0.SubpassLoad($1)";
-        case glsl: __intrinsic_asm "subpassLoad($0, $1)";
-        case spirv:
-        {
-            let zeroVec = int2(0);
-            return spirv_asm
-            {
-                OpCapability StorageImageReadWithoutFormat;
-                result:$$T = OpImageRead $this $zeroVec Sample $sample
-            };
-        }
-        }
-    }
+    [require(glsl_hlsl_metal_spirv, subpass)]
+    __intrinsic_op($(kIROp_SubpassLoad))
+    T SubpassLoad(int sample);
 }
 
 ///
@@ -22622,7 +22896,7 @@ struct HitObject
             // Save the attributes
             __hitObjectAttributes<attr_t>() = attributes;
 
-            __glslMakeMotionHit(
+            __glslMakeMotionHitNV(
                 __return_val,
                 AccelerationStructure,
                 InstanceIndex,
@@ -22784,7 +23058,7 @@ struct HitObject
             // Save the attributes
             __hitObjectAttributes<attr_t>() = attributes;
 
-            __glslMakeMotionHitWithIndex(
+            __glslMakeMotionHitWithIndexNV(
                 __return_val,
                 AccelerationStructure,
                 InstanceIndex,              ///? Same as instanceid ?
@@ -23495,8 +23769,8 @@ struct HitObject
     __glsl_extension(GL_NV_cluster_acceleration_structure)
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     int GetClusterID()
     {
         __target_switch
@@ -23504,10 +23778,12 @@ struct HitObject
         case hlsl_nvapi: __intrinsic_asm ".GetClusterID";
         case glsl: __intrinsic_asm "hitObjectGetClusterIdNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetClusterId";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_cluster_acceleration_structure";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingClusterAccelerationStructureNV;
                 result:$$int = OpHitObjectGetClusterIdNV &this;
             };
@@ -23516,7 +23792,8 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     float4 GetSpherePositionAndRadius()
     {
         __target_switch
@@ -23526,10 +23803,12 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 OpCapability RayTracingSpheresGeometryNV;
                 %position:$$float3 = OpHitObjectGetSpherePositionNV &this;
@@ -23541,7 +23820,8 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     float2x4 GetLssPositionsAndRadii()
     {
         __target_switch
@@ -23551,10 +23831,12 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 OpCapability RayTracingSpheresGeometryNV;
                 %positions:$$float3[2] = OpHitObjectGetLSSPositionsNV &this;
@@ -23572,7 +23854,8 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     bool IsSphereHit()
     {
         __target_switch
@@ -23582,10 +23865,12 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectIsSphereHit";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 result:$$bool = OpHitObjectIsSphereHitNV &this;
             };
@@ -23594,7 +23879,8 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     bool IsLssHit()
     {
         __target_switch
@@ -23604,10 +23890,12 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectIsLSSHit";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 result:$$bool = OpHitObjectIsLSSHitNV &this;
             };
@@ -24291,7 +24579,7 @@ struct HitObject
     // "void hitObjectRecordMissMotionNV(hitObjectNV, uint, vec3, float, vec3, float, float);"
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
     static void __glslMakeMissMotionNV(
         out HitObject hitObj,
         uint MissShaderIndex,
@@ -24506,12 +24794,12 @@ struct HitObject
         }
     }
 
-    //  "void hitObjectRecordHitWithIndexMotionNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,float,int);"
+    // NV-specific helper used by public hitObjectRecordHitWithIndexMotionNV.
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
-    static void __glslMakeMotionHitWithIndex(
+    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
+    static void __glslMakeMotionHitWithIndexNV(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
@@ -24558,12 +24846,12 @@ struct HitObject
         }
     }
 
-        // "void hitObjectRecordHitMotionNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,float,int);"
+    // NV-specific helper used by public hitObjectRecordHitMotionNV.
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
-    static void __glslMakeMotionHit(
+    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
+    static void __glslMakeMotionHitNV(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
@@ -27053,9 +27341,9 @@ namespace linalg
 
 enum CoopMatMatrixUse
 {
-    MatrixA = 0,
-    MatrixB = 1,
-    MatrixAccumulator = 2,
+    MatrixA = $(SLANG_COOPERATIVE_MATRIX_USE_A),
+    MatrixB = $(SLANG_COOPERATIVE_MATRIX_USE_B),
+    MatrixAccumulator = $(SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR),
 };
 
 enum CoopMatMatrixLayout
@@ -27315,6 +27603,32 @@ $}
 // Cooperative Matrix type
 //
 
+[require(hlsl)]
+void __requirePrelude_hlsl_cm_scale()
+{
+    __requirePrelude("#include \"dx/linalg.h\"");
+    __requirePrelude(R"(
+template<
+    dx::linalg::ComponentEnum CT,
+    int M,
+    int N,
+    dx::linalg::MatrixUseEnum U,
+    dx::linalg::MatrixScopeEnum S,
+    typename ScalarT>
+dx::linalg::Matrix<CT, M, N, U, S> __slang_cm_scale(
+    dx::linalg::Matrix<CT, M, N, U, S> a,
+    ScalarT scalar)
+{
+    dx::linalg::Matrix<CT, M, N, U, S> c;
+    int len = a.Length();
+    for (int i = 0; i < len; i++)
+        c.Set(i, a.Get(i) * scalar);
+    return c;
+}
+    )");
+}
+
+
 //@public:
 /**
 Represents a cooperative matrix for efficient warp/subgroup-level matrix operations on GPU hardware.
@@ -27330,16 +27644,19 @@ matrix extensions.
 @param R The matrix use specifier indicating whether this is a Matrix A, Matrix B, or accumulator matrix.
 
 @remarks
-The dimensions M and N must match hardware-supported fragment shapes. For CUDA WMMA,
-valid shape combinations are (where k is always 16):
+The dimensions M and N must match hardware-supported fragment shapes. For CUDA (mma.sync.m16n8k16),
+only the m16n16k16 shape is supported:
 - Shape m16n16k16: Matrix A (16×16), Matrix B (16×16), Accumulator (16×16)
-- Shape m8n32k16:  Matrix A (8×16),  Matrix B (16×32), Accumulator (8×32)
-- Shape m32n8k16:  Matrix A (32×16), Matrix B (16×8),  Accumulator (32×8)
 
 Matrix A dimensions are (m×k), Matrix B dimensions are (k×n), and Accumulator dimensions are (m×n).
-For all CUDA WMMA shapes listed above:
-- Matrix A and B support: half, uint8, int8
-- Accumulator (Matrix C) supports: float, half, int
+For CUDA m16n16k16:
+- Matrix A and B support: half, BFloat16, int8_t, uint8_t, FloatE4M3, FloatE5M2
+  (A and B must share the same element type)
+- Accumulator (Matrix C) supports an element type that matches the input family:
+  - half inputs        -> half or float accumulator/output
+  - BFloat16 inputs    -> float accumulator/output
+  - int8_t / uint8_t   -> int (s32) accumulator/output (with optional .satfinite)
+  - FloatE4M3 / FloatE5M2 inputs -> half or float accumulator/output (SM 8.9+)
 
 All matrices involved in a multiply-accumulate operation must use the same shape combination.
 The actual physical layout and distribution of elements across threads is hardware-specific.
@@ -27380,6 +27697,13 @@ matrix can use larger matrix shapes that are multiples of 16/32 depending on the
 Workgroup-scope cooperative matrices requires a specific workgroup size setting (specified via
 `[numthreads]`). Use the Vulkan API to query the supported combinations of element type, matrix
 shape and workgroup size settings.
+
+Metal backend (simdgroup_matrix):
+- Only 8x8 matrix dimensions
+- Only half and float element types
+- Supported operations: fill, Load, Store, coopMatMulAdd
+- No per-element access (subscript, GetLength, getCount)
+- No scalar multiply, copyFrom, transpose, reduce, or MapElement
 
 @category matrix_types
 */
@@ -27467,8 +27791,97 @@ struct CoopMat
             };
         case cuda:
             __intrinsic_asm "($0)->fill($1)";
+        case metal:
+            __intrinsic_asm "_slang_simdgroup_fill($0, $1)";
+        case hlsl:
+            __intrinsic_asm ".Splat";
         }
     }
+
+    /// Sets all elements of the cooperative matrix to zero.
+    /// On CUDA, uses integer zero-fill which enables CSE to a single register,
+    /// reducing register pressure when the zero matrix is used as an MMA accumulator.
+    [ForceInline]
+    [mutating]
+    [require(cooperative_matrix)]
+    void clear()
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "($0)->clear()";
+        default:
+            this.fill(T(0));
+        }
+    }
+
+    /// Writes a raw 32-bit value to a specific fragment register.
+    /// This provides direct access to the underlying hardware register layout
+    /// for building matrix tiles from per-thread data via warp shuffles.
+    ///
+    /// @param regIndex The fragment register index (0 to __getPackedFragmentCount()-1).
+    /// @param value The 32-bit value to write (packs 1 float, 2 halves, or 4 int8s).
+    [ForceInline]
+    [mutating]
+    [require(cuda, cooperative_matrix)]
+    void __fragmentWrite(int regIndex, uint value)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "($0)->FragmentWrite($1, $2)";
+        }
+    }
+
+    /// Reads a raw 32-bit value from a specific fragment register.
+    /// Inverse of __fragmentWrite. Used to extract per-thread data from matrix tiles.
+    ///
+    /// @param regIndex The fragment register index (0 to __getPackedFragmentCount()-1).
+    /// @return The raw 32-bit register value.
+    [ForceInline]
+    [__NoSideEffect]
+    [require(cuda, cooperative_matrix)]
+    uint __fragmentRead(int regIndex)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "($0).FragmentRead($1)";
+        }
+    }
+
+    [require(sm_6_10)]
+    [__NoSideEffect]
+    internal static This __hlslLoadBAB<let matrixLayout : CoopMatMatrixLayout>(
+        ByteAddressBuffer buffer, uint byteOffset, uint byteStride)
+    {
+        if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+            __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::RowMajor)";
+        else
+            __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::ColMajor)";
+    }
+
+    [require(sm_6_10)]
+    [__NoSideEffect]
+    internal static This __hlslLoadRWBAB<let matrixLayout : CoopMatMatrixLayout>(
+        RWByteAddressBuffer buffer, uint byteOffset, uint byteStride)
+    {
+        if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+            __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::RowMajor)";
+        else
+            __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::ColMajor)";
+    }
+
+    [require(sm_6_10)]
+    internal void __hlslStoreBAB<let matrixLayout : CoopMatMatrixLayout>(
+        RWByteAddressBuffer buffer, uint byteOffset, uint byteStride)
+    {
+        if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+            __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::RowMajor)";
+        else
+            __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::ColMajor)";
+    }
+
 
     /// Copies the contents from another cooperative matrix into this matrix.
     /// @param U The element type of the source cooperative matrix.
@@ -27483,6 +27896,7 @@ struct CoopMat
     {
         __target_switch
         {
+        case hlsl:
         case spirv:
             if (__isCoopFloat<T>() && __isInt<U>())
                 this = __int_to_float_cast<T, R>(other);
@@ -27517,11 +27931,19 @@ struct CoopMat
     ///
     /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_hlsl_spirv, cooperative_matrix)]
     [__NoSideEffect]
     int getCount()
     {
-        return GetLength();
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".Length";
+        case cuda:
+            __intrinsic_asm "($0).GetLength()";
+        default:
+            return GetLength();
+        }
     }
 
     /// Subscript operator to access elements in the cooperative matrix.
@@ -27531,6 +27953,7 @@ struct CoopMat
     /// belong to the current thread, but the locations of those elements on the matrix is
     /// unspecified. It indicates that user can only use this operator to perform uniform
     /// operations.
+    [require(cuda_hlsl_spirv, cooperative_matrix)]
     __subscript(int index) -> T
     {
         [__NoSideEffect]
@@ -27543,6 +27966,8 @@ struct CoopMat
                 return __indexRead(index);
             case cuda:
                 __intrinsic_asm "($0).get($1)";
+            case hlsl:
+                __intrinsic_asm "($0).Get($1)";
             }
         }
 
@@ -27555,9 +27980,12 @@ struct CoopMat
                 __indexRef(index) = newValue;
             case cuda:
                 __intrinsic_asm "($0)->set($1, $2)";
+            case hlsl:
+                __intrinsic_asm "($0).Set($1, $2)";
             }
         }
     }
+
 
     //
     // CoopMat operations
@@ -27570,26 +27998,44 @@ struct CoopMat
     ///
     /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_hlsl_spirv, cooperative_matrix)]
     static uint GetLength()
     {
         __target_switch
         {
+        case hlsl:
+        case cuda:
+            This tmp;
+            return tmp.getCount();
         case spirv:
             return spirv_asm
             {
                 result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
             };
+        }
+    }
+
+    /// Returns the number of 32-bit fragment registers per thread for this matrix type.
+    /// Each register packs multiple elements: 1 for float, 2 for half, 4 for int8.
+    ///
+    /// @return The number of packed 32-bit registers per thread.
+    [ForceInline]
+    [require(cuda, cooperative_matrix)]
+    [__NoSideEffect]
+    static int __getPackedFragmentCount()
+    {
+        __target_switch
+        {
         case cuda:
             This result;
-            return __getNumElementsPerThread(result);
+            return int(__cuda_getPackedFragmentCount(result));
         }
     }
 
     [require(cuda_sm_8_0)]
-    internal static uint __getNumElementsPerThread(__ref This coopMat)
+    internal static uint __cuda_getPackedFragmentCount(__ref This coopMat)
     {
-        __intrinsic_asm "($0)->GetLength()";
+        __intrinsic_asm "($0)->GetPackedFragmentCount()";
     }
 
     /// Returns the number of rows in the matrix.
@@ -27608,9 +28054,24 @@ struct CoopMat
         return N;
     }
 
+    /// Transposes each 8x8 sub-block of the cooperative matrix in-register.
+    /// This reinterprets a row-major loaded fragment as column-major (and vice versa)
+    /// without performing a full matrix transpose. On CUDA, uses movmatrix.sync.aligned
+    /// PTX instruction on each of the 4 registers for 16x16 f16 MatrixA/MatrixB.
+    [require(cuda, cooperative_matrix)]
+    [mutating]
+    void __ChangeMajor()
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"(($0)->ChangeMajor())";
+        }
+    }
+
     /// Transposes the cooperative matrix. Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
     /// @return A transposed cooperative matrix with dimensions N×M and MatrixB usage.
-    [require(cooperative_matrix_conversion)]
+    [require(spirv, cooperative_matrix_conversion)]
     CoopMat<T, S, N, M, CoopMatMatrixUse.MatrixB> Transpose()
     {
         return spirv_asm
@@ -27722,6 +28183,7 @@ struct CoopMat
     /// @param TFunc The functor type implementing IFunc<T, uint32_t, uint32_t, T>.
     /// @param mapOp A functor object that takes (row, column, element) and returns a new element value.
     /// @return A new cooperative matrix with the operation applied to each element.
+    [require(cooperative_matrix_map_element)]
     This MapElement<
         TFunc : IFunc<T, uint32_t, uint32_t, T>
     >(TFunc mapOp)
@@ -27743,7 +28205,16 @@ struct CoopMat
         let matrixLayout : CoopMatMatrixLayout
     >(RWByteAddressBuffer buffer, uint element, uint stride)
     {
-        __store<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
+        __target_switch
+        {
+        case hlsl:
+            __hlslStoreBAB<matrixLayout>(
+                buffer,
+                element * __naturalStrideOf<T>(),
+                stride * __naturalStrideOf<T>());
+        default:
+            __store<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
+        }
     }
 
     /// Stores the cooperative matrix into a structured buffer.
@@ -27752,35 +28223,40 @@ struct CoopMat
     /// @param stride The stride in elements between consecutive rows (for row major layout) or
     ///        columns (for column major layout) and must be a multiple of 8 for __half element type
     ///        or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
-    [require(cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
-        let matrixLayout : CoopMatMatrixLayout
-    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
+        let matrixLayout : CoopMatMatrixLayout,
+        L : IBufferDataLayout = DefaultDataLayout
+    >(RWStructuredBuffer<T, L> buffer, uint element, uint stride)
     {
         __store<matrixLayout>(buffer, element, stride);
     }
 
-    [require(cooperative_matrix)]
-    internal void __store<
-        let matrixLayout : CoopMatMatrixLayout
-    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    [require(cuda_metal_spirv, cooperative_matrix)]
+    void __store<
+        let matrixLayout : CoopMatMatrixLayout,
+        L : IBufferDataLayout
+    >(RWStructuredBuffer<T, L> buffer, uint element, uint stride)
     {
-        let zero = 0;
-        let alignment = 16U;
         __target_switch
         {
         case spirv:
+            let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
+            let alignment = 16U;
             spirv_asm
             {
-                %storagePointerType = OpTypePointer StorageBuffer $$T;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+                OpCooperativeMatrixStoreKHR $pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "simdgroup_store($0, (device $[0]*)($1) + $2, (ulong)$3)", T;
+            else
+                __intrinsic_asm "simdgroup_store($0, (device $[0]*)($1) + $2, (ulong)$3, ulong2(0), true)", T;
         }
     }
 
@@ -27789,7 +28265,7 @@ struct CoopMat
     /// @param buffer The pointer to the buffer to store the matrix into.
     /// @param element The starting element index in the buffer.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
-    [require(cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
@@ -27808,6 +28284,11 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "simdgroup_store($0, $1 + $2, (ulong)$3)";
+            else
+                __intrinsic_asm "simdgroup_store($0, $1 + $2, (ulong)$3, ulong2(0), true)";
         }
     }
 
@@ -27841,7 +28322,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -27850,23 +28331,27 @@ struct CoopMat
         __target_switch
         {
         case spirv:
+            let pointer = __getAddress(data[element]);
             let alignment = 16U;
             spirv_asm
             {
-                %workgroupPointerType = OpTypePointer Workgroup $$T;
-                %pointer:%workgroupPointerType = OpAccessChain &data $element;
-                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+                OpCooperativeMatrixStoreKHR $pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, $2, $3)";
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, $2, $3)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "simdgroup_store($0, &((*($1))[0]) + $2, (ulong)$3)";
+            else
+                __intrinsic_asm "simdgroup_store($0, &((*($1))[0]) + $2, (ulong)$3, ulong2(0), true)";
         }
     }
 
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
     >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
@@ -27884,6 +28369,11 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, 0, $2)";
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, 0, $2)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "simdgroup_store($0, ($1), (ulong)$2)";
+            else
+                __intrinsic_asm "simdgroup_store($0, ($1), (ulong)$2, ulong2(0), true)";
         }
     }
 
@@ -27895,7 +28385,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -27905,23 +28395,30 @@ struct CoopMat
         __target_switch
         {
         case spirv:
+            let pointer = __getAddress(data[element]);
             let alignment = 16U;
             spirv_asm
             {
-                %workgroupPointerType = OpTypePointer Workgroup $$U;
-                %pointer:%workgroupPointerType = OpAccessChain &data $element;
-                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+                OpCooperativeMatrixStoreKHR $pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data + $2, $3)";
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data + $2, $3)";
+        case metal:
+            // This overload indexes the groupshared array in U elements. Metal's
+            // simdgroup_store writes through a T*, so offset in U first, then
+            // cast; only the row/column stride needs conversion to T elements.
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)(&((*($1))[0]) + $2), (ulong)($3 * (sizeof($[1]) / sizeof($[0]))))", T, U;
+            else
+                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)(&((*($1))[0]) + $2), (ulong)($3 * (sizeof($[1]) / sizeof($[0]))), ulong2(0), true)", T, U;
         }
     }
 
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -27940,6 +28437,11 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1), $2)";
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1), $2)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)($1), (ulong)($2 * (sizeof($[1]) / sizeof($[0]))))", T, U;
+            else
+                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)($1), (ulong)($2 * (sizeof($[1]) / sizeof($[0]))), ulong2(0), true)", T, U;
         }
     }
 
@@ -27962,11 +28464,10 @@ struct CoopMat
     >(__ref groupshared vector<U, L>[V] data, uint element, uint stride)
     {
         let alignment = 16U;
+        let pointer = __getAddress(data[element]);
         spirv_asm
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$vector<U, L>;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            OpCooperativeMatrixStoreKHR $pointer $this $matrixLayout $stride Aligned !alignment;
         };
     }
 
@@ -27989,34 +28490,47 @@ $}
         uint element,
         uint stride)
     {
-        return Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
+        __target_switch
+        {
+        case hlsl:
+            return __hlslLoad$(RW)BAB<matrixLayout>(
+                buffer,
+                element * __naturalStrideOf<T>(),
+                stride * __naturalStrideOf<T>());
+        default:
+            return Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
+        }
     }
 
     [__NoSideEffect]
-    [require(cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
-        let matrixLayout : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout,
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         uint stride)
     {
-        let zero = 0;
         let alignment = 16U;
         __target_switch
         {
         case spirv:
+            let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
             return spirv_asm
             {
-                %storagePointerType = OpTypePointer StorageBuffer $$T;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "_slang_simdgroup_load<$TR>((const device $[0]*)($0) + $1, (ulong)$2)", T;
+            else
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>((const device $[0]*)($0) + $1, (ulong)$2)", T;
         }
     }
 
@@ -28032,7 +28546,7 @@ $}
     /// @return A cooperative matrix loaded from the buffer.
     [ForceInline]
     [__NoSideEffect]
-    [require(cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
@@ -28051,6 +28565,11 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "_slang_simdgroup_load<$TR>($0 + $1, (ulong)$2)";
+            else
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>($0 + $1, (ulong)$2)";
         }
     }
 
@@ -28088,7 +28607,7 @@ $}
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -28097,23 +28616,27 @@ $}
         __target_switch
         {
         case spirv:
+            let pointer = __getAddress(data[element]);
             let alignment = 16U;
             return spirv_asm
             {
-                %workgroupPointerType = OpTypePointer Workgroup $$T;
-                %pointer:%workgroupPointerType = OpAccessChain &data $element;
-                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>(($0)->m_data, $1, $2)";
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data, $1, $2)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "_slang_simdgroup_load<$TR>(&((*($0))[0]) + $1, (ulong)$2)";
+            else
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>(&((*($0))[0]) + $1, (ulong)$2)";
         }
     }
 
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
     >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
@@ -28131,6 +28654,11 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, 0, $1)";
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, 0, $1)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "_slang_simdgroup_load<$TR>($0, (ulong)$1)";
+            else
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>($0, (ulong)$1)";
         }
     }
 
@@ -28143,7 +28671,7 @@ $}
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -28153,23 +28681,30 @@ $}
         __target_switch
         {
         case spirv:
+            let pointer = __getAddress(data[element]);
             let alignment = 16U;
             return spirv_asm
             {
-                %workgroupPointerType = OpTypePointer Workgroup $$U;
-                %pointer:%workgroupPointerType = OpAccessChain &data $element;
-                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>(($0)->m_data + $1, $2)";
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data + $1, $2)";
+        case metal:
+            // This overload indexes the groupshared array in U elements. Metal's
+            // simdgroup_load reads through a T*, so offset in U first, then cast;
+            // only the row/column stride needs conversion to T elements.
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "_slang_simdgroup_load<$TR>((const threadgroup $[0]*)(&((*($0))[0]) + $1), (ulong)($2 * (sizeof($[1]) / sizeof($[0]))))", T, U;
+            else
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>((const threadgroup $[0]*)(&((*($0))[0]) + $1), (ulong)($2 * (sizeof($[1]) / sizeof($[0]))))", T, U;
         }
     }
 
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -28188,6 +28723,11 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1)";
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1)";
+        case metal:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "_slang_simdgroup_load<$TR>((const threadgroup $[0]*)($0), (ulong)($1 * (sizeof($[1]) / sizeof($[0]))))", T, U;
+            else
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>((const threadgroup $[0]*)($0), (ulong)($1 * (sizeof($[1]) / sizeof($[0]))))", T, U;
         }
     }
 
@@ -28211,11 +28751,10 @@ $}
     >(__constref groupshared vector<U, L>[V] data, uint element, uint stride)
     {
         let alignment = 16U;
+        let pointer = __getAddress(data[element]);
         return spirv_asm
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$vector<U, L>;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $pointer $matrixLayout $stride Aligned !alignment;
         };
     }
 
@@ -28366,9 +28905,10 @@ $}
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout)
     {
@@ -28378,14 +28918,15 @@ $}
     [require(cooperative_matrix_tensor_addressing)]
     static This __loadLayout<
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
         This ret;
@@ -28393,9 +28934,7 @@ $}
         {
             OpCapability CooperativeMatrixTensorAddressingNV;
             OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment None;
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $ret $tensorLayout Aligned !alignment None;
         };
     }
 
@@ -28421,9 +28960,10 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
@@ -28437,15 +28977,16 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
         This ret;
@@ -28453,9 +28994,7 @@ $}
         {
             OpCapability CooperativeMatrixTensorAddressingNV;
             OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView $tensorView;
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $ret $tensorLayout Aligned !alignment TensorView $tensorView;
         };
     }
 
@@ -28477,9 +29016,10 @@ $}
     static This Load<
         U,
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
@@ -28491,15 +29031,16 @@ $}
     static This __loadLayoutDecode<
         U,
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
         This ret;
@@ -28507,9 +29048,7 @@ $}
         {
             OpCapability CooperativeMatrixBlockLoadsNV;
             OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment DecodeFunc $decodeFunc;
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $ret $tensorLayout Aligned !alignment DecodeFunc $decodeFunc;
         };
     }
 
@@ -28538,9 +29077,10 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
@@ -28556,16 +29096,17 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
         This ret;
@@ -28574,9 +29115,7 @@ $}
             OpCapability CooperativeMatrixTensorAddressingNV;
             OpCapability CooperativeMatrixBlockLoadsNV;
             OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView|DecodeFunc $tensorView $decodeFunc;
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $ret $tensorLayout Aligned !alignment TensorView|DecodeFunc $tensorView $decodeFunc;
         };
     }
 
@@ -28599,14 +29138,15 @@ $}
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        RWStructuredBuffer<T> buffer,
+        RWStructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         __target_switch
         {
@@ -28615,9 +29155,7 @@ $}
             {
                 OpCapability CooperativeMatrixTensorAddressingNV;
                 OpExtension "SPV_NV_cooperative_matrix2";
-                %storagePointerType = OpTypePointer StorageBuffer $$T;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-                OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment None;
+                OpCooperativeMatrixStoreTensorNV $pointer $this $tensorLayout Aligned !alignment None;
             };
         }
     }
@@ -28667,15 +29205,16 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        RWStructuredBuffer<T> buffer,
+        RWStructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         __target_switch
         {
@@ -28684,9 +29223,7 @@ $}
             {
                 OpCapability CooperativeMatrixTensorAddressingNV;
                 OpExtension "SPV_NV_cooperative_matrix2";
-                %storagePointerType = OpTypePointer StorageBuffer $$T;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-                OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment TensorView $tensorView;
+                OpCooperativeMatrixStoreTensorNV $pointer $this $tensorLayout Aligned !alignment TensorView $tensorView;
             };
         }
     }
@@ -28786,7 +29323,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     uint element,
     uint stride)
 {
-    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
+    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
 /// Loads a cooperative matrix from an RWByteAddressBuffer.
@@ -28815,7 +29352,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     uint element,
     uint stride)
 {
-    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
+    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
 /// Loads a cooperative matrix from a StructuredBuffer.
@@ -28826,21 +29363,23 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param N The number of columns in the matrix fragment.
 /// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
 /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param L The data layout of the StructuredBuffer.
 /// @param buffer The StructuredBuffer to load from.
 /// @param element The starting element index in the buffer.
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cuda_metal_spirv, cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
-    let matrixLayout : CoopMatMatrixLayout
+    let matrixLayout : CoopMatMatrixLayout,
+    L : IBufferDataLayout = DefaultDataLayout
 >(
-    StructuredBuffer<T> buffer,
+    StructuredBuffer<T, L> buffer,
     uint element,
     uint stride)
 {
@@ -28855,21 +29394,23 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param N The number of columns in the matrix fragment.
 /// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
 /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param L The data layout of the RWStructuredBuffer.
 /// @param buffer The RWStructuredBuffer to load from.
 /// @param element The starting element index in the buffer.
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cuda_metal_spirv, cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
-    let matrixLayout : CoopMatMatrixLayout
+    let matrixLayout : CoopMatMatrixLayout,
+    L : IBufferDataLayout = DefaultDataLayout
 >(
-    RWStructuredBuffer<T> buffer,
+    RWStructuredBuffer<T, L> buffer,
     uint element,
     uint stride)
 {
@@ -28889,7 +29430,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cuda_metal_spirv, cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : ICoopElement,
     let S : MemoryScope,
@@ -28951,7 +29492,7 @@ CoopMat<T, S, M, N, R> coopMatLoadCoherent<
 /// @param stride The stride in elements between consecutive rows or columns.
 /// @return A cooperative matrix loaded from the groupshared array.
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cuda_metal_spirv, cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : ICoopElement,
     let S : MemoryScope,
@@ -29027,6 +29568,22 @@ CoopMat<T,S,M,N,R1> __float_to_int_cast<
 // Cooperative Matrix Multiply-Accumulate
 //
 
+__intrinsic_op($(kIROp_CoopMatMulAdd))
+internal CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> __coopMatMulAdd<
+    T : ICoopElement,
+    U : ICoopElement,
+    V : ICoopElement,
+    W : ICoopElement,
+    let S : MemoryScope,
+    let M : int,
+    let K : int,
+    let N : int
+>(
+    CoopMat<U, S, M, K, CoopMatMatrixUse.MatrixA> matA,
+    CoopMat<V, S, K, N, CoopMatMatrixUse.MatrixB> matB,
+    CoopMat<W, S, M, N, CoopMatMatrixUse.MatrixAccumulator> matC,
+    bool saturatingAccumulation);
+
 /// Performs cooperative matrix multiply-accumulate operation: D = A * B + C
 /// This is the fundamental operation for hardware-accelerated matrix multiplication.
 /// All threads in the warp/subgroup cooperate to compute the result.
@@ -29059,61 +29616,7 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     CoopMat<V, S, K, N, CoopMatMatrixUse.MatrixB> matB,
     CoopMat<W, S, M, N, CoopMatMatrixUse.MatrixAccumulator> matC)
 {
-    __target_switch
-    {
-    case spirv:
-        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-        int operands = 0; // NoneKHR
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x01; // MatrixASignedComponentsKHR
-        }
-        if (__isSignedInt<V>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<W>())
-        {
-            operands |= 0x04; // MatrixCSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-        if (saturatingAccumulation)
-        {
-            operands |= 0x10; // SaturatingAccumulationKHR
-        }
-
-        return spirv_asm
-        {
-            result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
-        };
-    case cuda:
-        if (saturatingAccumulation)
-            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
-                                                         $T0::ElementType,
-                                                         $T1::ElementType,
-                                                         $T2::ElementType,
-                                                         $TR::ElementType,
-                                                         $T0::m_M,
-                                                         $T0::m_N,
-                                                         $T0::m_K,
-                                                         true
-                                                        >($0, $1, $2))";
-        else
-            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
-                                                         $T0::ElementType,
-                                                         $T1::ElementType,
-                                                         $T2::ElementType,
-                                                         $TR::ElementType,
-                                                         $T0::m_M,
-                                                         $T0::m_N,
-                                                         $T0::m_K,
-                                                         false
-                                                        >($0, $1, $2))";
-
-    }
+    return __coopMatMulAdd<T, U, V, W, S, M, K, N>(matA, matB, matC, saturatingAccumulation);
 }
 
 extension<
@@ -29141,11 +29644,12 @@ extension<
     {
         return __MapElement(this, mapOp.operator(), mapOp);
     }
-} // struct CoopMat
+}
 
 // IArithmetic implementation for CoopMat, where T is __BuiltinArithmeticType.
-// Note that arithmetic operations are not allowed on CoopMat with FloatE4M3, FloatE5M2,
-// BFloat16 element types.
+// Note that arithmetic operations are not allowed on CoopMat with FloatE4M3 or
+// FloatE5M2 element types. CoopMat<BFloat16, ...> arithmetic is provided by a
+// separate, target-gated extension below.
 extension<
     T,
     let S : MemoryScope,
@@ -29255,6 +29759,281 @@ extension<
     }
 }
 
+// IArithmetic implementation for CoopMat<BFloat16, ...>.
+//
+// BFloat16 does not conform to __BuiltinArithmeticType today (cross-target scalar
+// bf16 arithmetic is not uniformly supported), so the IArithmetic extension above
+// does not apply. We provide a parallel implementation here gated on bf16-capable
+// targets only:
+//   - CUDA (cuda_sm_8_0): dispatch to the prelude's WmmaFragment operator overloads,
+//     which lower to packed __nv_bfloat162 PTX (add.bf16x2 / fma.rn.bf16x2 /
+//     neg.bf16x2 / ...).
+//   - SPIRV (spvBFloat16KHR): fall back to an element-wise loop, converting bf16
+//     -> float for the arithmetic and back to bf16, since SPIRV does not yet
+//     provide bf16 cooperative-matrix arithmetic ops directly.  We use `float`
+//     (not `half`) as the intermediate because BFloat16 has FP32's 8-bit
+//     exponent range, and routing through half (5-bit exponent, max ~65504)
+//     would overflow / underflow valid bf16 values during the temporary
+//     conversion.
+extension<
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+> CoopMat<BFloat16, S, M, N, R> : IArithmetic
+{
+    /// Performs element-wise addition of two cooperative matrices.
+    /// @param other The cooperative matrix to add.
+    /// @return A new cooperative matrix containing the element-wise sum.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    This add(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "$0 + $1";
+        case spvBFloat16KHR:
+            This ret;
+            for (int i = 0; i < GetLength(); ++i)
+            {
+                ret[i] = BFloat16(float(this[i]) + float(other[i]));
+            }
+            return ret;
+
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> add is not supported for this target");
+            return other;
+        }
+    }
+
+    /// Performs element-wise subtraction of two cooperative matrices.
+    /// @param other The cooperative matrix to subtract.
+    /// @return A new cooperative matrix containing the element-wise difference.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    This sub(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "$0 - $1";
+        case spvBFloat16KHR:
+            This ret;
+            for (int i = 0; i < GetLength(); ++i)
+            {
+                ret[i] = BFloat16(float(this[i]) - float(other[i]));
+            }
+            return ret;
+
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> sub is not supported for this target");
+            return other;
+        }
+    }
+
+    /// Performs element-wise multiplication of two cooperative matrices.
+    /// @param other The cooperative matrix to multiply with.
+    /// @return A new cooperative matrix containing the element-wise product.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    This mul(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "$0 * $1";
+        case spvBFloat16KHR:
+            This ret;
+            for (int i = 0; i < GetLength(); ++i)
+            {
+                ret[i] = BFloat16(float(this[i]) * float(other[i]));
+            }
+            return ret;
+
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> mul is not supported for this target");
+            return other;
+        }
+    }
+
+    /// Performs element-wise division of two cooperative matrices.
+    /// @param other The cooperative matrix to divide by.
+    /// @return A new cooperative matrix containing the element-wise quotient.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    This div(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "$0 / $1";
+        case spvBFloat16KHR:
+            This ret;
+            for (int i = 0; i < GetLength(); ++i)
+            {
+                ret[i] = BFloat16(float(this[i]) / float(other[i]));
+            }
+            return ret;
+
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> div is not supported for this target");
+            return other;
+        }
+    }
+
+    /// Negates all elements in the cooperative matrix.
+    /// @return A new cooperative matrix with all elements negated.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    This neg()
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "-$0";
+        case spvBFloat16KHR:
+            This ret;
+            for (int i = 0; i < GetLength(); ++i)
+            {
+                ret[i] = BFloat16(-float(this[i]));
+            }
+            return ret;
+
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> neg is not supported for this target");
+            return this;
+        }
+    }
+
+    /// Performs element-wise modulo operation of two cooperative matrices.
+    /// @param other The cooperative matrix to compute modulo with.
+    /// @return A new cooperative matrix containing the element-wise remainder.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    This mod(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "$0 % $1";
+        case spvBFloat16KHR:
+            {
+                This ret;
+                for (int i = 0; i < GetLength(); ++i)
+                {
+                    ret[i] = BFloat16(float(this[i]) % float(other[i]));
+                }
+                return ret;
+            }
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> mod is not supported for this target");
+            return other;
+        }
+    }
+
+    /// Tests if two cooperative matrices are equal by comparing all elements.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if all corresponding elements are equal, false otherwise.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    bool equals(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "$0 == $1";
+        case spvBFloat16KHR:
+            {
+                for (int i = 0; i < GetLength(); i++)
+                {
+                    if (float(this[i]) != float(other[i]))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> equals is not supported for this target");
+            return false;
+        }
+    }
+
+    /// Performs lexicographic comparison to test if this matrix is less than another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than other, false otherwise.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    bool lessThan(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "$0 < $1";
+        case spvBFloat16KHR:
+            {
+                for (int i = 0; i < GetLength(); i++)
+                {
+                    if (float(this[i]) < float(other[i]))
+                    {
+                        return true;
+                    }
+                    else if (float(this[i]) > float(other[i]))
+                    {
+                        return false;
+                    }
+                }
+                return false;
+            }
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> lessThan is not supported for this target");
+            return false;
+        }
+    }
+
+    /// Performs lexicographic comparison to test if this matrix is less than or equal to another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than or equal to other, false otherwise.
+    [ForceInline]
+    [require(cuda_sm_8_0, cooperative_matrix)]
+    [require(spvBFloat16KHR, cooperative_matrix)]
+    bool lessThanOrEquals(This other)
+    {
+        __target_switch
+        {
+        case _cuda_sm_8_0:
+            __intrinsic_asm "$0 <= $1";
+        case spvBFloat16KHR:
+            {
+                for (int i = 0; i < GetLength(); i++)
+                {
+                    if (float(this[i]) < float(other[i]))
+                    {
+                        return true;
+                    }
+                    else if (float(this[i]) > float(other[i]))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        default:
+            static_assert(false, "CoopMat<BFloat16, ...> lessThanOrEquals is not supported for this target");
+            return false;
+        }
+    }
+}
+
 } // namespace linalg
 
 //
@@ -29271,7 +30050,7 @@ extension<
 /// @param lhs The cooperative matrix to multiply.
 /// @param rhs The scalar value to multiply each element by.
 /// @return A new cooperative matrix with all elements multiplied by the scalar.
-[require(cooperative_matrix)]
+[require(cuda_hlsl_spirv, cooperative_matrix)]
 linalg.CoopMat<T, S, M, N, R> operator *<
     T : ICoopElement,
     let S : MemoryScope,
@@ -29289,6 +30068,9 @@ linalg.CoopMat<T, S, M, N, R> operator *<
         };
     case cuda:
         __intrinsic_asm "$0 * $1";
+    case hlsl:
+        linalg.__requirePrelude_hlsl_cm_scale();
+        __intrinsic_asm "__slang_cm_scale($0, $1)";
     }
 }
 
@@ -29302,7 +30084,7 @@ linalg.CoopMat<T, S, M, N, R> operator *<
 /// @param lhs The scalar value to multiply each element by.
 /// @param rhs The cooperative matrix to multiply.
 /// @return A new cooperative matrix with all elements multiplied by the scalar.
-[require(cooperative_matrix)]
+[require(cuda_hlsl_spirv, cooperative_matrix)]
 linalg.CoopMat<T, S, M, N, R> operator *<
     T : ICoopElement,
     let S : MemoryScope,
@@ -29454,19 +30236,17 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     }
 
     [require(cooperative_vector)]
-    void store(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+    void store<L : IBufferDataLayout = DefaultDataLayout>(RWStructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
         {
         case spirv:
-            let zero = 0;
+            let pointer = __getStructuredBufferPtr<T, L>(buffer);
             spirv_asm
             {
-                %runtimeArrayType = OpTypeRuntimeArray $$T;
-                %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero;
-                OpCooperativeVectorStoreNV %pointer $byteOffset16ByteAligned $this None;
+                OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this None;
             };
+            return;
         default:
             for(int i = 0; i < N; ++i)
                 buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
@@ -29603,18 +30383,15 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [__NoSideEffect]
     [require(cooperative_vector)]
-    static CoopVec<T, N> load(StructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+    static CoopVec<T, N> load<L : IBufferDataLayout = DefaultDataLayout>(StructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
         {
         case spirv:
-            let zero = 0;
+            let pointer = __getStructuredBufferPtr<T, L>(buffer);
             return spirv_asm
             {
-                %runtimeArrayType = OpTypeRuntimeArray $$T;
-                %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero;
-                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV %pointer $byteOffset16ByteAligned None;
+                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned None;
             };
         default:
             var vec = CoopVec<T, N>();
@@ -29626,19 +30403,16 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     }
 
     [__NoSideEffect]
-    [require(spirv, cooperative_vector)]
-    static CoopVec<T, N> load(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+    [require(cooperative_vector)]
+    static CoopVec<T, N> load<L : IBufferDataLayout = DefaultDataLayout>(RWStructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
         {
         case spirv:
-            let zero = 0;
+            let pointer = __getStructuredBufferPtr<T, L>(buffer);
             return spirv_asm
             {
-                %runtimeArrayType = OpTypeRuntimeArray $$T;
-                %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero;
-                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV %pointer $byteOffset16ByteAligned None;
+                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned None;
             };
         default:
             var vec = CoopVec<T, N>();
@@ -30156,63 +30930,6 @@ static const struct {
 };
 for(auto buffer : kByteAddressBufferCases) {
 $}
-    [mutating]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __mutMatMul<U : __BuiltinArithmeticType, let K : int>(
-        CoopVec<U, K> input, uint inputInterpretationHLSL,
-        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
-        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
-    {
-        __target_switch
-        {
-        case hlsl:
-            if (__isFloat<T>() || __isSignedInt<T>())
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-            }
-            else
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-            }
-        }
-    }
-
-    [mutating]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __mutMatMulAdd<U : __BuiltinArithmeticType, let K : int>(
-        CoopVec<U, K> input, uint inputInterpretationHLSL,
-        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
-        $(buffer.type) bias, uint biasOffset, uint biasInterpretationHLSL,
-        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
-    {
-        __target_switch
-        {
-        case hlsl:
-            if (__isFloat<T>() || __isSignedInt<T>())
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-            }
-            else
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-            }
-        }
-    }
-
     /// Multiply the given input Cooperative vector with the given matrix and accumulate the result into this vector.
     /// @param input The input Cooperative vector to multiply with the matrix.
     /// @param inputInterpretation Specifies how to interpret the values in the input vector (e.g. as packed values).
@@ -30244,41 +30961,20 @@ $}
         static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                     , "for non-packed inputInterpretation values k must be equal to the input vector length");
         static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                    || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                    || k <= __componentPackingFactor(inputInterpretation)*PackedK
                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
 
-        __target_switch
-        {
-        case hlsl:
-            let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-            let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-            let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-            This temp = this;
-            temp.__mutMatMul(
-                input,
-                inputInterpretationHLSL,
-                matrix,
-                matrixOffset,
-                matrixInterpretationHLSL,
-                N,
-                k,
-                memoryLayoutHLSL,
-                transpose,
-                matrixStride
-            );
-            this.__mutAdd(temp);
-        default: this = this + coopVecMatMulPacked<T, N, PackedK, U>(
-                input,
-                inputInterpretation,
-                k,
-                matrix,
-                matrixOffset,
-                matrixInterpretation,
-                memoryLayout,
-                transpose,
-                matrixStride
-            );
-        }
+        this = this + coopVecMatMulPacked<T, N, PackedK, U>(
+            input,
+            inputInterpretation,
+            k,
+            matrix,
+            matrixOffset,
+            matrixInterpretation,
+            memoryLayout,
+            transpose,
+            matrixStride
+        );
     }
 
     /// Accumulate the result from a matrix multiplication between an input Cooperative vector and a matrix.
@@ -30341,34 +31037,10 @@ $}
         static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                     , "for non-packed inputInterpretation values k must be equal to the input vector length");
         static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                    || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                    || k <= __componentPackingFactor(inputInterpretation)*PackedK
                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
 
-        __target_switch
-        {
-        case hlsl:
-            let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-            let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-            let biasInterpretationHLSL = __getHLSLCoopVecComponentType(biasInterpretation);
-            let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-            This temp = this;
-            temp.__mutMatMulAdd(
-                input,
-                inputInterpretationHLSL,
-                matrix,
-                matrixOffset,
-                matrixInterpretationHLSL,
-                bias,
-                biasOffset,
-                biasInterpretationHLSL,
-                N,
-                k,
-                memoryLayoutHLSL,
-                transpose,
-                matrixStride
-            );
-            this.__mutAdd(temp);
-        default: this = this + coopVecMatMulAddPacked<T, N, PackedK, U>(
+        this = this + coopVecMatMulAddPacked<T, N, PackedK, U>(
             input,
             inputInterpretation,
             k,
@@ -30381,8 +31053,7 @@ $}
             memoryLayout,
             transpose,
             matrixStride
-            );
-        }
+        );
     }
 
     /// Performs matrix multiplication and accumulation with bias: this += input * matrix + bias
@@ -30434,25 +31105,6 @@ $}
             matrixStride
         );
     }
-
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __OuterProductAccumulate<let K : int>(
-        CoopVec<T, K> b,
-        $(buffer.type) matrix,
-        int32_t matrixOffset,
-        uint matrixStride,
-        uint memoryLayout,
-        uint matrixInterpretation,
-    )
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "__builtin_OuterProductAccumulate($0, $1, $2, $3, $6, $5, $4)";
-        }
-    }
-
 
 ${
 }
@@ -30944,14 +31596,14 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWByteAddres
 
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(StructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType, L : IBufferDataLayout = DefaultDataLayout>(StructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
 
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType, L : IBufferDataLayout = DefaultDataLayout>(RWStructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
@@ -30988,10 +31640,10 @@ CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : __BuiltinArithmeticType, l
 /// including standard row-major and column-major layouts as well as specialized layouts optimized for specific operations.
 enum CoopVecMatrixLayout
 {
-    RowMajor,
-    ColumnMajor,
-    InferencingOptimal,
-    TrainingOptimal
+    RowMajor = $(SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR),
+    ColumnMajor = $(SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR),
+    InferencingOptimal = $(SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL),
+    TrainingOptimal = $(SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL)
 };
 
 /// Specifies how to interpret the values in a cooperative vector or matrix.
@@ -31017,7 +31669,7 @@ enum CoopVecComponentType
 };
 
 [ForceInline]
-int __inputInterpretationPackingFactor(CoopVecComponentType componentType)
+int __componentPackingFactor(CoopVecComponentType componentType)
 {
     switch (componentType)
     {
@@ -31031,133 +31683,47 @@ int __inputInterpretationPackingFactor(CoopVecComponentType componentType)
 [ForceInline]
 bool __isPackedInputInterpretation(CoopVecComponentType componentType)
 {
-    return __inputInterpretationPackingFactor(componentType) != 1;
-}
-
-// TODO: We might consider some way of specifying these from our lookup tables
-[ForceInline]
-uint32_t __getSpvCoopVecMatrixLayout(CoopVecMatrixLayout layout)
-{
-    switch (layout)
-    {
-    case CoopVecMatrixLayout::RowMajor:
-        return 0;
-    case CoopVecMatrixLayout::ColumnMajor:
-        return 1;
-    case CoopVecMatrixLayout::InferencingOptimal:
-        return 2;
-    case CoopVecMatrixLayout::TrainingOptimal:
-        return 3;
-    default:
-        static_assert(false, "unsupported layout value");
-    }
-    return 0xffffffff;
+    return __componentPackingFactor(componentType) != 1;
 }
 
 [ForceInline]
-uint32_t __getHLSLCoopVecMatrixLayout(CoopVecMatrixLayout layout)
-{
-    switch (layout)
-    {
-    // TODO: Check these are the same
-    case CoopVecMatrixLayout::RowMajor:
-        return 0;
-    case CoopVecMatrixLayout::ColumnMajor:
-        return 1;
-    case CoopVecMatrixLayout::InferencingOptimal:
-        return 2;
-    case CoopVecMatrixLayout::TrainingOptimal:
-        return 3;
-    default:
-        static_assert(false, "unsupported layout value");
-    }
-    return 0xffffffff;
-}
-
-[ForceInline]
-uint32_t __getSpvCoopVecComponentType(CoopVecComponentType componentType)
+int __getCoopVecComponentScalarType(CoopVecComponentType componentType)
 {
     switch (componentType)
     {
-    case CoopVecComponentType::Float16:
-        return 0;
-    case CoopVecComponentType::Float32:
-        return 1;
-    case CoopVecComponentType::Float64:
-        return 2;
-    case CoopVecComponentType::SignedInt8:
-        return 3;
-    case CoopVecComponentType::SignedInt16:
-        return 4;
-    case CoopVecComponentType::SignedInt32:
-        return 5;
-    case CoopVecComponentType::SignedInt8Packed:
-        return 1000491000;
-    case CoopVecComponentType::SignedInt64:
-        return 6;
-    case CoopVecComponentType::UnsignedInt8:
-        return 7;
-    case CoopVecComponentType::UnsignedInt16:
-        return 8;
-    case CoopVecComponentType::UnsignedInt32:
-        return 9;
-    case CoopVecComponentType::UnsignedInt8Packed:
-        return 1000491001;
-    case CoopVecComponentType::UnsignedInt64:
-        return 10;
     case CoopVecComponentType::FloatE4M3:
-        return 1000491002;
+        return $(SLANG_SCALAR_TYPE_FLOAT_E4M3);
     case CoopVecComponentType::FloatE5M2:
-        return 1000491003;
-    default:
-        static_assert(false, "unsupported componentType value");
+        return $(SLANG_SCALAR_TYPE_FLOAT_E5M2);
+    case CoopVecComponentType::Float16:
+        return $(SLANG_SCALAR_TYPE_FLOAT16);
+    case CoopVecComponentType::Float32:
+        return $(SLANG_SCALAR_TYPE_FLOAT32);
+    case CoopVecComponentType::Float64:
+        return $(SLANG_SCALAR_TYPE_FLOAT64);
+    case CoopVecComponentType::SignedInt8:
+    case CoopVecComponentType::SignedInt8Packed:
+        // Packed property is handled in a separate field.
+        return $(SLANG_SCALAR_TYPE_INT8);
+    case CoopVecComponentType::SignedInt16:
+        return $(SLANG_SCALAR_TYPE_INT16);
+    case CoopVecComponentType::SignedInt32:
+        return $(SLANG_SCALAR_TYPE_INT32);
+    case CoopVecComponentType::SignedInt64:
+        return $(SLANG_SCALAR_TYPE_INT64);
+    case CoopVecComponentType::UnsignedInt8:
+    case CoopVecComponentType::UnsignedInt8Packed:
+        // Packed property is handled in a separate field.
+        return $(SLANG_SCALAR_TYPE_UINT8);
+    case CoopVecComponentType::UnsignedInt16:
+        return $(SLANG_SCALAR_TYPE_UINT16);
+    case CoopVecComponentType::UnsignedInt32:
+        return $(SLANG_SCALAR_TYPE_UINT32);
+    case CoopVecComponentType::UnsignedInt64:
+        return $(SLANG_SCALAR_TYPE_UINT64);
     }
+    static_assert(false, "unsupported componentType value");
     return 0xffffffff;
-}
-
-[ForceInline]
-uint32_t __getHLSLCoopVecComponentType(CoopVecComponentType componentType)
-{
-    __target_switch
-    {
-    case hlsl:
-        switch (componentType)
-        {
-        case CoopVecComponentType::SignedInt16:
-            return 2;
-        case CoopVecComponentType::UnsignedInt16:
-            return 3;
-        case CoopVecComponentType::SignedInt32:
-            return 4;
-        case CoopVecComponentType::UnsignedInt32:
-            return 5;
-        case CoopVecComponentType::SignedInt64:
-            return 6;
-        case CoopVecComponentType::UnsignedInt64:
-            return 7;
-        case CoopVecComponentType::Float16:
-            return 8;
-        case CoopVecComponentType::Float32:
-            return 9;
-        case CoopVecComponentType::Float64:
-            return 10;
-        case CoopVecComponentType::SignedInt8Packed:
-            return 17;
-        case CoopVecComponentType::UnsignedInt8Packed:
-            return 18;
-        case CoopVecComponentType::UnsignedInt8:
-            return 19;
-        case CoopVecComponentType::SignedInt8:
-            return 20;
-        case CoopVecComponentType::FloatE4M3:
-            return 21;
-        case CoopVecComponentType::FloatE5M2:
-            return 22;
-        default:
-            static_assert(false, "unsupported componentType value");
-        }
-        return 0; // ComponentType::Invalid
-    }
 }
 
 [ForceInline]
@@ -31209,12 +31775,109 @@ static const struct {
 for(auto buffer : kByteAddressBufferCases_) {
 $}
 
-// Internal implementation without static_assert; github issue 8620
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> __coopVecMatMul(
+    CoopVec<U, PackedK> input,
+    constexpr int inputInterpretation,
+    constexpr int inputInterpretationPackingFactor,
+    Ptr<T[]> matrixPtr,
+    int32_t matrixOffset,
+    constexpr int matrixInterpretation,
+    constexpr int32_t k,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> __coopVecMatMul(
+    CoopVec<U, PackedK> input,
+    constexpr int inputInterpretation,
+    constexpr int inputInterpretationPackingFactor,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    constexpr int matrixInterpretation,
+    constexpr int32_t k,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> __coopVecMatMulAdd(
+    CoopVec<U, PackedK> input,
+    constexpr int inputInterpretation,
+    constexpr int inputInterpretationPackingFactor,
+    Ptr<T[]> matrixPtr,
+    int32_t matrixOffset,
+    constexpr int matrixInterpretation,
+    constexpr int32_t k,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride,
+    Ptr<T[]> biasPtr,
+    int32_t biasOffset,
+    constexpr int biasInterpretation);
+
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> __coopVecMatMulAdd(
+    CoopVec<U, PackedK> input,
+    constexpr int inputInterpretation,
+    constexpr int inputInterpretationPackingFactor,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    constexpr int matrixInterpretation,
+    constexpr int32_t k,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride,
+    $(buffer.type) bias,
+    int32_t biasOffset,
+    constexpr int biasInterpretation);
+
+__intrinsic_op($(kIROp_CoopVecOuterProductAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let N : int>
+void __coopVecOuterProductAccumulate(
+    Ptr<T[]> matrixPtr,
+    int32_t matrixOffset,
+    CoopVec<T, M> a,
+    CoopVec<T, N> b,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr int matrixInterpretation,
+    constexpr uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecOuterProductAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let N : int>
+void __coopVecOuterProductAccumulate(
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    CoopVec<T, M> a,
+    CoopVec<T, N> b,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr int matrixInterpretation,
+    constexpr uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecReduceSumAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let N : int>
+void __coopVecReduceSumAccumulate(
+    Ptr<T[]> bufferPtr,
+    int32_t offset,
+    CoopVec<T, N> v);
+
+__intrinsic_op($(kIROp_CoopVecReduceSumAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let N : int>
+void __coopVecReduceSumAccumulate(
+    $(buffer.type) buffer,
+    int32_t offset,
+    CoopVec<T, N> v);
+
 [ForceInline]
 [require(cooperative_vector)]
 [require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
-CoopVec<T, M> __coopVecMatMulPacked_impl(
+CoopVec<T, M> coopVecMatMulPacked(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
@@ -31226,54 +31889,42 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
     constexpr uint matrixStride
 )
 {
+    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
+    static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                || k <= __componentPackingFactor(inputInterpretation)*PackedK
+                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
     __target_switch
     {
     case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
-        let zero = 0;
-
-        int operands = 0;
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02;
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08;
-        }
-        return spirv_asm
-        {
-            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
+        return __coopVecMatMul<T, M, PackedK, U, uint32_t>(
+            input,
+            __getCoopVecComponentScalarType(inputInterpretation),
+            __componentPackingFactor(inputInterpretation),
+            matrixBuf,
+            matrixOffset,
+            __getCoopVecComponentScalarType(matrixInterpretation),
+            k,
+            memoryLayout,
+            transpose,
+            matrixStride);
 
     case hlsl:
-        var ret = CoopVec<T, M>(0);
-        let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-        let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-        ret.__mutMatMul(
-             input,
-             inputInterpretationHLSL,
-             matrix,
-             matrixOffset,
-             matrixInterpretationHLSL,
-             M,
-             k,
-             memoryLayoutHLSL,
-             transpose,
-             matrixStride
-        );
-        return ret;
-
     case optix_coopvec:
-        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $7, $8)", T, M, U, PackedK;
+        return __coopVecMatMul<T, M, PackedK, U>(
+            input,
+            __getCoopVecComponentScalarType(inputInterpretation),
+            __componentPackingFactor(inputInterpretation),
+            matrix,
+            matrixOffset,
+            __getCoopVecComponentScalarType(matrixInterpretation),
+            k,
+            memoryLayout,
+            transpose,
+            matrixStride);
 
     default:
         var result = CoopVec<T, M>(0);
@@ -31371,42 +32022,6 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
 /// values to use from the packed input.
 // TODO: Can we ForceInline for just hlsl? the other platforms don't really
 // need it
-[ForceInline]
-[require(cooperative_vector)]
-[require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
-CoopVec<T, M> coopVecMatMulPacked(
-    CoopVec<U, PackedK> input,
-    constexpr CoopVecComponentType inputInterpretation,
-    constexpr int k,
-    $(buffer.type) matrix,
-    int32_t matrixOffset,
-    constexpr CoopVecComponentType matrixInterpretation,
-    constexpr CoopVecMatrixLayout memoryLayout,
-    constexpr bool transpose,
-    constexpr uint matrixStride
-)
-{
-    // Static assertions to validate parameters at compile time
-    // These can be evaluated because this wrapper function can be inlined (no GenericAsm)
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-
-    // Delegate to implementation function (which contains GenericAsm for OptiX)
-    return __coopVecMatMulPacked_impl<T, M, PackedK, U>(
-        input,
-        inputInterpretation,
-        k,
-        matrix,
-        matrixOffset,
-        matrixInterpretation,
-        memoryLayout,
-        transpose,
-        matrixStride);
-}
 
 /// Multiply a matrix with a cooperative vector. Given a M-row by K-col `matrix`, and a K-element column vector `input`, computes `matrix * input`, and
 /// returns a M-element vector.
@@ -31456,11 +32071,10 @@ CoopVec<T, M> coopVecMatMul(
         matrixStride);
 }
 
-// Internal implementation without static_assert; github issue 8620
 [ForceInline]
 [require(cooperative_vector)]
 [require(optix_coopvec)]
-CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
+CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
@@ -31475,61 +32089,50 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
     constexpr uint matrixStride
 )
 {
+    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
+    static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                || k <= __componentPackingFactor(inputInterpretation)*PackedK
+                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+    static_assert(__componentPackingFactor(biasInterpretation) == 1, "can't use packed component type in biasInterpretation");
+
     __target_switch
     {
     case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
         let biasBuf = __getEquivalentStructuredBuffer<uint32_t>(bias);
-        let zero = 0;
-
-        int operands = 0;
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02;
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08;
-        }
-        return spirv_asm
-        {
-            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
-            %biasPointer:%storagePointerType = OpAccessChain $biasBuf $zero;
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv %biasPointer $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
+        return __coopVecMatMulAdd<T, M, PackedK, U, uint32_t>(
+            input,
+            __getCoopVecComponentScalarType(inputInterpretation),
+            __componentPackingFactor(inputInterpretation),
+            matrixBuf,
+            matrixOffset,
+            __getCoopVecComponentScalarType(matrixInterpretation),
+            k,
+            memoryLayout,
+            transpose,
+            matrixStride,
+            biasBuf,
+            biasOffset,
+            __getCoopVecComponentScalarType(biasInterpretation));
 
     case hlsl:
-        var ret = CoopVec<T, M>(0);
-        let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-        let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationHLSL = __getHLSLCoopVecComponentType(biasInterpretation);
-        let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-        ret.__mutMatMulAdd(
-             input,
-             inputInterpretationHLSL,
-             matrix,
-             matrixOffset,
-             matrixInterpretationHLSL,
-             bias,
-             biasOffset,
-             biasInterpretationHLSL,
-             M,
-             k,
-             memoryLayoutHLSL,
-             transpose,
-             matrixStride
-        );
-        return ret;
-
     case optix_coopvec:
-        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
+        return __coopVecMatMulAdd<T, M, PackedK, U>(
+            input,
+            __getCoopVecComponentScalarType(inputInterpretation),
+            __componentPackingFactor(inputInterpretation),
+            matrix,
+            matrixOffset,
+            __getCoopVecComponentScalarType(matrixInterpretation),
+            k,
+            memoryLayout,
+            transpose,
+            matrixStride,
+            bias,
+            biasOffset,
+            __getCoopVecComponentScalarType(biasInterpretation));
 
     default:
         var result = coopVecMatMulPacked<T, M, PackedK, U>(
@@ -31621,31 +32224,6 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
 /// Transposing is not supported when `memoryLayout` is `RowMajor` or `ColumnMajor`, and `transpose` must be `false`.
 /// Not all component types support transposing.
 /// When `memoryLayout` is `InferencingOptimal` or `TrainingOptimal`, `matrixStride` is ignored.
-[ForceInline]
-[require(cooperative_vector)]
-[require(optix_coopvec)]
-CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
-    CoopVec<U, PackedK> input,
-    constexpr CoopVecComponentType inputInterpretation,
-    constexpr int k,
-    $(buffer.type) matrix,
-    int32_t matrixOffset,
-    constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
-    int32_t biasOffset,
-    constexpr CoopVecComponentType biasInterpretation,
-    constexpr CoopVecMatrixLayout memoryLayout,
-    constexpr bool transpose,
-    constexpr uint matrixStride
-)
-{
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    return __coopVecMatMulAddPacked_impl<T, M, PackedK, U>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, bias, biasOffset, biasInterpretation, memoryLayout, transpose, matrixStride);
-}
 
 /// Multiply a matrix with a cooperative vector and add a bias vector.
 /// Given a M-row by K-col `matrix`, a K-element column vector `input`, and a M-element vector `bias`, computes `matrix * input + bias`, and
@@ -31750,27 +32328,30 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     constexpr CoopVecComponentType matrixInterpretation,
 )
 {
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
     __target_switch
     {
-    case hlsl:
-        uint matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-        uint memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-        return a.__OuterProductAccumulate(b, matrix, matrixOffset, matrixStride, memoryLayoutHLSL, matrixInterpretationHLSL);
     case spirv:
-        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
-        let zero = 0;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
-            OpCooperativeVectorOuterProductAccumulateNV %matrixPointer $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
-        };
+        __coopVecOuterProductAccumulate<T, M, N, uint32_t>(
+            matrixBuf,
+            matrixOffset,
+            a,
+            b,
+            memoryLayout,
+            __getCoopVecComponentScalarType(matrixInterpretation),
+            matrixStride);
+    case hlsl:
     case optix_coopvec:
-        __intrinsic_asm "optixCoopVecOuterProductAccumulate($0, $1, (CUdeviceptr)(&$2), $3, $4)";
+        __coopVecOuterProductAccumulate<T, M, N>(
+            matrix,
+            matrixOffset,
+            a,
+            b,
+            memoryLayout,
+            __getCoopVecComponentScalarType(matrixInterpretation),
+            matrixStride);
     default:
         for (int i = 0; i < M; ++i)
         {
@@ -31837,6 +32418,7 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
 /// for (int i = 0; i < N; i++)
 ///     atomicAdd(dest[i], v[i]);
 /// ```
+[ForceInline]
 [require(cooperative_vector)]
 [require(optix_coopvec)]
 void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
@@ -31847,21 +32429,12 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 {
     __target_switch
     {
-    case hlsl:
-        __intrinsic_asm "__builtin_VectorAccumulate($0, $1, $2)";
     case spirv:
         let bufBuf = __getEquivalentStructuredBuffer<uint32_t>(buffer);
-        let zero = 0;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %bufferPointer:%storagePointerType = OpAccessChain $bufBuf $zero;
-            OpCooperativeVectorReduceSumAccumulateNV %bufferPointer $offset $v;
-        };
+        __coopVecReduceSumAccumulate<T, N, uint32_t>(bufBuf, offset, v);
+    case hlsl:
     case optix_coopvec:
-        __intrinsic_asm "optixCoopVecReduceSumAccumulate($0, (CUdeviceptr)(&$1), $2)";
+        __coopVecReduceSumAccumulate<T, N>(buffer, offset, v);
     default:
         for (int i = 0; i < N; ++i)
         {
@@ -31891,53 +32464,54 @@ static const struct {
 for(auto buffer : kStructuredBufferCases_) {
 $}
 
-// Internal implementation without static_assert; github issue 8620
-[ForceInline]
-[require(spirv, cooperative_vector)]
-[require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
-CoopVec<T, M> __coopVecMatMulPacked_impl(
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
+CoopVec<T, M> __coopVecMatMul(
     CoopVec<U, PackedK> input,
-    constexpr CoopVecComponentType inputInterpretation,
-    constexpr int k,
+    constexpr int inputInterpretation,
+    constexpr int inputInterpretationPackingFactor,
     $(buffer.type) matrix,
     int32_t matrixOffset,
-    constexpr CoopVecComponentType matrixInterpretation,
+    constexpr int matrixInterpretation,
+    constexpr int32_t k,
     constexpr CoopVecMatrixLayout memoryLayout,
     constexpr bool transpose,
-    constexpr uint matrixStride
-)
-{
-    __target_switch
-    {
-    case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let zero = 0;
+    constexpr uint matrixStride);
 
-        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-        int operands = 0; // NoneKHR
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-        return spirv_asm
-        {
-            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
-    case optix_coopvec:
-        __intrinsic_asm "slangOptixCoopVecMatMul<$T0, $T0, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $8)";
-    }
-}
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType, IgnoredBiasBufferElementType>
+CoopVec<T, M> __coopVecMatMulAdd(
+    CoopVec<U, PackedK> input,
+    constexpr int inputInterpretation,
+    constexpr int inputInterpretationPackingFactor,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    constexpr int matrixInterpretation,
+    constexpr int32_t k,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride,
+    $(buffer.biasType) bias,
+    int32_t biasOffset,
+    constexpr int biasInterpretation);
+
+__intrinsic_op($(kIROp_CoopVecOuterProductAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let N : int, IgnoredBufferElementType>
+void __coopVecOuterProductAccumulate(
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    CoopVec<T, M> a,
+    CoopVec<T, N> b,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr int matrixInterpretation,
+    constexpr uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecReduceSumAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let N : int, IgnoredBufferElementType>
+void __coopVecReduceSumAccumulate(
+    $(buffer.type) buffer,
+    int32_t offset,
+    CoopVec<T, N> v);
 
 [ForceInline]
 [require(spirv, cooperative_vector)]
@@ -31958,9 +32532,21 @@ CoopVec<T, M> coopVecMatMulPacked(
     static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                  , "for non-packed inputInterpretation values k must be equal to the input vector length");
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                || k <= __componentPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    return __coopVecMatMulPacked_impl<T, M, PackedK, U, IgnoredBufferElementType>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, memoryLayout, transpose, matrixStride);
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
+    return __coopVecMatMul<T, M, PackedK, U, IgnoredBufferElementType>(
+        input,
+        __getCoopVecComponentScalarType(inputInterpretation),
+        __componentPackingFactor(inputInterpretation),
+        matrix,
+        matrixOffset,
+        __getCoopVecComponentScalarType(matrixInterpretation),
+        k,
+        memoryLayout,
+        transpose,
+        matrixStride);
 }
 
 // specialized coopVecMatMul for non-packed inputs
@@ -31993,61 +32579,6 @@ CoopVec<T, M> coopVecMatMul(
         matrixStride);
 }
 
-// Internal implementation without static_assert; github issue 8620
-[ForceInline]
-[require(spirv, cooperative_vector)]
-[require(optix_coopvec)]
-CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
-    CoopVec<U, PackedK> input,
-    constexpr CoopVecComponentType inputInterpretation,
-    constexpr int k,
-    $(buffer.type) matrix,
-    int32_t matrixOffset,
-    constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.biasType) bias,
-    int32_t biasOffset,
-    constexpr CoopVecComponentType biasInterpretation,
-    constexpr CoopVecMatrixLayout memoryLayout,
-    constexpr bool transpose,
-    constexpr uint matrixStride
-)
-{
-    __target_switch
-    {
-    case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let zero = 0;
-
-        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-        int operands = 0; // NoneKHR
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-
-        return spirv_asm
-        {
-            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
-            %runtimeBiasArrayType = OpTypeRuntimeArray $$IgnoredBiasBufferElementType;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %storageBiasPointerType = OpTypePointer StorageBuffer %runtimeBiasArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
-            %biasPointer:%storageBiasPointerType = OpAccessChain $bias $zero;
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv %biasPointer $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
-    case optix_coopvec:
-        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
-    }
-}
-
 [ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
@@ -32069,10 +32600,26 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                  , "for non-packed inputInterpretation values k must be equal to the input vector length");
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                || k <= __componentPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    return __coopVecMatMulAddPacked_impl<T, M, PackedK, U, IgnoredBufferElementType, IgnoredBiasBufferElementType>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, bias, biasOffset, biasInterpretation, memoryLayout, transpose, matrixStride);
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
+    return __coopVecMatMulAdd<T, M, PackedK, U, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
+        input,
+        __getCoopVecComponentScalarType(inputInterpretation),
+        __componentPackingFactor(inputInterpretation),
+        matrix,
+        matrixOffset,
+        __getCoopVecComponentScalarType(matrixInterpretation),
+        k,
+        memoryLayout,
+        transpose,
+        matrixStride,
+        bias,
+        biasOffset,
+        __getCoopVecComponentScalarType(biasInterpretation));
 }
+
 
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
@@ -32127,21 +32674,16 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     constexpr CoopVecComponentType matrixInterpretation,
 )
 {
-    __target_switch
-    {
-    case spirv:
-        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let zero = 0;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
-            OpCooperativeVectorOuterProductAccumulateNV %matrixPointer $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
-        };
-    }
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
+    __coopVecOuterProductAccumulate<T, M, N, IgnoredBufferElementType>(
+        matrix,
+        matrixOffset,
+        a,
+        b,
+        memoryLayout,
+        __getCoopVecComponentScalarType(matrixInterpretation),
+        matrixStride);
 }
 
 [require(spirv, cooperative_vector_training)]
@@ -32151,19 +32693,7 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, Ignore
     int32_t offset
 )
 {
-    __target_switch
-    {
-    case spirv:
-        let zero = 0;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %bufferPointer:%storagePointerType = OpAccessChain $buffer $zero;
-            OpCooperativeVectorReduceSumAccumulateNV %bufferPointer $offset $v;
-        };
-    }
+    __coopVecReduceSumAccumulate<T, N, IgnoredBufferElementType>(buffer, offset, v);
 }
 
 ${
@@ -32171,6 +32701,40 @@ ${
 } // buffer type loop
 $}
 
+[ForceInline]
+[require(spirv, cooperative_vector_training)]
+__generic<T : __BuiltinArithmeticType, let M : int, let N : int>
+void __coopVecOuterProductAccumulateFromPointer(
+    void* matrixPtr,
+    int32_t matrixOffset,
+    CoopVec<T, M> a,
+    CoopVec<T, N> b,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr CoopVecComponentType matrixInterpretation,
+    constexpr uint matrixStride)
+{
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
+    __coopVecOuterProductAccumulate<T, M, N>(
+        (Ptr<T[]>)matrixPtr,
+        matrixOffset,
+        a,
+        b,
+        memoryLayout,
+        __getCoopVecComponentScalarType(matrixInterpretation),
+        matrixStride);
+}
+
+[ForceInline]
+[require(spirv, cooperative_vector_training)]
+__generic<T : __BuiltinArithmeticType, let N : int>
+void __coopVecReduceSumAccumulateFromPointer(
+    void* bufferPtr,
+    int32_t offset,
+    CoopVec<T, N> v)
+{
+    __coopVecReduceSumAccumulate<T, N>((Ptr<T[]>)bufferPtr, offset, v);
+}
 
 [require(spirv, cooperative_vector_training)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int, U : __BuiltinArithmeticType, let IgnoredBufferSize : int>(
@@ -32183,17 +32747,15 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     constexpr CoopVecComponentType matrixInterpretation,
 )
 {
-    __target_switch
-    {
-    case spirv:
-        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorOuterProductAccumulateNV &matrix $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
-        };
-    }
+    let matrixPtr0 = (void*)(__getAddress(matrix));
+    __coopVecOuterProductAccumulateFromPointer<T, M, N>(
+        matrixPtr0,
+        matrixOffset,
+        a,
+        b,
+        memoryLayout,
+        matrixInterpretation,
+        matrixStride);
 }
 
 [require(spirv, cooperative_vector_training)]
@@ -32203,15 +32765,8 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, U, let
     int32_t offset
 )
 {
-    __target_switch
-    {
-    case spirv:
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorReduceSumAccumulateNV &buffer $offset $v;
-        };
-    }
+    let bufferPtr0 = (void*)(__getAddress(buffer));
+    __coopVecReduceSumAccumulateFromPointer<T, N>(bufferPtr0, offset, v);
 }
 
 // Pointer overloads for coopvector operations.
@@ -32232,31 +32787,23 @@ CoopVec<T, M> coopVecMatMulPacked(
     static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                  , "for non-packed inputInterpretation values k must be equal to the input vector length");
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                || k <= __componentPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    __target_switch
-    {
-    case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        int operands = 0; // NoneKHR
-        let zero = 0;
-        let cvtMatPtr = (Ptr<T[]>)matrixPtr;
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-        return spirv_asm
-        {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
-    }
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
+    let zero = 0;
+    let cvtMatPtr = (Ptr<T[]>)matrixPtr;
+    return __coopVecMatMul<T, M, PackedK, U>(
+        input,
+        __getCoopVecComponentScalarType(inputInterpretation),
+        __componentPackingFactor(inputInterpretation),
+        cvtMatPtr,
+        zero,
+        __getCoopVecComponentScalarType(matrixInterpretation),
+        k,
+        memoryLayout,
+        transpose,
+        matrixStride);
 }
 
 // specialized coopVecMatMul for non-packed inputs
@@ -32303,34 +32850,28 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                  , "for non-packed inputInterpretation values k must be equal to the input vector length");
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                || k <= __componentPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+    static_assert(__componentPackingFactor(biasInterpretation) == 1, "can't use packed component type in biasInterpretation");
 
-    __target_switch
-    {
-    case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let zero : int32_t = 0;
-        let cvtMatPtr = (Ptr<T[]>)matrixPtr;
-        let cvtBiasPtr = (Ptr<T[]>)biasPtr;
-        int operands = 0; // NoneKHR
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-        return spirv_asm
-        {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
-    }
+    let zero : int32_t = 0;
+    let cvtMatPtr = (Ptr<T[]>)matrixPtr;
+    let cvtBiasPtr = (Ptr<T[]>)biasPtr;
+    return __coopVecMatMulAdd<T, M, PackedK, U>(
+        input,
+        __getCoopVecComponentScalarType(inputInterpretation),
+        __componentPackingFactor(inputInterpretation),
+        cvtMatPtr,
+        zero,
+        __getCoopVecComponentScalarType(matrixInterpretation),
+        k,
+        memoryLayout,
+        transpose,
+        matrixStride,
+        cvtBiasPtr,
+        zero,
+        __getCoopVecComponentScalarType(biasInterpretation));
 }
 
 [require(spirv, cooperative_vector)]
@@ -32373,18 +32914,14 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
 )
 {
     let zero : int32_t = 0;
-    __target_switch
-    {
-    case spirv:
-        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let cvtMatrixPtr = (Ptr<T[]>)matrixPtr;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorOuterProductAccumulateNV $cvtMatrixPtr $zero $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
-        };
-    }
+    __coopVecOuterProductAccumulateFromPointer<T, M, N>(
+        matrixPtr,
+        zero,
+        a,
+        b,
+        memoryLayout,
+        matrixInterpretation,
+        matrixStride);
 }
 
 [require(spirv, cooperative_vector_training)]
@@ -32394,16 +32931,7 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 )
 {
     let zero : int32_t = 0;
-    let bufferPtr = (Ptr<T[]>)(buffer);
-    __target_switch
-    {
-    case spirv:
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorReduceSumAccumulateNV $bufferPtr $zero $v;
-        };
-    }
+    __coopVecReduceSumAccumulateFromPointer<T, N>(buffer, zero, v);
 }
 
 //@public:
@@ -32562,9 +33090,7 @@ struct DispatchNodeInputRecord
         case spirv:
             return spirv_asm
             {
-                %in_payload_t = OpTypeNodePayloadArrayAMDX $$T;
-                %in_payload_ptr_t = OpTypePointer NodePayloadAMDX %in_payload_t;
-                %var = OpVariable %in_payload_ptr_t NodePayloadAMDX;
+                %var : $$NodePayloadPtr<T> = OpVariable NodePayloadAMDX;
                 result : $$NodePayloadPtr<T> = OpAccessChain %var $index;
             };
         }

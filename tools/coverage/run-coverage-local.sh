@@ -123,7 +123,6 @@ if [[ "$SKIP_TEST" == "false" ]]; then
     "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
     "-skip-reference-image-generation"
     "-show-adapter-info"
-    "-ignore-abort-msg"
     "-enable-debug-layers" "true"
   )
 

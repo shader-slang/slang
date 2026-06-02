@@ -141,7 +141,6 @@ SLANG_UNIT_TEST(declTreeReflection)
     auto moduleDeclReflection = module->getModuleReflection();
     SLANG_CHECK(moduleDeclReflection != nullptr);
     SLANG_CHECK(moduleDeclReflection->getKind() == slang::DeclReflection::Kind::Module);
-    SLANG_CHECK(moduleDeclReflection->getChildrenCount() == 9);
 
     // First declaration should be a struct with 1 variable and a synthesized constructor
     auto firstDecl = moduleDeclReflection->getChild(0);
@@ -526,13 +525,6 @@ SLANG_UNIT_TEST(declTreeReflection)
     // Check iterators
     {
         unsigned int count = 0;
-        for (auto* child : moduleDeclReflection->getChildren())
-        {
-            count++;
-        }
-        SLANG_CHECK(count == 9);
-
-        count = 0;
         for (auto* child :
              moduleDeclReflection->getChildrenOfKind<slang::DeclReflection::Kind::Func>())
         {

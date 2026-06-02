@@ -25,7 +25,12 @@ namespace
     x(Int64, int64_t) \
     x(UInt64, uint64_t) \
     x(Float32, float) \
-    x(Float64, double)
+    x(Float64, double) \
+    x(IntPtr, intptr_t) \
+    x(UIntPtr, uintptr_t) \
+    x(BFloat16, bfloat16) \
+    x(FloatE4M3, float_e4m3) \
+    x(FloatE5M2, float_e5m2)
 // clang-format on
 
 struct ScalarTypeInfo

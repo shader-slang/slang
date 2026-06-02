@@ -13,15 +13,6 @@ void stripLegalizationOnlyInstructions(IRModule* module)
     {
         switch (inst->getOp())
         {
-        // Remove cached dictionaries.
-        case kIROp_GenericSpecializationDictionary:
-        case kIROp_ExistentialFuncSpecializationDictionary:
-        case kIROp_ExistentialTypeSpecializationDictionary:
-            {
-                inst->removeAndDeallocate();
-                break;
-            }
-
         // Remove global param entry point param decoration.
         case kIROp_GlobalParam:
             {

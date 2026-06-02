@@ -62,7 +62,7 @@ static void handle_slang_createGlobalSession2(ReplayContext& ctx)
 }
 
 /// Register all replay handlers.
-/// This function is called during static initialization.
+/// Called during static initialization and by registerDefaultHandlers().
 static void registerAllHandlers()
 {
     // =========================================================================
@@ -317,5 +317,10 @@ struct HandlerRegistrar
 };
 static HandlerRegistrar s_registrar;
 } // namespace
+
+void ReplayContext::registerDefaultHandlers()
+{
+    registerAllHandlers();
+}
 
 } // namespace SlangRecord

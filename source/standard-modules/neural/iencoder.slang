@@ -1,5 +1,4 @@
 implementing neural;
-#include "common-def.slang"
 
 public interface IStaticEncoder<T,
     InArray,
@@ -32,5 +31,5 @@ public interface ITrainableEncoder<T,
     [Differentiable]
     public OutArray encode<Address>(in InArray input, Address parametersAddress)
         where Address : IPointerLikeAddress<T>
-        where Address.Differential : IPointerLikeAddress<T.Differential>;
+        where Address.Differential : IPointerLikeAddress<T>;
 }

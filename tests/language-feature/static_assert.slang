@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK):-target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHK_NEG):-target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=SPV):-target spirv -stage compute -entry computeMain
@@ -79,12 +80,12 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     //
     TEST_target_switch();
 
-    //CHK-NOT: MyType init true
-    //CHK: MyType init false
+    //CHK_NEG-NOT: MyType init true
+    //CHK-DAG: MyType init false
     MyType<float> obj;
 
-    //CHK: error[E41402]
-    //CHK: static_assert.slang:[[#@LINE+1]]
+    //CHK-DAG: error[E41402]
+    //CHK-DAG: static_assert.slang:[[#@LINE+1]]
     static_assert(dispatchThreadID.x == 0, "not constant");
 }
 

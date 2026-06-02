@@ -7,7 +7,6 @@
 #include "../core/slang-text-io.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
-#include "slang-mangled-lexer.h"
 #include "slang-parser.h"
 #include "slang-serialize-ast.h"
 #include "slang-serialize-ir.h"
@@ -225,6 +224,7 @@ public:
         if (auto moduleDecl = module->getModuleDecl())
         {
             SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<Module>::ASTModule);
+            SLANG_AST_BUILDER_RAII(module->getASTBuilder());
             writeSerializedModuleAST(_cursor, moduleDecl, _sourceLocWriter);
         }
 

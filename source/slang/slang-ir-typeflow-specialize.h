@@ -1,6 +1,7 @@
 // slang-ir-typeflow-specialize.h
 #pragma once
 #include "slang-ir.h"
+#include "slang-target-program.h"
 
 namespace Slang
 {
@@ -19,8 +20,10 @@ struct SpecializationContext;
 //
 bool specializeDynamicInsts(
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink,
-    SpecializationContext* specializationContext);
+    SpecializationContext* context,
+    bool shouldReportDynamicDispatchSites);
 
 bool isSetSpecializedGeneric(IRInst* callee);
 

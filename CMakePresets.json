@@ -72,6 +72,7 @@
       "name": "vs2022-dev",
       "inherits": "msvc-base",
       "description": "Visual Studio 2022 project with debug assisting features",
+      "binaryDir": "${sourceDir}/build/windows-vs2022-dev",
       "generator": "Visual Studio 17 2022",
       "cacheVariables": {
         "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
@@ -194,6 +195,26 @@
       "name": "vs2022-releaseWithDebugInfo",
       "configurePreset": "vs2022",
       "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "vs2022-dev-debug",
+      "configurePreset": "vs2022-dev",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vs2022-dev-release",
+      "configurePreset": "vs2022-dev",
+      "configuration": "Release"
+    },
+    {
+      "name": "vs2022-dev-releaseWithDebugInfo",
+      "configurePreset": "vs2022-dev",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "vs2022-dev-minSizeRel",
+      "configurePreset": "vs2022-dev",
+      "configuration": "MinSizeRel"
     },
     {
       "name": "vs2026-debug",

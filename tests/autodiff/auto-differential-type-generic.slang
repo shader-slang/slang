@@ -25,9 +25,11 @@ struct Linear<let C : int>
     typedef Feature<C> Output;
 
     [BackwardDerivative(eval_bwd)]
+    [ForwardDifferentiable]
     Output eval(Input in_feature)
     {
         Output out_feature;
+        [ForceUnroll]
         for (int i = 0; i < C; i++)
         {
             out_feature.vals[i] = in_feature.vals[i] * 2.0;

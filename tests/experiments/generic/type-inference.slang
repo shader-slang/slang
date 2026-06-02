@@ -5,7 +5,7 @@
 .slang(17): error 39999: could not specialize generic for arguments of type (float[4])
     let val = get0(values);
                   ^
-.slang(5): note 39999: see declaration of func get0<T>(T[4]) -> T
+.slang(5): note: see declaration of func get0<T>(T[4]) -> T
 
  */
 

@@ -8,8 +8,8 @@
 # - .github/workflows/ci-slang-test-container.yml
 #
 # Build and push:
-#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0 .
-#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
+#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1 .
+#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
 #
 # IMPORTANT: After pushing a new version, update all references in:
 #   - .github/workflows/ci-slang-build-container.yml
@@ -39,6 +39,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install build dependencies
+# Note: Vulkan headers, spirv-tools, and glslang come from the Vulkan SDK tarball below.
+# Do NOT install libgl1-mesa-dev — it pulls in mesa-vulkan-drivers and libLLVM-15,
+# which cause concurrent Vulkan initialization crashes in test-servers (see #10618).
 RUN apt-get update && apt-get install -y \
     build-essential \
     ninja-build \
@@ -51,10 +54,7 @@ RUN apt-get update && apt-get install -y \
     libxrandr-dev \
     libxinerama-dev \
     libxi-dev \
-    libgl1-mesa-dev \
-    libvulkan-dev \
-    spirv-tools \
-    glslang-tools \
+    gdb \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Vulkan SDK 1.4.341.1 from tarball (apt packages discontinued after 1.4.313)
@@ -65,6 +65,7 @@ ENV LD_LIBRARY_PATH="${VULKAN_SDK}/lib:${LD_LIBRARY_PATH}"
 ENV VK_LAYER_PATH="${VULKAN_SDK}/share/vulkan/explicit_layer.d"
 
 RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.341.1/linux/vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
+    echo "3bf0f762afb6c79bc6a9d9fb5998745ccff928800a29619b501ed9de7fd9789b  vulkansdk-linux-x86_64-1.4.341.1.tar.xz" | sha256sum -c - && \
     tar -xf vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
     mkdir -p /opt/vulkan-sdk && \
     mv 1.4.341.1 /opt/vulkan-sdk/ && \
@@ -73,19 +74,13 @@ RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.341.1/linux/vulkansdk-linux-
     ldconfig
 
 # Install runtime libraries for test execution
-RUN apt-get update && apt-get install -y \
+# Use --no-install-recommends to avoid pulling in mesa-vulkan-drivers (see #10618).
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libx11-6 \
     libxext6 \
     libegl1 \
     libvulkan1 \
     && rm -rf /var/lib/apt/lists/*
-
-# Remove Mesa Vulkan drivers and system LLVM. The Mesa device_select implicit
-# Vulkan layer loads libLLVM-15.so.1 which crashes (null deref in
-# UpgradeOperandBundles) when multiple test-servers initialize Vulkan
-# concurrently. Mesa drivers are not needed — we always use the NVIDIA ICD.
-RUN apt-get purge -y --auto-remove mesa-vulkan-drivers libllvm15 && \
-    rm -f /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
 
 # Install CMake 3.30 (required for CMakePresets.json version 6)
 RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0-linux-x86_64.tar.gz && \
@@ -98,9 +93,6 @@ RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.3
 # Install environment info script
 COPY docker/print-env-info.sh /usr/local/bin/print-env-info
 RUN chmod +x /usr/local/bin/print-env-info
-
-# Git configuration for container workflows
-RUN git config --global --add safe.directory '*'
 
 # Verify installations
 RUN echo "=== Installed Tools ===" && \

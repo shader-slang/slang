@@ -14,6 +14,315 @@
 
 namespace Slang
 {
+namespace
+{
+
+static bool _diagnoseKnownInvalidShapePackTransformArg(
+    Val* val,
+    SourceLoc loc,
+    DiagnosticSink* sink)
+{
+    if (!val || !sink)
+        return false;
+
+    if (auto shapeConcatPack = as<ShapeConcatIntValPack>(val))
+    {
+        auto leftPack = as<ConcreteIntValPack>(shapeConcatPack->getLeftPack()->resolve());
+        auto rightPack = as<ConcreteIntValPack>(shapeConcatPack->getRightPack()->resolve());
+        IntegerLiteralValue axisValue = 0;
+        auto knownRankPack = leftPack ? leftPack : rightPack;
+        if (knownRankPack && (!leftPack || !rightPack))
+        {
+            if (tryGetConstantIntVal(shapeConcatPack->getAxis(), axisValue))
+            {
+                if (axisValue < 0 || axisValue >= knownRankPack->getCount())
+                {
+                    sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+                        .opName = "__shapeConcat",
+                        .axis = (int)axisValue,
+                        .rank = (int)knownRankPack->getCount(),
+                        .location = loc});
+                    return true;
+                }
+            }
+            else if (knownRankPack->getCount() == 0)
+            {
+                sink->diagnose(Diagnostics::ShapePackNoValidAxis{
+                    .opName = "__shapeConcat",
+                    .rank = 0,
+                    .location = loc});
+                return true;
+            }
+        }
+
+        if (leftPack && rightPack)
+        {
+            if (leftPack->getCount() != rightPack->getCount())
+            {
+                sink->diagnose(Diagnostics::ShapePackRankMismatch{
+                    .opName = "__shapeConcat",
+                    .leftRank = (int)leftPack->getCount(),
+                    .rightRank = (int)rightPack->getCount(),
+                    .location = loc});
+                return true;
+            }
+
+            if (tryGetConstantIntVal(shapeConcatPack->getAxis(), axisValue))
+            {
+                if (axisValue < 0 || axisValue >= leftPack->getCount())
+                {
+                    sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+                        .opName = "__shapeConcat",
+                        .axis = (int)axisValue,
+                        .rank = (int)leftPack->getCount(),
+                        .location = loc});
+                    return true;
+                }
+
+                for (Index i = 0; i < leftPack->getCount(); ++i)
+                {
+                    if (i != axisValue && areProvablyDifferentShapeElements(
+                                              leftPack->getElement(i),
+                                              rightPack->getElement(i)))
+                    {
+                        sink->diagnose(Diagnostics::ShapeConcatNonAxisMismatch{
+                            .axis = (int)axisValue,
+                            .dimIndex = (int)i,
+                            .location = loc});
+                        return true;
+                    }
+                }
+            }
+            else if (leftPack->getCount() == 0)
+            {
+                sink->diagnose(Diagnostics::ShapePackNoValidAxis{
+                    .opName = "__shapeConcat",
+                    .rank = 0,
+                    .location = loc});
+                return true;
+            }
+            else if (!hasAnyPotentialConcatAxis(leftPack, rightPack))
+            {
+                sink->diagnose(Diagnostics::ShapeConcatNoValidAxis{
+                    .rank = (int)leftPack->getCount(),
+                    .location = loc});
+                return true;
+            }
+        }
+
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeConcatPack->getLeftPack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeConcatPack->getRightPack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeConcatPack->getAxis(), loc, sink))
+            return true;
+    }
+    else if (auto shapePermutePack = as<ShapePermuteIntValPack>(val))
+    {
+        auto valuePack = as<ConcreteIntValPack>(shapePermutePack->getValuePack()->resolve());
+        auto orderPack = as<ConcreteIntValPack>(shapePermutePack->getOrderPack()->resolve());
+        if (valuePack && orderPack)
+        {
+            if (valuePack->getCount() != orderPack->getCount())
+            {
+                sink->diagnose(Diagnostics::ShapePermuteOrderLengthMismatch{
+                    .orderRank = (int)orderPack->getCount(),
+                    .valueRank = (int)valuePack->getCount(),
+                    .location = loc});
+                return true;
+            }
+
+            Index firstPosition = 0;
+            Index secondPosition = 0;
+            IntegerLiteralValue orderIndex = 0;
+            bool hasConcreteIndex = false;
+            if (tryFindProvableDuplicateOrderIndices(
+                    orderPack,
+                    firstPosition,
+                    secondPosition,
+                    orderIndex,
+                    hasConcreteIndex))
+            {
+                if (hasConcreteIndex)
+                {
+                    sink->diagnose(Diagnostics::ShapePermuteDuplicateIndex{
+                        .indexValue = (int)orderIndex,
+                        .firstPosition = (int)firstPosition,
+                        .secondPosition = (int)secondPosition,
+                        .location = loc});
+                }
+                else
+                {
+                    sink->diagnose(Diagnostics::ShapePermuteDuplicateEquivalentIndex{
+                        .firstPosition = (int)firstPosition,
+                        .secondPosition = (int)secondPosition,
+                        .location = loc});
+                }
+                return true;
+            }
+
+            for (Index i = 0; i < orderPack->getCount(); ++i)
+            {
+                orderIndex = 0;
+                if (!tryGetConstantIntVal(orderPack->getElement(i), orderIndex))
+                    continue;
+
+                if (orderIndex < 0 || orderIndex >= valuePack->getCount())
+                {
+                    sink->diagnose(Diagnostics::ShapePermuteIndexOutOfRange{
+                        .indexValue = (int)orderIndex,
+                        .indexPosition = (int)i,
+                        .rank = (int)valuePack->getCount(),
+                        .location = loc});
+                    return true;
+                }
+            }
+        }
+
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapePermutePack->getValuePack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapePermutePack->getOrderPack(), loc, sink))
+            return true;
+    }
+    else if (auto shapeSwapPack = as<ShapeSwapIntValPack>(val))
+    {
+        auto valuePack = as<ConcreteIntValPack>(shapeSwapPack->getValuePack()->resolve());
+        IntegerLiteralValue dimValue = 0;
+        if (valuePack && tryGetConstantIntVal(shapeSwapPack->getDim0(), dimValue) &&
+            (dimValue < 0 || dimValue >= valuePack->getCount()))
+        {
+            sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+                .opName = "__shapeSwap",
+                .axis = (int)dimValue,
+                .rank = (int)valuePack->getCount(),
+                .location = loc});
+            return true;
+        }
+
+        if (valuePack && tryGetConstantIntVal(shapeSwapPack->getDim1(), dimValue) &&
+            (dimValue < 0 || dimValue >= valuePack->getCount()))
+        {
+            sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+                .opName = "__shapeSwap",
+                .axis = (int)dimValue,
+                .rank = (int)valuePack->getCount(),
+                .location = loc});
+            return true;
+        }
+
+        if (valuePack && valuePack->getCount() == 0)
+        {
+            sink->diagnose(Diagnostics::ShapePackNoValidAxis{
+                .opName = "__shapeSwap",
+                .rank = 0,
+                .location = loc});
+            return true;
+        }
+
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeSwapPack->getValuePack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeSwapPack->getDim0(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeSwapPack->getDim1(), loc, sink))
+            return true;
+    }
+    else if (auto shapeReducePack = as<ShapeReduceIntValPack>(val))
+    {
+        auto valuePack = as<ConcreteIntValPack>(shapeReducePack->getValuePack()->resolve());
+        IntegerLiteralValue axisValue = 0;
+        if (valuePack && tryGetConstantIntVal(shapeReducePack->getAxis(), axisValue) &&
+            (axisValue < 0 || axisValue >= valuePack->getCount()))
+        {
+            sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+                .opName = "__shapeReduce",
+                .axis = (int)axisValue,
+                .rank = (int)valuePack->getCount(),
+                .location = loc});
+            return true;
+        }
+
+        if (valuePack && valuePack->getCount() == 0)
+        {
+            sink->diagnose(Diagnostics::ShapePackNoValidAxis{
+                .opName = "__shapeReduce",
+                .rank = 0,
+                .location = loc});
+            return true;
+        }
+
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeReducePack->getValuePack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeReducePack->getAxis(), loc, sink))
+            return true;
+    }
+    else if (auto concretePack = as<ConcreteIntValPack>(val))
+    {
+        for (Index i = 0; i < concretePack->getCount(); ++i)
+        {
+            if (_diagnoseKnownInvalidShapePackTransformArg(concretePack->getElement(i), loc, sink))
+                return true;
+        }
+    }
+    else if (auto firstVal = as<FirstIntVal>(val))
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(firstVal->getBasePack(), loc, sink))
+            return true;
+    }
+    else if (auto lastVal = as<LastIntVal>(val))
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(lastVal->getBasePack(), loc, sink))
+            return true;
+    }
+    else if (auto trimFirstPack = as<TrimFirstIntValPack>(val))
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(trimFirstPack->getBasePack(), loc, sink))
+            return true;
+    }
+    else if (auto trimLastPack = as<TrimLastIntValPack>(val))
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(trimLastPack->getBasePack(), loc, sink))
+            return true;
+    }
+
+    return false;
+}
+
+static bool _diagnoseKnownInvalidShapePackTransforms(
+    Type* toType,
+    Type* fromType,
+    SourceLoc loc,
+    DiagnosticSink* sink)
+{
+    if (!sink)
+        return false;
+
+    auto toDeclRefType = as<DeclRefType>(toType);
+    auto fromDeclRefType = as<DeclRefType>(fromType);
+    if (!toDeclRefType || !fromDeclRefType)
+        return false;
+
+    auto toGenApp = as<GenericAppDeclRef>(toDeclRefType->getDeclRefBase());
+    auto fromGenApp = as<GenericAppDeclRef>(fromDeclRefType->getDeclRefBase());
+    if (!toGenApp || !fromGenApp || toGenApp->getBase() != fromGenApp->getBase())
+        return false;
+
+    auto toArgs = toGenApp->getArgs();
+    auto fromArgs = fromGenApp->getArgs();
+    auto argCount =
+        toArgs.getCount() < fromArgs.getCount() ? toArgs.getCount() : fromArgs.getCount();
+    for (Index i = 0; i < argCount; ++i)
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(toArgs[i], loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(fromArgs[i], loc, sink))
+            return true;
+    }
+
+    return false;
+}
+
+} // namespace
+
 ConversionCost SemanticsVisitor::getImplicitConversionCost(Decl* decl)
 {
     if (auto modifier = decl->findModifier<ImplicitConversionModifier>())
@@ -67,6 +376,11 @@ bool SemanticsVisitor::isEffectivelyScalarForInitializerLists(Type* type)
     {
         if (as<StructDecl>(declRefType->getDeclRef()))
             return false;
+    }
+
+    if (auto modifiedType = as<ModifiedType>(type))
+    {
+        return isEffectivelyScalarForInitializerLists(modifiedType->getBase());
     }
 
     return true;
@@ -526,6 +840,38 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
             diagnoseOnce(Diagnostics::CannotUseInitializerListForType{
                 .type = toType,
                 .initList = fromInitializerListExpr});
+
+            // Emit a note naming the first member whose visibility mismatches the
+            // struct's. Guard against emitting it when a different isCStyleType
+            // condition is the real cause — those conditions are checked first:
+            //   - Non-interface inheritance (rule 2): guard 1.
+            //   - Explicit constructor (rule 3): guard 2.
+            bool hasNonInterfaceBase = false;
+            for (auto inheritanceDecl : structDecl->getMembersOfType<InheritanceDecl>())
+            {
+                if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
+                {
+                    hasNonInterfaceBase = true;
+                    break;
+                }
+            }
+            if (!hasNonInterfaceBase && !_hasExplicitConstructor(structDecl, true))
+            {
+                DeclVisibility structVis = getDeclVisibility(structDecl);
+                for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+                {
+                    DeclVisibility memberVis = getDeclVisibility(varDecl);
+                    if (memberVis != structVis)
+                    {
+                        diagnoseOnce(Diagnostics::InitializerListMemberVisibilityMismatch{
+                            .memberVis = memberVis,
+                            .type = toType,
+                            .structVis = structVis,
+                            .member = varDecl});
+                        break;
+                    }
+                }
+            }
         }
 
         return false;
@@ -571,6 +917,33 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
             getSink()->diagnoseRaw(
                 Severity::Error,
                 static_cast<char const*>(blob->getBufferPointer()));
+
+            // When the synthesized constructor has fewer parameters than
+            // members because some members are less visible than the struct
+            // itself, the user gets "too many arguments" without
+            // understanding why certain members were excluded from the
+            // constructor. Emit a note naming each non-public member so
+            // they know what to fix (issue #11005).
+            //
+            // Use the same criteria as `collectInitializableMembers`:
+            // instance members whose visibility is strictly less than the
+            // struct's are excluded from the synthesized ctor.
+            DeclVisibility structVis = getDeclVisibility(structDecl);
+            for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+            {
+                if (varDecl->hasModifier<HLSLStaticModifier>())
+                    continue;
+                DeclVisibility memberVis = getDeclVisibility(varDecl);
+                if (memberVis < structVis)
+                {
+                    diagnoseOnce(Diagnostics::InitializerListMemberVisibilityMismatch{
+                        .memberVis = memberVis,
+                        .type = toType,
+                        .structVis = structVis,
+                        .member = varDecl});
+                }
+            }
+
             return false;
         }
     }
@@ -583,7 +956,9 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
     InitializerListExpr* fromInitializerListExpr,
     UInt& ioArgIndex)
 {
-    auto toType = inToType;
+    // TODO(sai): there's a massive number of special cases to handle for
+    // modified types..
+    auto toType = unwrapModifiedType(inToType);
     UInt argCount = fromInitializerListExpr->args.getCount();
 
     // In the case where we need to build a result expression,
@@ -1092,6 +1467,28 @@ bool SemanticsVisitor::_failedCoercion(
                     .expectedType = toType,
                     .actualType = fromExpr->type,
                     .expr = fromExpr});
+
+                // When calling an interface method on an existential, the
+                // 'This' type in the parameter becomes an
+                // ExtractExistentialType. If the argument is also an opened
+                // existential (a different ExtractExistentialType), both
+                // print as "This" in the error, making the message confusing.
+                // Add a note explaining the type-erasure issue.
+                if (auto toExtType = as<ExtractExistentialType>(toType))
+                {
+                    if (auto fromExtType = as<ExtractExistentialType>(fromType))
+                    {
+                        Type* toInterfaceType = toExtType->getOriginalInterfaceType();
+                        Type* fromInterfaceType = fromExtType->getOriginalInterfaceType();
+                        if (toInterfaceType && fromInterfaceType &&
+                            toInterfaceType->equals(fromInterfaceType))
+                        {
+                            sink->diagnose(Diagnostics::ThisTypeMismatchAfterErasure{
+                                .interfaceType = toInterfaceType,
+                                .location = fromExpr->loc});
+                        }
+                    }
+                }
             }
         }
     }
@@ -1130,7 +1527,7 @@ static bool _hasMatchingModifier(ModifiedType* type, Val* modifier)
 /// For example, it is generally safe to convert from a value
 /// of type `T` to a value of type `const T` in C/C++.
 ///
-static bool _canModifierBeAddedDuringCoercion(Val* modifier)
+static bool _canModifierBeAddedDuringCoercion(SemanticsVisitor* ctx, Type* fromType, Val* modifier)
 {
     switch (modifier->astNodeType)
     {
@@ -1139,8 +1536,13 @@ static bool _canModifierBeAddedDuringCoercion(Val* modifier)
 
     case ASTNodeType::UNormModifierVal:
     case ASTNodeType::SNormModifierVal:
-    case ASTNodeType::NoDiffModifierVal:
         return true;
+
+    case ASTNodeType::NoDiffModifierVal:
+        if (ctx->isTypeDifferentiable(fromType) && !ctx->getAllowDroppingDerivatives())
+            return false;
+        else
+            return true;
     }
 }
 
@@ -1297,7 +1699,7 @@ bool SemanticsVisitor::_coerce(
         ShortList<Expr*> coercibleCandidates;
         for (auto candidate : overloadedExpr2->candidateExprs)
         {
-            if (canCoerce(toType, candidate->type, candidate))
+            if ((candidate->type.type) && canCoerce(toType, candidate->type, candidate))
                 coercibleCandidates.add(candidate);
         }
         if (coercibleCandidates.getCount() == 1)
@@ -1329,6 +1731,24 @@ bool SemanticsVisitor::_coerce(
             }
         }
         return false;
+    }
+
+    if (outToExpr)
+    {
+        // Before falling back to generic type equality, check for fully-known invalid
+        // shape-pack transforms in the generic arguments of the types being compared.
+        // This lets us report the more specific `__shapeConcat` / `__shapePermute` /
+        // `__shapeSwap` / `__shapeReduce` diagnostics instead of a later generic
+        // type-mismatch error.
+        bool diagnosedKnownInvalidShapePack =
+            _diagnoseKnownInvalidShapePackTransforms(toType, fromType.type, fromExpr->loc, sink);
+        if (diagnosedKnownInvalidShapePack)
+        {
+            *outToExpr = CreateErrorExpr(fromExpr);
+            if (outCost)
+                *outCost = kConversionCost_None;
+            return true;
+        }
     }
 
     // An important and easy case is when the "to" and "from" types are equal.
@@ -1451,7 +1871,7 @@ bool SemanticsVisitor::_coerce(
 
     {
         // It is possible that one or more of the types involved might have modifiers
-        // on it, but the underlying types are otherwise the same.
+        // on it, but the underlying types are otherwise coercible.
         //
         auto toModified = as<ModifiedType>(toType);
         auto toBase = toModified ? toModified->getBase() : toType;
@@ -1461,7 +1881,7 @@ bool SemanticsVisitor::_coerce(
             fromModified ? QualType(fromModified->getBase(), fromType.isLeftValue) : fromType;
 
 
-        if ((toModified || fromModified) && toBase->equals(fromBase))
+        if (toModified || fromModified)
         {
             // We need to check each modifier present on either `toType`
             // or `fromType`. For each modifier, it will either be:
@@ -1482,7 +1902,7 @@ bool SemanticsVisitor::_coerce(
                     // then we need to know whether this modifier can be added
                     // to the type of an expression as part of coercion.
                     //
-                    if (!_canModifierBeAddedDuringCoercion(modifier))
+                    if (!_canModifierBeAddedDuringCoercion(this, fromType, modifier))
                     {
                         return _failedCoercion(toType, outToExpr, fromExpr, sink);
                     }
@@ -1508,16 +1928,40 @@ bool SemanticsVisitor::_coerce(
                 }
             }
 
-            // If all the modifiers were okay, we can convert.
+            // If all the modifiers were okay, recursively coerce the base types.
+            Expr* coercedBaseExpr = nullptr;
+            ConversionCost baseCost = kConversionCost_None;
+
+            if (!_coerce(
+                    site,
+                    toBase,
+                    outToExpr ? &coercedBaseExpr : nullptr,
+                    fromBase,
+                    fromExpr,
+                    sink,
+                    &baseCost,
+                    outWitnessOfConversion))
+            {
+                return false;
+            }
 
             // TODO: we may need a cost to allow disambiguation of overloads based on modifiers?
             if (outCost)
             {
-                *outCost = kConversionCost_None;
+                *outCost = baseCost;
             }
             if (outToExpr)
             {
-                *outToExpr = createModifierCastExpr(toType, fromExpr);
+                // If the target type has modifiers, wrap the coerced expression
+                // in a modifier cast to apply them.
+                if (toModified)
+                {
+                    *outToExpr = createModifierCast(toType, coercedBaseExpr->type, coercedBaseExpr);
+                }
+                else
+                {
+                    *outToExpr = coercedBaseExpr;
+                }
             }
 
             return true;
@@ -1571,6 +2015,21 @@ bool SemanticsVisitor::_coerce(
     // none_t can be cast into any Optional<T> type.
     if (as<NoneType>(fromType) && as<OptionalType>(toType))
     {
+        // Guard against Optional<T> where T is opaque — this catches the generic
+        // specialization case (e.g. process<SamplerState>(none)) that CoerceToUsableType
+        // misses because T was still abstract at declaration time.
+        // Only emit the diagnostic when we are constructing the final expression
+        // (outToExpr != nullptr); canCoerce() probes with outToExpr=nullptr but
+        // also passes getSink(), so we must not emit there to avoid duplicates.
+        auto optType = as<OptionalType>(toType);
+        if (typeTransitivelyContainsOpaqueHandle(this, optType->getValueType()))
+        {
+            if (sink && outToExpr)
+                sink->diagnose(Diagnostics::OptionalCannotWrapResourceType{
+                    .type = optType->getValueType(),
+                    .expr = fromExpr});
+            return false;
+        }
         if (outCost)
         {
             *outCost = kConversionCost_NoneToOptional;
@@ -1661,6 +2120,16 @@ bool SemanticsVisitor::_coerce(
     //
     if (auto witness = tryGetSubtypeWitness(fromType, toType))
     {
+        // Interface-to-interface upcast may receive a compressed witness
+        // whose internal `DeclRef` is rooted in an intermediate interface
+        // rather than `fromType`.  Expand it into a transitive chain so
+        // IR lowering can walk the inheritance path mechanically without
+        // inspecting the inheritance graph itself.
+        if (isInterfaceType(fromType) && isInterfaceType(toType))
+        {
+            witness = normalizeSubtypeWitnessForInterfaceUpcast(fromType, witness);
+        }
+
         if (outToExpr)
         {
             *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
@@ -1674,13 +2143,10 @@ bool SemanticsVisitor::_coerce(
             //
             if (fromExpr && fromExpr->type.isLeftValue)
             {
-                // If the original type is a concrete type and toType is an interface type,
-                // we need to wrap the original expression into a MakeExistential, and the
-                // result of MakeExistential is not an l-value.
-                bool toTypeIsInterface = isInterfaceType(toType);
-                bool fromTypeIsInterface = isInterfaceType(fromType);
-                if (!toTypeIsInterface || toTypeIsInterface == fromTypeIsInterface)
-                    (*outToExpr)->type.isLeftValue = true;
+                // If toType is an interface type, we need to wrap the original
+                // expression into a MakeExistential, and the result of
+                // MakeExistential is not an l-value.
+                (*outToExpr)->type.isLeftValue = !isInterfaceType(toType);
             }
         }
         if (outCost)
@@ -1707,6 +2173,11 @@ bool SemanticsVisitor::_coerce(
             if (outToExpr)
             {
                 *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, fromIsToWitness);
+                // Type-equality casts preserve l-value status since the
+                // types are structurally equivalent (e.g., T.Differential == T
+                // via a where clause).
+                if (fromExpr)
+                    (*outToExpr)->type.isLeftValue = fromExpr->type.isLeftValue;
             }
             if (outCost)
                 *outCost = 0;
@@ -2162,6 +2633,23 @@ bool SemanticsVisitor::_coerce(
                         .fromType = fromType.type,
                         .toType = toType,
                         .location = fromExpr->loc});
+
+                    if (auto fromPtrType = as<PtrType>(fromType.type))
+                    {
+                        if (auto toPtrType = as<PtrType>(toType))
+                        {
+                            auto fromVal = fromPtrType->getValueType();
+                            auto toVal = toPtrType->getValueType();
+                            if (!isInterfaceType(fromVal) && isInterfaceType(toVal) &&
+                                tryGetSubtypeWitness(fromVal, toVal))
+                            {
+                                sink->diagnose(Diagnostics::NoteConcreteToInterfacePtrUnsafe{
+                                    .from = fromVal,
+                                    .to = toVal,
+                                    .location = fromExpr->loc});
+                            }
+                        }
+                    }
                 }
             }
             // For general implicit conversions with high cost, emit a warning
@@ -2252,6 +2740,8 @@ bool SemanticsVisitor::_coerce(
             //
             castExpr->arguments.clear();
             castExpr->arguments.add(args[0]);
+
+            // TODO: Register associated differentiable methods & types here as well.
         }
         if (!cachedMethod)
         {
@@ -2522,6 +3012,67 @@ Expr* SemanticsVisitor::createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, 
     return expr;
 }
 
+SubtypeWitness* SemanticsVisitor::normalizeSubtypeWitnessForInterfaceUpcast(
+    Type* subType,
+    SubtypeWitness* witness,
+    int depth)
+{
+    // Bound against a corrupt or cyclic inheritance graph.  Well-formed
+    // hierarchies are acyclic and extremely shallow in practice; 64 is a
+    // generous defensive limit.
+    static const int kMaxDepth = 64;
+    SLANG_RELEASE_ASSERT(depth < kMaxDepth);
+
+    if (!witness)
+        return witness;
+
+    if (auto transitive = as<TransitiveSubtypeWitness>(witness))
+    {
+        auto subToMid = normalizeSubtypeWitnessForInterfaceUpcast(
+            subType,
+            transitive->getSubToMid(),
+            depth + 1);
+        auto midType = subToMid->getSup();
+        auto midToSup = normalizeSubtypeWitnessForInterfaceUpcast(
+            midType,
+            transitive->getMidToSup(),
+            depth + 1);
+        if (subToMid == transitive->getSubToMid() && midToSup == transitive->getMidToSup())
+            return witness;
+        return m_astBuilder->getTransitiveSubtypeWitness(subToMid, midToSup);
+    }
+
+    if (auto declared = as<DeclaredSubtypeWitness>(witness))
+    {
+        // Use `getParentDeclRef` so substitutions from the witness's DeclRef
+        // propagate to the parent (e.g. for `IDerived<float>: IBase<float>`
+        // we need the parent to be `IDerived<float>`, not the unspecialized
+        // `IDerived<T>`).
+        auto parentInterfaceDeclRef = getParentDeclRef(declared->getDeclRef()).as<InterfaceDecl>();
+        if (!parentInterfaceDeclRef)
+            return witness;
+
+        auto parentInterfaceType = DeclRefType::create(m_astBuilder, parentInterfaceDeclRef);
+        if (parentInterfaceType->equals(subType))
+            return witness;
+
+        // The declRef belongs to a different interface than `subType`.
+        // Split into (subType : parentInterfaceType) ∘ (parentInterfaceType : sup).
+        auto subToParent = tryGetSubtypeWitness(subType, parentInterfaceType);
+        SLANG_RELEASE_ASSERT(subToParent);
+        subToParent = normalizeSubtypeWitnessForInterfaceUpcast(subType, subToParent, depth + 1);
+
+        auto parentToSup = m_astBuilder->getDeclaredSubtypeWitness(
+            parentInterfaceType,
+            declared->getSup(),
+            declared->getDeclRef());
+
+        return m_astBuilder->getTransitiveSubtypeWitness(subToParent, parentToSup);
+    }
+
+    return witness;
+}
+
 Expr* SemanticsVisitor::createModifierCastExpr(Type* toType, Expr* fromExpr)
 {
     ModifierCastExpr* expr = m_astBuilder->create<ModifierCastExpr>();
@@ -2529,6 +3080,29 @@ Expr* SemanticsVisitor::createModifierCastExpr(Type* toType, Expr* fromExpr)
     expr->type = QualType(toType);
     expr->valueArg = fromExpr;
     return expr;
+}
+
+Expr* SemanticsVisitor::createModifierCast(Type* toType, Type* fromType, Expr* fromExpr)
+{
+    if (!isTypeDifferentiable(toType) && isTypeDifferentiable(fromType))
+    {
+        // TODO: It's possible that multiple modifiers are changing..
+        // Right now, this just works because no other modifier actually needs any non-trivial
+        // handling.
+        //
+        // However, if that changes, we may need more complex logic for modifier casting.
+        //
+        auto detachExpr = getCurrentASTBuilder()->create<DetachExpr>();
+        detachExpr->loc = fromExpr->loc;
+        detachExpr->inner = fromExpr;
+        detachExpr->type.type = toType;
+        return detachExpr;
+    }
+    else
+    {
+        // General case..
+        return createModifierCastExpr(toType, fromExpr);
+    }
 }
 
 

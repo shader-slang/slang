@@ -11,6 +11,8 @@
 #include "slang-source-map.h"
 #include "slang.h"
 
+#include <mutex>
+
 namespace Slang
 {
 
@@ -63,7 +65,8 @@ struct PathInfo
                     ///< taken as to map to a loaded file)
         TokenPaste, ///< No paths, just created to do a macro expansion
         TypeParse,  ///< No path, just created to do a type parse
-        CommandLine, ///< A macro constructed from the command line
+        CommandLine,    ///< A macro constructed from the command line
+        MacroExpansion, ///< A specific invocation of a macro; foundPath holds the macro name
     };
 
     /// True if has a canonical path
@@ -118,6 +121,10 @@ struct PathInfo
     static PathInfo makeFromString(const String& userPath)
     {
         return PathInfo{Type::FromString, userPath, String()};
+    }
+    static PathInfo makeFromMacroExpansion(const String& macroName)
+    {
+        return PathInfo{Type::MacroExpansion, macroName, String()};
     }
 
     Type type;             ///< The type of path
@@ -352,7 +359,8 @@ protected:
     ComPtr<ISlangBlob> m_contentBlob; ///< A blob that owns the storage for the file contents. If
                                       ///< nullptr, there is no contents
     UnownedStringSlice m_content;     ///< The actual contents of the file.
-    size_t m_contentSize;             ///< The size of the actual contents
+    size_t m_contentSize; ///< Initially set to the raw blob size; updated by setContents() to
+                          ///< the decoded content size after BOM/encoding processing.
 
     SHA1::Digest m_digest;
 
@@ -360,6 +368,8 @@ protected:
     // we will cache the starting offset of each line break in
     // the input file:
     List<uint32_t> m_lineBreakOffsets;
+    // Parallel diagnostics and backend work can lazily populate these SourceFile caches.
+    std::mutex m_cacheMutex;
 
     // If set then the locations in this file are really from locations from elsewhere,
     // where the SourceMap specifies that mapping

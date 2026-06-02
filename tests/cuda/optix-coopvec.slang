@@ -21,8 +21,8 @@
 // CHECK: (optixCoopVecMax((_S{{[0-9]+}}), (_S{{[0-9]+}})))
 // CHECK: (optixCoopVecMin((_S{{[0-9]+}}), (_S{{[0-9]+}})))
 // CHECK: (optixCoopVecMul((_S{{[0-9]+}}), (_S{{[0-9]+}})))
-// CHECK: optixCoopVecOuterProductAccumulate((_S{{[0-9]+}}), (_S{{[0-9]+}}), (CUdeviceptr)(&(globalParams_{{[0-9]+}}->outputMat_{{[0-9]+}})), (int(0)), (32U))
-// CHECK: optixCoopVecReduceSumAccumulate((_S{{[0-9]+}}), (CUdeviceptr)(&(globalParams_{{[0-9]+}}->outputMat{{[0-9]+}}_{{[0-9]+}})), (int(0)))
+// CHECK: optixCoopVecOuterProductAccumulate(_S{{[0-9]+}}, _S{{[0-9]+}}, (CUdeviceptr)(&(globalParams_{{[0-9]+}}->outputMat_{{[0-9]+}})), int(0), 32U)
+// CHECK: optixCoopVecReduceSumAccumulate(_S{{[0-9]+}}, (CUdeviceptr)(&(globalParams_{{[0-9]+}}->outputMat{{[0-9]+}}_{{[0-9]+}})), int(0))
 // CHECK: (optixCoopVecStep((_S{{[0-9]+}}), (_S{{[0-9]+}})))
 // CHECK: (optixCoopVecSub((_S{{[0-9]+}}), (_S{{[0-9]+}})))
 // CHECK: (optixCoopVecLog2((_S{{[0-9]+}})))
@@ -171,21 +171,23 @@ void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     CoopVec<float, 4> resultMin = min(vec1, vec2);
     
     CoopVec<float, 4> resultVecMul = vec1 * vec2;
+    CoopVec<half, 4> trainingVec1 = coopVecLoad<4, half>(input1);
+    CoopVec<half, 4> trainingVec2 = coopVecLoad<4, half>(input2);
     
     outputMat.Store<float>(0, float(1));
     coopVecOuterProductAccumulate(
-        vec1,
-        vec2,
+        trainingVec1,
+        trainingVec2,
         outputMat,
         0,
         32,
-        CoopVecMatrixLayout::RowMajor,
-        CoopVecComponentType::Float32,
+        CoopVecMatrixLayout::TrainingOptimal,
+        CoopVecComponentType::Float16,
     );
 
-    outputMat2.Store(0, float(1));
+    outputMat2.Store<float>(0, float(1));
     coopVecReduceSumAccumulate(
-        vec1,
+        trainingVec1,
         outputMat2,
         0,
     );

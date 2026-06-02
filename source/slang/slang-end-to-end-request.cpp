@@ -143,6 +143,20 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         target->getOptionSet().inheritFrom(getOptionSet());
     m_frontEndReq->optionSet = getOptionSet();
 
+    // `-pass-through` bypasses the IR pipeline that emits coverage
+    // instrumentation, so the two flags are mutually exclusive.
+    // The check lives here (not in `OptionsParser::_parse`) so that
+    // C++ API callers using `setPassThrough()` are also covered —
+    // OptionsParser only runs for the slangc CLI path.
+    if (m_passThrough != PassThroughMode::None &&
+        (getOptionSet().getBoolOption(CompilerOptionName::TraceCoverage) ||
+         getOptionSet().getBoolOption(CompilerOptionName::TraceFunctionCoverage) ||
+         getOptionSet().getBoolOption(CompilerOptionName::TraceBranchCoverage)))
+    {
+        getSink()->diagnose(Diagnostics::CoveragePassThroughIncompatible{});
+        return SLANG_FAIL;
+    }
+
     // We only do parsing and semantic checking if we *aren't* doing
     // a pass-through compilation.
     //
@@ -379,6 +393,36 @@ SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact
         writeArtifactToStandardOutput(artifact, getSink());
     }
     return SLANG_OK;
+}
+
+// If the artifact carries coverage tracing metadata, write it to
+// `<path>.coverage-mapping.json` alongside the compiled code. Hosts
+// can read this sidecar to attribute runtime counter values back to
+// source entries. The JSON content is produced by the
+// public `slang_writeCoverageManifestJson` API; both that API and
+// this sidecar writer emit byte-identical output, so customers
+// working in-process can pipe the API output through the same
+// downstream tooling that consumes the sidecar.
+SlangResult EndToEndCompileRequest::_maybeWriteCoverageMapping(
+    const String& path,
+    IArtifact* artifact)
+{
+    if (!artifact || path.getLength() == 0)
+        return SLANG_OK;
+    auto coverage = findAssociatedRepresentation<slang::ICoverageTracingMetadata>(artifact);
+    // Emit the sidecar if either dimension has data. Future coverage
+    // modes may record source entries without runtime counters, or
+    // runtime counter allocation before all source-entry metadata is
+    // populated; the sidecar is the persisted handoff for both.
+    if (!coverage || (coverage->getCounterCount() == 0 && coverage->getEntryCount() == 0))
+        return SLANG_OK;
+    ComPtr<ISlangBlob> jsonBlob;
+    SLANG_RETURN_ON_FAIL(slang_writeCoverageManifestJson(coverage, jsonBlob.writeRef()));
+    String sidecarPath = path + ".coverage-mapping.json";
+    return File::writeAllBytes(
+        sidecarPath,
+        jsonBlob->getBufferPointer(),
+        jsonBlob->getBufferSize());
 }
 
 SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArtifact* artifact)
@@ -756,6 +800,8 @@ void EndToEndCompileRequest::generateOutput()
                     // If we are compiling separate debug info, check for the additional
                     // SPIRV artifact and write that if needed.
                     _maybeWriteDebugArtifact(targetProgram, path, artifact);
+
+                    _maybeWriteCoverageMapping(path, artifact);
                 }
             }
             else
@@ -772,6 +818,8 @@ void EndToEndCompileRequest::generateOutput()
                         // If we are compiling separate debug info, check for the additional
                         // SPIRV artifact and write that if needed.
                         _maybeWriteDebugArtifact(targetProgram, path, artifact);
+
+                        _maybeWriteCoverageMapping(path, artifact);
                     }
                 }
             }

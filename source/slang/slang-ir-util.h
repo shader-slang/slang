@@ -65,6 +65,49 @@ struct DeduplicateContext
     }
 };
 
+
+//
+// Helper struct to represent a parameter's direction and type component separately.
+// Useful for passes that need to reason about parameter directions (like `in`, `out`, `ref`, etc.)
+//
+struct ParameterDirectionInfo
+{
+    enum Kind
+    {
+        In,
+        BorrowIn,
+        Out,
+        BorrowInOut,
+        Ref
+    } kind;
+
+    // For Ref and BorrowInOut
+    AddressSpace addressSpace;
+
+    ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)
+        : kind(kind), addressSpace(addressSpace)
+    {
+    }
+
+    ParameterDirectionInfo()
+        : kind(Kind::In), addressSpace((AddressSpace)0)
+    {
+    }
+
+    bool operator==(const ParameterDirectionInfo& other) const
+    {
+        return kind == other.kind && addressSpace == other.addressSpace;
+    }
+};
+
+
+// Split into direction and type
+std::tuple<ParameterDirectionInfo, IRType*> splitParameterDirectionAndType(IRType* paramType);
+
+IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IRType* type);
+
+bool isAnnotation(IRInst* inst);
+
 bool isPtrToClassType(IRInst* type);
 
 bool isPtrToArrayType(IRInst* type);
@@ -76,6 +119,9 @@ bool isPointerOfType(IRInst* ptrType, IRInst* elementType);
 bool isPointerOfType(IRInst* ptrType, IROp opCode);
 
 bool isUserPointerType(IRInst* type);
+
+// True if inst produces a derived address from another base address.
+bool isAddressInst(IRInst* inst);
 
 // Builds a dictionary that maps from requirement key to requirement value for `interfaceType`.
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType);
@@ -245,7 +291,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
 /// Get a unit-type (aka `void`) value using the `poison` instruction,
 /// which indicates an undefined (and potentially unstable) value.
 ///
-IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module);
+IRInst* getUnitPoisonVal(IRBuilder* builder, IRModule* module);
 
 // The the equivalent op of (a op b) in (b op' a). For example, a > b is equivalent to b < a. So (<)
 // ==> (>).
@@ -410,12 +456,18 @@ bool isFirstBlock(IRInst* inst);
 bool isSpecConstRateType(IRType* type);
 void hoistInstAndOperandsToGlobal(IRBuilder* builder, IRInst* inst);
 IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* oldType);
+IRType* ensureSpecConstRate(IRBuilder* builder, IRType* type);
 bool canOperationBeSpecConst(
     IROp op,
     IRType* resultType,
     IRInst* const* fixedArgs,
     IRUse* operands);
-bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs);
+bool shouldHaveSpecConstRate(
+    IROp op,
+    IRType* resultType,
+    UInt operandCount,
+    IRInst* const* operands);
+bool isInstHoistable(IROp op);
 
 // most of <algorithm> doesn't work on out non-const iterators, so define this
 // version
@@ -441,6 +493,10 @@ IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type);
 bool isSignedType(IRType* type);
 
 bool isIROpaqueType(IRType* type);
+
+IRInst* tryGetTranslation(IRModule* module, IRInst* inst);
+
+IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
 
 // Returns true if the memory location pointed to by `ptrInst` is immutable.
 // An immutable location is the memory region that can't be modified by the user code.
@@ -472,6 +528,15 @@ bool canInstBeStored(IRInst* inst);
 
 IRType* getTextureTypeFromCombinedTextureSampler(IRType* type);
 IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type);
+
+bool isReadNoneCallee(IRInst* callee);
+bool isNoSideEffectCallee(IRInst* callee);
+
+bool tryGetConstantIntLit(IRInst* inst, Int64& outValue);
+
+bool areKnownEqualShapeElements(IRInst* left, IRInst* right);
+
+IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> elements);
 
 } // namespace Slang
 

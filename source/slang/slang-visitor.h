@@ -433,6 +433,13 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
         return e;
     }
 
+    Expr* visitShapePackTransformExpr(ShapePackTransformExpr* e)
+    {
+        for (auto& arg : e->args)
+            arg = dispatchIfNotNull(arg);
+        return e;
+    }
+
     Expr* visitPackBranchTypeExpr(PackBranchTypeExpr* e)
     {
         e->packOperand.exp = dispatchIfNotNull(e->packOperand.exp);

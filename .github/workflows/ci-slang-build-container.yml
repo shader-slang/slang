@@ -20,7 +20,9 @@ jobs:
       contents: read
       packages: read # Required to pull container from ghcr.io
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
+      # The disk cleanup step below removes host runner directories, so this job
+      # keeps the host-root bind mount and root user intentionally.
       options: --user root -v /:/host_root
 
     env:
@@ -60,13 +62,28 @@ jobs:
           echo "=== Disk space after cleanup ==="
           df -h /host_root || true
 
-      - name: Configure Git safe directory
-        run: git config --global --add safe.directory '*'
-
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           submodules: "recursive"
           fetch-depth: "2"
+
+      - name: Configure Git safe directory
+        run: |
+          # RUNNER_TEMP is GitHub Actions' job-local temporary directory.
+          if [[ -n "${RUNNER_TEMP:-}" && -d "$RUNNER_TEMP" && -w "$RUNNER_TEMP" ]]; then
+            git_config_dir="$RUNNER_TEMP"
+          else
+            git_config_dir="/tmp"
+          fi
+          git_config_global="$git_config_dir/gitconfig"
+          echo "GIT_CONFIG_GLOBAL=$git_config_global" >> "$GITHUB_ENV"
+          GIT_CONFIG_GLOBAL="$git_config_global" git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Check disk space
+        uses: ./.github/actions/check-disk-space
+        with:
+          min-disk-gb: "5"
 
       # Restore sccache local cache from master
       - name: Restore sccache cache

@@ -384,7 +384,7 @@ public:
 
     StringSlice(String const& str, UInt beginIndex, UInt endIndex);
 
-    UInt getLength() const { return endIndex - beginIndex; }
+    UInt getLength() const { return representation ? (endIndex - beginIndex) : 0; }
 
     char const* begin() const
     {

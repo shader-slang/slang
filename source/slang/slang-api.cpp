@@ -1,5 +1,6 @@
 // slang-api.cpp
 
+#include "../compiler-core/slang-artifact-associated-impl.h"
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-platform.h"
 #include "../core/slang-rtti-info.h"
@@ -283,6 +284,7 @@ SLANG_API void slang_shutdown()
     Slang::SPIRVCoreGrammarInfo::freeEmbeddedGrammerInfo();
     Slang::RttiInfo::deallocateAll();
     Slang::freeCapabilityDefs();
+    SlangRecord::ReplayContext::destroySingleton();
 }
 
 SLANG_API void slang_enableRecordLayer(bool enable)
@@ -1086,6 +1088,221 @@ SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t s
     return blob.detach();
 }
 
+// JSON-escape one byte into `out`. Handles backslash, double-quote,
+// and the standard control-character escapes; falls back to \u00XX
+// for the remaining U+0000..U+001F range. Source paths can carry tabs
+// or newlines (e.g. from `#line` directives), so the full control
+// range is covered.
+static void _appendCoverageManifestJsonEscaped(Slang::StringBuilder& out, unsigned char uc)
+{
+    switch (uc)
+    {
+    case '\\':
+        out << "\\\\";
+        return;
+    case '"':
+        out << "\\\"";
+        return;
+    case '\b':
+        out << "\\b";
+        return;
+    case '\f':
+        out << "\\f";
+        return;
+    case '\n':
+        out << "\\n";
+        return;
+    case '\r':
+        out << "\\r";
+        return;
+    case '\t':
+        out << "\\t";
+        return;
+    }
+    if (uc < 0x20)
+    {
+        char buf[8];
+        snprintf(buf, sizeof(buf), "\\u%04x", (unsigned)uc);
+        out << buf;
+        return;
+    }
+    out.appendChar((char)uc);
+}
+
+static void _appendCoverageManifestJsonStringOrNull(Slang::StringBuilder& out, const char* value)
+{
+    if (!value)
+    {
+        out << "null";
+        return;
+    }
+    out << "\"";
+    for (const char* p = value; *p; ++p)
+        _appendCoverageManifestJsonEscaped(out, (unsigned char)*p);
+    out << "\"";
+}
+
+static const char* _getCoverageEntryKindName(slang::CoverageEntryKind kind)
+{
+    switch (kind)
+    {
+    case slang::CoverageEntryKind::Line:
+        return "line";
+    case slang::CoverageEntryKind::Branch:
+        return "branch";
+    case slang::CoverageEntryKind::Function:
+        return "function";
+    case slang::CoverageEntryKind::Region:
+        return "region";
+    default:
+        return "unknown";
+    }
+}
+
+static const char* _getCoverageCounterModeName(slang::CoverageCounterMode mode)
+{
+    switch (mode)
+    {
+    case slang::CoverageCounterMode::Count:
+        return "count";
+    default:
+        return "unknown";
+    }
+}
+
+static const char* _getCoverageBranchArmKindName(slang::CoverageBranchArmKind kind)
+{
+    switch (kind)
+    {
+    case slang::CoverageBranchArmKind::TrueArm:
+        return "true";
+    case slang::CoverageBranchArmKind::FalseArm:
+        return "false";
+    case slang::CoverageBranchArmKind::CaseArm:
+        return "case";
+    case slang::CoverageBranchArmKind::DefaultArm:
+        return "default";
+    default:
+        return "unknown";
+    }
+}
+
+SLANG_EXTERN_C SLANG_API SlangResult
+slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlangBlob** outBlob)
+{
+    if (!metadata || !outBlob)
+        return SLANG_E_INVALID_ARG;
+
+    Slang::StringBuilder out;
+    out << "{\n";
+    out << "  \"format\": \"slang-coverage\",\n";
+    out << "  \"version\": 2,\n";
+    uint32_t counterCount = metadata->getCounterCount();
+    uint32_t entryCount = metadata->getEntryCount();
+    out << "  \"counter_count\": " << (int64_t)counterCount << ",\n";
+    out << "  \"buffer\": {\n";
+    out << "    \"name\": \"__slang_coverage\",\n";
+    out << "    \"element_type\": \"uint32\",\n";
+    out << "    \"element_stride\": 4";
+    if (auto syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
+            slang::ISyntheticResourceMetadata::getTypeGuid()))
+    {
+        uint32_t coverageResourceIndex = 0;
+        if (SLANG_SUCCEEDED(syntheticResources->findResourceIndexByID(
+                uint32_t(Slang::SyntheticResourceKnownID::Coverage),
+                &coverageResourceIndex)))
+        {
+            slang::SyntheticResourceInfo resourceInfo;
+            SLANG_RETURN_ON_FAIL(
+                syntheticResources->getResourceInfo(coverageResourceIndex, &resourceInfo));
+            if (resourceInfo.space >= 0)
+                out << ",\n    \"space\": " << (int64_t)resourceInfo.space;
+            if (resourceInfo.binding >= 0)
+                out << ",\n    \"binding\": " << (int64_t)resourceInfo.binding;
+            if (resourceInfo.uniformOffset >= 0)
+                out << ",\n    \"uniform_offset\": " << (int64_t)resourceInfo.uniformOffset;
+            if (resourceInfo.uniformStride > 0)
+                out << ",\n    \"uniform_stride\": " << (int64_t)resourceInfo.uniformStride;
+        }
+    }
+    out << "\n  },\n";
+    out << "  \"entries\": [";
+    for (uint32_t i = 0; i < entryCount; ++i)
+    {
+        slang::CoverageEntryInfo entry;
+        // Every index in [0, entryCount) is a valid argument to
+        // `getEntryInfo` by construction; failure here means an
+        // internal invariant violation. Bail rather than silently
+        // dropping entries — a partial manifest with out-of-order
+        // counter indices would misalign the host's counter array.
+        if (SLANG_FAILED(metadata->getEntryInfo(i, &entry)))
+            return SLANG_FAIL;
+        if (entry.counterIndex != slang::kInvalidCoverageCounterIndex &&
+            entry.counterIndex >= counterCount)
+        {
+            return SLANG_FAIL;
+        }
+        out << (i == 0 ? "" : ",");
+        out << "\n    {\"kind\": \"" << _getCoverageEntryKindName(entry.kind) << "\", ";
+        out << "\"counter\": ";
+        if (entry.counterIndex == slang::kInvalidCoverageCounterIndex)
+            out << "null";
+        else
+            out << (int64_t)entry.counterIndex;
+        out << ", \"mode\": \"" << _getCoverageCounterModeName(entry.counterMode) << "\", ";
+        out << "\"file\": ";
+        // Mirror the C++ API's nullable contract: `getEntryInfo`
+        // returns `entry.file == nullptr` for unattributable entries,
+        // so the JSON manifest emits `null` (not `""`) for the same
+        // case. A strict consumer that distinguishes "missing source"
+        // from "empty path" sees the same shape from both channels.
+        _appendCoverageManifestJsonStringOrNull(out, entry.file);
+        out << ", \"line\": " << (int64_t)entry.line;
+        if (entry.startColumn != 0)
+            out << ", \"start_column\": " << (int64_t)entry.startColumn;
+        if (entry.endLine != 0)
+            out << ", \"end_line\": " << (int64_t)entry.endLine;
+        if (entry.endColumn != 0)
+            out << ", \"end_column\": " << (int64_t)entry.endColumn;
+        if (entry.kind == slang::CoverageEntryKind::Function)
+        {
+            if (!entry.functionName && !entry.functionMangledName)
+                return SLANG_FAIL;
+            if (entry.functionName)
+            {
+                out << ", \"function\": ";
+                _appendCoverageManifestJsonStringOrNull(out, entry.functionName);
+            }
+            if (entry.functionMangledName)
+            {
+                out << ", \"function_mangled\": ";
+                _appendCoverageManifestJsonStringOrNull(out, entry.functionMangledName);
+            }
+        }
+        if (entry.kind == slang::CoverageEntryKind::Branch)
+        {
+            if (entry.branchSiteID == 0 || entry.branchArmID == 0 ||
+                entry.branchArmKind == slang::CoverageBranchArmKind::Unknown)
+            {
+                return SLANG_FAIL;
+            }
+            out << ", \"branch_site\": " << (int64_t)entry.branchSiteID;
+            out << ", \"branch_arm\": " << (int64_t)entry.branchArmID;
+            out << ", \"branch_arm_kind\": \"" << _getCoverageBranchArmKindName(entry.branchArmKind)
+                << "\"";
+        }
+        out << "}";
+    }
+    out << "\n  ]\n";
+    out << "}\n";
+
+    Slang::ComPtr<ISlangBlob> blob = Slang::StringBlob::create(out.toString());
+    if (!blob)
+        return SLANG_E_OUT_OF_MEMORY;
+    *outBlob = blob.detach();
+    return SLANG_OK;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Module Loading !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 SLANG_EXTERN_C SLANG_API slang::IModule* slang_loadModuleFromSource(
@@ -1101,7 +1318,7 @@ SLANG_EXTERN_C SLANG_API slang::IModule* slang_loadModuleFromSource(
 
     // Create a blob from the source data using the slang_createBlob function.
     Slang::ComPtr<ISlangBlob> sourceBlob;
-    sourceBlob = slang_createBlob(source, sourceSize);
+    sourceBlob.attach(slang_createBlob(source, sourceSize));
     if (!sourceBlob)
         return nullptr;
 
@@ -1122,7 +1339,7 @@ SLANG_EXTERN_C SLANG_API slang::IModule* slang_loadModuleFromIRBlob(
 
     // Create a blob from the source data using the slang_createBlob function.
     Slang::ComPtr<ISlangBlob> sourceBlob;
-    sourceBlob = slang_createBlob(source, sourceSize);
+    sourceBlob.attach(slang_createBlob(source, sourceSize));
     if (!sourceBlob)
         return nullptr;
 
@@ -1143,7 +1360,7 @@ SLANG_EXTERN_C SLANG_API SlangResult slang_loadModuleInfoFromIRBlob(
 
     // Create a blob from the source data using the slang_createBlob function.
     Slang::ComPtr<ISlangBlob> sourceBlob;
-    sourceBlob = slang_createBlob(source, sourceSize);
+    sourceBlob.attach(slang_createBlob(source, sourceSize));
     if (!sourceBlob)
         return SLANG_E_INVALID_ARG;
 

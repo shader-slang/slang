@@ -14,7 +14,7 @@ import GlossyMaterialInstance;
 //TEST_INPUT: type_conformance DiffuseMaterial:IMaterial = 0
 //TEST_INPUT: type_conformance GlossyMaterial:IMaterial = 1
 
-[BackwardDifferentiable]
+[Differentiable]
 float3 evalBSDF(int type)
 {
     float3 wi = normalize(float3(0.5, 0.2, 0.8));

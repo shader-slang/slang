@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import datetime
+import glob
 import html as html_mod
 import json
 import os
@@ -35,7 +36,11 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Generate CI analytics HTML from job data."
     )
-    parser.add_argument("--input", default="ci_jobs.json", help="Input JSON file")
+    parser.add_argument("--input", default="ci_jobs.json", help="Input JSON file (legacy single-file mode)")
+    parser.add_argument(
+        "--input-dir",
+        help="Input directory containing monthly ci_jobs_YYYY-MM.json files (preferred over --input)",
+    )
     parser.add_argument(
         "--pr-input", default="pr_merges.json",
         help="Input JSON file with merged PR data (default: pr_merges.json)",
@@ -968,6 +973,20 @@ def generate_statistics(data, config, output_dir):
             "fill": True,
             "tension": 0.1,
         })
+    parallel_datasets_js = ",".join(
+        (
+            "{"
+            f"label:{json.dumps(ds['label'])}, "
+            f"data:sliceData({json.dumps(ds['data'])},30), "
+            f"_allData:{json.dumps(ds['data'])}, "
+            f"borderColor:{json.dumps(ds['borderColor'])}, "
+            f"backgroundColor:{json.dumps(ds['backgroundColor'])}, "
+            f"fill:{json.dumps(ds['fill'])}, "
+            f"tension:{json.dumps(ds['tension'])}"
+            "}"
+        )
+        for ds in parallel_datasets
+    )
 
     # Build and test wait times per day
     build_wait_by_date = data.get("build_wait_by_date", {})
@@ -1138,6 +1157,10 @@ const allMqFailure = {json.dumps(mq_failure_per_day)};
 const allMqCancelled = {json.dumps(mq_cancelled_per_day)};
 const allMqFailRate = {json.dumps(mq_fail_rate_per_day)};
 const allMqTat = {json.dumps(mq_avg_tat_per_day)};
+const allQueueWaitAvg = {json.dumps(cap_avg_queue)};
+const allQueueWaitP50 = {json.dumps(cap_p50_queue)};
+const allQueueWaitP90 = {json.dumps(cap_p90_queue)};
+const allQueueWaitP95 = {json.dumps(cap_p95_queue)};
 const hasMqData = {json.dumps(has_mq_data)};
 
 let charts = [];
@@ -1295,25 +1318,25 @@ new Chart(document.getElementById('byGroup_canvas').getContext('2d'), {{
 }});
 
 // Parallelization rate
-new Chart(document.getElementById('parallelRate_canvas').getContext('2d'), {{
-  type: 'line',
+makeChart('parallelRate_canvas', 'line', {{
   data: {{
-    labels: {json.dumps(dates)},
-    datasets: {json.dumps(parallel_datasets)}
+    labels: sliceData(allLabels, 30),
+    datasets: [
+      {parallel_datasets_js}
+    ]
   }},
   options: {{responsive:true, scales:{{y:{{stacked:true,min:0,title:{{display:true,text:'Avg Concurrent Runners'}}}}}}}}
 }});
 
 // Queue wait time percentiles
-new Chart(document.getElementById('queueWait_canvas').getContext('2d'), {{
-  type: 'line',
+makeChart('queueWait_canvas', 'line', {{
   data: {{
-    labels: {json.dumps(dates)},
+    labels: sliceData(allLabels, 30),
     datasets: [
-      {{label:'Avg', data:{json.dumps(cap_avg_queue)}, borderColor:'#0d6efd', fill:false, tension:0.1}},
-      {{label:'p50', data:{json.dumps(cap_p50_queue)}, borderColor:'#28a745', borderDash:[5,5], fill:false, tension:0.1}},
-      {{label:'p90', data:{json.dumps(cap_p90_queue)}, borderColor:'#ffc107', borderDash:[5,5], fill:false, tension:0.1}},
-      {{label:'p95', data:{json.dumps(cap_p95_queue)}, borderColor:'#dc3545', borderDash:[5,5], fill:false, tension:0.1}},
+      {{label:'Avg', data:sliceData(allQueueWaitAvg,30), _allData:allQueueWaitAvg, borderColor:'#0d6efd', fill:false, tension:0.1}},
+      {{label:'p50', data:sliceData(allQueueWaitP50,30), _allData:allQueueWaitP50, borderColor:'#28a745', borderDash:[5,5], fill:false, tension:0.1}},
+      {{label:'p90', data:sliceData(allQueueWaitP90,30), _allData:allQueueWaitP90, borderColor:'#ffc107', borderDash:[5,5], fill:false, tension:0.1}},
+      {{label:'p95', data:sliceData(allQueueWaitP95,30), _allData:allQueueWaitP95, borderColor:'#dc3545', borderDash:[5,5], fill:false, tension:0.1}},
     ]
   }},
   options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
@@ -1538,6 +1561,40 @@ def generate_health(output_dir):
         f.write(page_template("Health", body, "Health"))
 
 
+def _load_monthly_jobs(input_dir):
+    """Load all ci_jobs_YYYY-MM.json files from a directory into a flat list."""
+    pattern = os.path.join(input_dir, "ci_jobs_*.json")
+    files = sorted(glob.glob(pattern))
+    # Filter to only YYYY-MM format files (exclude legacy ci_jobs.json if present)
+    prefix = "ci_jobs_"
+    suffix = ".json"
+    files = [
+        p for p in files
+        if (m := os.path.basename(p)[len(prefix):-len(suffix)])
+        and len(m) == 7
+        and m[4] == "-"
+    ]
+    if not files:
+        print(f"Error: no ci_jobs_*.json files found in {input_dir}", file=sys.stderr)
+        sys.exit(2)
+    all_jobs = []
+    for path in files:
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, list):
+                print(
+                    f"Error: expected top-level array in {path}, got {type(data).__name__}",
+                    file=sys.stderr,
+                )
+                sys.exit(2)
+            all_jobs.extend(data)
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Error: failed reading {path}: {e}", file=sys.stderr)
+            sys.exit(2)
+    return all_jobs
+
+
 # --- Main ---
 
 
@@ -1546,25 +1603,29 @@ def main():
     config = load_config()
 
     # Load job data
-    print(f"Loading job data from {args.input}...")
-    try:
-        with open(args.input, encoding="utf-8") as f:
-            jobs_data = json.load(f)
-    except FileNotFoundError:
-        print(f"Error: input JSON not found: {args.input}", file=sys.stderr)
-        sys.exit(2)
-    except json.JSONDecodeError as e:
-        print(f"Error: invalid JSON in {args.input}: {e}", file=sys.stderr)
-        sys.exit(2)
-    except OSError as e:
-        print(f"Error: failed reading {args.input}: {e}", file=sys.stderr)
-        sys.exit(2)
-    if not isinstance(jobs_data, list):
-        print(
-            f"Error: expected top-level array in {args.input}, got {type(jobs_data).__name__}",
-            file=sys.stderr,
-        )
-        sys.exit(2)
+    if args.input_dir:
+        print(f"Loading job data from {args.input_dir}/...")
+        jobs_data = _load_monthly_jobs(args.input_dir)
+    else:
+        print(f"Loading job data from {args.input}...")
+        try:
+            with open(args.input, encoding="utf-8") as f:
+                jobs_data = json.load(f)
+        except FileNotFoundError:
+            print(f"Error: input JSON not found: {args.input}", file=sys.stderr)
+            sys.exit(2)
+        except json.JSONDecodeError as e:
+            print(f"Error: invalid JSON in {args.input}: {e}", file=sys.stderr)
+            sys.exit(2)
+        except OSError as e:
+            print(f"Error: failed reading {args.input}: {e}", file=sys.stderr)
+            sys.exit(2)
+        if not isinstance(jobs_data, list):
+            print(
+                f"Error: expected top-level array in {args.input}, got {type(jobs_data).__name__}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
     print(f"Loaded {len(jobs_data)} jobs")
 
     # Load PR merge data (optional)

@@ -1,0 +1,208 @@
+@echo off
+rem This batch file helps coding agents (e.g. Codex, Claude Code, Copilot) build
+rem the Slang project on Windows sandbox environments.
+rem
+rem The script loads the MSVC environment via vcvarsall.bat, configures the project
+rem using the Visual Studio 2022 generator (`vs2022-dev` preset), and builds it from
+rem the command line. It prefers locally cached dependencies so the configure step
+rem does not need to fetch packages over the network.
+rem
+rem Usage:
+rem   extras\win-sandbox-build.bat [debug|release|releaseWithDebugInfo|minSizeRel] [x64|arm64|Win32] [target...]
+rem
+rem By default this script builds `slangc`, `slang-test`, and `slangi`. This
+rem avoids the Visual Studio CLI `ALL_BUILD` aggregation path, which is not
+rem reliable in sandboxed runs.
+rem The build is also kept single-node because `/m` has proven flaky in sandboxed
+rem MSBuild invocations.
+
+setlocal EnableExtensions EnableDelayedExpansion
+
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%..") do set "REPO_ROOT=%%~fI"
+set "CONFIGURE_PRESET=vs2022-dev"
+set "DEFAULT_BUILD_KIND=debug"
+set "DEFAULT_ARCH=x64"
+set "DEFAULT_BUILD_TARGETS=slangc slang-test slangi"
+
+set "BUILD_KIND=%DEFAULT_BUILD_KIND%"
+set "TARGET_ARCH=%DEFAULT_ARCH%"
+set "VCVARS_ARCH=x64"
+set "BUILD_TARGETS="
+
+if "%~1"=="" goto build_kind_done
+if /i "%~1"=="debug" set "BUILD_KIND=debug" & shift & goto build_kind_done
+if /i "%~1"=="release" set "BUILD_KIND=release" & shift & goto build_kind_done
+if /i "%~1"=="releaseWithDebugInfo" set "BUILD_KIND=releaseWithDebugInfo" & shift & goto build_kind_done
+if /i "%~1"=="minSizeRel" set "BUILD_KIND=minSizeRel" & shift & goto build_kind_done
+:build_kind_done
+
+if "%~1"=="" goto target_arch_done
+if /i "%~1"=="x64" set "TARGET_ARCH=x64" & set "VCVARS_ARCH=x64" & shift & goto target_arch_done
+if /i "%~1"=="arm64" set "TARGET_ARCH=ARM64" & set "VCVARS_ARCH=arm64" & shift & goto target_arch_done
+if /i "%~1"=="Win32" set "TARGET_ARCH=Win32" & set "VCVARS_ARCH=x86" & shift & goto target_arch_done
+if /i "%~1"=="x86" set "TARGET_ARCH=Win32" & set "VCVARS_ARCH=x86" & shift & goto target_arch_done
+:target_arch_done
+
+if "%~1"=="" goto build_targets_done
+set "BUILD_TARGETS=%~1"
+shift
+:collect_build_targets
+if "%~1"=="" goto build_targets_done
+set "BUILD_TARGETS=!BUILD_TARGETS! %~1"
+shift
+goto collect_build_targets
+:build_targets_done
+
+if not defined BUILD_TARGETS set "BUILD_TARGETS=%DEFAULT_BUILD_TARGETS%"
+
+if /i "%BUILD_KIND%"=="debug" set "BUILD_PRESET=vs2022-dev-debug"
+if /i "%BUILD_KIND%"=="release" set "BUILD_PRESET=vs2022-dev-release"
+if /i "%BUILD_KIND%"=="releaseWithDebugInfo" set "BUILD_PRESET=vs2022-dev-releaseWithDebugInfo"
+if /i "%BUILD_KIND%"=="minSizeRel" set "BUILD_PRESET=vs2022-dev-minSizeRel"
+
+set "VCVARSALL="
+
+if defined VSINSTALLDIR if exist "%VSINSTALLDIR%VC\Auxiliary\Build\vcvarsall.bat" (
+    set "VCVARSALL=%VSINSTALLDIR%VC\Auxiliary\Build\vcvarsall.bat"
+)
+
+if not defined VCVARSALL (
+    set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+    if exist "%VSWHERE%" (
+        for /f "usebackq delims=" %%I in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do (
+            if exist "%%~I\VC\Auxiliary\Build\vcvarsall.bat" (
+                set "VCVARSALL=%%~I\VC\Auxiliary\Build\vcvarsall.bat"
+            )
+        )
+    )
+)
+
+if not defined VCVARSALL (
+    for %%I in (
+        "%ProgramFiles%\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvarsall.bat"
+        "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat"
+        "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
+        "%ProgramFiles%\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat"
+        "%ProgramFiles%\Microsoft Visual Studio\18\Insiders\VC\Auxiliary\Build\vcvarsall.bat"
+    ) do (
+        if not defined VCVARSALL if exist "%%~I" set "VCVARSALL=%%~I"
+    )
+)
+
+if not defined VCVARSALL (
+    echo Failed to locate vcvarsall.bat.
+    echo Install Visual Studio C++ tools or update this script with the correct path.
+    exit /b 1
+)
+
+where cmake.exe >nul 2>&1
+if errorlevel 1 (
+    echo Failed to find cmake.exe in PATH.
+    exit /b 1
+)
+
+echo Loading MSVC environment from:
+echo   %VCVARSALL%
+call "%VCVARSALL%" %VCVARS_ARCH%
+if errorlevel 1 (
+    echo vcvarsall.bat failed.
+    exit /b 1
+)
+
+pushd "%REPO_ROOT%"
+
+set "LOCAL_CACHE_INIT_FILE=%REPO_ROOT%\build\win-sandbox-build-local-deps.cmake"
+set "LOCAL_FETCHCONTENT_CACHE_DIR_PRIMARY=%REPO_ROOT%\build\_deps"
+set "LOCAL_FETCHCONTENT_CACHE_DIR_SECONDARY=%REPO_ROOT%\build\windows-vs2022-dev\_deps"
+set "LOCAL_PACKAGE_CACHE_DIR_PRIMARY=%REPO_ROOT%\build"
+set "LOCAL_PACKAGE_CACHE_DIR_SECONDARY=%REPO_ROOT%\build\windows-vs2022-dev"
+set /a LOCAL_FETCHCONTENT_OVERRIDE_COUNT=0
+
+if not exist "%REPO_ROOT%\build" (
+    mkdir "%REPO_ROOT%\build"
+)
+
+> "%LOCAL_CACHE_INIT_FILE%" echo # Auto-generated by extras\win-sandbox-build.bat
+>> "%LOCAL_CACHE_INIT_FILE%" echo set^(SLANG_IGNORE_ABORT_MSG ON CACHE BOOL "" FORCE^)
+rem Propagate the SLANG_ENABLE_COVERAGE env var into the cmake cache so the
+rem coverage-oriented MSVC flags (e.g. /Ob0 in cmake/CompilerFlags.cmake)
+rem apply to the build. Opt-in; default off.
+if /i "%SLANG_ENABLE_COVERAGE%"=="ON" (
+    >> "%LOCAL_CACHE_INIT_FILE%" echo set^(SLANG_ENABLE_COVERAGE ON CACHE BOOL "" FORCE^)
+)
+set "LOCAL_PATH="
+for %%D in (DXC WINPIX AGILITY_SDK AFTERMATH_SDK NVAPI OPTIX_8_0 OPTIX_8_1 OPTIX_9_0 VULKAN_HEADERS METAL_CPP DAWN GLFW) do (
+    set "LOCAL_PATH="
+    if exist "%LOCAL_FETCHCONTENT_CACHE_DIR_PRIMARY%\%%D-src" set "LOCAL_PATH=%LOCAL_FETCHCONTENT_CACHE_DIR_PRIMARY%\%%D-src"
+    if not defined LOCAL_PATH if exist "%LOCAL_FETCHCONTENT_CACHE_DIR_SECONDARY%\%%D-src" set "LOCAL_PATH=%LOCAL_FETCHCONTENT_CACHE_DIR_SECONDARY%\%%D-src"
+    if defined LOCAL_PATH (
+        set "LOCAL_PATH=!LOCAL_PATH:\=/!"
+        set /a LOCAL_FETCHCONTENT_OVERRIDE_COUNT+=1
+        echo   Using local FetchContent source for %%D: !LOCAL_PATH!
+        >> "%LOCAL_CACHE_INIT_FILE%" echo set^(FETCHCONTENT_SOURCE_DIR_%%D "!LOCAL_PATH!" CACHE PATH "" FORCE^)
+    )
+)
+
+set "LOCAL_PATH="
+if exist "%LOCAL_PACKAGE_CACHE_DIR_PRIMARY%\webgpu_dawn-windows-x64" set "LOCAL_PATH=%LOCAL_PACKAGE_CACHE_DIR_PRIMARY%\webgpu_dawn-windows-x64"
+if not defined LOCAL_PATH if exist "%LOCAL_PACKAGE_CACHE_DIR_SECONDARY%\webgpu_dawn-windows-x64" set "LOCAL_PATH=%LOCAL_PACKAGE_CACHE_DIR_SECONDARY%\webgpu_dawn-windows-x64"
+if defined LOCAL_PATH (
+    set "LOCAL_PATH=!LOCAL_PATH:\=/!"
+    echo   Using local package cache for SLANG_WEBGPU_DAWN_BINARY_URL: !LOCAL_PATH!
+    >> "%LOCAL_CACHE_INIT_FILE%" echo set^(SLANG_WEBGPU_DAWN_BINARY_URL "!LOCAL_PATH!" CACHE STRING "" FORCE^)
+)
+
+set "LOCAL_PATH="
+if exist "%LOCAL_PACKAGE_CACHE_DIR_PRIMARY%\slang-tint-windows-x64" set "LOCAL_PATH=%LOCAL_PACKAGE_CACHE_DIR_PRIMARY%\slang-tint-windows-x64"
+if not defined LOCAL_PATH if exist "%LOCAL_PACKAGE_CACHE_DIR_SECONDARY%\slang-tint-windows-x64" set "LOCAL_PATH=%LOCAL_PACKAGE_CACHE_DIR_SECONDARY%\slang-tint-windows-x64"
+if defined LOCAL_PATH (
+    set "LOCAL_PATH=!LOCAL_PATH:\=/!"
+    echo   Using local package cache for SLANG_SLANG_TINT_BINARY_URL: !LOCAL_PATH!
+    >> "%LOCAL_CACHE_INIT_FILE%" echo set^(SLANG_SLANG_TINT_BINARY_URL "!LOCAL_PATH!" CACHE STRING "" FORCE^)
+)
+
+set "LLVM_LOCAL_PATH="
+for /d %%I in ("%LOCAL_PACKAGE_CACHE_DIR_PRIMARY%\slang-*-windows-x86_64") do (
+    if not defined LLVM_LOCAL_PATH if exist "%%~fI" set "LLVM_LOCAL_PATH=%%~fI"
+)
+for /d %%I in ("%LOCAL_PACKAGE_CACHE_DIR_SECONDARY%\slang-*-windows-x86_64") do (
+    if not defined LLVM_LOCAL_PATH if exist "%%~fI" set "LLVM_LOCAL_PATH=%%~fI"
+)
+for %%I in ("%LOCAL_PACKAGE_CACHE_DIR_PRIMARY%\slang-*-windows-x86_64.zip") do (
+    if not defined LLVM_LOCAL_PATH if exist "%%~fI" set "LLVM_LOCAL_PATH=%%~fI"
+)
+for %%I in ("%LOCAL_PACKAGE_CACHE_DIR_SECONDARY%\slang-*-windows-x86_64.zip") do (
+    if not defined LLVM_LOCAL_PATH if exist "%%~fI" set "LLVM_LOCAL_PATH=%%~fI"
+)
+if defined LLVM_LOCAL_PATH (
+    set "LLVM_LOCAL_PATH=!LLVM_LOCAL_PATH:\=/!"
+    echo   Using local package cache for SLANG_SLANG_LLVM_BINARY_URL: !LLVM_LOCAL_PATH!
+    >> "%LOCAL_CACHE_INIT_FILE%" echo set^(SLANG_SLANG_LLVM_BINARY_URL "!LLVM_LOCAL_PATH!" CACHE STRING "" FORCE^)
+)
+
+if not "!LOCAL_FETCHCONTENT_OVERRIDE_COUNT!"=="0" (
+    >> "%LOCAL_CACHE_INIT_FILE%" echo set^(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL "" FORCE^)
+    >> "%LOCAL_CACHE_INIT_FILE%" echo set^(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL "" FORCE^)
+    echo Reusing !LOCAL_FETCHCONTENT_OVERRIDE_COUNT! locally cached FetchContent package^(s^) in offline mode.
+)
+
+echo Configuring with preset "%CONFIGURE_PRESET%"...
+set "CMAKE_GENERATOR=Visual Studio 17 2022"
+set "CMAKE_GENERATOR_PLATFORM=%TARGET_ARCH%"
+cmake.exe --preset "%CONFIGURE_PRESET%" -C "%LOCAL_CACHE_INIT_FILE%"
+set "CONFIGURE_EXIT=%ERRORLEVEL%"
+set "CMAKE_GENERATOR="
+set "CMAKE_GENERATOR_PLATFORM="
+if exist "%LOCAL_CACHE_INIT_FILE%" del /q "%LOCAL_CACHE_INIT_FILE%" >nul 2>&1
+if not "%CONFIGURE_EXIT%"=="0" (
+    popd
+    exit /b %CONFIGURE_EXIT%
+)
+
+echo Building with preset "%BUILD_PRESET%" for target^(s^) "%BUILD_TARGETS%"...
+cmake.exe --build --preset "%BUILD_PRESET%" --verbose --target %BUILD_TARGETS%
+set "BUILD_EXIT=%ERRORLEVEL%"
+
+popd
+exit /b %BUILD_EXIT%

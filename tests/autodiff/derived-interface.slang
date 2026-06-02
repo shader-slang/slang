@@ -8,7 +8,7 @@ RWStructuredBuffer<float> outputBuffer;
 interface IFoo : IDifferentiable
 {
     [Differentiable]
-    __init<T:IFoo>(T d); 
+    __init<T : IFoo>(T d); 
     
     [Differentiable]
     static This create(Differential d);

@@ -134,9 +134,6 @@ public:
                     break;
                 switch (child->getOp())
                 {
-                case kIROp_GenericSpecializationDictionary:
-                case kIROp_ExistentialFuncSpecializationDictionary:
-                case kIROp_ExistentialTypeSpecializationDictionary:
                 case kIROp_DebugInlinedAt:
                 case kIROp_DebugFunction:
                     continue;

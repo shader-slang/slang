@@ -51,13 +51,9 @@ cd ../..
 
 1. Update the SPIRV-Headers submodule to what SPIRV-Tools uses
    ```
-   git -C external/spirv-headers fetch
-   git -C external/spirv-tools/external/spirv-headers log -1 --oneline
-   git -C external/spirv-headers checkout [commit hash from the previous command]
-   ```
-   Alternatively you can get the hash value of spirv-headers with the following command,
-   ```
    grep spirv_headers_revision external/spirv-tools/DEPS
+   git -C external/spirv-headers fetch origin [commit hash from the previous command]
+   git -C external/spirv-headers checkout [commit hash from the previous command]
    ```
 
 Note that the update of SPIRV-Headers should be done after running `python3.exe utils\git-sync-deps`, because the python script will update `external/spirv-tools/external/spirv-headers` to whichever commit the current SPIRV-Tools depends on.

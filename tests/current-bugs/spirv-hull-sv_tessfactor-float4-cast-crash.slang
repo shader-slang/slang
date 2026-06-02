@@ -11,7 +11,7 @@ Slang currently allows authoring `float4`/`float2` here (and docs show this form
 but SPIR-V legalization introduces a BuiltinCast (vector -> array) which the SPIR-V
 emitter doesn't handle, leading to an internal error like:
 
-(0): error 99999: Slang compilation aborted due to an exception of ...: unimplemented:
+(0): error 99997: Slang compilation aborted due to an exception of ...: unimplemented:
 Unhandled local inst in spirv-emit:
 let  %1 : %2    = BuiltinCast(%3)
 */

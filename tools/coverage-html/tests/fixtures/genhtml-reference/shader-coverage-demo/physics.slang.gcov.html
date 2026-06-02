@@ -1,0 +1,124 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - demo-cpu.info - shader-coverage-demo/physics.slang</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="title">LCOV - code coverage report</td></tr>
+            <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+            <tr>
+              <td width="100%">
+                <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="10%" class="headerValue"><a href="../index.html" title="Click to go to top-level">top level</a> - <a href="index.html" title="Click to go to directory shader-coverage-demo">shader-coverage-demo</a> - physics.slang</td>
+            <td width="5%"></td>
+            <td width="5%"></td>
+            <td width="5%" class="headerCovTableHead">Coverage</td>
+            <td width="5%" class="headerCovTableHead" title="Covered + Uncovered code">Total</td>
+            <td width="5%" class="headerCovTableHead" title="Exercised code only">Hit</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">demo-cpu.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntryMed">85.7&nbsp;%</td>
+            <td class="headerCovTableEntry">14</td>
+            <td class="headerCovTableEntry">12</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test Date:</td>
+            <td class="headerValue">2026-04-24 16:05:06</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntryHi">-</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">0</td>
+          </tr>
+                  <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+          </table>
+
+          <table cellpadding=0 cellspacing=0 border=0>
+            <tr>
+              <td><br></td>
+            </tr>
+            <tr>
+              <td>
+<pre class="sourceHeading">            Line data    Source code</pre>
+<pre class="source">
+<span id="L1"><span class="lineNum">       1</span>              : // physics.slang — per-particle-type physics steps, split into its own</span>
+<span id="L2"><span class="lineNum">       2</span>              : // module to demonstrate that `-trace-coverage` attributes counters</span>
+<span id="L3"><span class="lineNum">       3</span>              : // correctly across multiple source files. The LCOV report produced</span>
+<span id="L4"><span class="lineNum">       4</span>              : // by the demo will contain separate `SF:` records for this file and</span>
+<span id="L5"><span class="lineNum">       5</span>              : // `simulate.slang`, each with its own per-line hit counts.</span>
+<span id="L6"><span class="lineNum">       6</span>              : </span>
+<span id="L7"><span class="lineNum">       7</span>              : public struct Particle</span>
+<span id="L8"><span class="lineNum">       8</span>              : {</span>
+<span id="L9"><span class="lineNum">       9</span>              :     public float3 position;</span>
+<span id="L10"><span class="lineNum">      10</span>              :     public float3 velocity;</span>
+<span id="L11"><span class="lineNum">      11</span>              :     public uint   type;</span>
+<span id="L12"><span class="lineNum">      12</span>              :     public uint   flags;</span>
+<span id="L13"><span class="lineNum">      13</span>              : };</span>
+<span id="L14"><span class="lineNum">      14</span>              : </span>
+<span id="L15"><span class="lineNum">      15</span>              : public float3 applyGravity(float3 velocity, float dt)</span>
+<span id="L16"><span class="lineNum">      16</span>              : {</span>
+<span id="L17"><span class="lineNum">      17</span> <span class="tlaGNC">         688 :     return velocity + float3(0.0, -9.8, 0.0) * dt;</span></span>
+<span id="L18"><span class="lineNum">      18</span>              : }</span>
+<span id="L19"><span class="lineNum">      19</span>              : </span>
+<span id="L20"><span class="lineNum">      20</span>              : public void stepFluid(inout Particle p, float dt)</span>
+<span id="L21"><span class="lineNum">      21</span>              : {</span>
+<span id="L22"><span class="lineNum">      22</span> <span class="tlaGNC">         528 :     p.velocity = applyGravity(p.velocity, dt);</span></span>
+<span id="L23"><span class="lineNum">      23</span>              :     // Viscous drag proportional to speed.</span>
+<span id="L24"><span class="lineNum">      24</span> <span class="tlaGNC">         176 :     float speed = length(p.velocity);</span></span>
+<span id="L25"><span class="lineNum">      25</span> <span class="tlaGNC">         176 :     if (speed &gt; 0.01)</span></span>
+<span id="L26"><span class="lineNum">      26</span> <span class="tlaGNC">         176 :         p.velocity -= normalize(p.velocity) * 0.5 * dt;</span></span>
+<span id="L27"><span class="lineNum">      27</span> <span class="tlaGNC">         176 :     p.position += p.velocity * dt;</span></span>
+<span id="L28"><span class="lineNum">      28</span>              : }</span>
+<span id="L29"><span class="lineNum">      29</span>              : </span>
+<span id="L30"><span class="lineNum">      30</span>              : public void stepGas(inout Particle p, float dt)</span>
+<span id="L31"><span class="lineNum">      31</span>              : {</span>
+<span id="L32"><span class="lineNum">      32</span>              :     // Gas rises buoyantly; no gravity pull, only ambient drag.</span>
+<span id="L33"><span class="lineNum">      33</span> <span class="tlaGNC">         504 :     p.velocity += float3(0.0, 2.5, 0.0) * dt;</span></span>
+<span id="L34"><span class="lineNum">      34</span> <span class="tlaGNC">         168 :     p.velocity *= 0.98;</span></span>
+<span id="L35"><span class="lineNum">      35</span> <span class="tlaGNC">         168 :     p.position += p.velocity * dt;</span></span>
+<span id="L36"><span class="lineNum">      36</span>              : }</span>
+<span id="L37"><span class="lineNum">      37</span>              : </span>
+<span id="L38"><span class="lineNum">      38</span>              : public void stepSolid(inout Particle p, float dt)</span>
+<span id="L39"><span class="lineNum">      39</span>              : {</span>
+<span id="L40"><span class="lineNum">      40</span>              :     // Solids fall under gravity; bounce on the floor.</span>
+<span id="L41"><span class="lineNum">      41</span> <span class="tlaGNC">         504 :     p.velocity = applyGravity(p.velocity, dt);</span></span>
+<span id="L42"><span class="lineNum">      42</span> <span class="tlaGNC">         168 :     p.position += p.velocity * dt;</span></span>
+<span id="L43"><span class="lineNum">      43</span> <span class="tlaGNC">         168 :     if (p.position.y &lt; 0.0)</span></span>
+<span id="L44"><span class="lineNum">      44</span>              :     {</span>
+<span id="L45"><span class="lineNum">      45</span> <span class="tlaUNC">           0 :         p.position.y = 0.0;</span></span>
+<span id="L46"><span class="lineNum">      46</span> <span class="tlaUNC">           0 :         p.velocity.y = -p.velocity.y * 0.6;  // inelastic bounce</span></span>
+<span id="L47"><span class="lineNum">      47</span>              :     }</span>
+<span id="L48"><span class="lineNum">      48</span>              : }</span>
+        </pre>
+              </td>
+            </tr>
+          </table>
+          <br>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+            <tr><td class="versionInfo">Generated by: <a href="https://github.com//linux-test-project/lcov" target="_parent">LCOV version 2.4-0</a></td></tr>
+          </table>
+          <br>
+
+</body>
+</html>

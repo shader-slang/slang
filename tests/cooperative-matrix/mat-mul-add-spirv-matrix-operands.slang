@@ -22,7 +22,8 @@ typealias CoopMatCType = CoopMat<T, MemoryScope.Subgroup, 16, 16, CoopMatMatrixU
 [numthreads(32, 1, 1)]
 void computeMain()
 {
-    // CHECK: OpCooperativeMatrixMulAddKHR {{.*}} NoneKHR
+    // When all types are unsigned and saturation is off, no operand mask is emitted.
+    // CHECK: OpCooperativeMatrixMulAddKHR %{{.*}} %{{.*}} %{{.*}} %{{.*}}{{$}}
     coopMatMulAdd<uint32_t, false>(
         CoopMatAType<uint16_t>(2),
         CoopMatBType<uint32_t>(3),

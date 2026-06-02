@@ -2,7 +2,7 @@
 
 // This test just needs to compile without crashing.
 
-// CUDA: __device__ void s_bwd_myKernel_0
+// CUDA: __device__ void s_bwdProp_myKernel_{{[0-9]+}}
 
 [Differentiable]
 uint3 load_foo(int32_t g_idx, TensorView<int32_t> indices)
@@ -64,7 +64,5 @@ void myKernel(DiffTensorView vertices, TensorView<int32_t> indices, DiffTensorVi
     if (cudaThreadIdx().x > 0)
         return;
 
-    TriangleFoo.Differential dp_g = TriangleFoo.dzero();
-
-    bwd_diff(load_triangle_foo)(cudaThreadIdx().x, vertices, indices, vertex_color, dp_g);
+    load_triangle_foo(cudaThreadIdx().x, vertices, indices, vertex_color);
 }

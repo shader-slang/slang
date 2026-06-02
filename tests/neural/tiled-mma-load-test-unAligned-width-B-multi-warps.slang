@@ -68,7 +68,6 @@ static const int N_TILES_PER_SUBGROUP = 2;
 public struct TestShMemSize : ISharedMemorySize {
     public static const uint Bytes = (SUBGROUP_COUNT * N_TILES_PER_SUBGROUP * TILE_SIZE) * sizeof(uint4);
 }
-typealias TestPool = SharedMemoryPool<TestShMemSize>;
 static const uint OffsetB = 0;
 
 void invalidateSharedMemory(uint tid, uint sharedMemOffset)
@@ -88,23 +87,9 @@ void invalidateSharedMemory(uint tid, uint sharedMemOffset)
         if (index >= TILE_SIZE * N_TILES_PER_SUBGROUP)
             break;
 
-        TestPool.data[sharedMemOffset + offset + index] = uint4(0x3C003C00);
+        neural_unittest.writeSharedMemory<TestShMemSize>(sharedMemOffset + offset + index, uint4(0x3C003C00));
     }
 
-    GroupMemoryBarrierWithWaveSync();
-}
-
-void testLoadShB<TargetEnum Target>(uint tid, uint tileIndex)
-{
-    half inputVector[InputSize];
-    float value = tid * 32;
-    for (int i = 0; i < 32; i++)
-    {
-        inputVector[i] = half(value + i);
-    }
-
-    uint subgroupIndex = tid / 32;
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, false>.loadVectorToShB(OffsetB, tileIndex, subgroupIndex, inputVector);
     GroupMemoryBarrierWithWaveSync();
 }
 
@@ -126,7 +111,7 @@ bool verifiedOutput(uint laneId, uint subgroupIndex, uint sharedMemOffset, uint 
         for (int i = 0; i < 2; i++)
         {
             uint indexInTile = laneId * 2 + i;
-            uint4 values = TestPool.data[sharedMemOffset + indexInTile];
+            uint4 values = neural_unittest.readSharedMemory<TestShMemSize>(sharedMemOffset + indexInTile);
             uint4 element = values;
 
             for (int j = 0; j < 4; j++)
@@ -163,7 +148,7 @@ bool verifiedOutput(uint laneId, uint subgroupIndex, uint sharedMemOffset, uint 
                 break;
 
             uint index = columnIndex * 2;
-            if (!TestPool.data[sharedMemOffset + index].equals(uint4(0)) || !TestPool.data[sharedMemOffset + index+1].equals(uint4(0)))
+            if (!neural_unittest.readSharedMemory<TestShMemSize>(sharedMemOffset + index).equals(uint4(0)) || !neural_unittest.readSharedMemory<TestShMemSize>(sharedMemOffset + index+1).equals(uint4(0)))
             {
                 return false;
             }
@@ -184,7 +169,7 @@ bool verifiedOutput(uint laneId, uint subgroupIndex, uint sharedMemOffset, uint 
             if (columnIndex >= 32)
                 break;
             uint index = columnIndex * 2;
-            if (!TestPool.data[sharedMemOffset + index].equals(uint4(0x3C003C00)) || !TestPool.data[sharedMemOffset + index+1].equals(uint4(0x3C003C00)))
+            if (!neural_unittest.readSharedMemory<TestShMemSize>(sharedMemOffset + index).equals(uint4(0x3C003C00)) || !neural_unittest.readSharedMemory<TestShMemSize>(sharedMemOffset + index+1).equals(uint4(0x3C003C00)))
             {
                 return false;
             }
@@ -202,19 +187,14 @@ void Test(uint tid, uint tileIndex, int resIndex)
     GroupMemoryBarrierWithGroupSync();
     invalidateSharedMemory(tid, OffsetB);
 
-    // Each warp will load its own tile.
-    __target_switch
-    {
-    case cuda:
-        testLoadShB<TargetEnum.CUDA>(tid, tileIndex);
-        break;
-    case spirv:
-        testLoadShB<TargetEnum.SPIR_V>(tid, tileIndex);
-        break;
-    }
-    // serialRead(tid, OffsetB);
+    half inputVector[InputSize];
+    float value = tid * 32;
+    for (int i = 0; i < 32; i++)
+        inputVector[i] = half(value + i);
 
     uint subgroupIndex = tid / 32;
+    neural_unittest.testLoadShB<InputSize, OutputSize, SubgroupSize, TestShMemSize, SUBGROUP_COUNT>(OffsetB, tileIndex, subgroupIndex, inputVector);
+
     int laneId = WaveGetLaneIndex();
     uint offset = subgroupIndex * (TILE_SIZE * N_TILES_PER_SUBGROUP);
     bool res = verifiedOutput(laneId, subgroupIndex, OffsetB + offset, tileIndex);
@@ -239,37 +219,6 @@ void Test(uint tid, uint tileIndex, int resIndex)
             }
         }
         outputBuffer[resIndex] = 1;
-    }
-}
-
-// This function is just used for debugging, not for verification. So keep it here.
-void serialRead(uint tid, uint sharedMemOffset)
-{
-    GroupMemoryBarrierWithGroupSync();
-
-    if (tid > 0)
-        return;
-
-    uint columnsPerTile = 16;
-    for (int id = 0; id < SUBGROUP_COUNT * N_TILES_PER_SUBGROUP * columnsPerTile; id++)
-    {
-        printf("col: %d\n", id);
-        for (int i = 0; i < 2; i++)
-        {
-            uint4 values = TestPool.data[sharedMemOffset + id * 2 + i];
-            uint4 element = values;
-            for (int j = 0; j < 4; j++)
-            {
-                uint value = element[j];
-                uint16_t a = (uint16_t)(value & 0xFFFF);
-                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
-
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
-                printf("%.1f %.1f ", float(aa), float(bb));
-            }
-        }
-        printf("\n");
     }
 }
 

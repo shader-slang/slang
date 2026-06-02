@@ -539,6 +539,40 @@ class TrimLastExpr : public PackQueryExpr
     FIDDLE(...)
 };
 
+FIDDLE(abstract)
+class ShapePackTransformExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() List<Expr*> args;
+
+    Expr* getArg(Index index) const { return args[index]; }
+    Index getArgCount() const { return args.getCount(); }
+};
+
+FIDDLE()
+class ShapeConcatExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ShapePermuteExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ShapeSwapExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ShapeReduceExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
 /// Expression for compile-time bit casting from floating-point to integer.
 /// __floatAsInt(expr) reinterprets the bits of a floating-point value as an integer.
 /// The input can be:
@@ -745,6 +779,31 @@ class BackwardDifferentiateExpr : public DifferentiateExpr
     FIDDLE(...)
 };
 
+/// An expression of the form `__apply(fn)` to access the
+/// apply-for-backward version of the function `fn`.
+/// Used in __func_extension to define a custom forward pass
+/// that returns a context for the backward pass.
+///
+FIDDLE()
+class ApplyForBwdExpr : public DifferentiateExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class FuncAsTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
+};
+
+FIDDLE()
+class FuncTypeOfExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
+};
+
 /// An expression of the form `__dispatch_kernel(fn, threadGroupSize, dispatchSize)` to
 /// dispatch a compute kernel from host.
 ///
@@ -864,8 +923,8 @@ class PackBranchTypeExpr : public Expr
     FIDDLE() TypeExp nonEmptyType;
 };
 
-/// An expression that applies a generic to arguments for some,
-/// but not all, of its explicit parameters.
+/// An expression that applies a generic after only some of its ordinary
+/// arguments have been provided.
 ///
 FIDDLE()
 class PartiallyAppliedGenericExpr : public Expr
@@ -878,8 +937,10 @@ public:
     /// The generic being applied
     DeclRef<GenericDecl> baseGenericDeclRef;
 
-    /// A substitution that includes the generic arguments known so far
-    List<Val*> knownGenericArgs;
+    /// Ordinary arguments already provided by the partial generic application.
+    /// Witness arguments are deliberately not stored here; they are formed only
+    /// after the remaining ordinary arguments are inferred.
+    List<Val*> providedOrdinaryArgs;
 };
 
 

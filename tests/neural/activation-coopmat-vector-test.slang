@@ -17,10 +17,16 @@ static const int VecSize = 3;
 static const int SubgroupSize = 32;
 static const int BatchSize = 32;
 
-typealias ShMemSize = SharedMemorySize<ElementType, TargetEnum.CUDA, ExecutionMode.Inference, SubgroupSize, BatchSize / SubgroupSize>;
 // Use a dummy layer size for shared memory calculation (we only need minimal shared memory for activations)
-typealias ShMemSizeLayer = ShMemSize.OfLayer1<VecSize, VecSize>;
-typealias Vec3 = WaveTangledVector<ElementType, ShMemSizeLayer, VecSize, SubgroupSize>;
+typealias ShMemSizeLayer = SharedMemorySize<
+    ElementType,
+    TargetEnum.CUDA,
+    ExecutionMode.Inference,
+    SubgroupSize,
+    BatchSize / SubgroupSize,
+    VecSize,
+    VecSize>;
+typealias Vec3 = WaveTangledVector<ElementType, ShMemSizeLayer, VecSize, SubgroupSize, 1>;
 
 // Helper: check if two floats are approximately equal
 bool approxEqual(ElementType a, ElementType b, ElementType eps = 0.0001)

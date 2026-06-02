@@ -13,6 +13,7 @@ concurrency:
 permissions:
   id-token: write # Required for Workload Identity (GCS auth)
   contents: read # Read slang repo
+  packages: read # Pull container images from ghcr.io
   pull-requests: write # For PR comments (if needed)
 
 jobs:
@@ -24,6 +25,7 @@ jobs:
       platform: x86_64
       config: relwithdebinfo
       runs-on: '["ubuntu-22.04"]'
+      container: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
       build-llvm: true
       deploy-pages: false
       server-count: 1
@@ -42,8 +44,32 @@ jobs:
       server-count: 1
     secrets: inherit
 
+  coverage-windows:
+    uses: ./.github/workflows/ci-slang-coverage.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: relwithdebinfo
+      runs-on: '["windows-latest"]'
+      build-llvm: true
+      deploy-pages: false
+      server-count: 1
+    secrets: inherit
+
   merge-and-deploy:
-    needs: [coverage-linux, coverage-macos]
+    needs: [coverage-linux, coverage-macos, coverage-windows]
+    # The merge / render work runs on any branch so dispatches off feature
+    # branches can validate the rendering pipeline (an artifact upload at
+    # the end exposes the output for inspection); the deploy-to-
+    # slang-coverage-reports steps below are still gated to master only.
+    # Linux + macOS success is required because the Organize Coverage Data
+    # step assumes their artifacts are present; Windows is allowed to fail
+    # (its block is guarded by `if [ -d ... ]`).
+    if: |
+      !cancelled() &&
+      needs.coverage-linux.result == 'success' &&
+      needs.coverage-macos.result == 'success'
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -62,7 +88,7 @@ jobs:
       - name: Organize Coverage Data
         run: |
           # Create organized structure
-          mkdir -p coverage-reports/{linux,macos}
+          mkdir -p coverage-reports/{linux,macos,windows}
 
           # Extract Linux coverage
           if [ -d "coverage-artifacts/coverage-linux-x86_64" ]; then
@@ -82,8 +108,152 @@ jobs:
             fi
           fi
 
+          # Extract Windows coverage. OpenCppCoverage does not produce a
+          # slangc-only HTML report on Windows (would require a second test
+          # pass with --excluded_sources baked in, doubling test-run time);
+          # the slangc LCOV is still captured and its totals flow through
+          # the JSON summary.
+          if [ -d "coverage-artifacts/coverage-windows-x86_64" ]; then
+            cp coverage-artifacts/coverage-windows-x86_64/coverage-summary.json coverage-reports/windows/
+            cp -r coverage-artifacts/coverage-windows-x86_64/coverage-html coverage-reports/windows/
+            if [ -f "coverage-artifacts/coverage-windows-x86_64/coverage-slangc.lcov" ]; then
+              cp coverage-artifacts/coverage-windows-x86_64/coverage-slangc.lcov coverage-reports/windows/
+            fi
+          fi
+
           echo "Organized coverage data:"
           ls -R coverage-reports/
+
+      - name: Render with slang-coverage-html (new renderer)
+        # Produces a merged cross-OS report and per-OS reports rendered with
+        # the new in-tree renderer (tools/coverage-html/slang-coverage-html.py).
+        # Runs alongside the existing per-OS HTML reports so output can be
+        # compared. Persists the merged LCOV + auth-summary so a future diff
+        # job can compare two runs without re-merging from scratch.
+        run: |
+          set -euo pipefail
+
+          ART=coverage-artifacts
+          MERGER=tools/coverage-html/slang-coverage-merge.py
+          RENDERER=tools/coverage-html/slang-coverage-html.py
+          SLANG_MERGE=tools/coverage/slang-merge.py
+          SLANG_RENDER=tools/coverage/slang-render.py
+
+          # Single source of truth: pull the runner-root prefixes from
+          # tools/coverage/slang_filters.py so the list used for the
+          # full-library merge below cannot drift from the one
+          # $SLANG_MERGE auto-injects for the slangc merge.
+          STRIP=()
+          while IFS= read -r prefix; do
+            STRIP+=( --strip-prefix "$prefix" )
+          done < <(
+            PYTHONPATH=tools/coverage python3 -c \
+              'from slang_filters import SLANG_CI_STRIP_PREFIXES; print("\n".join(SLANG_CI_STRIP_PREFIXES))'
+          )
+
+          # Locate the per-OS gzipped LCOV artifacts. The compiler-suffixed
+          # artifact names (e.g. coverage-lcov-linux-x86_64-clang-18) are set
+          # by ci-slang-coverage.yml's "Upload LCOV Report" step.
+          shopt -s nullglob
+          LINUX_GZ=( $ART/coverage-lcov-linux-*/coverage.lcov.gz )
+          MACOS_GZ=( $ART/coverage-lcov-macos-*/coverage.lcov.gz )
+          WINDOWS_GZ=( $ART/coverage-lcov-windows-*/coverage.lcov.gz )
+          shopt -u nullglob
+
+          # Build the inputs list for the multi-OS merge. Each --auth-summary
+          # locks per-file totals to llvm-cov report numbers (Linux + macOS
+          # only -- Windows has no llvm-cov report).
+          INPUTS=()
+          AUTH_FULL=()
+          AUTH_SLANGC=()
+          [ ${#LINUX_GZ[@]}   -gt 0 ] && INPUTS+=( "${LINUX_GZ[0]}" )
+          [ ${#MACOS_GZ[@]}   -gt 0 ] && INPUTS+=( "${MACOS_GZ[0]}" )
+          [ ${#WINDOWS_GZ[@]} -gt 0 ] && INPUTS+=( "${WINDOWS_GZ[0]}" )
+          [ -f "$ART/coverage-linux-x86_64/coverage-report.txt"        ] && AUTH_FULL+=( --auth-summary "$ART/coverage-linux-x86_64/coverage-report.txt" )
+          [ -f "$ART/coverage-macos-aarch64/coverage-report.txt"       ] && AUTH_FULL+=( --auth-summary "$ART/coverage-macos-aarch64/coverage-report.txt" )
+          [ -f "$ART/coverage-linux-x86_64/coverage-report-slangc.txt" ] && AUTH_SLANGC+=( --auth-summary "$ART/coverage-linux-x86_64/coverage-report-slangc.txt" )
+          [ -f "$ART/coverage-macos-aarch64/coverage-report-slangc.txt" ] && AUTH_SLANGC+=( --auth-summary "$ART/coverage-macos-aarch64/coverage-report-slangc.txt" )
+
+          if [ ${#INPUTS[@]} -eq 0 ]; then
+            echo "::warning::No per-OS LCOV artifacts found; skipping new-renderer reports."
+            exit 0
+          fi
+
+          # ----- Merged full-library report -----
+          mkdir -p coverage-reports/merged/full
+          MERGED_FULL_LCOV=coverage-reports/merged/full/coverage.lcov
+          MERGED_FULL_REPORT=coverage-reports/merged/full/coverage-report.txt
+          AUTH_OUT_FULL=()
+          [ ${#AUTH_FULL[@]} -gt 0 ] && AUTH_OUT_FULL=( --auth-summary-out "$MERGED_FULL_REPORT" )
+
+          python3 "$MERGER" "${INPUTS[@]}" "${STRIP[@]}" \
+            "${AUTH_FULL[@]}" "${AUTH_OUT_FULL[@]}" \
+            -o "$MERGED_FULL_LCOV"
+
+          REND_AUTH_FULL=()
+          [ -f "$MERGED_FULL_REPORT" ] && REND_AUTH_FULL=( --auth-summary "$MERGED_FULL_REPORT" )
+          python3 "$RENDERER" "$MERGED_FULL_LCOV" \
+            "${REND_AUTH_FULL[@]}" \
+            --title "Slang merged coverage (Linux + macOS + Windows)" \
+            --output-dir coverage-reports/merged/full/html
+
+          # ----- Merged slangc-only report (slang-merge.py auto-injects the
+          # slangc exclusion regex from tools/coverage/slang_filters.py) -----
+          mkdir -p coverage-reports/merged/slangc
+          MERGED_SLANGC_LCOV=coverage-reports/merged/slangc/coverage.lcov
+          MERGED_SLANGC_REPORT=coverage-reports/merged/slangc/coverage-report.txt
+          AUTH_OUT_SLANGC=()
+          [ ${#AUTH_SLANGC[@]} -gt 0 ] && AUTH_OUT_SLANGC=( --auth-summary-out "$MERGED_SLANGC_REPORT" )
+
+          python3 "$SLANG_MERGE" "${INPUTS[@]}" \
+            "${AUTH_SLANGC[@]}" "${AUTH_OUT_SLANGC[@]}" \
+            -o "$MERGED_SLANGC_LCOV"
+
+          REND_AUTH_SLANGC=()
+          [ -f "$MERGED_SLANGC_REPORT" ] && REND_AUTH_SLANGC=( --auth-summary "$MERGED_SLANGC_REPORT" )
+          python3 "$RENDERER" "$MERGED_SLANGC_LCOV" \
+            "${REND_AUTH_SLANGC[@]}" \
+            --title "Slang merged slangc coverage (Linux + macOS + Windows)" \
+            --output-dir coverage-reports/merged/slangc/html
+
+          # ----- Per-OS reports (new renderer, side-by-side with existing) -----
+          # Path-normalize each per-OS LCOV via the merger in single-input
+          # mode so --source-root resolves source files cleanly.
+          render_per_os() {
+            local os="$1" platform="$2"
+            local gz_glob=( $ART/coverage-lcov-$platform-*/coverage.lcov.gz )
+            [ ${#gz_glob[@]} -eq 0 ] && { echo "skip $os: no LCOV artifact"; return; }
+            local gz="${gz_glob[0]}"
+            local report="$ART/coverage-$platform/coverage-report.txt"
+            local report_slangc="$ART/coverage-$platform/coverage-report-slangc.txt"
+            local dest="coverage-reports/$os/new-html"
+
+            mkdir -p "$dest/full" "$dest/slangc"
+
+            python3 "$MERGER" "$gz" "${STRIP[@]}" -o "$dest/full/coverage.lcov"
+
+            local auth=()
+            [ -f "$report" ] && auth=( --auth-summary "$report" )
+            python3 "$RENDERER" "$dest/full/coverage.lcov" "${auth[@]}" \
+              --source-root . \
+              --title "Slang $os coverage (new renderer)" \
+              --output-dir "$dest/full/html"
+
+            auth=()
+            [ -f "$report_slangc" ] && auth=( --auth-summary "$report_slangc" )
+            python3 "$SLANG_RENDER" "$dest/full/coverage.lcov" "${auth[@]}" \
+              --source-root . \
+              --title "Slang $os slangc coverage (new renderer)" \
+              --output-dir "$dest/slangc/html"
+          }
+          shopt -s nullglob
+          render_per_os linux   linux-x86_64
+          render_per_os macos   macos-aarch64
+          render_per_os windows windows-x86_64
+          shopt -u nullglob
+
+          echo "New-renderer outputs:"
+          find coverage-reports -maxdepth 6 -name index.html -printf '  %p\n' | sort
 
       - name: Combine Platform Summaries
         run: |
@@ -92,8 +262,9 @@ jobs:
           COMMIT_SHORT=$(git rev-parse --short HEAD)
 
           # Read platform summaries
-          LINUX_JSON=$(cat coverage-reports/linux/coverage-summary.json || echo "{}")
-          MACOS_JSON=$(cat coverage-reports/macos/coverage-summary.json || echo "{}")
+          LINUX_JSON=$(cat coverage-reports/linux/coverage-summary.json 2>/dev/null || echo "{}")
+          MACOS_JSON=$(cat coverage-reports/macos/coverage-summary.json 2>/dev/null || echo "{}")
+          WINDOWS_JSON=$(cat coverage-reports/windows/coverage-summary.json 2>/dev/null || echo "{}")
 
           # Create combined summary (platforms only for now, merged TBD)
           cat > coverage-reports/combined-summary.json <<EOF
@@ -102,7 +273,8 @@ jobs:
             "commit": "${COMMIT_SHORT}",
             "platforms": {
               "linux": ${LINUX_JSON},
-              "macos": ${MACOS_JSON}
+              "macos": ${MACOS_JSON},
+              "windows": ${WINDOWS_JSON}
             }
           }
           EOF
@@ -110,7 +282,18 @@ jobs:
           echo "Combined summary:"
           cat coverage-reports/combined-summary.json
 
+      - name: Upload Merged Coverage Reports
+        # Lets feature-branch dispatches inspect the merged + new-renderer
+        # output without writing to slang-coverage-reports. Always uploads
+        # so we can compare the new and existing renderers across runs.
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports-merged
+          path: coverage-reports/
+          retention-days: 7
+
       - name: Checkout Coverage Reports Repository
+        if: github.ref == 'refs/heads/master'
         uses: actions/checkout@v4
         with:
           repository: "shader-slang/slang-coverage-reports"
@@ -118,6 +301,7 @@ jobs:
           token: ${{ secrets.SLANG_COVERAGE_REPORTS_PAT }}
 
       - name: Deploy Multi-Platform Coverage
+        if: github.ref == 'refs/heads/master'
         run: |
           REPORT_DATE=$(date -u +"%Y-%m-%d")
           COMMIT_SHORT=$(git rev-parse --short HEAD)
@@ -131,8 +315,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # Create directory structure
-          mkdir -p "${REPORT_DIR}"/{linux,macos}
-          mkdir -p reports/latest/{linux,macos}
+          mkdir -p "${REPORT_DIR}"/{linux,macos,windows}
+          mkdir -p reports/latest/{linux,macos,windows}
 
           # Copy Linux coverage
           cp -r ../coverage-reports/linux/coverage-html/* "${REPORT_DIR}/linux/"
@@ -150,11 +334,54 @@ jobs:
             cp -r ../coverage-reports/macos/coverage-html-slangc/* "${REPORT_DIR}/macos/slangc/"
           fi
 
+          # Copy Windows coverage. No coverage-html-slangc/ on Windows -- the
+          # full HTML report is the only browseable view; slangc totals come
+          # from coverage-slangc.lcov which we stash next to the summary.
+          if [ -d "../coverage-reports/windows/coverage-html" ]; then
+            cp -r ../coverage-reports/windows/coverage-html/* "${REPORT_DIR}/windows/"
+            cp ../coverage-reports/windows/coverage-summary.json "${REPORT_DIR}/windows/"
+            if [ -f "../coverage-reports/windows/coverage-slangc.lcov" ]; then
+              cp ../coverage-reports/windows/coverage-slangc.lcov "${REPORT_DIR}/windows/"
+            fi
+          fi
+
           # Copy combined summary
           cp ../coverage-reports/combined-summary.json "${REPORT_DIR}/"
 
+          # Copy new-renderer reports (rendered alongside the existing
+          # llvm-cov / ReportGenerator HTML so the two outputs can be
+          # compared visually). Best-effort: skip silently when missing.
+          for os in linux macos windows; do
+            for view in full slangc; do
+              src="../coverage-reports/$os/new-html/$view/html"
+              dest="${REPORT_DIR}/$os/new/$view"
+              if [ -d "$src" ]; then
+                mkdir -p "$dest"
+                cp -r "$src"/* "$dest/"
+              fi
+            done
+          done
+
+          # Merged cross-OS report (single canonical view that rolls up all
+          # three platforms). The merged LCOV + auth-summary are persisted
+          # next to the HTML so a future diff job can compare two historical
+          # runs without re-merging from scratch.
+          if [ -d ../coverage-reports/merged/full/html ]; then
+            mkdir -p "${REPORT_DIR}/merged/full"
+            cp -r ../coverage-reports/merged/full/html/* "${REPORT_DIR}/merged/full/"
+            cp ../coverage-reports/merged/full/coverage.lcov "${REPORT_DIR}/merged/full/" || true
+            cp ../coverage-reports/merged/full/coverage-report.txt "${REPORT_DIR}/merged/full/" 2>/dev/null || true
+          fi
+          if [ -d ../coverage-reports/merged/slangc/html ]; then
+            mkdir -p "${REPORT_DIR}/merged/slangc"
+            cp -r ../coverage-reports/merged/slangc/html/* "${REPORT_DIR}/merged/slangc/"
+            cp ../coverage-reports/merged/slangc/coverage.lcov "${REPORT_DIR}/merged/slangc/" || true
+            cp ../coverage-reports/merged/slangc/coverage-report.txt "${REPORT_DIR}/merged/slangc/" 2>/dev/null || true
+          fi
+
           # Update latest
-          rm -rf reports/latest/{linux,macos}/*
+          rm -rf reports/latest/{linux,macos,windows}/*
+          rm -rf reports/latest/merged
           cp -r ../coverage-reports/linux/coverage-html/* reports/latest/linux/
           cp ../coverage-reports/linux/coverage-summary.json reports/latest/linux/
           if [ -d "../coverage-reports/linux/coverage-html-slangc" ]; then
@@ -167,7 +394,38 @@ jobs:
             mkdir -p reports/latest/macos/slangc
             cp -r ../coverage-reports/macos/coverage-html-slangc/* reports/latest/macos/slangc/
           fi
+          if [ -d "../coverage-reports/windows/coverage-html" ]; then
+            cp -r ../coverage-reports/windows/coverage-html/* reports/latest/windows/
+            cp ../coverage-reports/windows/coverage-summary.json reports/latest/windows/
+            if [ -f "../coverage-reports/windows/coverage-slangc.lcov" ]; then
+              cp ../coverage-reports/windows/coverage-slangc.lcov reports/latest/windows/
+            fi
+          fi
           cp ../coverage-reports/combined-summary.json reports/latest/
+
+          # Mirror the new-renderer reports into reports/latest/.
+          for os in linux macos windows; do
+            for view in full slangc; do
+              src="../coverage-reports/$os/new-html/$view/html"
+              dest="reports/latest/$os/new/$view"
+              if [ -d "$src" ]; then
+                mkdir -p "$dest"
+                cp -r "$src"/* "$dest/"
+              fi
+            done
+          done
+          if [ -d ../coverage-reports/merged/full/html ]; then
+            mkdir -p reports/latest/merged/full
+            cp -r ../coverage-reports/merged/full/html/* reports/latest/merged/full/
+            cp ../coverage-reports/merged/full/coverage.lcov reports/latest/merged/full/ || true
+            cp ../coverage-reports/merged/full/coverage-report.txt reports/latest/merged/full/ 2>/dev/null || true
+          fi
+          if [ -d ../coverage-reports/merged/slangc/html ]; then
+            mkdir -p reports/latest/merged/slangc
+            cp -r ../coverage-reports/merged/slangc/html/* reports/latest/merged/slangc/
+            cp ../coverage-reports/merged/slangc/coverage.lcov reports/latest/merged/slangc/ || true
+            cp ../coverage-reports/merged/slangc/coverage-report.txt reports/latest/merged/slangc/ 2>/dev/null || true
+          fi
 
           # Cleanup old reports (keep last 7 days + monthly snapshots)
           if [ -f "tools/cleanup-old-reports.sh" ]; then
@@ -190,7 +448,7 @@ jobs:
             TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
             git commit -m "Add multi-platform coverage report for ${REPORT_DATE} (${COMMIT_SHORT})" \
                        -m "Generated from shader-slang/slang@${FULL_COMMIT}" \
-                       -m "Platforms: Linux (x86_64), macOS (aarch64)" \
+                       -m "Platforms: Linux (x86_64), macOS (aarch64), Windows (x86_64)" \
                        -m "Date: ${TIMESTAMP}"
 
             git push origin main

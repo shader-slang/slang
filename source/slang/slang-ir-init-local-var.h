@@ -10,4 +10,8 @@ struct IRGlobalValueWithCode;
 // the same basic block.
 void initializeLocalVariables(IRModule* module, IRGlobalValueWithCode* func);
 
+// Initialize out parameters with default values if they aren't being initialized locally in
+// the same basic block.
+void initializeOutParameters(IRModule* module, IRGlobalValueWithCode* func);
+
 } // namespace Slang

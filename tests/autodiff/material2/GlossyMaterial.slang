@@ -25,6 +25,8 @@ public struct GlossyMaterial : IMaterial
     [TreatAsDifferentiable]
     public void __bwd_d_getAlbedo(inout DifferentialPair<float3> dpAlbedo, float3 dOut)
     {
+        dpAlbedo = diffPair(dpAlbedo.p, float3.dzero());
+        
         [unroll]
         for (int j = 0; j < 3; j++) outputBuffer[j + 3] += dOut[j];
     }

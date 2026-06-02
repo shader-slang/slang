@@ -81,7 +81,7 @@ static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, i
     {
         // TODO: some way to check if the method
         // is actually used for autodiff
-        if (as<IRDifferentialPairUserCodeType>(inout->getValueType()))
+        if (as<IRDifferentialPairType>(inout->getValueType()))
             return Never;
 
         switch (stage)
@@ -116,26 +116,6 @@ static bool isAliasable(IRInst* inst)
         return true;
     default:
         break;
-    }
-
-    return false;
-}
-
-static bool isDifferentiableFunc(IRInst* func)
-{
-    for (auto decor = func->getFirstDecoration(); decor; decor = decor->getNextDecoration())
-    {
-        switch (decor->getOp())
-        {
-        case kIROp_ForwardDerivativeDecoration:
-        case kIROp_ForwardDifferentiableDecoration:
-        case kIROp_BackwardDerivativeDecoration:
-        case kIROp_BackwardDifferentiableDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration:
-            return true;
-        default:
-            break;
-        }
     }
 
     return false;
@@ -231,11 +211,7 @@ static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
     IRFuncType* ftype = nullptr;
     if (auto spec = as<IRSpecialize>(callee))
         ftn = as<IRFunc>(getResolvedInstForDecorations(spec));
-
-    // Differentiable functions are mostly ignored, treated as having inout parameters
-    else if (as<IRForwardDifferentiate>(callee))
-        return Store;
-    else if (as<IRBackwardDifferentiate>(callee))
+    else if (as<IRTranslateBase>(callee))
         return Store;
 
     else if (auto wit = as<IRLookupWitnessMethod>(callee))
@@ -307,6 +283,7 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
     // These instructions will store data...
     case kIROp_Store:
     case kIROp_SwizzledStore:
+    case kIROp_MatrixSwizzleStore:
     case kIROp_SPIRVAsm:
     case kIROp_AtomicStore:
         return Store;
@@ -618,11 +595,6 @@ static void checkParameterAsOut(
 
 static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
 {
-    // Differentiable functions will generate undefined values
-    // strictly so that they can be set in a differentiable way
-    if (isDifferentiableFunc(func))
-        return;
-
     auto firstBlock = func->getFirstBlock();
     if (!firstBlock)
         return;

@@ -20,7 +20,7 @@ Foo<3> getFoo(float x)
 [Differentiable]
 float foobar(float x)
 {
-    int i = 3 * int(floor(x));
+    int i = 3 * int(no_diff floor(x));
     Foo<3> foo = getFoo(x);
     return foo.x[i] * foo.x[i];
 }

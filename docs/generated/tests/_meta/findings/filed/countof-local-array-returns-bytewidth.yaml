@@ -1,0 +1,32 @@
+schema_version: 1
+id: countof-local-array-returns-bytewidth
+bundle: syntax-reference/keywords-and-builtins
+suspected_kind: wrong-codegen
+title: "[slangi] countof(fixed-size local array) returns byte width, not element count"
+observed_at: 2026-05-28T10:30:00+00:00
+evidence:
+  command: slangi repro.slang
+  source_slang: docs/generated/tests/syntax-reference/keywords-and-builtins/countof-local-array.slang
+  observed_summary: countof(localArr) under slangi prints 4 (the element byte width) instead of 5 (the documented element count); the variadic-pack form returns the correct count, so the bug is specific to plain fixed-size local-array values
+  exit_code: 0
+  minimized_repro: |
+    //TEST:INTERPRET(filecheck=CHECK):
+    void main()
+    {
+        static const int arr[5] = { 0, 0, 0, 0, 0 };
+        // CHECK: 5
+        printf("%d\n", countof(arr));
+    }
+  stderr_tail: "output observed: 4 (expected 5)"
+expected:
+  claim: countof(arr) on a fixed-size array of N elements returns N (the element count), per the language documentation for the countof builtin.
+  citation_kind: doc
+  citation: docs/generated/design/syntax-reference/keywords-and-builtins.md
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: fa86e5a04
+  doc_anchor: docs/generated/design/syntax-reference/keywords-and-builtins.md
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - May be slangi-only (interpreter) rather than a pipeline-wide defect; a `-target hlsl` compile-time-fold test would distinguish front-end vs interpreter.

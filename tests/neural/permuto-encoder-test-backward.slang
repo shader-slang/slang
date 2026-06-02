@@ -61,19 +61,13 @@ void encodeAllLevels(
     BindlessAddress<float> featureAddress,
     out float output[N_FEATURES])
 {
-    Encoder.Params params;
-    params.maxLevel = MAX_LEVEL_RATIO * float(N_LEVELS);
-
-    // Process all levels - encodePerLevel writes to output at correct offset
+    // Process all levels
     [ForceUnroll]
     for (uint level = 0; level < N_LEVELS; ++level)
     {
-        // Setup params using prepareLevelInfo which computes all level-specific parameters
-        Encoder.prepareLevelInfo(level, BASE_SCALE, LOG2_PER_LEVEL_SCALE, 1337u, params.levelInfo);
-
-        // Encode this level - writes to output at offset level * FEATURE_DIM_PER_ENTRY
-        Encoder.encodePerLevel<BindlessAddress<float>>(
-            params, position, featureAddress, output);
+        neural_unittest.testEncodePerLevel<float, N_POS_DIMS, FEATURE_DIM_PER_ENTRY, LOG2_HASHMAP_SIZE, N_LEVELS, InArray, OutArray>(
+            level, MAX_LEVEL_RATIO * float(N_LEVELS), BASE_SCALE, LOG2_PER_LEVEL_SCALE, 1337u,
+            position, featureAddress, output);
     }
 }
 
