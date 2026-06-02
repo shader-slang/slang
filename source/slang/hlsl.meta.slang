@@ -22908,7 +22908,7 @@ struct HitObject
             // Save the attributes
             __hitObjectAttributes<attr_t>() = attributes;
 
-            __glslMakeMotionHit(
+            __glslMakeMotionHitNV(
                 __return_val,
                 AccelerationStructure,
                 InstanceIndex,
@@ -23070,7 +23070,7 @@ struct HitObject
             // Save the attributes
             __hitObjectAttributes<attr_t>() = attributes;
 
-            __glslMakeMotionHitWithIndex(
+            __glslMakeMotionHitWithIndexNV(
                 __return_val,
                 AccelerationStructure,
                 InstanceIndex,              ///? Same as instanceid ?
@@ -23781,8 +23781,8 @@ struct HitObject
     __glsl_extension(GL_NV_cluster_acceleration_structure)
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     int GetClusterID()
     {
         __target_switch
@@ -23790,10 +23790,12 @@ struct HitObject
         case hlsl_nvapi: __intrinsic_asm ".GetClusterID";
         case glsl: __intrinsic_asm "hitObjectGetClusterIdNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetClusterId";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_cluster_acceleration_structure";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingClusterAccelerationStructureNV;
                 result:$$int = OpHitObjectGetClusterIdNV &this;
             };
@@ -23802,7 +23804,8 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     float4 GetSpherePositionAndRadius()
     {
         __target_switch
@@ -23812,10 +23815,12 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 OpCapability RayTracingSpheresGeometryNV;
                 %position:$$float3 = OpHitObjectGetSpherePositionNV &this;
@@ -23827,7 +23832,8 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     float2x4 GetLssPositionsAndRadii()
     {
         __target_switch
@@ -23837,10 +23843,12 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 OpCapability RayTracingSpheresGeometryNV;
                 %positions:$$float3[2] = OpHitObjectGetLSSPositionsNV &this;
@@ -23858,7 +23866,8 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     bool IsSphereHit()
     {
         __target_switch
@@ -23868,10 +23877,12 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectIsSphereHit";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 result:$$bool = OpHitObjectIsSphereHitNV &this;
             };
@@ -23880,7 +23891,8 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     bool IsLssHit()
     {
         __target_switch
@@ -23890,10 +23902,12 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectIsLSSHit";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 result:$$bool = OpHitObjectIsLSSHitNV &this;
             };
@@ -24577,7 +24591,7 @@ struct HitObject
     // "void hitObjectRecordMissMotionNV(hitObjectNV, uint, vec3, float, vec3, float, float);"
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
     static void __glslMakeMissMotionNV(
         out HitObject hitObj,
         uint MissShaderIndex,
@@ -24792,12 +24806,12 @@ struct HitObject
         }
     }
 
-    //  "void hitObjectRecordHitWithIndexMotionNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,float,int);"
+    // NV-specific helper used by public hitObjectRecordHitWithIndexMotionNV.
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
-    static void __glslMakeMotionHitWithIndex(
+    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
+    static void __glslMakeMotionHitWithIndexNV(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
@@ -24844,12 +24858,12 @@ struct HitObject
         }
     }
 
-        // "void hitObjectRecordHitMotionNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,float,int);"
+    // NV-specific helper used by public hitObjectRecordHitMotionNV.
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
-    static void __glslMakeMotionHit(
+    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
+    static void __glslMakeMotionHitNV(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
