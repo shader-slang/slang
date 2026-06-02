@@ -28186,6 +28186,7 @@ struct CoopMat
     /// @param element The starting element index in the buffer to store the matrix into.
     /// @param stride The stride in elements between consecutive rows (for row major layout) or columns (for column major layout)
     ///        and must be a multiple of 8 for __half element type or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
+    [ForceInline]
     [require(cooperative_matrix, byteaddressbuffer)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
@@ -28209,6 +28210,7 @@ struct CoopMat
     /// @param stride The stride in elements between consecutive rows (for row major layout) or
     ///        columns (for column major layout) and must be a multiple of 8 for __half element type
     ///        or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
+    [ForceInline]
     [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
@@ -28218,6 +28220,7 @@ struct CoopMat
         __store<matrixLayout>(buffer, element, stride);
     }
 
+    [ForceInline]
     [require(cuda_metal_spirv, cooperative_matrix)]
     void __store<
         let matrixLayout : CoopMatMatrixLayout,
@@ -28467,6 +28470,7 @@ ${
     {
 $}
 
+    [ForceInline]
     [__NoSideEffect]
     [require(cooperative_matrix, byteaddressbuffer)]
     static This Load<
@@ -28488,6 +28492,7 @@ $}
         }
     }
 
+    [ForceInline]
     [__NoSideEffect]
     [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
@@ -28876,6 +28881,7 @@ ${
     {
 $}
 
+    [ForceInline]
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,
@@ -28888,6 +28894,7 @@ $}
         return __loadLayout<Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
     }
 
+    [ForceInline]
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,
@@ -28901,6 +28908,7 @@ $}
         return __loadLayout<Dim, ClampMode>(buffer, element, tensorLayout);
     }
 
+    [ForceInline]
     [require(cooperative_matrix_tensor_addressing)]
     static This __loadLayout<
         let Dim : uint32_t,
@@ -29109,6 +29117,7 @@ ${
     } // RW
 $}
 
+    [ForceInline]
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
         let Dim : uint32_t,
@@ -29121,6 +29130,7 @@ $}
         Store(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
     }
 
+    [ForceInline]
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
         let Dim : uint32_t,

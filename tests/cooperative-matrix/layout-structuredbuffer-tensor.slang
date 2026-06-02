@@ -8,14 +8,14 @@
 // CHECK-DAG: %[[COOP_MAT:[A-Za-z0-9_]+]] = OpTypeCooperativeMatrixKHR %float
 // CHECK-DAG: %[[PTR_140]] = OpTypePointer StorageBuffer %float
 // CHECK-DAG: %[[PTR_430]] = OpTypePointer StorageBuffer %float
-// CHECK: %[[INPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_140]] %input140 %int_0 %{{[A-Za-z0-9_]+}}
+// CHECK: %[[INPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_140]] %input140 %int_0 %uint_0
 // CHECK: %[[MAT_140:[A-Za-z0-9_]+]] = OpCooperativeMatrixLoadTensorNV %[[COOP_MAT]] %[[INPUT_140]]
-// CHECK: %[[OUTPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_140]] %output140 %int_0 %{{[A-Za-z0-9_]+}}
-// CHECK: OpCooperativeMatrixStoreTensorNV %[[OUTPUT_140]] %{{[A-Za-z0-9_]+}}
-// CHECK: %[[INPUT_430:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_430]] %input430 %int_0 %{{[A-Za-z0-9_]+}}
+// CHECK: %[[OUTPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_140]] %output140 %int_0 %uint_0
+// CHECK: OpCooperativeMatrixStoreTensorNV %[[OUTPUT_140]] %[[MAT_140]]
+// CHECK: %[[INPUT_430:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_430]] %input430 %int_0 %uint_0
 // CHECK: %[[MAT_430:[A-Za-z0-9_]+]] = OpCooperativeMatrixLoadTensorNV %[[COOP_MAT]] %[[INPUT_430]]
-// CHECK: %[[OUTPUT_430:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_430]] %output430 %int_0 %{{[A-Za-z0-9_]+}}
-// CHECK: OpCooperativeMatrixStoreTensorNV %[[OUTPUT_430]] %{{[A-Za-z0-9_]+}}
+// CHECK: %[[OUTPUT_430:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_430]] %output430 %int_0 %uint_0
+// CHECK: OpCooperativeMatrixStoreTensorNV %[[OUTPUT_430]] %[[MAT_430]]
 
 // The scalar float element type has the same size in both layouts, but the
 // StructuredBuffer element stride differs: std140 rounds up to 16, std430 stays at 4.
