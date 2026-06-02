@@ -340,7 +340,7 @@ Reserve a descriptor set when auto-allocating the synthesized `__slang_coverage`
 
 **-coverage-manifest-output &lt;path&gt;**
 
-Write shader coverage manifest metadata to an explicit JSON sidecar path. Use this when compiled output is written to stdout or when the build needs a stable manifest path instead of the default `&lt;output&gt;.coverage-manifest.json` sidecar. Requires at least one coverage tracing mode, is not supported for container outputs, and is valid only when exactly one compiled artifact carries coverage metadata. 
+Write shader coverage manifest metadata to an explicit JSON sidecar path. Use this when compiled output is written to stdout or when the build needs a stable manifest path instead of the default `&lt;output&gt;.coverage-manifest.json` sidecar. Requires at least one coverage tracing mode, is not supported for container outputs, and is valid only when exactly one compiled artifact carries coverage metadata. The path must not overlap any emitted artifact path. 
 
 
 <a id="report-dynamic-dispatch-sites"></a>

@@ -1111,19 +1111,24 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
                 disassemblyArtifact.writeRef()));
 
             auto debugArtifact = getSeparateDbgArtifact(intermediateArtifact);
-            if (debugArtifact ||
-                findAssociatedRepresentation<slang::ICoverageTracingMetadata>(intermediateArtifact))
+            auto coverageMetadata =
+                findAssociatedRepresentation<slang::ICoverageTracingMetadata>(intermediateArtifact);
+            if (debugArtifact || coverageMetadata)
             {
                 // Preserve metadata sidecars when disassembly output still needs
                 // them: separate debug info historically used this association,
                 // and coverage manifests need the coverage metadata on the
-                // final disassembly artifact.
+                // final disassembly artifact. Keep separate-debug-only behavior
+                // to the historical first metadata artifact; copy all metadata
+                // only when coverage needs the coverage-specific association.
                 for (auto associated : intermediateArtifact->getAssociated())
                 {
                     if (associated->getDesc().payload == ArtifactPayload::Metadata ||
                         associated->getDesc().payload == ArtifactPayload::PostEmitMetadata)
                     {
                         disassemblyArtifact->addAssociated(associated);
+                        if (!coverageMetadata)
+                            break;
                     }
                 }
             }

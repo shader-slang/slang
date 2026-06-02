@@ -655,7 +655,8 @@ void initCommandOptions(CommandOptions& options)
          "a stable manifest path instead of the default "
          "`<output>.coverage-manifest.json` sidecar. Requires at least one coverage tracing mode, "
          "is not supported for container outputs, and is valid only when exactly one compiled "
-         "artifact carries coverage metadata."},
+         "artifact carries coverage metadata. The path must not overlap any emitted artifact "
+         "path."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,

@@ -1219,6 +1219,27 @@ static SlangResult _testCoverageExplicitSidecarRejectsWholeProgramCollision(
     return SLANG_OK;
 }
 
+static SlangResult _testWholeProgramOutputUsesTargetArtifactPath(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-whole-program");
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode != 0)
+        return SLANG_FAIL;
+    if (!File::exists(files.outputPath))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 static SlangResult _testCoverageExplicitSidecarSupportsMultiEntrySingleArtifact(
     UnitTestContext* context)
 {
@@ -1401,6 +1422,33 @@ static SlangResult _testCoverageExplicitSidecarRejectsContainerOutput(UnitTestCo
     return SLANG_OK;
 }
 
+static SlangResult _testCoverageExplicitSidecarReportsWriteFailure(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    String unwritableManifestPath =
+        Path::combine(files.basePath + ".missing-directory", "sidecar.coverage-manifest.json");
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-coverage-manifest-output");
+    args.add(unwritableManifestPath);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E52004", "unable to write file"))
+        return SLANG_FAIL;
+    if (File::exists(unwritableManifestPath))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 static slang::CompilerOptionEntry _makeBoolCompilerOption(
     slang::CompilerOptionName name,
     bool value)
@@ -1558,6 +1606,7 @@ SLANG_UNIT_TEST(SlangcCoverageManifestOutput)
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteDebugArtifact(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsWholeProgramCollision(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testWholeProgramOutputUsesTargetArtifactPath(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(
         _testCoverageExplicitSidecarSupportsMultiEntrySingleArtifact(unitTestContext)));
     SLANG_CHECK(
@@ -1569,5 +1618,6 @@ SLANG_UNIT_TEST(SlangcCoverageManifestOutput)
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarRequiresCoverage(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarRejectsContainerOutput(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarReportsWriteFailure(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageManifestOutputDoesNotAffectCompilerOptionHash()));
 }
