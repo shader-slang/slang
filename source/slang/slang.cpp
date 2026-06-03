@@ -78,10 +78,16 @@ const char* getBuildTagString()
     return SLANG_TAG_VERSION;
 }
 
-Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
+Profile getEffectiveTargetProfile(TargetRequest* target, CompilerOptionSet& optionSet)
 {
-    auto entryPointProfile = entryPoint->getProfile();
-    auto targetProfile = target->getOptionSet().getProfile();
+    auto& targetOptionSet = target->getOptionSet();
+    auto targetProfile = targetOptionSet.getProfile();
+    bool isExplicitProfile = targetOptionSet.hasOption(CompilerOptionName::Profile);
+    if (targetProfile.getFamily() == ProfileFamily::Unknown)
+    {
+        targetProfile = optionSet.getProfile();
+        isExplicitProfile = optionSet.hasOption(CompilerOptionName::Profile);
+    }
 
     // Depending on the target *format* we might have to restrict the
     // profile family to one that makes sense.
@@ -106,11 +112,35 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
     case CodeGenTarget::HLSL:
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::DXBytecodeAssembly:
-    case CodeGenTarget::DXIL:
-    case CodeGenTarget::DXILAssembly:
         if (targetProfile.getFamily() != ProfileFamily::DX)
         {
             targetProfile.setVersion(ProfileVersion::DX_5_1);
+        }
+        break;
+
+    case CodeGenTarget::DXIL:
+    case CodeGenTarget::DXILAssembly:
+        {
+            // DXIL generation goes through DXC, which requires Shader Model 6.0 or later.
+            // Apply this as the default only; keep explicit user DX profiles authoritative.
+            auto minVersion = ProfileVersion::DX_6_0;
+
+            if (optionSet.getBoolOption(CompilerOptionName::GenerateWholeProgram))
+            {
+                // DXC validation rejects lib_6_1 and lib_6_2, so default whole-program DXIL to
+                // the first accepted DXIL library shader-model version. Preserve the stage here;
+                // callers that must pass a lib_* profile to DXC clear the stage at that boundary.
+                minVersion = ProfileVersion::DX_6_3;
+            }
+
+            if (targetProfile.getFamily() != ProfileFamily::DX)
+            {
+                targetProfile.setVersion(minVersion);
+            }
+            else if (!isExplicitProfile && targetProfile.getVersion() < minVersion)
+            {
+                targetProfile.setVersion(minVersion);
+            }
         }
         break;
     case CodeGenTarget::Metal:
@@ -122,6 +152,19 @@ Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
         }
         break;
     }
+
+    return targetProfile;
+}
+
+Profile getEffectiveTargetProfile(TargetRequest* target)
+{
+    return getEffectiveTargetProfile(target, target->getOptionSet());
+}
+
+Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
+{
+    auto entryPointProfile = entryPoint->getProfile();
+    auto targetProfile = getEffectiveTargetProfile(target);
 
     auto entryPointProfileVersion = entryPointProfile.getVersion();
     auto targetProfileVersion = targetProfile.getVersion();

@@ -1,0 +1,53 @@
+# agentic-coverage-excludes.txt — paths skipped in the coverage agentic pass
+#
+# `tools/coverage/run-coverage.sh` reads this file and appends one
+# `-exclude-prefix` flag to the agentic slang-test invocation for each
+# entry. The agentic pass under coverage instrumentation can SIGSEGV
+# inside slang-test on certain tests; the orchestrator dies and takes
+# the tail of the suite down with it, so we exclude those tests up
+# front to keep the rest of the suite running and producing coverage.
+#
+# This file is NOT consulted by ci-agentic-tests-nightly.yml — those
+# tests still run in the nightly against the uninstrumented binary,
+# where they bucket as `failed(expected)` via expected-failures.txt
+# where appropriate. The exclude is purely a coverage-stability hack.
+#
+# Format
+# ------
+# One path per line. Lines starting with `#` and blank lines are
+# ignored. Comments after `#` on a path line are also stripped. Each
+# entry is passed verbatim to slang-test's `-exclude-prefix` flag,
+# which is a path-prefix filter — listing a directory excludes
+# everything under it.
+#
+# Each entry SHOULD be accompanied by a `#` comment block above it
+# documenting the symptom and how it was identified (CI run URL +
+# the last-printed test before the crash), so a future maintainer
+# can verify whether the underlying issue is still present.
+#
+# Staleness signal
+# ----------------
+# Unlike `-expected-failure-list`, `-exclude-prefix` has no
+# "passing tests that are expected to fail" reporter, so entries
+# here can rot silently once the underlying crash is fixed. To
+# audit the list periodically:
+#   1. Compile slang with coverage instrumentation locally.
+#   2. Remove an entry below and run
+#      `./tools/coverage/run-coverage.sh --with-agentic-tests`
+#      (or trigger the coverage workflow on a branch with the
+#      entry removed).
+#   3. If the run completes without a SIGSEGV in slang-test, the
+#      underlying crash has been fixed — drop the entry for real.
+# A green ci-agentic-tests-nightly run on the same test is a
+# necessary but NOT sufficient condition: the nightly uses an
+# uninstrumented binary, and the crash here is
+# coverage-instrumentation-specific.
+
+# Run 26813684019 (sequential reproducer with -server-count 1):
+# SIGSEGV in slang-test immediately after
+# ir-reference/metadata/type-layout-base.slang passes. The same
+# test is already listed in expected-failures.txt (it fails on the
+# uninstrumented Linux nightly); coverage instrumentation
+# escalates that failure into a SIGSEGV inside the slang-test
+# orchestrator, which kills the rest of the suite.
+docs/generated/tests/ir-reference/metadata/unorm-attr-on-buffer-element.slang

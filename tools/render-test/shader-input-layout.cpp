@@ -527,25 +527,17 @@ struct ShaderInputLayoutParser
         }
     }
 
+    // type name: <word> ( "." <word> )*
     String parseTypeName(Misc::TokenReader& parser)
     {
-        String typeName = parser.ReadWord();
         StringBuilder sb;
+        sb << parser.ReadWord();
 
-        while (true)
+        while (parser.AdvanceIf("."))
         {
-            sb << typeName;
-
-            if (parser.AdvanceIf("."))
-            {
-                sb << ".";
-                typeName = parser.ReadWord();
-                continue;
-            }
-
-            break;
+            sb << ".";
+            sb << parser.ReadWord();
         }
-
 
         if (parser.AdvanceIf("<"))
         {
