@@ -5159,9 +5159,13 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
 {
     // SPIR-V asm blocks and their sub-instructions are opaque to C-like targets.
     // Their operands may reference the enclosing function (e.g. $main), which
-    // would cause a false circularity in the emit ordering. Skip them entirely.
+    // would cause a false circularity in the emit ordering. Preserve the result
+    // type order, then skip asm operands.
     if (inst->getOp() == kIROp_SPIRVAsm)
+    {
+        ensureInstOperand(ctx, inst->getFullType());
         return;
+    }
 
     ensureInstOperand(ctx, inst->getFullType());
 

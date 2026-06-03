@@ -4470,6 +4470,8 @@ attribute_syntax [MaxRecords(count: int)] : MaxRecordsAttribute;
 
 /// Overrides the node identifier (name and optional array index) used in the work graph.
 /// The second argument (array index) is optional and defaults to 0.
+/// The front end materializes the default, so HLSL emission canonicalizes an omitted
+/// array index as an explicit `0`.
 __attributeTarget(FuncDecl)
 __attributeTarget(ParamDecl)
 attribute_syntax [NodeID(name: String, arrayIndex: int = 0)] : NodeIDAttribute;

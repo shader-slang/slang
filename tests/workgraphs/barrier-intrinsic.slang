@@ -20,6 +20,7 @@ void main(RWBuffer<int> buf)
     Barrier(BarrierMemoryTypeFlags.GROUP_SHARED_MEMORY, BarrierSemanticFlags.GROUP_SYNC);
     Barrier(BarrierMemoryTypeFlags.NODE_OUTPUT_MEMORY, BarrierSemanticFlags.GROUP_SYNC);
     Barrier(BarrierMemoryTypeFlags.UAV_MEMORY, (BarrierSemanticFlags)0);
+    Barrier((BarrierMemoryTypeFlags)0, BarrierSemanticFlags.GROUP_SYNC);
 }
 
 //CHK: dx.op.barrierByMemoryType(i32 244, i32 1, i32 1)
@@ -28,6 +29,7 @@ void main(RWBuffer<int> buf)
 //CHK: dx.op.barrierByMemoryType(i32 244, i32 2, i32 1)
 //CHK: dx.op.barrierByMemoryType(i32 244, i32 8, i32 1)
 //CHK: dx.op.barrierByMemoryType(i32 244, i32 1, i32 0)
+//CHK: dx.op.barrierByMemoryType(i32 244, i32 0, i32 1)
 
 //CHK_HLSL: Barrier((UAV_MEMORY), (GROUP_SYNC))
 //CHK_HLSL: Barrier((UAV_MEMORY | NODE_INPUT_MEMORY), (GROUP_SCOPE | DEVICE_SCOPE))
@@ -35,3 +37,4 @@ void main(RWBuffer<int> buf)
 //CHK_HLSL: Barrier((GROUP_SHARED_MEMORY), (GROUP_SYNC))
 //CHK_HLSL: Barrier((NODE_OUTPUT_MEMORY), (GROUP_SYNC))
 //CHK_HLSL: Barrier((UAV_MEMORY), (0))
+//CHK_HLSL: Barrier((0), (GROUP_SYNC))

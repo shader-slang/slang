@@ -1398,7 +1398,7 @@ static void _diagnoseNodeOnlyParameterAttributes(DiagnosticSink* sink, ParamDecl
 static bool _isWorkGraphMaxRecordsParameterType(Type* type)
 {
     type = unwrapConditionalType(type);
-    if (auto modifiedType = as<ModifiedType>(type))
+    while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
 
     auto declRefType = as<DeclRefType>(type);
@@ -1408,6 +1408,8 @@ static bool _isWorkGraphMaxRecordsParameterType(Type* type)
     auto decl = declRefType->getDeclRef().getDecl();
     auto name = decl ? decl->getName() : nullptr;
     if (!name)
+        return false;
+    if (!decl->findModifier<WorkGraphRecordTypeAttribute>())
         return false;
 
     char const* validTypeNames[] = {
@@ -1823,6 +1825,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     Diagnostics::ConflictingNodeGridAttributes{.decl = entryPointFuncDecl});
             }
             auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
+            if (!launchAttr)
+            {
+                sink->diagnose(
+                    Diagnostics::NodeLaunchAttributeRequired{.decl = entryPointFuncDecl});
+            }
             if ((hasMaxGrid || hasFixedGrid) && (!launchAttr || launchAttr->mode != "broadcasting"))
             {
                 sink->diagnose(

@@ -50,6 +50,16 @@ void recordsMain(
 }
 
 [shader("node")]
+[NodeLaunch("thread")]
+void recordsTooLargeMain(
+    [MaxRecords(257)] NodeOutput<OutputRecord> output,
+//CHECK: E31406
+    RWBuffer<int> buffer)
+{
+    buffer[0] = 0;
+}
+
+[shader("node")]
 [NodeLaunch("broadcasting")]
 [NodeDispatchGrid(1, 1, 1)]
 [NodeID("BadNode", -1)]
@@ -66,6 +76,16 @@ void nodeIDMain(RWBuffer<int> output)
 void nodeIDDefaultIndexMain(RWBuffer<int> output)
 {
     output[0] = 0;
+}
+
+[shader("node")]
+[NodeLaunch("thread")]
+void nodeArrayTooLargeMain(
+    [NodeArraySize(65536)] NodeOutputArray<OutputRecord> output,
+//CHECK: E31406
+    RWBuffer<int> buffer)
+{
+    buffer[0] = 0;
 }
 
 [shader("node")]

@@ -16,10 +16,36 @@ int helper()
     }
 }
 
+struct AsmResult
+{
+    int value;
+};
+
+RWStructuredBuffer<AsmResult> outputBuffer;
+
+AsmResult typedHelper()
+{
+    __target_switch
+    {
+    case hlsl:
+        AsmResult result;
+        result.value = 1;
+        return result;
+    case spirv:
+        return spirv_asm
+        {
+            OpName $computeMain "computeMain";
+            result: $$AsmResult = OpConstantNull $$AsmResult;
+        };
+    }
+}
+
+// CHECK: struct AsmResult
 // CHECK: [numthreads(1, 1, 1)]
 // CHECK: void computeMain()
 [numthreads(1, 1, 1)]
 void computeMain()
 {
     int value = helper();
+    outputBuffer[0] = typedHelper();
 }

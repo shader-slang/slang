@@ -75,6 +75,7 @@ enum class StageType
     Geometry,
     Fragment,
     Compute,
+    Dispatch,
     RayGeneration,
     Intersection,
     AnyHit,

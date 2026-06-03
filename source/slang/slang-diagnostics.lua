@@ -2481,6 +2481,13 @@ err(
     span { loc = "location", message = "~flagType:String operand to Barrier must be a compile-time constant" }
 )
 
+err(
+    "node-launch-attribute-required",
+    31410,
+    "NodeLaunch attribute is required on node shaders",
+    span { loc = "decl:Decl", message = "node shader entry point requires a NodeLaunch attribute" }
+)
+
 warning(
     "explicit-uniform-location",
     31104,

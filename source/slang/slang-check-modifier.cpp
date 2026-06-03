@@ -393,8 +393,9 @@ Modifier* SemanticsVisitor::validateAttribute(
     AttributeDecl* attribClassDecl,
     ModifiableSyntaxNode* attrTarget)
 {
-    constexpr IRIntegerValue kMaxNodeAttributeValue = 0x7fffffff;
+    constexpr IRIntegerValue kMaxNodeArraySize = 65535;
     constexpr IRIntegerValue kMaxNodeGridDimension = 65535;
+    constexpr IRIntegerValue kMaxNodeRecords = 256;
 
     const auto checkNodeAttributeArgInRange = [&](Expr* expr,
                                                   char const* attributeName,
@@ -563,8 +564,7 @@ Modifier* SemanticsVisitor::validateAttribute(
     else if (auto maxRecAttr = as<MaxRecordsAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
-        auto value =
-            checkPositiveNodeAttributeArg(attr->args[0], "MaxRecords", kMaxNodeAttributeValue);
+        auto value = checkPositiveNodeAttributeArg(attr->args[0], "MaxRecords", kMaxNodeRecords);
         if (!value)
             return nullptr;
         maxRecAttr->value = value;
@@ -580,7 +580,7 @@ Modifier* SemanticsVisitor::validateAttribute(
             attr->args[1],
             "NodeID array index",
             0,
-            kMaxNodeAttributeValue);
+            kMaxNodeArraySize);
         if (!nodeIDAttr->arrayIndex)
             return nullptr;
     }
@@ -588,7 +588,7 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
         auto value =
-            checkPositiveNodeAttributeArg(attr->args[0], "NodeArraySize", kMaxNodeAttributeValue);
+            checkPositiveNodeAttributeArg(attr->args[0], "NodeArraySize", kMaxNodeArraySize);
         if (!value)
             return nullptr;
         nodeArraySizeAttr->count = value;

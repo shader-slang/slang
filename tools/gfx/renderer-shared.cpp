@@ -171,6 +171,8 @@ StageType mapStage(SlangStage stage)
         return gfx::StageType::ClosestHit;
     case SLANG_STAGE_COMPUTE:
         return gfx::StageType::Compute;
+    case SLANG_STAGE_DISPATCH:
+        return gfx::StageType::Dispatch;
     case SLANG_STAGE_DOMAIN:
         return gfx::StageType::Domain;
     case SLANG_STAGE_FRAGMENT:
