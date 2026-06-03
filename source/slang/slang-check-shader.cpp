@@ -1749,7 +1749,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     Diagnostics::ConflictingNodeGridAttributes{.decl = entryPointFuncDecl});
             }
             auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
-            if ((hasMaxGrid || hasFixedGrid) && launchAttr && launchAttr->mode != "broadcasting")
+            if ((hasMaxGrid || hasFixedGrid) && (!launchAttr || launchAttr->mode != "broadcasting"))
             {
                 sink->diagnose(
                     Diagnostics::NodeGridAttributeRequiresBroadcasting{.decl = entryPointFuncDecl});

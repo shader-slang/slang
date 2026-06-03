@@ -10,3 +10,12 @@ void main(RWBuffer<int> output)
 {
     output[0] = 0;
 }
+
+[shader("node")]
+[NodeLaunch("Broadcasting")]
+//CHECK: E31401
+[numthreads(1, 1, 1)]
+void mainCaseSensitive(RWBuffer<int> output)
+{
+    output[0] = 0;
+}

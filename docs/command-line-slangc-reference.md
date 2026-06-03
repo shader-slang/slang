@@ -1339,7 +1339,6 @@ A capability describes an optional feature that a target may or may not support.
 * `domain` 
 * `geometry` 
 * `dispatch` 
-* `node` 
 * `SPV_EXT_fragment_shader_interlock` : enables the SPV_EXT_fragment_shader_interlock extension 
 * `SPV_EXT_physical_storage_buffer` : enables the SPV_EXT_physical_storage_buffer extension 
 * `SPV_EXT_fragment_fully_covered` : enables the SPV_EXT_fragment_fully_covered extension 
@@ -1614,6 +1613,7 @@ A capability describes an optional feature that a target may or may not support.
 * `mesh` 
 * `task` 
 * `amplification` 
+* `node` 
 * `any_stage` 
 * `amplification_mesh` 
 * `raytracing_stages` 

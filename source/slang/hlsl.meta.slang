@@ -33146,7 +33146,7 @@ int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 //@public:
 /// Read-only input to a broadcasting-launch node shader.
 __generic<T>
-[require(hlsl_spirv)]
+[require(hlsl)]
 [__workGraphRecordType]
 struct DispatchNodeInputRecord
 {

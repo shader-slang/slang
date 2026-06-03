@@ -2453,6 +2453,13 @@ err(
     span { loc = "location", message = "node shader stage is not supported for '~target:String' output" }
 )
 
+err(
+    "invalid-node-attribute-argument-value",
+    31406,
+    "invalid node attribute argument value",
+    span { loc = "attr:Modifier", message = "'~attribute:String' expects positive 32-bit integer arguments, got '~value:Int'" }
+)
+
 warning(
     "explicit-uniform-location",
     31104,
