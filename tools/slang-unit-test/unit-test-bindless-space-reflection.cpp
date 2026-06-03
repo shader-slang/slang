@@ -33,14 +33,16 @@ static void _checkBindlessSpaceReflection(
     BindlessSpaceExpectation bindlessSpaceExpectation,
     bool expectedUsesBindlessResourceHeap,
     const slang::CompilerOptionEntry* compilerOptions = nullptr,
-    uint32_t compilerOptionCount = 0)
+    uint32_t compilerOptionCount = 0,
+    SlangCompileTarget targetFormat = SLANG_SPIRV,
+    const char* profileName = "spirv_1_5")
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_SPIRV;
-    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    targetDesc.format = targetFormat;
+    targetDesc.profile = globalSession->findProfile(profileName);
 
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
@@ -132,6 +134,23 @@ SLANG_UNIT_TEST(bindlessSpaceReflection)
     _checkBindlessSpaceReflection(userSource, _expectReservedBindlessSpaceAt(2), true);
 }
 
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithUnboundedResourceArray)
+{
+    const char* userSource = R"(
+        Texture2D<float4> gTextures[];
+        RWStructuredBuffer<float> gOutput;
+
+        [Shader("compute")]
+        [NumThreads(1, 1, 1)]
+        void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            gOutput[0] = gTextures[0].Load(int3(0, 0, 0)).x;
+        }
+    )";
+
+    _checkBindlessSpaceReflection(userSource, _expectAnyReservedBindlessSpace(), false);
+}
+
 SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandle)
 {
     const char* userSource = R"(
@@ -211,4 +230,35 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithTexelPointerHeap)
     )";
 
     _checkBindlessSpaceReflection(userSource, _expectReservedBindlessSpaceAt(2), true);
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataHLSLResourceAndSamplerHandles)
+{
+    const char* userSource = R"(
+        RWStructuredBuffer<float> gOutput;
+
+        struct P
+        {
+            Texture2D.Handle t;
+            SamplerState.Handle s;
+        };
+
+        ParameterBlock<P> p1;
+
+        [Shader("compute")]
+        [NumThreads(1, 1, 1)]
+        void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            gOutput[0] = p1.t.Sample(p1.s, float2(0.0f, 0.0f)).x;
+        }
+    )";
+
+    _checkBindlessSpaceReflection(
+        userSource,
+        _expectAnyReservedBindlessSpace(),
+        true,
+        nullptr,
+        0,
+        SLANG_HLSL,
+        "sm_6_6");
 }

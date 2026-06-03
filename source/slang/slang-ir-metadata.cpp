@@ -118,8 +118,11 @@ static void _insertBinding(
     ranges.add(newRange);
 }
 
-static bool _isBindlessResourceHeapGlobalParam(IRInst* inst)
+static bool _isBindlessResourceHeapGlobalParam(IRInst* inst, int bindlessSpaceIndex)
 {
+    if (bindlessSpaceIndex < 0)
+        return false;
+
     auto globalParam = as<IRGlobalParam>(inst);
     if (!globalParam)
         return false;
@@ -132,20 +135,28 @@ static bool _isBindlessResourceHeapGlobalParam(IRInst* inst)
     if (!varLayout)
         return false;
 
-    if (!varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot))
+    auto descriptorTableSlotOffset =
+        varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot);
+    if (!descriptorTableSlotOffset)
         return false;
 
-    // `lowerDynamicResourceHeap` replaces the intrinsic with a synthetic unbounded descriptor-table
-    // global param, so opcode checks alone no longer see the heap after lowering.
+    UInt spaceIndex = descriptorTableSlotOffset->getSpace();
+    if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+        spaceIndex += spaceAttr->getOffset();
+    if (spaceIndex != (UInt)bindlessSpaceIndex)
+        return false;
+
+    // `lowerDynamicResourceHeap` replaces the intrinsic with a synthetic global param in the
+    // reserved bindless space, so opcode checks alone no longer see the heap after lowering.
     auto typeLayout = varLayout->getTypeLayout();
     auto descriptorTableSlotSize =
         typeLayout ? typeLayout->findSizeAttr(LayoutResourceKind::DescriptorTableSlot) : nullptr;
     return descriptorTableSlotSize && descriptorTableSlotSize->getSize().isInfinite();
 }
 
-static bool _instUsesBindlessResourceHeap(IRInst* inst)
+static bool _instUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
 {
-    if (_isBindlessResourceHeapGlobalParam(inst))
+    if (_isBindlessResourceHeapGlobalParam(inst, bindlessSpaceIndex))
         return true;
 
     switch (inst->getOp())
@@ -157,22 +168,20 @@ static bool _instUsesBindlessResourceHeap(IRInst* inst)
     case kIROp_SPIRVLoadTexelPointerFromHeap:
     case kIROp_SPIRVResourceHeap:
     case kIROp_SPIRVSamplerHeap:
-    case kIROp_MakeCombinedTextureSamplerFromHandle:
-    case kIROp_CastDescriptorHandleToResource:
         return true;
     default:
         return false;
     }
 }
 
-static bool _subtreeUsesBindlessResourceHeap(IRInst* inst)
+static bool _subtreeUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
 {
-    if (_instUsesBindlessResourceHeap(inst))
+    if (_instUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
         return true;
 
     for (auto child : inst->getChildren())
     {
-        if (_subtreeUsesBindlessResourceHeap(child))
+        if (_subtreeUsesBindlessResourceHeap(child, bindlessSpaceIndex))
             return true;
     }
 
@@ -251,14 +260,17 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
 }
 
 // Collects the metadata from the provided IR module, saves it in outMetadata.
-void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMetadata)
+void collectMetadata(
+    const IRModule* irModule,
+    int bindlessSpaceIndex,
+    ArtifactPostEmitMetadata& outMetadata)
 {
     // Scan the instructions looking for global resource declarations
     // and exported functions.
     bool usesBindlessResourceHeap = false;
     for (const auto& inst : irModule->getGlobalInsts())
     {
-        if (!usesBindlessResourceHeap && _subtreeUsesBindlessResourceHeap(inst))
+        if (!usesBindlessResourceHeap && _subtreeUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
             usesBindlessResourceHeap = true;
 
         if (auto func = as<IRFunc>(inst))

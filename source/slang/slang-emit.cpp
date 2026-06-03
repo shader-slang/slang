@@ -2407,7 +2407,10 @@ Result linkAndOptimizeIR(
         SLANG_PASS(unexportNonEmbeddableIR, target);
     }
 
-    SLANG_PASS(collectMetadata, *metadata);
+    int bindlessSpaceIndex = -1;
+    if (auto programLayout = targetProgram->getExistingLayout())
+        bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
+    SLANG_PASS(collectMetadata, bindlessSpaceIndex, *metadata);
 
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);

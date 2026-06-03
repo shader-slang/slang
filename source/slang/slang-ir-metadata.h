@@ -17,6 +17,9 @@ void collectCooperativeMetadata(
     DiagnosticSink* sink,
     ArtifactPostEmitMetadata& outMetadata);
 
-void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMetadata);
+void collectMetadata(
+    const IRModule* irModule,
+    int bindlessSpaceIndex,
+    ArtifactPostEmitMetadata& outMetadata);
 
 } // namespace Slang
