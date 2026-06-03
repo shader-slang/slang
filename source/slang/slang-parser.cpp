@@ -8382,19 +8382,15 @@ static Expr* parseAtomicExpr(Parser* parser)
                     // 'L' / 'UL' suffix -> `int` / `uint` (no distinct `long`)
                     suffixBaseType = isUnsigned ? BaseType::UInt : BaseType::Int;
                 }
-                else if (isUnsigned)
-                {
-                    // 'U' suffix -> `uint`
-                    suffixBaseType = BaseType::UInt;
-                }
                 else
                 {
-                    // No specifier consumed but the suffix existed — so we had
-                    // characters that didn't match any specifier.
-                    parser->sink->diagnose(Diagnostics::InvalidIntegerLiteralSuffix{
-                        .suffix = String(suffix),
-                        .location = token.loc});
-                    suffixBaseType = BaseType::Int;
+                    // The remaining well-formed shape is the bare unsigned
+                    // suffix ('U' / 'u'). The `isMalformed` arm above has
+                    // already rejected suffixes where neither specifier was
+                    // consumed, so this branch is reachable only when
+                    // `isUnsigned` is true.
+                    SLANG_ASSERT(isUnsigned);
+                    suffixBaseType = BaseType::UInt;
                 }
             }
             else if (!hasOverflowed)

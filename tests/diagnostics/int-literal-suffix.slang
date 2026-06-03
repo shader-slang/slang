@@ -6,18 +6,29 @@
 
 void foo()
 {
-    // Well-formed suffixes (no diagnostics expected).
+    // Well-formed suffixes (no diagnostics expected). Includes lowercase
+    // and mixed unsigned/length case (`uL`, `Lu`, `lU`, `Ul` are all
+    // valid because the case rule applies *within* the length specifier
+    // only — the unsigned specifier and the length specifier may differ
+    // in case).
     let okA = 1L;
-    let okB = 1U;
-    let okC = 1UL;
-    let okD = 1LU;
-    let okE = 1LL;
-    let okF = 1ll;
-    let okG = 1ULL;
-    let okH = 1LLU;
-    let okI = 1Z;
-    let okJ = 1uZ;
-    let okK = 1Zu;
+    let okB = 1l;
+    let okC = 1U;
+    let okD = 1u;
+    let okE = 1Z;
+    let okF = 1z;
+    let okG = 1UL;
+    let okH = 1uL;
+    let okI = 1Lu;
+    let okJ = 1lU;
+    let okK = 1Ul;
+    let okL = 1LU;
+    let okM = 1LL;
+    let okN = 1ll;
+    let okO = 1ULL;
+    let okP = 1LLU;
+    let okQ = 1uZ;
+    let okR = 1Zu;
 
     // Malformed: 'Z' present but stray 'L's are silently dropped.
     let bad1 = 1ULLLLLLLZ;
@@ -44,8 +55,28 @@ void foo()
 //CHECK:       ^^^ invalid suffix on integer literal
 //CHECK:       ^^^ invalid suffix 'UU' on integer literal
 
-    // Malformed: Z followed by L.
+    // Malformed: Z followed by L (length specifier already consumed).
     let bad6 = 1ZL;
 //CHECK:       ^^^ invalid suffix on integer literal
 //CHECK:       ^^^ invalid suffix 'ZL' on integer literal
+
+    // Malformed: L followed by Z.
+    let bad7 = 1LZ;
+//CHECK:       ^^^ invalid suffix on integer literal
+//CHECK:       ^^^ invalid suffix 'LZ' on integer literal
+
+    // Malformed: doubled Z.
+    let bad8 = 1ZZ;
+//CHECK:       ^^^ invalid suffix on integer literal
+//CHECK:       ^^^ invalid suffix 'ZZ' on integer literal
+
+    // Malformed: U on both sides of length specifier.
+    let bad9 = 1ULU;
+//CHECK:       ^^^^ invalid suffix on integer literal
+//CHECK:       ^^^^ invalid suffix 'ULU' on integer literal
+
+    // Malformed: U on both sides of Z.
+    let bad10 = 1UZU;
+//CHECK:        ^^^^ invalid suffix on integer literal
+//CHECK:        ^^^^ invalid suffix 'UZU' on integer literal
 }
