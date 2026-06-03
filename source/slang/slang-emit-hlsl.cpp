@@ -1168,6 +1168,16 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
     switch (inst->getOp())
     {
+    case kIROp_NodeOutputRecordGetElementPtr:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, inOuterPrec);
+            m_writer->emit(".Get(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(")");
+            return true;
+        }
+
     case kIROp_SubpassLoad:
         {
             auto subpassLoad = as<IRSubpassLoad>(inst);
@@ -1195,7 +1205,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 {"UAV_MEMORY", BarrierMemoryTypeFlags::UavMemory},
                 {"GROUP_SHARED_MEMORY", BarrierMemoryTypeFlags::GroupSharedMemory},
                 {"NODE_INPUT_MEMORY", BarrierMemoryTypeFlags::NodeInputMemory},
-                {"NODE_OUTPUT_MEMORY", BarrierMemoryTypeFlags::OutputMemory},
+                {"NODE_OUTPUT_MEMORY", BarrierMemoryTypeFlags::NodeOutputMemory},
             };
             auto remaining = emitNamedBarrierFlags(
                 flagVal,

@@ -922,7 +922,8 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(
     IRFunc* irFunc,
     IREntryPointDecoration* entryPointDecor)
 {
-    auto profile = entryPointDecor->getProfile();
+    SLANG_UNUSED(entryPointDecor);
+    auto profile = m_effectiveProfile;
     auto stage = profile.getStage();
 
     switch (stage)
@@ -943,11 +944,6 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(
             m_writer->emit(")]\n");
             break;
         }
-    case Stage::Node:
-        getSink()->diagnose(Diagnostics::NodeStageNotSupportedOnTarget{
-            .target = "C++",
-            .location = irFunc->sourceLoc});
-        return;
     default:
         break;
     }

@@ -1291,8 +1291,11 @@ Result ComputeCommandEncoderImpl::bindRootObjectAsCompute(
     if (!program || !rootObject)
         return SLANG_E_INVALID_ARG;
 
-    auto programImpl = static_cast<ShaderProgramImpl*>(program);
-    auto rootObjectImpl = static_cast<RootShaderObjectImpl*>(rootObject);
+    auto programImpl = dynamic_cast<ShaderProgramImpl*>(program);
+    auto rootObjectImpl = dynamic_cast<RootShaderObjectImpl*>(rootObject);
+    if (!programImpl || !rootObjectImpl)
+        return SLANG_E_INVALID_ARG;
+
     auto rootLayoutImpl = programImpl->m_rootObjectLayout.Ptr();
     if (!rootLayoutImpl || !rootLayoutImpl->m_rootSignature)
         return SLANG_FAIL;

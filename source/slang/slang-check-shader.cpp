@@ -1368,6 +1368,80 @@ static bool _outputDeclHasSemantic(
     return _typeHasSemanticImpl(astBuilder, type, baseName, seenTypes);
 }
 
+static void _diagnoseNodeOnlyAttribute(DiagnosticSink* sink, Attribute* attr)
+{
+    if (!attr)
+        return;
+
+    sink->diagnose(Diagnostics::NodeAttributeOnlyValidOnNodeStage{
+        .attrName = attr->getKeywordName(),
+        .attr = attr});
+}
+
+static void _diagnoseNodeOnlyFunctionAttributes(DiagnosticSink* sink, FuncDecl* funcDecl)
+{
+    _diagnoseNodeOnlyAttribute(sink, funcDecl->findModifier<NodeLaunchAttribute>());
+    _diagnoseNodeOnlyAttribute(sink, funcDecl->findModifier<NodeMaxDispatchGridAttribute>());
+    _diagnoseNodeOnlyAttribute(sink, funcDecl->findModifier<NodeDispatchGridAttribute>());
+    _diagnoseNodeOnlyAttribute(sink, funcDecl->findModifier<NodeIDAttribute>());
+    _diagnoseNodeOnlyAttribute(sink, funcDecl->findModifier<NodeIsProgramEntryAttribute>());
+}
+
+static void _diagnoseNodeOnlyParameterAttributes(DiagnosticSink* sink, ParamDecl* paramDecl)
+{
+    _diagnoseNodeOnlyAttribute(sink, paramDecl->findModifier<MaxRecordsAttribute>());
+    _diagnoseNodeOnlyAttribute(sink, paramDecl->findModifier<NodeIDAttribute>());
+    _diagnoseNodeOnlyAttribute(sink, paramDecl->findModifier<NodeArraySizeAttribute>());
+    _diagnoseNodeOnlyAttribute(sink, paramDecl->findModifier<AllowSparseNodesAttribute>());
+}
+
+static bool _isWorkGraphMaxRecordsParameterType(Type* type)
+{
+    type = unwrapConditionalType(type);
+    if (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return false;
+
+    auto decl = declRefType->getDeclRef().getDecl();
+    auto name = decl ? decl->getName() : nullptr;
+    if (!name)
+        return false;
+
+    char const* validTypeNames[] = {
+        "NodeOutput",
+        "NodeOutputArray",
+        "ThreadNodeOutputRecords",
+        "GroupNodeOutputRecords",
+        "EmptyNodeOutput",
+        "EmptyNodeOutputArray",
+        "GroupNodeInputRecords",
+        "EmptyNodeInput",
+    };
+    for (auto validTypeName : validTypeNames)
+    {
+        if (name->text == validTypeName)
+            return true;
+    }
+    return false;
+}
+
+static void _validateMaxRecordsParameterAttribute(DiagnosticSink* sink, ParamDecl* paramDecl)
+{
+    auto maxRecordsAttr = paramDecl->findModifier<MaxRecordsAttribute>();
+    if (!maxRecordsAttr)
+        return;
+
+    if (_isWorkGraphMaxRecordsParameterType(paramDecl->getType()))
+        return;
+
+    sink->diagnose(Diagnostics::AttributeNotApplicable{
+        .attrName = maxRecordsAttr->getKeywordName(),
+        .attr = maxRecordsAttr});
+}
+
 
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
@@ -1760,8 +1834,22 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         break;
     }
 
+    if (stage != Stage::Node)
+    {
+        _diagnoseNodeOnlyFunctionAttributes(sink, entryPointFuncDecl);
+    }
+
     for (const auto& param : entryPointFuncDecl->getParameters())
     {
+        if (stage == Stage::Node)
+        {
+            _validateMaxRecordsParameterAttribute(sink, param);
+        }
+        else
+        {
+            _diagnoseNodeOnlyParameterAttributes(sink, param);
+        }
+
         if (isUniformParameterType(param->getType()))
         {
             // Automatically add `uniform` modifier to entry point parameters.

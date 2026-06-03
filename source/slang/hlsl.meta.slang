@@ -33157,17 +33157,6 @@ struct DispatchNodeInputRecord
         {
         case hlsl:
             __intrinsic_asm ".Get";
-        case spirv:
-            int index = 0;
-            return spirv_asm
-            {
-                %in_payload_t = OpTypeNodePayloadArrayAMDX $$T;
-                %in_payload_arr_ptr_t = OpTypePointer NodePayloadAMDX %in_payload_t;
-                %in_payload_elem_ptr_t = OpTypePointer NodePayloadAMDX $$T;
-                %var = OpVariable %in_payload_arr_ptr_t NodePayloadAMDX;
-                %ptr : %in_payload_elem_ptr_t = OpAccessChain %var $index;
-                result : $$T = OpLoad %ptr;
-            };
         }
     }
 };
@@ -33395,7 +33384,7 @@ enum BarrierMemoryTypeFlags : uint
     UAV_MEMORY          = $(BarrierMemoryTypeFlags::UavMemory),
     GROUP_SHARED_MEMORY = $(BarrierMemoryTypeFlags::GroupSharedMemory),
     NODE_INPUT_MEMORY   = $(BarrierMemoryTypeFlags::NodeInputMemory),
-    NODE_OUTPUT_MEMORY  = $(BarrierMemoryTypeFlags::OutputMemory),
+    NODE_OUTPUT_MEMORY  = $(BarrierMemoryTypeFlags::NodeOutputMemory),
     ALL_MEMORY          = $(BarrierMemoryTypeFlags::AllMemory),
 }
 

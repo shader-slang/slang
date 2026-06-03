@@ -2467,6 +2467,13 @@ err(
     span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected 0, ALL_MEMORY (0xf), or a combination of UAV_MEMORY (0x1), GROUP_SHARED_MEMORY (0x2), NODE_INPUT_MEMORY (0x4), and NODE_OUTPUT_MEMORY (0x8)" }
 )
 
+err(
+    "node-attribute-only-valid-on-node-stage",
+    31408,
+    "node attribute is only valid on node shaders",
+    span { loc = "attr:Modifier", message = "attribute '~attrName:Name' is only valid on node shaders" }
+)
+
 warning(
     "explicit-uniform-location",
     31104,

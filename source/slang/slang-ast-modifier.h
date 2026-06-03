@@ -1316,7 +1316,7 @@ class NodeIDAttribute : public Attribute
 {
     FIDDLE(...)
     FIDDLE() String name;
-    FIDDLE() IntVal* arrayIndex; // nullptr when the second argument is omitted (implies 0)
+    FIDDLE() IntVal* arrayIndex; // Defaults to 0 when the second argument is omitted.
 };
 
 FIDDLE()

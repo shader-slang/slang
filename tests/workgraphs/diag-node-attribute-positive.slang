@@ -7,6 +7,11 @@ struct OutputRecord
     int value;
 };
 
+struct InputRecord
+{
+    int value;
+};
+
 [shader("node")]
 [NodeLaunch("broadcasting")]
 [NodeDispatchGrid(0, 1, 1)]
@@ -55,6 +60,15 @@ void nodeIDMain(RWBuffer<int> output)
 }
 
 [shader("node")]
+[NodeLaunch("broadcasting")]
+[NodeDispatchGrid(1, 1, 1)]
+[NodeID("DefaultIndexNode")]
+void nodeIDDefaultIndexMain(RWBuffer<int> output)
+{
+    output[0] = 0;
+}
+
+[shader("node")]
 [NodeLaunch("coalescing")]
 [MaxRecords(8)]
 //CHECK: attribute 'MaxRecords' is not valid here
@@ -62,4 +76,37 @@ void nodeIDMain(RWBuffer<int> output)
 void functionMaxRecordsMain(RWBuffer<int> output)
 {
     output[0] = 0;
+}
+
+[shader("compute")]
+[NodeLaunch("thread")]
+//CHECK: E31408
+[numthreads(1, 1, 1)]
+void wrongStageNodeLaunchMain(RWBuffer<int> output)
+{
+    output[0] = 0;
+}
+
+[shader("node")]
+[NodeLaunch("broadcasting")]
+[NodeDispatchGrid(1, 1, 1)]
+[numthreads(1, 1, 1)]
+void dispatchInputMaxRecordsMain(
+    [MaxRecords(4)] DispatchNodeInputRecord<InputRecord> input,
+//CHECK: attribute 'MaxRecords' is not valid here
+    RWBuffer<int> output)
+{
+    let value = input.Get().value;
+    output[0] = value;
+}
+
+[shader("node")]
+[NodeLaunch("thread")]
+void threadInputMaxRecordsMain(
+    [MaxRecords(4)] ThreadNodeInputRecord<InputRecord> input,
+//CHECK: attribute 'MaxRecords' is not valid here
+    RWBuffer<int> output)
+{
+    let value = input.Get().value;
+    output[0] = value;
 }
