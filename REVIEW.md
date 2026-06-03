@@ -80,6 +80,8 @@ Wait for all 6 background agents to complete. You will be automatically notified
 
 Once ALL 6 have returned findings, build the editorial table below, **fill every column for every Keep row**, and post only Keep rows.
 
+If `tmp/prior-review-threads.json` exists, read it first — it lists prior Claude findings on this PR and any maintainer replies. Apply Rule 7 below before keeping anything.
+
 | Source agent | file:line | Severity | Confidence | Evidence / verification quote | User-visible impact | Keep / Drop |
 
 Rules (applied in order, before any posting):
@@ -98,6 +100,16 @@ Rules (applied in order, before any posting):
 5. **Dedup + bundling:** Merge duplicates across teammates. Group closely related consistency nits (missing `static`/`override`/`public`, docstring polish) into one comment; do not post low-impact maintainability items as separate inline threads.
 
 6. **CI-enforced drops:** Drop formatting/style issues (`./extras/formatting.sh`) and anything already caught by existing CI.
+
+7. **Respect prior maintainer verdicts — but only while they are still valid.** If `tmp/prior-review-threads.json` exists, match each candidate finding against prior threads on the same `path` (±8 lines, or the same symbol/function if code moved). Suppress a candidate **only when ALL of these hold**:
+   - a prior thread raised an equivalent claim, **and**
+   - a non-Claude author replied **declining, deferring, or explaining** it ("won't fix", "by design", "intentional", "unfixable", "no such target", "the diagnostic test is exhaustive", …), **and**
+   - **the verdict is still valid for the current code** — i.e. the code the verdict was about has NOT materially changed since the reply. Treat the verdict as **stale (do not suppress, re-evaluate normally)** if any of:
+     - the prior thread is marked `outdated: true` in the JSON (its anchored line changed), **or**
+     - the current `tmp/pr-diff.patch` touches the lines/symbol the verdict was about, **or**
+     - the finding now rests on different evidence than the prior thread addressed.
+
+   When suppressing, mark the row **Drop** with `Suppressed: prior verdict by @user` in the table. **Exception:** keep a 🔴 Bug whose evidence quote shows a concrete wrong output the reply did not actually rebut — state why the reply does not cover it. A prior thread with **no** human reply never suppresses (the point may have been missed); re-surface it at most once. A missing JSON file means "no prior verdicts" — proceed normally.
 
 A finding that fails any rule above is marked Drop in the table. Do not post Drop rows. Do not post findings that were not in the table.
 
