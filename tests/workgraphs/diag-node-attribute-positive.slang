@@ -107,6 +107,78 @@ void wrongStageNodeLaunchMain(RWBuffer<int> output)
     output[0] = 0;
 }
 
+[shader("compute")]
+[NodeMaxDispatchGrid(1, 1, 1)]
+//CHECK: E31408
+[numthreads(1, 1, 1)]
+void wrongStageNodeMaxDispatchGridMain(RWBuffer<int> output)
+{
+    output[0] = 0;
+}
+
+[shader("compute")]
+[NodeDispatchGrid(1, 1, 1)]
+//CHECK: E31408
+[numthreads(1, 1, 1)]
+void wrongStageNodeDispatchGridMain(RWBuffer<int> output)
+{
+    output[0] = 0;
+}
+
+[shader("compute")]
+[NodeID("WrongStageNode")]
+//CHECK: E31408
+[numthreads(1, 1, 1)]
+void wrongStageNodeIDMain(RWBuffer<int> output)
+{
+    output[0] = 0;
+}
+
+[shader("compute")]
+[NodeIsProgramEntry]
+//CHECK: E31408
+[numthreads(1, 1, 1)]
+void wrongStageNodeIsProgramEntryMain(RWBuffer<int> output)
+{
+    output[0] = 0;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void wrongStageParamMaxRecordsMain(
+    [MaxRecords(1)] RWBuffer<int> output)
+//CHECK: E31408
+{
+    output[0] = 0;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void wrongStageParamNodeIDMain(
+    [NodeID("WrongStageParam")] RWBuffer<int> output)
+//CHECK: E31408
+{
+    output[0] = 0;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void wrongStageParamNodeArraySizeMain(
+    [NodeArraySize(1)] RWBuffer<int> output)
+//CHECK: E31408
+{
+    output[0] = 0;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void wrongStageParamAllowSparseNodesMain(
+    [AllowSparseNodes] RWBuffer<int> output)
+//CHECK: E31408
+{
+    output[0] = 0;
+}
+
 [shader("node")]
 [NodeLaunch("broadcasting")]
 [NodeDispatchGrid(1, 1, 1)]

@@ -72,6 +72,8 @@ StageType translateStage(SlangStage slangStage)
         CASE(FRAGMENT, Fragment);
 
         CASE(COMPUTE, Compute);
+        CASE(AMPLIFICATION, Amplification);
+        CASE(MESH, Mesh);
         CASE(DISPATCH, Dispatch);
         CASE(NODE, Node);
 
