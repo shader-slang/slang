@@ -17,10 +17,11 @@
 #                                 (optional; skips auto-detection when set)
 #   SLANG_DXC_BUILD_FROM_SOURCE - ON: build from source when supported; OFF:
 #                                 always use prebuilt when available (skips detection);
-#                                 unset: auto-detect on native Linux x86_64 by
-#                                 downloading the prebuilt binary and inspecting
-#                                 the GLIBC requirements of both libdxcompiler.so
-#                                 and libdxil.so
+#                                 unset: build from source on macOS; auto-detect
+#                                 on native Linux x86_64 by downloading the
+#                                 prebuilt binary and inspecting the GLIBC
+#                                 requirements of both libdxcompiler.so and
+#                                 libdxil.so
 #   SLANG_GITHUB_TOKEN          - GitHub token for authenticated downloads (optional)
 #
 # Requires the following variables to be set by the caller (set in SlangTarget.cmake):
@@ -128,6 +129,17 @@ if(SLANG_DXC_BUILD_FROM_SOURCE)
         )
         return()
     endif()
+elseif(
+    NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
+    AND CMAKE_SYSTEM_NAME STREQUAL "Darwin"
+    AND NOT DEFINED SLANG_DXC_BINARY_URL
+)
+    message(
+        STATUS
+        "SLANG_DXC_BUILD_FROM_SOURCE is unset on macOS; building DXC from "
+        "source (${_dxc_version_tag})."
+    )
+    set(_dxc_build_from_source ON)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CROSSCOMPILING)
     if(DEFINED SLANG_DXC_BINARY_URL)
         message(
