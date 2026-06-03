@@ -26,6 +26,15 @@ inline Type* getToType(ASTBuilder* astBuilder, DeclRef<TypeCoercionConstraintDec
     return declRef.substitute(astBuilder, declRef.getDecl()->toType);
 }
 
+inline Type* getBaseType(
+    ASTBuilder* astBuilder,
+    DeclRef<HasDiffTypeInfoConstraintDecl> const& declRef)
+{
+    if (!declRef)
+        return nullptr;
+    return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
+}
+
 // `Val`
 
 inline bool areValsEqual(Val* left, Val* right)
@@ -387,9 +396,9 @@ inline Type* getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef
 {
     if (hasDirectFuncType(declRef))
     {
-        return as<FuncType>(
-                   declRef.substitute(astBuilder, declRef.getDecl()->funcType.type)->resolve())
-            ->getResultType();
+        auto substituted = declRef.substitute(astBuilder, declRef.getDecl()->funcType.type);
+        if (auto funcType = as<FuncType>(substituted->resolve()))
+            return funcType->getResultType();
     }
 
     return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);

@@ -726,18 +726,6 @@ DifferentialPairType* ASTBuilder::getDifferentialPairType(Type* valueType, Witne
         getSpecializedBuiltinType(makeArrayView(args), "DifferentialPairType"));
 }
 
-DeclRef<InterfaceDecl> ASTBuilder::getDiffTypeInfoInterfaceDecl()
-{
-    DeclRef<InterfaceDecl> declRef =
-        DeclRef<InterfaceDecl>(getBuiltinDeclRef("DiffTypeInfoInterfaceType", nullptr));
-    return declRef;
-}
-
-Type* ASTBuilder::getDiffTypeInfoInterfaceType()
-{
-    return DeclRefType::create(this, getDiffTypeInfoInterfaceDecl());
-}
-
 DifferentialPtrPairType* ASTBuilder::getDifferentialPtrPairType(
     Type* valueType,
     Witness* diffRefTypeWitness)
@@ -1388,6 +1376,12 @@ Val* ASTBuilder::getShapeReduceIntValPack(Val* valuePack, IntVal* axis)
 NonEmptyPackWitness* ASTBuilder::getNonEmptyPackWitness(Val* pack)
 {
     return getOrCreate<NonEmptyPackWitness>(pack);
+}
+
+HasDiffTypeInfoWitness* ASTBuilder::getHasDiffTypeInfoWitness(
+    DeclRef<HasDiffTypeInfoConstraintDecl> declRef)
+{
+    return getOrCreate<HasDiffTypeInfoWitness>(declRef);
 }
 
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(Type* type)

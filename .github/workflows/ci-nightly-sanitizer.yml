@@ -1,0 +1,47 @@
+name: Nightly Sanitizer
+
+on:
+  schedule:
+    # Run nightly at 2:00 AM UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  sanitizer-nightly:
+    uses: ./.github/workflows/ci-slang-sanitizer.yml
+    with:
+      runs-on: '["ubuntu-22.04"]'
+      # Full test category on a GitHub-hosted CPU runner. GPU-requiring
+      # tests are skipped (no GPU available); this maximizes coverage of
+      # CPU, SPIRV-emit, and diagnostic tests under sanitizer.
+      test-category: full
+      server-count: 1
+      timeout-minutes: 90
+    secrets: inherit
+
+  notify:
+    needs: [sanitizer-nightly]
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Success notification
+        if: needs.sanitizer-nightly.result == 'success'
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "Sanitizer-Nightly": ":green-check-mark: Sanitizer nightly: clean (${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SANITIZER_NIGHTLY_WEBHOOK_URL }}
+
+      - name: Failure notification
+        if: needs.sanitizer-nightly.result != 'success'
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "Sanitizer-Nightly": ":alert: Sanitizer nightly: ${{ needs.sanitizer-nightly.result }}\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SANITIZER_NIGHTLY_WEBHOOK_URL }}

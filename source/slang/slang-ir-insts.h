@@ -2603,6 +2603,12 @@ struct IRDebugBuildIdentifier : IRInst
 };
 
 FIDDLE()
+struct IRDebugCompilationUnit : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
 struct IRDebugLine : IRInst
 {
     FIDDLE(leafInst())
@@ -3486,6 +3492,7 @@ $(type_info.return_type) $(type_info.method_name)(
         bool isIncludedFile);
     IRInst* emitDebugBuildIdentifier(UnownedStringSlice buildIdentifier, IRIntegerValue flags);
     IRInst* emitDebugBuildIdentifier(IRInst* debugBuildIdentifier);
+    IRInst* emitDebugCompilationUnit(IRInst* source);
     IRInst* emitDebugLine(
         IRInst* source,
         IRIntegerValue lineStart,
@@ -3499,6 +3506,20 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* col,
         IRInst* argIndex = nullptr);
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
+    // Emit coverage marker ops. The coverage instrumentation IR pass
+    // later rewrites each occurrence into an atomic add on a synthesized
+    // counter buffer and records the marker-specific source-entry
+    // metadata. Source position is carried on the standard per-
+    // instruction `sourceLoc` field, so the ops are independent of
+    // debug-info state.
+    IRInst* emitIncrementCoverageCounter();
+    IRInst* emitIncrementFunctionCoverageCounter(
+        UnownedStringSlice functionName,
+        UnownedStringSlice functionMangledName);
+    IRInst* emitIncrementBranchCoverageCounter(
+        IRIntegerValue branchSiteID,
+        IRIntegerValue branchArmID,
+        IRIntegerValue branchArmKind);
     IRInst* emitDebugInlinedAt(
         IRInst* line,
         IRInst* col,

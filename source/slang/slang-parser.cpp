@@ -1783,6 +1783,24 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
             continue;
         }
 
+        Token hasDiffTypeInfoToken;
+        if (AdvanceIf(parser, "__hasDiffTypeInfo", &hasDiffTypeInfoToken))
+        {
+            auto constraint = parser->astBuilder->create<HasDiffTypeInfoConstraintDecl>();
+            constraint->whereTokenLoc = whereToken.loc;
+            constraint->loc = hasDiffTypeInfoToken.loc;
+            parser->ReadMatchingToken(TokenType::LParent);
+            constraint->type = parser->ParseTypeExp();
+            parser->ReadMatchingToken(TokenType::RParent);
+            if (optional)
+            {
+                parser->sink->diagnose(Diagnostics::OptionalHasDiffTypeInfoConstraintIsInvalid{
+                    .location = hasDiffTypeInfoToken.loc});
+            }
+            AddMember(genericParent, constraint);
+            continue;
+        }
+
         auto subType = parser->ParseTypeExp();
         Token constraintToken;
         if (AdvanceIf(parser, TokenType::Colon, &constraintToken))
@@ -2864,6 +2882,26 @@ static NodeBase* parseBackwardDifferentiate(Parser* parser, void* /* unused */)
     return parseBackwardDifferentiate(parser);
 }
 
+/// Parse an expression of the form __apply(fn) where fn is an
+/// identifier pointing to a function.
+static Expr* parseApplyForBwd(Parser* parser)
+{
+    ApplyForBwdExpr* applyExpr = parser->astBuilder->create<ApplyForBwdExpr>();
+
+    parser->ReadToken(TokenType::LParent);
+
+    applyExpr->baseFunction = parser->ParseExpression();
+
+    parser->ReadToken(TokenType::RParent);
+
+    return applyExpr;
+}
+
+static NodeBase* parseApplyForBwd(Parser* parser, void* /* unused */)
+{
+    return parseApplyForBwd(parser);
+}
+
 static Expr* parseFuncAsTypeExpr(Parser* parser)
 {
     // Parse an expr of the form `__func_as_type(fn)`
@@ -3902,6 +3940,63 @@ static NodeBase* parseExtensionDecl(Parser* parser, void* /*userData*/)
             parseOptionalInheritanceClause(parser, decl);
             maybeParseGenericConstraints(parser, genericParent);
             parseDeclBody(parser, decl);
+            return decl;
+        });
+}
+
+static NodeBase* parseFuncExtensionDecl(Parser* parser, void* /*userData*/)
+{
+    return parseOptGenericDecl(
+        parser,
+        [&](GenericDecl* genericParent)
+        {
+            FuncExtensionDecl* decl = parser->astBuilder->create<FuncExtensionDecl>();
+            parser->FillPosition(decl);
+
+            // Parse the target as a higher-order expression via keyword dispatch.
+            // e.g. "fwd_diff(foo<T>)" dispatches to parseForwardDifferentiate,
+            // "bwd_diff(foo)" dispatches to parseBackwardDifferentiate, etc.
+            // We use syntax-decl lookup to avoid hard-coding operator names.
+            Expr* targetExpr = nullptr;
+            if (!tryParseUsingSyntaxDecl(parser, &targetExpr))
+            {
+                parser->diagnose(Diagnostics::UnexpectedToken{
+                    .tokenType = TokenTypeToString(peekTokenType(parser)),
+                    .location = peekToken(parser).getLoc()});
+                return decl;
+            }
+            decl->targetExpr = targetExpr;
+
+            // Parse function signature: (params) -> ReturnType { body }
+            FuncDecl* innerFunc = parser->astBuilder->create<FuncDecl>();
+            parser->FillPosition(innerFunc);
+
+            parser->PushScope(innerFunc);
+            parseModernParamList(parser, innerFunc);
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
+
+            if (AdvanceIf(parser, "throws"))
+            {
+                innerFunc->errorType = parser->ParseTypeExp();
+            }
+            if (AdvanceIf(parser, TokenType::RightArrow))
+            {
+                innerFunc->returnType = parser->ParseTypeExp();
+            }
+            maybeParseGenericConstraints(parser, genericParent);
+
+            parser->PushScope(funcScope);
+            innerFunc->body = parseOptBody(parser);
+            if (auto blockStmt = as<BlockStmt>(innerFunc->body))
+                innerFunc->closingSourceLoc = blockStmt->closingSourceLoc;
+            else if (auto unparsedStmt = as<UnparsedStmt>(innerFunc->body))
+                innerFunc->closingSourceLoc = unparsedStmt->tokens.getLast().getLoc();
+            parser->PopScope();
+
+            // `FuncExtensionDecl` is not a container; semantic checking assigns
+            // the parent when it moves this function into the generated extension.
+            decl->innerFunc = innerFunc;
             return decl;
         });
 }
@@ -5932,7 +6027,8 @@ static Decl* parseEnumDecl(Parser* parser)
     // TODO: diagnose this with a warning some day, and move
     // toward deprecating it.
     //
-    bool isEnumClass = AdvanceIf(parser, "class");
+    Token classToken{};
+    bool isEnumClass = AdvanceIf(parser, "class", &classToken);
     bool isUnscoped = false;
 
     if (!isEnumClass)
@@ -5951,7 +6047,17 @@ static Decl* parseEnumDecl(Parser* parser)
     {
         decl->nameAndLoc.name = generateName(parser);
         decl->nameAndLoc.loc = decl->loc;
-        isUnscoped = true;
+
+        if (!isEnumClass)
+        {
+            isUnscoped = true;
+        }
+        else
+        {
+            // enum class cannot be anonymous
+            parser->sink->diagnose(
+                Diagnostics::AnonymousScopedEnum{.classLocation = classToken.loc});
+        }
     }
     else
     {
@@ -5968,6 +6074,17 @@ static Decl* parseEnumDecl(Parser* parser)
             {
                 addModifier(decl, parser->astBuilder->create<UnscopedEnumAttribute>());
             }
+
+            // If the enum was declared as an enum class, insert a modifier for
+            // conflicting unscoped/scoped enum detection.
+            if (isEnumClass)
+            {
+                auto enumClassModifier = parser->astBuilder->create<EnumClassModifier>();
+                enumClassModifier->loc = classToken.loc;
+                enumClassModifier->keywordName = getName(parser, classToken.getContent());
+                addModifier(decl, enumClassModifier);
+            }
+
             parseOptionalInheritanceClause(parser, decl);
             maybeParseGenericConstraints(parser, genericParent);
             parser->ReadToken(TokenType::LBrace);
@@ -7830,19 +7947,22 @@ static BaseType _determineNonSuffixedIntegerLiteralType(
     {
         baseType = BaseType::UInt64;
 
-        // Emit warning if the value is too large for signed 64-bit, regardless of base
-
-        // There is an edge case here where 9223372036854775808 or INT64_MAX + 1
-        // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and is
-        // valid. Unfortunately because the lexer handles the negative(-) part of the literal
-        // separately it is impossible to know whether the literal has a negative sign or not.
-        // We emit the warning and initially process it as a uint64 anyways, and the negative
-        // sign will be properly parsed and the value will still be properly stored as a
-        // negative INT64_MIN.
-
-        // Decimal integer is too large to be represented as signed.
-        // Output warning that it is represented as unsigned instead.
-        sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
+        // The type ladder for non-decimal integer literals (hex / oct / bin)
+        // explicitly admits `uint64_t` as a valid choice — landing on it should
+        // not warn. Only decimal literals warn here, because for decimal the
+        // ladder is `[int, int64_t]` and reaching `uint64_t` means the value
+        // overflowed the documented signed range.
+        //
+        // There is an edge case where 9223372036854775808 (INT64_MAX + 1)
+        // brings us here, but the complete literal is -9223372036854775808
+        // (INT64_MIN) and is valid. The lexer handles the negative sign
+        // separately, so we cannot tell the literal is going to be negated.
+        // We still emit the warning for that decimal case; the negation will
+        // be parsed and the value will still be stored as INT64_MIN.
+        if (isDecimalBase)
+        {
+            sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
+        }
     }
 
     return baseType;
@@ -7963,7 +8083,7 @@ static bool _isCast(Parser* parser, Expr* expr)
             // want the interpretation of something in parentheses to be determined by something
             // as common as + or - whitespace.
 
-            if (const auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr))
+            if (const auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr); staticMemberExpr)
             {
                 // Apply the heuristic:
                 TokenReader::ParsingCursor cursor = parser->tokenReader.getCursor();
@@ -9732,6 +9852,26 @@ static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
 
 static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
 {
+    if ((!parser->options.allowGLSLInput) &&
+        (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026))
+    {
+        parser->sink->diagnose(Diagnostics::RemovedModifierUsage{
+            .modifierName = "volatile",
+            .message = "Suggested replacement: Atomic<T>",
+            .location = parser->tokenReader.peekLoc()});
+    }
+    else if (
+        (!parser->options.allowGLSLInput) &&
+        (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025))
+    {
+        parser->sink->diagnose(Diagnostics::DeprecatedModifierUsage{
+            .modifierName = "volatile",
+            .message = "to be removed in Slang 2026. Suggested replacement: Atomic<T>",
+            .location = parser->tokenReader.peekLoc()});
+    }
+
+    // note: no diagnostics before Slang version 2025
+
     ModifierListBuilder listBuilder;
 
     auto hlslMod = parser->astBuilder->create<HLSLVolatileModifier>();
@@ -10141,6 +10281,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("__generic", parseGenericDecl),
     _makeParseDecl("__extension", parseExtensionDecl),
     _makeParseDecl("extension", parseExtensionDecl),
+    _makeParseDecl("__func_extension", parseFuncExtensionDecl),
     _makeParseDecl("__init", parseConstructorDecl),
     _makeParseDecl("__subscript", parseSubscriptDecl),
     _makeParseDecl("property", parsePropertyDecl),
@@ -10278,6 +10419,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("__func_as_type", parseFuncAsTypeExpr),
     _makeParseExpr("fwd_diff", parseForwardDifferentiate),
     _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
+    _makeParseExpr("__apply", parseApplyForBwd),
     _makeParseExpr("__dispatch_kernel", parseDispatchKernel),
     _makeParseExpr("sizeof", parseSizeOfExpr),
     _makeParseExpr("alignof", parseAlignOfExpr),

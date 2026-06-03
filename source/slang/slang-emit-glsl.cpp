@@ -8,7 +8,6 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-legalize-types.h"
-#include "slang-mangled-lexer.h"
 #include "slang-rich-diagnostics.h"
 #include "slang/slang-ir.h"
 
@@ -1062,6 +1061,11 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(
     if (type->isArray())
     {
         m_writer->emit("Array");
+        if (type->GetBaseShape() == SLANG_TEXTURE_CUBE)
+        {
+            // samplerCubeArray requires GL_ARB_texture_cube_map_array on GLSL < 4.00
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_texture_cube_map_array"));
+        }
     }
 
     // Note: we're adding 'Shadow' only for combined texture/sampler types. Plain texture
@@ -2406,6 +2410,20 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     break;
                 }
                 break;
+            case BaseType::Double:
+                switch (fromType)
+                {
+                case BaseType::UInt64:
+                    m_writer->emit("uint64BitsToDouble");
+                    break;
+                case BaseType::Int64:
+                    m_writer->emit("int64BitsToDouble");
+                    break;
+                default:
+                    emitType(inst->getDataType());
+                    break;
+                }
+                break;
             case BaseType::Bool:
                 m_writer->emit("bool");
                 break;
@@ -2424,7 +2442,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_Not:
         {
             IRInst* operand = inst->getOperand(0);
-            if (const auto vectorType = as<IRVectorType>(operand->getDataType()))
+            if (const auto vectorType = as<IRVectorType>(operand->getDataType()); vectorType)
             {
                 EmitOpInfo outerPrec = inOuterPrec;
                 bool needClose = false;
@@ -2607,6 +2625,19 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 m_writer->emit("0");
             }
             m_writer->emit(getIntVal(location));
+            return true;
+        }
+    case kIROp_SubpassLoad:
+        {
+            auto subpassLoad = as<IRSubpassLoad>(inst);
+            m_writer->emit("subpassLoad(");
+            emitOperand(subpassLoad->getSubpassInput(), getInfo(EmitOp::General));
+            if (auto sample = subpassLoad->getSample())
+            {
+                m_writer->emit(", ");
+                emitOperand(sample, getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
             return true;
         }
     case kIROp_ImageLoad:
@@ -3543,7 +3574,8 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         _emitGLSLSubpassInputType(subpassType);
         return;
     }
-    else if (const auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+    else if (const auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
+             structuredBufferType)
     {
         // TODO: We desugar global variables with structured-buffer type into GLSL
         // `buffer` declarations, but we don't currently handle structured-buffer types

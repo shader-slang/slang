@@ -38,7 +38,7 @@ static bool isCompositeTypeContainingArrays(IRType* type)
     {
         for (auto field : structType->getFields())
         {
-            if (const auto arrayType = as<IRArrayTypeBase>(field->getFieldType()))
+            if (const auto arrayType = as<IRArrayTypeBase>(field->getFieldType()); arrayType)
             {
                 return true;
             }

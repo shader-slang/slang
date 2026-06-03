@@ -672,12 +672,6 @@ class LegacyBwdDiffFuncInterfaceType : public BuiltinType
     FIDDLE(...)
 };
 
-FIDDLE()
-class DiffTypeInfoInterfaceType : public BuiltinType
-{
-    FIDDLE(...)
-};
-
 // Built-in type to translate the type.
 FIDDLE()
 class FwdDiffFuncType : public BuiltinType

@@ -1,0 +1,35 @@
+name: Check Disk Space
+description: Fail early if available disk space is below threshold
+
+inputs:
+  min-disk-gb:
+    description: "Minimum required free disk space in GB"
+    required: false
+    default: "3"
+
+runs:
+  using: composite
+  steps:
+    - name: Check available disk space
+      shell: bash
+      run: |
+        min_gb="${{ inputs.min-disk-gb }}"
+
+        # Get available space in KB for the current filesystem
+        avail_kb=$(df -k . | tail -1 | awk '{print $4}')
+
+        if ! [[ "$avail_kb" =~ ^[0-9]+$ ]]; then
+          echo "::warning::Could not parse available disk space from df output"
+          df -k .
+          exit 0
+        fi
+
+        avail_gb=$(awk "BEGIN {printf \"%.1f\", $avail_kb / 1048576}")
+
+        echo "Available disk space: ${avail_gb} GB (minimum: ${min_gb} GB)"
+
+        if awk "BEGIN {exit !($avail_gb < $min_gb)}"; then
+          echo "::error::Insufficient disk space: ${avail_gb} GB available, ${min_gb} GB required"
+          df -h .
+          exit 1
+        fi

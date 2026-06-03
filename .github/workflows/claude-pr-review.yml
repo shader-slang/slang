@@ -31,10 +31,12 @@ permissions:
 
 jobs:
   review:
-    # Skip bot PRs and Claude's own branches (loop prevention)
+    # Skip draft PRs, bot PRs, and Claude's own branches (loop prevention)
+    # Drafts will trigger automatically on `ready_for_review` (see types: above)
     # workflow_dispatch bypasses these checks (manual trigger = intentional)
     if: |
       github.event_name == 'workflow_dispatch' || (
+        github.event.pull_request.draft == false &&
         !contains(github.event.pull_request.user.login, '[bot]') &&
         !startsWith(github.event.pull_request.head.ref, 'claude/')
       )
@@ -189,6 +191,9 @@ jobs:
           show-debug-output: ${{ (vars.SLANG_CLAUDE_DEBUG_ENV == '1' || vars.SLANG_CLAUDE_DEBUG_ENV == 'true') && 'true' || 'false' }}
           # Allow fork PRs. Safe: base-only checkout, COMMENT-only tools, bot approval dismissal.
           allowed-non-write-users: "*"
+          # Allow nv-slang-bot to trigger reviews (e.g. when it pushes commits to a PR).
+          # Reviews are still safe: base-only checkout + COMMENT-only tools regardless of actor.
+          allowed-bots: "nv-slang-bot"
           nv-inference-opus-model: ${{ vars.CLAUDE_NV_OPUS_MODEL }}
           nv-inference-sonnet-model: ${{ vars.CLAUDE_NV_SONNET_MODEL }}
           nv-inference-haiku-model: ${{ vars.CLAUDE_NV_HAIKU_MODEL }}

@@ -105,6 +105,12 @@ private:
 
     static TypeId peekTypeId(ReplayStream& stream);
     static TypeId readTypeId(ReplayStream& stream);
+    static void decodeValueFromStream(
+        ReplayStream& stream,
+        Slang::StringBuilder& output,
+        int indentLevel,
+        int recursionDepth);
+    static void skipValueInStream(ReplayStream& stream, int recursionDepth);
 
     static void indent(Slang::StringBuilder& output, int level);
     static void appendHexDump(

@@ -196,6 +196,13 @@ IRInst* cloneInst(
 static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
     SLANG_UNUSED(clonedInst);
+
+    // Local annotations will be cloned normally as part of cloning their parent function/generic
+    // body. Only explicitly chase use-list annotations for module-scope instructions, where the
+    // annotations are not children of the cloned instruction itself.
+    if (!originalInst->getParent() || originalInst->getParent()->getOp() != kIROp_ModuleInst)
+        return;
+
     traverseUsers<IRAnnotation>(
         originalInst,
         [&](IRAnnotation* annotation)
@@ -2228,6 +2235,10 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 // but we still need to keep it around if it is in the IR.
                 cloneValue(context, inst);
                 break;
+            case kIROp_DebugCompilationUnit:
+                // DebugCompilationUnit references a DebugSource; clone it along with source.
+                cloneValue(context, inst);
+                break;
             }
         }
     }
@@ -2448,7 +2459,7 @@ struct IRPrelinkContext : IRSpecContext
         case kIROp_WitnessTable:
             {
                 auto witnessTable = as<IRWitnessTable>(originalVal);
-                clonedInst = builder->createWitnessTable(
+                clonedInst = builderForClone->createWitnessTable(
                     cloneType(this, (IRType*)witnessTable->getConformanceType()),
                     cloneType(this, witnessTable->getConcreteType()));
                 break;
@@ -2517,7 +2528,6 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
     // First, register all external symbols in the current module.
     insertGlobalValueSymbols(&sharedContext, irModule);
 
-    List<KeyValuePair<IRInst*, IRInst*>> pendingReplacements;
     for (auto originalInst : externalSymbolsToLink)
     {
         // originalInst is the function in the imported module to clone.
@@ -2528,19 +2538,19 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
         specContext.shared->symbols.remove(mangledName);
         specContext.builder->setInsertBefore(existingInst);
 
-        // Remove existing inst from the module before cloning so our duplication-check
-        // (`checkIRDuplicate`) doesn't complain.
-        existingInst->removeFromParent();
+        // Strip the linkage decoration from existingInst so that checkIRDuplicate
+        // won't find a name conflict when the clone is created.
+        // We intentionally keep existingInst in the module tree so that its children
+        // (e.g. Specialize insts inside a Generic's body that reference the Generic
+        // itself) remain connected to the module during replaceUsesWith. Removing it
+        // from parent would orphan the entire subtree and crash the dedup/hoisting
+        // logic when it encounters those children as users with no module.
+        if (auto linkageDecor = existingInst->findDecoration<IRLinkageDecoration>())
+            linkageDecor->removeAndDeallocate();
 
         auto cloned = cloneValue(&specContext, originalInst);
-        pendingReplacements.add(KeyValuePair<IRInst*, IRInst*>(existingInst, cloned));
-    }
-
-    // Now we can replace all the inlined extern symbols with the cloned values.
-    for (auto kv : pendingReplacements)
-    {
-        kv.key->replaceUsesWith(kv.value);
-        kv.key->removeAndDeallocate();
+        existingInst->replaceUsesWith(cloned);
+        existingInst->removeAndDeallocate();
     }
 }
 

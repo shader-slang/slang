@@ -12,6 +12,53 @@
 namespace Slang
 {
 
+static void addDefaultPayloadAccessQualifiersToField(IRBuilder& builder, IRStructKey* fieldKey)
+{
+    const bool hasReadAccess = fieldKey->findDecoration<IRStageReadAccessDecoration>() != nullptr;
+    const bool hasWriteAccess = fieldKey->findDecoration<IRStageWriteAccessDecoration>() != nullptr;
+    if (hasReadAccess && hasWriteAccess)
+        return;
+
+    IRInst* stageNames[] = {
+        builder.getStringValue(UnownedStringSlice("caller")),
+        builder.getStringValue(UnownedStringSlice("anyhit")),
+        builder.getStringValue(UnownedStringSlice("closesthit")),
+        builder.getStringValue(UnownedStringSlice("miss")),
+    };
+
+    if (!hasReadAccess)
+    {
+        builder.addDecoration(
+            fieldKey,
+            kIROp_StageReadAccessDecoration,
+            stageNames,
+            SLANG_COUNT_OF(stageNames));
+    }
+
+    if (!hasWriteAccess)
+    {
+        builder.addDecoration(
+            fieldKey,
+            kIROp_StageWriteAccessDecoration,
+            stageNames,
+            SLANG_COUNT_OF(stageNames));
+    }
+}
+
+static void addDefaultPayloadAccessQualifiersToStruct(IRBuilder& builder, IRStructType* structType)
+{
+    for (auto field : structType->getFields())
+    {
+        addDefaultPayloadAccessQualifiersToField(builder, field->getKey());
+    }
+}
+
+static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
+{
+    if (!type->findDecoration<IRRayPayloadDecoration>())
+        builder.addRayPayloadDecoration(type);
+}
+
 void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* inst)
 {
     for (auto child : inst->getChildren())
@@ -42,7 +89,12 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
                     {
                         call->setArg(i, arg->getOperand(0));
                         if (isForcedRayPayloadStruct)
-                            builder.addRayPayloadDecoration(forceStructBaseType);
+                        {
+                            addRayPayloadDecorationIfNeeded(builder, forceStructBaseType);
+                            addDefaultPayloadAccessQualifiersToStruct(
+                                builder,
+                                cast<IRStructType>(forceStructBaseType));
+                        }
                         continue;
                     }
 
@@ -62,13 +114,16 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
 
                     builder.setInsertBefore(call->getCallee());
                     auto structType = builder.createStructType();
-                    StringBuilder structName;
                     builder.addNameHintDecoration(structType, UnownedStringSlice(typeNameHint));
                     if (isForcedRayPayloadStruct)
-                        builder.addRayPayloadDecoration(structType);
+                        addRayPayloadDecorationIfNeeded(builder, structType);
 
                     auto elementBufferKey = builder.createStructKey();
                     builder.addNameHintDecoration(elementBufferKey, UnownedStringSlice("data"));
+                    if (isForcedRayPayloadStruct)
+                    {
+                        addDefaultPayloadAccessQualifiersToField(builder, elementBufferKey);
+                    }
                     auto _dataField = builder.createStructField(
                         structType,
                         elementBufferKey,
@@ -126,13 +181,34 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
     // First, collect all empty ray payload structs to process.
     // We must collect first because the processing phase inserts new global
     // instructions (struct keys, string values) which would invalidate the iterator.
-    List<IRStructType*> emptyRayPayloadStructs;
+    HashSet<IRStructType*> emptyRayPayloadStructs;
 
     for (auto globalInst : module->getGlobalInsts())
     {
         auto structType = as<IRStructType>(globalInst);
         if (!structType)
+        {
+            // Also check global variables with IRVulkanRayPayloadDecoration.
+            // These arise from [__vulkanRayPayload] parameters in built-in functions
+            // (e.g. __spirvTraceRayHitObjectEXT) where the decoration is on the
+            // variable rather than the struct type itself.
+            auto globalVar = as<IRGlobalVar>(globalInst);
+            if (!globalVar)
+                continue;
+            if (!globalVar->findDecoration<IRVulkanRayPayloadDecoration>())
+                continue;
+            auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
+            if (!ptrType)
+                continue;
+            structType = as<IRStructType>(ptrType->getValueType());
+            if (!structType)
+                continue;
+            // Check if the struct is empty
+            if (structType->getFields().begin() != structType->getFields().end())
+                continue;
+            emptyRayPayloadStructs.add(structType);
             continue;
+        }
 
         // Check if this struct has ray payload decoration
         auto rayPayloadDec = structType->findDecoration<IRRayPayloadDecoration>();
@@ -159,9 +235,7 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
         builder.addNameHintDecoration(dummyKey, UnownedStringSlice("_slang_dummy"));
 
         // Add stage access decorations that ray payload fields require
-        IRInst* stageName = builder.getStringValue(UnownedStringSlice("caller"));
-        builder.addDecoration(dummyKey, kIROp_StageReadAccessDecoration, &stageName, 1);
-        builder.addDecoration(dummyKey, kIROp_StageWriteAccessDecoration, &stageName, 1);
+        addDefaultPayloadAccessQualifiersToField(builder, dummyKey);
 
         builder.createStructField(structType, dummyKey, builder.getIntType());
 

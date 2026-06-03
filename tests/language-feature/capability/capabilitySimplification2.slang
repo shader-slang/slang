@@ -8,7 +8,8 @@
 
 // SPIRV: warning[E41012]
 // SPIRV-NOT: spirv_1_2
-// SPIRV: spvGroupNonUniformBallot
+// SPIRV-NOT: spvGroupNonUniformBallot
+// SPIRV: spvGroupNonUniform
 
 // GLSL: warning[E41012]
 // GLSL-NOT: GLSL_400

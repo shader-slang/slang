@@ -5,59 +5,12 @@
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
-#include "slang-mangled-lexer.h"
 #include "slang-rich-diagnostics.h"
 
 #include <assert.h>
 
 namespace Slang
 {
-
-static const char* kMetalBuiltinPreludeMatrixCompMult = R"(
-template<typename T, int A, int B>
-matrix<T,A,B> _slang_matrixCompMult(matrix<T,A,B> m1, matrix<T,A,B> m2)
-{
-    matrix<T,A,B> result;
-    for (int i = 0; i < A; i++)
-        result[i] = m1[i] * m2[i];
-    return result;
-}
-)";
-
-static const char* kMetalBuiltinPreludeMatrixReshape = R"(
-template<int A, int B, typename T, int N, int M>
-matrix<T,A,B> _slang_matrixReshape(matrix<T,N,M> m)
-{
-    matrix<T,A,B> result = T(0);
-    for (int i = 0; i < min(A,N); i++)
-        for (int j = 0; j < min(B,M); j++)
-            result[i] = m[i][j];
-    return result;
-}
-)";
-
-static const char* kMetalBuiltinPreludeVectorReshape = R"(
-template<int A, typename T, int N>
-vec<T,A> _slang_vectorReshape(vec<T,N> v)
-{
-    vec<T,A> result = T(0);
-    for (int i = 0; i < min(A,N); i++)
-        result[i] = v[i];
-    return result;
-}
-)";
-
-static const char* kMetalBuiltinPreludeMatrixFmod = R"(
-template<typename T, int A, int B>
-matrix<T,A,B> _slang_matrixFmod(matrix<T,A,B> m1, matrix<T,A,B> m2)
-{
-    matrix<T,A,B> result;
-    for (int i = 0; i < A; i++)
-        result[i] = fmod(m1[i], m2[i]);
-    return result;
-}
-)";
-
 
 void MetalSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
@@ -183,18 +136,27 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
     if (!layoutDecoration)
+    {
+        if (param->findDecoration<IRTargetSystemValueDecoration>())
+            maybeEmitSystemSemantic(param);
         return;
+    }
     auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
     if (!layout)
         return;
+
+    // DescriptorHandle<T> is bindless on Metal and has T's layout, so unwrap
+    // it before the per-kind type tests below.
+    IRType* paramType = param->getDataType();
+    if (auto handleType = as<IRDescriptorHandleType>(paramType))
+        paramType = handleType->getResourceType();
 
     for (auto rr : layout->getOffsetAttrs())
     {
         switch (rr->getResourceKind())
         {
         case LayoutResourceKind::MetalTexture:
-            if (as<IRTextureTypeBase>(param->getDataType()) ||
-                as<IRTextureBufferType>(param->getDataType()))
+            if (as<IRTextureTypeBase>(paramType) || as<IRTextureBufferType>(paramType))
             {
                 m_writer->emit(" [[texture(");
                 m_writer->emit(rr->getOffset());
@@ -202,11 +164,10 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::MetalBuffer:
-            if (as<IRPtrTypeBase>(param->getDataType()) ||
-                as<IRHLSLStructuredBufferTypeBase>(param->getDataType()) ||
-                as<IRByteAddressBufferTypeBase>(param->getDataType()) ||
-                as<IRUniformParameterGroupType>(param->getDataType()) ||
-                as<IRRaytracingAccelerationStructureType>(param->getDataType()))
+            if (as<IRPtrTypeBase>(paramType) || as<IRHLSLStructuredBufferTypeBase>(paramType) ||
+                as<IRByteAddressBufferTypeBase>(paramType) ||
+                as<IRUniformParameterGroupType>(paramType) ||
+                as<IRRaytracingAccelerationStructureType>(paramType))
             {
                 m_writer->emit(" [[buffer(");
                 m_writer->emit(rr->getOffset());
@@ -214,7 +175,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::SamplerState:
-            if (as<IRSamplerStateTypeBase>(param->getDataType()))
+            if (as<IRSamplerStateTypeBase>(paramType))
             {
                 m_writer->emit(" [[sampler(");
                 m_writer->emit(rr->getOffset());
@@ -469,6 +430,12 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_Discard:
         m_writer->emit("discard_fragment();\n");
         return true;
+    case kIROp_SubpassLoad:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            inst,
+            "SubpassLoad should have been lowered before Metal emission");
+        return true;
     case kIROp_MetalAtomicCast:
         {
             auto oldValName = getName(inst);
@@ -711,6 +678,33 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit("}\n");
             return true;
         }
+    case kIROp_CoopMatMulAdd:
+        {
+            auto coopMatMulAdd = cast<IRCoopMatMulAdd>(inst);
+            if (auto satLit = as<IRBoolLit>(coopMatMulAdd->getSaturatingAccumulation()))
+            {
+                if (satLit->getValue())
+                {
+                    getSink()->diagnose(Diagnostics::Unimplemented{
+                        .feature = "saturating accumulation for Metal cooperative matrices "
+                                   "(simdgroup_matrix)",
+                        .location = inst->sourceLoc});
+                    return false;
+                }
+            }
+            emitType(inst->getDataType(), getName(inst));
+            m_writer->emit(";\n");
+            m_writer->emit("simdgroup_multiply_accumulate(");
+            m_writer->emit(getName(inst));
+            m_writer->emit(", ");
+            emitOperand(coopMatMulAdd->getMatA(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopMatMulAdd->getMatB(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopMatMulAdd->getMatC(), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
     }
     return false;
 }
@@ -831,6 +825,24 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             emitOperand(
                 inst->getOperand(0),
                 leftSide(getInfo(EmitOp::General), getInfo(EmitOp::General)));
+            m_writer->emit(")");
+            return true;
+        }
+    case kIROp_CastDescriptorHandleToUInt64:
+        {
+            // Metal: DescriptorHandle is a pointer; emit C-style cast to ulong.
+            m_writer->emit("(ulong)(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+    case kIROp_CastUInt64ToDescriptorHandle:
+        {
+            // Metal: cast integer back to pointer type.
+            m_writer->emit("(");
+            emitType(inst->getDataType());
+            m_writer->emit(")(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
         }
@@ -1021,6 +1033,12 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("nullptr");
             return true;
         }
+    case kIROp_SubpassLoad:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            inst,
+            "SubpassLoad should have been lowered before Metal emission");
+        return true;
     default:
         break;
     }
@@ -1148,6 +1166,32 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 void MetalSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
     emitType(type, name);
+}
+
+void MetalSourceEmitter::_validateCoopMatrixType(IRCoopMatrixType* coopType)
+{
+    auto rows = getIntVal(coopType->getRowCount());
+    auto cols = getIntVal(coopType->getColumnCount());
+    if (rows != 8 || cols != 8)
+    {
+        getSink()->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions",
+            .location = coopType->sourceLoc});
+    }
+    auto scope = getIntVal(coopType->getScope());
+    if (scope != (IRIntegerValue)MemoryScope::Subgroup)
+    {
+        getSink()->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices (simdgroup_matrix) only support Subgroup scope",
+            .location = coopType->sourceLoc});
+    }
+    auto elementType = coopType->getElementType();
+    if (elementType->getOp() != kIROp_HalfType && elementType->getOp() != kIROp_FloatType)
+    {
+        getSink()->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices only support half and float element types",
+            .location = coopType->sourceLoc});
+    }
 }
 
 void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
@@ -1308,6 +1352,27 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(">");
             return;
         }
+    case kIROp_CoopMatrixType:
+        {
+            auto coopType = as<IRCoopMatrixType>(type);
+            _validateCoopMatrixType(coopType);
+            // Metal's simdgroup_matrix<T, Cols, Rows> uses Cols, Rows order
+            m_writer->emit("simdgroup_matrix<");
+            emitType(coopType->getElementType());
+            m_writer->emit(", ");
+            emitVal(coopType->getColumnCount(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitVal(coopType->getRowCount(), getInfo(EmitOp::General));
+            m_writer->emit(">");
+            ensurePrelude(kMetalBuiltinPreludeSimdgroupMatrixOps);
+            return;
+        }
+    case kIROp_SubpassInputType:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            type,
+            "SubpassInputType should have been lowered before Metal emission");
+        return;
     default:
         break;
     }
@@ -1335,7 +1400,8 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_writer->emit(" device*");
         return;
     }
-    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type);
+             untypedBufferType)
     {
         switch (type->getOp())
         {

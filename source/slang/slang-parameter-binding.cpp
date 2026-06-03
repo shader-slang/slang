@@ -2324,19 +2324,19 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             return arrayTypeLayout;
         }
         // Ignore a bunch of types that don't make sense here...
-        else if (const auto subpassType = as<SubpassInputType>(type))
+        else if (const auto subpassType = as<SubpassInputType>(type); subpassType)
         {
             return nullptr;
         }
-        else if (const auto textureType = as<TextureType>(type))
+        else if (const auto textureType = as<TextureType>(type); textureType)
         {
             return nullptr;
         }
-        else if (const auto samplerStateType = as<SamplerStateType>(type))
+        else if (const auto samplerStateType = as<SamplerStateType>(type); samplerStateType)
         {
             return nullptr;
         }
-        else if (const auto constantBufferType = as<ConstantBufferType>(type))
+        else if (const auto constantBufferType = as<ConstantBufferType>(type); constantBufferType)
         {
             return nullptr;
         }
@@ -2486,6 +2486,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                         getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
                             .paramName = field.getName(),
                             .decl = field.getDecl()});
+
+                        // Keep the aggregate layout structurally well-formed so later
+                        // validation and cleanup code doesn't trip over a null field layout
+                        // after we've already diagnosed the invalid varying field.
+                        fieldTypeLayout = new TypeLayout();
+                        fieldTypeLayout->type = getType(context->getASTBuilder(), field);
+                        fieldTypeLayout->rules = context->layoutContext.rules;
+                        fieldVarLayout->typeLayout = fieldTypeLayout;
                         continue;
                     }
                     fieldVarLayout->typeLayout = fieldTypeLayout;
@@ -2615,7 +2623,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         }
 
         // If we ran into an error in checking the user's code, then skip this parameter
-        else if (const auto errorType = as<ErrorType>(type))
+        else if (const auto errorType = as<ErrorType>(type); errorType)
         {
             return nullptr;
         }
@@ -4387,16 +4395,24 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
 
 ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 {
+    // Layout construction still walks shared linkage-owned front-end state, so serialize it with
+    // other component-type front-end operations.
+    std::lock_guard<std::recursive_mutex> lock(
+        m_program->getLinkage()->getComponentTypeOperationMutex());
+
+    m_targetReq->getTargetCaps();
+    m_targetReq->getHLSLToVulkanLayoutOptions();
+
     if (!m_layout)
     {
         m_layout = generateParameterBindings(this, sink);
         if (sink->getErrorCount() != 0)
             return nullptr;
+    }
 
-        if (m_layout)
-        {
-            m_irModuleForLayout = createIRModuleForLayout(sink);
-        }
+    if (m_layout && !m_irModuleForLayout)
+    {
+        m_irModuleForLayout = createIRModuleForLayout(sink);
     }
     return m_layout;
 }

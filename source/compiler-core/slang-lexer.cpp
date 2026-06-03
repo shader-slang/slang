@@ -1099,16 +1099,22 @@ String getStringLiteralTokenValue(Token const& token)
 
     char const* cursor = content.begin();
     char const* end = content.end();
-    SLANG_UNREFERENCED_VARIABLE(end);
+
+    // The token's content slice is a precise view of the lexed source text.
+    // For an unterminated literal (newline / EOF inside a string), the lexer
+    // emits a diagnostic but still produces a token whose content slice ends
+    // before any closing quote. Every cursor advance below must therefore be
+    // gated on `cursor < end` to avoid an out-of-bounds read into the
+    // surrounding heap (#11278).
+    if (cursor == end)
+        return String();
 
     auto quote = *cursor++;
     SLANG_ASSERT(quote == '\'' || quote == '"');
 
     StringBuilder valueBuilder;
-    for (;;)
+    while (cursor < end)
     {
-        SLANG_ASSERT(cursor != end);
-
         auto c = *cursor++;
 
         // If we see a closing quote, then we are at the end of the string literal
@@ -1129,6 +1135,8 @@ String getStringLiteralTokenValue(Token const& token)
         // Now we look at another character to figure out the kind of
         // escape sequence we are dealing with:
 
+        if (cursor >= end)
+            break;
         char d = *cursor++;
 
         switch (d)
@@ -1178,6 +1186,8 @@ String getStringLiteralTokenValue(Token const& token)
                 int value = 0;
                 for (int ii = 0; ii < 3; ++ii)
                 {
+                    if (cursor >= end)
+                        break;
                     d = *cursor;
                     if (('0' <= d) && (d <= '7'))
                     {
@@ -1203,6 +1213,8 @@ String getStringLiteralTokenValue(Token const& token)
                 int value = 0;
                 for (;;)
                 {
+                    if (cursor >= end)
+                        break;
                     d = *cursor++;
                     int digitValue = 0;
                     if (('0' <= d) && (d <= '9'))
@@ -1234,6 +1246,11 @@ String getStringLiteralTokenValue(Token const& token)
             // TODO: Unicode escape sequences
         }
     }
+
+    // Unterminated literal: return what we have built so far rather than
+    // continuing to read past `end`. The lexer has already emitted a
+    // diagnostic for the unterminated literal at this point.
+    return valueBuilder.produceString();
 }
 
 String getFileNameTokenValue(Token const& token)
@@ -1246,6 +1263,8 @@ String getFileNameTokenValue(Token const& token)
 
     // Just trim off the first and last characters to remove the quotes
     // (whether they were `""` or `<>`.
+    if (content.getLength() < 2)
+        return String();
     return String(content.begin() + 1, content.end() - 1);
 }
 

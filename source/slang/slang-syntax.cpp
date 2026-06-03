@@ -152,6 +152,38 @@ void printDiagnosticArg(StringBuilder& sb, Decl* decl)
 {
     if (!decl)
         return;
+    // Unwrap GenericDecl to check for constructors inside.
+    auto innerDecl = maybeGetInner(decl);
+    if (as<ConstructorDecl>(innerDecl))
+    {
+        // Print constructors as "TypeName.init" instead of the internal "$init" name.
+        // Walk up through parent chain, skipping GenericDecl wrappers, to find the
+        // containing type declaration.
+        for (auto parent = decl->parentDecl; parent; parent = parent->parentDecl)
+        {
+            if (as<GenericDecl>(parent))
+                continue;
+            if (parent->getName() && parent->getName()->text.getLength())
+            {
+                sb << getText(parent->getName()) << ".";
+            }
+            else if (auto extDecl = as<ExtensionDecl>(parent))
+            {
+                // ExtensionDecl has no name; recover the type name from targetType.
+                if (auto declRefType = as<DeclRefType>(extDecl->targetType.type))
+                {
+                    auto typeDecl = declRefType->getDeclRef().getDecl();
+                    if (typeDecl && typeDecl->getName() && typeDecl->getName()->text.getLength())
+                    {
+                        sb << getText(typeDecl->getName()) << ".";
+                    }
+                }
+            }
+            break;
+        }
+        sb << "init";
+        return;
+    }
     if (decl->getName() && decl->getName()->text.getLength())
         sb << getText(decl->getName());
     else
@@ -302,6 +334,9 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
         break;
     case ASTNodeType::NonEmptyPackConstraintDecl:
         sb << "NonEmptyPackConstraintDecl";
+        break;
+    case ASTNodeType::HasDiffTypeInfoConstraintDecl:
+        sb << "__hasDiffTypeInfo";
         break;
     case ASTNodeType::SimpleTypeDecl:
         sb << "SimpleTypeDecl";

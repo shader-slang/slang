@@ -1,0 +1,30 @@
+//META: generated=true
+//META: model=claude-opus-4-7
+//META: generated_at=2026-05-21T18:00:00+00:00
+//META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
+//META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
+//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
+//META: purpose=A float LiteralExpr lowers to an IRFloatLit constant inst spelled as `<value> : Float` inline in its operand position — the float-side of the doc's "LiteralExpr -> constant inst (IRIntLit, IRFloatLit, ...)" row.
+//META: intent=boundary
+//META: pipeline_stage=lower
+//META: warning=Auto-generated. May drift from source. Do not edit by hand.
+
+// Boundary: LiteralExpr type axis — float (sibling of Int). The doc
+// lists IRFloatLit as one of the constant-inst classes. The literal
+// `2.5f` shows up as `2.5 : Float` as the second operand of the
+// `mul` instruction.
+
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+
+uniform float a;
+uniform RWStructuredBuffer<float> buf;
+
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    float r = a * 2.5f;
+    buf[0] = r;
+}
+
+// CHECK-LABEL: func %main
+// CHECK: mul(%{{.*}}, 2.5 : Float)

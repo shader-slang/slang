@@ -481,9 +481,9 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 ///     associatedtype Differential : IDifferentiable
 ///         where Differential.Differential == Differential;
 ///
-///     static Differential dzero();
+///     [Differentiable] static Differential dzero();
 ///
-///     static Differential dadd(Differential, Differential);
+///     [Differentiable] static Differential dadd(Differential, Differential);
 /// }
 /// ```
 ///
@@ -542,24 +542,26 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 ///     // Specify that `MyRay.Differential` is `MyRayDifferential`.
 ///     typealias Differential = MyRayDifferential;
 ///
-///     // Specify that the derivative for `origin` will be stored in `MayRayDifferential.d_origin`.
-///     [DerivativeMember(MayRayDifferential.d_origin)]
+///     // Specify that the derivative for `origin` will be stored in `MyRayDifferential.d_origin`.
+///     [DerivativeMember(MyRayDifferential.d_origin)]
 ///     float3 origin;
 ///
-///     // Specify that the derivative for `dir` will be stored in `MayRayDifferential.d_dir`.
-///     [DerivativeMember(MayRayDifferential.d_dir)]
+///     // Specify that the derivative for `dir` will be stored in `MyRayDifferential.d_dir`.
+///     [DerivativeMember(MyRayDifferential.d_dir)]
 ///     float3 dir;
 ///
 ///     // This is a non-differentiable field so we don't put any attributes on it.
 ///     int nonDifferentiablePayload;
 ///
 ///     // Define zero derivative.
+///     [Differentiable]
 ///     static MyRayDifferential dzero()
 ///     {
 ///         return {float3(0.0), float3(0.0)};
 ///     }
 ///
 ///     // Define the add operation of two derivatives.
+///     [Differentiable]
 ///     static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
 ///     {
 ///         MyRayDifferential result;
@@ -573,7 +575,11 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 /// Note that for each struct field that is differentiable, we need to use the `[DerivativeMember]` attribute to associate it with the
 /// corresponding field in the `Differential` type, so the compiler knows how to access the derivative for the field.
 ///
-/// However, there is still a missing piece in the above code: we also need to make `MyRayDifferential` conform to `IDifferentiable` because it is required that the `Differential` of a type must itself be `Differential`. Again we can use automatic fulfillment by simply adding `IDifferentiable` conformance to `MyRayDifferential`:
+/// However, there is still a missing piece in the above code: we also need to make
+/// `MyRayDifferential` conform to `IDifferentiable` because it is required that
+/// the `Differential` of a type must itself be `IDifferentiable`, and that
+/// `Differential.Differential == Differential`. Again we can use automatic
+/// fulfillment by simply adding `IDifferentiable` conformance to `MyRayDifferential`:
 /// ```csharp
 /// struct MyRayDifferential : IDifferentiable
 /// {
@@ -590,28 +596,31 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 /// {
 ///     typealias Differential = MyRayDifferential;
 ///
-///    [DerivativeMember(MyRayDifferential.d_origin)]
-///    float3 d_origin;
+///     [DerivativeMember(MyRayDifferential.d_origin)]
+///     float3 d_origin;
 ///
-///    [DerivativeMember(MyRayDifferential.d_dir)]
-///    float3 d_dir;
+///     [DerivativeMember(MyRayDifferential.d_dir)]
+///     float3 d_dir;
 ///
-///    static MyRayDifferential dzero()
-///    {
-///        return {float3(0.0), float3(0.0)};
-///    }
+///     [Differentiable]
+///     static MyRayDifferential dzero()
+///     {
+///         return {float3(0.0), float3(0.0)};
+///     }
 ///
-///    static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
-///    {
-///        MyRayDifferential result;
-///        result.d_origin = v1.d_origin + v2.d_origin;
+///     [Differentiable]
+///     static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
+///     {
+///         MyRayDifferential result;
+///         result.d_origin = v1.d_origin + v2.d_origin;
 ///         result.d_dir = v1.d_dir + v2.d_dir;
 ///         return result;
 ///     }
 /// }
 /// ```
-/// In this specific case, the automatically generated `IDifferentiable`
-/// implementation will be exactly the same as the manually written code listed above.
+/// In this specific case, the manually written `dzero` and `dadd` have the same
+/// value behavior as the automatically generated `IDifferentiable` implementation.
+/// When writing these requirements manually, include `[Differentiable]` as shown.
 ///
 ///
 __magic_type(DifferentiableType)
@@ -660,49 +669,45 @@ interface IDifferentiablePtrType
     associatedtype Differential : IDifferentiablePtrType;
 };
 
-__magic_type(DiffTypeInfoInterfaceType)
-interface IHasDiffTypeInfo
-{ };
-
 __magic_type(FwdDiffFuncType)
 __intrinsic_type($(kIROp_ForwardDiffFuncType))
-struct FwdDiffFuncType<FType> where FType : IHasDiffTypeInfo
+struct FwdDiffFuncType<FType> where __hasDiffTypeInfo(FType)
 { };
 
 __magic_type(BwdCallableFuncType)
 __intrinsic_type($(kIROp_BwdCallableFuncType))
-struct BwdCallableFuncType<FType, CtxType> where FType : IHasDiffTypeInfo
+struct BwdCallableFuncType<FType, CtxType> where __hasDiffTypeInfo(FType)
 { };
 
 __magic_type(RematFuncType)
 __intrinsic_type($(kIROp_RematFuncType))
-struct RematFuncType<FType, MinimalCtxType, FullCtxType> where FType : IHasDiffTypeInfo
+struct RematFuncType<FType, MinimalCtxType, FullCtxType> where __hasDiffTypeInfo(FType)
 { };
 
 __magic_type(ApplyForBwdFuncType)
 __intrinsic_type($(kIROp_ApplyForBwdFuncType))
-struct ApplyForBwdFuncType<FType, CtxType> where FType : IHasDiffTypeInfo
+struct ApplyForBwdFuncType<FType, CtxType> where __hasDiffTypeInfo(FType)
 { };
 
 __magic_type(BwdDiffFuncType)
 __intrinsic_type($(kIROp_BackwardDiffFuncType))
-struct BwdDiffFuncType<FType> where FType : IHasDiffTypeInfo
+struct BwdDiffFuncType<FType> where __hasDiffTypeInfo(FType)
 { };
 
 __magic_type(ForwardDiffFuncInterfaceType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IForwardDifferentiable))]
 [__FunctionInterface]
-interface IForwardDifferentiable<FType> where FType : IHasDiffTypeInfo
+interface IForwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
     [MaybeDifferentiable]
-    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff 
 };
 
 // Core library interfaces:
 __magic_type(BwdCallableBaseType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IBwdCallable))]
-interface IBwdCallable<FType> where FType : IHasDiffTypeInfo
+interface IBwdCallable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallablePropFunc))
     __associatedfunc BwdCallableFuncType<FType, This> operator(); // -> bwd_prop
@@ -711,7 +716,7 @@ interface IBwdCallable<FType> where FType : IHasDiffTypeInfo
 __magic_type(BwdDiffFuncInterfaceType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IBackwardDifferentiable))]
 [__FunctionInterface]
-interface IBackwardDifferentiable<FType> where FType : IHasDiffTypeInfo
+interface IBackwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
     associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
@@ -722,16 +727,11 @@ interface IBackwardDifferentiable<FType> where FType : IHasDiffTypeInfo
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
     __associatedfunc ApplyForBwdFuncType<FType, This.MinimalContext> apply_bwd; // -> apply_bwd
 
-    // WARNING: Currently, the func-type produced by 'remat' is actually inconsistent
-    // with the implementation because the position of the 'this-type' is different.
-    // This isn't an issue at the moment since the IR generates
-    // both the implementation and the call, butthis needs to be fixed.
-    // 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableRematFunc))
-    __associatedfunc RematFuncType<FType, This.MinimalContext, This.BwdCallable> remat; // -> remat
+    static __associatedfunc RematFuncType<FType, This.MinimalContext, This.BwdCallable> remat; // -> remat
 
     __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
-    __associatedfunc BwdDiffFuncType<FType> bwd_diff; // -> bwd_diff
+    static __associatedfunc BwdDiffFuncType<FType> bwd_diff; // -> bwd_diff
 };
 
 /// `DifferentialPair<T>` is a built-in type that carries both the original and derivative value of a term.
@@ -742,8 +742,8 @@ interface IBackwardDifferentiable<FType> where FType : IHasDiffTypeInfo
 ///     typealias Differential = DifferentialPair<T.Differential>;
 ///     property T p {get;}
 ///     property T.Differential d {get;}
-///     static Differential dzero();
-///     static Differential dadd(Differential a, Differential b);
+///     [Differentiable] static Differential dzero();
+///     [Differentiable] static Differential dadd(Differential a, Differential b);
 /// }
 /// ```
 ///
@@ -903,6 +903,7 @@ interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat, IFloatingPoint
 {
         /// Get the value of the mathematical constant pi in this type.
     [Differentiable]
+    [__readNone]
     static This getPi();
 }
 
@@ -1292,6 +1293,7 @@ ${
     case BaseType::Double:
 $}
         [Differentiable]
+        [__readNone]
         static $(kBaseTypes[tt].name) getPi() { return $(kBaseTypes[tt].name)(3.14159265358979323846264338328); }
 
          __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
@@ -1682,7 +1684,7 @@ extension uintptr_t : IRangedValue
 
 /// Represent a 8-bit floating point value with 4 bits of exponent and 3 bits of mantissa.
 [require(spvFloat8EXT)]
-[require(cuda_sm_8_0)]
+[require(cuda_sm_8_9)]
 __intrinsic_type($(kIROp_FloatE4M3Type))
 __magic_type(FloatE4M3Type)
 struct FloatE4M3 : IFloatingPointCoopElement
@@ -1698,7 +1700,7 @@ struct FloatE4M3 : IFloatingPointCoopElement
 
 /// Represent a 8-bit floating point value with 5 bits of exponent and 2 bits of mantissa.
 [require(spvFloat8EXT)]
-[require(cuda_sm_8_0)]
+[require(cuda_sm_8_9)]
 __intrinsic_type($(kIROp_FloatE5M2Type))
 __magic_type(FloatE5M2Type)
 struct FloatE5M2 : IFloatingPointCoopElement
@@ -3325,6 +3327,22 @@ __generic<T, U>
 __intrinsic_op($(kIROp_CreateExistentialObject))
 T createDynamicObject(uint typeId, U value);
 
+// One-argument shorthand for stateless dispatch: interfaces whose conforming
+// types have an empty any-value payload.  Forwards to the two-argument form
+// with a zero `uint` so the overload resolver has a concrete `U` to infer.
+// When the interface's any-value size is zero this byte is discarded.
+// When the interface's any-value size is non-zero this form is *not*
+// equivalent to calling the two-argument form with a real payload — the
+// packing path (`emitPackAnyValue` / `generatePackingFunc`) zero-initializes
+// the any-value buffer, so every byte of the payload is 0.  Callers that
+// need a specific payload must pass it explicitly via the two-argument form.
+__generic<T>
+[__unsafeForceInlineEarly]
+T createDynamicObject(uint typeId)
+{
+    return createDynamicObject<T, uint>(typeId, 0);
+}
+
 /// Reinterpret type `U` as type `T`. `T` and `U`
 /// can be any scalar, vector, matrix, struct or array types.
 /// @category conversion
@@ -4694,8 +4712,35 @@ attribute_syntax [noinline] : NoInlineAttribute;
 
 /// Mark a declaration as deprecated.
 /// @param message The diagnostic message to show when the declaration is used.
+///
+/// @see `[RemovedSince]`.
 __attributeTarget(DeclBase)
 attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
+
+/// Mark a declaration as removed starting from the specified language version.
+///
+/// @param languageVersion  The first version from which the declaration is considered removed.
+/// @param message The diagnostic message to show when the declaration is used.
+///
+/// This attribute is used for a scheduled removal of a declaration.
+///
+/// An error is triggered when a declaration tagged with
+/// `[RemovedSince]` is referenced by a module that is compiled with
+/// language version `languageVersion` or higher.
+/// When an error is triggered due to removal, a possible
+/// `[deprecated]` attribute decoration for the same declaration is ignored.
+///
+/// It is not required that `languageVersion` match a version
+/// that is supported by `slangc`. This allows removal
+/// of declarations from future language versions. Value `-1`
+/// marks the declaration as removed from all language versions.
+///
+/// When a declaration is slated for removal, it is recommended to
+/// also tag it with the `[deprecated]` attribute.
+///
+/// @see `[deprecated]`.
+__attributeTarget(DeclBase)
+attribute_syntax [RemovedSince(languageVersion: int, message: String)] : RemovedSinceAttribute;
 
 /// Controls the behavior of the compiler when a differentiable function is detected to have side-effects.
 /// @category misc_types
@@ -5162,6 +5207,12 @@ semantic sv_wavelaneindex
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    get : uint;
+}
+
+semantic sv_waveindex
+{
+    [require(compute)]
     get : uint;
 }
 

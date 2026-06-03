@@ -2,6 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BAB):-vk -emit-spirv-directly -Xslang -DBAB
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BAB):-cuda -Xslang -DBAB
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type -Xslang -DMETAL
 
 //DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include -DBAB
 //DXIL: result code = 0
@@ -39,12 +40,20 @@ RWStructuredBuffer<float> outputBuffer;
 
 using namespace linalg;
 
+#ifdef METAL
+typealias CoopMatType = CoopMat<float, MemoryScope.Subgroup, 8, 8, CoopMatMatrixUse::MatrixAccumulator>;
+#else
 typealias CoopMatType = CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+#endif
 
 [numthreads(32, 1, 1)]
 void computeMain()
 {
+#ifdef METAL
+    let stride = 8;
+#else
     let stride = 16;
+#endif
     let matrixLayout = CoopMatMatrixLayout::RowMajor;
 
     CoopMatType coopMatArray[2];

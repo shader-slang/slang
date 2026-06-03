@@ -206,7 +206,7 @@ static void _getDocumentSymbolsImpl(
                     sym.selectionRange.end = sym.range.end;
                 }
             }
-            if (const auto childContainerDecl = as<ContainerDecl>(child))
+            if (const auto childContainerDecl = as<ContainerDecl>(child); childContainerDecl)
             {
                 // Recurse
                 bool shouldRecurse = true;

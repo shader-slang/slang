@@ -544,6 +544,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.fragmentShadingRateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.fragmentShadingRateFeatures;
 
+        // fragment shader barycentric features
+        extendedFeatures.fragmentShaderBarycentricFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.fragmentShaderBarycentricFeatures;
+
         // raytracing validation features
         extendedFeatures.rayTracingValidationFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.rayTracingValidationFeatures;
@@ -851,11 +855,29 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             deviceExtensions.add(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
             m_features.add("push-descriptor");
         }
-        if (extensionNames.contains(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME))
+
+        const bool khrFragmentBarycentrics =
+            extensionNames.contains(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME) &&
+            extendedFeatures.fragmentShaderBarycentricFeatures.fragmentShaderBarycentric == VK_TRUE;
+        const bool nvFragmentBarycentrics =
+            extensionNames.contains(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
+        if (khrFragmentBarycentrics || nvFragmentBarycentrics)
         {
-            deviceExtensions.add(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
             m_features.add("barycentrics");
         }
+
+        if (khrFragmentBarycentrics)
+        {
+            deviceExtensions.add(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
+            extendedFeatures.fragmentShaderBarycentricFeatures.pNext =
+                (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.fragmentShaderBarycentricFeatures;
+        }
+        if (nvFragmentBarycentrics)
+        {
+            deviceExtensions.add(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
+        }
+
         if (extensionNames.contains(VK_NV_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME))
         {
             deviceExtensions.add(VK_NV_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME);
@@ -1762,6 +1784,8 @@ Result DeviceImpl::createTextureResource(
             m_api.vkMapMemory(m_device, uploadBuffer.m_memory, 0, bufferSize, 0, (void**)&dstData);
             uint8_t* dstDataStart;
             dstDataStart = dstData;
+            // TODO: PR #2244 (lucy96chen) - dstDataStart is set but never used.
+            SLANG_UNUSED(dstDataStart);
 
             Offset dstSubresourceOffset = 0;
             for (int i = 0; i < arraySize; ++i)

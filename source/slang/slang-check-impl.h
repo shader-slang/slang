@@ -312,8 +312,11 @@ struct OverloadCandidate
     // The type of the result expression if this candidate is selected
     Type* resultType = nullptr;
 
-    // A system for tracking constraints introduced on generic parameters
-    //            ConstraintSystem constraintSystem;
+    // Generic overload candidates store the substitution used to type-check the
+    // candidate. Before constraint validation this may contain only ordinary
+    // generic arguments inferred from the call. After generic-constraint
+    // validation succeeds, it is replaced with the full generic application
+    // substitution, including compiler-solved witness arguments.
 
     // How much conversion cost should be considered for this overload,
     // when ranking candidates.
@@ -628,6 +631,39 @@ struct InheritanceInfo
     FacetList facets;
 };
 
+/// Records the extension epoch observed for one declaration dependency.
+///
+/// Inheritance and subtype cache entries can depend on many declarations via
+/// transitive facets. We snapshot the epoch for each contributing declaration so
+/// we can validate lazily instead of eagerly scanning and invalidating large
+/// global cache dictionaries when a new extension is registered.
+struct DeclExtensionEpochStamp
+{
+    Decl* decl = nullptr;
+    UInt epoch = 0;
+};
+
+/// Cached inheritance info plus the declaration epochs it depends on.
+///
+/// The `generation` value changes whenever the entry is recomputed. Subtype
+/// cache entries store the generations they were built against so they can
+/// cheaply detect when either endpoint's inheritance info has changed.
+struct InheritanceInfoCacheEntry
+{
+    InheritanceInfo info;
+    List<DeclExtensionEpochStamp> dependencyEpochs;
+    UInt generation = 0;
+    bool isComputing = false;
+};
+
+/// Cached subtype query plus the inheritance cache generations it depended on.
+struct SubtypeWitnessCacheEntry
+{
+    SubtypeWitness* witness = nullptr;
+    UInt subTypeGeneration = 0;
+    UInt superTypeGeneration = 0;
+};
+
 /// Cached information about how to convert between two types.
 struct ImplicitCastMethod
 {
@@ -727,6 +763,18 @@ struct SharedSemanticsContext : public RefObject
 
     Dictionary<Val*, VariadicPackCardinality> m_packCardinalityCache;
 
+    // Cache from a semantic value to the ordinary-argument and witness-argument
+    // declarations structurally mentioned by that value. Generic default solving
+    // asks this Val* -> dependent Decl* question repeatedly across
+    // specializations of the same generic, and the answer does not depend on a
+    // particular solver instance; the solver later filters these declarations
+    // through its current relevance/readiness rules.
+    // Cached dependency declarations live in lists so the solver can return
+    // array views instead of references into the dictionary's value storage.
+    // Empty dependency lists are cached here too; an empty list has no element
+    // buffer allocation.
+    Dictionary<Val*, List<Decl*>> m_genericSolverValToDependentDeclsCache;
+
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
@@ -815,16 +863,8 @@ public:
         InheritanceCircularityInfo* circularityInfo);
 
     /// Try get subtype witness from cache, returns true if cache contains a result for the query.
-    bool tryGetSubtypeWitnessFromCache(Type* sub, Type* sup, SubtypeWitness*& outWitness)
-    {
-        auto pair = TypePair{sub, sup};
-        return m_mapTypePairToSubtypeWitness.tryGetValue(pair, outWitness);
-    }
-    void cacheSubtypeWitness(Type* sub, Type* sup, SubtypeWitness*& outWitness)
-    {
-        auto pair = TypePair{sub, sup};
-        m_mapTypePairToSubtypeWitness[pair] = outWitness;
-    }
+    bool tryGetSubtypeWitnessFromCache(Type* sub, Type* sup, SubtypeWitness*& outWitness);
+    void cacheSubtypeWitness(Type* sub, Type* sup, SubtypeWitness*& outWitness);
     ImplicitCastMethod* tryGetImplicitCastMethod(ImplicitCastMethodKey key)
     {
         return m_mapTypePairToImplicitCastMethod.tryGetValue(key);
@@ -856,7 +896,7 @@ private:
     /// Used to detect when loadedModulesList has changed and the cache needs updating.
     Index m_candidateExtensionListsBuiltForModuleCount = 0;
 
-    /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`
+    /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`.
     void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
 
     /// Mapping from a decl to additional declarations of the same decl.
@@ -882,6 +922,20 @@ private:
         DeclRef<Decl> declRef,
         Type* selfType,
         InheritanceCircularityInfo* circularityInfo);
+
+    UInt getDeclExtensionEpoch(Decl* decl) const;
+    void bumpDeclExtensionEpoch(Decl* decl);
+
+    bool _isInheritanceInfoCacheEntryUpToDate(InheritanceInfoCacheEntry const& entry) const;
+
+    void _collectInheritanceInfoDependencyEpochs(
+        Decl* subjectDecl,
+        InheritanceInfo const& info,
+        List<DeclExtensionEpochStamp>& outDependencyEpochs) const;
+
+    UInt _getInheritanceInfoCacheGeneration(
+        Type* type,
+        InheritanceCircularityInfo* circularityInfo = nullptr);
 
     void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
 
@@ -985,11 +1039,13 @@ private:
         SubtypeWitness* selfIsSubtypeOfBase,
         SubtypeWitness* baseIsSubtypeOfFacet);
 
-    Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
-    Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
-    Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
+    Dictionary<Type*, InheritanceInfoCacheEntry> m_mapTypeToInheritanceInfo;
+    Dictionary<DeclRef<Decl>, InheritanceInfoCacheEntry> m_mapDeclRefToInheritanceInfo;
+    Dictionary<TypePair, SubtypeWitnessCacheEntry> m_mapTypePairToSubtypeWitness;
     Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
     Dictionary<Type*, bool> m_isCStyleTypeCache;
+    Dictionary<Decl*, UInt> m_mapDeclToExtensionEpoch;
+    UInt m_nextInheritanceInfoCacheGeneration = 1;
 };
 
 /// Local/scoped state of the semantic-checking system
@@ -1477,7 +1533,10 @@ public:
 
     Scope* getScope(SyntaxNode* node);
 
-    void diagnoseDeprecatedDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
+    void diagnoseDeprecatedAndRemovedDeclRefUsage(
+        DeclRef<Decl> declRef,
+        SourceLoc loc,
+        Expr* originalExpr);
 
     DeclRef<Decl> getDefaultDeclRef(Decl* decl)
     {
@@ -1768,7 +1827,7 @@ public:
 
     // Convert a function's original type to it's forward/backward diff'd type.
     Type* getForwardDiffFuncType(FuncType* originalType, QualType thisType);
-    Type* getBackwardDiffFuncType(FuncType* originalType);
+    Type* getBackwardDiffFuncType(FuncType* originalType, QualType thisType = QualType());
 
     /// Registers a type as conforming to IDifferentiable, along with a witness
     /// describing the relationship.
@@ -2037,7 +2096,6 @@ public:
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyConstraintRequirements(
-        Type* satisfyingType,
         DeclRef<ContainerDecl> requiredAssociatedTypeDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
@@ -2078,6 +2136,7 @@ public:
         MethodResultTypeMismatch, // Method return type doesn't match interface requirement
         ParameterDirMismatch,     // Parameter direction mismatch (e.g., `in` vs `out`)
         GenericSignatureMismatch, // Generic signature mismatch (e.g., number of generic parameters)
+        DifferentiabilityMismatch, // Method differentiability doesn't match interface requirement
     };
 
     /// Details about method witness synthesis failure
@@ -2568,9 +2627,7 @@ public:
 
     FuncType* getCalculatedDiffFuncType(const char* magicCalcName, Type* baseFuncAsType)
     {
-        Val* args[] = {
-            baseFuncAsType,
-            tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+        Val* args[] = {baseFuncAsType, getDiffTypeInfoWitness(baseFuncAsType)};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2580,10 +2637,7 @@ public:
         Type* baseFuncAsType,
         Type* operand1)
     {
-        Val* args[] = {
-            baseFuncAsType,
-            operand1,
-            tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+        Val* args[] = {baseFuncAsType, operand1, getDiffTypeInfoWitness(baseFuncAsType)};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2594,11 +2648,7 @@ public:
         Type* operand1,
         Type* operand2)
     {
-        Val* args[] = {
-            baseFuncAsType,
-            operand1,
-            operand2,
-            tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+        Val* args[] = {baseFuncAsType, operand1, operand2, getDiffTypeInfoWitness(baseFuncAsType)};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2607,46 +2657,194 @@ public:
     Type* getBackwardDiffFuncInterfaceType(Type* baseType);
     Type* getBwdCallableBaseType(Type* baseType);
 
-    //
-
-    struct Constraint
+    // Priority levels for constraint solving. Lower numeric values indicate
+    // higher priority: a Required constraint overrides Optional, which
+    // overrides Default.
+    enum class ConstraintPriority
     {
-        Decl* decl = nullptr;  // the declaration of the thing being constraints
-        Index indexInPack = 0; // If the constraint is for a type parameter pack, which index in
-                               // the pack is this constraint for?
-
-        Val* val = nullptr;          // the value to which we are constraining it
-        bool isUsedAsLValue = false; // If this constraint is for a type parameter, is the type
-                                     // used in an l-value parameter?
-        bool satisfied = false;      // Has this constraint been met?
-
-        // Is this constraint optional? An optional constraint provides a hint value to a
-        // parameter if it is otherwise unconstrained, but doesn't take precedence over a
-        // constraint that is not optional.
-        bool isOptional = false;
-
-        // Is this constraint an equality? This tells us that "joining" types is meaningless, we
-        // know the result will be the sub type. If it is not, we will error once we start
-        // substituting types.
-        bool isEquality = false;
+        // Constraints from inferred argument types or where-clauses.
+        Required = 0,
+        // constraints from `where optional` clauses and hint values from
+        // inferred-but-non-binding unification steps
+        Optional,
+        // default generic argument values (e.g., T = int)
+        Default
     };
 
-    // A collection of constraints that will need to be satisfied (solved)
-    // in order for checking to succeed.
-    struct ConstraintSystem
+    // One collected constraint for generic argument solving.
+    //
+    // Unification writes ordinary type/value constraints into
+    // `GenericInferenceContext::discoveredConstraints`, and the generic solver
+    // adds default generic arguments and source generic constraints using the same shape.
+    // Once copied into the solver's stable constraint table, `satisfied` and
+    // `queued` track work-list state for the iterative solving loop.
+    struct SolverConstraint
     {
-        // A source location to use in reporting any issues
-        SourceLoc loc;
+        enum class Kind
+        {
+            // A constraint that solves an ordinary type/value argument. The
+            // target argument is named by `decl`, the constraint value is
+            // stored in `val`, and `ordinaryArgMergeMode` decides how that
+            // value is merged with any previous answer.
+            OrdinaryArgConstraint,
 
-        // The generic declaration whose parameters we
-        // are trying to solve for.
+            // A default generic argument for an ordinary argument. In
+            // `Foo<T : IFoo, U = T.A>`, the `U = T.A` default is represented by
+            // this kind of constraint. The target argument is named by `decl`
+            // and the declaration-time default is stored in `val`.
+            DefaultArgConstraint,
+
+            // A source generic constraint that must produce a witness argument,
+            // such as `T : IFoo`, a type-coercion constraint, a non-empty-pack
+            // constraint, or a differentiability constraint. The source
+            // constraint declaration is named by `decl`.
+            WitnessConstraint,
+        };
+
+        enum class OrdinaryArgMergeMode
+        {
+            // Merge type constraints with the existing type-join behavior. This is
+            // used for normal type inference from call arguments, so a generic
+            // parameter can still settle on a common type when several ordinary
+            // argument constraints contribute types.
+            TypeJoin,
+
+            // Treat the constraint value as an exact answer. This is used for
+            // value arguments such as `N = 4`, dependent values substituted as
+            // ordinary constraints such as `U = T.A`, and source equality
+            // requirements such as `T.A == U`.
+            Exact,
+        };
+
+        // Selects the solver routine that handles this constraint. The fields
+        // below document which `Kind` reads them.
+        Kind kind = Kind::OrdinaryArgConstraint;
+
+        // The generic declaration whose argument list contains the ordinary
+        // argument or witness argument affected by this constraint. This field
+        // is required for `DefaultArgConstraint` and `WitnessConstraint`; it is
+        // usually not needed for `OrdinaryArgConstraint`, whose target
+        // declaration already carries its parent generic.
         GenericDecl* genericDecl = nullptr;
 
-        // Constraints we have accumulated, which constrain
-        // the possible arguments for those parameters.
-        List<Constraint> constraints;
+        // For `OrdinaryArgConstraint`, the ordinary generic parameter being
+        // solved. For `DefaultArgConstraint`, the ordinary generic parameter
+        // whose default value is being substituted. For `WitnessConstraint`,
+        // the source generic constraint declaration whose proof should be
+        // written as a witness argument.
+        Decl* decl = nullptr;
 
-        // Additional subtype witnesses available to the currentt constraint solving context.
+        // Only used by `OrdinaryArgConstraint` when `decl` names a type
+        // parameter pack. It identifies which pack element the value in
+        // `val` constrains.
+        Index indexInPack = 0;
+
+        // For `OrdinaryArgConstraint`, the type or value to merge into the
+        // ordinary argument named by `decl`. For `DefaultArgConstraint`, the
+        // unevaluated declaration-time default generic argument. Unused by
+        // `WitnessConstraint`, which reads the source constraint declaration
+        // from `decl`.
+        Val* val = nullptr;
+
+        // Only used by `OrdinaryArgConstraint` when `decl` names a type
+        // parameter. It records whether the constraint came from an l-value
+        // parameter use so the merged type keeps the correct value category.
+        bool isUsedAsLValue = false;
+
+        // True when the solver has no more work for this constraint. Ordinary
+        // constraints stay satisfied once their value has been applied; default
+        // generic arguments and witness constraints can be marked unsatisfied
+        // again when a dependency changes and they need to substitute through
+        // the current argument list again.
+        bool satisfied = false;
+
+        // Only used by `OrdinaryArgConstraint`. There are multiple levels of
+        // ordinary-argument constraints: required constraints from call
+        // inference or where clauses, optional constraints from
+        // `where optional`, and defaults. Lower numeric priority wins when two
+        // constraints compete.
+        ConstraintPriority priority = ConstraintPriority::Required;
+
+        // Only used by `OrdinaryArgConstraint`. It tells the type-parameter
+        // merge path whether the constraint value should use ordinary type
+        // joining or exact equality. Value-parameter constraints always use
+        // `Exact`.
+        OrdinaryArgMergeMode ordinaryArgMergeMode = OrdinaryArgMergeMode::TypeJoin;
+
+        // True when `val` must be substituted through the current generic
+        // argument list before it is used. This is used by
+        // `OrdinaryArgConstraint` for dependent constraint values such as
+        // `U = T.A`, and by `DefaultArgConstraint` for declaration-time
+        // defaults. It is unused by `WitnessConstraint`, whose source
+        // declaration is substituted by building a specialized decl-ref.
+        bool potentiallyDependent = false;
+
+        // True while this constraint's index is already present in the work-list
+        // queue. This scheduling bit applies to every `Kind`.
+        bool queued = false;
+
+        // Build a constraint that merges one inferred ordinary type/value argument.
+        static SolverConstraint makeOrdinaryArg(
+            Decl* paramDecl,
+            Val* arg,
+            ConstraintPriority priority,
+            OrdinaryArgMergeMode mergeMode,
+            Index indexInPack = 0,
+            bool isUsedAsLValue = false,
+            bool potentiallyDependent = false)
+        {
+            SolverConstraint constraint;
+            constraint.kind = Kind::OrdinaryArgConstraint;
+            constraint.decl = paramDecl;
+            constraint.indexInPack = indexInPack;
+            constraint.val = arg;
+            constraint.isUsedAsLValue = isUsedAsLValue;
+            constraint.priority = priority;
+            constraint.ordinaryArgMergeMode = mergeMode;
+            constraint.potentiallyDependent = potentiallyDependent;
+            return constraint;
+        }
+
+        // Build a constraint that substitutes a declaration-time default argument.
+        static SolverConstraint makeDefaultArg(GenericDecl* genericDecl, Decl* paramDecl, Val* arg)
+        {
+            SolverConstraint constraint;
+            constraint.kind = Kind::DefaultArgConstraint;
+            constraint.genericDecl = genericDecl;
+            constraint.decl = paramDecl;
+            constraint.val = arg;
+            constraint.potentiallyDependent = true;
+            return constraint;
+        }
+
+        // Build a constraint that solves one compiler-formed witness argument.
+        static SolverConstraint makeWitness(GenericDecl* genericDecl, Decl* constraintDecl)
+        {
+            SolverConstraint constraint;
+            constraint.kind = Kind::WitnessConstraint;
+            constraint.genericDecl = genericDecl;
+            constraint.decl = constraintDecl;
+            return constraint;
+        }
+    };
+
+    // The shared context used while semantic checking, type joining, and
+    // unification infer arguments for one generic application. It is not the
+    // generic solver's work list; `discoveredConstraints` is only a temporary
+    // inbox that shared helpers append to before the solver copies those
+    // constraints into its own durable work table.
+    struct GenericInferenceContext
+    {
+        // The generic declaration whose ordinary arguments and witness
+        // arguments are being solved.
+        GenericDecl* genericDecl = nullptr;
+
+        // Ordinary argument constraints discovered by unification or type
+        // joining. The generic solver drains and clears this list whenever it
+        // needs to pull newly discovered constraints into the iterative loop.
+        ShortList<SolverConstraint, 8> discoveredConstraints;
+
+        // Additional subtype witnesses available to the current constraint solving context.
         Type* subTypeForAdditionalWitnesses = nullptr;
         Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitnesses = nullptr;
 
@@ -2656,10 +2854,10 @@ public:
         ConversionCost typePromotionCost = kConversionCost_None;
     };
 
-    bool isRelevantGeneric(ConstraintSystem& system, Decl* generic);
+    bool isRelevantGeneric(GenericInferenceContext& system, Decl* generic);
 
     Type* TryJoinVectorAndScalarType(
-        ConstraintSystem* constraints,
+        GenericInferenceContext* constraints,
         VectorExpressionType* vectorType,
         BasicExpressionType* scalarType);
 
@@ -2697,7 +2895,8 @@ public:
         Type* superType,
         IsSubTypeOptions isSubTypeOptions);
 
-    SubtypeWitness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
+    Witness* getDiffTypeInfoWitness(Type* type);
+    Witness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
 
     bool isValidGenericConstraintType(Type* type);
 
@@ -2728,6 +2927,27 @@ public:
 
     Expr* createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, Val* witness);
 
+    /// Expand a compressed interface-to-interface subtype witness into a
+    /// transitive chain rooted at `subType`.
+    ///
+    /// The facet merger (see `_specializeInterfaceInheritanceWitness`) may
+    /// produce a `DeclaredSubtypeWitness(sub, sup, declRef)` where
+    /// `declRef.parent` is an interface *different* from `sub` — i.e. the
+    /// witness is conceptually a composition of (sub : declRef.parent) and
+    /// (declRef.parent : sup) but stored as a single node.  That shape is
+    /// fine for facet-based lookup but malformed for IR lowering, because
+    /// `declRef`'s inheritance key only resolves against the witness table
+    /// of its declaring interface.
+    ///
+    /// This helper walks the witness tree and splits any such compressed
+    /// step back into a `TransitiveSubtypeWitness`, so downstream lowering
+    /// can mechanically chain `lookupWitnessMethod` calls without doing
+    /// any inheritance-graph discovery itself.
+    SubtypeWitness* normalizeSubtypeWitnessForInterfaceUpcast(
+        Type* subType,
+        SubtypeWitness* witness,
+        int depth = 0);
+
     // Handles special modifier cases. In general case, calls createModifierCastExpr.
     Expr* createModifierCast(Type* toType, Type* fromType, Expr* fromExpr);
     Expr* createModifierCastExpr(Type* toType, Expr* fromExpr); // General modifier cast expr.
@@ -2739,23 +2959,27 @@ public:
 
     ConversionCost getConversionCost(Type* toType, QualType fromType);
 
-    Type* _tryJoinTypeWithInterface(ConstraintSystem* constraints, Type* type, Type* interfaceType);
+    Type* _tryJoinTypeWithInterface(
+        GenericInferenceContext* constraints,
+        Type* type,
+        Type* interfaceType);
 
     // Try to compute the "join" between two types
-    Type* TryJoinTypes(ConstraintSystem* constraints, QualType left, QualType right);
+    Type* TryJoinTypes(GenericInferenceContext* constraints, QualType left, QualType right);
 
-    // Try to solve a system of generic constraints.
-    // The `system` argument provides the constraints.
-    // The `varSubst` argument provides the list of constraint
-    // variables that were created for the system.
+    // Try to solve the ordinary and witness arguments for one generic
+    // application. The inference context must be moved into the solver because
+    // solving drains discovered constraints, appends follow-up constraints, and
+    // updates type-promotion cost while finding the final substitution.
+    // Accepting an rvalue reference keeps this ownership transfer explicit and
+    // avoids copying the discovered constraint list at the call boundary.
     //
-    // Returns a new declref to the inner decl of `genericDeclRef`,
-    // representing the specialized generic with the values
-    // we solved for along the way.
-    DeclRef<Decl> trySolveConstraintSystem(
-        ConstraintSystem* system,
+    // Returns a new declref to the inner decl of `genericDeclRef`, representing
+    // the specialized generic with the values and witnesses solved along the way.
+    DeclRef<Decl> trySolveGenericArguments(
+        GenericInferenceContext&& inferenceContext,
         DeclRef<GenericDecl> genericDeclRef,
-        ArrayView<Val*> knownGenericArgs,
+        ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost);
 
 
@@ -2989,89 +3213,100 @@ public:
     // indirect parents.
     GenericDecl* findNextOuterGeneric(Decl* decl);
 
-    struct ValUnificationContext
+    // Per-call options for recursive unification. These fields describe how a
+    // discovered ordinary argument constraint should be interpreted, but they
+    // do not own the discovered constraints themselves.
+    struct UnificationOptions
     {
+        // When a pack is expanded during unification, this records which pack
+        // element is currently being constrained.
         Index indexInTypePack = 0;
+
+        // True when the discovered constraint should be treated as optional
+        // overload-ranking information rather than as a required answer.
         bool optionalConstraint = false;
+
+        // True when a discovered type argument must be an exact answer instead
+        // of being merged through the usual type-join behavior.
         bool equalityConstraint = false;
     };
 
     // Try to find a unification for two values
     bool TryUnifyVals(
-        ConstraintSystem& constraints,
-        ValUnificationContext unificationContext,
+        GenericInferenceContext& constraints,
+        UnificationOptions unificationOptions,
         Val* fst,
         bool fstLVal,
         Val* snd,
         bool sndLVal);
 
     bool tryUnifyDeclRef(
-        ConstraintSystem& constraints,
-        ValUnificationContext unificationContext,
+        GenericInferenceContext& constraints,
+        UnificationOptions unificationOptions,
         DeclRefBase* fst,
         bool fstLVal,
         DeclRefBase* snd,
         bool sndLVal);
 
     bool tryUnifyGenericAppDeclRef(
-        ConstraintSystem& constraints,
-        ValUnificationContext unificationContext,
+        GenericInferenceContext& constraints,
+        UnificationOptions unificationOptions,
         GenericAppDeclRef* fst,
         bool fstLVal,
         GenericAppDeclRef* snd,
         bool sndLVal);
 
     bool TryUnifyTypeParam(
-        ConstraintSystem& constraints,
-        ValUnificationContext unificationContext,
+        GenericInferenceContext& constraints,
+        UnificationOptions unificationOptions,
         GenericTypeParamDeclBase* typeParamDecl,
         QualType type);
 
     bool TryUnifyIntParam(
-        ConstraintSystem& constraints,
-        ValUnificationContext unificationContext,
+        GenericInferenceContext& constraints,
+        UnificationOptions unificationOptions,
         GenericValueParamDecl* paramDecl,
         IntVal* val);
 
     bool TryUnifyIntParam(
-        ConstraintSystem& constraints,
-        ValUnificationContext unificationContext,
+        GenericInferenceContext& constraints,
+        UnificationOptions unificationOptions,
         DeclRef<VarDeclBase> const& varRef,
         IntVal* val);
 
     bool TryUnifyFunctorByStructuralMatch(
-        ConstraintSystem& constraints,
-        ValUnificationContext unifyCtx,
+        GenericInferenceContext& constraints,
+        UnificationOptions unificationOptions,
         StructDecl* fst,
         FuncType* snd);
 
     bool TryUnifyFuncTypesByStructuralMatch(
-        ConstraintSystem& constraints,
-        ValUnificationContext unifyCtx,
+        GenericInferenceContext& constraints,
+        UnificationOptions unificationOptions,
         FuncType* fst,
         FuncType* snd);
 
     bool TryUnifyTypesByStructuralMatch(
-        ConstraintSystem& constraints,
-        ValUnificationContext unificationContext,
+        GenericInferenceContext& constraints,
+        UnificationOptions unificationOptions,
         QualType fst,
         QualType snd);
 
     bool TryUnifyTypes(
-        ConstraintSystem& constraints,
-        ValUnificationContext unificationContext,
+        GenericInferenceContext& constraints,
+        UnificationOptions unificationOptions,
         QualType fst,
         QualType snd);
 
     bool TryUnifyConjunctionType(
-        ConstraintSystem& constraints,
-        ValUnificationContext unificationContext,
+        GenericInferenceContext& constraints,
+        UnificationOptions unificationOptions,
         QualType fst,
         QualType snd);
 
-    void maybeUnifyUnconstraintIntParam(
-        ConstraintSystem& constraints,
-        ValUnificationContext unificationContext,
+    bool tryAddOptionalIntParamConstraintIfUnconstrained(
+        GenericInferenceContext& constraints,
+        UnificationOptions unificationOptions,
         IntVal* param,
         IntVal* arg,
         bool paramIsLVal);
@@ -3104,7 +3339,7 @@ public:
     DeclRef<Decl> inferGenericArguments(
         DeclRef<GenericDecl> genericDeclRef,
         OverloadResolveContext& context,
-        ArrayView<Val*> knownGenericArgs,
+        ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost,
         List<QualType>* innerParameterTypes = nullptr);
 
@@ -3141,14 +3376,13 @@ public:
     // in an ordinary function-call context (that is, where it
     // has been applied to arguments using `()` and not `<>`).
     //
-    // If some or all of the generic arguments to `genericDeclRef`
-    // are known at the call site, they should be passed in via
-    // `substWithKnownGenericArgs`.
+    // If some or all of the ordinary generic arguments to `genericDeclRef`
+    // are already provided, they should be passed in via `providedOrdinaryArgs`.
     //
     void addOverloadCandidatesForCallToGeneric(
         LookupResultItem genericItem,
         OverloadResolveContext& context,
-        ArrayView<Val*> knownGenericArgs);
+        ArrayView<Val*> providedOrdinaryArgs);
 
     /// Check a generic application where the operands have already been checked.
     Expr* checkGenericAppWithCheckedArgs(GenericAppExpr* genericAppExpr);
@@ -3157,6 +3391,10 @@ public:
 
 
     void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
+    void _checkAliasedOutArguments(
+        InvokeExpr* invoke,
+        FuncType* funcType,
+        FunctionDeclBase* funcDeclBase);
     Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr* expr);
     // Get the type to use when referencing a declaration
     QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
@@ -3395,6 +3633,7 @@ public:
 
     Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
     Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
+    Expr* visitApplyForBwdExpr(ApplyForBwdExpr* expr);
     Expr* visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr);
     Expr* visitDispatchKernelExpr(DispatchKernelExpr* expr);
 
@@ -3542,6 +3781,10 @@ VarDeclBase* getTrailingUnsizedArrayElement(
 // texture, buffer, sampler, acceleration structure, etc.
 bool isOpaqueHandleType(Type* type);
 
+// Returns true if `type` itself is an opaque handle type, or if it is a struct
+// (or array thereof) that transitively contains an opaque handle field.
+bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
+
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
@@ -3592,24 +3835,41 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
     EndToEndCompileRequest* endToEndReq,
     List<RefPtr<ComponentType>>& outSpecializedEntryPoints);
 
-// Returns `false` if coerce fails.
-// * `constraintDecl` is the constraint we need to satisfy
-// * `genericDeclRef` is the generic decl we are operating on
-// * `maybeContext` is the contect for our current operation. This variable must be filled if
-// `shouldEmitError == true`.
-// * `maybeConstrainedGenericParams` contains set of constrained params relative to `genericDeclRef`
-// and current context.
-//   This param is optional. Coercion `toType` and `fromType` will be added to the set if function
-//   succeeds.
-// * `args` are the current arguments relative to `genericDeclRef`.
-bool addTypeCoercionWitnessToArgs(
+// Return the witness that proves a type-coercion constraint under `args`, or
+// `nullptr` if the substituted source and destination types cannot be coerced.
+// `maybeContext` is required when `shouldEmitError` is true so diagnostics can
+// point at the operation that requested the constraint.
+TypeCoercionWitness* findTypeCoercionWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
     TypeCoercionConstraintDecl* constraintDecl,
     DeclRef<GenericDecl> genericDeclRef,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
-    HashSet<Decl*>* maybeConstrainedGenericParams,
-    ShortList<Val*>& args,
+    ArrayView<Val*> args,
+    bool shouldEmitError);
+
+// Return the witness that proves differentiability metadata is available for
+// the substituted constraint type, or `nullptr` if the metadata cannot be
+// proved. `maybeContext` is required when `shouldEmitError` is true so
+// diagnostics can point at the operation that requested the constraint.
+Witness* findDiffTypeInfoWitnessForConstraint(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    HasDiffTypeInfoConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    ArrayView<Val*> args,
+    bool shouldEmitError);
+
+// Return the witness that proves `constrainedArg` is a non-empty pack, or
+// `nullptr` if the pack is empty or not known to be non-empty. `maybeContext` is
+// required when `shouldEmitError` is true so diagnostics can point at the
+// operation that requested the constraint.
+Witness* findNonEmptyPackWitnessForConstraint(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    Val* constrainedArg,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);
 
 SourceLoc _getTypeNestingDiagnosticPosForDecl(Decl* decl);

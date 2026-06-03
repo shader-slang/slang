@@ -19,11 +19,20 @@ import slang.neural;
 static const int SubgroupSize = 32;
 static const int WARPS = 4;
 
-typealias ShMemSize = SharedMemorySize<half, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, WARPS>;
-typealias ShMemSizeLayer = ShMemSize.OfLayer4<2, 128, 128, 128, 3>;
-typealias InVec = WaveTangledVector<half, ShMemSizeLayer, 2, SubgroupSize>;
-typealias HidVec = WaveTangledVector<half, ShMemSizeLayer, 128, SubgroupSize>;
-typealias OutVec = WaveTangledVector<half, ShMemSizeLayer, 3, SubgroupSize>;
+typealias ShMemSizeLayer = SharedMemorySize<
+    half,
+    TargetEnum.CUDA,
+    ExecutionMode.Training,
+    SubgroupSize,
+    WARPS,
+    2,
+    128,
+    128,
+    128,
+    3>;
+typealias InVec = WaveTangledVector<half, ShMemSizeLayer, 2, SubgroupSize, WARPS>;
+typealias HidVec = WaveTangledVector<half, ShMemSizeLayer, 128, SubgroupSize, WARPS>;
+typealias OutVec = WaveTangledVector<half, ShMemSizeLayer, 3, SubgroupSize, WARPS>;
 typealias L1 = FFLayer<half, InVec, HidVec, LinearLayout, LeakyReLU<half>, true>;
 typealias L2 = FFLayer<half, HidVec, OutVec, LinearLayout, Sigmoid<half>, true>;
 typealias Storage = TorchTensorViewAddress<half>;

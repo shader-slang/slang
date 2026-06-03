@@ -1096,6 +1096,46 @@ local insts = {
 			{ atomicDec = { operands = { { "ptr" } } } },
 		},
 	},
+	-- Emitted at AST lowering when line coverage is on. The instruction
+	-- has no operands; its source position is carried on the standard
+	-- per-instruction `sourceLoc` field, which is always preserved and
+	-- never stripped by `stripDebugInfo`. The coverage-instrument IR pass
+	-- later rewrites each coverage marker into an atomic add on the IR-
+	-- synthesized `__slang_coverage` buffer. The current line/function/
+	-- branch producers assign one direct counter per marker; future
+	-- source-region coverage can keep using marker metadata without
+	-- preserving that one-to-one lowering. Host-side tooling reads
+	-- source coverage entries and projects them to LCOV records.
+	-- Inherent side-effect semantics keep the optimizer from deleting or
+	-- hoisting these ops.
+	{ IncrementCoverageCounter = {} },
+	-- Function-entry coverage marker. The marker's sourceLoc points at
+	-- the function declaration/body start. Display and mangled names are
+	-- carried as operands so later IR passes do not need AST access.
+	{
+		IncrementFunctionCoverageCounter =
+		{
+			operands =
+			{
+				{ "functionName", "IRStringLit" },
+				{ "functionMangledName", "IRStringLit" },
+			}
+		}
+	},
+	-- Branch-arm coverage marker. SourceLoc points at the branch
+	-- condition. Site/arm ids are local to the emitted metadata object;
+	-- semantic arm kind lets LCOV export distinguish true/false/case.
+	{
+		IncrementBranchCoverageCounter =
+		{
+			operands =
+			{
+				{ "branchSiteID", "IRIntLit" },
+				{ "branchArmID", "IRIntLit" },
+				{ "branchArmKind", "IRIntLit" },
+			}
+		}
+	},
 	-- Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 	-- currently accumulated derivative to pass to some dOut argument in a nested call.
 	{ LoadReverseGradient = { operands = { { "value" } } } },
@@ -1120,6 +1160,9 @@ local insts = {
 	-- Pointer offset: computes pBase + offset_in_elements
 	{ getOffsetPtr = { operands = { { "base" }, { "offset" } } } },
 	{ getAddr = { struct_name = "GetAddress", operands = { { "ptr" } } } },
+	-- An address obtained via __getAddress. Lowered away after validation
+	-- into the underlying address operand.
+	{ assumeAddress = { operands = { { "addr" } } } },
 	{ castDynamicResource = { operands = { { "resource" } } } },
 	-- Get an unowned NativeString from a String.
 	{ getNativeStr = { operands = { { "stringValue" } } } },
@@ -1143,6 +1186,8 @@ local insts = {
 	},
 	-- Store into an Image.
 	{ imageStore = { operands = { { "image" }, { "coord" }, { "value" } } } },
+	-- Load from a SubpassInput.
+	{ SubpassLoad = { operands = { { "subpassInput" }, { "sample", optional = true } } } },
 	-- Load (almost) arbitrary-type data from a byte-address buffer
 	-- %dst = byteAddressBufferLoad(%buffer, %offset, %alignment)
 	-- where
@@ -2436,7 +2481,7 @@ local insts = {
 			},
 			{
 				DisallowSpecializationWithExistentialsDecoration = { },
-			}
+			},
 		},
 	},
 	-- Decoration
@@ -2579,6 +2624,10 @@ local insts = {
 		{ SynthesizedBackwardDerivativeWitnessTable = { min_operands = 1 } },
 		{ MakeIDifferentiableWitness = { min_operands = 1 } },
 		{ SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc = { min_operands = 2 } },
+
+		-- For user-provided apply (__func_extension __apply(fn)).
+		-- Identity remat for when MinimalContext == BwdCallable.
+		{ IdentityRemat = { min_operands = 1 } },
 	} },
 	{ DispatchKernel = { operands = { { "baseFn" }, { "threadGroupSize" }, { "dispatchSize" } } } },
 	{
@@ -2684,11 +2733,6 @@ local insts = {
 	{
 		LiveRangeMarker = { { liveRangeStart = { min_operands = 2 } }, { liveRangeEnd = {} } },
 	},
-	-- IRSpecialization
-	{ SpecializationDictionaryItem = {} },
-	{ GenericSpecializationDictionary = { parent = true } },
-	{ ExistentialFuncSpecializationDictionary = { parent = true } },
-	{ ExistentialTypeSpecializationDictionary = { parent = true } },
 	-- Differentiable Type Dictionary
 	{ DifferentiableTypeDictionaryItem = { operands = { { "concreteType" }, { "witness" } } } },
 	-- Differentiable Type Annotation (for run-time types)
@@ -2728,6 +2772,12 @@ local insts = {
 	{
 		DebugBuildIdentifier = {
 			min_operands = 2,
+		},
+	},
+	{
+		DebugCompilationUnit = {
+			operands = { { "source" } },
+			hoistable = true,
 		},
 	},
 	-- Embedded Precompiled Libraries
@@ -3085,7 +3135,7 @@ local insts = {
 	} },
 	{ WeakUse = { hoistable = true } },
 	{ FuncTypeOf = { hoistable = true }},
-	{ SpecializeExistentials = {
+	{ SpecializeExistentialsInFunc = {
 		-- Represents a reference to a function with specific existential parameter bindings.
 		--
 		-- Used by the type-flow specialization pass to represent different
@@ -3100,6 +3150,15 @@ local insts = {
 		--
 		hoistable = true,
 		operands = { {"func"} }
+	} },
+	{ SpecializeExistentialsInType = {
+		-- Represents an existential specialization key for type specialization caching.
+		--
+		-- Used as a compiler-dictionary key for specialized BindExistentialsType results.
+		-- Operands: (baseType, binding0, binding1, ...)
+		--
+		hoistable = true,
+		operands = { {"baseType"} }
 	} },
 	{ CompilerDictionaryEntry = { hoistable = true, parent = true }},
 	{ CompilerDictionaryValue = { operands = { {"value"} } } },

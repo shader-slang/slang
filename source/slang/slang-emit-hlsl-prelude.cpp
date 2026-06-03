@@ -46,9 +46,10 @@ vector<OutElTy, MatM> __slang_linalg_Mul(
         dx::linalg::MatrixUse::A,
         dx::linalg::MatrixScope::Thread>;
     MatTy mat = MatTy::template Load<LoadLayout>(matBuf, matOff, matStr);
-    return dx::linalg::Multiply<OutElTy>(
+    return dx::linalg::MultiplyAdd<OutElTy>(
         mat,
-        dx::linalg::MakeInterpretedVector<InputDT>(input));
+        dx::linalg::MakeInterpretedVector<InputDT>(input),
+        (vector<OutElTy, MatM>)0);
 }
 
 template<
@@ -103,25 +104,18 @@ void __slang_linalg_OuterProductAccumulate(
 {
     using AccTy = dx::linalg::Matrix<
         MatDT,
-        MatM * dx::linalg::__detail::ComponentTypeTraits<ElTy>::ElementsPerScalar,
-        MatN * dx::linalg::__detail::ComponentTypeTraits<ElTy>::ElementsPerScalar,
+        MatM,
+        MatN,
         dx::linalg::MatrixUse::Accumulator,
         dx::linalg::MatrixScope::Thread>;
-    AccTy acc =
-        dx::linalg::OuterProduct<MatDT, dx::linalg::MatrixScope::Thread>(a, b);
-    acc.InterlockedAccumulate(matBuf, matOff, uint(sizeof(ElTy)));
+    AccTy acc = dx::linalg::OuterProduct<MatDT>(a, b);
+    acc.InterlockedAccumulate(matBuf, matOff);
 }
 
 template<typename ElTy, uint N, typename BufTy>
 void __slang_linalg_VectorAccumulate(vector<ElTy, N> inputVec, BufTy buffer, uint offset)
 {
-    // No dx::linalg wrapper for cooperative-vector reduce-sum yet; approximate with per-lane load/add/store
-    for (uint i = 0; i < N; ++i)
-    {
-        uint byteOffset = offset + i * uint(sizeof(ElTy));
-        ElTy cur = buffer.template Load<ElTy>(byteOffset);
-        buffer.template Store<ElTy>(byteOffset, cur + inputVec[i]);
-    }
+    dx::linalg::InterlockedAccumulate(inputVec, buffer, offset);
 }
 )";
 
@@ -396,9 +390,9 @@ __slang_cm_muladd(
         switch (slangValue)
         {
         case SLANG_SCALAR_TYPE_INT8:
-            return UnownedStringSlice(sm610OrAbove ? "PackedS8x32" : "DATA_TYPE_SINT8_T4_PACKED");
+            return UnownedStringSlice(sm610OrAbove ? "I8" : "DATA_TYPE_SINT8_T4_PACKED");
         case SLANG_SCALAR_TYPE_UINT8:
-            return UnownedStringSlice(sm610OrAbove ? "PackedU8x32" : "DATA_TYPE_UINT8_T4_PACKED");
+            return UnownedStringSlice(sm610OrAbove ? "U8" : "DATA_TYPE_UINT8_T4_PACKED");
         default:
             SLANG_UNEXPECTED(
                 "Unsupported packed cooperative vector input interpretation for HLSL emission");

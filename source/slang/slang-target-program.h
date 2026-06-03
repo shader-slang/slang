@@ -13,6 +13,8 @@
 #include "slang-linkable.h"
 #include "slang-target.h"
 
+#include <mutex>
+
 namespace Slang
 {
 
@@ -68,7 +70,12 @@ public:
     IArtifact* getOrCreateEntryPointResult(Int entryPointIndex, DiagnosticSink* sink);
     IArtifact* getOrCreateWholeProgramResult(DiagnosticSink* sink);
 
-    IArtifact* getExistingWholeProgramResult() { return m_wholeProgramResult; }
+    IArtifact* getExistingWholeProgramResult()
+    {
+        // These accessors can race a worker thread publishing the cached whole-program result.
+        std::lock_guard<std::mutex> lock(m_resultCacheMutex);
+        return m_wholeProgramResult;
+    }
     /// Get the compiled code for an entry point on the target.
     ///
     /// This routine assumes that `getOrCreateEntryPointResult`
@@ -76,6 +83,10 @@ public:
     ///
     IArtifact* getExistingEntryPointResult(Int entryPointIndex)
     {
+        // Guard both the cache read and the bounds check because the array is resized lazily.
+        std::lock_guard<std::mutex> lock(m_resultCacheMutex);
+        if (entryPointIndex < 0 || entryPointIndex >= m_entryPointResults.getCount())
+            return nullptr;
         return m_entryPointResults[entryPointIndex];
     }
 
@@ -124,6 +135,8 @@ private:
     RefPtr<ProgramLayout> m_layout;
 
     CompilerOptionSet m_optionSet;
+    // Parallel backend emission shares these lazy result caches across threads.
+    mutable std::mutex m_resultCacheMutex;
 
     // Generated compile results for each entry point
     // in the parent `Program` (indexing matches

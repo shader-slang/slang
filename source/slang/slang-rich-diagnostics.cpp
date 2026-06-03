@@ -57,6 +57,15 @@ UnownedStringSlice nameToPrintableString(Name* name)
     return name ? name->text.getUnownedSlice() : UnownedStringSlice{"<unknown name>"};
 }
 
+String declToPrintableString(Decl* decl)
+{
+    if (!decl)
+        return "<unknown decl>";
+    StringBuilder sb;
+    printDiagnosticArg(sb, decl);
+    return sb.produceString();
+}
+
 String typeToPrintableString(Type* type)
 {
     return type ? type->toString() : "<unknown type>";
@@ -114,6 +123,21 @@ String codeGenTargetToPrintableString(CodeGenTarget target)
     StringBuilder sb;
     printDiagnosticArg(sb, target);
     return sb.produceString();
+}
+
+String declVisibilityToPrintableString(DeclVisibility visibility)
+{
+    switch (visibility)
+    {
+    case DeclVisibility::Public:
+        return "public";
+    case DeclVisibility::Internal:
+        return "internal";
+    case DeclVisibility::Private:
+        return "private";
+    default:
+        return "<unknown>";
+    }
 }
 
 // Generate member function implementations
@@ -248,7 +272,7 @@ String codeGenTargetToPrintableString(CodeGenTarget target)
 %           elseif ptype == "qualtype" then
           qualTypeToPrintableString($(base_expr))
 %           elseif ptype == "decl" then
-          nameToPrintableString($(base_expr)->getName())
+          declToPrintableString($(base_expr))
 %           elseif ptype == "modifier" then
           modifierToPrintableString($(base_expr))
 %           elseif ptype == "irinst" then
@@ -261,6 +285,8 @@ String codeGenTargetToPrintableString(CodeGenTarget target)
           astNodeTypeToPrintableString($(base_expr))
 %           elseif ptype == "codegentarget" then
           codeGenTargetToPrintableString($(base_expr))
+%           elseif ptype == "declvisibility" then
+          declVisibilityToPrintableString($(base_expr))
 %           elseif ptype == "expr" or ptype == "stmt" or ptype == "val" then
           $(base_expr)
 %           else

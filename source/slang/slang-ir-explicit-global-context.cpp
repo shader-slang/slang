@@ -208,7 +208,7 @@ struct IntroduceExplicitGlobalContextPass
                     if (!canHoistType(GlobalObjectKind::GlobalParam))
                         continue;
                     // Global parameters are another HLSL/Slang concept
-                    // that doesn't have a parallel in langauges like C/C++.
+                    // that doesn't have a parallel in languages like C/C++.
                     //
                     auto globalParam = cast<IRGlobalParam>(inst);
 
