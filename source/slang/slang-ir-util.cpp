@@ -2616,7 +2616,8 @@ bool shouldDuplicateInstAtUseSite(IRInst* inst, TargetProgram* target)
     {
     case kIROp_CastDescriptorHandleToResource:
     case kIROp_CastDynamicResource:
-        // These casts potentially produces non-storable types, so we will always duplicate them at
+    case kIROp_SPIRVConvertUToAccelerationStructure:
+        // These ops potentially produce non-storable types, so we will always duplicate them at
         // use sites.
         return true;
     }
