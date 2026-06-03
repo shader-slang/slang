@@ -11227,7 +11227,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             }
                         });
                 }
-
             }
         }
 
