@@ -46,6 +46,9 @@ jobs:
 
     env:
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+      # Keep macOS CI from spending time on DXC source builds. DXC coverage is
+      # already exercised on other CI platforms.
+      SLANG_CI_EXTRA_CMAKE_FLAGS: ${{ inputs.os == 'macos' && '-DSLANG_DXC_BUILD_FROM_SOURCE=OFF' || '' }}
 
     defaults:
       run:
@@ -191,13 +194,6 @@ jobs:
               exit 1
             fi
 
-            cmake_ci_defines=()
-            if [[ "${{ inputs.os }}" == "macos" ]]; then
-              # Keep macOS CI from spending time on DXC source builds. DXC
-              # coverage is already exercised on other CI platforms.
-              cmake_ci_defines+=("-DSLANG_DXC_BUILD_FROM_SOURCE=OFF")
-            fi
-
             if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
               # Doing a debug build will try to link against a release built llvm, this
               # is a problem on Windows, so make slang-llvm in release build and use
@@ -211,7 +207,7 @@ jobs:
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}" \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
                 -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
-                "${cmake_ci_defines[@]}" \
+                $SLANG_CI_EXTRA_CMAKE_FLAGS \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
@@ -221,7 +217,7 @@ jobs:
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
                 -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
-                "${cmake_ci_defines[@]}" \
+                $SLANG_CI_EXTRA_CMAKE_FLAGS \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             else
@@ -232,7 +228,7 @@ jobs:
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
                 -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
-                "${cmake_ci_defines[@]}" \
+                $SLANG_CI_EXTRA_CMAKE_FLAGS \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             fi
