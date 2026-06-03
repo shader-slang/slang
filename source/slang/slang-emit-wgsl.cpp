@@ -201,6 +201,12 @@ void WGSLSourceEmitter::emitEntryPointAttributesImpl(
         }
         break;
 
+    case Stage::Node:
+        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = "WGSL node shader stage",
+            .location = irFunc->sourceLoc});
+        break;
+
     default:
         SLANG_ABORT_COMPILATION("unsupported stage.");
     }

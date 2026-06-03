@@ -1182,7 +1182,12 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 emitFlag("NODE_INPUT_MEMORY", BarrierMemoryTypeFlags::NodeInputMemory);
                 emitFlag("NODE_OUTPUT_MEMORY", BarrierMemoryTypeFlags::NodeOutputMemory);
                 if (first)
-                    m_writer->emit("0"); // no bits set — fallback
+                {
+                    getSink()->diagnose(Diagnostics::InvalidBarrierMemoryTypeFlagsValue{
+                        .value = String(flagVal),
+                        .location = inst->sourceLoc});
+                    m_writer->emit("0");
+                }
             }
             m_writer->emit(")");
             return true;

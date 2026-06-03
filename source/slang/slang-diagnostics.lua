@@ -2585,7 +2585,7 @@ err(
     "invalid-barrier-semantic-flags-value",
     31116,
     "invalid 'BarrierSemanticFlags' value",
-    span { loc = "location", message = "unrecognized BarrierSemanticFlags value '~value:String'; expected a combination of GroupSync (0x1), GroupScope (0x2), DeviceScope (0x4), or Reorder (0x0)" }
+    span { loc = "location", message = "unrecognized BarrierSemanticFlags value '~value:String'; expected Reorder (0x0) on its own, or any combination of GroupSync (0x1), GroupScope (0x2), DeviceScope (0x4)" }
 )
 
 err(

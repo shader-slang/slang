@@ -126,7 +126,6 @@ SlangResult GLSLSourceEmitter::init()
             break;
         }
     case Stage::Node:
-        SLANG_UNIMPLEMENTED_X("Node stage for GLSL output");
         break;
     default:
         break;
@@ -1536,7 +1535,9 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
         emitLocalSizeLayout();
         break;
     case Stage::Node:
-        // Node stage is not supported on GLSL; diagnostic emitted in init().
+        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = "GLSL node shader stage",
+            .location = irFunc->sourceLoc});
         break;
     default:
         break;

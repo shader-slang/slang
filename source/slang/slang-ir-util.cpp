@@ -3315,38 +3315,12 @@ IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> eleme
     return builder.emitMakeValuePack(resultType, elements.getCount(), elements.getBuffer());
 }
 
-static const UnownedStringSlice kWorkGraphRecordTypeNames[] = {
-    UnownedStringSlice::fromLiteral("DispatchNodeInputRecord"),
-    UnownedStringSlice::fromLiteral("ThreadNodeInputRecord"),
-    UnownedStringSlice::fromLiteral("GroupNodeInputRecords"),
-    UnownedStringSlice::fromLiteral("EmptyNodeInput"),
-    UnownedStringSlice::fromLiteral("ThreadNodeOutputRecords"),
-    UnownedStringSlice::fromLiteral("GroupNodeOutputRecords"),
-    UnownedStringSlice::fromLiteral("NodeOutput"),
-    UnownedStringSlice::fromLiteral("NodeOutputArray"),
-    UnownedStringSlice::fromLiteral("EmptyNodeOutput"),
-    UnownedStringSlice::fromLiteral("EmptyNodeOutputArray"),
-};
-
 bool isWorkGraphRecordType(IRType* type)
 {
     auto structType = as<IRStructType>(type);
     if (!structType)
         return false;
-    if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>())
-        return true;
-
-    auto nameHint = structType->findDecoration<IRNameHintDecoration>();
-    if (!nameHint)
-        return false;
-
-    auto name = nameHint->getName();
-    for (auto recordTypeName : kWorkGraphRecordTypeNames)
-    {
-        if (name == recordTypeName)
-            return true;
-    }
-    return false;
+    return structType->findDecoration<IRWorkGraphRecordTypeDecoration>() != nullptr;
 }
 
 } // namespace Slang

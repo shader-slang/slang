@@ -1,4 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY_ZERO,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY_ZERO
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SEMANTIC,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DSEMANTIC
 import experimental.workgraph;
 
@@ -11,6 +12,9 @@ void main()
 #if defined(MEMORY)
     Barrier((BarrierMemoryTypeFlags)0xdead, BarrierSemanticFlags.GROUP_SYNC);
 //CHECK_MEMORY: E31117
+#elif defined(MEMORY_ZERO)
+    Barrier((BarrierMemoryTypeFlags)0, BarrierSemanticFlags.GROUP_SYNC);
+//CHECK_MEMORY_ZERO: E31117
 #elif defined(SEMANTIC)
     Barrier(BarrierMemoryTypeFlags.UAV_MEMORY, (BarrierSemanticFlags)0xdead);
 //CHECK_SEMANTIC: E31116

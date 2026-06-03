@@ -16,6 +16,7 @@ void main(DispatchNodeInputRecord<RecordData> inputData)
     output[0] = recordData.myData;
 }
 
+//CHK-NOT: layout-sensitive SPIR-V type declaration
 //CHK: ; Types, variables and constants
 //CHK: [[MemberType:%[a-zA-Z_0-9]+]] = OpTypeInt 32 1
 //CHK: [[StructType:%[a-zA-Z_0-9]+]] = OpTypeStruct [[MemberType]]
