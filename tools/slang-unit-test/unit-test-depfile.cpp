@@ -5,6 +5,7 @@
 #include "core/slang-io.h"
 #include "core/slang-process-util.h"
 #include "slang/slang-compiler-api.h"
+#include "slang/slang-emit-dependency-file.h"
 #include "slang/slang-internal.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -14,6 +15,20 @@ using namespace Slang;
 static bool _contains(const String& text, const char* expected)
 {
     return text.getUnownedSlice().indexOf(UnownedStringSlice(expected)) >= 0;
+}
+
+/// Returns the number of non-overlapping occurrences of `needle` in `text`.
+static int _countOccurrences(const String& text, const char* needle)
+{
+    int count = 0;
+    Index needleLen = Index(strlen(needle));
+    Index pos = text.indexOf(needle, 0);
+    while (pos >= 0)
+    {
+        ++count;
+        pos = text.indexOf(needle, pos + needleLen);
+    }
+    return count;
 }
 
 /// RAII wrapper that deletes a temporary file on destruction.
@@ -441,5 +456,71 @@ SLANG_UNIT_TEST(DepfileOutput)
         SLANG_CHECK_MSG(
             _contains(depContent, Path::getFileName(slangPath).getBuffer()),
             "depfile missing input file dependency");
+    }
+
+    // --- Test 7: multi-target dedup — writtenStdoutSentinel fires across successive targets ---
+    //
+    // writeDependencyFile iterates over linkage->targets. When two targets both have an
+    // empty wholeTargetOutputPath, _writeDependencyStatement is called twice with an empty
+    // path. The guard must suppress the second emission so the depfile contains exactly one
+    // "-:" occurrence.
+    //
+    // This scenario cannot be triggered via CLI (auto-rawOutput requires a single target),
+    // so we set up the condition in-process: parse args with two targets so that
+    // linkage->targets is populated, then manually insert TargetInfo entries with empty
+    // wholeTargetOutputPath and call writeDependencyFile directly.
+    {
+        TempFile depFile;
+        SLANG_CHECK(SLANG_SUCCEEDED(_makeTempFile("slangc-df-multitgt-dep", depFile)));
+
+        {
+            SlangCompileRequest* request =
+                spCreateCompileRequest((SlangSession*)unitTestContext->slangGlobalSession);
+            SLANG_CHECK(request != nullptr);
+
+            spSetCommandLineCompilerMode(request);
+
+            auto* endToEnd = asInternal(request);
+
+            // Parse with two targets so linkage->targets has two entries.
+            // No -o is given; auto-rawOutput does not fire for multi-target invocations
+            // so m_targetInfos stays empty — we populate it manually below.
+            const char* parseArgs[] = {"-target", "spirv", "-target", "hlsl"};
+            SLANG_CHECK(SLANG_SUCCEEDED(
+                spProcessCommandLineArguments(request, parseArgs, SLANG_COUNT_OF(parseArgs))));
+
+            // Manually insert a TargetInfo with empty wholeTargetOutputPath for each target,
+            // and enable GenerateWholeProgram so writeDependencyFile takes the whole-target
+            // branch (which reads wholeTargetOutputPath).
+            auto* linkage = endToEnd->getLinkage();
+            for (auto& targetRef : linkage->targets)
+            {
+                TargetRequest* targetReq = targetRef.Ptr();
+                RefPtr<EndToEndCompileRequest::TargetInfo> info =
+                    new EndToEndCompileRequest::TargetInfo();
+                info->wholeTargetOutputPath = "";
+                endToEnd->m_targetInfos[targetReq] = info;
+                endToEnd->getTargetOptionSet(targetReq)
+                    .set(CompilerOptionName::GenerateWholeProgram, true);
+            }
+
+            endToEnd->m_dependencyOutputPath = depFile.path;
+
+            // Call writeDependencyFile directly — no compilation needed; we only want to
+            // verify the dedup guard fires when both targets have an empty output path.
+            SLANG_CHECK(SLANG_SUCCEEDED(writeDependencyFile(endToEnd)));
+
+            spDestroyCompileRequest(request);
+        }
+
+        String depContent;
+        SLANG_CHECK(SLANG_SUCCEEDED(File::readAllText(depFile.path, depContent)));
+        getTestReporter()->message(TestMessageType::Info, depContent.getBuffer());
+
+        // The dedup guard must have suppressed the second empty-path call: exactly one "-:"
+        // in the output, not two.
+        SLANG_CHECK_MSG(
+            _countOccurrences(depContent, "-:") == 1,
+            "dedup guard failed: depfile must contain exactly one '-:' sentinel");
     }
 }
