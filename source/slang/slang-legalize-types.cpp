@@ -1195,7 +1195,30 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
 
     context->builder->setInsertBefore(type);
 
-    if (auto uniformBufferType = as<IRUniformParameterGroupType>(type))
+    if (auto attributedType = as<IRAttributedType>(type))
+    {
+        auto legalBaseType = legalizeType(context, attributedType->getBaseType());
+        switch (legalBaseType.flavor)
+        {
+        case LegalType::Flavor::none:
+            return LegalType();
+        case LegalType::Flavor::simple:
+            {
+                if (legalBaseType.getSimple() == attributedType->getBaseType())
+                    return LegalType::simple(type);
+
+                List<IRAttr*> attrs;
+                for (auto attr : attributedType->getAllAttrs())
+                    attrs.add(attr);
+                return LegalType::simple(
+                    context->getBuilder()->getAttributedType(legalBaseType.getSimple(), attrs));
+            }
+        default:
+            // Attributes cannot currently wrap decomposed legalized types.
+            return legalBaseType;
+        }
+    }
+    else if (auto uniformBufferType = as<IRUniformParameterGroupType>(type))
     {
         // We have one of:
         //

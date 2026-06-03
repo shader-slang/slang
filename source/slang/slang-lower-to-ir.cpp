@@ -2948,6 +2948,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitGloballyCoherentModifierVal(GloballyCoherentModifierVal* astVal)
     {
         SLANG_UNUSED(astVal);
+        // `coherent` and `globallycoherent` both parse to GloballyCoherentModifier today.
+        // Preserve that existing consolidation for type modifiers: both map to the
+        // device-scope coherent bit used by HLSL/SPIR-V emission.
         IRInst* memoryQualifierBit = getBuilder()->getIntValue(
             getBuilder()->getIntType(),
             MemoryQualifierSetModifier::Flags::kCoherent);

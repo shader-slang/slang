@@ -1,10 +1,10 @@
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -capability spvDescriptorHeapEXT -capability vk_mem_model
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl -profile cs_6_6 -entry computeMain
+//TEST(compute, vulkan):SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -capability spvDescriptorHeapEXT -capability vk_mem_model
+//TEST(compute):SIMPLE(filecheck=HLSL): -target hlsl -profile cs_6_6 -entry computeMain
 
 // SPIRV: OpImageRead %{{.*}} {{.*}} MakeTexelVisible|NonPrivateTexel %
 // SPIRV: OpImageWrite {{.*}} {{.*}} {{.*}} MakeTexelAvailable|NonPrivateTexel %
 
-// HLSL: globallycoherent RWTexture2D<float4
+// HLSL-COUNT-2: globallycoherent RWTexture2D<float4
 
 uniform DescriptorHandle<coherent RWTexture2D<float4>> coherentTexture;
 uniform DescriptorHandle<globallycoherent RWTexture2D<float4>> globallyCoherentTexture;
