@@ -6312,6 +6312,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 const auto topologyType = OutputTopologyType(o->getTopologyType());
 
                 SpvExecutionMode m = SpvExecutionModeMax;
+                bool shouldEmitExecutionMode = true;
                 if (entryPointDecor)
                 {
                     switch (entryPointDecor->getProfile().getStage())
@@ -6326,6 +6327,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             m = SpvExecutionModePointMode;
                         // OutputTopologyType::Line is represented by the Isolines execution mode
                         // emitted for the domain decoration.
+                        else if (topologyType == OutputTopologyType::Line)
+                            shouldEmitExecutionMode = false;
                         break;
                     case Stage::Mesh:
                         if (topologyType == OutputTopologyType::Triangle)
@@ -6340,8 +6343,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                 }
 
-                if (m != SpvExecutionModeMax)
+                if (shouldEmitExecutionMode)
+                {
+                    SLANG_ASSERT(m != SpvExecutionModeMax);
                     requireSPIRVExecutionMode(decoration, dstID, m);
+                }
             }
             break;
 
