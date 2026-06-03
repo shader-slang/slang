@@ -1,5 +1,6 @@
 #include "slang-ir-check-unsupported-inst.h"
 
+#include "../core/slang-dictionary.h"
 #include "../core/slang-type-text-util.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -9,11 +10,15 @@
 namespace Slang
 {
 
-// Targets that emit "standalone" C++/CUDA — they do not inject `slang.h` into
-// the generated source and so do not have access to `Slang::String`. Using
-// `String` on these targets produces invalid C++ output (#11297). The
-// `Host*` cousins do include `slang.h`, so `String` resolves to
-// `Slang::String` and is allowed.
+// Targets that emit "standalone" C++/CUDA — they do not inject `slang.h`
+// (or `slang-cpp-types-core.h`'s `String` wrapper) into the generated
+// source, so a `String` identifier reaching emit produces undeclared-
+// identifier C++ output (#11297). The `Host*` cousins do include
+// `slang.h`, so `String` resolves to `Slang::String` and is allowed.
+//
+// `CUDAHeader` (`-target cuh`) and `CUDASource` go through the same
+// `CUDASourceEmitter` and use `prelude/slang-cuda-prelude.h`, so both
+// must be diagnosed; same pairing for `CPPSource` / `CPPHeader`.
 static bool _isStandaloneCppLikeTarget(TargetRequest* target)
 {
     switch (target->getTarget())
@@ -21,64 +26,128 @@ static bool _isStandaloneCppLikeTarget(TargetRequest* target)
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         return true;
     default:
         return false;
     }
 }
 
-// Return true if `inst`'s type is the `String` type.
-static bool _isStringTyped(IRInst* inst)
+// Hint text appended after the main error sentence. `NativeString`'s
+// `getLength` / `getBuffer` are gated `[require(cpp_llvm)]`
+// (`core.meta.slang:2119,2134`) and `-target host-cpp` is a CPU target,
+// so neither is actionable advice for cuda kernel authors. Keep the
+// suggestion target-appropriate.
+static UnownedStringSlice _stringTypeHintFor(TargetRequest* target)
 {
-    return inst && inst->getDataType() && inst->getDataType()->getOp() == kIROp_StringType;
+    switch (target->getTarget())
+    {
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
+        return UnownedStringSlice::fromLiteral(
+            "use 'NativeString' instead, or compile with -target host-cpp");
+    default:
+        return UnownedStringSlice::fromLiteral(
+            "the standalone cpp/cuda preludes do not include the Slang runtime");
+    }
 }
 
-// Find the first instruction in `func` that exposes a `String`-typed
-// value on the cpp/cuda emit path: a `String` parameter in the function
-// signature, or a `kIROp_Call` whose return type or any operand is
-// `String`.
+// Peel `Out<T>` / `InOut<T>` / `Ptr<T>` / `Ref<T>` wrappers (all of
+// which derive from `IRPtrTypeBase`) and answer whether the underlying
+// type is `kIROp_StringType`.
+static bool _isStringLikeType(IRType* type)
+{
+    while (auto ptr = as<IRPtrTypeBase>(type))
+        type = ptr->getValueType();
+    return type && type->getOp() == kIROp_StringType;
+}
+
+// Return true if `inst`'s data type is `String` (after peeling pointer-
+// like wrappers — an `out String` parameter has `Out<String>` as its
+// data type).
+static bool _isStringTyped(IRInst* inst)
+{
+    return inst && _isStringLikeType(inst->getDataType());
+}
+
+// IR ops that legitimately carry a `String`-typed `IRStringLit` operand
+// at this stage of lowering but never produce a runtime `String` value
+// in the generated source. Either the front-end consumes their string
+// and the inst is dropped before emit (`StaticAssert`, `RequirePrelude`,
+// `RequireTargetExtension`), or the string is inlined as raw asm /
+// metadata rather than as a `String` value (`GenericAsm`). Block
+// parameters (`kIROp_Param`) are skipped during the body walk because
+// they are reported separately via `func->getParams()`.
+static bool _isPreEmitStringConsumer(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_Param:
+    case kIROp_StaticAssert:
+    case kIROp_RequirePrelude:
+    case kIROp_RequireTargetExtension:
+    case kIROp_GenericAsm:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Walk `func` and call `report(offendingInst)` for every distinct
+// position where a `String`-typed value reaches the cpp/cuda emit
+// pipeline. Three categories are checked:
 //
-// We restrict body-walking to `kIROp_Call` rather than scanning all
-// block-level insts because several non-emit IR ops legitimately carry
-// `String` operands that never reach the cpp/cuda backend — most
-// notably `kIROp_StaticAssert` (the message is consumed by
-// `checkStaticAssert` and the inst is then dropped). Calls, on the
-// other hand, *are* emitted: a String-using call site survives into
-// the generated source and produces the undeclared-`String` failure
-// from #11297. Function-signature params are also emitted verbatim
-// (`void f(String s)`) so they're checked separately.
-//
-// `IRStringLit`s always carry `kIROp_StringType` regardless of whether
-// the calling context expects `String` or `NativeString` — see
-// `IRBuilder::getStringValue` — so a literal's type alone is not a
-// reliable user-vs-builtin signal. A Call with a String-typed operand
-// is, because intrinsics that take `NativeString` (e.g. `printf`,
-// `static_assert`) rewrite the operand at conversion time.
-static IRInst* _findStringUseInFunc(IRFunc* func)
+// 1. Function-signature parameters (`void f(String s)`,
+//    `void f(out String s)`). These are emitted verbatim into the
+//    target source. Body-less declarations still need this check —
+//    `extern void log(String);` emitted to `-target cpp-header`
+//    prints `void log(String)` into the `.h`.
+// 2. Function return type. `String foo()` emits `String foo()`.
+// 3. Block-level instructions. We skip a small allowlist of pre-emit
+//    consumers (`StaticAssert`, `RequirePrelude`,
+//    `RequireTargetExtension`, `GenericAsm`) whose `String`-typed
+//    operands are dropped or inlined as raw asm/metadata before
+//    emit; everything else is checked. Operand types are inspected
+//    because `IRStringLit` is always `String`-typed regardless of
+//    whether the consuming intrinsic expects `String` or
+//    `NativeString` (see `IRBuilder::getStringValue`).
+template<typename Report>
+static void _walkStringUsesInFunc(IRFunc* func, Report report)
 {
     for (auto param : func->getParams())
     {
         if (_isStringTyped(param))
-            return param;
+            report(param);
     }
+
+    if (auto funcType = as<IRFuncType>(func->getDataType()))
+    {
+        if (_isStringLikeType(funcType->getResultType()))
+            report(func);
+    }
+
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())
         {
-            if (inst->getOp() != kIROp_Call)
+            if (_isPreEmitStringConsumer(inst))
                 continue;
             if (_isStringTyped(inst))
-                return inst;
+            {
+                report(inst);
+                continue;
+            }
             const UInt operandCount = inst->getOperandCount();
             for (UInt i = 0; i < operandCount; ++i)
             {
-                IRInst* operand = inst->getOperand(i);
-                if (_isStringTyped(operand))
-                    return inst;
+                if (_isStringTyped(inst->getOperand(i)))
+                {
+                    report(inst);
+                    break;
+                }
             }
         }
     }
-    return nullptr;
 }
 
 void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
@@ -101,34 +170,49 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
 
 // On standalone cpp/cuda targets, `String` resolves to an undeclared
 // identifier in the generated source (the prelude does not include
-// `slang.h`). Detect block-level uses of `String`-typed values so that
-// the user gets a clear front-end error instead of a downstream g++
-// error like:
+// `slang.h`). Detect uses of `String`-typed values so that the user
+// gets a clear front-end error instead of a downstream g++ error like:
 //     int64_t _S3 = "123".getLength();
 //     // -> request for member 'getLength' in '"123"', non-class type
-// (#11297). Diagnose at most once per emit target.
+// (#11297). Diagnose every offending function — sibling checks in this
+// file (e.g. `kIROp_GetArrayLength` above) iterate to completion, so we
+// follow the same pattern rather than stopping after the first hit.
 static void _checkStringTypeUse(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
+    const UnownedStringSlice hint = _stringTypeHintFor(target);
+    const String targetName = String(
+        TypeTextUtil::getCompileTargetName(SlangCompileTarget(target->getTarget())));
+
     for (auto globalInst : module->getGlobalInsts())
     {
         IRFunc* func = nullptr;
         if (auto f = as<IRFunc>(globalInst))
             func = f;
         else if (auto generic = as<IRGeneric>(globalInst))
-            func = as<IRFunc>(findGenericReturnVal(generic));
+            func = as<IRFunc>(findInnerMostGenericReturnVal(generic));
 
-        if (!func || !func->getFirstBlock())
+        if (!func)
             continue;
 
-        if (auto stringUse = _findStringUseInFunc(func))
-        {
-            SourceLoc loc = stringUse->sourceLoc.isValid() ? stringUse->sourceLoc : func->sourceLoc;
-            sink->diagnose(Diagnostics::StringTypeNotSupportedOnTarget{
-                .target = String(
-                    TypeTextUtil::getCompileTargetName(SlangCompileTarget(target->getTarget()))),
-                .location = loc});
-            return;
-        }
+        // IR lowering can split one source-level expression across
+        // several String-typed insts (e.g. `let s = call f()` produces
+        // both a `let` and a `call` that share a source loc). Dedupe
+        // by raw source-loc within a function so the user sees one
+        // diagnostic per source position rather than per IR inst.
+        HashSet<SourceLoc::RawValue> reportedLocs;
+        _walkStringUsesInFunc(
+            func,
+            [&](IRInst* stringUse)
+            {
+                SourceLoc loc =
+                    stringUse->sourceLoc.isValid() ? stringUse->sourceLoc : func->sourceLoc;
+                if (!reportedLocs.add(loc.getRaw()))
+                    return;
+                sink->diagnose(Diagnostics::StringTypeNotSupportedOnTarget{
+                    .target = targetName,
+                    .hint = String(hint),
+                    .location = loc});
+            });
     }
 }
 

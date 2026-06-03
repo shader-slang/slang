@@ -1596,7 +1596,7 @@ err(
 err(
     "string-type-not-supported-on-target",
     33083,
-    "the 'String' type is not supported on the '~target' target; use 'NativeString' instead, or compile with -target host-cpp",
+    "the 'String' type is not supported on the '~target' target; ~hint",
     span { loc = "location", message = "use of 'String' here" }
 )
 

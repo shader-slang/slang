@@ -9,25 +9,44 @@
 //
 // The host-cpp / executable / host-callable targets keep working
 // because they pull in `slang.h` and `Slang::String` is in scope —
-// `tests/cpu-program/string-passing.slang` exercises that path.
+// `tests/cpu-program/string-passing.slang` exercises that path. Both
+// the cpp emitter and its `hpp` (CPPHeader) sibling go through the
+// same path, so we exercise both via stacked test directives.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cpp -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target cpp -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hpp -stage compute -entry main
 
 RWStructuredBuffer<int64_t> output;
 
-// Helper with a `String` parameter — exercises the parameter-type
-// branch in `_findStringUseInFunc` (caught even before any String
-// member call appears in the body).
+// `String` parameter — exercises the parameter-type branch in
+// `_walkStringUsesInFunc`.
 int64_t getLen(String s)
-//CHECK:              ^ the 'String' type is not supported on the 'cpp' target; use 'NativeString' instead, or compile with -target host-cpp
+//CHECK:              ^ the 'String' type is not supported on the
 //CHECK:              ^ use of 'String' here
 {
     return s.getLength();
+}
+
+// `out String` parameter — exercises the wrapper-peel in
+// `_isStringLikeType` so `Out<String>` matches.
+void writeStr(out String s)
+//CHECK:                 ^ the 'String' type is not supported on the
+//CHECK:                 ^ use of 'String' here
+{
+    s = "hi";
 }
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
-    output[0] = getLen("123");
+    String s;
+//CHECK:   ^ the 'String' type is not supported on the
+//CHECK:   ^ use of 'String' here
+    writeStr(s);
+    // Call site: `s` is a `String`-typed operand of the `kIROp_Call`
+    // — exercises the body-walk operand branch.
+    output[0] = getLen(s);
+//CHECK:              ^ the 'String' type is not supported on the
+//CHECK:              ^ use of 'String' here
 }
