@@ -109,7 +109,7 @@ Rules (applied in order, before any posting):
      - the current `tmp/pr-diff.patch` touches the lines/symbol the verdict was about, **or**
      - the finding now rests on different evidence than the prior thread addressed.
 
-   When suppressing, mark the row **Drop** with `Suppressed: prior verdict by @user` in the table. **Exception:** keep a 🔴 Bug whose evidence quote shows a concrete wrong output the reply did not actually rebut — state why the reply does not cover it. A prior thread with **no** human reply never suppresses (the point may have been missed); re-surface it at most once. A missing JSON file means "no prior verdicts" — proceed normally.
+   When suppressing, mark the row **Drop** with `Suppressed: prior verdict by @user` in the table, and add the finding to the folded **Suppressed** section of the review body (see Review Body Format) — one row with its location, a one-line description, and a short paraphrase of the maintainer's reply. This keeps suppression transparent without re-posting the inline comment. **Exception:** keep a 🔴 Bug whose evidence quote shows a concrete wrong output the reply did not actually rebut — state why the reply does not cover it. A prior thread with **no** human reply never suppresses (the point may have been missed); re-surface it at most once. A missing JSON file means "no prior verdicts" — proceed normally.
 
 A finding that fails any rule above is marked Drop in the table. Do not post Drop rows. Do not post findings that were not in the table.
 
@@ -207,9 +207,18 @@ The review body is the SUMMARY. The detailed analysis goes in inline comments. U
 | 🔵 Question | `file:line` | <one-line description — detail is in the inline comment> |
 
 </details>
+
+<details>
+<summary>Suppressed (K) — findings a maintainer already addressed on this PR; not re-posted</summary>
+
+| Location | Finding | Maintainer verdict |
+|----------|---------|--------------------|
+| `file:line` | <one-line description of the dropped finding> | @user: <short paraphrase of their reply> |
+
+</details>
 ```
 
-Omit the Findings section if there are 0 findings. Changes Overview is ALWAYS included.
+Omit the Findings section if there are 0 findings. Omit the Suppressed section if nothing was suppressed under Rule 7. Changes Overview is ALWAYS included.
 
 ### Severity badges:
 
