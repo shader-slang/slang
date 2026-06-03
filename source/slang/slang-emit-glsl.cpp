@@ -1536,7 +1536,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
         emitLocalSizeLayout();
         break;
     case Stage::Node:
-        // Node stage is not supported on GLSL; handled above.
+        // Node stage is not supported on GLSL; diagnostic emitted in init().
         break;
     default:
         break;

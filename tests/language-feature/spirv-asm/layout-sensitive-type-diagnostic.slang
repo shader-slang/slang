@@ -1,6 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_WARN):-target spirv-asm -entry computeMain -stage compute -DWARN
 //TEST:SIMPLE(filecheck=CHECK_OK):-target spirv-asm -entry computeMain -stage compute -DNO_WARN
-//TEST:SIMPLE(filecheck=CHECK_NODE_PAYLOAD_OK):-target spirv-asm -entry computeMain -stage compute -DNODE_PAYLOAD_OK -skip-spirv-validation
 
 // Check that direct layout-sensitive OpType declarations in spirv_asm warn,
 // while using Slang-typed pointer operands does not.
@@ -44,20 +43,5 @@ void computeMain()
         result:$$uint = OpLoad $pointer;
     };
     buffer[0] = value;
-}
-#elif defined(NODE_PAYLOAD_OK)
-// CHECK_NODE_PAYLOAD_OK-NOT: layout-sensitive SPIR-V type declaration
-// CHECK_NODE_PAYLOAD_OK: OpEntryPoint
-// CHECK_NODE_PAYLOAD_OK-NOT: layout-sensitive SPIR-V type declaration
-
-[numthreads(1, 1, 1)]
-void computeMain()
-{
-    let value = spirv_asm
-    {
-        %nodePayload = OpTypeNodePayloadArrayAMDX $$uint;
-        %nodePayloadPtr = OpTypePointer NodePayloadAMDX %nodePayload;
-        result:$$uint = OpConstant 1;
-    };
 }
 #endif

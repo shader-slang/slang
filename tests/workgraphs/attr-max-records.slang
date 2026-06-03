@@ -19,4 +19,5 @@ void main([MaxRecords(4)] NodeOutput<MyRecord> output, RWBuffer<int> buf)
 }
 
 //CHK_DXIL: define void @main()
+//CHK_DXIL: !{i32 1, i32 6, i32 2, !{{[0-9]+}}, i32 3, i32 4, i32 0, !{{[0-9]+}}}
 //CHK_SPIRV: OpFunction
