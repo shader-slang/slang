@@ -7052,7 +7052,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return type;
     }
 
-    SpvInst* getDescriptorRuntimeArrayType(SpvInst* descriptorElementType)
+    SpvInst* getDescriptorRuntimeArrayType(
+        SpvInst* descriptorElementType,
+        int defaultArrayStride = 0)
     {
         if (auto found = m_descriptorHeapRuntimeArrayTypes.tryGetValue(descriptorElementType))
             return *found;
@@ -7071,10 +7073,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         if (userDefinedStride == 0)
         {
-            IRBuilder builder(m_irModule);
-            builder.setInsertInto(m_irModule->getModuleInst());
+            if (defaultArrayStride != 0)
+            {
+                userDefinedStride = defaultArrayStride;
+            }
+            else
+            {
+                IRBuilder builder(m_irModule);
+                builder.setInsertInto(m_irModule->getModuleInst());
 
-            stride = emitOpConstantSizeOfEXT(nullptr, builder.getUIntType(), descriptorElementType);
+                stride =
+                    emitOpConstantSizeOfEXT(nullptr, builder.getUIntType(), descriptorElementType);
+            }
         }
 
         auto runtimeArrayType = emitOpTypeRuntimeArray(nullptr, descriptorElementType);
@@ -7106,11 +7116,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         switch (valueType->getOp())
         {
         case kIROp_TextureType:
-        case kIROp_RaytracingAccelerationStructureType:
         case kIROp_SamplerStateType:
         case kIROp_SamplerComparisonStateType:
             descriptorElementType = ensureInst(valueType);
             break;
+        case kIROp_RaytracingAccelerationStructureType:
+            {
+                // Acceleration structure heap entries are 64-bit device addresses that are
+                // converted to acceleration structure handles after loading.
+                IRBuilder builder(m_irModule);
+                builder.setInsertInto(m_irModule->getModuleInst());
+                descriptorElementType = ensureInst(builder.getUInt64Type());
+                break;
+            }
         default:
             isBufferResource = true;
             descriptorElementType = ensureDescriptorHeapBufferDescriptorType(
@@ -7121,7 +7139,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (outIsBufferResource)
             *outIsBufferResource = isBufferResource;
 
-        return getDescriptorRuntimeArrayType(descriptorElementType);
+        const int defaultAccelerationStructureStride = 8;
+        return getDescriptorRuntimeArrayType(
+            descriptorElementType,
+            valueType->getOp() == kIROp_RaytracingAccelerationStructureType
+                ? defaultAccelerationStructureStride
+                : 0);
     }
 
     SpvInst* emitAccelerationStructureFromDescriptorHeap(
