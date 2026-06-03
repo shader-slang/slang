@@ -2128,22 +2128,31 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     }
     else
     {
-        // System-value semantic inputs (e.g. `SV_PrimitiveID`) are runtime-provided
-        // varyings rather than user-defined `in` parameters, so they are allowed
-        // even in stages that otherwise reject `in` parameters.
+        // Some system-value semantics are runtime-provided varyings rather than
+        // user-defined `in` parameters, so they should be allowed even in stages
+        // that otherwise reject `in` parameters / route `in` to hit attributes.
         //
-        // Note: `SV_RayPayload` and `SV_IntersectionAttributes` are not true
-        // runtime-provided system values — they are markers that identify the
-        // parameter as a payload / hit-attribute slot. Those still need to flow
-        // through the payload / hit-attribute layout path below.
-        bool isSystemValueInput = false;
+        // We deliberately keep the allowlist tight and matched to the meta-side
+        // change in `core.meta.slang`: only the semantics whose accessor table
+        // was extended to ray-tracing stages are bypassed here. Adding to this
+        // list should be paired with a `[require(<stage>)]` entry on the
+        // `semantic` declaration plus a regression test (#11197).
+        bool isAllowedRaytracingSystemValueInput = false;
         if (state.optSemanticName)
         {
             auto sn = state.optSemanticName->toLower();
-            if ((sn.startsWith("sv_") || sn.startsWith("nv_")) &&
-                sn != "sv_raypayload" && sn != "sv_intersectionattributes")
+            if (sn == "sv_primitiveid")
             {
-                isSystemValueInput = true;
+                switch (state.stage)
+                {
+                case Stage::Intersection:
+                case Stage::AnyHit:
+                case Stage::ClosestHit:
+                    isAllowedRaytracingSystemValueInput = true;
+                    break;
+                default:
+                    break;
+                }
             }
         }
 
@@ -2163,7 +2172,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             // an `in` parameter as indicating a payload that the
             // programmer doesn't intend to write to.
             //
-            if (!isSystemValueInput)
+            if (!isAllowedRaytracingSystemValueInput)
             {
                 getSink(context)->diagnose(Diagnostics::DontExpectInParametersForStage{
                     .stage = getStageName(state.stage),
@@ -2173,10 +2182,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
         case Stage::AnyHit:
         case Stage::ClosestHit:
-            // `in` parameter is hit attributes (true system-value `in` parameters
-            // such as `SV_PrimitiveID` fall through to ordinary varying-input
-            // handling below).
-            if (!isSystemValueInput)
+            // `in` parameter is hit attributes (allowed system-value inputs such
+            // as `SV_PrimitiveID` fall through to ordinary varying-input handling
+            // below instead of the hit-attribute layout path).
+            if (!isAllowedRaytracingSystemValueInput)
             {
                 return createTypeLayoutWith(
                     context->layoutContext,
