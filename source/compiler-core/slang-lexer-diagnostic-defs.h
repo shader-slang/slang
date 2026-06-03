@@ -43,4 +43,10 @@ DIAGNOSTIC(
     integerLiteralTooLargeForAnyType,
     "integer literal is too large to be represented in any integer type")
 
+DIAGNOSTIC(
+    10013,
+    Error,
+    floatingPointLiteralTooLarge,
+    "floating-point literal is too large to be represented in a 64-bit floating-point type")
+
 #undef DIAGNOSTIC

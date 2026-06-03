@@ -8409,7 +8409,8 @@ static Expr* parseAtomicExpr(Parser* parser)
             constExpr->token = token;
 
             UnownedStringSlice suffix;
-            FloatingPointLiteralValue value = getFloatingPointLiteralValue(token, &suffix);
+            FloatingPointLiteralValue value =
+                getFloatingPointLiteralValue(token, parser->sink, &suffix);
 
             // Look at any suffix on the value
             char const* suffixCursor = suffix.begin();

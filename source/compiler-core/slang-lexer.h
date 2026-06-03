@@ -185,6 +185,7 @@ IntegerLiteralValue getIntegerLiteralValue(
     bool* outHasOverflowed = 0);
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
+    DiagnosticSink* sink,
     UnownedStringSlice* outSuffix = 0);
 
 IntegerLiteralValue getCharLiteralValue(Token const& token);

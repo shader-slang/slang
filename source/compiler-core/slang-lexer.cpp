@@ -1,6 +1,10 @@
 // slang-lexer.cpp
 #include "slang-lexer.h"
 
+#include <charconv>
+#include <limits>
+#include <system_error>
+
 // This file implements the lexer/scanner, which is responsible for taking a raw stream of
 // input bytes and turning it into semantically useful tokens.
 //
@@ -776,6 +780,7 @@ IntegerLiteralValue getIntegerLiteralValue(
 
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
+    DiagnosticSink* sink,
     UnownedStringSlice* outSuffix)
 {
     const UnownedStringSlice content = token.getContent();
@@ -783,9 +788,9 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     char const* end = content.end();
 
     // Slang accepts an HLSL/legacy-MSVC `#INF` infinity literal (e.g.
-    // `1#INF`, `0.#INF`), which `strtod` does not recognise. Detect it
-    // before the strtod call so the value is correctly set to infinity
-    // and the literal's bounds are reported in `outSuffix`.
+    // `1#INF`, `0.#INF`), which `std::from_chars` does not recognise.
+    // Detect it before the conversion so the value is correctly set to
+    // infinity and the literal's bounds are reported in `outSuffix`.
     for (char const* p = begin; p < end; ++p)
     {
         if (*p == '#')
@@ -801,24 +806,47 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         }
     }
 
-    // Hand the literal off to `strtod`, which provides correctly-rounded IEEE
-    // 754 conversion for arbitrarily long digit strings and the C99 hex-float
-    // form `0x1.4p+3`. The previous digit-accumulation loop here used a naive
-    // `value = value * radix + digit` and silently saturated to ±INF for
-    // long-digit literals (#11276, originally observed in #332).
+    // Use `std::from_chars` for correctly-rounded IEEE 754 conversion of
+    // arbitrarily long digit strings. The previous digit-accumulation loop
+    // here used a naive `value = value * radix + digit` and silently
+    // saturated to ±INF for long-digit literals (#11276, originally
+    // observed in #332).
     //
-    // `strtod` requires a null-terminated buffer; copy `content` into a
-    // `String` (which is null-terminated) and pass that.
-    String buffer(content);
-    char* parseEnd = nullptr;
-    FloatingPointLiteralValue value = strtod(buffer.getBuffer(), &parseEnd);
-    SLANG_ASSERT(parseEnd != nullptr && parseEnd >= buffer.getBuffer());
+    // `std::from_chars` is locale-independent by spec — important because
+    // Slang ships as a library and downstream embedders commonly call
+    // `setlocale(LC_ALL, "")` to honour the user's environment, which
+    // would otherwise cause `strtod` / `atof` to misparse `.` as a thousands
+    // separator under e.g. `de_DE`. The output side already takes the same
+    // care via `std::locale::classic()` (see `slang-emit-source-writer.cpp`).
+    //
+    // For the C99 hex-float form `0x1.4p+3`, `std::from_chars` requires the
+    // bare hex digits and `chars_format::hex` — strip the `0x` prefix here.
+    char const* parseStart = begin;
+    auto format = std::chars_format::general;
+    if (end - parseStart >= 2 && parseStart[0] == '0' &&
+        (parseStart[1] == 'x' || parseStart[1] == 'X'))
+    {
+        parseStart += 2;
+        format = std::chars_format::hex;
+    }
 
-    char const* consumedEnd = begin + (parseEnd - buffer.getBuffer());
-    if (consumedEnd > end)
-        consumedEnd = end;
+    FloatingPointLiteralValue value = 0;
+    auto result = std::from_chars(parseStart, end, value, format);
+
+    if (result.ec == std::errc::result_out_of_range)
+    {
+        // Out-of-`double`-range literal (e.g. `1e500`). `std::from_chars`
+        // leaves `value` unmodified on overflow; record the result as +∞
+        // and flag the diagnostic so the user is not silently miscompiled.
+        // Sign is always positive here because the lexer scans the unary
+        // `-` separately.
+        value = std::numeric_limits<FloatingPointLiteralValue>::infinity();
+        if (sink)
+            diagnose(sink, token.loc, LexerDiagnostics::floatingPointLiteralTooLarge);
+    }
+
     if (outSuffix)
-        *outSuffix = UnownedStringSlice(consumedEnd, end);
+        *outSuffix = UnownedStringSlice(result.ptr, end);
 
     return value;
 }
