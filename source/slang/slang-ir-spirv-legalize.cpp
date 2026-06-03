@@ -2277,48 +2277,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return inst->findDecoration<IRSPIRVNonUniformResourceDecoration>() != nullptr;
     }
 
-    // Stage 2 of the NonUniform propagation pipeline (see the overview at the
-    // top of slang-ir-float-non-uniform-resource-index.cpp for the full picture).
-    //
-    // Propagate NonUniform decorations through the IR so that the actual resource
-    // operands consumed by memory/sampling instructions carry the decoration.
-    // Vulkan (VUID-RuntimeSpirv-None-10148) requires NonUniform on the resource
-    // operand of the consuming instruction, not just on the index used in an
-    // access chain; earlier passes only decorate the index/access-chain, so we
-    // must push the decoration the rest of the way down the use-def chain.
-    //
-    // Algorithm: a worklist seeded with every already-decorated instruction. When
-    // an instruction becomes decorated we enqueue its users, so the decoration
-    // flows downstream toward the consuming instruction without rescanning the
-    // whole module.
-    //
-    // Termination: each instruction is processed at most once. `inWorklist` is
-    // never cleared, so once an instruction is added it cannot be re-enqueued.
-    // Combined with the finite instruction count, the worklist is guaranteed to
-    // drain in O(N + E) time (instructions + use-def edges visited).
-    //
-    // Correctness: seeds (already-decorated instructions) are enqueued first and
-    // processed before downstream users, so by the time a user is visited at
-    // least one of its operands is guaranteed decorated, ensuring tryPropagate
-    // can make the correct decision in a single pass.
-    //
-    // Direction: propagation is one-directional (operand -> user), which is
-    // sufficient because the Vulkan requirement is on the resource operand
-    // *consumed* by the memory/sampling instruction, and that operand is always a
-    // (transitive) user of the seed decoration. We deliberately do NOT back-
-    // propagate to an access chain's index operand: the index is not a consumed
-    // resource operand, so VUID-RuntimeSpirv-None-10148 does not require it to
-    // carry NonUniform. (The index may still be decorated independently by the
-    // float pass; that is incidental, not required here.)
+    // Forward-propagate NonUniform decorations to resource operands consumed
+    // by memory/sampling instructions (Vulkan VUID-RuntimeSpirv-None-10148).
     void propagateNonUniformAccessChainDecorations()
     {
         List<IRInst*> worklist;
         HashSet<IRInst*> inWorklist;
 
         // Seed: collect all instructions that already carry NonUniform.
-        // Precondition: this runs after generic specialization, so all
-        // relevant instructions are inside top-level IRFunc globals (no
-        // decorated instructions remain inside IRGeneric wrappers).
         for (auto globalInst : m_module->getGlobalInsts())
         {
             auto func = as<IRFunc>(globalInst);
@@ -2382,10 +2348,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     return addNonUniformDecoration(inst);
                 break;
             case kIROp_MakeCombinedTextureSampler:
-                // Stage 1 (float pass) handles the case where NonUniform directly
-                // wraps an operand; this Stage 2 case handles chain-derived
-                // non-uniformity (e.g., texture loaded from a non-uniform pointer,
-                // decorated by the Load case above, then flowing onward here).
+                // Propagates chain-derived non-uniformity that the float pass
+                // did not handle directly (e.g. texture loaded from a non-uniform pointer).
                 if (hasNonUniformDecoration(inst->getOperand(0)) ||
                     hasNonUniformDecoration(inst->getOperand(1)))
                     return addNonUniformDecoration(inst);
@@ -2400,10 +2364,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     return addNonUniformDecoration(inst);
                 break;
             default:
-                // Other opcodes (including CastDynamicResource) do not appear
-                // in the IR at this point: function-call specialization inlines
-                // CastDynamicResource before SPIR-V legalization runs, so no
-                // propagation rule is needed for it here.
+                // CastDynamicResource is inlined by specialization before this pass.
                 SLANG_ASSERT(inst->getOp() != kIROp_CastDynamicResource);
                 break;
             }

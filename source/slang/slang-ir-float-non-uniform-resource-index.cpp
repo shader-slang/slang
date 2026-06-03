@@ -1,31 +1,3 @@
-// NonUniform propagation pipeline overview
-// =========================================
-// Correct SPIR-V NonUniform handling is a three-stage pipeline:
-//
-// 1. Float pass (this file): hoists `NonUniformResourceIndex` wrappers outward
-//    through value-level ops (GetElement, GetElementPtr, Load, Swizzle,
-//    IntCast, MakeCombinedTextureSampler) so the wrapper reaches the final
-//    resource-producing instruction. Then replaces the wrapper with an
-//    `IRSPIRVNonUniformResourceDecoration` on the index or resource value.
-//
-// 2. SPIR-V legalization (`slang-ir-spirv-legalize.cpp`,
-//    `propagateNonUniformAccessChainDecorations`): forward-propagates those
-//    decorations through Load, FieldAddress, FieldExtract, and
-//    MakeCombinedTextureSampler so that the actual resource operand consumed by
-//    memory/sampling instructions carries the decoration.
-//
-// 3. SPIR-V emitter (`slang-emit-spirv.cpp`, asm-block propagation): carries
-//    NonUniform through compiler-generated `spirv_asm` blocks (e.g.
-//    OpSampledImage in hlsl.meta.slang) so the asm-materialized result that
-//    feeds the final OpImageSample*/OpImageFetch also gets decorated.
-//
-// Each stage relies on the prior stage having already run. A missing decoration
-// at any stage produces invalid SPIR-V that violates VUID-RuntimeSpirv-None-10148.
-//
-// Completion guarantee: after all three stages, every SPIR-V resource operand
-// consumed by a memory or sampling instruction whose provenance includes a
-// `NonUniformResourceIndex` carries the `NonUniform` decoration.
-
 #include "slang-ir-float-non-uniform-resource-index.h"
 
 #include "slang-ir-util.h"
@@ -240,14 +212,6 @@ void processNonUniformResourceIndex(
         // with a [NonUniformResource] decoration. For SPIR-V we want the decoration on the
         // index used in access chains, so prefer decorating index operands for getElement/
         // getElementPtr (and loads of those).
-        //
-        // Rationale for preferring the index: processGlobalParam in
-        // slang-ir-spirv-legalize.cpp detects non-uniformity by checking
-        // getElement->getIndex() for the decoration (form 2 of its three-form
-        // check), and the access-chain rewrite places NonUniform on the new
-        // address from that signal. Decorating the index here ensures Stage 2
-        // finds it without requiring Stage 1 to also decorate the getElement
-        // itself (though form 3 covers that as a fallback).
         auto operand = inst->getOperand(0);
         auto type = operand->getDataType();
         if (isResourceType(type) || isPointerToResourceType(type))
