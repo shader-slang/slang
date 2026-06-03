@@ -138,14 +138,19 @@ void SharedSemanticsContext::cacheSubtypeWitness(Type* sub, Type* sup, SubtypeWi
 
 InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     Type* type,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    HashSet<DeclRef<Decl>>* ioSkippedInProgress)
 {
     // We cache the computed inheritance information for types,
     // and re-use that information whenever possible.
 
     // DeclRefTypes will have their inheritance info cached in m_mapDeclRefToInheritanceInfo.
     if (auto declRefType = as<DeclRefType>(type))
-        return _getInheritanceInfo(declRefType->getDeclRef(), declRefType, circularityInfo);
+        return _getInheritanceInfo(
+            declRefType->getDeclRef(),
+            declRefType,
+            circularityInfo,
+            ioSkippedInProgress);
 
     // Non ordinary types are cached on m_mapTypeToInheritanceInfo.
     // Each entry also snapshots the extension epochs of the declarations that
@@ -170,20 +175,42 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
         entry.isComputing = true;
     }
 
-    auto info = _calcInheritanceInfo(type, circularityInfo);
+    // Collect any in-progress ancestors that had to be skipped to break a
+    // benevolent cycle (see `_getInheritanceInfo`). A non-`DeclRefType` has no
+    // `DeclRef` identity to subtract as "self"; but the equality cycles we
+    // tolerate are between associated-type accesses, which are `DeclRefType`s
+    // routed through `_getInheritanceInfo` (which subtracts their own self), so
+    // a non-empty `frameSkipped` here means this result is still missing an
+    // ancestor and must not be cached.
+    HashSet<DeclRef<Decl>> frameSkipped;
+    auto info = _calcInheritanceInfo(type, circularityInfo, &frameSkipped);
 
-    auto& entry = m_mapTypeToInheritanceInfo[type];
-    entry.info = info;
-    _collectInheritanceInfoDependencyEpochs(nullptr, info, entry.dependencyEpochs);
-    entry.generation = m_nextInheritanceInfoCacheGeneration++;
-    entry.isComputing = false;
+    if (frameSkipped.getCount() == 0)
+    {
+        auto& entry = m_mapTypeToInheritanceInfo[type];
+        entry.info = info;
+        _collectInheritanceInfoDependencyEpochs(nullptr, info, entry.dependencyEpochs);
+        entry.generation = m_nextInheritanceInfoCacheGeneration++;
+        entry.isComputing = false;
+    }
+    else
+    {
+        // Contextual/partial result: roll back the in-progress entry so a later
+        // root-level query recomputes the complete list, and propagate the
+        // unresolved ancestors to our caller.
+        m_mapTypeToInheritanceInfo.remove(type);
+        if (ioSkippedInProgress)
+            for (auto& k : frameSkipped)
+                ioSkippedInProgress->add(k);
+    }
 
     return info;
 }
 
 InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     DeclRef<ExtensionDecl> const& extension,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    HashSet<DeclRef<Decl>>* ioSkippedInProgress)
 {
     if (_checkForCircularityInExtensionTargetType(extension.getDecl(), circularityInfo))
     {
@@ -199,7 +226,29 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     // routine with an optional `Type` parameter.
     //
     InheritanceCircularityInfo newCircularityInfo(extension.getDecl(), circularityInfo);
-    return _getInheritanceInfo(extension, nullptr, &newCircularityInfo);
+    return _getInheritanceInfo(extension, nullptr, &newCircularityInfo, ioSkippedInProgress);
+}
+
+bool SharedSemanticsContext::_isInheritanceInfoInProgress(Type* type)
+{
+    // A type is "in progress" when its inheritance-info cache entry exists and
+    // is still marked `isComputing` -- i.e. it is an ancestor currently on the
+    // inheritance-computation stack. We use this to detect a *benevolent* cycle:
+    // an equality constraint such as `__constraint A == B` makes `T.A` and `T.B`
+    // each a base of the other, so while computing `T.A` we will be asked to add
+    // `T.B`, whose computation in turn wants to add `T.A` -- but `T.A` is still
+    // in progress. Rather than feed that back into the linearization (which would
+    // be reported as a cyclic-inheritance error), the caller skips the constraint.
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto found = m_mapDeclRefToInheritanceInfo.tryGetValue(declRefType->getDeclRef()))
+            return found->isComputing;
+    }
+    else if (auto found = m_mapTypeToInheritanceInfo.tryGetValue(type))
+    {
+        return found->isComputing;
+    }
+    return false;
 }
 
 bool SharedSemanticsContext::_checkForCircularityInExtensionTargetType(
@@ -221,7 +270,8 @@ bool SharedSemanticsContext::_checkForCircularityInExtensionTargetType(
 InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     DeclRef<Decl> declRef,
     Type* selfType,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    HashSet<DeclRef<Decl>>* ioSkippedInProgress)
 {
     // Just as with `Type`s, we cache and re-use the inheritance
     // information that has been computed for a `DeclRef` whenever
@@ -246,13 +296,54 @@ InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
         entry.isComputing = true;
     }
 
-    auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo);
+    // `_calcInheritanceInfo` accumulates into `frameSkipped` the set of
+    // in-progress *ancestor* `DeclRef`s that had to be skipped to break a
+    // benevolent equality cycle (its own skips plus any propagated up from the
+    // bases it recursed into).
+    HashSet<DeclRef<Decl>> frameSkipped;
+    auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo, &frameSkipped);
 
-    auto& entry = m_mapDeclRefToInheritanceInfo[declRef];
-    entry.info = info;
-    _collectInheritanceInfoDependencyEpochs(declRef.getDecl(), info, entry.dependencyEpochs);
-    entry.generation = m_nextInheritanceInfoCacheGeneration++;
-    entry.isComputing = false;
+    // This frame *supplies* its own facet, so it resolves any skip that named
+    // it. Remove ourselves from the unresolved set; what remains are ancestors
+    // strictly above us that are still missing.
+    //
+    // Worked example -- `interface IDerived { __constraint A == B; }`:
+    //   * computing `T.A` expands `A == B` and recurses into `T.B`;
+    //   * `T.B` sees `T.A` is in progress, skips the constraint, and reports
+    //     `frameSkipped = {T.A}` -> `T.B` is partial and is NOT cached;
+    //   * back in `T.A`: `frameSkipped = {T.A}` minus self `{T.A}` = {} -> `T.A`
+    //     is complete (the only thing `T.B` omitted was `T.A`, which `T.A`
+    //     already contains) and IS cached;
+    //   * a later root-level query for `T.B` (with `T.A` now cached) skips
+    //     nothing -> complete -> cached.
+    //
+    // The set (rather than a bool) is required for longer cycles: in
+    // `A -> B -> C -> A`, `C` skips `A`, and `B` stays partial (it inherits the
+    // unresolved `{A}`) until the computation unwinds to `A` itself, which is
+    // the only frame that may cache.
+    frameSkipped.remove(declRef);
+    bool isComplete = frameSkipped.getCount() == 0;
+
+    if (isComplete)
+    {
+        auto& entry = m_mapDeclRefToInheritanceInfo[declRef];
+        entry.info = info;
+        _collectInheritanceInfoDependencyEpochs(declRef.getDecl(), info, entry.dependencyEpochs);
+        entry.generation = m_nextInheritanceInfoCacheGeneration++;
+        entry.isComputing = false;
+    }
+    else
+    {
+        // Partial/contextual result: it was computed while an ancestor was still
+        // in progress, so it would wrongly omit that ancestor. Do not cache it;
+        // roll the in-progress entry back to "not computed" so the next
+        // (root-level) query recomputes the complete list, and propagate the
+        // still-unresolved ancestors to our caller.
+        m_mapDeclRefToInheritanceInfo.remove(declRef);
+        if (ioSkippedInProgress)
+            for (auto& k : frameSkipped)
+                ioSkippedInProgress->add(k);
+    }
 
     getSession()->m_typeDictionarySize = Math::Max(
         getSession()->m_typeDictionarySize,
@@ -345,7 +436,8 @@ SubtypeWitness* SharedSemanticsContext::_specializeInterfaceInheritanceWitness(
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     DeclRef<Decl> declRef,
     Type* selfType,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    HashSet<DeclRef<Decl>>* ioSkippedInProgress)
 {
     // This method is the main engine for computing linearized inheritance
     // lists for types and `extension` declarations.
@@ -496,7 +588,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         //
         SLANG_ASSERT(selfIsBaseWitness);
 
-        auto baseInheritanceInfo = getInheritanceInfo(baseType, circularityInfo);
+        auto baseInheritanceInfo =
+            getInheritanceInfo(baseType, circularityInfo, ioSkippedInProgress);
 
         DeclRef<Decl> baseDeclRef;
         if (auto baseDeclRefType = as<DeclRefType>(baseType))
@@ -548,7 +641,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             // own linearized inheritance list will include
             // any transitive based declared on the `extension`.
             //
-            auto extInheritanceInfo = getInheritanceInfo(extDeclRef, circularityInfo);
+            auto extInheritanceInfo =
+                getInheritanceInfo(extDeclRef, circularityInfo, ioSkippedInProgress);
             addDirectBaseFacet(
                 Facet::Kind::Extension,
                 selfType,
@@ -838,7 +932,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
 
         for (auto const& anchor : anchors)
         {
-            auto anchorInheritanceInfo = getInheritanceInfo(anchor.type, circularityInfo);
+            auto anchorInheritanceInfo =
+                getInheritanceInfo(anchor.type, circularityInfo, ioSkippedInProgress);
             for (auto facet : anchorInheritanceInfo.facets)
             {
                 auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>();
@@ -913,6 +1008,34 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     if (baseChain.getCount() > selfChainDepth)
                         continue;
 
+                    // Break *benevolent* equality cycles. An equality such as
+                    // `__constraint A == B` makes `T.A` and `T.B` each a base of
+                    // the other. While computing one of them, the other is still
+                    // in progress (an ancestor on the stack); adding it as a base
+                    // here would put the in-progress type back into the
+                    // linearization and surface as a "cyclic inheritance" error.
+                    //
+                    // Instead we skip the constraint and record the skipped
+                    // in-progress ancestor. The frame that *is* that ancestor
+                    // already contains itself, so it ends up complete (and
+                    // cached); this contextual frame is reported partial (and not
+                    // cached) so a later root-level query -- by which point the
+                    // ancestor is cached -- recomputes the full list. See
+                    // `_getInheritanceInfo`.
+                    //
+                    // This skip is deliberately scoped to constraint-derived
+                    // bases (not the shared `addDirectBaseType` used for ordinary
+                    // `interface` inheritance), so genuinely circular interface
+                    // inheritance (`interface IFoo : IBar {} interface IBar :
+                    // IFoo {}`) is still diagnosed rather than silently accepted.
+                    if (_isInheritanceInfoInProgress(baseType))
+                    {
+                        if (ioSkippedInProgress)
+                            if (auto baseDeclRefType = as<DeclRefType>(baseType))
+                                ioSkippedInProgress->add(baseDeclRefType->getDeclRef());
+                        continue;
+                    }
+
                     auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
                         selfType,
                         baseType,
@@ -945,7 +1068,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 auto extDeclRef =
                     createDefaultSubstitutionsIfNeeded(astBuilder, &visitor, extensionDecl)
                         .as<ExtensionDecl>();
-                auto extInheritanceInfo = getInheritanceInfo(extDeclRef, circularityInfo);
+                auto extInheritanceInfo =
+                    getInheritanceInfo(extDeclRef, circularityInfo, ioSkippedInProgress);
                 addDirectBaseFacet(
                     Facet::Kind::Extension,
                     selfType,
@@ -1651,7 +1775,8 @@ bool FacetList::containsMatchFor(Facet facet) const
 
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     Type* type,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    HashSet<DeclRef<Decl>>* ioSkippedInProgress)
 {
     // The majority of the interesting for for computing linearized
     // inheritance information arises for `DeclRef`s, but we still
@@ -1730,8 +1855,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             List<InheritanceInfo> elementInheritanceInfos;
             for (Index i = 0; i < concreteTypePack->getTypeCount(); i++)
             {
-                elementInheritanceInfos.add(
-                    getInheritanceInfo(concreteTypePack->getElementType(i), circularityInfo));
+                elementInheritanceInfos.add(getInheritanceInfo(
+                    concreteTypePack->getElementType(i),
+                    circularityInfo,
+                    ioSkippedInProgress));
             }
 
             for (auto facet : elementInheritanceInfos[0].facets)
@@ -1789,7 +1916,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     else if (auto eachType = as<EachType>(type))
     {
         auto elementInheritanceInfo =
-            getInheritanceInfo(eachType->getElementType(), circularityInfo);
+            getInheritanceInfo(eachType->getElementType(), circularityInfo, ioSkippedInProgress);
         return projectBaseFacets(
             type,
             elementInheritanceInfo,
@@ -1802,7 +1929,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto firstType = as<FirstPackElementType>(type))
     {
-        auto packInheritanceInfo = getInheritanceInfo(firstType->getBasePack(), circularityInfo);
+        auto packInheritanceInfo =
+            getInheritanceInfo(firstType->getBasePack(), circularityInfo, ioSkippedInProgress);
         return projectBaseFacets(
             type,
             packInheritanceInfo,
@@ -1815,7 +1943,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto lastType = as<LastPackElementType>(type))
     {
-        auto packInheritanceInfo = getInheritanceInfo(lastType->getBasePack(), circularityInfo);
+        auto packInheritanceInfo =
+            getInheritanceInfo(lastType->getBasePack(), circularityInfo, ioSkippedInProgress);
         return projectBaseFacets(
             type,
             packInheritanceInfo,
@@ -1829,7 +1958,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     else if (auto expandType = as<ExpandType>(type))
     {
         auto patternInheritanceInfo =
-            getInheritanceInfo(expandType->getPatternType(), circularityInfo);
+            getInheritanceInfo(expandType->getPatternType(), circularityInfo, ioSkippedInProgress);
         return projectBaseFacets(
             type,
             patternInheritanceInfo,
@@ -1843,7 +1972,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     else if (auto trimFirstType = as<TrimFirstTypePack>(type))
     {
         auto packInheritanceInfo =
-            getInheritanceInfo(trimFirstType->getBasePack(), circularityInfo);
+            getInheritanceInfo(trimFirstType->getBasePack(), circularityInfo, ioSkippedInProgress);
         return projectBaseFacets(
             type,
             packInheritanceInfo,
@@ -1856,7 +1985,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto trimLastType = as<TrimLastTypePack>(type))
     {
-        auto packInheritanceInfo = getInheritanceInfo(trimLastType->getBasePack(), circularityInfo);
+        auto packInheritanceInfo =
+            getInheritanceInfo(trimLastType->getBasePack(), circularityInfo, ioSkippedInProgress);
         return projectBaseFacets(
             type,
             packInheritanceInfo,
@@ -1879,10 +2009,14 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             visitor.createTypeEqualityWitness(type));
         Facet tail = directFacet;
 
-        auto emptyInheritanceInfo =
-            getInheritanceInfo(packBranchType->getEmptyType(), circularityInfo);
-        auto nonEmptyInheritanceInfo =
-            getInheritanceInfo(packBranchType->getNonEmptyType(), circularityInfo);
+        auto emptyInheritanceInfo = getInheritanceInfo(
+            packBranchType->getEmptyType(),
+            circularityInfo,
+            ioSkippedInProgress);
+        auto nonEmptyInheritanceInfo = getInheritanceInfo(
+            packBranchType->getNonEmptyType(),
+            circularityInfo,
+            ioSkippedInProgress);
 
         for (auto emptyFacet : emptyInheritanceInfo.facets)
         {
@@ -1921,7 +2055,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto modifiedType = as<ModifiedType>(type))
     {
-        auto baseInheritanceInfo = _calcInheritanceInfo(modifiedType->getBase(), circularityInfo);
+        auto baseInheritanceInfo =
+            _calcInheritanceInfo(modifiedType->getBase(), circularityInfo, ioSkippedInProgress);
 
         if (modifiedType->findModifier<NoDiffModifierVal>())
         {

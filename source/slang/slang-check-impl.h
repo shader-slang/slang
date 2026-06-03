@@ -842,15 +842,27 @@ public:
 
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker() { return &m_glslBindingOffsetTracker; }
 
-    /// Get the processed inheritance information for `type`, including all its facets
+    /// Get the processed inheritance information for `type`, including all its facets.
+    ///
+    /// `ioSkippedInProgress` is an internal accumulator used to make
+    /// inheritance computation tolerant of *benevolent* cycles introduced by
+    /// equality constraints (e.g. an interface `__constraint A == B`, which
+    /// makes `T.A` and `T.B` mutual bases). When a computation has to skip a
+    /// constraint because its base type is still being computed (an ancestor on
+    /// the call stack), the skipped ancestor's `DeclRef` is recorded here so the
+    /// caller can tell its result is *contextual* (partial) and must not be
+    /// cached. External callers leave it null. See `_getInheritanceInfo` for the
+    /// "skipped-ancestors minus self" completeness rule.
     InheritanceInfo getInheritanceInfo(
         Type* type,
-        InheritanceCircularityInfo* circularityInfo = nullptr);
+        InheritanceCircularityInfo* circularityInfo = nullptr,
+        HashSet<DeclRef<Decl>>* ioSkippedInProgress = nullptr);
 
     /// Get the processed inheritance information for `extension`, including all its facets
     InheritanceInfo getInheritanceInfo(
         DeclRef<ExtensionDecl> const& extension,
-        InheritanceCircularityInfo* circularityInfo = nullptr);
+        InheritanceCircularityInfo* circularityInfo = nullptr,
+        HashSet<DeclRef<Decl>>* ioSkippedInProgress = nullptr);
 
     /// Prevent an unsupported case of
     /// ```
@@ -914,14 +926,24 @@ private:
     InheritanceInfo _getInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
-        InheritanceCircularityInfo* circularityInfo);
+        InheritanceCircularityInfo* circularityInfo,
+        HashSet<DeclRef<Decl>>* ioSkippedInProgress = nullptr);
 
-    InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
+    InheritanceInfo _calcInheritanceInfo(
+        Type* type,
+        InheritanceCircularityInfo* circularityInfo,
+        HashSet<DeclRef<Decl>>* ioSkippedInProgress);
 
     InheritanceInfo _calcInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
-        InheritanceCircularityInfo* circularityInfo);
+        InheritanceCircularityInfo* circularityInfo,
+        HashSet<DeclRef<Decl>>* ioSkippedInProgress);
+
+    /// True if inheritance info for `type` is currently being computed (its
+    /// cache entry is marked in-progress) -- i.e. `type` is an ancestor on the
+    /// current inheritance-computation stack. Used to detect benevolent cycles.
+    bool _isInheritanceInfoInProgress(Type* type);
 
     UInt getDeclExtensionEpoch(Decl* decl) const;
     void bumpDeclExtensionEpoch(Decl* decl);
