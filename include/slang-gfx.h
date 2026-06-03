@@ -83,7 +83,7 @@ enum class StageType
     Callable,
     Amplification,
     Mesh,
-    Node = 16,
+    Node = 15,
     CountOf,
 };
 
