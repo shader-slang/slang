@@ -671,7 +671,8 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             if (compilerType == PassThroughMode::Dxc)
             {
                 // Can support no entry points on DXC because we can build libraries
-                profile = getTargetProgram()->getOptionSet().getProfile();
+                profile = getEffectiveTargetProfile(targetReq, getTargetProgram()->getOptionSet());
+                profile.setStage(Stage::Unknown);
             }
             else
             {
@@ -1390,6 +1391,14 @@ bool CodeGenContext::shouldReportDynamicDispatchSites()
 bool CodeGenContext::shouldTraceCoverage()
 {
     return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::TraceCoverage);
+}
+
+bool CodeGenContext::shouldTraceAnyCoverage()
+{
+    auto& optionSet = getTargetProgram()->getOptionSet();
+    return optionSet.getBoolOption(CompilerOptionName::TraceCoverage) ||
+           optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage) ||
+           optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
 }
 
 bool CodeGenContext::shouldDumpIntermediates()
