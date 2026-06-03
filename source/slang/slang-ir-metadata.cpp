@@ -120,10 +120,27 @@ static void _insertBinding(
 
 static bool _isBindlessResourceHeapGlobalParam(IRInst* inst)
 {
-    if (inst->getOp() != kIROp_GlobalParam)
+    auto globalParam = as<IRGlobalParam>(inst);
+    if (!globalParam)
         return false;
 
-    return inst->findDecoration<IRBindlessResourceHeapDecoration>() != nullptr;
+    auto layoutDecoration = globalParam->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecoration)
+        return false;
+
+    auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+    if (!varLayout)
+        return false;
+
+    if (!varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot))
+        return false;
+
+    // `lowerDynamicResourceHeap` replaces the intrinsic with a synthetic unbounded descriptor-table
+    // global param, so opcode checks alone no longer see the heap after lowering.
+    auto typeLayout = varLayout->getTypeLayout();
+    auto descriptorTableSlotSize =
+        typeLayout ? typeLayout->findSizeAttr(LayoutResourceKind::DescriptorTableSlot) : nullptr;
+    return descriptorTableSlotSize && descriptorTableSlotSize->getSize().isInfinite();
 }
 
 static bool _instUsesBindlessResourceHeap(IRInst* inst)

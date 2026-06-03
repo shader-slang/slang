@@ -89,7 +89,6 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
             bindingIndex);
         builder.addLayoutDecoration(param, varLayout);
         builder.addNameHintDecoration(param, toSlice("__slang_resource_heap"));
-        builder.addDecoration(param, kIROp_BindlessResourceHeapDecoration);
         inst->replaceUsesWith(param);
     }
 }

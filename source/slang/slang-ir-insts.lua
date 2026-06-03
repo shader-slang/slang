@@ -1698,11 +1698,6 @@ local insts = {
 				nameHint = { struct_name = "NameHintDecoration", operands = { { "nameOperand", "IRStringLit" } } },
 			},
 			{
-				bindlessResourceHeap = {
-					struct_name = "BindlessResourceHeapDecoration",
-				},
-			},
-			{
 				PhysicalType = {
 					struct_name = "PhysicalTypeDecoration",
 					min_operands = 1,

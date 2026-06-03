@@ -832,6 +832,5 @@ return {
 	["SubpassLoad"] = 856,
 	["TranslateBase.IdentityRemat"] = 857,
 	["IncrementFunctionCoverageCounter"] = 858,
-	["IncrementBranchCoverageCounter"] = 859,
-	["Decoration.bindlessResourceHeap"] = 860
+	["IncrementBranchCoverageCounter"] = 859
 }
