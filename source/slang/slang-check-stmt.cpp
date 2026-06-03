@@ -685,6 +685,23 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
             }
         }
     }
+    else if (auto invokeExpr = as<InvokeExpr>(stmt->expression))
+    {
+        // Warn when the non-void result of a `[nodiscard]`-attributed function
+        // is discarded at statement level.
+        if (auto calleeDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr))
+        {
+            auto calleeDecl = calleeDeclRefExpr->declRef.getDecl();
+            if (calleeDecl && calleeDecl->hasModifier<NoDiscardAttribute>())
+            {
+                auto resultType = invokeExpr->type.type;
+                if (resultType && !resultType->equals(m_astBuilder->getVoidType()))
+                {
+                    getSink()->diagnose(Diagnostics::DiscardedNodiscardResult{.expr = invokeExpr});
+                }
+            }
+        }
+    }
 }
 
 void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)

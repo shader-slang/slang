@@ -4525,6 +4525,12 @@ attribute_syntax [mutating] : MutatingAttribute;
 __attributeTarget(AccessorDecl)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
 
+/// Marks a function whose return value should not be discarded. The compiler warns
+/// when a call to a `[nodiscard]`-attributed function appears as a statement and its
+/// non-void result is not used. Mirrors C++ `[[nodiscard]]`.
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [nodiscard] : NoDiscardAttribute;
+
 /// @internal
 /// Marks a member function to make `this` argument passed by const reference.
 __attributeTarget(FunctionDeclBase)

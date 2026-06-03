@@ -1385,6 +1385,15 @@ class NonmutatingAttribute : public Attribute
     FIDDLE(...)
 };
 
+// A `[nodiscard]` attribute, which indicates that the result
+// of calling the function should not be discarded.
+//
+FIDDLE()
+class NoDiscardAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 // A `[constref]` attribute, which indicates that the `this` parameter of
 // a member function should be passed by const reference.
 //

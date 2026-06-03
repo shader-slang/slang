@@ -1293,6 +1293,13 @@ warning(
     span { loc = "expr:Expr", message = "result of '==' not used, did you intend '='?" }
 )
 
+warning(
+    "discarded-nodiscard-result",
+    30059,
+    "ignoring return value of function declared with '[nodiscard]' attribute",
+    span { loc = "expr:Expr", message = "the result of this '[nodiscard]' call is being discarded" }
+)
+
 err(
     "expected-a-type",
     30060,
