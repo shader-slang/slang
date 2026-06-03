@@ -3123,6 +3123,14 @@ static Expr* constructDefaultConstructorForType(
     {
         if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
         {
+            // Ensure the struct has reached AttributesChecked before looking
+            // for its synthesized default constructor.  Otherwise, if the
+            // member's struct is defined later in the file and has not yet
+            // been checked, synthesis has not run and `_getDefaultCtor` would
+            // return null -- producing "not enough arguments to call" at the
+            // outer struct's `= {}` site (issue #11095).
+            if (!structDecl->checkState.isBeingChecked())
+                visitor->ensureDecl(structDecl, DeclCheckState::AttributesChecked);
             defaultCtor = _getDefaultCtor(structDecl);
         }
     }
