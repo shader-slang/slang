@@ -15,6 +15,7 @@ The suite is **additive** — it does not replace the hand-written
 **Where to look next:**
 
 - [`INDEX.md`](INDEX.md) — bundle-by-bundle navigation table with per-bundle test counts and links to each bundle's `README.md`.
+- [`_meta/PIPELINE.md`](_meta/PIPELINE.md) — end-to-end pipeline: doc inputs, generation stages, outputs, operator interaction points, and feedback loops into the docs.
 - [`_meta/regenerate.md`](_meta/regenerate.md) — operator workflow.
 - [`_meta/prompts/_common.md`](_meta/prompts/_common.md) — universal rules every generation agent inherits.
 
