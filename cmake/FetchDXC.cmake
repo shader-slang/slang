@@ -478,39 +478,23 @@ endif()
 
 if(_dxc_build_from_source)
     set(_dxc_forwarded_config_args "")
-    if(
-        CMAKE_SYSTEM_NAME STREQUAL "Linux"
-        OR CMAKE_SYSTEM_NAME STREQUAL "Darwin"
-    )
-        # LLVM_ENABLE_WARNINGS=OFF prevents adding warning flags but does not
-        # actively suppress existing ones. Pass -w via CMAKE_*_FLAGS to silence
-        # all compiler warnings from DXC's source.
-        set(_dxc_c_flags "${CMAKE_C_FLAGS}")
-        set(_dxc_cxx_flags "${CMAKE_CXX_FLAGS}")
-        string(APPEND _dxc_c_flags " -w")
-        string(APPEND _dxc_cxx_flags " -w")
-        set(_dxc_forwarded_config_args
-            "-DCMAKE_C_FLAGS=${_dxc_c_flags}"
-            "-DCMAKE_CXX_FLAGS=${_dxc_cxx_flags}"
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        foreach(
+            _dxc_osx_var
+            CMAKE_OSX_ARCHITECTURES
+            CMAKE_OSX_SYSROOT
+            CMAKE_OSX_DEPLOYMENT_TARGET
         )
-        if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-            foreach(
-                _dxc_osx_var
-                CMAKE_OSX_ARCHITECTURES
-                CMAKE_OSX_SYSROOT
-                CMAKE_OSX_DEPLOYMENT_TARGET
-            )
-                if(DEFINED ${_dxc_osx_var} AND NOT "${${_dxc_osx_var}}" STREQUAL "")
-                    set(_dxc_osx_value "${${_dxc_osx_var}}")
-                    string(REPLACE ";" "\\;" _dxc_osx_value "${_dxc_osx_value}")
-                    list(
-                        APPEND
-                        _dxc_forwarded_config_args
-                        "-D${_dxc_osx_var}=${_dxc_osx_value}"
-                    )
-                endif()
-            endforeach()
-        endif()
+            if(DEFINED ${_dxc_osx_var} AND NOT "${${_dxc_osx_var}}" STREQUAL "")
+                set(_dxc_osx_value "${${_dxc_osx_var}}")
+                string(REPLACE ";" "\\;" _dxc_osx_value "${_dxc_osx_value}")
+                list(
+                    APPEND
+                    _dxc_forwarded_config_args
+                    "-D${_dxc_osx_var}=${_dxc_osx_value}"
+                )
+            endif()
+        endforeach()
     endif()
 
     # DXC's build (PredefinedParams.cmake) is designed for a single-config
