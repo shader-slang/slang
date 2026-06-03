@@ -146,3 +146,11 @@ jobs:
           # don't abort the build when ASAN is enabled. No-op for other options.
           ASAN_OPTIONS: detect_leaks=0
         run: cmake --build build --config "$cmake_config"
+
+      # Exercise `cmake --install` for entries that opt in via install_test.
+      # The static-lib build (SLANG_LIB_TYPE=STATIC) used to skip the
+      # install(EXPORT ...) step entirely, so a broken export would not have
+      # been caught by a plain configure+build. See issue #11359.
+      - name: Install Slang (${{ matrix.option }})
+        if: matrix.install_test == 'true' && matrix.windows_only != 'true'
+        run: cmake --install build --config "$cmake_config" --prefix install

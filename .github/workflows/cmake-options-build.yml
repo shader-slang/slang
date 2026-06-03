@@ -177,3 +177,11 @@ jobs:
       - name: Build Slang (${{ matrix.option }})
         if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')
         run: cmake --build build --config "$cmake_config"
+
+      # Exercise `cmake --install` for entries that opt in via install_test.
+      # The static-lib build (SLANG_LIB_TYPE=STATIC) used to skip the
+      # install(EXPORT ...) step entirely, so a broken export would not have
+      # been caught by a plain configure+build. See issue #11359.
+      - name: Install Slang (${{ matrix.option }})
+        if: matrix.install_test == 'true' && (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')
+        run: cmake --install build --config "$cmake_config" --prefix install
