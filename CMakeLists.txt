@@ -203,6 +203,18 @@ advanced_option(
     "Build using system glslang library"
     OFF
 )
+
+# Highest-precedence DXC acquisition path; see docs/building.md
+# (#dxc-acquisition). Hidden unless SLANG_ENABLE_DXIL=ON.
+cmake_dependent_option(
+    SLANG_USE_SYSTEM_DXC
+    "Build using system DXC instead of fetching or building it"
+    OFF
+    "SLANG_ENABLE_DXIL"
+    OFF
+)
+mark_as_advanced(SLANG_USE_SYSTEM_DXC)
+
 if(WIN32)
     set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT ON)
 else()
@@ -556,7 +568,11 @@ if(${SLANG_USE_SYSTEM_GLSLANG})
 endif()
 
 if(SLANG_ENABLE_DXIL)
-    include(FetchDXC)
+    if(SLANG_USE_SYSTEM_DXC)
+        include(SystemDXC)
+    else()
+        include(FetchDXC)
+    endif()
 endif()
 
 add_subdirectory(external)

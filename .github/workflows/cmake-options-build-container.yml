@@ -91,6 +91,10 @@ jobs:
             echo "cmake_config=Debug" >> $GITHUB_ENV
           fi
 
+      - name: Pre-configure step (${{ matrix.option }})
+        if: matrix.pre_configure != '' && matrix.windows_only != 'true'
+        run: ${{ matrix.pre_configure }}
+
       - name: Configure CMake (${{ matrix.option }})
         if: matrix.windows_only != 'true'
         run: |

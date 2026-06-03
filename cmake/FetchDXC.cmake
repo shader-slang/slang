@@ -28,32 +28,14 @@
 #   library_subdir   - Destination for Unix shared libraries (e.g. "lib")
 
 include(FetchContent)
+include(DXCMetadata)
 
-# DXC release metadata.
-#
-# To upgrade DXC:
-#   1. Pick a release tag from
-#      https://github.com/microsoft/DirectXShaderCompiler/releases.
-#   2. Set _dxc_version_tag to that tag.
-#   3. Set _dxc_release_date to the date used in the release asset names:
-#      dxc_<YYYY_MM_DD>.zip and linux_dxc_<YYYY_MM_DD>.x86_64.tar.gz.
-#   4. Resolve the release tag to the source commit used by source builds:
-#      git ls-remote https://github.com/microsoft/DirectXShaderCompiler.git \
-#          "refs/tags/<tag>" "refs/tags/<tag>^{}"
-#      For an annotated tag, use the peeled ^{} hash. Otherwise use the tag hash.
-#   5. Download the Windows zip and Linux tarball, then update the hashes with:
-#      sha256sum dxc_<YYYY_MM_DD>.zip linux_dxc_<YYYY_MM_DD>.x86_64.tar.gz
-#   6. Keep external/slang-rhi/CMakeLists.txt's SLANG_RHI_DXC_URL in sync with
-#      the Windows DXC URL below.
-set(_dxc_version_tag "v1.9.2602")
-set(_dxc_expected_git_commit "21d28f727ad395b59394815ef76012e432f7e4e5")
-set(_dxc_release_date "2026_02_20")
-set(_dxc_windows_sha256
-    "a1e89031421cf3c1fca6627766ab3020ca4f962ac7e2caa7fab2b33a8436151e"
-)
-set(_dxc_linux_sha256
-    "a1d3e3b5e1c5685b3eb27d5e8890e41d87df45def05112a2d6f1a63a931f7d60"
-)
+# Local aliases keep the rest of this file readable.
+set(_dxc_version_tag "${SLANG_DXC_VERSION_TAG}")
+set(_dxc_expected_git_commit "${SLANG_DXC_EXPECTED_GIT_COMMIT}")
+set(_dxc_release_date "${SLANG_DXC_RELEASE_DATE}")
+set(_dxc_windows_sha256 "${SLANG_DXC_WINDOWS_SHA256}")
+set(_dxc_linux_sha256 "${SLANG_DXC_LINUX_SHA256}")
 set(_dxc_windows_url_hash "SHA256=${_dxc_windows_sha256}")
 set(_dxc_linux_url_hash "SHA256=${_dxc_linux_sha256}")
 

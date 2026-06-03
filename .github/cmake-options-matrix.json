@@ -68,6 +68,18 @@
       "option": "SLANG_ENABLE_OPTIX",
       "container_only": "true",
       "extra_cmake_flags": "-DSLANG_ENABLE_CUDA=ON"
+    },
+    {
+      "option": "SLANG_USE_SYSTEM_DXC",
+      "linux_only": "true",
+      "pre_configure": "cmake -P cmake/StageDXCForCI.cmake",
+      "extra_cmake_flags": "-DDXC_ROOT_DIR=${RUNNER_TEMP}/dxc"
+    },
+    {
+      "option": "SLANG_USE_SYSTEM_DXC",
+      "windows_only": "true",
+      "pre_configure": "cmake -P cmake/StageDXCForCI.cmake",
+      "extra_cmake_flags": "-DDXC_ROOT_DIR=${RUNNER_TEMP}/dxc"
     }
   ]
 }
