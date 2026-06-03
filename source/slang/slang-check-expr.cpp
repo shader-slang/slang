@@ -337,11 +337,10 @@ bool isOwnModuleOrIncludedFileScope(ContainerDecl* containerDecl, ModuleDecl* mo
     // the imported surface), or a *foreign* module's `FileDecl` that a plain,
     // non-`__exported` transitive `import` put on the chain (its `parentDecl` is that
     // other module — `import` is non-transitive; only `__exported import` re-exports).
-    // The `parentDecl == moduleDecl` conjunct is load-bearing: dropping it would
-    // re-export those foreign files and make plain `import` transitive. (Plain
-    // transitive `import` is the only way a foreign `FileDecl` reaches this chain; a
-    // `using namespace <module>;` can't, since a module name is not a usable namespace
-    // in `using` and is rejected with `ExpectedANamespace`.)
+    // The `parentDecl == moduleDecl` conjunct is load-bearing: any foreign module's
+    // `FileDecl` that lands on this chain has its `parentDecl` pointing at that other
+    // module, so it is dropped regardless of how it arrived. Dropping the conjunct
+    // would re-export those foreign files and make plain `import` transitive.
     // See shader-slang/slang#11443.
     if (containerDecl == moduleDecl)
         return true;
