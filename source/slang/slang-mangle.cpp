@@ -636,7 +636,7 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
         // generic, not an interface) are unaffected.
         if (auto genConstraintDeclRef = declRef.as<GenericTypeConstraintDecl>())
         {
-            if (as<InterfaceDecl>(genConstraintDeclRef.getDecl()->parentDecl))
+            if (isInterfaceRequirement(genConstraintDeclRef.getDecl()))
             {
                 emitType(context, getSub(context->astBuilder, genConstraintDeclRef));
             }

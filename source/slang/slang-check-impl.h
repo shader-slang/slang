@@ -856,7 +856,7 @@ public:
 
     /// Get the processed inheritance information for `type`, including all its facets.
     ///
-    /// `ioSkippedInProgress` is an internal accumulator used to make
+    /// `ioSkippedIncompleteFacet` is an internal accumulator used to make
     /// inheritance computation tolerant of *benevolent* cycles introduced by
     /// equality constraints (e.g. an interface `__constraint A == B`, which
     /// makes `T.A` and `T.B` mutual bases). When a computation has to skip a
@@ -868,13 +868,13 @@ public:
     InheritanceInfo getInheritanceInfo(
         Type* type,
         InheritanceCircularityInfo* circularityInfo = nullptr,
-        HashSet<DeclRef<Decl>>* ioSkippedInProgress = nullptr);
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet = nullptr);
 
     /// Get the processed inheritance information for `extension`, including all its facets
     InheritanceInfo getInheritanceInfo(
         DeclRef<ExtensionDecl> const& extension,
         InheritanceCircularityInfo* circularityInfo = nullptr,
-        HashSet<DeclRef<Decl>>* ioSkippedInProgress = nullptr);
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet = nullptr);
 
     /// Prevent an unsupported case of
     /// ```
@@ -939,23 +939,23 @@ private:
         DeclRef<Decl> declRef,
         Type* selfType,
         InheritanceCircularityInfo* circularityInfo,
-        HashSet<DeclRef<Decl>>* ioSkippedInProgress = nullptr);
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet = nullptr);
 
     InheritanceInfo _calcInheritanceInfo(
         Type* type,
         InheritanceCircularityInfo* circularityInfo,
-        HashSet<DeclRef<Decl>>* ioSkippedInProgress);
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet);
 
     InheritanceInfo _calcInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
         InheritanceCircularityInfo* circularityInfo,
-        HashSet<DeclRef<Decl>>* ioSkippedInProgress);
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet);
 
     /// True if inheritance info for `type` is currently being computed (its
     /// cache entry is marked in-progress) -- i.e. `type` is an ancestor on the
     /// current inheritance-computation stack. Used to detect benevolent cycles.
-    bool _isInheritanceInfoInProgress(Type* type);
+    bool _isInheritanceInfoBeingComputed(Type* type);
 
     UInt getDeclExtensionEpoch(Decl* decl) const;
     void bumpDeclExtensionEpoch(Decl* decl);
