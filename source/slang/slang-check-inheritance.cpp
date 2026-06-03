@@ -946,20 +946,47 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 for (auto constraintDeclRef :
                      getMembersOfType<GenericTypeConstraintDecl>(astBuilder, interfaceDeclRef))
                 {
+                    auto constraintDecl = constraintDeclRef.getDecl();
+
                     // Skip a constraint that is currently being checked: resolving
                     // a multi-level subject (e.g. `This.TA.TB`) requires the
                     // inheritance of a shallower access (`This.TA`), which can
                     // re-enter this routine. Skipping the in-progress constraint
                     // breaks that cycle; the shallower access does not need the
                     // deeper constraint as one of its bases anyway.
-                    if (constraintDeclRef.getDecl()->checkState.isBeingChecked())
+                    if (constraintDecl->checkState.isBeingChecked())
                         continue;
 
-                    ensureDecl(
-                        &visitor,
-                        constraintDeclRef.getDecl(),
-                        DeclCheckState::CanSpecializeGeneric);
-                    auto constraintDecl = constraintDeclRef.getDecl();
+                    // Do not force-check (`ensureDecl`) an as-yet-unresolved sibling
+                    // constraint from inside an inheritance computation. Resolving its
+                    // subject performs a member lookup that can re-enter the very type
+                    // we are currently computing: e.g. while computing `This.A` we would
+                    // resolve a sibling `__constraint A.C : I`, look up `C` on the
+                    // still-in-progress `A`, and spuriously report "member not found"
+                    // (which also poisons the sibling's subtype). This bites when two
+                    // multi-level constraints share a leading associated type -- the
+                    // first one's check drives the computation of `A`, whose constraint
+                    // scan then trips over the second.
+                    //
+                    // Every interface-level constraint is checked on its own as a direct
+                    // interface member, so here we only need to *observe* those whose
+                    // endpoints are already resolved. An unresolved sibling is skipped
+                    // and the result is reported partial (not cached) -- reusing the
+                    // mechanism that breaks benevolent equality cycles -- so the query
+                    // re-runs once that constraint has been checked. The constraint's
+                    // own `DeclRef` is never the self of an inheritance frame, so it is
+                    // never removed from the skipped set, which keeps every frame up to
+                    // the root from caching until the constraint is resolved. See
+                    // `_getInheritanceInfo`.
+                    if (!constraintDecl->sub.type ||
+                        (constraintDecl->isEqualityConstraint && !constraintDecl->sup.type))
+                    {
+                        if (ioSkippedInProgress)
+                            ioSkippedInProgress->add(constraintDeclRef);
+                        continue;
+                    }
+
+                    ensureDecl(&visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
 
                     // An endpoint denotes `selfType` (anchored at `anchor.type`)
                     // when it is rooted at the interface's `This` and its chain of
