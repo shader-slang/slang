@@ -21,6 +21,7 @@ void main(DispatchNodeInputRecord<RecordData> inputData)
 //CHK: [[StructType:%[a-zA-Z_0-9]+]] = OpTypeStruct [[MemberType]]
 //CHK: [[PayloadType:%[a-zA-Z_0-9]+]] = OpTypeNodePayloadArrayAMDX [[StructType]]
 //CHK: [[PtrType:%[a-zA-Z_0-9]+]] = OpTypePointer NodePayloadAMDX [[PayloadType]]
+//CHK: [[ElemPtrType:%[a-zA-Z_0-9]+]] = OpTypePointer NodePayloadAMDX [[StructType]]
 
 //CHK: ; Function
 //CHK: [[VarName:%[a-zA-Z_0-9]+]] = OpVariable [[PtrType]] NodePayloadAMDX
