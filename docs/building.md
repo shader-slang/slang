@@ -245,7 +245,7 @@ works for any given binary.
 | ------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `SLANG_VERSION`                       | Latest `v*` tag               | The project version, detected using git if available                                                                                     |
 | `SLANG_DXC_BINARY_URL`                | Stable DXC release URL        | URL of the prebuilt DXC binary archive to download; overrides the default release URL and skips GLIBC auto-detection on Linux            |
-| `SLANG_DXC_BUILD_FROM_SOURCE`         | Unset (auto on native Linux x86_64) | `ON`: build DXC from source when supported; `OFF`: use prebuilt when available; unset: auto-select on native Linux x86_64 (see [DXC GLIBC auto-detection](#dxc-glibc-auto-detection)) |
+| `SLANG_DXC_BUILD_FROM_SOURCE`         | Unset (auto on native Linux x86_64; otherwise prebuilt when available) | `ON`: build DXC from source on Windows, Linux, and macOS; `OFF`: use prebuilt when available; unset: auto-select on native Linux x86_64, otherwise use prebuilt when available (see [DXC GLIBC auto-detection](#dxc-glibc-auto-detection)) |
 | `SLANG_EMBED_CORE_MODULE`             | `TRUE`                        | Build slang with an embedded version of the core module                                                                                  |
 | `SLANG_EMBED_CORE_MODULE_SOURCE`      | `TRUE`                        | Embed the core module source in the binary                                                                                               |
 | `SLANG_ENABLE_DXIL`                   | `TRUE`                        | Enable generating DXIL using DXC                                                                                                         |
@@ -285,18 +285,40 @@ provides, or if the requirement or system GLIBC version cannot be detected, DXC
 is built from source instead. Successful detection results are cached in stamp
 files so subsequent reconfigures are fast. For example, if a DXC Linux prebuilt
 requires GLIBC 2.38 and the host provides an older GLIBC, CMake selects the
-source-build path.
+source-build path. On macOS, Microsoft does not publish a prebuilt DXC package;
+set `-DSLANG_DXC_BUILD_FROM_SOURCE=ON` to build DXC locally. The default macOS
+configuration leaves DXC unavailable to avoid the large clone and build cost.
 
-- `ON`: build DXC from source on Windows and Linux; on other platforms, DXC is unavailable.
+```mermaid
+flowchart TD
+    Start["Configure DXC support"] --> BuildFromSource{"SLANG_DXC_BUILD_FROM_SOURCE"}
+    BuildFromSource -->|ON| Source["Build DXC from source"]
+    BuildFromSource -->|OFF| Prebuilt["Use a prebuilt binary when available"]
+    BuildFromSource -->|unset| CustomUrl{"SLANG_DXC_BINARY_URL set?"}
+    CustomUrl -->|yes| CustomPrebuilt["Use custom prebuilt URL and skip GLIBC detection"]
+    CustomUrl -->|no| NativeLinux{"Native Linux x86_64?"}
+    NativeLinux -->|yes| Probe["Download Linux prebuilt and inspect GLIBC requirements"]
+    Probe --> Compatible{"Detected requirements are compatible with host GLIBC?"}
+    Compatible -->|yes| LinuxPrebuilt["Use Linux prebuilt binary"]
+    Compatible -->|no or unknown| Source
+    NativeLinux -->|no| OfficialPrebuilt{"Official prebuilt exists for platform?"}
+    OfficialPrebuilt -->|yes| Prebuilt
+    OfficialPrebuilt -->|no| Unavailable["DXC unavailable unless built from source"]
+```
+
+- `ON`: build DXC from source on Windows, Linux, and macOS; on other platforms, DXC is unavailable.
 - `OFF`: use the prebuilt binary when one is available and skip the GLIBC check; on
-  non-x86_64 Linux, DXC is unavailable unless `SLANG_DXC_BINARY_URL` is set to a
-  custom prebuilt for that architecture.
+  non-x86_64 Linux and macOS, DXC is unavailable unless `SLANG_DXC_BINARY_URL`
+  is set to a custom prebuilt for that architecture/platform.
 - unset on native non-x86_64 Linux (e.g. ARM64): DXC is unavailable because no official prebuilt binary exists; set `ON` to build DXC from source.
+- unset on macOS: DXC is unavailable because no official prebuilt binary exists; set `ON` to build DXC from source.
 - unset while cross-compiling for Linux x86_64: skip GLIBC detection because the target system cannot be probed at configure time.
 
 The source-build path clones DXC plus LLVM/Clang submodules on the first run
 and can take tens of minutes to configure and build; later reconfigures and
 incremental builds use stamp files and build outputs to skip repeated work.
+
+#### Optional backend and test dependencies
 
 The following options relate to optional dependencies for additional backends
 and running additional tests. Left unchanged they are auto detected, however

@@ -25,7 +25,7 @@
 #
 # Requires the following variables to be set by the caller (set in SlangTarget.cmake):
 #   runtime_subdir   - Destination for Windows DLLs (e.g. "bin")
-#   library_subdir   - Destination for Linux .so files (e.g. "lib")
+#   library_subdir   - Destination for Unix shared libraries (e.g. "lib")
 
 include(FetchContent)
 
@@ -62,8 +62,8 @@ function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
 
     # Stage public DXC HLSL headers (e.g. dx/linalg.h) at a stable path so test
     # directives and local `slangc -Xdxc -Ibuild/dxc/include` invocations can
-    # resolve them. Done as a build-graph custom command, matching the DLL/.so
-    # copy pattern below.
+    # resolve them. Done as a build-graph custom command, matching the DXC
+    # runtime copy pattern below.
     if(EXISTS "${dxc_root}/include/hlsl/dx/linalg.h")
         set(_dxc_hlsl_include_dir "${dxc_root}/include/hlsl")
     elseif(EXISTS "${dxc_root}/inc/hlsl/dx/linalg.h")
@@ -117,6 +117,7 @@ if(SLANG_DXC_BUILD_FROM_SOURCE)
     if(
         CMAKE_SYSTEM_NAME STREQUAL "Windows"
         OR CMAKE_SYSTEM_NAME STREQUAL "Linux"
+        OR CMAKE_SYSTEM_NAME STREQUAL "Darwin"
     )
         set(_dxc_build_from_source ON)
     else()
@@ -464,13 +465,42 @@ endif()
 # ---------------------------------------------------------------------------
 
 if(_dxc_build_from_source)
+    set(_dxc_forwarded_config_args "")
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-        set(_dxc_warning_flags "")
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set(_dxc_forwarded_config_args "")
+    elseif(
+        CMAKE_SYSTEM_NAME STREQUAL "Linux"
+        OR CMAKE_SYSTEM_NAME STREQUAL "Darwin"
+    )
         # LLVM_ENABLE_WARNINGS=OFF prevents adding warning flags but does not
         # actively suppress existing ones. Pass -w via CMAKE_*_FLAGS to silence
-        # all GCC/Clang warnings from DXC's source.
-        set(_dxc_warning_flags "-DCMAKE_C_FLAGS=-w" "-DCMAKE_CXX_FLAGS=-w")
+        # all compiler warnings from DXC's source.
+        set(_dxc_c_flags "${CMAKE_C_FLAGS}")
+        set(_dxc_cxx_flags "${CMAKE_CXX_FLAGS}")
+        string(APPEND _dxc_c_flags " -w")
+        string(APPEND _dxc_cxx_flags " -w")
+        set(_dxc_forwarded_config_args
+            "-DCMAKE_C_FLAGS=${_dxc_c_flags}"
+            "-DCMAKE_CXX_FLAGS=${_dxc_cxx_flags}"
+        )
+        if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+            foreach(
+                _dxc_osx_var
+                CMAKE_OSX_ARCHITECTURES
+                CMAKE_OSX_SYSROOT
+                CMAKE_OSX_DEPLOYMENT_TARGET
+            )
+                if(DEFINED ${_dxc_osx_var})
+                    set(_dxc_osx_value "${${_dxc_osx_var}}")
+                    string(REPLACE ";" "\\;" _dxc_osx_value "${_dxc_osx_value}")
+                    list(
+                        APPEND
+                        _dxc_forwarded_config_args
+                        "-D${_dxc_osx_var}=${_dxc_osx_value}"
+                    )
+                endif()
+            endforeach()
+        endif()
     endif()
 
     # DXC's build (PredefinedParams.cmake) is designed for a single-config
@@ -479,12 +509,13 @@ if(_dxc_build_from_source)
     # mirror the parent so the same toolchain is used.
     #
     # LLVM uses CMAKE_CFG_INTDIR (e.g. "." for Ninja, "$(Configuration)" for VS)
-    # to set LLVM_RUNTIME_OUTPUT_INTDIR, so for VS the DLLs land in
-    # <BINARY_DIR>/MinSizeRel/bin/ rather than <BINARY_DIR>/bin/. Track this
-    # in _dxc_dll_subdir so byproducts and copy commands point to the right path.
+    # to set LLVM_RUNTIME_OUTPUT_INTDIR and LLVM_LIBRARY_OUTPUT_INTDIR, so for
+    # multi-config generators the artifacts land under MinSizeRel. Track these
+    # subdirectories so byproducts and copy commands point to the right path.
     if(CMAKE_GENERATOR MATCHES "Ninja")
         set(_dxc_generator_args -G Ninja)
         set(_dxc_dll_subdir "bin")
+        set(_dxc_lib_subdir "lib")
     else()
         set(_dxc_generator_args -G "${CMAKE_GENERATOR}")
         if(CMAKE_GENERATOR_PLATFORM)
@@ -494,6 +525,7 @@ if(_dxc_build_from_source)
             list(APPEND _dxc_generator_args -T "${CMAKE_GENERATOR_TOOLSET}")
         endif()
         set(_dxc_dll_subdir "MinSizeRel/bin")
+        set(_dxc_lib_subdir "MinSizeRel/lib")
     endif()
 
     # Step 1: Clone DXC source at Slang configure time.
@@ -552,13 +584,13 @@ if(_dxc_build_from_source)
 
     # Step 2: Configure DXC at Slang configure time.
     # The stamp content is keyed on resolved source commit, generator, platform,
-    # toolset, and both compilers so that switching any of these invalidates the
-    # cached configure. A SHA256 hash keeps the content short regardless of
-    # lengths.
+    # toolset, both compilers, and forwarded configure arguments so switching any
+    # of these invalidates the cached configure. A SHA256 hash keeps the content
+    # short regardless of lengths.
     string(
         SHA256
         _dxc_config_hash
-        "${_dxc_expected_git_commit}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_PLATFORM}_${CMAKE_GENERATOR_TOOLSET}_${CMAKE_C_COMPILER}_${CMAKE_CXX_COMPILER}"
+        "${_dxc_expected_git_commit}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_PLATFORM}_${CMAKE_GENERATOR_TOOLSET}_${CMAKE_C_COMPILER}_${CMAKE_CXX_COMPILER}_${_dxc_forwarded_config_args}"
     )
     set(_dxc_configure_stamp "${_dxc_build_dir}/.slang_dxc_configured")
     set(_dxc_configure_is_current OFF)
@@ -595,7 +627,8 @@ if(_dxc_build_from_source)
                 # command. Passing it here covers single-config generators (Ninja).
                 -DCMAKE_BUILD_TYPE=MinSizeRel -DHLSL_COPY_GENERATED_SOURCES=OFF
                 -DLLVM_INCLUDE_TESTS=OFF -DCLANG_INCLUDE_TESTS=OFF
-                -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_warning_flags} -Wno-dev
+                -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_forwarded_config_args}
+                -Wno-dev
             RESULT_VARIABLE _dxc_configure_result
             OUTPUT_VARIABLE _dxc_configure_output
             ERROR_VARIABLE _dxc_configure_error
@@ -618,7 +651,7 @@ if(_dxc_build_from_source)
 
     # Step 3: Build DXC at Slang build time.
     # The DXIL validator target is named 'dxildll' in DXC's CMake (it produces
-    # libdxil.so on Linux / dxil.dll on Windows).
+    # dxil.dll on Windows and a shared library on Unix-like systems).
     if(CMAKE_GENERATOR MATCHES "Ninja")
         set(_dxc_build_cmd
             ${CMAKE_COMMAND}
@@ -650,9 +683,17 @@ if(_dxc_build_from_source)
             "${_dxc_build_dir}/${_dxc_dll_subdir}/dxil.dll"
         )
     else()
+        set(_dxc_shared_library_prefix "${CMAKE_SHARED_LIBRARY_PREFIX}")
+        set(_dxc_shared_library_suffix "${CMAKE_SHARED_LIBRARY_SUFFIX}")
+        set(_dxc_dxcompiler_library_name
+            "${_dxc_shared_library_prefix}dxcompiler${_dxc_shared_library_suffix}"
+        )
+        set(_dxc_dxil_library_name
+            "${_dxc_shared_library_prefix}dxil${_dxc_shared_library_suffix}"
+        )
         set(_dxc_src_byproducts
-            "${_dxc_build_dir}/lib/libdxcompiler.so"
-            "${_dxc_build_dir}/lib/libdxil.so"
+            "${_dxc_build_dir}/${_dxc_lib_subdir}/${_dxc_dxcompiler_library_name}"
+            "${_dxc_build_dir}/${_dxc_lib_subdir}/${_dxc_dxil_library_name}"
         )
     endif()
 
@@ -687,9 +728,14 @@ if(_dxc_build_from_source)
         endforeach()
     else()
         foreach(_lib dxcompiler dxil)
-            set(_src "${_dxc_build_dir}/lib/lib${_lib}.so")
+            set(_dxc_shared_library_name
+                "${_dxc_shared_library_prefix}${_lib}${_dxc_shared_library_suffix}"
+            )
+            set(_src
+                "${_dxc_build_dir}/${_dxc_lib_subdir}/${_dxc_shared_library_name}"
+            )
             set(_dst
-                "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/lib${_lib}.so"
+                "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${_dxc_shared_library_name}"
             )
             add_custom_command(
                 OUTPUT "${_dst}"
@@ -804,11 +850,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         add_custom_target(copy-${_dll} DEPENDS "${_dst}")
         set_target_properties(copy-${_dll} PROPERTIES FOLDER generated)
     endforeach()
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+elseif(
+    CMAKE_SYSTEM_NAME STREQUAL "Linux"
+    OR CMAKE_SYSTEM_NAME STREQUAL "Darwin"
+)
+    set(_dxc_shared_library_prefix "${CMAKE_SHARED_LIBRARY_PREFIX}")
+    set(_dxc_shared_library_suffix "${CMAKE_SHARED_LIBRARY_SUFFIX}")
     foreach(_lib dxcompiler dxil)
-        set(_src "${dxc_SOURCE_DIR}/lib/lib${_lib}.so")
+        set(_dxc_shared_library_name
+            "${_dxc_shared_library_prefix}${_lib}${_dxc_shared_library_suffix}"
+        )
+        set(_src "${dxc_SOURCE_DIR}/lib/${_dxc_shared_library_name}")
         set(_dst
-            "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/lib${_lib}.so"
+            "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${_dxc_shared_library_name}"
         )
         add_custom_command(
             OUTPUT "${_dst}"
