@@ -144,7 +144,7 @@ Slang supports the following HLSL feature sets when targeting SPIR-V.
 - mesh shader,
 - tessellation shader,
 - geometry shader,
-- wave intrinsics,
+- wave intrinsics (note: `WaveGetWaveIndex` and `WaveGetNumWaves` are restricted to compute-class execution models — compute, mesh, amplification — because the underlying SPIR-V `BuiltIn SubgroupId` / `NumSubgroups` are spec-restricted to those stages),
 - barriers,
 - atomics,
 - and more

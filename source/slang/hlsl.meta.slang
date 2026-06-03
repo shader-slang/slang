@@ -17144,6 +17144,13 @@ uint WaveGetLaneIndex()
 
 /// Returns the number of waves (subgroups) in the current workgroup.
 /// Equivalent to GLSL gl_NumSubgroups.
+///
+/// **Note**: Restricted to compute-class execution models (compute,
+/// mesh, amplification). Calling from vertex, fragment, geometry,
+/// tessellation, or ray tracing stages is a compile-time error,
+/// because the underlying `gl_NumSubgroups` / `BuiltIn NumSubgroups`
+/// are only declared on compute-class stages by the GLSL / Vulkan
+/// specs.
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
@@ -17153,7 +17160,22 @@ uint WaveGetNumWaves()
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "(gl_NumSubgroups)";
+        // `gl_NumSubgroups` is declared only in `computeSubgroupDecls`
+        // (GLSL `GL_KHR_shader_subgroup_basic`); using it from a
+        // raytracing/fragment/vertex entry point produces invalid
+        // GLSL with the same #11303 root cause.
+        __stage_switch
+        {
+        case compute:
+        case _mesh:
+        case _amplification:
+            __intrinsic_asm "(gl_NumSubgroups)";
+        default:
+            static_assert(
+                false,
+                "WaveGetNumWaves is only supported in compute-class execution models for GLSL");
+            return 0;
+        }
     case spirv:
         // SPIR-V's `BuiltIn NumSubgroups` is restricted to compute-class
         // execution models (GLCompute / MeshEXT / TaskEXT) by
@@ -17177,7 +17199,12 @@ uint WaveGetNumWaves()
             return 0;
         }
     default:
-        // For HLSL/CUDA/Metal/WGSL: compute from workgroup size and wave size
+        // For HLSL/CUDA/Metal/WGSL: compute from workgroup size and wave size.
+        // Mesh/amplification stages on these backends would need
+        // `[require(meshshading)]` to import `WorkgroupSize()`'s mesh
+        // capability — kept compute-only here to preserve the
+        // pre-#11303 capability surface; the SPIR-V arm widens to
+        // mesh/amplification because it bypasses `WorkgroupSize`.
         __stage_switch
         {
         case compute:
@@ -17196,6 +17223,12 @@ uint WaveGetNumWaves()
 
 /// Returns the index of the current wave (subgroup) within the workgroup.
 /// Equivalent to GLSL gl_SubgroupID / Metal simdgroup_index_in_threadgroup.
+///
+/// **Note**: Restricted to compute-class execution models (compute,
+/// mesh, amplification). Calling from vertex, fragment, geometry,
+/// tessellation, or ray tracing stages is a compile-time error,
+/// because the underlying `gl_SubgroupID` / `BuiltIn SubgroupId` are
+/// only declared on compute-class stages by the GLSL / Vulkan specs.
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
@@ -17207,7 +17240,22 @@ uint WaveGetWaveIndex()
     __target_switch
     {
     case glsl:
-        __intrinsic_asm "(gl_SubgroupID)";
+        // `gl_SubgroupID` is declared only in `computeSubgroupDecls`
+        // (GLSL `GL_KHR_shader_subgroup_basic`); using it from a
+        // raytracing/fragment/vertex entry point produces invalid
+        // GLSL with the same #11303 root cause.
+        __stage_switch
+        {
+        case compute:
+        case _mesh:
+        case _amplification:
+            __intrinsic_asm "(gl_SubgroupID)";
+        default:
+            static_assert(
+                false,
+                "WaveGetWaveIndex is only supported in compute-class execution models for GLSL");
+            return 0;
+        }
     case cuda:
         {
             uint3 tid = cudaThreadIdx();
@@ -17249,6 +17297,10 @@ uint WaveGetWaveIndex()
             return 0;
         }
     case hlsl:
+        // Mesh/amplification stages would need `[require(meshshading)]`
+        // here to import `__builtinGroupIndex`'s extra capability —
+        // kept compute-only to preserve the pre-#11303 capability
+        // surface; the SPIR-V arm above widens to mesh/amplification.
         __stage_switch
         {
         case compute:
