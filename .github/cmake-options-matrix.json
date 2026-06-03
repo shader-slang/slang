@@ -2,6 +2,11 @@
   "include": [
     {
       "option": "SLANG_DXC_BUILD_FROM_SOURCE",
+      "value": "ON",
+      "windows_only": "true"
+    },
+    {
+      "option": "SLANG_DXC_BUILD_FROM_SOURCE",
       "value": "OFF"
     },
     { "option": "SLANG_EMBED_CORE_MODULE_SOURCE" },
