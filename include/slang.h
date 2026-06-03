@@ -1176,6 +1176,18 @@ typedef uint32_t SlangSizeT;
                  //   a repeatable hint consumed only when any coverage mode is enabled.
         TraceFunctionCoverage = 148, // bool: insert per-function-entry coverage counters
         TraceBranchCoverage = 149,   // bool: insert per-branch-arm coverage counters
+        // 150 is reserved for CoverageManifestOutput from PR #11336
+        // (feature/shader-coverage-slangc-cli). When that PR lands first this
+        // 64-bit counter PR rebases cleanly; if this PR lands first, #11336
+        // takes the next free ID.
+        TraceCoverageCounterWidth =
+            151, // intValue0: per-slot byte width for the synthesized __slang_coverage
+                 //   buffer. Accepts 4 (uint32) or 8 (uint64). Defaults to 8 when any
+                 //   coverage mode is enabled. Use 4 to opt down to uint32 when the
+                 //   runtime driver lacks 64-bit shader atomic support (notably MoltenVK
+                 //   on Apple Silicon, where Vulkan exposes shaderBufferInt64Atomics =
+                 //   false). uint32 counters wrap silently at 2^32 hits per slot;
+                 //   uint64 counters effectively do not wrap within any practical run.
 
         CountOf,
     };
@@ -4716,6 +4728,17 @@ struct CoverageBufferInfo
     /// `register`, Vulkan `binding`), or -1 if not assigned for
     /// this target.
     int32_t binding = -1;
+
+    /// Byte width of one counter slot in the synthesized buffer.
+    /// `4` when the IR coverage pass synthesizes a
+    /// `RWStructuredBuffer<uint>`, `8` when it synthesizes a
+    /// `RWStructuredBuffer<uint64_t>`. The host must read back
+    /// `getCounterCount() * elementByteWidth` bytes and interpret
+    /// each slot as a little-endian unsigned integer of this
+    /// width. `0` is reserved for "not assigned" and should be
+    /// treated as `4` for compatibility with older outputs that
+    /// did not populate this field.
+    uint32_t elementByteWidth = 4;
 };
 
 struct ICoverageTracingMetadata : public ISlangCastable

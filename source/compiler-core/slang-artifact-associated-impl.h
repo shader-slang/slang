@@ -303,6 +303,12 @@ public:
     // Coverage tracing data, populated by `instrumentCoverage` when
     // `-trace-coverage` is active. Empty otherwise.
     uint32_t m_coverageCounterCount = 0;
+    // Byte width of one counter slot in the synthesized buffer
+    // (`4` for `uint`, `8` for `uint64_t`). Set by
+    // `instrumentCoverage` based on the target's int64-atomic
+    // capability; defaults to `4` so an uninitialized metadata
+    // object surfaces as the historical uint32 layout.
+    uint32_t m_coverageCounterByteWidth = 4;
     List<CoverageTracingEntry> m_coverageEntries;
 
     // Generic compiler-synthesized bindable resources, including

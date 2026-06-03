@@ -36,6 +36,12 @@ uploads, and dispatches 512×512 = 262144 rays from a synthetic camera.
 
 # Compile-time disable coverage instrumentation (baseline):
 ./shader-coverage-bvh-traversal --mode=stress --no-coverage
+
+# Default counter width is 32-bit so the demo runs on MoltenVK out of
+# the box. On desktop Vulkan with `VK_KHR_shader_atomic_int64`, pass
+# `--counter-width=64` to use the wider counters that effectively
+# cannot wrap.
+./shader-coverage-bvh-traversal --mode=stress --counter-width=64
 ```
 
 Each coverage run writes:

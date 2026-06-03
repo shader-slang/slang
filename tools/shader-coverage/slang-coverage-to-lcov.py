@@ -6,18 +6,23 @@ Pipeline:
     1. Compile a shader with:
            slangc shader.slang -trace-coverage ...
        This instruments the shader with a synthesized
-       `RWStructuredBuffer<uint> __slang_coverage`. Counter slots are
-       assigned according to the coverage metadata. The current
-       line/function/branch modes use one direct counter per marker op,
-       but consumers must treat the manifest as authoritative.
+       `RWStructuredBuffer<uint64_t> __slang_coverage` by default, or
+       `RWStructuredBuffer<uint>` when
+       `-trace-coverage-counter-width 32` is passed (e.g. for
+       runtime drivers that lack 64-bit shader atomic add).
+       Counter slots are assigned according to the coverage metadata.
+       The current line/function/branch modes use one direct counter
+       per marker op, but consumers must treat the manifest as
+       authoritative.
     2. Read the `.coverage-mapping.json` sidecar describing each
        source coverage entry's counter/source mapping, or query the
        same data through
        `ICoverageTracingMetadata`.
     3. Dispatch the shader, bound to the coverage buffer at the
        reflected binding reported by the metadata / sidecar.
-    4. Read the UAV back to a binary file of little-endian uint32's,
-       one per counter.
+    4. Read the UAV back to a binary file of little-endian unsigned
+       integers — one per counter, with the byte width given by
+       `manifest.buffer.element_stride` (4 for uint32, 8 for uint64).
     5. Run this script:
            slang-coverage-to-lcov.py \\
                --manifest shader.spv.coverage-mapping.json \\
@@ -25,8 +30,13 @@ Pipeline:
                --output shader.lcov
 
 Supported counter input formats:
-    --counters <file>          Binary: uint32 little-endian * N (default)
+    --counters <file>          Binary: little-endian unsigned ints of
+                               the width reported in the manifest's
+                               `buffer.element_stride` (uint32 or
+                               uint64). Width is auto-detected from
+                               the manifest; no flag needed.
     --counters-text <file>     Text: whitespace-separated decimal ints
+                               (width-agnostic).
     --counters-text -          Text from stdin (handy for piping
                                slang-test output through `grep | awk`)
 
@@ -42,15 +52,31 @@ import struct
 import sys
 
 
-def load_counters_binary(path, count):
+# Map manifest `element_stride` to the `struct` module's little-endian
+# format character. The IR coverage pass synthesizes either a
+# `RWStructuredBuffer<uint>` (4 bytes / "I") or a
+# `RWStructuredBuffer<uint64_t>` (8 bytes / "Q") depending on
+# `-trace-coverage-counter-width`; both produce host buffers of
+# consecutive little-endian unsigned integers of the matching width.
+_STRIDE_TO_STRUCT_CODE = {4: "I", 8: "Q"}
+
+
+def load_counters_binary(path, count, stride):
+    code = _STRIDE_TO_STRUCT_CODE.get(stride)
+    if code is None:
+        sys.exit(
+            f"error: unsupported element_stride {stride} from manifest; "
+            f"slang-coverage-to-lcov.py only handles 4 (uint32) and 8 (uint64)"
+        )
+    needed = count * stride
     with open(path, "rb") as f:
         raw = f.read()
-    if len(raw) < count * 4:
+    if len(raw) < needed:
         sys.exit(
             f"error: counter file '{path}' is {len(raw)} bytes; "
-            f"manifest expects at least {count * 4}"
+            f"manifest expects at least {needed} ({count} slots * {stride} bytes)"
         )
-    return list(struct.unpack(f"<{count}I", raw[: count * 4]))
+    return list(struct.unpack(f"<{count}{code}", raw[:needed]))
 
 
 def load_counters_text(src, count):
@@ -95,6 +121,27 @@ def get_manifest_counter_count(manifest):
     if total < 0:
         sys.exit(f"error: manifest counter count must be non-negative, got {total}")
     return total
+
+
+def get_manifest_element_stride(manifest):
+    # Pull the per-slot byte width from `buffer.element_stride`.
+    # Compilers that predate the
+    # `-trace-coverage-counter-width` flag did not populate this
+    # field; treat its absence as the historical uint32 layout so
+    # this script can still read counters from those older outputs
+    # without forcing a re-compile.
+    buffer = manifest.get("buffer")
+    if not isinstance(buffer, dict):
+        return 4
+    stride = buffer.get("element_stride")
+    if stride is None:
+        return 4
+    parsed = parse_manifest_int(stride, "buffer element_stride")
+    if parsed <= 0:
+        sys.exit(
+            f"error: manifest buffer.element_stride must be positive, got {parsed}"
+        )
+    return parsed
 
 
 def iter_manifest_entries(manifest):
@@ -150,7 +197,12 @@ def main():
         help="path to .coverage-mapping.json (or equivalent JSON built from "
         "ICoverageTracingMetadata)",
     )
-    p.add_argument("--counters", help="binary uint32 little-endian counter buffer")
+    p.add_argument(
+        "--counters",
+        help="binary counter buffer. Each slot is a little-endian unsigned "
+        "integer of the width reported in the manifest's "
+        "`buffer.element_stride` (4 for uint32, 8 for uint64).",
+    )
     p.add_argument(
         "--counters-text", help="whitespace-separated integers (file or '-' for stdin)"
     )
@@ -170,9 +222,12 @@ def main():
         manifest = json.load(f)
 
     total = get_manifest_counter_count(manifest)
+    stride = get_manifest_element_stride(manifest)
     if args.counters:
-        counters = load_counters_binary(args.counters, total)
+        counters = load_counters_binary(args.counters, total, stride)
     else:
+        # Text mode is width-agnostic: the values are already decimal
+        # ints, so the manifest stride is informational only.
         counters = load_counters_text(args.counters_text, total)
 
     # Aggregate by (file, line). Multiple counter slots may map to the

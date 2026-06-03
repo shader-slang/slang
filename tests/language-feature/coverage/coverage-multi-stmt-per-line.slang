@@ -20,6 +20,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // The three statements on one source line must each produce a distinct
 // atomic add on a distinct slot. If the compiler dedupes back to
 // (file, line), slots 2 and 3 here would disappear.
-//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
-//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}
-//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(3\)}}
+//CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(1\)}}
+//CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(2\)}}
+//CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(3\)}}

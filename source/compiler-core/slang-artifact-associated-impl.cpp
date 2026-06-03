@@ -447,6 +447,17 @@ SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* o
             break;
         }
     }
+
+    // Optional tail field: write the per-slot byte width only if the
+    // caller's `CoverageBufferInfo` is large enough to receive it.
+    // Older callers (smaller `structSize`) see no field; their
+    // pre-existing default of `4` from the struct's in-class
+    // initializer continues to apply at the caller side.
+    if (outInfo->structSize >=
+        offsetof(slang::CoverageBufferInfo, elementByteWidth) + sizeof(outInfo->elementByteWidth))
+    {
+        outInfo->elementByteWidth = m_coverageCounterByteWidth;
+    }
     return SLANG_OK;
 }
 

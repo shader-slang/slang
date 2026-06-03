@@ -2,6 +2,7 @@
 
 import json
 import pathlib
+import struct
 import subprocess
 import sys
 import tempfile
@@ -30,6 +31,33 @@ class SlangCoverageToLcovTests(unittest.TestCase):
                     "shader_coverage",
                 ],
                 input=counters_text,
+                capture_output=True,
+                text=True,
+                check=check,
+            )
+
+    def run_converter_binary(self, manifest, counter_bytes, check=True):
+        # Mirror `run_converter` but exercise the binary `--counters`
+        # path, which is the one that has to honor the manifest's
+        # `buffer.element_stride`.
+        with tempfile.TemporaryDirectory() as td:
+            td_path = pathlib.Path(td)
+            manifest_path = td_path / "shader.coverage-mapping.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            counters_path = td_path / "shader.counters.bin"
+            counters_path.write_bytes(counter_bytes)
+
+            return subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--manifest",
+                    str(manifest_path),
+                    "--counters",
+                    str(counters_path),
+                    "--test-name",
+                    "shader_coverage",
+                ],
                 capture_output=True,
                 text=True,
                 check=check,
@@ -679,6 +707,95 @@ class SlangCoverageToLcovTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("error: invalid v2 entry in manifest", result.stderr)
+
+    def test_binary_counters_uint32_stride(self):
+        # element_stride=4 is the legacy / opt-down width; verify the
+        # converter unpacks the buffer as little-endian uint32 and
+        # propagates the values into the LCOV output unchanged.
+        manifest = {
+            "version": 2,
+            "counter_count": 2,
+            "buffer": {
+                "name": "__slang_coverage",
+                "element_type": "uint32",
+                "element_stride": 4,
+            },
+            "entries": [
+                {"kind": "line", "counter": 0, "file": "shader.slang", "line": 10},
+                {"kind": "line", "counter": 1, "file": "shader.slang", "line": 11},
+            ],
+        }
+        counters = struct.pack("<2I", 7, 13)
+
+        result = self.run_converter_binary(manifest, counters)
+
+        self.assertIn("DA:10,7\n", result.stdout)
+        self.assertIn("DA:11,13\n", result.stdout)
+        self.assertEqual(result.stderr, "")
+
+    def test_binary_counters_uint64_stride(self):
+        # element_stride=8 is the default. The value chosen below
+        # (2^33 + 1 = 8589934593) cannot be represented in uint32, so
+        # a regression to the old `<NI` unpack format would either
+        # truncate it to 1 or fail with a buffer-size mismatch.
+        big = (1 << 33) + 1
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "buffer": {
+                "name": "__slang_coverage",
+                "element_type": "uint64",
+                "element_stride": 8,
+            },
+            "entries": [
+                {"kind": "line", "counter": 0, "file": "shader.slang", "line": 42},
+            ],
+        }
+        counters = struct.pack("<Q", big)
+
+        result = self.run_converter_binary(manifest, counters)
+
+        self.assertIn(f"DA:42,{big}\n", result.stdout)
+        self.assertEqual(result.stderr, "")
+
+    def test_binary_counters_default_stride_is_uint32(self):
+        # Older slang outputs predate the `element_stride` field. Treat
+        # the absence of `buffer.element_stride` as the historical
+        # uint32 layout so older manifest/buffer pairs still convert.
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "buffer": {"name": "__slang_coverage"},
+            "entries": [
+                {"kind": "line", "counter": 0, "file": "shader.slang", "line": 5},
+            ],
+        }
+        counters = struct.pack("<I", 99)
+
+        result = self.run_converter_binary(manifest, counters)
+
+        self.assertIn("DA:5,99\n", result.stdout)
+        self.assertEqual(result.stderr, "")
+
+    def test_binary_counters_unsupported_stride_errors(self):
+        # The converter only handles 4-byte and 8-byte counters today.
+        # A 2-byte / 16-byte stride must produce a clear error rather
+        # than silently feeding garbage through the `struct` module.
+        manifest = {
+            "version": 2,
+            "counter_count": 1,
+            "buffer": {
+                "name": "__slang_coverage",
+                "element_stride": 2,
+            },
+            "entries": [
+                {"kind": "line", "counter": 0, "file": "shader.slang", "line": 5},
+            ],
+        }
+        result = self.run_converter_binary(manifest, b"\x00\x00", check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsupported element_stride 2", result.stderr)
 
 
 if __name__ == "__main__":

@@ -4796,6 +4796,16 @@ warning(
     "`-trace-coverage-reserved-space` does not apply to this target; ignoring reserved spaces"
 )
 
+-- 45108..45112 are reserved for the slangc coverage CLI PR
+-- (#11336, feature/shader-coverage-slangc-cli). Picking 45113 here so the
+-- two PRs rebase cleanly regardless of merge order.
+err(
+    "coverage-counter-width-invalid",
+    45113,
+    "`-trace-coverage-counter-width` value is invalid",
+    span { loc = "location", message = "option `-trace-coverage-counter-width` accepts only `32` or `64`, but got `~parsedValue:Int`. uint64 (the default) effectively cannot wrap; uint32 wraps silently at 2^32 hits per slot but is needed when the runtime driver does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon)." }
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(

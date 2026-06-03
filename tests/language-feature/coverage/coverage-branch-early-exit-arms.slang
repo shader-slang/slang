@@ -52,15 +52,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //   - break if true/false
 //   - return if true/false
 //CPP: RWStructuredBuffer{{.*}}_slang_coverage
-//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(0\)}}
-//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
-//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}
-//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(3\)}}
-//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(4\)}}
-//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(5\)}}
-//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(6\)}}
-//CPP-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(7\)}}
-//CPP-NOT: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(8\)}}
+//CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(0\)}}
+//CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(1\)}}
+//CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(2\)}}
+//CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(3\)}}
+//CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(4\)}}
+//CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(5\)}}
+//CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(6\)}}
+//CPP-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(7\)}}
+//CPP-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(8\)}}
 
 //HLSL: _slang_coverage
 //HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(0\)}}

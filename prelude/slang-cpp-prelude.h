@@ -339,6 +339,9 @@ public:                                                                         
 static_assert(
     sizeof(long) == 4,
     "_InterlockedExchangeAdd uses `long`; MSVC LLP64 requires sizeof(long)==4");
+static_assert(
+    sizeof(long long) == 8,
+    "_InterlockedExchangeAdd64 uses `long long`; expected 8-byte width");
 static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
 {
     // Returns the PRIOR value, matching HLSL InterlockedAdd and GLSL atomicAdd.
@@ -350,12 +353,32 @@ static inline int32_t _slang_atomic_add_i32(int32_t* ptr, int32_t val)
     return static_cast<int32_t>(
         _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(ptr), static_cast<long>(val)));
 }
+static inline uint64_t _slang_atomic_add_u64(uint64_t* ptr, uint64_t val)
+{
+    return static_cast<uint64_t>(_InterlockedExchangeAdd64(
+        reinterpret_cast<volatile long long*>(ptr),
+        static_cast<long long>(val)));
+}
+static inline int64_t _slang_atomic_add_i64(int64_t* ptr, int64_t val)
+{
+    return static_cast<int64_t>(_InterlockedExchangeAdd64(
+        reinterpret_cast<volatile long long*>(ptr),
+        static_cast<long long>(val)));
+}
 #elif SLANG_GCC || SLANG_CLANG
 static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
 {
     return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
 }
 static inline int32_t _slang_atomic_add_i32(int32_t* ptr, int32_t val)
+{
+    return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
+}
+static inline uint64_t _slang_atomic_add_u64(uint64_t* ptr, uint64_t val)
+{
+    return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
+}
+static inline int64_t _slang_atomic_add_i64(int64_t* ptr, int64_t val)
 {
     return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
 }
@@ -373,6 +396,18 @@ static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
 static inline int32_t _slang_atomic_add_i32(int32_t* ptr, int32_t val)
 {
     int32_t old = *ptr;
+    *ptr = old + val;
+    return old;
+}
+static inline uint64_t _slang_atomic_add_u64(uint64_t* ptr, uint64_t val)
+{
+    uint64_t old = *ptr;
+    *ptr = old + val;
+    return old;
+}
+static inline int64_t _slang_atomic_add_i64(int64_t* ptr, int64_t val)
+{
+    int64_t old = *ptr;
     *ptr = old + val;
     return old;
 }

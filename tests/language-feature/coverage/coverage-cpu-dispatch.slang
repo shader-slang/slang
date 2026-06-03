@@ -33,4 +33,4 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // Counter increments happen against the coverage buffer accessed via
 // globalParams — confirms the IR pass found and rewrote correctly.
-//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage
+//CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage

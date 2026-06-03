@@ -14,9 +14,6 @@
 
 #include "vk_compute_demo.h"
 
-#include <slang-com-ptr.h>
-#include <slang.h>
-
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -26,6 +23,8 @@
 #include <iostream>
 #include <map>
 #include <random>
+#include <slang-com-ptr.h>
+#include <slang.h>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -90,7 +89,12 @@ struct CompiledShader
 // Compile pipeline.slang to SPIR-V plus optional coverage metadata.
 // `enableCoverage` toggles the `-trace-coverage*` flags so the same
 // binary can produce a baseline (uncovered) timing measurement.
-CompiledShader compileShader(bool enableCoverage)
+// `counterWidthBits` is forwarded to `-trace-coverage-counter-width`
+// when coverage is enabled; valid values are 32 and 64. The default
+// (64) is correct on any Vulkan driver that supports
+// `VK_KHR_shader_atomic_int64`; pass 32 on runtimes that do not
+// (most notably MoltenVK on Apple Silicon as of MoltenVK 1.4).
+CompiledShader compileShader(bool enableCoverage, int counterWidthBits)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     checkSlang(slang::createGlobalSession(globalSession.writeRef()), "createGlobalSession");
@@ -100,7 +104,8 @@ CompiledShader compileShader(bool enableCoverage)
     targetDesc.profile = globalSession->findProfile("spirv_1_5");
 
     std::vector<slang::CompilerOptionEntry> options;
-    auto pushBool = [&](slang::CompilerOptionName name) {
+    auto pushBool = [&](slang::CompilerOptionName name)
+    {
         slang::CompilerOptionEntry e = {};
         e.name = name;
         e.value.kind = slang::CompilerOptionValueKind::Int;
@@ -120,6 +125,15 @@ CompiledShader compileShader(bool enableCoverage)
         pin.value.intValue0 = kCoverageBinding;
         pin.value.intValue1 = kCoverageSet;
         options.push_back(pin);
+
+        // Forward the counter-width selection. The slangc CLI parser
+        // converts `-trace-coverage-counter-width <bits>` to a byte
+        // width (4 or 8); the API option matches that convention.
+        slang::CompilerOptionEntry widthOpt = {};
+        widthOpt.name = slang::CompilerOptionName::TraceCoverageCounterWidth;
+        widthOpt.value.kind = slang::CompilerOptionValueKind::Int;
+        widthOpt.value.intValue0 = counterWidthBits / 8;
+        options.push_back(widthOpt);
     }
 
     const std::string searchPath = getDemoDirectory().string();
@@ -145,13 +159,16 @@ CompiledShader compileShader(bool enableCoverage)
     ComPtr<slang::IModule> module(loaded);
 
     ComPtr<slang::IEntryPoint> entryPoint;
-    checkSlang(module->findEntryPointByName("computeMain", entryPoint.writeRef()), "findEntryPointByName");
+    checkSlang(
+        module->findEntryPointByName("computeMain", entryPoint.writeRef()),
+        "findEntryPointByName");
 
     slang::IComponentType* parts[] = {module.get(), entryPoint.get()};
     ComPtr<slang::IComponentType> composed;
     diagnostics.setNull();
     checkSlang(
-        session->createCompositeComponentType(parts, 2, composed.writeRef(), diagnostics.writeRef()),
+        session
+            ->createCompositeComponentType(parts, 2, composed.writeRef(), diagnostics.writeRef()),
         "createCompositeComponentType");
     diagnoseIfNeeded(diagnostics);
 
@@ -162,7 +179,9 @@ CompiledShader compileShader(bool enableCoverage)
 
     ComPtr<slang::IBlob> code;
     diagnostics.setNull();
-    checkSlang(linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef()), "getEntryPointCode");
+    checkSlang(
+        linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef()),
+        "getEntryPointCode");
     diagnoseIfNeeded(diagnostics);
 
     CompiledShader out;
@@ -284,17 +303,20 @@ void writeManifest(slang::ICoverageTracingMetadata* coverage, const std::filesys
         (std::streamsize)manifestBlob->getBufferSize());
 }
 
-void writeCountersBinary(const std::vector<uint32_t>& hits, const std::filesystem::path& path)
+void writeCountersBinary(const std::vector<uint8_t>& rawBytes, const std::filesystem::path& path)
 {
+    // The host file mirrors the on-GPU memory layout exactly: N
+    // little-endian unsigned integers, each of byte width
+    // `manifest.buffer.element_stride`. Downstream tools (the LCOV
+    // converter, the HTML renderer, slang-rhi consumers) read both
+    // the manifest and this file as a pair.
     std::ofstream out(path, std::ios::binary);
-    out.write(
-        reinterpret_cast<const char*>(hits.data()),
-        (std::streamsize)(hits.size() * sizeof(uint32_t)));
+    out.write(reinterpret_cast<const char*>(rawBytes.data()), (std::streamsize)rawBytes.size());
 }
 
 void writeLcov(
     slang::ICoverageTracingMetadata* coverage,
-    const std::vector<uint32_t>& hits,
+    const std::vector<uint64_t>& hits,
     const std::filesystem::path& path,
     const char* testName)
 {
@@ -332,7 +354,7 @@ struct CoverageSummary
 
 CoverageSummary summarize(
     slang::ICoverageTracingMetadata* coverage,
-    const std::vector<uint32_t>& hits)
+    const std::vector<uint64_t>& hits)
 {
     CoverageSummary s = {};
     const uint32_t n = coverage->getCounterCount();
@@ -346,15 +368,18 @@ CoverageSummary summarize(
         {
         case slang::CoverageEntryKind::Line:
             ++s.lineTotal;
-            if (covered) ++s.lineCovered;
+            if (covered)
+                ++s.lineCovered;
             break;
         case slang::CoverageEntryKind::Function:
             ++s.functionTotal;
-            if (covered) ++s.functionCovered;
+            if (covered)
+                ++s.functionCovered;
             break;
         case slang::CoverageEntryKind::Branch:
             ++s.branchTotal;
-            if (covered) ++s.branchCovered;
+            if (covered)
+                ++s.branchCovered;
             break;
         default:
             break;
@@ -377,25 +402,55 @@ int main(int argc, char** argv)
 {
     std::string mode = "smoke";
     bool enableCoverage = true;
+    // 32 by default so the demo runs on MoltenVK out of the box.
+    // Pass `--counter-width=64` on any Vulkan driver that supports
+    // `VK_KHR_shader_atomic_int64` to exercise the wider counters.
+    int counterWidthBits = 32;
     for (int i = 1; i < argc; ++i)
     {
         std::string_view a = argv[i];
-        if (a == "--mode=smoke") mode = "smoke";
-        else if (a == "--mode=exhaustive") mode = "exhaustive";
-        else if (a == "--no-coverage") enableCoverage = false;
-        else if (a == "--coverage") enableCoverage = true;
-        else { std::cerr << "unknown arg: " << a << "\n"; return 1; }
+        if (a == "--mode=smoke")
+            mode = "smoke";
+        else if (a == "--mode=exhaustive")
+            mode = "exhaustive";
+        else if (a == "--no-coverage")
+            enableCoverage = false;
+        else if (a == "--coverage")
+            enableCoverage = true;
+        else if (a == "--counter-width=32")
+            counterWidthBits = 32;
+        else if (a == "--counter-width=64")
+            counterWidthBits = 64;
+        else
+        {
+            std::cerr << "unknown arg: " << a << "\n";
+            return 1;
+        }
     }
 
     std::cout << "compiling pipeline.slang"
-              << (enableCoverage ? " (coverage on)\n" : " (no coverage)\n");
-    auto shader = compileShader(enableCoverage);
+              << (enableCoverage ? " (coverage on, " : " (no coverage")
+              << (enableCoverage ? (std::to_string(counterWidthBits) + "-bit counters)\n") : ")\n");
+    auto shader = compileShader(enableCoverage, counterWidthBits);
 
     uint32_t counterCount = 0;
+    uint32_t counterByteWidth = 4;
     if (enableCoverage)
     {
         counterCount = shader.coverageMetadata->getCounterCount();
-        std::cout << "coverage counter count: " << counterCount << "\n";
+        // Match the GPU-side buffer's per-slot byte width to whatever
+        // the compiler synthesized. The default is uint64 (8); the
+        // `-trace-coverage-counter-width 32` opt-down produces uint32
+        // (4). Either way the host must allocate and read back the
+        // matching layout.
+        slang::CoverageBufferInfo bufferInfo = {};
+        if (SLANG_SUCCEEDED(shader.coverageMetadata->getBufferInfo(&bufferInfo)) &&
+            bufferInfo.elementByteWidth != 0)
+        {
+            counterByteWidth = bufferInfo.elementByteWidth;
+        }
+        std::cout << "coverage counter count: " << counterCount << " (" << (counterByteWidth * 8)
+                  << "-bit slots)\n";
     }
 
     vkdemo::Context ctx;
@@ -404,7 +459,8 @@ int main(int argc, char** argv)
     // Application bindings at set=0; coverage at set=kCoverageSet binding=kCoverageBinding.
     std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings;
     setBindings.resize(2);
-    auto pushBinding = [](std::vector<VkDescriptorSetLayoutBinding>& v, uint32_t b) {
+    auto pushBinding = [](std::vector<VkDescriptorSetLayoutBinding>& v, uint32_t b)
+    {
         VkDescriptorSetLayoutBinding lb = {};
         lb.binding = b;
         lb.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -412,36 +468,37 @@ int main(int argc, char** argv)
         lb.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
         v.push_back(lb);
     };
-    pushBinding(setBindings[0], 0);  // inputImage
-    pushBinding(setBindings[0], 1);  // outputImage
-    pushBinding(setBindings[0], 2);  // paramsBuffer
+    pushBinding(setBindings[0], 0); // inputImage
+    pushBinding(setBindings[0], 1); // outputImage
+    pushBinding(setBindings[0], 2); // paramsBuffer
     if (enableCoverage)
     {
-        pushBinding(setBindings[1], kCoverageBinding);  // coverage buffer
+        pushBinding(setBindings[1], kCoverageBinding); // coverage buffer
     }
     else
     {
-        setBindings.pop_back();  // no coverage set
+        setBindings.pop_back(); // no coverage set
     }
 
     // Slang's SPIR-V emit renames the entry point to "main" by default.
-    auto pipe = ctx.createComputePipeline(
-        shader.spirv.data(),
-        shader.spirv.size(),
-        setBindings,
-        "main");
+    auto pipe =
+        ctx.createComputePipeline(shader.spirv.data(), shader.spirv.size(), setBindings, "main");
 
     const auto image = generateTestImage(kImageWidth, kImageHeight);
-    auto inputBuf = ctx.createBuffer(image.size() * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    auto inputBuf =
+        ctx.createBuffer(image.size() * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     ctx.upload(inputBuf, image.data(), inputBuf.size);
-    auto outputBuf = ctx.createBuffer(image.size() * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    auto outputBuf =
+        ctx.createBuffer(image.size() * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     auto paramsBuf = ctx.createBuffer(sizeof(PipelineParams), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
     vkdemo::Buffer coverageBuf = {};
     if (enableCoverage)
     {
-        coverageBuf = ctx.createBuffer(counterCount * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        std::vector<uint32_t> zero(counterCount, 0u);
+        coverageBuf = ctx.createBuffer(
+            (size_t)counterCount * counterByteWidth,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        std::vector<uint8_t> zero((size_t)counterCount * counterByteWidth, 0u);
         ctx.upload(coverageBuf, zero.data(), coverageBuf.size);
     }
 
@@ -481,9 +538,9 @@ int main(int argc, char** argv)
         ctx.dispatch(pipe, sets, groupsX, groupsY, 1);
     }
     const auto renderEnd = std::chrono::steady_clock::now();
-    const double renderMs = std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
-    std::cout << "render wall time: " << renderMs << " ms ("
-              << configs.size() << " dispatches, "
+    const double renderMs =
+        std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
+    std::cout << "render wall time: " << renderMs << " ms (" << configs.size() << " dispatches, "
               << (renderMs / configs.size()) << " ms/dispatch)\n";
 
     if (!enableCoverage)
@@ -496,17 +553,34 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    std::vector<uint32_t> hits(counterCount);
-    ctx.download(coverageBuf, hits.data(), coverageBuf.size);
+    // Read the GPU buffer back as raw bytes, then widen each slot to
+    // a uint64_t so the summary/LCOV writers don't have to care about
+    // the on-GPU width. The host file (`<mode>.counters.bin`) is
+    // written out at the original byte width so downstream tools that
+    // consume the manifest's `element_stride` see consistent layout.
+    std::vector<uint8_t> rawBytes((size_t)counterCount * counterByteWidth);
+    ctx.download(coverageBuf, rawBytes.data(), coverageBuf.size);
+    std::vector<uint64_t> hits(counterCount, 0);
+    for (uint32_t i = 0; i < counterCount; ++i)
+    {
+        uint64_t value = 0;
+        const uint8_t* slot = rawBytes.data() + (size_t)i * counterByteWidth;
+        for (uint32_t b = 0; b < counterByteWidth; ++b)
+            value |= (uint64_t)slot[b] << (b * 8);
+        hits[i] = value;
+    }
 
     auto summary = summarize(shader.coverageMetadata, hits);
     printSummary(mode.c_str(), summary);
 
     const auto outDir = getDemoDirectory();
     writeManifest(shader.coverageMetadata, outDir / (mode + ".coverage-mapping.json"));
-    writeLcov(shader.coverageMetadata, hits, outDir / (mode + ".lcov"),
-              ("image-pipeline-" + mode).c_str());
-    writeCountersBinary(hits, outDir / (mode + ".counters.bin"));
+    writeLcov(
+        shader.coverageMetadata,
+        hits,
+        outDir / (mode + ".lcov"),
+        ("image-pipeline-" + mode).c_str());
+    writeCountersBinary(rawBytes, outDir / (mode + ".counters.bin"));
     std::cout << "wrote " << (outDir / (mode + ".coverage-mapping.json")) << "\n";
     std::cout << "wrote " << (outDir / (mode + ".lcov")) << "\n";
     std::cout << "wrote " << (outDir / (mode + ".counters.bin")) << "\n";

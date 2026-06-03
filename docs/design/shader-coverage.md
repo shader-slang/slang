@@ -15,8 +15,9 @@ Shader coverage has two separate jobs:
 
 These are handled by two different mechanisms:
 
-- IR-time synthesis of `RWStructuredBuffer<uint> __slang_coverage`
-  in the `slang-ir-coverage-instrument` pass
+- IR-time synthesis of `RWStructuredBuffer<uint64_t> __slang_coverage`
+  (or `RWStructuredBuffer<uint>` under `-trace-coverage-counter-width
+  32`) in the `slang-ir-coverage-instrument` pass
 - post-emit metadata exposed as `ICoverageTracingMetadata` for
   today's source-entry attribution view and
   `ISyntheticResourceMetadata` for hidden resource binding
@@ -139,7 +140,11 @@ counters are inserted, with examples, see
    before `collectGlobalUniformParameters` packs globals into the
    `GlobalParams` struct. The pass:
    - **Synthesizes the coverage buffer** as a fresh `IRGlobalParam`
-     of type `RWStructuredBuffer<uint>`, with a target-aware layout:
+     of type `RWStructuredBuffer<uint64_t>` by default, or
+     `RWStructuredBuffer<uint>` when the user passes
+     `-trace-coverage-counter-width 32`. See the "Counter element
+     width" section below for the tradeoff. The buffer carries a
+     target-aware layout:
      `UnorderedAccess` for D3D-style targets, `MetalBuffer` for
      Metal, `DescriptorTableSlot` for Khronos / SPIR-V / GLSL. For
      CPU and CUDA targets it additionally reports `Uniform` size,
@@ -194,16 +199,64 @@ counters are inserted, with examples, see
      `entry.file == nullptr` / `entry.line == 0` after `getEntryInfo`.
 
 3. **Emission.** Each backend already handles `kIROp_AtomicAdd` on
-   `RWStructuredBuffer<uint>`:
-   - HLSL/DXIL → `InterlockedAdd`
-   - SPIR-V → `OpAtomicIAdd`
+   the synthesized buffer. The exact spelling shifts with the chosen
+   counter width (see "Counter element width" below); both 32-bit
+   and 64-bit forms reduce to the backend's native atomic-add
+   intrinsic:
+   - HLSL/DXIL → `InterlockedAdd` (DXC SM6.6 has a `uint64_t`
+     overload; SM5.x / SM6.0–6.5 require uint32).
+   - SPIR-V → `OpAtomicIAdd`. The emitter auto-declares
+     `OpCapability Int64Atomics` whenever the atomic op operates on a
+     64-bit integer pointer.
    - GLSL → `atomicAdd`
-   - Metal → Metal atomic builtins
+   - Metal → Metal atomic builtins (`atomic_fetch_add_explicit` on
+     `atomic_uint` / `atomic_ulong`).
    - WGSL / LLVM-emitted CPU targets → not reached today; coverage
      instrumentation is skipped before rewrite for these targets
-   - CUDA → `atomicAdd`
-   - CPU source → `_slang_atomic_add_u32` prelude helper (GCC/Clang
-     `__atomic_fetch_add`, MSVC `_InterlockedExchangeAdd`)
+   - CUDA → `atomicAdd((unsigned long long*)..., 1ULL)` for uint64
+     slots; `atomicAdd((unsigned*)..., 1U)` for uint32.
+   - CPU source → `_slang_atomic_add_u64` / `_slang_atomic_add_u32`
+     prelude helpers (GCC/Clang `__atomic_fetch_add`, MSVC
+     `_InterlockedExchangeAdd64` / `_InterlockedExchangeAdd`)
+
+Counter element width
+---------------------
+
+The synthesized `__slang_coverage` buffer's element width is
+controlled by `-trace-coverage-counter-width <bits>`:
+
+- `64` (default) — `RWStructuredBuffer<uint64_t>`. A single counter
+  can absorb ~1.84e19 increments before wrapping; in practice this
+  is unreachable within any process lifetime.
+- `32` — `RWStructuredBuffer<uint>`. A single counter wraps silently
+  at 2^32 (~4.3e9) increments. Use this only when the runtime driver
+  does not support 64-bit shader atomic add.
+
+The compiler cannot see the runtime driver and therefore cannot
+auto-pick the width on the customer's behalf. Two cases where 32-bit
+is the right choice:
+
+- **MoltenVK on Apple Silicon** (as of MoltenVK 1.4) reports
+  `shaderBufferInt64Atomics = false` and does not expose
+  `VK_KHR_shader_atomic_int64`. SPIR-V compiled at the 64-bit
+  default fails at `vkCreateShaderModule` / pipeline-create.
+- **HLSL targeting Shader Model 5.x / 6.0–6.5**. DXC's
+  `InterlockedAdd(uint64_t, ...)` overload requires SM6.6 and the
+  `Int64BufferAtomics` shader feature. Older profiles must use
+  the 32-bit path.
+
+The chosen width is recorded on the manifest's
+`buffer.element_type` (`"uint32"` or `"uint64"`) and
+`buffer.element_stride` (`4` or `8`) fields, and on the public
+`CoverageBufferInfo::elementByteWidth`. Host code reading back the
+counter buffer must allocate `getCounterCount() * elementByteWidth`
+bytes and interpret each slot as a little-endian unsigned integer
+of that width. The bundled LCOV converter
+(`tools/shader-coverage/slang-coverage-to-lcov.py`) and the
+shader-coverage demos both follow this contract.
+
+Invalid values (`16`, `128`, etc.) produce a clear
+`E45113 coverage-counter-width-invalid` front-end diagnostic.
 
 Coverage marker ops are side-effectful by default in DCE analysis, so
 they survive optimizations untouched until the coverage pass rewrites

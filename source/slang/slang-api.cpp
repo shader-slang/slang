@@ -1200,10 +1200,21 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
     uint32_t counterCount = metadata->getCounterCount();
     uint32_t entryCount = metadata->getEntryCount();
     out << "  \"counter_count\": " << (int64_t)counterCount << ",\n";
+    // Resolve the per-slot byte width from the metadata's
+    // `CoverageBufferInfo`. The compiler always populates the new
+    // `elementByteWidth` field; a `0` here would only arise from a
+    // sufficiently old metadata object that didn't, in which case we
+    // mirror the historical layout (uint32) so existing tooling keeps
+    // working.
+    slang::CoverageBufferInfo bufferInfo;
+    if (SLANG_FAILED(metadata->getBufferInfo(&bufferInfo)))
+        return SLANG_FAIL;
+    uint32_t elementByteWidth = bufferInfo.elementByteWidth == 0 ? 4 : bufferInfo.elementByteWidth;
+    const char* elementTypeName = elementByteWidth == 8 ? "uint64" : "uint32";
     out << "  \"buffer\": {\n";
     out << "    \"name\": \"__slang_coverage\",\n";
-    out << "    \"element_type\": \"uint32\",\n";
-    out << "    \"element_stride\": 4";
+    out << "    \"element_type\": \"" << elementTypeName << "\",\n";
+    out << "    \"element_stride\": " << (int64_t)elementByteWidth;
     if (auto syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
             slang::ISyntheticResourceMetadata::getTypeGuid()))
     {

@@ -1077,6 +1077,18 @@ Result linkAndOptimizeIR(
                 reservedSpaces.add((int)value.intValue);
             }
         }
+        // Default to uint64 (8 bytes per slot). Customers opt down to
+        // uint32 (4 bytes per slot) only when targeting a runtime driver
+        // without 64-bit shader-atomic-add support — notably MoltenVK on
+        // Apple Silicon, where Vulkan reports
+        // `shaderBufferInt64Atomics = false`. The compiler can't see the
+        // runtime driver, so the choice is the caller's responsibility.
+        int counterByteWidth = 8;
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageCounterWidth))
+        {
+            if (values->getCount() > 0)
+                counterByteWidth = (int)(*values)[0].intValue;
+        }
         SLANG_PASS(
             instrumentCoverage,
             sink,
@@ -1085,6 +1097,7 @@ Result linkAndOptimizeIR(
             explicitSpace,
             reservedSpaces.getBuffer(),
             (int)reservedSpaces.getCount(),
+            counterByteWidth,
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);

@@ -1358,16 +1358,31 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             // through the CPU prelude helpers. Matches HLSL/GLSL
             // semantics: returns the prior value as the inst result.
             //
-            // Only 32-bit integer widths are supported by the prelude
-            // helpers today; wider/narrower types fall through to the
-            // default unhandled-opcode diagnostic so the build fails
-            // loudly instead of producing bogus code.
+            // 32-bit and 64-bit integer widths are supported via the
+            // matching prelude helper pair
+            // (`_slang_atomic_add_{u,i}{32,64}`). Other widths /
+            // float types fall through to the default unhandled-
+            // opcode diagnostic so the build fails loudly instead
+            // of producing bogus code.
             auto dataType = inst->getDataType();
-            bool isSignedInt = dataType->getOp() == kIROp_IntType;
-            bool isUnsignedInt = dataType->getOp() == kIROp_UIntType;
-            if (!isSignedInt && !isUnsignedInt)
+            char const* helper = nullptr;
+            switch (dataType->getOp())
+            {
+            case kIROp_UIntType:
+                helper = "_slang_atomic_add_u32";
+                break;
+            case kIROp_IntType:
+                helper = "_slang_atomic_add_i32";
+                break;
+            case kIROp_UInt64Type:
+                helper = "_slang_atomic_add_u64";
+                break;
+            case kIROp_Int64Type:
+                helper = "_slang_atomic_add_i64";
+                break;
+            default:
                 return false;
-            char const* helper = isSignedInt ? "_slang_atomic_add_i32" : "_slang_atomic_add_u32";
+            }
             emitInstResultDecl(inst);
             m_writer->emit(helper);
             m_writer->emit("(");

@@ -645,6 +645,16 @@ void initCommandOptions(CommandOptions& options)
          "pipeline layout owns descriptor sets that are "
          "not visible in the compiled shader IR. Repeat for multiple spaces; "
          "duplicates are idempotent. Applies to Khronos descriptor-set targets."},
+        {OptionKind::TraceCoverageCounterWidth,
+         "-trace-coverage-counter-width",
+         "-trace-coverage-counter-width <bits>",
+         "Per-slot bit width of the synthesized `__slang_coverage` buffer. "
+         "Accepts `64` (default) or `32`. uint64 counters effectively cannot wrap "
+         "within any practical run; uint32 counters wrap silently at 2^32 hits per "
+         "slot. Use `32` when targeting a runtime driver that does not support "
+         "64-bit shader atomic add (notably MoltenVK on Apple Silicon, which "
+         "exposes `shaderBufferInt64Atomics = false`). Implies `-trace-coverage` "
+         "is meaningful; ignored when no coverage mode is enabled."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -3044,6 +3054,31 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.add(OptionKind::TraceCoverageReservedSpace, (int)bindingSpace);
+                break;
+            }
+        case OptionKind::TraceCoverageCounterWidth:
+            {
+                // -trace-coverage-counter-width <bits>
+                // Validate up front rather than at IR-pass time: this is a
+                // user-facing CLI flag, not an internal state, so an invalid
+                // value should produce a clear front-end diagnostic instead
+                // of a downstream codegen surprise.
+                Int widthBits;
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, widthBits));
+                if (widthBits != 32 && widthBits != 64)
+                {
+                    m_sink->diagnose(Diagnostics::CoverageCounterWidthInvalid{
+                        .parsedValue = widthBits,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
+                // Store the byte width (4 or 8) so the IR pass and metadata
+                // writer can treat the value as a stride directly without
+                // re-translating bits → bytes.
+                linkage->m_optionSet.set(
+                    OptionKind::TraceCoverageCounterWidth,
+                    (int)(widthBits / 8));
                 break;
             }
         case OptionKind::Profile:

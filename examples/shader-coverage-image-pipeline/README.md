@@ -31,6 +31,13 @@ The coverage delta between the two runs is the demo's headline.
 # Compile-time disable coverage instrumentation (baseline for overhead
 # measurement):
 ./shader-coverage-image-pipeline --mode=exhaustive --no-coverage
+
+# Default counter width is 32-bit so the demo runs on MoltenVK out of
+# the box (Apple Silicon lacks `VK_KHR_shader_atomic_int64`). On a
+# desktop Vulkan driver that supports the extension, pass
+# `--counter-width=64` to exercise the wider counters (cannot wrap
+# within any practical run; default in production use):
+./shader-coverage-image-pipeline --mode=exhaustive --counter-width=64
 ```
 
 Each coverage run writes alongside the executable:

@@ -40,6 +40,15 @@ class ArtifactPostEmitMetadata;
 // updates the caller's pointer so the subsequent
 // `collectGlobalUniformParameters` pass sees the extended layout.
 //
+// `counterByteWidth` selects the per-slot element width of the
+// synthesized buffer: `8` for `RWStructuredBuffer<uint64_t>` (the
+// default; effectively immune to counter wrap), or `4` for
+// `RWStructuredBuffer<uint>` (wraps at 2^32 hits per slot — only used
+// when the runtime driver lacks 64-bit shader atomic add). Any other
+// value is a programming error (the front-end validates the user
+// flag), but the pass treats values other than 8 conservatively as 4
+// to avoid emitting an unsupported width.
+//
 // When `enabled` is false the pass is a no-op: any stray marker ops
 // from cached modules are dropped so the backend never sees them, no
 // buffer is synthesized, and `outMetadata` and `globalScopeVarLayout`
@@ -52,6 +61,7 @@ void instrumentCoverage(
     int explicitSpace,
     const int* reservedSpaces,
     int reservedSpaceCount,
+    int counterByteWidth,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);
