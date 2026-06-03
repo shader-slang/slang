@@ -8958,7 +8958,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             if (inst.operands.getCount() >= 2)
             {
                 const auto& storageClassOperand = inst.operands[1];
-                if (storageClassOperand.flavor == SPIRVAsmOperand::NamedValue &&
+                if ((storageClassOperand.flavor == SPIRVAsmOperand::NamedValue ||
+                     storageClassOperand.flavor == SPIRVAsmOperand::Literal) &&
                     storageClassOperand.knownValue == SpvStorageClassNodePayloadAMDX)
                     return false;
             }

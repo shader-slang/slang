@@ -33146,7 +33146,7 @@ int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 //@public:
 /// Read-only input to a broadcasting-launch node shader.
 __generic<T>
-[require(hlsl)]
+[require(hlsl, sm_6_8)]
 [__workGraphRecordType]
 struct DispatchNodeInputRecord
 {
@@ -33174,7 +33174,7 @@ struct DispatchNodeInputRecord
 
 /// Read-only input to a thread-launch node shader.
 __generic<T>
-[require(hlsl)]
+[require(hlsl, sm_6_8)]
 [__workGraphRecordType]
 struct ThreadNodeInputRecord
 {
@@ -33191,7 +33191,7 @@ struct ThreadNodeInputRecord
 
 /// Read-only input array for a coalescing-launch node shader.
 __generic<T>
-[require(hlsl)]
+[require(hlsl, sm_6_8)]
 [__workGraphRecordType]
 struct GroupNodeInputRecords
 {
@@ -33221,7 +33221,7 @@ struct GroupNodeInputRecords
 };
 
 /// Input record collection for a coalescing-launch node that consumes records with no payload data.
-[require(hlsl)]
+[require(hlsl, sm_6_8)]
 [__workGraphRecordType]
 struct EmptyNodeInput
 {
@@ -33231,7 +33231,7 @@ struct EmptyNodeInput
 
 /// Per-thread output records for node shader output; call OutputComplete() when done writing.
 __generic<T>
-[require(hlsl)]
+[require(hlsl, sm_6_8)]
 [__workGraphRecordType]
 struct ThreadNodeOutputRecords
 {
@@ -33264,7 +33264,7 @@ struct ThreadNodeOutputRecords
 
 /// Per-group (shared) output records for node shader output; call OutputComplete() when done writing.
 __generic<T>
-[require(hlsl)]
+[require(hlsl, sm_6_8)]
 [__workGraphRecordType]
 struct GroupNodeOutputRecords
 {
@@ -33298,7 +33298,7 @@ struct GroupNodeOutputRecords
 
 /// Output node handle; use to obtain output record objects for the named output node.
 __generic<T>
-[require(hlsl)]
+[require(hlsl, sm_6_8)]
 [__workGraphRecordType]
 struct NodeOutput
 {
@@ -33333,7 +33333,7 @@ struct NodeOutput
 
 /// Array of output node handles indexed by node array index.
 __generic<T>
-[require(hlsl)]
+[require(hlsl, sm_6_8)]
 [__workGraphRecordType]
 struct NodeOutputArray
 {
@@ -33354,7 +33354,7 @@ struct NodeOutputArray
 };
 
 /// Output node handle for downstream nodes that carry no payload data.
-[require(hlsl)]
+[require(hlsl, sm_6_8)]
 [__workGraphRecordType]
 struct EmptyNodeOutput
 {
@@ -33375,7 +33375,7 @@ struct EmptyNodeOutput
 };
 
 /// Array of payload-free output node handles indexed by node array index.
-[require(hlsl)]
+[require(hlsl, sm_6_8)]
 [__workGraphRecordType]
 struct EmptyNodeOutputArray
 {

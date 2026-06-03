@@ -248,6 +248,11 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
         emitRequiredThreadsPerThreadgroup();
         m_writer->emit("[[object]] ");
         break;
+    case Stage::Node:
+        getSink()->diagnose(Diagnostics::NodeStageNotSupportedOnTarget{
+            .target = "Metal",
+            .location = irFunc->sourceLoc});
+        return;
     default:
         SLANG_ABORT_COMPILATION("unsupported stage.");
     }

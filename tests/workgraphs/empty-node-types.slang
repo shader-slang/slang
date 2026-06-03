@@ -14,6 +14,8 @@ void main(
     EmptyNodeOutputArray outputArr)
 {
     uint count = input.Count();
+    if (count != 0)
+        outputA.GroupIncrementOutputCount(count);
     if (outputA.IsValid())
         outputA.ThreadIncrementOutputCount(1);
     EmptyNodeOutput elem = outputArr[0];
@@ -22,5 +24,6 @@ void main(
 }
 
 //CHK: dx.op.createNodeOutputHandle
+//CHK: dx.op.getInputRecordCount
 //CHK: dx.op.nodeOutputIsValid
 //CHK: dx.op.incrementOutputCount

@@ -1907,10 +1907,12 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>())
             {
                 auto nameHint = structType->findDecoration<IRNameHintDecoration>();
+                SLANG_RELEASE_ASSERT(
+                    nameHint && "work-graph record types must preserve their canonical HLSL name");
                 if (auto elemDecor =
                         structType->findDecoration<IRWorkGraphRecordElementTypeDecoration>())
                 {
-                    m_writer->emit(nameHint ? nameHint->getName() : getName(type));
+                    m_writer->emit(nameHint->getName());
                     m_writer->emit("<");
                     emitType(elemDecor->getElementType());
                     m_writer->emit(">");
@@ -1919,7 +1921,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 {
                     // Non-generic work-graph type (EmptyNodeOutput, EmptyNodeInput, etc.):
                     // emit the original HLSL name without a template argument.
-                    m_writer->emit(nameHint ? nameHint->getName() : getName(type));
+                    m_writer->emit(nameHint->getName());
                 }
                 return;
             }

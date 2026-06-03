@@ -1308,7 +1308,8 @@ Result ComputeCommandEncoderImpl::bindRootObjectAsCompute(
     context.outOfMemoryHeap = (D3D12_DESCRIPTOR_HEAP_TYPE)(-1);
 
     m_commandBuffer->bindDescriptorHeaps();
-    if (rootObjectImpl->bindAsRoot(&context, rootLayoutImpl) == SLANG_E_OUT_OF_MEMORY)
+    auto bindResult = rootObjectImpl->bindAsRoot(&context, rootLayoutImpl);
+    if (bindResult == SLANG_E_OUT_OF_MEMORY)
     {
         if (!m_transientHeap->canResize())
             return SLANG_E_OUT_OF_MEMORY;
@@ -1330,6 +1331,10 @@ Result ComputeCommandEncoderImpl::bindRootObjectAsCompute(
         }
 
         SLANG_RETURN_ON_FAIL(rootObjectImpl->bindAsRoot(&context, rootLayoutImpl));
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(bindResult);
     }
 
     return SLANG_OK;
