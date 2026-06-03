@@ -5055,6 +5055,9 @@ semantic sv_primitiveid
     [require(geometry)]
     [require(hull)]
     [require(domain)]
+    [require(intersection)]
+    [require(anyhit)]
+    [require(closesthit)]
     get : uint;
 
     [require(geometry)]

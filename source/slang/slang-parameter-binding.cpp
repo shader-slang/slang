@@ -2128,6 +2128,25 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     }
     else
     {
+        // System-value semantic inputs (e.g. `SV_PrimitiveID`) are runtime-provided
+        // varyings rather than user-defined `in` parameters, so they are allowed
+        // even in stages that otherwise reject `in` parameters.
+        //
+        // Note: `SV_RayPayload` and `SV_IntersectionAttributes` are not true
+        // runtime-provided system values — they are markers that identify the
+        // parameter as a payload / hit-attribute slot. Those still need to flow
+        // through the payload / hit-attribute layout path below.
+        bool isSystemValueInput = false;
+        if (state.optSemanticName)
+        {
+            auto sn = state.optSemanticName->toLower();
+            if ((sn.startsWith("sv_") || sn.startsWith("nv_")) &&
+                sn != "sv_raypayload" && sn != "sv_intersectionattributes")
+            {
+                isSystemValueInput = true;
+            }
+        }
+
         switch (state.stage)
         {
         default:
@@ -2144,18 +2163,27 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             // an `in` parameter as indicating a payload that the
             // programmer doesn't intend to write to.
             //
-            getSink(context)->diagnose(Diagnostics::DontExpectInParametersForStage{
-                .stage = getStageName(state.stage),
-                .location = state.loc});
+            if (!isSystemValueInput)
+            {
+                getSink(context)->diagnose(Diagnostics::DontExpectInParametersForStage{
+                    .stage = getStageName(state.stage),
+                    .location = state.loc});
+            }
             break;
 
         case Stage::AnyHit:
         case Stage::ClosestHit:
-            // `in` parameter is hit attributes
-            return createTypeLayoutWith(
-                context->layoutContext,
-                context->getRulesFamily()->getHitAttributesParameterRules(),
-                type);
+            // `in` parameter is hit attributes (true system-value `in` parameters
+            // such as `SV_PrimitiveID` fall through to ordinary varying-input
+            // handling below).
+            if (!isSystemValueInput)
+            {
+                return createTypeLayoutWith(
+                    context->layoutContext,
+                    context->getRulesFamily()->getHitAttributesParameterRules(),
+                    type);
+            }
+            break;
         }
     }
 
