@@ -329,6 +329,25 @@ void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, Cont
     destScope->nextSibling = subScope;
 }
 
+bool isOwnModuleOrIncludedFileScope(ContainerDecl* containerDecl, ModuleDecl* moduleDecl)
+{
+    // The module's own scope, or one of its own `__include`d files (a `FileDecl`
+    // whose parent is this module). Everything else on the module's sibling chain is
+    // excluded from re-export: a `using`-spliced namespace (lookup-local, not part of
+    // the imported surface), or a *foreign* module's `FileDecl` that a plain,
+    // non-`__exported` transitive `import` put on the chain (its `parentDecl` is that
+    // other module — `import` is non-transitive; only `__exported import` re-exports).
+    // The `parentDecl == moduleDecl` conjunct is load-bearing: dropping it would
+    // re-export those foreign files and make plain `import` transitive. (Plain
+    // transitive `import` is the only way a foreign `FileDecl` reaches this chain; a
+    // `using namespace <module>;` can't, since a module name is not a usable namespace
+    // in `using` and is rejected with `ExpectedANamespace`.)
+    // See shader-slang/slang#11443.
+    if (containerDecl == moduleDecl)
+        return true;
+    return as<FileDecl>(containerDecl) && containerDecl->parentDecl == moduleDecl;
+}
+
 ContainerDecl* isStaticScopeDecl(Decl* decl)
 {
     if (as<NamespaceDeclBase>(decl) || as<FileDecl>(decl))

@@ -16054,23 +16054,13 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
     for (auto moduleScope = moduleDecl->ownedScope; moduleScope;
          moduleScope = moduleScope->nextSibling)
     {
-        // Re-export only the module's own scope and the scopes of its `__include`d
-        // files (its own `FileDecl` children). A `using` directive splices the used
-        // namespace in as a sibling of the module scope, but `using` is lookup-local
-        // to the declaring module and is not part of its imported surface, so a
-        // primary-file `using namespace Foo;` must not be re-exported through
-        // `import`. See shader-slang/slang#11443.
-        //
-        // Keep the `parentDecl == moduleDecl` clause: it scopes re-export to *this*
-        // module's own files. `as<FileDecl>` alone would be broader than "this
-        // module's FileDecl children" — only the module's own files belong on its
-        // imported surface, never another module's. Do not simplify this predicate
-        // to a bare `as<FileDecl>(containerDecl)`.
+        // Re-export only this module's own scope and its own `__include`d files;
+        // drop `using`-spliced namespace siblings (a primary-file `using namespace
+        // Foo;` must not leak through `import`) and any foreign module's files that a
+        // plain transitive `import` put on the chain. See
+        // `isOwnModuleOrIncludedFileScope` / shader-slang/slang#11443.
         auto containerDecl = moduleScope->containerDecl;
-        bool isOwnModuleScope = containerDecl == moduleDecl;
-        bool isOwnIncludedFileScope =
-            as<FileDecl>(containerDecl) && containerDecl->parentDecl == moduleDecl;
-        if (!isOwnModuleScope && !isOwnIncludedFileScope)
+        if (!isOwnModuleOrIncludedFileScope(containerDecl, moduleDecl))
             continue;
 
         addSiblingScopeForContainerDecl(getASTBuilder(), scope, containerDecl);

@@ -64,6 +64,14 @@ Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink);
 /// Note: this currently does not include PtrTypeBase.
 Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 
+/// True if `containerDecl` is `moduleDecl` itself or one of its own `__include`d
+/// `FileDecl` children — i.e. a scope that belongs on `moduleDecl`'s imported surface.
+/// Used by both the `import` re-export filter (`importModuleIntoScope`) and the
+/// legacy/API name-lookup scope (`_getOrCreateScopeForLegacyLookup`) to drop
+/// `using`-spliced namespace siblings and other modules' transitively-imported files.
+/// See shader-slang/slang#11443.
+bool isOwnModuleOrIncludedFileScope(ContainerDecl* containerDecl, ModuleDecl* moduleDecl);
+
 inline int getIntValueBitSize(IntegerLiteralValue val)
 {
 #if SLANG_VC

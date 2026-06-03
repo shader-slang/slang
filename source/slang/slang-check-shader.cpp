@@ -3121,23 +3121,20 @@ Scope* ComponentType::_getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder)
         for (auto srcScope = module->getModuleDecl()->ownedScope; srcScope;
              srcScope = srcScope->nextSibling)
         {
-            // Re-export only the module's own scope and its own `__include`d
-            // `FileDecl` children into the legacy name-based lookup scope (which
-            // backs `getTypeFromString`, string-specified entry points /
-            // type-conformance, and specialization-argument parsing). A primary-file
-            // `using namespace Foo;` splices `Foo` as a sibling of the module scope,
-            // but `using` is lookup-local and must not leak into reflection/API name
-            // lookup either. Mirrors `SemanticsVisitor::importModuleIntoScope`; keep
-            // the `parentDecl` clause (rationale there). See shader-slang/slang#11443.
+            // Re-export only the module's own scope and its own `__include`d files
+            // into the legacy name-based lookup scope (which backs `getTypeFromString`,
+            // string-specified entry points / type-conformance, and
+            // specialization-argument parsing); drop `using`-spliced namespaces and any
+            // foreign module's files a transitive `import` put on the chain, so `using`
+            // can't leak into reflection/API name lookup. Mirrors
+            // `importModuleIntoScope` (see `isOwnModuleOrIncludedFileScope` /
+            // shader-slang/slang#11443).
             auto containerDecl = srcScope->containerDecl;
-            bool isOwnModuleScope = containerDecl == module->getModuleDecl();
-            bool isOwnIncludedFileScope =
-                as<FileDecl>(containerDecl) && containerDecl->parentDecl == module->getModuleDecl();
-            if (!isOwnModuleScope && !isOwnIncludedFileScope)
+            if (!isOwnModuleOrIncludedFileScope(containerDecl, module->getModuleDecl()))
                 continue; // Skip scopes that are not part of the current module.
 
             Scope* moduleScope = astBuilder->create<Scope>();
-            moduleScope->containerDecl = srcScope->containerDecl;
+            moduleScope->containerDecl = containerDecl;
 
             moduleScope->nextSibling = scope->nextSibling;
             scope->nextSibling = moduleScope;
