@@ -4525,9 +4525,11 @@ attribute_syntax [mutating] : MutatingAttribute;
 __attributeTarget(AccessorDecl)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
 
-/// Marks a function whose return value should not be discarded. The compiler warns
-/// when a call to a `[nodiscard]`-attributed function appears as a statement and its
-/// non-void result is not used. Mirrors C++ `[[nodiscard]]`.
+/// Marks a function whose non-void return value should not be ignored. The compiler
+/// warns when a direct call to a `[nodiscard]`-attributed function is used as a whole
+/// statement and its result is discarded (e.g. `foo();` where `foo` returns a value).
+/// Inspired by C++ `[[nodiscard]]`. Note: only a direct call statement is diagnosed;
+/// a result discarded in a sub-expression or through operator syntax is not.
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [nodiscard] : NoDiscardAttribute;
 

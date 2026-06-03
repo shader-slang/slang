@@ -687,13 +687,23 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
     }
     else if (auto invokeExpr = as<InvokeExpr>(stmt->expression))
     {
-        // Warn when the non-void result of a `[nodiscard]`-attributed function
-        // is discarded at statement level.
+        // Diagnose discarding the non-void result of a `[nodiscard]`-attributed call.
+        //
+        // `OperatorExpr` derives from `InvokeExpr`, so operator-syntax statements are
+        // handled by the branch above (which only special-cases `==`); diagnosing a
+        // discarded `[nodiscard]` operator is intentionally out of scope here.
+        //
+        // We read the modifier off the callee declaration: after overload resolution an
+        // ordinary/member/static call's `functionExpr` is a `DeclRefExpr` naming the
+        // resolved callee (`MemberExpr`/`StaticMemberExpr` derive from `DeclRefExpr`), so
+        // that is where `[nodiscard]` lives. Other callee shapes are not diagnosed.
         if (auto calleeDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr))
         {
             auto calleeDecl = calleeDeclRefExpr->declRef.getDecl();
             if (calleeDecl && calleeDecl->hasModifier<NoDiscardAttribute>())
             {
+                // A null result type means the call already failed to type-check; skip
+                // rather than warn on an already-errored call.
                 auto resultType = invokeExpr->type.type;
                 if (resultType && !resultType->equals(m_astBuilder->getVoidType()))
                 {
