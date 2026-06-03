@@ -13,11 +13,17 @@
 // `@` is not a valid start-of-decl token, so the parser emits a
 // diagnostic when it encounters it.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 @ int x = 1;
-//CHECK: error
-//CHECK: E20003
+/*CHECK:
+^ unexpected token
+^ unexpected '@', expected identifier
+      ^ unexpected token
+      ^ unexpected identifier, expected ';'
+        ^ unexpected token
+        ^ unexpected '=', expected identifier
+*/
 
 void main()
 {

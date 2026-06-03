@@ -223,6 +223,7 @@ documents:
       - source/slang/slang-parser.h
       - source/slang/slang-parser.cpp
       - source/compiler-core/slang-lexer.cpp
+      - source/slang/slang-ast-expr.h
     depends_on:
       - syntax-reference/tokens.md
       - syntax-reference/keywords-and-builtins.md

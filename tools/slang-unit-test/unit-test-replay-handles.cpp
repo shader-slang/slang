@@ -146,6 +146,52 @@ SLANG_UNIT_TEST(replayContextHandleNull)
     SLANG_CHECK(readBlob == nullptr);
 }
 
+// These exception tests catch concrete replay exception types through ReplayContext entry points.
+// That covers the in-process slang-test path where exceptions cross the slang shared-library
+// boundary before reaching the unit-test module.
+SLANG_UNIT_TEST(replayContextUntrackedInterfaceException)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    auto osFileSystem = Slang::OSFileSystem::getMutableSingleton();
+    ISlangMutableFileSystem* untrackedFileSystem = osFileSystem;
+
+    ctx().setMode(Mode::Record);
+
+    bool caught = false;
+    try
+    {
+        ctx().record(RecordFlag::Input, untrackedFileSystem);
+    }
+    catch (const UntrackedInterfaceException& e)
+    {
+        caught = true;
+        SLANG_CHECK(e.getObject() == toSlangUnknown(osFileSystem));
+    }
+    SLANG_CHECK(caught);
+}
+
+SLANG_UNIT_TEST(replayContextHandleNotFoundException)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    const uint64_t missingHandle = kFirstValidHandle;
+
+    bool caught = false;
+    try
+    {
+        ctx().getProxy(missingHandle);
+    }
+    catch (const HandleNotFoundException& e)
+    {
+        caught = true;
+        SLANG_CHECK(e.getHandle() == missingHandle);
+    }
+    SLANG_CHECK(caught);
+}
+
 SLANG_UNIT_TEST(replayContextInlineBlob)
 {
     REPLAY_TEST;
@@ -268,6 +314,60 @@ SLANG_UNIT_TEST(replayContextTypeReflectionNull)
     ctx().record(RecordFlag::Input, readType);
 
     SLANG_CHECK(readType == nullptr);
+}
+
+SLANG_UNIT_TEST(replayContextUnresolvedTypeException)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
+
+    slang::SessionDesc sessionDesc = {};
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+
+    const char* testCode = R"(
+        struct UnregisteredType
+        {
+            float value;
+        };
+    )";
+    ComPtr<slang::IBlob> diagnostics;
+    slang::IModule* module = session->loadModuleFromSourceString(
+        "unregistered-type-module",
+        "unregistered-type-module.slang",
+        testCode,
+        diagnostics.writeRef());
+    SLANG_CHECK(module != nullptr);
+
+    auto* layout = module->getLayout();
+    SLANG_CHECK(layout != nullptr);
+    slang::TypeReflection* originalType = layout->findTypeByName("UnregisteredType");
+    SLANG_CHECK(originalType != nullptr);
+
+    ctx().setMode(Mode::Record);
+
+    slang::TypeReflection* unresolvedType = originalType;
+    bool caught = false;
+    try
+    {
+        ctx().record(RecordFlag::Input, unresolvedType);
+    }
+    catch (const UnresolvedTypeException& e)
+    {
+        caught = true;
+        SLANG_CHECK(e.getType() == originalType);
+    }
+    SLANG_CHECK(caught);
 }
 
 SLANG_UNIT_TEST(replayContextTypeReflectionBasic)

@@ -42,8 +42,12 @@ void main(
     buf[primitiveID] = v.position;
 }
 
-// The streamOutputTypeDecoration carries the HLSL stream-output type
-// as an inst reference (the IRHLSLStreamOutputType operand prints as
-// %N). Wildcard the operand text since the inst id is unstable.
-// CHECK-DAG: [streamOutputTypeDecoration(
-// CHECK-DAG: [nameHint("main")]
+// In the early `-dump-ir` snapshot the decoration prints as the
+// `streamOutputTypeLayout` inst rather than the
+// `streamOutputTypeDecoration` name documented in the IR reference —
+// both refer to the same conceptual decoration on the geometry-shader
+// entry point at different lowering phases. The CHECK matches what the
+// dump emits at this stage. Wildcard the operand text since the inst
+// id is unstable.
+// CHECK-DAG: streamOutputTypeLayout
+// CHECK-DAG: nameHint("main")

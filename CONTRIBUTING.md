@@ -153,7 +153,11 @@ Install CMake and Ninja; we recommend using [Homebrew](https://brew.sh/) for ins
 ```
 $ brew install ninja
 $ brew install cmake
+$ brew install zstd
 ```
+
+> [!NOTE]
+> - The intallation of zstd can be skipped if you use a cmake option of `-DSLANG_SLANG_LLVM_FLAVOR=DISABLE`
 
 Run CMake with the following command to generate Makefile:
 
@@ -189,27 +193,6 @@ Build with the following command:
 ```
 $ cmake --build --preset release
 ```
-
-#### GitHub REST API Limit
-
-When you execute `cmake --preset`, CMake uses the GitHub REST API, and there is a daily/hourly API limit for each IP address. If you are using an IP address shared by many people, you may hit this limit occasionally. Refer to [Rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api) for more information.
-
-When this happens, you will see a warning message from CMake as follows:
-
-```
-CMake Warning at cmake/GitHubRelease.cmake:53 (message):
-  If API rate limit is exceeded, Github allows a higher limit when you use
-  token.  Try a cmake option -DSLANG_GITHUB_TOKEN=your_token_here
-Call Stack (most recent call first):
-  cmake/GitHubRelease.cmake:114 (check_release_and_get_latest)
-  CMakeLists.txt:141 (get_best_slang_binary_release_url)
-```
-
-The limit is higher when you use your personal account with a "personal access token".
-
-To generate a "personal access token" on GitHub, follow steps in [Creating a personal access token (classic)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic)
-
-Use the generated "token" with a cmake option "-DSLANG_GITHUB_TOKEN=your-token-here".
 
 ### Making Changes
 

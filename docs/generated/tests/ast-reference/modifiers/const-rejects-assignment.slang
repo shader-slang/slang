@@ -13,7 +13,7 @@
 // binding. The checker rejects any subsequent assignment with an
 // l-value-of-type-const-is-not-modifiable diagnostic.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 void main()
 {

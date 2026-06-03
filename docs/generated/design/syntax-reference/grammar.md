@@ -392,7 +392,7 @@ AtomExpr        ::= Literal
                   | KeywordExpr
                   | LambdaExpr
                   | NewExpr
-KeywordExpr     ::= 'this' | 'true' | 'false' | 'nullptr' | 'none'
+KeywordExpr     ::= 'this'
                   | 'try' Expr
                   | 'no_diff' Expr
                   | ('fwd_diff'|'__fwd_diff') '(' Expr ')'
@@ -409,11 +409,31 @@ LambdaExpr      ::= '(' ParamList? ')' '=>' Expr
                   | IDENT '=>' Expr
 NewExpr         ::= 'new' Type ('(' ArgList? ')')?
 Literal         ::= INT_LIT | FLOAT_LIT | STRING_LIT | CHAR_LIT
+                  | 'true' | 'false'                            -- BoolLiteralExpr
+                  | 'nullptr'                                   -- NullPtrLiteralExpr
+                  | 'none'                                      -- NoneLiteralExpr
 InitListExpr    ::= '{' (Expr (',' Expr)* ','?)? '}'
 
 AssignOp        ::= '=' | '+=' | '-=' | '*=' | '/=' | '%='
                   | '<<=' | '>>=' | '&=' | '|=' | '^='
 ```
+
+### Literal forms vs. token kinds
+
+`INT_LIT`, `FLOAT_LIT`, `STRING_LIT`, and `CHAR_LIT` are distinct
+`TokenType` values from [tokens.md](tokens.md). The four remaining
+literal forms (`true`, `false`, `nullptr`, `none`) have no dedicated
+token kind: the lexer emits them as `Identifier`, and the parser
+recognises them through entries in the keyword syntax-decl table
+(`_makeParseExpr("true", parseTrueExpr)` and friends in
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp)). They
+are nonetheless grouped under `Literal` here because they map onto
+concrete `LiteralExpr` subclasses in
+[slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h)
+(`BoolLiteralExpr`, `NullPtrLiteralExpr`, `NoneLiteralExpr`)
+alongside `IntegerLiteralExpr`, `FloatingPointLiteralExpr`, and
+`StringLiteralExpr`. `CHAR_LIT` is also a `Literal` but lowers to an
+`IntegerLiteralExpr` rather than a dedicated character-literal node.
 
 ### `<` disambiguation
 

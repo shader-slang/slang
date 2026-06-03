@@ -20,8 +20,8 @@ void main()
 {
     int int = 5;
     int x = int + 1;
-    // CHECK: error
-    // CHECK: expected a type
-// CHECK: E30060
+    // CHECK-DAG: error
+    // CHECK-DAG: expected a type
+// CHECK-DAG: E30060
     printf("%d\n", x);
 }

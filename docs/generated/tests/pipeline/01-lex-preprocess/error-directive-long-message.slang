@@ -13,7 +13,7 @@
 // echoed verbatim into the diagnostic, so we FileCheck a unique
 // substring near the end to confirm the long message survives.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 #error this is a very long preprocessor error message designed to probe the upper boundary of the message text and contain a distinctive sentinel SENTINEL_END
 //CHECK: SENTINEL_END

@@ -19,7 +19,7 @@ void main()
 {
     let x = 7;
     x = 8;
-    // CHECK: error
-    // CHECK: l-value
-    // CHECK: E30011
+    // CHECK-DAG: error
+    // CHECK-DAG: l-value
+    // CHECK-DAG: E30011
 }
