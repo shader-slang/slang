@@ -426,13 +426,8 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(
     IRFunc* irFunc,
     IREntryPointDecoration* entryPointDecor)
 {
-    if (entryPointDecor->getProfile().getStage() == Stage::Node)
-    {
-        getSink()->diagnose(Diagnostics::NodeStageNotSupportedOnTarget{
-            .target = "CUDA",
-            .location = irFunc->sourceLoc});
-        return;
-    }
+    SLANG_UNUSED(irFunc);
+    SLANG_UNUSED(entryPointDecor);
 }
 
 void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
@@ -441,6 +436,19 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
         return;
     if (inst->findDecoration<IREntryPointDecoration>())
     {
+        if (auto func = as<IRFunc>(inst))
+        {
+            if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
+            {
+                if (entryPointDecor->getProfile().getStage() == Stage::Node)
+                {
+                    getSink()->diagnose(Diagnostics::NodeStageNotSupportedOnTarget{
+                        .target = "CUDA",
+                        .location = func->sourceLoc});
+                    return;
+                }
+            }
+        }
         m_writer->emit("extern \"C\" __global__ ");
         return;
     }

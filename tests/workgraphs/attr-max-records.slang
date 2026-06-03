@@ -18,6 +18,6 @@ void main([MaxRecords(4)] NodeOutput<MyRecord> output, RWBuffer<int> buf)
 }
 
 //CHK_DXIL: define void @main()
-//CHK_DXIL: i32 3, i32 4
+//CHK_DXIL: ![[NODE_OUTPUT:[0-9]+]] = !{i32 1, i32 6, i32 2, !{{[0-9]+}}, i32 3, i32 4,
 //CHK_HLSL: [MaxRecords(4)]
 //CHK_HLSL: NodeOutput<MyRecord
