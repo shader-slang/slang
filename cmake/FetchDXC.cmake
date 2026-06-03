@@ -479,8 +479,7 @@ if(_dxc_build_from_source)
         set(_dxc_cxx_flags "${CMAKE_CXX_FLAGS}")
         string(APPEND _dxc_c_flags " -w")
         string(APPEND _dxc_cxx_flags " -w")
-        set(
-            _dxc_forwarded_config_args
+        set(_dxc_forwarded_config_args
             "-DCMAKE_C_FLAGS=${_dxc_c_flags}"
             "-DCMAKE_CXX_FLAGS=${_dxc_cxx_flags}"
         )
@@ -626,7 +625,8 @@ if(_dxc_build_from_source)
                 # command. Passing it here covers single-config generators (Ninja).
                 -DCMAKE_BUILD_TYPE=MinSizeRel -DHLSL_COPY_GENERATED_SOURCES=OFF
                 -DLLVM_INCLUDE_TESTS=OFF -DCLANG_INCLUDE_TESTS=OFF
-                -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_forwarded_config_args} -Wno-dev
+                -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_forwarded_config_args}
+                -Wno-dev
             RESULT_VARIABLE _dxc_configure_result
             OUTPUT_VARIABLE _dxc_configure_output
             ERROR_VARIABLE _dxc_configure_error
@@ -683,12 +683,10 @@ if(_dxc_build_from_source)
     else()
         set(_dxc_shared_library_prefix "${CMAKE_SHARED_LIBRARY_PREFIX}")
         set(_dxc_shared_library_suffix "${CMAKE_SHARED_LIBRARY_SUFFIX}")
-        set(
-            _dxc_dxcompiler_library_name
+        set(_dxc_dxcompiler_library_name
             "${_dxc_shared_library_prefix}dxcompiler${_dxc_shared_library_suffix}"
         )
-        set(
-            _dxc_dxil_library_name
+        set(_dxc_dxil_library_name
             "${_dxc_shared_library_prefix}dxil${_dxc_shared_library_suffix}"
         )
         set(_dxc_src_byproducts
@@ -728,8 +726,7 @@ if(_dxc_build_from_source)
         endforeach()
     else()
         foreach(_lib dxcompiler dxil)
-            set(
-                _dxc_shared_library_name
+            set(_dxc_shared_library_name
                 "${_dxc_shared_library_prefix}${_lib}${_dxc_shared_library_suffix}"
             )
             set(_src "${_dxc_build_dir}/lib/${_dxc_shared_library_name}")
@@ -856,8 +853,7 @@ elseif(
     set(_dxc_shared_library_prefix "${CMAKE_SHARED_LIBRARY_PREFIX}")
     set(_dxc_shared_library_suffix "${CMAKE_SHARED_LIBRARY_SUFFIX}")
     foreach(_lib dxcompiler dxil)
-        set(
-            _dxc_shared_library_name
+        set(_dxc_shared_library_name
             "${_dxc_shared_library_prefix}${_lib}${_dxc_shared_library_suffix}"
         )
         set(_src "${dxc_SOURCE_DIR}/lib/${_dxc_shared_library_name}")
