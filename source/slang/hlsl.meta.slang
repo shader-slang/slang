@@ -33432,7 +33432,7 @@ void __Barrier_hlsl(int memoryTypeFlags, int semanticFlags)
 
 /// Synchronizes memory and/or thread execution using static Barrier flag values.
 /// For example, GroupMemoryBarrierWithGroupSync() maps to
-/// Barrier(GROUP_SHARED_MEMORY, GROUP_SCOPE | GROUP_SYNC).
+/// Barrier(GROUP_SHARED_MEMORY, GROUP_SYNC).
 [ForceInline]
 [require(hlsl, sm_6_8)]
 void Barrier(BarrierMemoryTypeFlags memoryTypeFlags, BarrierSemanticFlags semanticFlags)

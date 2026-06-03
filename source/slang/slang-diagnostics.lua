@@ -2443,7 +2443,7 @@ err(
     "invalid-barrier-semantic-flags-value",
     31404,
     "invalid 'BarrierSemanticFlags' value",
-    span { loc = "location", message = "unrecognized BarrierSemanticFlags value '~value:String'; expected 0 or a combination of GroupSync (0x1), GroupScope (0x2), and DeviceScope (0x4)" }
+    span { loc = "location", message = "unrecognized BarrierSemanticFlags value '~value:String'; expected 0 or a combination of GROUP_SYNC (0x1), GROUP_SCOPE (0x2), and DEVICE_SCOPE (0x4)" }
 )
 
 err(
@@ -2464,7 +2464,7 @@ err(
     "invalid-barrier-memory-type-flags-value",
     31407,
     "invalid 'BarrierMemoryTypeFlags' value",
-    span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected 0, AllMemory (0xf), or a combination of UavMemory (0x1), GroupSharedMemory (0x2), NodeInputMemory (0x4), and NodeOutputMemory (0x8)" }
+    span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected 0, ALL_MEMORY (0xf), or a combination of UAV_MEMORY (0x1), GROUP_SHARED_MEMORY (0x2), NODE_INPUT_MEMORY (0x4), and NODE_OUTPUT_MEMORY (0x8)" }
 )
 
 warning(
