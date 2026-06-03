@@ -987,6 +987,11 @@ local insts = {
 		},
 	},
 	{
+		SPIRVConvertUToAccelerationStructure = {
+			operands = { { "address" } },
+		},
+	},
+	{
 		SPIRVLoadTexelPointerFromHeap = {
 			operands = { { "heap" }, { "index" }, { "textureType" }, { "coord" }, { "sampleIndex" } },
 		},

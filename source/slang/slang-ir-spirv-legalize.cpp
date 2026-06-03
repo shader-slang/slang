@@ -28,8 +28,6 @@
 #include "slang-legalize-types.h"
 #include "slang-rich-diagnostics.h"
 
-#include <spirv/unified1/spirv.h>
-
 namespace Slang
 {
 
@@ -1648,31 +1646,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             inst->getHeap(),
             inst->getIndex());
 
-        auto asmInst = builder.emitSPIRVAsm(inst->getDataType());
-        {
-            IRBuilderInsertLocScope insertScope(&builder);
-            builder.setInsertInto(asmInst);
+        IRInst* addressArgs[] = {address};
+        auto accelerationStructure = builder.emitIntrinsicInst(
+            inst->getDataType(),
+            kIROp_SPIRVConvertUToAccelerationStructure,
+            SLANG_COUNT_OF(addressArgs),
+            addressArgs);
 
-            auto extensionOp = builder.emitSPIRVAsmOperandEnum(
-                builder.getIntValue(builder.getUIntType(), SpvOpExtension));
-            List<IRInst*> extensionOperands;
-            extensionOperands.add(builder.emitSPIRVAsmOperandLiteral(
-                builder.getStringValue(UnownedStringSlice::fromLiteral("SPV_KHR_ray_tracing"))));
-            builder.emitSPIRVAsmInst(extensionOp, extensionOperands);
-
-            auto convertOp = builder.emitSPIRVAsmOperandEnum(builder.getIntValue(
-                builder.getUIntType(),
-                SpvOpConvertUToAccelerationStructureKHR));
-            List<IRInst*> convertOperands;
-            convertOperands.add(builder.emitSPIRVAsmOperandInst(inst->getDataType()));
-            convertOperands.add(builder.emitSPIRVAsmOperandResult());
-            convertOperands.add(builder.emitSPIRVAsmOperandInst(address));
-            builder.emitSPIRVAsmInst(convertOp, convertOperands);
-        }
-
-        inst->replaceUsesWith(asmInst);
+        inst->replaceUsesWith(accelerationStructure);
         inst->removeAndDeallocate();
-        addUsersToWorkList(asmInst);
+        addUsersToWorkList(accelerationStructure);
     }
 
     static bool isAsmInst(IRInst* inst)

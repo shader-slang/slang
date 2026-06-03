@@ -4914,6 +4914,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     emitDescriptorHeapLoad(parent, inst, loadDesc->getHeap(), loadDesc->getIndex());
                 break;
             }
+        case kIROp_SPIRVConvertUToAccelerationStructure:
+            result = emitSPIRVConvertUToAccelerationStructure(
+                parent,
+                cast<IRSPIRVConvertUToAccelerationStructure>(inst));
+            break;
         case kIROp_SPIRVLoadTexelPointerFromHeap:
             {
                 auto loadDesc = as<IRSPIRVLoadTexelPointerFromHeap>(inst);
@@ -7155,6 +7160,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return result;
         }
         return emitOpLoad(parent, inst, inst->getDataType(), valuePtr);
+    }
+
+    SpvInst* emitSPIRVConvertUToAccelerationStructure(
+        SpvInstParent* parent,
+        IRSPIRVConvertUToAccelerationStructure* inst)
+    {
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
+        return emitInst(
+            parent,
+            inst,
+            SpvOpConvertUToAccelerationStructureKHR,
+            inst->getDataType(),
+            kResultID,
+            inst->getAddress());
     }
 
     SpvInst* maybeEmitSystemVal(IRInst* inst)
