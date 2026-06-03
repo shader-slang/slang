@@ -186,3 +186,29 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithStrippedNameHints)
         &obfuscationOption,
         1);
 }
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithTexelPointerHeap)
+{
+    // Use format id 37 (`r32ui`) so the SPIR-V texel-pointer path validates.
+    const char* userSource = R"(
+        RWStructuredBuffer<uint> gOutput;
+
+        struct P
+        {
+            RWTexture2D<uint, 0, 37>.Handle t;
+        };
+
+        ParameterBlock<P> p1;
+
+        [Shader("compute")]
+        [NumThreads(1, 1, 1)]
+        void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            uint previousValue;
+            InterlockedAdd(p1.t[dispatchThreadID.xy], 1, previousValue);
+            gOutput[0] = previousValue;
+        }
+    )";
+
+    _checkBindlessSpaceReflection(userSource, _expectReservedBindlessSpaceAt(2), true);
+}

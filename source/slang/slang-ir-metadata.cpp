@@ -137,6 +137,7 @@ static bool _instUsesBindlessResourceHeap(IRInst* inst)
     case kIROp_LoadResourceDescriptorFromHeap:
     case kIROp_LoadSamplerDescriptorFromHeap:
     case kIROp_SPIRVLoadDescriptorFromHeap:
+    case kIROp_SPIRVLoadTexelPointerFromHeap:
     case kIROp_SPIRVResourceHeap:
     case kIROp_SPIRVSamplerHeap:
     case kIROp_MakeCombinedTextureSamplerFromHandle:
