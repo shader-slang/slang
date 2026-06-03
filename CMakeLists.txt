@@ -660,32 +660,35 @@ configure_package_config_file(
     INSTALL_DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
 )
 
-# Conditionally handle the case for Emscripten where slang does not create
-# linkable targets. In this case do not export the targets. Otherwise, just
-# export the slang targets.
+# Export the slang targets for every build except Emscripten, where slang
+# creates no linkable targets. Both shared and static builds export here:
+# slang_add_target wraps slang's private link dependencies in
+# $<BUILD_LOCAL_INTERFACE:...> / $<BUILD_INTERFACE:...> (see cmake/SlangTarget.cmake),
+# which strips the internal, non-installed targets (core, prelude,
+# compiler-core, ...) from the install/export link interface. The SlangTargets
+# export set therefore does not require them, so install(EXPORT) is valid for
+# static builds as well as shared.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    if(NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
-        install(
-            EXPORT SlangTargets
-            FILE ${PROJECT_NAME}Targets.cmake
-            NAMESPACE ${PROJECT_NAME}::
-            DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
+    install(
+        EXPORT SlangTargets
+        FILE ${PROJECT_NAME}Targets.cmake
+        NAMESPACE ${PROJECT_NAME}::
+        DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
+    )
+
+    if(UNIX)
+        configure_file(
+            "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
+            "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+            @ONLY
         )
 
-        if(UNIX)
-            configure_file(
-                "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
-                "${PROJECT_BINARY_DIR}/slang-compiler.pc"
-                @ONLY
-            )
-
-            # TODO: When build system is changed to respect CMAKE_INSTALL_LIBDIR,
-            # update this destination.
-            install(
-                FILES "${PROJECT_BINARY_DIR}/slang-compiler.pc"
-                DESTINATION "lib/pkgconfig"
-            )
-        endif()
+        # TODO: When build system is changed to respect CMAKE_INSTALL_LIBDIR,
+        # update this destination.
+        install(
+            FILES "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+            DESTINATION "lib/pkgconfig"
+        )
     endif()
 endif()
 
