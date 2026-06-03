@@ -459,6 +459,12 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_AttributedType:
         {
             auto attributedType = cast<IRAttributedType>(type);
+            for (auto attr : attributedType->getAllAttrs())
+            {
+                SLANG_ASSERT(
+                    attr->getOp() == kIROp_NoDiffAttr ||
+                    attr->getOp() == kIROp_MemoryQualifierSetAttr);
+            }
             return getSizeAndAlignment(
                 targetReq,
                 this,
