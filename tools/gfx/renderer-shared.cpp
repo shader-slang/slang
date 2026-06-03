@@ -72,6 +72,7 @@ StageType translateStage(SlangStage slangStage)
         CASE(FRAGMENT, Fragment);
 
         CASE(COMPUTE, Compute);
+        CASE(DISPATCH, Dispatch);
         CASE(NODE, Node);
 
         CASE(RAY_GENERATION, RayGeneration);

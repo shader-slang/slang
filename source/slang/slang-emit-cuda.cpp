@@ -442,9 +442,6 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
             {
                 if (entryPointDecor->getProfile().getStage() == Stage::Node)
                 {
-                    getSink()->diagnose(Diagnostics::NodeStageNotSupportedOnTarget{
-                        .target = "CUDA",
-                        .location = func->sourceLoc});
                     return;
                 }
             }
