@@ -58,6 +58,11 @@ set(_dxc_linux_sha256
 set(_dxc_windows_url_hash "SHA256=${_dxc_windows_sha256}")
 set(_dxc_linux_url_hash "SHA256=${_dxc_linux_sha256}")
 
+set(_dxc_has_custom_binary_url OFF)
+if(DEFINED SLANG_DXC_BINARY_URL AND NOT SLANG_DXC_BINARY_URL STREQUAL "")
+    set(_dxc_has_custom_binary_url ON)
+endif()
+
 function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
     set(_dxc_header_deps "${ARGN}")
 
@@ -132,7 +137,7 @@ if(SLANG_DXC_BUILD_FROM_SOURCE)
 elseif(
     NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
     AND CMAKE_SYSTEM_NAME STREQUAL "Darwin"
-    AND NOT DEFINED SLANG_DXC_BINARY_URL
+    AND NOT _dxc_has_custom_binary_url
 )
     message(
         STATUS
@@ -141,7 +146,7 @@ elseif(
     )
     set(_dxc_build_from_source ON)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CROSSCOMPILING)
-    if(DEFINED SLANG_DXC_BINARY_URL)
+    if(_dxc_has_custom_binary_url)
         message(
             STATUS
             "Cross-compiling for Linux: GLIBC auto-detection is skipped; "
@@ -174,7 +179,7 @@ elseif(
     AND NOT SLANG_DXC_BUILD_FROM_SOURCE
     AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
-    AND NOT DEFINED SLANG_DXC_BINARY_URL
+    AND NOT _dxc_has_custom_binary_url
     AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
 )
     # User explicitly disabled the source build on x86_64 Linux; skip
@@ -190,7 +195,7 @@ elseif(
 elseif(
     CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
-    AND DEFINED SLANG_DXC_BINARY_URL
+    AND _dxc_has_custom_binary_url
 )
     # User supplied a custom URL; skip GLIBC auto-detection and use it as-is.
     message(
@@ -202,7 +207,7 @@ elseif(
     NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
     AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
-    AND NOT DEFINED SLANG_DXC_BINARY_URL
+    AND NOT _dxc_has_custom_binary_url
     AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
 )
     # Auto-detect: download the prebuilt Linux binary and inspect both
@@ -444,7 +449,7 @@ elseif(
 elseif(
     CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
-    AND NOT DEFINED SLANG_DXC_BINARY_URL
+    AND NOT _dxc_has_custom_binary_url
     AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
 )
     # Non-x86_64 Linux: no prebuilt binary is available for this architecture.
@@ -759,7 +764,7 @@ endif()
 # Prebuilt binary download path.
 # ---------------------------------------------------------------------------
 
-if(NOT DEFINED SLANG_DXC_BINARY_URL)
+if(NOT _dxc_has_custom_binary_url)
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         set(SLANG_DXC_BINARY_URL
             "https://github.com/microsoft/DirectXShaderCompiler/releases/download/${_dxc_version_tag}/dxc_${_dxc_release_date}.zip"
@@ -781,7 +786,7 @@ if(NOT DEFINED SLANG_DXC_BINARY_URL)
     endif()
 endif()
 
-if(NOT DEFINED SLANG_DXC_BINARY_URL)
+if(NOT DEFINED SLANG_DXC_BINARY_URL OR SLANG_DXC_BINARY_URL STREQUAL "")
     return()
 endif()
 
