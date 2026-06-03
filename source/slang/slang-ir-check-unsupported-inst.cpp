@@ -106,11 +106,8 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
 // error like:
 //     int64_t _S3 = "123".getLength();
 //     // -> request for member 'getLength' in '"123"', non-class type
-// (#11297). Diagnose at most once per compile.
-static void _checkStringTypeUse(
-    IRModule* module,
-    TargetRequest* target,
-    DiagnosticSink* sink)
+// (#11297). Diagnose at most once per emit target.
+static void _checkStringTypeUse(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -125,11 +122,10 @@ static void _checkStringTypeUse(
 
         if (auto stringUse = _findStringUseInFunc(func))
         {
-            SourceLoc loc =
-                stringUse->sourceLoc.isValid() ? stringUse->sourceLoc : func->sourceLoc;
+            SourceLoc loc = stringUse->sourceLoc.isValid() ? stringUse->sourceLoc : func->sourceLoc;
             sink->diagnose(Diagnostics::StringTypeNotSupportedOnTarget{
-                .target = String(TypeTextUtil::getCompileTargetName(
-                    SlangCompileTarget(target->getTarget()))),
+                .target = String(
+                    TypeTextUtil::getCompileTargetName(SlangCompileTarget(target->getTarget()))),
                 .location = loc});
             return;
         }

@@ -15,12 +15,19 @@
 
 RWStructuredBuffer<int64_t> output;
 
+// Helper with a `String` parameter — exercises the parameter-type
+// branch in `_findStringUseInFunc` (caught even before any String
+// member call appears in the body).
+int64_t getLen(String s)
+//CHECK:              ^ the 'String' type is not supported on the 'cpp' target; use 'NativeString' instead, or compile with -target host-cpp
+//CHECK:              ^ use of 'String' here
+{
+    return s.getLength();
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
-    let str : String = "123";
-    output[0] = str.getLength();
-//CHECK:                     ^ the 'String' type is not supported on the 'cpp' target; use 'NativeString' instead, or compile with -target host-cpp
-//CHECK:                     ^ use of 'String' here
+    output[0] = getLen("123");
 }
