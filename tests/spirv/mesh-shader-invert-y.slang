@@ -31,10 +31,10 @@ void main(
 [ outputtopology( "point" ) ]
 [ numthreads( 1, 1, 1 ) ]
 void pointMain(
-	out vertices PS_IN outputVerts[ 1 ],
-	out indices uint outputIB[ 1 ] )
+    out vertices PS_IN outputVerts[ 1 ],
+    out indices uint outputIB[ 1 ] )
 {
-	SetMeshOutputCounts( 1, 1 );
+    SetMeshOutputCounts( 1, 1 );
 
     outputVerts[ 0 ].vPositionPs = float4( 0, 1, 0, 0 );
     outputIB[ 0 ] = 0;
