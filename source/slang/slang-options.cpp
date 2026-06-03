@@ -3496,7 +3496,33 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     if (SLANG_SUCCEEDED(
                             TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
                     {
-                        m_session->setDownstreamCompilerPath(passThrough, name.value.getBuffer());
+                        // Executable-based downstream compilers (Metal, GCC,
+                        // Clang) locate the tool by combining the user-supplied
+                        // directory with a fixed executable name.  Users often
+                        // pass the full path to the executable instead (e.g.
+                        // `-metal-path "C:\...\bin\metal.exe"`), which produces
+                        // a doubled path.  Normalize to the parent directory for
+                        // these compilers only.  Shared-library backends (DXC,
+                        // FXC, NVRTC, etc.) already handle file-vs-directory
+                        // disambiguation in their own locators and rely on the
+                        // exact filename the user supplied.
+                        String compilerPath = name.value;
+                        if (passThrough == SLANG_PASS_THROUGH_METAL ||
+                            passThrough == SLANG_PASS_THROUGH_CLANG ||
+                            passThrough == SLANG_PASS_THROUGH_GCC ||
+                            passThrough == SLANG_PASS_THROUGH_GENERIC_C_CPP)
+                        {
+                            SlangPathType pathType;
+                            if (compilerPath.getLength() &&
+                                SLANG_SUCCEEDED(Path::getPathType(compilerPath, &pathType)) &&
+                                pathType == SLANG_PATH_TYPE_FILE)
+                            {
+                                String parentDir = Path::getParentDirectory(compilerPath);
+                                if (parentDir.getLength())
+                                    compilerPath = parentDir;
+                            }
+                        }
+                        m_session->setDownstreamCompilerPath(passThrough, compilerPath.getBuffer());
                         continue;
                     }
                     else
