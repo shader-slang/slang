@@ -38,19 +38,9 @@ static void _escapeDependencyString(const char* string, StringBuilder& outBuilde
     }
 }
 
-// Writes a line to the file stream, formatted like this:
-//   <output-file>: <dependency-file> <dependency-file...>
-//
-// When outputPath is empty (output going to stdout), "-" is used as the make target placeholder.
-// This follows the Unix convention where "-" denotes stdin/stdout, and keeps the depfile
-// syntactically valid so tools that only care about the dependency list (right of ":") still work.
-//
-// writtenStdoutSentinel deduplicates the "-: ..." line when this function is called more than
-// once with an empty path. This happens today when a SlangModule-container compile runs without
-// an explicit container output path: the whole-target call site emits the "-: <deps>" line,
-// then the SlangModule branch in writeDependencyFile would emit an identical line — the guard
-// suppresses the duplicate. The same suppression covers any future call site that also passes
-// an empty path.
+// Writes a "<output-file>: <dep> <dep...>" line to the stream.
+// When outputPath is empty (output to stdout), "-" is used as the make target placeholder.
+// writtenStdoutSentinel prevents duplicate "-: ..." lines across multiple call sites.
 static void _writeDependencyStatement(
     Stream& stream,
     EndToEndCompileRequest* compileRequest,

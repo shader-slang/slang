@@ -2,10 +2,10 @@
 // Tests for -depfile output, covering both file-output and stdout-output (no -o) cases,
 // plus a dedup guard test exercising the writtenStdoutSentinel branch.
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process-util.h"
-#include "../../source/slang/slang-compiler-api.h"
-#include "../../source/slang/slang-internal.h"
+#include "core/slang-io.h"
+#include "core/slang-process-util.h"
+#include "slang/slang-compiler-api.h"
+#include "slang/slang-internal.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

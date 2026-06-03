@@ -62,31 +62,9 @@ The space between - D and &lt;name&gt; is optional. If no &lt;value&gt; is speci
 
 Save the source file dependency list in a file. 
 
-The file uses Makefile dependency syntax: &lt;target&gt;: &lt;dep1&gt; &lt;dep2&gt; ... 
+Uses Makefile dependency syntax: &lt;output&gt;: &lt;dep&gt; &lt;dep...&gt; 
 
-Each compiled output produces one line where [&lt;target&gt;](#target-1) is the output file path. 
-
-When no [-o](#o) flag is given for a target (output goes to stdout), - is used as the 
-
-Make target placeholder, following the Unix convention where - denotes stdin/stdout. 
-
-This keeps the depfile syntactically valid so tools that only care about the 
-
-dependency list still work. Build systems that match on the target name will not 
-
-find a rule for -; pass [-o](#o) explicitly or filter out -: lines if needed. 
-
-Slang uses - rather than the input filename (GCC -MD style) because the output 
-
-format is not derived from the input name. 
-
-When some targets have an explicit [-o](#o) path and others do not, each target gets its 
-
-own depfile line; named targets produce &lt;path&gt;: &lt;deps&gt; and unnamed ones produce 
-
--: &lt;deps&gt;. When several targets all lack [-o](#o), only one -: &lt;deps&gt; line is written; 
-
-a deduplication guard suppresses the redundant identical lines. 
+When no [-o](#o) is given, - is used as the make target (output goes to stdout). 
 
 
 <a id="entry"></a>
