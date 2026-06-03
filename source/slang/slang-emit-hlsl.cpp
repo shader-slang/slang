@@ -672,8 +672,7 @@ void HLSLSourceEmitter::ensureCoopVecHlslPreludeForProfile()
 {
     ensurePrelude("#include \"dx/linalg.h\"");
 
-    auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
-    if (targetProfile.getVersion() > ProfileVersion::DX_6_9)
+    if (m_effectiveProfile.getVersion() > ProfileVersion::DX_6_9)
     {
         ensurePrelude(m_CoopVecPrelude_sm610);
     }
@@ -1049,6 +1048,12 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 
 static bool isTargetHLSL2018(HLSLSourceEmitter* emitter, CapabilitySet targetCaps, Stage stage)
 {
+    if (stage == Stage::Unknown)
+    {
+        // Whole-program emission may not have an entry-point stage.
+        return !targetCaps.implies(CapabilitySet(CapabilityName::hlsl_2018));
+    }
+
     auto stageAtom = getAtomFromStage(stage);
 
     // Cache the result of this function for easier lookup.
@@ -1163,8 +1168,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             // SM6.0 requires to use `and()` and `or()` functions for the logical-AND and
             // logical-OR, respectively, with non-scalar operands.
-            auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
-            if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
+            if (m_effectiveProfile.getVersion() < ProfileVersion::DX_6_0)
                 return false;
             auto targetCaps = getTargetReq()->getTargetCaps();
             if (!isTargetHLSL2018(this, targetCaps, m_entryPointStage))
@@ -1191,8 +1195,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             // SM6.0 requires to use `select()` instead of the ternary operator "?:" when the
             // operands are non-scalar.
-            auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
-            if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
+            if (m_effectiveProfile.getVersion() < ProfileVersion::DX_6_0)
                 return false;
             auto targetCaps = getTargetReq()->getTargetCaps();
             if (!isTargetHLSL2018(this, targetCaps, m_entryPointStage))
@@ -1572,8 +1575,8 @@ static bool _canEmitExport(const Profile& profile)
 {
     const auto family = profile.getFamily();
     const auto version = profile.getVersion();
-    // Is ita late enough version of shader model to output with 'export'
-    return (family == ProfileFamily::DX && version >= ProfileVersion::DX_6_1);
+    // DXC rejects pre-SM6.3 library profiles for whole-program DXIL output.
+    return (family == ProfileFamily::DX && version >= ProfileVersion::DX_6_3);
 }
 
 /* virtual */ void HLSLSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)

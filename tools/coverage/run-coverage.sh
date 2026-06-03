@@ -142,21 +142,138 @@ else
   if [[ "$WITH_AGENTIC_TESTS" == "true" ]]; then
     echo
     echo "Running agentic test suite (docs/generated/tests/) for coverage..."
-    AGENTIC_TEST_ARGS=("-test-dir" "docs/generated/tests")
-    # Inherit server-count from the main pass when in use.
-    for ((i = 0; i < ${#TEST_ARGS[@]}; i++)); do
-      if [[ "${TEST_ARGS[i]}" == "-use-test-server" ]]; then
-        AGENTIC_TEST_ARGS+=("-use-test-server")
-      elif [[ "${TEST_ARGS[i]}" == "-server-count" ]]; then
-        AGENTIC_TEST_ARGS+=("-server-count" "${TEST_ARGS[i + 1]}")
-      fi
+    # Use the agentic suite's own expected-failure list.
+    # `slang-test -expected-failure-list` does EXACT-STRING matching:
+    # listed paths get reclassified to `failed(expected)` (slang-test's
+    # TestResult::ExpectedFail), the run exits 0 when only those
+    # occur, and any entry that has started passing is reported under
+    # "passing tests that are expected to fail" so it can be removed.
+    # Caveat: multi-//TEST tests are named per sub-test
+    # (`foo.slang`, `foo.slang.1`, …), so if a specific sub-test
+    # needs suppression, the entry must include the `.N` suffix —
+    # there is no canonicalization on this path.
+    # Build the agentic invocation: start with the agentic-specific
+    # overrides (test-dir and expected-failure-list — those are
+    # what differ from the main pass), then inherit every other
+    # flag from the main pass's TEST_ARGS so settings like
+    # -use-test-server, -synthesizedTestApi,
+    # -skip-reference-image-generation, -enable-debug-layers, etc.
+    # apply uniformly. -server-count is also overridden, but in a
+    # dedicated block further down (the value gets forced to 1 for
+    # sequential execution under coverage instrumentation; see the
+    # comment at the `AGENTIC_TEST_ARGS+=("-server-count" "1")`
+    # line for the rationale). This keeps the agentic pass running
+    # in the same slang-test mode as the main pass; the only
+    # differences are which tests run, which list of failures to
+    # expect, and forced sequential execution.
+    AGENTIC_TEST_ARGS=(
+      "-test-dir" "docs/generated/tests"
+      "-expected-failure-list" "docs/generated/tests/_meta/expected-failures.txt"
+    )
+    # Walk TEST_ARGS one token at a time and classify each:
+    #   - Agentic-overridden value-taking flags (-test-dir,
+    #     -expected-failure-list, -server-count): skip flag + value.
+    #   - Known no-value option flags (used in the coverage workflow's
+    #     test_args): inherit as a lone token.
+    #   - Any other "-*" flag: assume it takes a value and inherit
+    #     flag + value. Default-to-two-arg is the safer policy: if a
+    #     future maintainer adds e.g. `-capability spirv_1_5` to the
+    #     workflow's test_args, the value is preserved instead of
+    #     being silently dropped as a "bare positional." If a new
+    #     no-value flag is ever added to test_args, add it to the
+    #     explicit no-value case above so the next token isn't
+    #     swallowed as a phantom value.
+    #   - Bare positional tokens (test selectors): drop. The agentic
+    #     pass runs over its own -test-dir; inheriting positionals
+    #     from the main pass would silently narrow the agentic run.
+    #     CI doesn't pass bare positionals here today; this only
+    #     guards local-dev `run-coverage.sh --with-agentic-tests foo`.
+    i=0
+    while [ "$i" -lt "${#TEST_ARGS[@]}" ]; do
+      arg="${TEST_ARGS[i]}"
+      case "$arg" in
+      -test-dir | -expected-failure-list | -server-count)
+        i=$((i + 2))
+        ;;
+      -use-test-server | -skip-reference-image-generation | -show-adapter-info | -only-synthesized)
+        AGENTIC_TEST_ARGS+=("$arg")
+        i=$((i + 1))
+        ;;
+      -*)
+        if [ "$((i + 1))" -lt "${#TEST_ARGS[@]}" ]; then
+          AGENTIC_TEST_ARGS+=("$arg" "${TEST_ARGS[i + 1]}")
+          i=$((i + 2))
+        else
+          AGENTIC_TEST_ARGS+=("$arg")
+          i=$((i + 1))
+        fi
+        ;;
+      *)
+        i=$((i + 1))
+        ;;
+      esac
     done
+    # Force sequential execution for the agentic pass under coverage.
+    # On Linux coverage we hit a deterministic SIGSEGV in slang-test
+    # (runs 26810699621, 26813684019) that kills the orchestrator and
+    # loses the tail of the suite. With -server-count 1 the crashing
+    # test is unambiguously the last one printed before the segfault,
+    # so we can identify it and add it to AGENTIC_COVERAGE_EXCLUDES
+    # (below). Once the list is stable we may flip back to parallel.
+    # Sequential adds wall time on Linux coverage but the workflow
+    # runs once a day; data quality > runner-minute savings.
+    AGENTIC_TEST_ARGS+=("-server-count" "1")
+
+    # Read coverage-only exclude list from
+    # docs/generated/tests/_meta/agentic-coverage-excludes.txt and add
+    # one -exclude-prefix flag per entry. These are tests that crash
+    # slang-test under coverage instrumentation (the orchestrator dies
+    # SIGSEGV and loses the tail of the suite); they still run in
+    # ci-agentic-tests-nightly against the uninstrumented binary.
+    AGENTIC_COVERAGE_EXCLUDES_FILE="$REPO_ROOT/docs/generated/tests/_meta/agentic-coverage-excludes.txt"
+    if [ -f "$AGENTIC_COVERAGE_EXCLUDES_FILE" ]; then
+      while IFS= read -r line || [ -n "$line" ]; do
+        # Strip trailing comment, then trim whitespace.
+        line="${line%%#*}"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        if [ -n "$line" ]; then
+          AGENTIC_TEST_ARGS+=("-exclude-prefix" "$line")
+        fi
+      done <"$AGENTIC_COVERAGE_EXCLUDES_FILE"
+    fi
+    # Retry once on crash (exit > 128 = killed by signal). The suite
+    # is long (~2680 bundles); a single SIGSEGV in slang-test mid-run
+    # loses the rest of the pass and produces minimal coverage uplift.
+    # Profraws from the first attempt are kept on disk and accumulate
+    # with the retry's so coverage from both runs merges into the
+    # report.
+    #
+    # Retries only fire on crashes, not on unexpected test failures
+    # (those repeat deterministically and would just waste runner
+    # time). The retry helps *flaky* crashes — for a reproducible
+    # SIGSEGV the second attempt is pure overhead and will crash at
+    # the same point. The 2-attempt cap bounds that cost.
+    AGENTIC_MAX_ATTEMPTS=2
     AGENTIC_EXIT=0
-    "$SLANG_TEST" "${AGENTIC_TEST_ARGS[@]}" || AGENTIC_EXIT=$?
+    for attempt in $(seq 1 $AGENTIC_MAX_ATTEMPTS); do
+      if [ "$attempt" -gt 1 ]; then
+        echo "Retrying agentic-test pass (attempt $attempt of $AGENTIC_MAX_ATTEMPTS)..."
+      fi
+      AGENTIC_EXIT=0
+      "$SLANG_TEST" "${AGENTIC_TEST_ARGS[@]}" || AGENTIC_EXIT=$?
+      if [ "$AGENTIC_EXIT" -le 128 ]; then
+        # Not a crash — passed, or had expected/unexpected failures.
+        # Don't retry; those don't change on a re-run.
+        break
+      fi
+      echo "Warning: agentic-test pass crashed (signal $((AGENTIC_EXIT - 128))) on attempt $attempt of $AGENTIC_MAX_ATTEMPTS"
+    done
+
     if [ "$AGENTIC_EXIT" -gt 128 ]; then
-      echo "Warning: agentic-test pass crashed (signal $((AGENTIC_EXIT - 128)))"
+      echo "Warning: agentic-test pass crashed on all $AGENTIC_MAX_ATTEMPTS attempts (signal $((AGENTIC_EXIT - 128))). Partial coverage data still collected."
     elif [ "$AGENTIC_EXIT" -ne 0 ]; then
-      echo "Note: agentic-test pass had test failures (exit code $AGENTIC_EXIT). Coverage data still collected."
+      echo "Note: agentic-test pass had unexpected test failures (exit code $AGENTIC_EXIT). Coverage data still collected; see ci-agentic-tests-nightly.yml for the authoritative pass/fail gate."
     fi
   fi
 
