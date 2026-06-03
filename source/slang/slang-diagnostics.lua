@@ -928,6 +928,13 @@ err(
     span { loc = "location", message = "unexpected function body after signature declaration, is this ';' a typo?" }
 )
 
+warning(
+    "keyword-as-identifier-name",
+    20103,
+    "'~name:Name' is a contextual keyword and using it as a declaration name will produce surprising results",
+    span { loc = "location", message = "'~name' is a contextual keyword; rename the declaration to avoid parser ambiguity" }
+)
+
 err(
     "decl-not-allowed",
     30102,
