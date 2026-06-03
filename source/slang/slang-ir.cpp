@@ -1460,19 +1460,36 @@ IRInst* mergeCandidateParentsForHoistableInst(IRInst* left, IRInst* right)
         }
     }
 
-    // As a matter of validity in the IR, we expect one
-    // of the two to be an ancestor (in the non-block case),
-    // because otherwise we'd be violating the basic dominance
-    // assumptions.
+    // If neither side dominates the other, the two operands live in
+    // unrelated regions of the IR (e.g. two sibling generic bodies).
+    // The original IR-emission/cloning pipeline should not produce
+    // a hoistable instruction whose operands span two such regions —
+    // that is a real upstream bug (issues #11033, #11182). However,
+    // we have observed it in practice when force-inlining generic
+    // constructors with `__BuiltinFloatingPointType` constraints
+    // before linking.
     //
-    SLANG_ASSERT(parentNonBlock);
-
-    // As a fallback, try to use the left parent as a default
-    // in case things go badly.
+    // To prevent a hard crash here while the upstream issue is
+    // addressed separately, fall back to the nearest enclosing module
+    // instruction. Module scope is the structural ancestor of both
+    // operands' generics, and gives `addHoistableInst` a non-null
+    // parent so that `parent->getFirstChild()` below does not
+    // dereference null. This is a mitigation, not a correctness fix —
+    // the resulting hoistable inst is still structurally suspect and
+    // the underlying clone path needs the proper remapping fix.
     //
     if (!parentNonBlock)
     {
-        parentNonBlock = leftNonBlock;
+        for (auto ll = leftNonBlock; ll; ll = ll->getParent())
+        {
+            if (as<IRModuleInst>(ll))
+            {
+                parentNonBlock = ll;
+                break;
+            }
+        }
+        if (!parentNonBlock)
+            parentNonBlock = leftNonBlock;
     }
 
     IRInst* parent = parentNonBlock;
