@@ -426,8 +426,12 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(
     IRFunc* irFunc,
     IREntryPointDecoration* entryPointDecor)
 {
-    SLANG_UNUSED(irFunc);
-    SLANG_UNUSED(entryPointDecor);
+    if (entryPointDecor->getProfile().getStage() == Stage::Node)
+    {
+        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = "CUDA node shader stage",
+            .location = irFunc->sourceLoc});
+    }
 }
 
 void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
