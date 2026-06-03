@@ -17155,11 +17155,27 @@ uint WaveGetNumWaves()
     case glsl:
         __intrinsic_asm "(gl_NumSubgroups)";
     case spirv:
-        return spirv_asm
+        // SPIR-V's `BuiltIn NumSubgroups` is restricted to compute-class
+        // execution models (GLCompute / MeshEXT / TaskEXT) by
+        // VUID-NumSubgroups-NumSubgroups-04293. Using it from a
+        // raytracing entry point produces spec-invalid SPIR-V that
+        // spirv-val rejects (#11303).
+        __stage_switch
         {
-            OpCapability GroupNonUniform;
-            result:$$uint = OpLoad builtin(NumSubgroups:uint)
-        };
+        case compute:
+        case _mesh:
+        case _amplification:
+            return spirv_asm
+            {
+                OpCapability GroupNonUniform;
+                result:$$uint = OpLoad builtin(NumSubgroups:uint)
+            };
+        default:
+            static_assert(
+                false,
+                "WaveGetNumWaves is only supported in compute-class execution models for SPIR-V");
+            return 0;
+        }
     default:
         // For HLSL/CUDA/Metal/WGSL: compute from workgroup size and wave size
         __stage_switch
@@ -17200,11 +17216,26 @@ uint WaveGetWaveIndex()
             return flattenedTid / WaveGetLaneCount();
         }
     case spirv:
-        return spirv_asm
+        // SPIR-V's `BuiltIn SubgroupId` is restricted to compute-class
+        // execution models by VUID-SubgroupId-SubgroupId-04367. Using
+        // it from a raytracing entry point produces spec-invalid
+        // SPIR-V that spirv-val rejects (#11303).
+        __stage_switch
         {
-            OpCapability GroupNonUniform;
-            result:$$uint = OpLoad builtin(SubgroupId:uint)
-        };
+        case compute:
+        case _mesh:
+        case _amplification:
+            return spirv_asm
+            {
+                OpCapability GroupNonUniform;
+                result:$$uint = OpLoad builtin(SubgroupId:uint)
+            };
+        default:
+            static_assert(
+                false,
+                "WaveGetWaveIndex is only supported in compute-class execution models for SPIR-V");
+            return 0;
+        }
     case metal:
         return __builtinWaveIndex;
     case wgsl:
