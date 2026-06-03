@@ -1037,9 +1037,11 @@ void printHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void* userData
     for (uint32_t i = 1; i < inst->operandCount; ++i)
     {
         auto& arg = inst->getOperand(i);
+        auto argSize =
+            arg.section == (uint8_t**)&ctx->m_stringLitsPtr ? sizeof(const char*) : arg.size;
         List<uint8_t> data;
-        data.setCount(arg.size);
-        memcpy(data.getBuffer(), arg.getPtr(), arg.size);
+        data.setCount(argSize);
+        memcpy(data.getBuffer(), arg.getPtr(), argSize);
         args.add(data);
     }
     for (auto& arg : args)
