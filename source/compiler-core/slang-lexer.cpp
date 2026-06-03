@@ -1328,6 +1328,13 @@ static TokenType _lexTokenImpl(Lexer* lexer)
             switch (_peek(lexer))
             {
             default:
+                // A bare `0` may be followed by the legacy MSVC infinity
+                // form `#INF` (so that `0#INF` parses as a floating-point
+                // literal, matching `1#INF` which already works through the
+                // 1-9 → `_lexNumber` path; #11276 Case 2). For any other
+                // trailing character the `0` is just an integer literal.
+                if (_maybeLexNumberExponent(lexer, 10))
+                    return _maybeLexNumberSuffix(lexer, TokenType::FloatingPointLiteral);
                 return _maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
 
             case '.':
