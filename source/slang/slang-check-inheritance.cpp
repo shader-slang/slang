@@ -433,6 +433,50 @@ SubtypeWitness* SharedSemanticsContext::_specializeInterfaceInheritanceWitness(
         baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution));
 }
 
+bool SharedSemanticsContext::tryResolveConstraintTypes(
+    DeclRef<GenericTypeConstraintDecl> constraintDeclRef)
+{
+    // Try to resolve the endpoint types of a constraint enough to match it during
+    // inheritance computation. Shared by both constraint scans in
+    // `_calcInheritanceInfo`. For an endpoint that is not yet resolved:
+    //
+    //   * a *leaf* reference (a bare type-parameter / associated-type name) is safe to
+    //     resolve eagerly -- resolving it performs no member lookup on the type
+    //     currently being computed -- and resolving it now lets a facet-introducing
+    //     constraint take effect regardless of the order constraints are written in;
+    //
+    //   * a *multi-level* (member-expression) access such as `T.A.C` must NOT be
+    //     resolved here: the lookup of `C` on `T.A` would re-enter `T.A`'s in-progress
+    //     inheritance and fail with a spurious "member not found" (and poison the
+    //     subtype).
+    //
+    // Returns true if the endpoints are resolved and the caller may match the
+    // constraint. Returns false if a multi-level endpoint is still unresolved; the
+    // caller then defers the constraint (the scans record it as an in-progress skip so
+    // the frame is reported partial and recomputed later -- see the call sites).
+    SemanticsVisitor visitor(this);
+    auto constraintDecl = constraintDeclRef.getDecl();
+
+    auto resolveLeafOrDefer = [&](TypeExp& endpoint) -> bool // true if must defer
+    {
+        if (endpoint.type)
+            return false; // already resolved -> observe
+        if (as<MemberExpr>(endpoint.exp))
+            return true;                                      // unresolved multi-level -> defer
+        endpoint = visitor.TranslateTypeNodeForced(endpoint); // leaf -> safe eager resolve
+        return false;
+    };
+
+    ensureDecl(&visitor, constraintDecl, DeclCheckState::ScopesWired);
+    visitor.CheckConstraintSubType(constraintDecl->sub);
+
+    bool mustDefer = resolveLeafOrDefer(constraintDecl->sub);
+    if (constraintDecl->isEqualityConstraint)
+        mustDefer = resolveLeafOrDefer(constraintDecl->sup) || mustDefer;
+
+    return !mustDefer;
+}
+
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     DeclRef<Decl> declRef,
     Type* selfType,
@@ -957,29 +1001,15 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     if (constraintDecl->checkState.isBeingChecked())
                         continue;
 
-                    // Do not force-check (`ensureDecl`) an as-yet-unresolved sibling
-                    // constraint from inside an inheritance computation. Resolving its
-                    // subject performs a member lookup that can re-enter the very type
-                    // we are currently computing: e.g. while computing `This.A` we would
-                    // resolve a sibling `__constraint A.C : I`, look up `C` on the
-                    // still-in-progress `A`, and spuriously report "member not found"
-                    // (which also poisons the sibling's subtype). This bites when two
-                    // multi-level constraints share a leading associated type -- the
-                    // first one's check drives the computation of `A`, whose constraint
-                    // scan then trips over the second.
-                    //
-                    // Every interface-level constraint is checked on its own as a direct
-                    // interface member, so here we only need to *observe* those whose
-                    // endpoints are already resolved. An unresolved sibling is skipped
-                    // and the result is reported partial (not cached) -- reusing the
-                    // mechanism that breaks benevolent equality cycles -- so the query
-                    // re-runs once that constraint has been checked. The constraint's
-                    // own `DeclRef` is never the self of an inheritance frame, so it is
-                    // never removed from the skipped set, which keeps every frame up to
-                    // the root from caching until the constraint is resolved. See
-                    // `_getInheritanceInfo`.
-                    if (!constraintDecl->sub.type ||
-                        (constraintDecl->isEqualityConstraint && !constraintDecl->sup.type))
+                    // Observe a constraint whose endpoint types resolve; defer one whose
+                    // subject is an unresolved multi-level access (resolving it would
+                    // re-enter the in-progress type). On deferral, record the constraint
+                    // as an in-progress skip so this frame is reported partial (and not
+                    // cached) and recomputed once the constraint has been checked on its
+                    // own; the constraint's own `DeclRef` is never the self of an
+                    // inheritance frame, so it is never removed from the skipped set. See
+                    // `_getInheritanceInfo`. Shared with the generic-parameter scan below.
+                    if (!tryResolveConstraintTypes(constraintDeclRef))
                     {
                         if (ioSkippedInProgress)
                             ioSkippedInProgress->add(constraintDeclRef);
@@ -1112,23 +1142,29 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         for (auto constraintDeclRef :
              getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericDeclRef))
         {
-            if (constraintDeclRef.getDecl()->checkState.isBeingChecked())
+            auto constraintDecl = constraintDeclRef.getDecl();
+            if (constraintDecl->checkState.isBeingChecked())
                 continue;
 
-            ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::ScopesWired);
-
-            // Check only the sub-type.
-            visitor.CheckConstraintSubType(constraintDeclRef.getDecl()->sub);
-            auto sub = constraintDeclRef.getDecl()->sub;
-
-            // If the sub-type part of the generic constraint is a member expression, it can't
-            // possibly be defining a constraint for a generic type parameter, so we skip it
-            // to avoid circular checking on the generic param type.
-            if (selfIsGenericParamType && as<MemberExpr>(sub.exp))
+            // A member-expression subject can't possibly constrain the *bare* generic
+            // type parameter (it constrains a deeper access), so skip it outright when
+            // computing the parameter's own inheritance -- this avoids circular checking
+            // on the generic param type.
+            if (selfIsGenericParamType && as<MemberExpr>(constraintDecl->sub.exp))
                 continue;
 
-            if (!sub.type)
-                sub = visitor.TranslateTypeNodeForced(sub);
+            // Observe a constraint whose endpoint types resolve; defer one whose subject
+            // is an unresolved multi-level access. On deferral, record it as an
+            // in-progress skip so the frame is reported partial and recomputed later
+            // (same as the associated-type scan above; see `_getInheritanceInfo`).
+            if (!tryResolveConstraintTypes(constraintDeclRef))
+            {
+                if (ioSkippedInProgress)
+                    ioSkippedInProgress->add(constraintDeclRef);
+                continue;
+            }
+
+            auto sub = constraintDecl->sub;
 
             // Canonicalize the constraint declRef to make sure we have a full reference to it.
             constraintDeclRef =

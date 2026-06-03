@@ -817,6 +817,18 @@ public:
     /// Invalidate inheritance info for `type`
     void invalidateInheritanceInfo(Type* type);
 
+    /// Try to resolve the endpoint types of `constraintDeclRef` enough to match it
+    /// during inheritance computation, for both constraint scans in
+    /// `_calcInheritanceInfo` (the access-centric scan for associated-type accesses and
+    /// the sub-centric scan for generic type parameters). A leaf endpoint is resolved
+    /// eagerly; an unresolved multi-level (member-expression) endpoint is NOT resolved
+    /// (doing so would re-enter the in-progress type).
+    ///
+    /// Returns true if the endpoints are resolved and the caller may proceed to match
+    /// the constraint; false if a multi-level endpoint is still unresolved (the caller
+    /// then defers the constraint and records it as an in-progress skip).
+    bool tryResolveConstraintTypes(DeclRef<GenericTypeConstraintDecl> constraintDeclRef);
+
     void registerAssociatedDecl(Decl* original, DeclAssociationKind assoc, Decl* declaration);
 
     List<RefPtr<DeclAssociation>> const& getAssociatedDeclsForDecl(Decl* decl);
