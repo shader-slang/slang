@@ -3,6 +3,8 @@
 //
 // Defines a type inside a namespace that the importing module reopens.
 
+module nested_namespace_lib;
+
 namespace Foo
 {
     public struct ImportedType

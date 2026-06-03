@@ -4165,18 +4165,23 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
                 namespaceDecl->nameAndLoc = nameAndLoc;
                 namespaceDecl->loc = nameAndLoc.loc;
                 AddMember(parentDecl, namespaceDecl);
-                // Push a fresh scope for the parent namespace only when we are
-                // not already inside it. For the dotted-name form
-                // `namespace A.B { ... }`, `A` was created in a previous
-                // iteration of this loop and is not yet the current scope, so we
-                // must push it to nest `B`. But when a `namespace` appears
-                // directly inside another namespace's body, e.g.
-                // `namespace Foo { namespace Nested {} }`, `parentDecl` is the
-                // enclosing namespace we are already inside; pushing here would
-                // overwrite its `ownedScope` (see `PushScope`), diverging the
-                // scope that lexical members (e.g. a sibling `struct`) see from
-                // the one cross-module sibling-namespace wiring attaches imports
-                // to, breaking unqualified lookup of imported names (#11442).
+                // Push a fresh scope for the parent namespace only when it is
+                // not already the current scope. The reopened namespace's
+                // `ownedScope` must stay the same `Scope` object its lexical
+                // members are parsed under, because the semantic checker wires
+                // cross-module same-name namespaces (and thus their imports)
+                // onto `ownedScope->nextSibling`
+                // (`SemanticsDeclScopeWiringVisitor::visitNamespaceDecl` ->
+                // `addSiblingScopeForContainerDecl`) while unqualified lookup
+                // walks the lexical scope; if the two diverge, imported names
+                // become unreachable from the body (#11442). `PushScope`
+                // overwrites `ownedScope`, so it must run only for a
+                // not-yet-entered parent: it nests `B` in `namespace A.B {}`
+                // (and `A` in `namespace Foo { namespace A.B {} }`), but is
+                // skipped for a namespace nested in an already-entered body
+                // (`namespace Foo { namespace Nested {} }`), which would
+                // otherwise stomp the enclosing scope after its members were
+                // parsed.
                 if (auto parentNamespace = as<NamespaceDecl>(parentDecl);
                     parentNamespace && parentDecl != parser->currentScope->containerDecl)
                 {
