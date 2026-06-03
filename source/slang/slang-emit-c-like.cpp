@@ -4465,7 +4465,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     // template types in HLSL/DXC; emitting a struct definition would shadow the built-in
     // and break DXC's recognition of the type. Suppress both annotated and unannotated
     // instances — the unannotated base struct should never appear in emitted code.
-    if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>())
+    if (isWorkGraphRecordType(structType))
     {
         return;
     }
@@ -5438,7 +5438,7 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
     case kIROp_StructType:
         // Work-graph record types are native HLSL/DXC template types;
         // forward-declaring them as structs would hide the built-in.
-        if (inst->findDecoration<IRWorkGraphRecordTypeDecoration>())
+        if (isWorkGraphRecordType(cast<IRType>(inst)))
             break;
         m_writer->emit("struct ");
         m_writer->emit(getName(inst));

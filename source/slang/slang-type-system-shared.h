@@ -13,7 +13,7 @@ enum BarrierMemoryTypeFlags : uint32_t
     UavMemory = 0x01u,
     GroupSharedMemory = 0x02u,
     NodeInputMemory = 0x04u,
-    OutputMemory = 0x08u,
+    NodeOutputMemory = 0x08u,
     AllMemory = 0x0fu,
 };
 

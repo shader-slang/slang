@@ -1,11 +1,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -experimental-feature
 import experimental.workgraph;
 
-// Test that an invalid NodeLaunch mode produces diagnostic E31401.
+// Test that an invalid NodeLaunch mode produces diagnostic E31113.
 
 [shader("node")]
 [NodeLaunch("invalid")]
-//CHECK: E31401
+//CHECK: E31113
 [numthreads(1, 1, 1)]
 void main(RWBuffer<int> output)
 {

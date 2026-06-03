@@ -290,7 +290,7 @@ public enum BarrierMemoryTypeFlags : uint
     UAV_MEMORY          = 0x01,
     GROUP_SHARED_MEMORY = 0x02,
     NODE_INPUT_MEMORY   = 0x04,
-    OUTPUT_MEMORY       = 0x08,
+    NODE_OUTPUT_MEMORY  = 0x08,
     ALL_MEMORY          = 0x0f,
 }
 

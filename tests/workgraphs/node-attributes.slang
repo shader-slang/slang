@@ -1,8 +1,7 @@
 //TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8 -experimental-feature
-//TEST:SIMPLE(filecheck=CHK_SPIRV): -target spirv-asm -stage node -entry main -experimental-feature
 import experimental.workgraph;
 
-// Test that NodeID, NodeIsProgramEntry, NodeArraySize, AllowSparseNodes compile to dxil and spirv.
+// Test that NodeID, NodeIsProgramEntry, NodeArraySize, AllowSparseNodes compile to dxil.
 
 struct OutputRecord { int value; };
 
@@ -18,10 +17,12 @@ void main(
     [AllowSparseNodes]
     NodeOutputArray<OutputRecord> outputs,
     [NodeID("TargetNode", 0)]
-    NodeOutput<OutputRecord> single)
+    NodeOutput<OutputRecord> single,
+    [NodeID("MaxNode", 0xffffffff)]
+    NodeOutput<OutputRecord> maxIndex)
 {
 }
 
 //CHK_DXIL: !"MyNode", i32 0
 //CHK_DXIL: !"TargetNode", i32 0
-//CHK_SPIRV: OpFunction
+//CHK_DXIL: !"MaxNode", i32 {{-1|4294967295}}

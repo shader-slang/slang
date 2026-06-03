@@ -48,13 +48,18 @@ ConstantIntVal* SemanticsVisitor::checkConstantIntVal(Expr* expr)
 
 static bool _checkWorkGraphUInt32AttributeValue(
     DiagnosticSink* sink,
-    ConstantIntVal* value,
+    IntVal* value,
     Expr* arg,
     char const* attrName)
 {
     static const IntegerLiteralValue kMaxUInt32Value = 0xffffffffLL;
 
-    const auto literalValue = value->getValue();
+    auto constValue = as<ConstantIntVal>(value);
+    SLANG_ASSERT(constValue);
+    if (!constValue)
+        return false;
+
+    const auto literalValue = constValue->getValue();
     if (literalValue < 0 || literalValue > kMaxUInt32Value)
     {
         sink->diagnose(Diagnostics::InvalidWorkGraphAttributeUint32Value{
@@ -530,6 +535,22 @@ Modifier* SemanticsVisitor::validateAttribute(
         gridAttr->z = checkConstantIntVal(attr->args[2]);
         if (!gridAttr->x || !gridAttr->y || !gridAttr->z)
             return nullptr;
+        if (!_checkWorkGraphUInt32AttributeValue(
+                getSink(),
+                gridAttr->x,
+                attr->args[0],
+                "NodeMaxDispatchGrid x") ||
+            !_checkWorkGraphUInt32AttributeValue(
+                getSink(),
+                gridAttr->y,
+                attr->args[1],
+                "NodeMaxDispatchGrid y") ||
+            !_checkWorkGraphUInt32AttributeValue(
+                getSink(),
+                gridAttr->z,
+                attr->args[2],
+                "NodeMaxDispatchGrid z"))
+            return nullptr;
     }
     else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(attr))
     {
@@ -538,6 +559,22 @@ Modifier* SemanticsVisitor::validateAttribute(
         fixedGridAttr->y = checkConstantIntVal(attr->args[1]);
         fixedGridAttr->z = checkConstantIntVal(attr->args[2]);
         if (!fixedGridAttr->x || !fixedGridAttr->y || !fixedGridAttr->z)
+            return nullptr;
+        if (!_checkWorkGraphUInt32AttributeValue(
+                getSink(),
+                fixedGridAttr->x,
+                attr->args[0],
+                "NodeDispatchGrid x") ||
+            !_checkWorkGraphUInt32AttributeValue(
+                getSink(),
+                fixedGridAttr->y,
+                attr->args[1],
+                "NodeDispatchGrid y") ||
+            !_checkWorkGraphUInt32AttributeValue(
+                getSink(),
+                fixedGridAttr->z,
+                attr->args[2],
+                "NodeDispatchGrid z"))
             return nullptr;
     }
     else if (auto maxRecAttr = as<MaxRecordsAttribute>(attr))

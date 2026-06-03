@@ -13,11 +13,11 @@ void main(RWBuffer<int> buf)
     // Single flags
     Barrier(BarrierMemoryTypeFlags.UAV_MEMORY, BarrierSemanticFlags.GROUP_SYNC);
     // Combined flags
-    Barrier(BarrierMemoryTypeFlags.UAV_MEMORY | BarrierMemoryTypeFlags.NODE_INPUT_MEMORY, BarrierSemanticFlags.GROUP_SCOPE | BarrierSemanticFlags.DEVICE_SCOPE);
+    Barrier(BarrierMemoryTypeFlags.UAV_MEMORY | BarrierMemoryTypeFlags.NODE_INPUT_MEMORY | BarrierMemoryTypeFlags.NODE_OUTPUT_MEMORY, BarrierSemanticFlags.GROUP_SCOPE | BarrierSemanticFlags.DEVICE_SCOPE);
     // ALL_MEMORY convenience constant
     Barrier(BarrierMemoryTypeFlags.ALL_MEMORY, BarrierSemanticFlags.GROUP_SYNC);
 }
 
 //CHK: dx.op.barrierByMemoryType(i32 244, i32 1, i32 1)
-//CHK: dx.op.barrierByMemoryType(i32 244, i32 5, i32 6)
+//CHK: dx.op.barrierByMemoryType(i32 244, i32 13, i32 6)
 //CHK: dx.op.barrierByMemoryType(i32 244, i32 15, i32 1)

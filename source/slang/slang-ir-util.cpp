@@ -3320,7 +3320,19 @@ bool isWorkGraphRecordType(IRType* type)
     auto structType = as<IRStructType>(type);
     if (!structType)
         return false;
-    return structType->findDecoration<IRWorkGraphRecordTypeDecoration>() != nullptr;
+    if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>())
+        return true;
+
+    auto nameHint = structType->findDecoration<IRNameHintDecoration>();
+    if (!nameHint)
+        return false;
+
+    auto name = nameHint->getName();
+    return name == "DispatchNodeInputRecord" || name == "ThreadNodeInputRecord" ||
+           name == "GroupNodeInputRecords" || name == "EmptyNodeInput" ||
+           name == "ThreadNodeOutputRecords" || name == "GroupNodeOutputRecords" ||
+           name == "NodeOutput" || name == "NodeOutputArray" || name == "EmptyNodeOutput" ||
+           name == "EmptyNodeOutputArray";
 }
 
 } // namespace Slang

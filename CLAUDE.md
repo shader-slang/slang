@@ -283,7 +283,7 @@ slang-test must run from repository root
 
 **Diagnostic Tests** (see `docs/diagnostics.md` for full details):
 
-Use `// DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):` as the test directive to verify that the compiler emits expected diagnostics. Annotations in comments match against compiler output by message text, severity, or error code. Carets align to columns on the preceding source line:
+Use `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):` as the test directive to verify that the compiler emits expected diagnostics. Annotations in comments match against compiler output by message text, severity, or error code. Carets align to columns on the preceding source line:
 
 ```slang
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
@@ -564,7 +564,7 @@ Use this when a Slang enum must be emitted as named constants rather than intege
 
 4. **Register the new IR op in `slang-ir-insts.lua`** and add a stable ID in `slang-ir-insts-stable-names.lua`.
 
-5. **Emit the named-constant string in the target emitter** (e.g. `tryEmitInstExprImpl` in `slang-emit-hlsl.cpp`): read the compile-time integer operand via `getIntVal(inst->getOperand(0))`, then map each bit or value to its HLSL named-constant string and write it out with `m_writer->emit(...)`.
+5. **Emit the named-constant string in the target emitter** (e.g. `tryEmitInstExprImpl` in `slang-emit-hlsl.cpp`): keep the IR operation tied to the symbolic enum or intrinsic value, then map each accepted bit or value to its HLSL named-constant string and write it out with `m_writer->emit(...)`. Do not document or implement examples that recover HLSL source names from raw integer positions.
 
 ### Git commit message
 

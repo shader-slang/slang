@@ -11,8 +11,10 @@ struct Record
 [NodeLaunch("broadcasting")]
 //CHECK: unknown attribute 'NodeLaunch'
 [NodeDispatchGrid(1, 1, 1)]
+//CHECK: unknown attribute 'NodeDispatchGrid'
 [numthreads(1, 1, 1)]
 void main([MaxRecords(1)] NodeOutput<Record> output)
+//CHECK: unknown attribute 'MaxRecords'
 //CHECK: undefined identifier 'NodeOutput'
 {
 }

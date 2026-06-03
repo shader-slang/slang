@@ -1148,7 +1148,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
             const uint32_t knownFlags =
                 BarrierMemoryTypeFlags::UavMemory | BarrierMemoryTypeFlags::GroupSharedMemory |
-                BarrierMemoryTypeFlags::NodeInputMemory | BarrierMemoryTypeFlags::OutputMemory;
+                BarrierMemoryTypeFlags::NodeInputMemory | BarrierMemoryTypeFlags::NodeOutputMemory;
             m_writer->emit("(");
             // ALL_MEMORY has its own named constant; otherwise decompose into individual flags.
             if (flagVal == BarrierMemoryTypeFlags::AllMemory)
@@ -1180,7 +1180,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 emitFlag("UAV_MEMORY", BarrierMemoryTypeFlags::UavMemory);
                 emitFlag("GROUP_SHARED_MEMORY", BarrierMemoryTypeFlags::GroupSharedMemory);
                 emitFlag("NODE_INPUT_MEMORY", BarrierMemoryTypeFlags::NodeInputMemory);
-                emitFlag("OUTPUT_MEMORY", BarrierMemoryTypeFlags::OutputMemory);
+                emitFlag("NODE_OUTPUT_MEMORY", BarrierMemoryTypeFlags::NodeOutputMemory);
                 if (first)
                     m_writer->emit("0"); // no bits set — fallback
             }

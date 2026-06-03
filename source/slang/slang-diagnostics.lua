@@ -2562,42 +2562,42 @@ err(
 
 err(
     "invalid-node-launch-mode",
-    31401,
+    31113,
     "invalid 'NodeLaunch' mode",
     span { loc = "attr:Modifier", message = "invalid NodeLaunch mode '~mode:String'; expected 'broadcasting', 'thread', or 'coalescing'" }
 )
 
 err(
     "conflicting-node-grid-attributes",
-    31402,
+    31114,
     "conflicting node grid attributes",
     span { loc = "decl:Decl", message = "'[NodeDispatchGrid]' and '[NodeMaxDispatchGrid]' cannot both appear on the same node shader" }
 )
 
 err(
     "node-grid-attribute-requires-broadcasting",
-    31403,
+    31115,
     "node grid attribute requires broadcasting launch mode",
     span { loc = "decl:Decl", message = "'[NodeDispatchGrid]' and '[NodeMaxDispatchGrid]' are only valid on broadcasting-launch node shaders" }
 )
 
 err(
     "invalid-barrier-semantic-flags-value",
-    31404,
+    31116,
     "invalid 'BarrierSemanticFlags' value",
     span { loc = "location", message = "unrecognized BarrierSemanticFlags value '~value:String'; expected a combination of GroupSync (0x1), GroupScope (0x2), DeviceScope (0x4), or Reorder (0x0)" }
 )
 
 err(
     "invalid-barrier-memory-type-flags-value",
-    31405,
+    31117,
     "invalid 'BarrierMemoryTypeFlags' value",
-    span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected a combination of UavMemory (0x1), GroupSharedMemory (0x2), NodeInputMemory (0x4), OutputMemory (0x8), or AllMemory (0xf)" }
+    span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected a combination of UavMemory (0x1), GroupSharedMemory (0x2), NodeInputMemory (0x4), NodeOutputMemory (0x8), or AllMemory (0xf)" }
 )
 
 err(
     "invalid-work-graph-attribute-uint32-value",
-    31406,
+    31118,
     "invalid work-graph attribute value",
     span { loc = "location", message = "~attrName:String must be in the range 0 to 0xffffffff, got ~value:Int" }
 )
