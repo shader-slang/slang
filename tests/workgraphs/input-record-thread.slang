@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK): -target dxil-asm -stage node -entry main -profile lib_6_8
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8
 
 // Test that ThreadNodeInputRecord<T> compiles as a thread-launch node shader parameter.
 
@@ -17,3 +18,5 @@ void main(ThreadNodeInputRecord<RecordData> input, RWBuffer<int> output)
 
 //CHK: dx.op.createNodeInputRecordHandle
 //CHK: dx.op.getNodeRecordPtr
+//CHK_HLSL: [NodeLaunch("thread")]
+//CHK_HLSL: ThreadNodeInputRecord<RecordData

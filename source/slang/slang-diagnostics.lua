@@ -2457,7 +2457,14 @@ err(
     "invalid-node-attribute-argument-value",
     31406,
     "invalid node attribute argument value",
-    span { loc = "attr:Modifier", message = "'~attribute:String' expects positive 32-bit integer arguments, got '~value:Int'" }
+    span { loc = "attr:Modifier", message = "'~attribute:String' expects integer arguments in the valid range, got '~value:Int'" }
+)
+
+err(
+    "invalid-barrier-memory-type-flags-value",
+    31407,
+    "invalid 'BarrierMemoryTypeFlags' value",
+    span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected 0, AllMemory (0xf), or a combination of UavMemory (0x1), GroupSharedMemory (0x2), NodeInputMemory (0x4), and NodeOutputMemory (0x8)" }
 )
 
 warning(

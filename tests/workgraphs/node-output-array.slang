@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK): -target dxil-asm -stage node -entry main -profile lib_6_8
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8
 
 // Test that NodeOutputArray compiles and emits indexing correctly.
 
@@ -27,3 +28,7 @@ void main(
 //CHK: dx.op.createNodeOutputHandle
 //CHK: dx.op.indexNodeHandle
 //CHK: dx.op.allocateNodeOutputRecords
+//CHK_HLSL: [MaxRecords(4)]
+//CHK_HLSL: NodeOutputArray<MyRecord
+//CHK_HLSL: NodeOutput<MyRecord
+//CHK_HLSL: ThreadNodeOutputRecords<MyRecord

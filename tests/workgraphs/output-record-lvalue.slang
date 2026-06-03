@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK): -target dxil-asm -stage node -entry main -profile lib_6_8
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8
 
 // Test that output record subscript returns an l-value so fields can be written,
 // and that GetGroupNodeOutputRecords is available on NodeOutput<T>.
@@ -31,3 +32,7 @@ void main(
 //CHK: dx.op.allocateNodeOutputRecords
 //CHK: dx.op.getNodeRecordPtr
 //CHK: dx.op.outputComplete
+//CHK_HLSL: [MaxRecords(4)]
+//CHK_HLSL: [MaxRecords(2)]
+//CHK_HLSL: ThreadNodeOutputRecords<OutData
+//CHK_HLSL: GroupNodeOutputRecords<OutData

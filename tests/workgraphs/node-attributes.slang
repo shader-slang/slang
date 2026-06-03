@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8
 
 // Test that NodeID, NodeIsProgramEntry, NodeArraySize, AllowSparseNodes compile to dxil.
 
@@ -22,3 +23,10 @@ void main(
 
 //CHK_DXIL: !"MyNode", i32 2
 //CHK_DXIL: !"TargetNode", i32 0
+//CHK_HLSL: [NodeID("MyNode", 2)]
+//CHK_HLSL: [NodeIsProgramEntry]
+//CHK_HLSL: [MaxRecords(4)]
+//CHK_HLSL: [NodeArraySize(8)]
+//CHK_HLSL: [AllowSparseNodes]
+//CHK_HLSL: NodeOutputArray<OutputRecord
+//CHK_HLSL: [NodeID("TargetNode", 0)]

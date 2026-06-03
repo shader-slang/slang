@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8
 
 struct RecordData
 {
@@ -23,3 +24,8 @@ void main(
 
 //CHK_DXIL: dx.op.createNodeInputRecordHandle
 //CHK_DXIL: dx.op.getNodeRecordPtr
+//CHK_HLSL: [NodeLaunch("broadcasting")]
+//CHK_HLSL: [NodeDispatchGrid(120, 270, 1)]
+//CHK_HLSL: [NodeID("GeneratePath", 0)]
+//CHK_HLSL: [NodeIsProgramEntry]
+//CHK_HLSL: DispatchNodeInputRecord<RecordData

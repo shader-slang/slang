@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8
 
 // Test that DispatchNodeInputRecord<T> compiles as a node shader parameter.
 
@@ -18,3 +19,5 @@ void main(DispatchNodeInputRecord<RecordData> input, RWBuffer<int> output)
 
 //CHK_DXIL: dx.op.createNodeInputRecordHandle
 //CHK_DXIL: dx.op.getNodeRecordPtr
+//CHK_HLSL: [NodeLaunch("broadcasting")]
+//CHK_HLSL: DispatchNodeInputRecord<RecordData

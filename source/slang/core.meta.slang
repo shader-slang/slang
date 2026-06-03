@@ -701,7 +701,7 @@ interface IForwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
     [MaybeDifferentiable]
-    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff 
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff
 };
 
 // Core library interfaces:
@@ -718,10 +718,10 @@ __magic_type(BwdDiffFuncInterfaceType)
 [__FunctionInterface]
 interface IBackwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
-    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType))
     associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
 
-    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType)) 
+    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType))
     associatedtype MinimalContext; // -> minimal_context_type
 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
@@ -1322,7 +1322,7 @@ $}
         {
             return a + b;
         }
-        
+
 ${
         break;
     }
@@ -2455,7 +2455,7 @@ extension matrix<T,N,M,L> : IFloat
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
     __init(float v) { this = matrix<T,N,M>(T(v)); }
-    
+
     /// Initialize a matrix where all elements have the same scalar `value`.
     [OverloadRank(-1)]
     [Differentiable]
@@ -4465,7 +4465,6 @@ attribute_syntax [NodeDispatchGrid(x: int, y: int, z: int)] : NodeDispatchGridAt
 
 /// Maximum number of output records for a node output parameter, or maximum input records
 /// for a coalescing node input parameter.
-__attributeTarget(FuncDecl)
 __attributeTarget(ParamDecl)
 attribute_syntax [MaxRecords(count: int)] : MaxRecordsAttribute;
 

@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK): -target dxil-asm -stage node -entry main -profile lib_6_8
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8
 
 // Test NodeOutput<T>, ThreadNodeOutputRecords<T>, IsValid(), and OutputComplete().
 
@@ -22,3 +23,6 @@ void main(RWBuffer<int> buf, [MaxRecords(4)] NodeOutput<OutputRecord> output)
 //CHK: dx.op.nodeOutputIsValid
 //CHK: dx.op.allocateNodeOutputRecords
 //CHK: dx.op.outputComplete
+//CHK_HLSL: [MaxRecords(4)]
+//CHK_HLSL: NodeOutput<OutputRecord
+//CHK_HLSL: ThreadNodeOutputRecords<OutputRecord

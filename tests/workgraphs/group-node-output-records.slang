@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK): -target dxil-asm -stage node -entry main -profile lib_6_8
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8
 
 // Test that GroupNodeOutputRecords compiles and emits correctly.
 
@@ -23,3 +24,7 @@ void main(
 //CHK: dx.op.createNodeOutputHandle
 //CHK: dx.op.allocateNodeOutputRecords
 //CHK: dx.op.outputComplete
+//CHK_HLSL: DispatchNodeInputRecord<MyRecord
+//CHK_HLSL: [MaxRecords(1)]
+//CHK_HLSL: NodeOutput<MyRecord
+//CHK_HLSL: GroupNodeOutputRecords<MyRecord

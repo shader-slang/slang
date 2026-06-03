@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8
 
 // Test that a broadcasting-launch node shader compiles to dxil.
 
@@ -12,3 +13,6 @@ void main(RWBuffer<int> output)
 }
 
 //CHK_DXIL: define void @main()
+//CHK_HLSL: [NodeLaunch("broadcasting")]
+//CHK_HLSL: [NodeDispatchGrid(1, 1, 1)]
+//CHK_HLSL: [numthreads(1, 1, 1)]
