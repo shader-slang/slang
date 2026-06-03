@@ -311,10 +311,11 @@ private:
                 if (view)
                 {
                     line.sourceAvailable = true;
-                    // Get the line content and trim end-of-line characters and trailing whitespace
+                    int offset = view->getRange().getOffset(span.startLoc);
+                    int physicalLine =
+                        view->getSourceFile()->calcLineIndexFromOffset(offset);
                     UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
-                        view->getSourceFile()->getLineAtIndex(span.line - 1));
-                    // Trim trailing whitespace but preserve leading whitespace (indentation)
+                        view->getSourceFile()->getLineAtIndex(physicalLine));
                     line.content = UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
                 }
             }
@@ -783,8 +784,11 @@ String renderDiagnosticMachineReadable(
             SourceView* view = sm->findSourceView(span.range.begin);
             if (view)
             {
+                int offset = view->getRange().getOffset(span.range.begin);
+                int physicalLine =
+                    view->getSourceFile()->calcLineIndexFromOffset(offset);
                 UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
-                    view->getSourceFile()->getLineAtIndex(beginLoc.line - 1));
+                    view->getSourceFile()->getLineAtIndex(physicalLine));
                 UnownedStringSlice lineContent =
                     UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
                 if (lineContent.getLength() > 0 && beginLoc.column > 0 &&
