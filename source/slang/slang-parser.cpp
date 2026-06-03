@@ -8303,73 +8303,94 @@ static Expr* parseAtomicExpr(Parser* parser)
             BaseType suffixBaseType = BaseType::Void;
             if (suffixExists)
             {
-                int lCount = 0;
-                int uCount = 0;
-                int zCount = 0;
-                int unknownCount = 0;
-                while (suffixCursor < suffixEnd)
+                // Match the suffix as: at most one unsigned specifier ('u'/'U')
+                // and at most one length specifier (one of 'L', 'l', 'LL', 'll',
+                // 'Z', 'z'), in either order. This mirrors the C/C++ rule and
+                // rejects malformed forms such as 'lL' (mixed case in 'LL'),
+                // 'LUL' (interleaved unsigned), or extra repeated characters
+                // such as 'LLLZ'.
+                auto tryParseUnsigned = [&]() -> bool
                 {
-                    switch (*suffixCursor++)
+                    if (suffixCursor < suffixEnd &&
+                        (*suffixCursor == 'u' || *suffixCursor == 'U'))
                     {
-                    case 'l':
-                    case 'L':
-                        lCount++;
-                        break;
-
-                    case 'u':
-                    case 'U':
-                        uCount++;
-                        break;
-
-                    case 'z':
-                    case 'Z':
-                        zCount++;
-                        break;
-
-                    default:
-                        unknownCount++;
-                        break;
+                        ++suffixCursor;
+                        return true;
                     }
-                }
+                    return false;
+                };
 
-                if (unknownCount)
+                // Parses a length specifier: 'L', 'l', 'LL', 'll' (case-consistent),
+                // 'Z', or 'z'. On success, sets `outLongCount` to 1 or 2 (with
+                // `outIsZ` false), or sets `outIsZ` true (with `outLongCount` 0).
+                // Mixed-case 'lL'/'Ll' is rejected (the second character is not
+                // consumed, so the outer match later flags the suffix as
+                // malformed).
+                auto parseLengthSpecifier = [&](int& outLongCount, bool& outIsZ)
+                {
+                    outLongCount = 0;
+                    outIsZ = false;
+                    if (suffixCursor >= suffixEnd)
+                        return;
+                    char c0 = *suffixCursor;
+                    if (c0 == 'z' || c0 == 'Z')
+                    {
+                        ++suffixCursor;
+                        outIsZ = true;
+                        return;
+                    }
+                    if (c0 == 'l' || c0 == 'L')
+                    {
+                        ++suffixCursor;
+                        outLongCount = 1;
+                        if (suffixCursor < suffixEnd && *suffixCursor == c0)
+                        {
+                            ++suffixCursor;
+                            outLongCount = 2;
+                        }
+                    }
+                };
+
+                bool isUnsigned = tryParseUnsigned();
+                int longCount = 0;
+                bool isZ = false;
+                parseLengthSpecifier(longCount, isZ);
+                if (!isUnsigned)
+                    isUnsigned = tryParseUnsigned();
+
+                bool isMalformed = (suffixCursor != suffixEnd);
+
+                if (isMalformed)
                 {
                     parser->sink->diagnose(Diagnostics::InvalidIntegerLiteralSuffix{
                         .suffix = String(suffix),
                         .location = token.loc});
                     suffixBaseType = BaseType::Int;
                 }
-                // `u` or `ul` suffix -> `uint`
-                else if (uCount == 1 && (lCount <= 1) && zCount == 0)
+                else if (isZ)
                 {
+                    // 'Z' / 'UZ' / 'ZU' suffix -> `intptr_t` / `uintptr_t`
+                    suffixBaseType = isUnsigned ? BaseType::UIntPtr : BaseType::IntPtr;
+                }
+                else if (longCount == 2)
+                {
+                    // 'LL' / 'ULL' suffix -> `int64_t` / `uint64_t`
+                    suffixBaseType = isUnsigned ? BaseType::UInt64 : BaseType::Int64;
+                }
+                else if (longCount == 1)
+                {
+                    // 'L' / 'UL' suffix -> `int` / `uint` (no distinct `long`)
+                    suffixBaseType = isUnsigned ? BaseType::UInt : BaseType::Int;
+                }
+                else if (isUnsigned)
+                {
+                    // 'U' suffix -> `uint`
                     suffixBaseType = BaseType::UInt;
                 }
-                // `l` suffix on integer -> `int` (== `long`)
-                else if (lCount == 1 && !uCount && zCount == 0)
-                {
-                    suffixBaseType = BaseType::Int;
-                }
-                // `ull` suffix -> `uint64_t`
-                else if (uCount == 1 && lCount == 2 && zCount == 0)
-                {
-                    suffixBaseType = BaseType::UInt64;
-                }
-                // `ll` suffix -> `int64_t`
-                else if (uCount == 0 && lCount == 2 && zCount == 0)
-                {
-                    suffixBaseType = BaseType::Int64;
-                }
-                else if (uCount == 0 && zCount == 1)
-                {
-                    suffixBaseType = BaseType::IntPtr;
-                }
-                else if (uCount == 1 && zCount == 1)
-                {
-                    suffixBaseType = BaseType::UIntPtr;
-                }
-                // TODO: do we need suffixes for smaller integer types?
                 else
                 {
+                    // No specifier consumed but the suffix existed — so we had
+                    // characters that didn't match any specifier.
                     parser->sink->diagnose(Diagnostics::InvalidIntegerLiteralSuffix{
                         .suffix = String(suffix),
                         .location = token.loc});
