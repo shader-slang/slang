@@ -4064,16 +4064,10 @@ static NodeBase* parseInterfaceConstraintDecl(Parser* parser, void*)
     parser->FillPosition(constraint);
 
     // `__constraint` is only meaningful as a requirement of an interface (it refines
-    // `This` and/or inherited associated types). Reject it in any other context with
-    // a diagnostic, rather than letting an invalid constraint decl leak into checking.
-    // (Generic-parameter constraints use a different parse path and are unaffected.)
-    if (!(parser->currentScope &&
-          as<InterfaceDecl>(parser->currentScope->containerDecl) != nullptr))
-    {
-        parser->sink->diagnose(Diagnostics::DeclNotAllowed{
-            .declType = String("__constraint"),
-            .location = constraint->loc});
-    }
+    // `This` and/or inherited associated types). Restricting it to an interface body is
+    // handled centrally by `isDeclAllowed` (a `GenericTypeConstraintDecl` is only
+    // permitted under an `InterfaceDecl`); generic-parameter constraints use a different
+    // parse path that does not flow through that check, so they are unaffected.
 
     constraint->sub = parser->ParseTypeExp();
     Token constraintToken;
@@ -5044,6 +5038,7 @@ static bool shouldDeclBeCheckedForNestingValidity(ASTNodeType declType)
     case ASTNodeType::ImplementingDecl:
     case ASTNodeType::ModuleDeclarationDecl:
     case ASTNodeType::AssocTypeDecl:
+    case ASTNodeType::GenericTypeConstraintDecl:
         return true;
     default:
         return false;
@@ -5112,6 +5107,9 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::LetDecl:
         case ASTNodeType::GenericDecl:
         case ASTNodeType::ConstructorDecl:
+        // A `__constraint` (and a relocated `associatedtype A : I` / `where` bound) is a
+        // requirement of the enclosing interface.
+        case ASTNodeType::GenericTypeConstraintDecl:
             return true;
         default:
             return false;
@@ -5204,6 +5202,8 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::TypeDefDecl:
         case ASTNodeType::ExtensionDecl:
         case ASTNodeType::SubscriptDecl:
+        // A generic's `where` / `<T : I>` constraints are siblings of its parameters.
+        case ASTNodeType::GenericTypeConstraintDecl:
             return true;
         default:
             return false;
