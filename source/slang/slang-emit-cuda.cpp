@@ -1526,6 +1526,17 @@ void CUDASourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
 
 void CUDASourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
+    if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
+    {
+        if (entryPointDecor->getProfile().getStage() == Stage::Node)
+        {
+            getSink()->diagnose(Diagnostics::NodeStageNotSupportedOnTarget{
+                .target = "CUDA",
+                .location = func->sourceLoc});
+            return;
+        }
+    }
+
     // Skip the CPP impl - as it does some processing we don't need here for entry points.
     CLikeSourceEmitter::emitSimpleFuncImpl(func);
 }
