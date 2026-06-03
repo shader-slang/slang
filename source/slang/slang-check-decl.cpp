@@ -16054,11 +16054,17 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
     for (auto moduleScope = moduleDecl->ownedScope; moduleScope;
          moduleScope = moduleScope->nextSibling)
     {
-        if (moduleScope->containerDecl != moduleDecl &&
-            moduleScope->containerDecl->parentDecl != moduleDecl)
+        // Re-export the module's own scope and the scopes of its `__include`d files
+        // (its `FileDecl` children) only. A `using` directive splices the used
+        // namespace (or module, and its files) in as a sibling of the module scope,
+        // but `using` is lookup-local and is not part of the module's imported
+        // surface. See shader-slang/slang#11443.
+        auto containerDecl = moduleScope->containerDecl;
+        if (containerDecl != moduleDecl &&
+            !(as<FileDecl>(containerDecl) && containerDecl->parentDecl == moduleDecl))
             continue;
 
-        addSiblingScopeForContainerDecl(getASTBuilder(), scope, moduleScope->containerDecl);
+        addSiblingScopeForContainerDecl(getASTBuilder(), scope, containerDecl);
     }
 
     // Also import any modules from nested `import` declarations
