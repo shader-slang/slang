@@ -4898,6 +4898,13 @@ err(
 )
 
 err(
+    "invalid-stage-output-topology",
+    50061,
+    "invalid output topology",
+    span { loc = "location", message = "Invalid output topology '~topology' for stage '~stage', must be one of: ~validTopologies" }
+)
+
+err(
     "no-type-conformances-found-for-interface",
     50100,
     "no type conformances found",
