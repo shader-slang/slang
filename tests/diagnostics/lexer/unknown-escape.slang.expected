@@ -1,0 +1,11 @@
+result code = -1
+standard error = {
+tests/diagnostics/lexer/unknown-escape.slang(15): error 10013: unknown escape sequence '\c'
+    let s = "ab\cde";
+            ^~~~~~~~
+tests/diagnostics/lexer/unknown-escape.slang(16): error 10013: unknown escape sequence '\c'
+    let c = '\c';
+            ^~~~
+}
+standard output = {
+}

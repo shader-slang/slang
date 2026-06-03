@@ -8540,16 +8540,16 @@ static Expr* parseAtomicExpr(Parser* parser)
             if (!parser->LookAheadToken(TokenType::StringLiteral))
             {
                 // Easy/common case: a single string
-                constExpr->value = getStringLiteralTokenValue(token);
+                constExpr->value = getStringLiteralTokenValue(token, parser->sink);
             }
             else
             {
                 StringBuilder sb;
-                sb << getStringLiteralTokenValue(token);
+                sb << getStringLiteralTokenValue(token, parser->sink);
                 while (parser->LookAheadToken(TokenType::StringLiteral))
                 {
                     token = parser->tokenReader.advanceToken();
-                    sb << getStringLiteralTokenValue(token);
+                    sb << getStringLiteralTokenValue(token, parser->sink);
                 }
                 constExpr->value = sb.produceString();
             }
@@ -8565,7 +8565,7 @@ static Expr* parseAtomicExpr(Parser* parser)
             auto token = parser->tokenReader.advanceToken();
             constExpr->token = token;
 
-            IntegerLiteralValue value = getCharLiteralValue(token);
+            IntegerLiteralValue value = getCharLiteralValue(token, parser->sink);
             constExpr->value = value;
             constExpr->suffixType = BaseType::UInt;
             return constExpr;

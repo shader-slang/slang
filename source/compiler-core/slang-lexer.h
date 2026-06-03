@@ -171,7 +171,7 @@ struct Lexer
 
 
 // Helper routines for extracting values from tokens
-String getStringLiteralTokenValue(Token const& token);
+String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink = nullptr);
 String getFileNameTokenValue(Token const& token);
 
 typedef int64_t IntegerLiteralValue;
@@ -187,7 +187,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
     UnownedStringSlice* outSuffix = 0);
 
-IntegerLiteralValue getCharLiteralValue(Token const& token);
+IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink = nullptr);
 } // namespace Slang
 
 #endif

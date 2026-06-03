@@ -6,6 +6,7 @@
 //
 
 #include "core/slang-char-encode.h"
+#include "core/slang-char-util.h"
 #include "core/slang-string-escape-util.h"
 #include "slang-core-diagnostics.h"
 #include "slang-name.h"
@@ -889,16 +890,116 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     return value;
 }
 
-IntegerLiteralValue getCharLiteralValue(Token const& token)
+IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink)
 {
     String unquotedContent = StringEscapeUtil::unquote('\'', token.getContent());
+
+    // Diagnose escape-value overflow before handing the slice to
+    // `appendUnescaped`. `encodeUnicodePointToUTF8` / `getUnicodePointFromUTF8`
+    // round-trip silently truncates the leading byte for values that exceed
+    // the legal Unicode range (#11291) — `'\xffffff'` previously came back
+    // as 47. Catch the case in source, where we still have the user's
+    // raw digit count to report. Hex escapes admit any number of digits;
+    // octal escapes are bounded to 3 in `_lexStringLiteralBody`, so the
+    // octal value is always <= 0o777 = 0x1FF, also out-of-range for char.
+    {
+        const char* p = unquotedContent.begin();
+        const char* const pe = unquotedContent.end();
+        if (p < pe && *p == '\\' && p + 1 < pe)
+        {
+            const char escape = p[1];
+            if (escape == 'x')
+            {
+                uint32_t value = 0;
+                bool overflowed = false;
+                const char* q = p + 2;
+                while (q < pe)
+                {
+                    int digit = CharUtil::getHexDigitValue(*q);
+                    if (digit < 0)
+                        break;
+                    if (value > 0x0FFFFFFFu)
+                        overflowed = true;
+                    value = value * 16u + uint32_t(digit);
+                    ++q;
+                }
+                if ((overflowed || value > 0x10FFFFu) && sink)
+                {
+                    StringBuilder sb;
+                    sb << "0x" << String(uint64_t(value), 16);
+                    diagnose(
+                        sink,
+                        token.loc,
+                        LexerDiagnostics::escapeSequenceOutOfRange,
+                        sb.produceString(),
+                        UnownedStringSlice("char"));
+                }
+            }
+            else if (escape >= '0' && escape <= '7')
+            {
+                uint32_t value = 0;
+                const char* q = p + 1;
+                for (int ii = 0; ii < 3 && q < pe; ++ii, ++q)
+                {
+                    if (*q < '0' || *q > '7')
+                        break;
+                    value = value * 8u + uint32_t(*q - '0');
+                }
+                // `'\377'` = 0xFF is in range; only diagnose if larger
+                // (cannot happen with the lexer's 3-digit limit, but
+                // future-proofs the check).
+                if (value > 0x10FFFFu && sink)
+                {
+                    StringBuilder sb;
+                    sb << "0x" << String(uint64_t(value), 16);
+                    diagnose(
+                        sink,
+                        token.loc,
+                        LexerDiagnostics::escapeSequenceOutOfRange,
+                        sb.produceString(),
+                        UnownedStringSlice("char"));
+                }
+            }
+        }
+    }
+
     StringBuilder unescaped(4);
     auto escapeHandler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
-    escapeHandler->appendUnescaped(unquotedContent.getUnownedSlice(), unescaped);
+    SlangResult unescapeResult =
+        escapeHandler->appendUnescaped(unquotedContent.getUnownedSlice(), unescaped);
 
+    // `appendUnescaped` returns `SLANG_FAIL` for unknown escapes such as
+    // `'\c'`. Surface a diagnostic instead of silently returning whatever
+    // partial bytes happened to land in the unescaped buffer (#11291).
+    if (SLANG_FAILED(unescapeResult) && sink)
+    {
+        // The failure can only come from the post-backslash byte — point
+        // at it so the user sees the offending character.
+        UnownedStringSlice escapeChar = unquotedContent.getUnownedSlice();
+        if (escapeChar.getLength() >= 2 && escapeChar[0] == '\\')
+        {
+            escapeChar = UnownedStringSlice(escapeChar.begin() + 1, escapeChar.begin() + 2);
+        }
+        diagnose(
+            sink,
+            token.loc,
+            LexerDiagnostics::unknownEscapeSequence,
+            escapeChar);
+    }
+
+    // Decode the unescaped bytes as a UTF-8 code point. Bound the reader at
+    // the buffer end so an invalid leading byte cannot read past the buffer
+    // (#11291; mirrors the string-literal fix in PR #11281).
     char const* cursor = unescaped.getBuffer();
+    char const* const cursorEnd = cursor + unescaped.getLength();
 
-    IntegerLiteralValue codepoint = getUnicodePointFromUTF8([&]() { return *cursor++; });
+    IntegerLiteralValue codepoint = getUnicodePointFromUTF8(
+        [&]() -> Byte
+        {
+            if (cursor < cursorEnd)
+                return Byte(*cursor++);
+            return 0;
+        });
     return codepoint;
 }
 
@@ -949,7 +1050,12 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
             return;
 
         case '\\':
-            // Need to handle various escape sequence cases
+            // Need to handle various escape sequence cases. Diagnostics for
+            // unknown escapes (`\c`) and out-of-range octal/hex escapes are
+            // emitted by the consumers (`getStringLiteralTokenValue` /
+            // `getCharLiteralValue`) so that contexts which reuse the same
+            // token but do not interpret escapes — e.g. `#include "./a\b.h"`
+            // via `getFileNameTokenValue` — are unaffected (#11291).
             _advance(lexer);
             switch (_peek(lexer))
             {
@@ -993,25 +1099,29 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
                 break;
 
             case 'x':
-                // hexadecimal escape: any number of characters
+                // hexadecimal escape: any number of hex digits
                 _advance(lexer);
-                for (;;)
+                while (CharUtil::getHexDigitValue(char(_peek(lexer))) >= 0)
                 {
-                    int d = _peek(lexer);
-                    if (('0' <= d) && (d <= '9') || ('a' <= d) && (d <= 'f') ||
-                        ('A' <= d) && (d <= 'F'))
-                    {
-                        _advance(lexer);
-                        continue;
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    _advance(lexer);
                 }
                 break;
 
                 // TODO: Unicode escape sequences
+
+            default:
+                {
+                    // Consume the post-backslash character. The consumer
+                    // diagnoses unknown escapes when it interprets the
+                    // token; for `#include`-style file-name use the
+                    // backslash is just a path separator.
+                    int d = _peek(lexer);
+                    if (d != kEOF && d != '\n' && d != '\r')
+                    {
+                        _advance(lexer);
+                    }
+                }
+                break;
             }
             break;
 
@@ -1088,12 +1198,26 @@ UnownedStringSlice getRawStringLiteralTokenValue(Token const& token)
     return UnownedStringSlice(contentBegin, contentEnd);
 }
 
-String getStringLiteralTokenValue(Token const& token)
+String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
 {
     SLANG_ASSERT(token.type == TokenType::StringLiteral || token.type == TokenType::CharLiteral);
 
     if (token.getContent().startsWith("R"))
         return getRawStringLiteralTokenValue(token);
+
+    auto diagnoseEscapeOverflow = [&](uint32_t value)
+    {
+        if (!sink)
+            return;
+        StringBuilder sb;
+        sb << "0x" << String(uint64_t(value), 16);
+        diagnose(
+            sink,
+            token.loc,
+            LexerDiagnostics::escapeSequenceOutOfRange,
+            sb.produceString(),
+            UnownedStringSlice("string"));
+    };
 
     const UnownedStringSlice content = token.getContent();
 
@@ -1183,7 +1307,7 @@ String getStringLiteralTokenValue(Token const& token)
         case '7':
             {
                 cursor--;
-                int value = 0;
+                uint32_t value = 0;
                 for (int ii = 0; ii < 3; ++ii)
                 {
                     if (cursor >= end)
@@ -1191,7 +1315,7 @@ String getStringLiteralTokenValue(Token const& token)
                     d = *cursor;
                     if (('0' <= d) && (d <= '7'))
                     {
-                        value = value * 8 + (d - '0');
+                        value = value * 8u + uint32_t(d - '0');
 
                         cursor++;
                         continue;
@@ -1202,48 +1326,61 @@ String getStringLiteralTokenValue(Token const& token)
                     }
                 }
 
-                // TODO: add support for appending an arbitrary code point?
+                // String-literal escape produces a single byte. `\777` =
+                // 0x1FF overflows the byte; diagnose so the user is not
+                // silently truncated (#11291).
+                if (value > 0xFFu)
+                    diagnoseEscapeOverflow(value);
                 valueBuilder.append((char)value);
             }
             continue;
 
-        // Hexadecimal escape: any number of characters
+        // Hexadecimal escape: any number of characters. Use the shared
+        // `CharUtil::getHexDigitValue` rather than the previous inline
+        // ladder which forgot the `+ 10` for letter digits and silently
+        // mapped `\xff` to `'U' = 0x55` (#11291). Diagnose value > 0xFF
+        // so a string `"\xffffff"` is no longer silently truncated.
         case 'x':
             {
-                int value = 0;
-                for (;;)
+                uint32_t value = 0;
+                bool overflowed = false;
+                while (cursor < end)
                 {
-                    if (cursor >= end)
+                    int digitValue = CharUtil::getHexDigitValue(*cursor);
+                    if (digitValue < 0)
                         break;
-                    d = *cursor++;
-                    int digitValue = 0;
-                    if (('0' <= d) && (d <= '9'))
-                    {
-                        digitValue = d - '0';
-                    }
-                    else if (('a' <= d) && (d <= 'f'))
-                    {
-                        digitValue = d - 'a';
-                    }
-                    else if (('A' <= d) && (d <= 'F'))
-                    {
-                        digitValue = d - 'A';
-                    }
-                    else
-                    {
-                        cursor--;
-                        break;
-                    }
-
-                    value = value * 16 + digitValue;
+                    if (value > 0x0FFFFFFFu)
+                        overflowed = true;
+                    value = value * 16u + uint32_t(digitValue);
+                    ++cursor;
                 }
+                if (overflowed || value > 0xFFu)
+                    diagnoseEscapeOverflow(value);
 
-                // TODO: add support for appending an arbitrary code point?
                 valueBuilder.append((char)value);
             }
             continue;
 
             // TODO: Unicode escape sequences
+
+        default:
+            // Unknown escape sequence (e.g. `\c`). Diagnose and emit the
+            // post-backslash byte so we don't silently drop characters
+            // from the literal value (#11291). For `#include` paths, the
+            // parser uses `getFileNameTokenValue` instead, which never
+            // calls this consumer — so Windows-style `"./a\b.h"` paths
+            // are unaffected.
+            if (sink)
+            {
+                char escapeText[2] = {char(d), 0};
+                diagnose(
+                    sink,
+                    token.loc,
+                    LexerDiagnostics::unknownEscapeSequence,
+                    UnownedStringSlice(escapeText, 1));
+            }
+            valueBuilder.append(d);
+            continue;
         }
     }
 

@@ -415,7 +415,22 @@ SlangResult CppStringEscapeHandler::appendUnescaped(
                         }
                         value = (value << 3) | digitValue;
                     }
-                    out.appendChar(char(value));
+                    // Mirror the hex-escape branch: if the byte is in the
+                    // ASCII range emit it directly, otherwise emit its UTF-8
+                    // encoding so callers (e.g. `getCharLiteralValue`) that
+                    // read the buffer back as UTF-8 do not see a stray
+                    // invalid leading byte (#11291).
+                    if (uint32_t(value) < 0x80u)
+                    {
+                        out.appendChar(char(value));
+                    }
+                    else
+                    {
+                        const Index maxUtf8EncodeCount = 6;
+                        char* chars = out.prepareForAppend(maxUtf8EncodeCount);
+                        int numChars = encodeUnicodePointToUTF8(Char32(value), chars);
+                        out.appendInPlace(chars, numChars);
+                    }
 
                     // Reset start
                     start = cur;

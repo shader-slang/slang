@@ -43,4 +43,16 @@ DIAGNOSTIC(
     integerLiteralTooLargeForAnyType,
     "integer literal is too large to be represented in any integer type")
 
+DIAGNOSTIC(
+    10013,
+    Error,
+    unknownEscapeSequence,
+    "unknown escape sequence '\\$0'")
+
+DIAGNOSTIC(
+    10014,
+    Error,
+    escapeSequenceOutOfRange,
+    "escape sequence value '$0' is out of range for the literal type ($1)")
+
 #undef DIAGNOSTIC

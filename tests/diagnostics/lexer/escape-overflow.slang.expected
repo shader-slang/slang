@@ -1,0 +1,14 @@
+result code = -1
+standard error = {
+tests/diagnostics/lexer/escape-overflow.slang(16): error 10014: escape sequence value '0xFFFFFF' is out of range for the literal type (char)
+    let c1 = '\xffffff';
+             ^~~~~~~~~~
+tests/diagnostics/lexer/escape-overflow.slang(19): error 10014: escape sequence value '0xFFFFFF' is out of range for the literal type (string)
+    let s1 = "\xffffff";
+             ^~~~~~~~~~
+tests/diagnostics/lexer/escape-overflow.slang(22): error 10014: escape sequence value '0x1FF' is out of range for the literal type (string)
+    let s2 = "\777";
+             ^~~~~~
+}
+standard output = {
+}
