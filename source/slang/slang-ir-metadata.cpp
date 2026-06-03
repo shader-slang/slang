@@ -123,8 +123,7 @@ static bool _isBindlessResourceHeapGlobalParam(IRInst* inst)
     if (inst->getOp() != kIROp_GlobalParam)
         return false;
 
-    auto nameHint = inst->findDecoration<IRNameHintDecoration>();
-    return nameHint && nameHint->getName() == "__slang_resource_heap";
+    return inst->findDecoration<IRBindlessResourceHeapDecoration>() != nullptr;
 }
 
 static bool _instUsesBindlessResourceHeap(IRInst* inst)

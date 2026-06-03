@@ -11,10 +11,29 @@ using namespace Slang;
 
 // Test that the reflection API correctly returns the bindless space index.
 
+struct BindlessSpaceExpectation
+{
+    bool expectsReservedSpace;
+    bool expectsExactSpaceIndex;
+    SlangInt exactSpaceIndex;
+};
+
+static BindlessSpaceExpectation _expectReservedBindlessSpaceAt(SlangInt index)
+{
+    return {true, true, index};
+}
+
+static BindlessSpaceExpectation _expectAnyReservedBindlessSpace()
+{
+    return {true, false, 0};
+}
+
 static void _checkBindlessSpaceReflection(
     const char* userSource,
-    SlangInt expectedBindlessSpaceIndex,
-    bool expectedUsesBindlessResourceHeap)
+    BindlessSpaceExpectation bindlessSpaceExpectation,
+    bool expectedUsesBindlessResourceHeap,
+    const slang::CompilerOptionEntry* compilerOptions = nullptr,
+    uint32_t compilerOptionCount = 0)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
@@ -26,6 +45,8 @@ static void _checkBindlessSpaceReflection(
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntries = compilerOptions;
+    sessionDesc.compilerOptionEntryCount = compilerOptionCount;
 
     ComPtr<slang::ISession> session;
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
@@ -59,13 +80,15 @@ static void _checkBindlessSpaceReflection(
     SLANG_CHECK(programLayout != nullptr);
 
     auto bindlessSpaceIndex = programLayout->getBindlessSpaceIndex();
-    if (expectedBindlessSpaceIndex >= 0)
+    if (bindlessSpaceExpectation.expectsReservedSpace)
     {
-        SLANG_CHECK(bindlessSpaceIndex == expectedBindlessSpaceIndex);
+        SLANG_CHECK(bindlessSpaceIndex >= 0);
+        if (bindlessSpaceExpectation.expectsExactSpaceIndex)
+            SLANG_CHECK(bindlessSpaceIndex == bindlessSpaceExpectation.exactSpaceIndex);
     }
     else
     {
-        SLANG_CHECK(bindlessSpaceIndex >= 0);
+        SLANG_CHECK(bindlessSpaceIndex == -1);
     }
 
     ComPtr<slang::IMetadata> metadata;
@@ -106,7 +129,7 @@ SLANG_UNIT_TEST(bindlessSpaceReflection)
     // - gInput and gOutput at space 0 (default)
     // - ParameterBlock<P> p1 at space 1
     // So the bindless space should be allocated at space 2.
-    _checkBindlessSpaceReflection(userSource, 2, true);
+    _checkBindlessSpaceReflection(userSource, _expectReservedBindlessSpaceAt(2), true);
 }
 
 SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandle)
@@ -126,5 +149,40 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandle)
 
     // Reflection still reserves a stable bindless space for descriptor-handle-capable
     // targets, but post-emit metadata reports that no bindless heap path survived.
-    _checkBindlessSpaceReflection(userSource, -1, false);
+    _checkBindlessSpaceReflection(userSource, _expectAnyReservedBindlessSpace(), false);
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithStrippedNameHints)
+{
+    const char* userSource = R"(
+        RWStructuredBuffer<float> gInput;
+        RWStructuredBuffer<float> gOutput;
+
+        struct P
+        {
+            Texture2D.Handle t;
+        };
+
+        ParameterBlock<P> p1;
+
+        [Shader("compute")]
+        [NumThreads(4, 1, 1)]
+        void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            uint tid = dispatchThreadID.x;
+            gOutput[tid] = gInput[tid] + p1.t.Load(int3(0,0,0)).x;
+        }
+    )";
+
+    slang::CompilerOptionEntry obfuscationOption = {};
+    obfuscationOption.name = slang::CompilerOptionName::Obfuscate;
+    obfuscationOption.value.kind = slang::CompilerOptionValueKind::Int;
+    obfuscationOption.value.intValue0 = 1;
+
+    _checkBindlessSpaceReflection(
+        userSource,
+        _expectReservedBindlessSpaceAt(2),
+        true,
+        &obfuscationOption,
+        1);
 }
