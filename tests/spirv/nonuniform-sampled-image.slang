@@ -13,8 +13,8 @@
 // CHECK-DAG: OpDecorate %[[AC]] NonUniform
 // CHECK-DAG: %[[LOAD:[A-Za-z0-9_]+]] = OpLoad %{{[A-Za-z0-9_]+}} %[[AC]]
 // CHECK-DAG: OpDecorate %[[LOAD]] NonUniform
-// CHECK-DAG: %sampledImage = OpSampledImage %{{[A-Za-z0-9_]+}} %[[LOAD]]
-// CHECK-DAG: OpDecorate %sampledImage NonUniform
+// CHECK-DAG: %[[SI:[A-Za-z0-9_]+]] = OpSampledImage %{{[A-Za-z0-9_]+}} %[[LOAD]]
+// CHECK-DAG: OpDecorate %[[SI]] NonUniform
 
 Texture2D<float> textures[8];
 SamplerState samp;

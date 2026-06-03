@@ -18,7 +18,8 @@
 
 // The sampled image actually consumed by the sampling op must be NonUniform.
 // CHECK-DAG: OpCapability SampledImageArrayNonUniformIndexing
-// CHECK-DAG: OpDecorate %sampledImage NonUniform
+// CHECK-DAG: %[[SI:[A-Za-z0-9_]+]] = OpSampledImage
+// CHECK-DAG: OpDecorate %[[SI]] NonUniform
 
 // The sparse result-type struct is a type, not a value, so it must never be
 // decorated NonUniform.

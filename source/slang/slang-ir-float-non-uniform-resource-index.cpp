@@ -108,26 +108,6 @@ void processNonUniformResourceIndex(
                             inst->getOperand(0));
                     }
                     break;
-                case kIROp_MakeCombinedTextureSampler:
-                    {
-                        // Float the `NonUniformResourceIndex` out through
-                        // combined-sampler construction so the combined result is
-                        // itself non-uniform when either constituent is. The
-                        // `NonUniformResourceIndex` is exactly one of the two
-                        // operands; replace that operand with the base inst it wraps
-                        // and rebuild.
-                        auto tex = user->getOperand(0);
-                        auto samp = user->getOperand(1);
-                        if (tex == inst)
-                            tex = inst->getOperand(0);
-                        else if (samp == inst)
-                            samp = inst->getOperand(0);
-                        else
-                            SLANG_UNREACHABLE("NonUniformResourceIndex must be an operand of MakeCombinedTextureSampler");
-                        newUser =
-                            builder.emitMakeCombinedTextureSampler(user->getFullType(), tex, samp);
-                    }
-                    break;
                 case kIROp_Swizzle:
                     // Ignore when `NonUniformResourceIndex` is not on base
                     if (user->getOperand(0) == inst)
@@ -179,7 +159,6 @@ void processNonUniformResourceIndex(
                 case kIROp_CastDescriptorHandleToUInt2:
                 case kIROp_GetElement:
                 case kIROp_Swizzle:
-                case kIROp_MakeCombinedTextureSampler:
                     resWorkList.add(nonuniformUser);
                     break;
                 };
