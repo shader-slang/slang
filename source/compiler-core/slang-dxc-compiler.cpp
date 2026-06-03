@@ -74,6 +74,25 @@ namespace Slang
 // and is visible to the sanitizer. This adapter keeps a reference to the
 // underlying `IDxcBlob` and forwards the accessors, so the data also outlives
 // any artifact representation that stores the blob.
+//
+// Usage: anywhere code would otherwise reinterpret-cast an `IDxcBlob*` to
+// `ISlangBlob*`, write `DxcBlob::create(dxcBlob)` instead. The constructor is
+// private so callers must go through the factory. The factory returns
+// `ComPtr<ISlangBlob>` (not `ComPtr<DxcBlob>`) on purpose — callers should
+// never reach through the adapter to the underlying `IDxcBlob`.
+//
+// TODO: three `IDxcBlob ↔ ISlangBlob` puns intentionally remain in this file
+// after this fix and still warrant attention:
+//   - `DxcIncludeHandler::LoadSource`: reverse-direction pun in
+//     `*outSource = (IDxcBlob*)blob.detach();`. DXC owns the outparam;
+//     wrapping it would require an `IDxcLibrary`-backed real-DXC-blob factory
+//     that isn't plumbed into this file today.
+//   - `DXCDownstreamCompiler::compile`: round-trip pun in both directions —
+//     `(ISlangBlob*)dxcResultBlob.get()` into `libraryBlobs`, then
+//     `(IDxcBlob*)libraryBlobs[i].get()` back out into
+//     `IDxcLinker::RegisterLibrary`. Same blocker as `LoadSource`.
+// All three are UB strictly speaking; UBSan happens not to flag them today
+// because of how those code paths are exercised, not because they are safe.
 class DxcBlob : public BlobBase
 {
 public:
@@ -96,6 +115,7 @@ private:
     explicit DxcBlob(IDxcBlob* blob)
         : m_blob(blob)
     {
+        SLANG_ASSERT(blob);
     }
     ComPtr<IDxcBlob> m_blob;
 };
