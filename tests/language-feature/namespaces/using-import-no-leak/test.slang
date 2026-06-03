@@ -1,4 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+// non-exhaustive: assert only the primary leak diagnostic; an undefined identifier
+// can also produce cascading diagnostics we don't want to pin here.
 
 module test;
 

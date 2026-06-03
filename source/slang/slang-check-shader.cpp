@@ -3121,9 +3121,20 @@ Scope* ComponentType::_getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder)
         for (auto srcScope = module->getModuleDecl()->ownedScope; srcScope;
              srcScope = srcScope->nextSibling)
         {
-            if (srcScope->containerDecl != module->getModuleDecl() &&
-                srcScope->containerDecl->parentDecl != module->getModuleDecl())
-                continue; // Skip scopes that is not part of current module.
+            // Re-export only the module's own scope and its own `__include`d
+            // `FileDecl` children into the legacy name-based lookup scope (which
+            // backs `getTypeFromString`, string-specified entry points /
+            // type-conformance, and specialization-argument parsing). A primary-file
+            // `using namespace Foo;` splices `Foo` as a sibling of the module scope,
+            // but `using` is lookup-local and must not leak into reflection/API name
+            // lookup either. Mirrors `SemanticsVisitor::importModuleIntoScope`; keep
+            // the `parentDecl` clause (rationale there). See shader-slang/slang#11443.
+            auto containerDecl = srcScope->containerDecl;
+            bool isOwnModuleScope = containerDecl == module->getModuleDecl();
+            bool isOwnIncludedFileScope =
+                as<FileDecl>(containerDecl) && containerDecl->parentDecl == module->getModuleDecl();
+            if (!isOwnModuleScope && !isOwnIncludedFileScope)
+                continue; // Skip scopes that are not part of the current module.
 
             Scope* moduleScope = astBuilder->create<Scope>();
             moduleScope->containerDecl = srcScope->containerDecl;
