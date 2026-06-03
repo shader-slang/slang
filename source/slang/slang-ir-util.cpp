@@ -3315,6 +3315,19 @@ IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> eleme
     return builder.emitMakeValuePack(resultType, elements.getCount(), elements.getBuffer());
 }
 
+static const UnownedStringSlice kWorkGraphRecordTypeNames[] = {
+    UnownedStringSlice::fromLiteral("DispatchNodeInputRecord"),
+    UnownedStringSlice::fromLiteral("ThreadNodeInputRecord"),
+    UnownedStringSlice::fromLiteral("GroupNodeInputRecords"),
+    UnownedStringSlice::fromLiteral("EmptyNodeInput"),
+    UnownedStringSlice::fromLiteral("ThreadNodeOutputRecords"),
+    UnownedStringSlice::fromLiteral("GroupNodeOutputRecords"),
+    UnownedStringSlice::fromLiteral("NodeOutput"),
+    UnownedStringSlice::fromLiteral("NodeOutputArray"),
+    UnownedStringSlice::fromLiteral("EmptyNodeOutput"),
+    UnownedStringSlice::fromLiteral("EmptyNodeOutputArray"),
+};
+
 bool isWorkGraphRecordType(IRType* type)
 {
     auto structType = as<IRStructType>(type);
@@ -3328,11 +3341,12 @@ bool isWorkGraphRecordType(IRType* type)
         return false;
 
     auto name = nameHint->getName();
-    return name == "DispatchNodeInputRecord" || name == "ThreadNodeInputRecord" ||
-           name == "GroupNodeInputRecords" || name == "EmptyNodeInput" ||
-           name == "ThreadNodeOutputRecords" || name == "GroupNodeOutputRecords" ||
-           name == "NodeOutput" || name == "NodeOutputArray" || name == "EmptyNodeOutput" ||
-           name == "EmptyNodeOutputArray";
+    for (auto recordTypeName : kWorkGraphRecordTypeNames)
+    {
+        if (name == recordTypeName)
+            return true;
+    }
+    return false;
 }
 
 } // namespace Slang
