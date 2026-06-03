@@ -17,10 +17,11 @@
 #                                 (optional; skips auto-detection when set)
 #   SLANG_DXC_BUILD_FROM_SOURCE - ON: build from source when supported; OFF:
 #                                 always use prebuilt when available (skips detection);
-#                                 unset: auto-detect on native Linux x86_64 by
-#                                 downloading the prebuilt binary and inspecting
-#                                 the GLIBC requirements of both libdxcompiler.so
-#                                 and libdxil.so
+#                                 unset: build from source on macOS (unless
+#                                 SLANG_DXC_BINARY_URL is set), auto-detect on
+#                                 native Linux x86_64 by downloading the prebuilt
+#                                 binary and inspecting the GLIBC requirements of
+#                                 both libdxcompiler.so and libdxil.so
 #   SLANG_GITHUB_TOKEN          - GitHub token for authenticated downloads (optional)
 #
 # Requires the following variables to be set by the caller (set in SlangTarget.cmake):
@@ -128,6 +129,23 @@ if(SLANG_DXC_BUILD_FROM_SOURCE)
         )
         return()
     endif()
+elseif(
+    NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
+    AND NOT DEFINED SLANG_DXC_BINARY_URL
+    AND CMAKE_SYSTEM_NAME STREQUAL "Darwin"
+)
+    # macOS has no Microsoft-published prebuilt DXC, so a source build is the
+    # only way to get DXIL support. Default to building from source when the
+    # user has not made an explicit choice and has not supplied a custom
+    # prebuilt via SLANG_DXC_BINARY_URL (a set URL is honored by the prebuilt
+    # path below). Pass -DSLANG_DXC_BUILD_FROM_SOURCE=OFF to skip the source
+    # build (e.g. to keep a build fast).
+    message(
+        STATUS
+        "macOS: no prebuilt DXC is published; defaulting to a source build so "
+        "DXIL is available. Set -DSLANG_DXC_BUILD_FROM_SOURCE=OFF to skip it."
+    )
+    set(_dxc_build_from_source ON)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CROSSCOMPILING)
     if(DEFINED SLANG_DXC_BINARY_URL)
         message(
