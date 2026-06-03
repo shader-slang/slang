@@ -6020,7 +6020,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto section = getSection(SpvLogicalSectionID::EntryPoints);
                 auto entryPointDecor = cast<IREntryPointDecoration>(decoration);
                 auto entryPoint = as<IRFunc>(decoration->getParent());
-                auto spvStage = mapStageToExecutionModel(entryPointDecor->getProfile().getStage());
+                SpvExecutionModel spvStage;
+                if (!tryMapStageToExecutionModel(
+                        entryPointDecor->getProfile().getStage(),
+                        spvStage))
+                {
+                    m_sink->diagnose(Diagnostics::NodeStageNotSupportedOnTarget{
+                        .target = "SPIR-V",
+                        .location = entryPoint ? entryPoint->sourceLoc : decoration->sourceLoc});
+                    break;
+                }
                 auto name = entryPointDecor->getName()->getStringSlice();
                 List<SpvInst*> params;
                 HashSet<SpvInst*> paramsSet;
@@ -6877,18 +6886,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    /// Map a Slang `Stage` to a corresponding SPIR-V execution model
-    SpvExecutionModel mapStageToExecutionModel(Stage stage)
+    /// Map a Slang `Stage` to a corresponding SPIR-V execution model.
+    bool tryMapStageToExecutionModel(Stage stage, SpvExecutionModel& outModel)
     {
         switch (stage)
         {
         default:
             SLANG_UNEXPECTED("unhandled stage");
-            UNREACHABLE_RETURN((SpvExecutionModel)0);
+            UNREACHABLE_RETURN(false);
 
-#define CASE(STAGE, MODEL) \
-    case Stage::STAGE:     \
-        return SpvExecutionModel##MODEL
+#define CASE(STAGE, MODEL)                   \
+    case Stage::STAGE:                       \
+        outModel = SpvExecutionModel##MODEL; \
+        return true
 
             CASE(Vertex, Vertex);
             CASE(Hull, TessellationControl);
@@ -6904,10 +6914,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             CASE(Miss, MissKHR);
             CASE(Intersection, IntersectionKHR);
             CASE(RayGeneration, RayGenerationKHR);
-            // TODO: Full SPIRV work-graph support requires declaring the SPV_AMDX_shader_enqueue
-            // extension and ShaderEnqueueAMDX capability. Currently maps to GLCompute as a
-            // placeholder; proper AMDX execution-mode and capability declarations are deferred.
-            CASE(Node, GLCompute);
+        case Stage::Node:
+            return false;
             // TODO: Extended execution models for ray tracing, etc.
 
 #undef CASE
@@ -11751,6 +11759,9 @@ SlangResult emitSPIRVFromIR(
         context.ensureInst(irEntryPoint);
         symbolsEmitted = true;
     }
+
+    if (sink->getErrorCount())
+        return SLANG_FAIL;
 
     if (!symbolsEmitted)
     {

@@ -49,6 +49,7 @@ protected:
         EmitLayoutSemanticOption layoutSemanticOption) SLANG_OVERRIDE;
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
         SLANG_OVERRIDE;
+    virtual bool shouldSuppressWorkGraphRecordTypeEmission(IRStructType* structType) SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(
         IRFunc* irFunc,
         IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;

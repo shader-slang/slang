@@ -338,7 +338,7 @@ It is produced by `slang-capability-generator` from `source/slang/slang-capabili
    ```
 3. Commit the updated `slang-capabilities.capdef` and the regenerated `.md` together.
 
-Note: the `///` comment must be on the **public alias** (e.g. `alias node = _node;`), not on the internal `def _node : stage;` atom, for the description to appear under the public name.
+Note: the generated documentation uses the comment attached to the public capability name. If the public name is an alias, put the `///` comment on that alias; if the public name is a direct `def`, put it on the `def`.
 
 ### Modifying Public Headers (`include/`)
 
@@ -467,8 +467,8 @@ If you skip the `touch` step the cached bootstrap binary may silently embed the 
 The correct pattern:
 
 1. **Define a Slang enum** (or a set of named intrinsic-backed constants) for each group of conceptual values (e.g. `NodeLaunch` mode, Barrier flag sets).
-2. **Store the name, not the integer, in the IR.** Use `IRStringLit` operands (as `NodeLaunchDecoration` does) or a `Ref<T>` / intrinsic-based accessor that preserves the identifier through to emission.
-3. **Provide a mapping function** in the HLSL emitter (`slang-emit-hlsl.cpp` or `slang-emit-c-like.cpp`) that converts the stored enum/string value back to the HLSL source name so that emitted code reads e.g. `[NodeLaunch("broadcasting")]` not `[NodeLaunch(0)]`.
+2. **Preserve enough symbolic information to recover the HLSL spelling.** Use `IRStringLit` operands (as `NodeLaunchDecoration` does) when the user-facing spelling is a string, or use a typed enum/intrinsic bridge when the source value is a compile-time flag set.
+3. **Provide a mapping function** in the HLSL emitter (`slang-emit-hlsl.cpp` or `slang-emit-c-like.cpp`) that converts the stored enum/string value back to the HLSL source name so that emitted code reads e.g. `[NodeLaunch("broadcasting")]` or `Barrier((UAV_MEMORY), (GROUP_SYNC))`, not hard-coded numeric literals.
 
 Examples of this pattern already in the codebase:
 - `NodeLaunchDecoration` stores the mode as `IRStringLit("broadcasting")` and the emitter re-emits the string verbatim.

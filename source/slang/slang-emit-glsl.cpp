@@ -126,8 +126,9 @@ SlangResult GLSLSourceEmitter::init()
             break;
         }
     case Stage::Node:
-        SLANG_UNIMPLEMENTED_X("Node stage for GLSL output");
-        break;
+        getSink()->diagnose(
+            Diagnostics::NodeStageNotSupportedOnTarget{.target = "GLSL", .location = SourceLoc()});
+        return SLANG_FAIL;
     default:
         break;
     }

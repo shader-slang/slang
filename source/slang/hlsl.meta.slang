@@ -33178,6 +33178,7 @@ __generic<T>
 [__workGraphRecordType]
 struct ThreadNodeInputRecord
 {
+    /// Returns the input record payload for this thread-launch node invocation.
     T Get()
     {
         __target_switch
@@ -33194,6 +33195,7 @@ __generic<T>
 [__workGraphRecordType]
 struct GroupNodeInputRecords
 {
+    /// Returns the number of input records visible to this coalescing-launch node invocation.
     uint Count()
     {
         __target_switch
@@ -33202,6 +33204,7 @@ struct GroupNodeInputRecords
             __intrinsic_asm ".Count";
         }
     }
+    /// Returns the input record payload at the given coalesced-record index.
     T Get(uint index)
     {
         __target_switch
@@ -33210,16 +33213,19 @@ struct GroupNodeInputRecords
             __intrinsic_asm ".Get";
         }
     }
+    /// Returns the input record payload at the given coalesced-record index.
     __subscript(uint index) -> T
     {
         get { return Get(index); }
     }
 };
 
+/// Input record collection for a coalescing-launch node that consumes records with no payload data.
 [require(hlsl)]
 [__workGraphRecordType]
 struct EmptyNodeInput
 {
+    /// Returns the number of empty input records visible to this coalesced node invocation.
     uint Count() { __intrinsic_asm ".Count"; }
 };
 
@@ -33229,6 +33235,7 @@ __generic<T>
 [__workGraphRecordType]
 struct ThreadNodeOutputRecords
 {
+    /// Returns a mutable output record payload reference for this thread.
     Ref<T> Get(uint index = 0)
     {
         __target_switch
@@ -33237,12 +33244,14 @@ struct ThreadNodeOutputRecords
             __intrinsic_asm ".Get";
         }
     }
+    /// Returns a mutable output record payload reference for this thread.
     __subscript(uint index) -> T
     {
         [nonmutating]
         __intrinsic_op($(kIROp_NodeOutputRecordGetElementPtr))
         ref;
     }
+    /// Marks this thread's output records as complete and ready for dispatch.
     void OutputComplete()
     {
         __target_switch
@@ -33259,6 +33268,7 @@ __generic<T>
 [__workGraphRecordType]
 struct GroupNodeOutputRecords
 {
+    /// Returns a mutable shared output record payload reference for the thread group.
     Ref<T> Get(uint index = 0)
     {
         __target_switch
@@ -33268,12 +33278,14 @@ struct GroupNodeOutputRecords
         }
     }
 
+    /// Returns a mutable shared output record payload reference for the thread group.
     __subscript(uint index) -> T
     {
         [nonmutating]
         __intrinsic_op($(kIROp_NodeOutputRecordGetElementPtr))
         ref;
     }
+    /// Marks this thread group's output records as complete and ready for dispatch.
     void OutputComplete()
     {
         __target_switch
@@ -33290,6 +33302,7 @@ __generic<T>
 [__workGraphRecordType]
 struct NodeOutput
 {
+    /// Returns whether this handle can launch the target node.
     bool IsValid()
     {
         __target_switch
@@ -33298,6 +33311,7 @@ struct NodeOutput
             __intrinsic_asm ".IsValid";
         }
     }
+    /// Allocates per-thread output records for this target node.
     ThreadNodeOutputRecords<T> GetThreadNodeOutputRecords(uint count)
     {
         __target_switch
@@ -33306,6 +33320,7 @@ struct NodeOutput
             __intrinsic_asm ".GetThreadNodeOutputRecords";
         }
     }
+    /// Allocates thread-group-shared output records for this target node.
     GroupNodeOutputRecords<T> GetGroupNodeOutputRecords(uint count)
     {
         __target_switch
@@ -33322,6 +33337,7 @@ __generic<T>
 [__workGraphRecordType]
 struct NodeOutputArray
 {
+    /// Returns the output handle for a specific node array element.
     NodeOutput<T> Get(uint index)
     {
         __target_switch
@@ -33330,33 +33346,42 @@ struct NodeOutputArray
             __intrinsic_asm ".operator[]";
         }
     }
+    /// Returns the output handle for a specific node array element.
     __subscript(uint index) -> NodeOutput<T>
     {
         get { return Get(index); }
     }
 };
 
+/// Output node handle for downstream nodes that carry no payload data.
 [require(hlsl)]
 [__workGraphRecordType]
 struct EmptyNodeOutput
 {
+    /// Returns whether this handle can launch the target node.
     bool IsValid() { __intrinsic_asm ".IsValid"; }
+    /// Adds payload-free output records from a single thread.
     void ThreadIncrementOutputCount(uint count)
     {
         __intrinsic_asm ".ThreadIncrementOutputCount";
     }
+    /// Adds payload-free output records cooperatively from the whole thread group.
     void GroupIncrementOutputCount(uint count)
     {
         __intrinsic_asm ".GroupIncrementOutputCount";
     }
+    /// Completes output production for this handle.
     void OutputComplete() { __intrinsic_asm ".OutputComplete"; }
 };
 
+/// Array of payload-free output node handles indexed by node array index.
 [require(hlsl)]
 [__workGraphRecordType]
 struct EmptyNodeOutputArray
 {
+    /// Returns the output handle for a specific node array element.
     EmptyNodeOutput Get(uint index) { __intrinsic_asm ".operator[]"; }
+    /// Returns the output handle for a specific node array element.
     __subscript(uint index) -> EmptyNodeOutput
     {
         get { return Get(index); }
@@ -33370,7 +33395,7 @@ enum BarrierMemoryTypeFlags : uint
     UAV_MEMORY          = $(BarrierMemoryTypeFlags::UavMemory),
     GROUP_SHARED_MEMORY = $(BarrierMemoryTypeFlags::GroupSharedMemory),
     NODE_INPUT_MEMORY   = $(BarrierMemoryTypeFlags::NodeInputMemory),
-    OUTPUT_MEMORY       = $(BarrierMemoryTypeFlags::OutputMemory),
+    NODE_OUTPUT_MEMORY  = $(BarrierMemoryTypeFlags::OutputMemory),
     ALL_MEMORY          = $(BarrierMemoryTypeFlags::AllMemory),
 }
 
@@ -33378,7 +33403,6 @@ enum BarrierMemoryTypeFlags : uint
 /// Values are defined as Slang::BarrierSemanticFlags in slang-type-system-shared.h.
 enum BarrierSemanticFlags : uint
 {
-    REORDER      = $(BarrierSemanticFlags::Reorder),
     GROUP_SYNC   = $(BarrierSemanticFlags::GroupSync),
     GROUP_SCOPE  = $(BarrierSemanticFlags::GroupScope),
     DEVICE_SCOPE = $(BarrierSemanticFlags::DeviceScope),
@@ -33406,7 +33430,9 @@ void __Barrier_hlsl(int memoryTypeFlags, int semanticFlags)
     }
 }
 
-/// Work-graph Barrier intrinsic (SM 6.8).
+/// Synchronizes memory and/or thread execution using static Barrier flag values.
+/// For example, GroupMemoryBarrierWithGroupSync() maps to
+/// Barrier(GROUP_SHARED_MEMORY, GROUP_SCOPE | GROUP_SYNC).
 [ForceInline]
 [require(hlsl, sm_6_8)]
 void Barrier(BarrierMemoryTypeFlags memoryTypeFlags, BarrierSemanticFlags semanticFlags)

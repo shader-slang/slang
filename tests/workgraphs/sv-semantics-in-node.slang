@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
-//TEST:SIMPLE(filecheck=CHK_SPIRV): -target spirv-asm -stage node -entry main
 
-// Test that SV_GroupIndex, SV_DispatchThreadID, SV_GroupID, SV_GroupThreadID
+// Test that SV_GroupIndex, SV_DispatchThreadID, SV_GroupID, and SV_GroupThreadID
 // are accepted as inputs in broadcasting-launch node shaders.
 
 [shader("node")]
@@ -20,4 +19,3 @@ void main(
 
 //CHK_DXIL: dx.op.flattenedThreadIdInGroup
 //CHK_DXIL: dx.op.threadId
-//CHK_SPIRV: OpFunction

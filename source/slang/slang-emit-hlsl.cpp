@@ -415,6 +415,13 @@ void HLSLSourceEmitter::emitParameterGroupImpl(
     _emitHLSLParameterGroup(varDecl, type);
 }
 
+bool HLSLSourceEmitter::shouldSuppressWorkGraphRecordTypeEmission(IRStructType* structType)
+{
+    // Work-graph record types are native HLSL/DXC template types. Emitting or forward-declaring
+    // them as structs would hide the built-ins and break DXC's recognition of the type.
+    return structType->findDecoration<IRWorkGraphRecordTypeDecoration>() != nullptr;
+}
+
 void HLSLSourceEmitter::emitEntryPointAttributesImpl(
     IRFunc* irFunc,
     IREntryPointDecoration* entryPointDecor)
@@ -1122,6 +1129,43 @@ static bool isTargetHLSL2018(HLSLSourceEmitter* emitter, CapabilitySet targetCap
 
 bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
+    struct NamedBarrierFlag
+    {
+        char const* name;
+        uint32_t bit;
+    };
+
+    auto emitNamedBarrierFlags = [&](uint32_t flagVal,
+                                     NamedBarrierFlag const* flags,
+                                     Index flagCount,
+                                     uint32_t allValue,
+                                     char const* allName) -> uint32_t
+    {
+        if (allName && flagVal == allValue)
+        {
+            m_writer->emit(allName);
+            return 0;
+        }
+
+        bool first = true;
+        uint32_t remaining = flagVal;
+        for (Index ii = 0; ii < flagCount; ++ii)
+        {
+            auto flag = flags[ii];
+            if (flagVal & flag.bit)
+            {
+                if (!first)
+                    m_writer->emit(" | ");
+                m_writer->emit(flag.name);
+                first = false;
+                remaining &= ~flag.bit;
+            }
+        }
+        if (first)
+            m_writer->emit("0");
+        return remaining;
+    };
+
     switch (inst->getOp())
     {
     case kIROp_SubpassLoad:
@@ -1147,31 +1191,18 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             SLANG_UNUSED(inOuterPrec);
             auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
             m_writer->emit("(");
-            // ALL_MEMORY has its own named constant; otherwise decompose into individual flags.
-            if (flagVal == BarrierMemoryTypeFlags::AllMemory)
-            {
-                m_writer->emit("ALL_MEMORY");
-            }
-            else
-            {
-                bool first = true;
-                auto emitFlag = [&](const char* name, uint32_t bit)
-                {
-                    if (flagVal & bit)
-                    {
-                        if (!first)
-                            m_writer->emit(" | ");
-                        m_writer->emit(name);
-                        first = false;
-                    }
-                };
-                emitFlag("UAV_MEMORY", BarrierMemoryTypeFlags::UavMemory);
-                emitFlag("GROUP_SHARED_MEMORY", BarrierMemoryTypeFlags::GroupSharedMemory);
-                emitFlag("NODE_INPUT_MEMORY", BarrierMemoryTypeFlags::NodeInputMemory);
-                emitFlag("OUTPUT_MEMORY", BarrierMemoryTypeFlags::OutputMemory);
-                if (first)
-                    m_writer->emit("0"); // no bits set — fallback
-            }
+            NamedBarrierFlag const flags[] = {
+                {"UAV_MEMORY", BarrierMemoryTypeFlags::UavMemory},
+                {"GROUP_SHARED_MEMORY", BarrierMemoryTypeFlags::GroupSharedMemory},
+                {"NODE_INPUT_MEMORY", BarrierMemoryTypeFlags::NodeInputMemory},
+                {"NODE_OUTPUT_MEMORY", BarrierMemoryTypeFlags::OutputMemory},
+            };
+            emitNamedBarrierFlags(
+                flagVal,
+                flags,
+                Index(sizeof(flags) / sizeof(flags[0])),
+                BarrierMemoryTypeFlags::AllMemory,
+                "ALL_MEMORY");
             m_writer->emit(")");
             return true;
         }
@@ -1181,35 +1212,24 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             SLANG_UNUSED(inOuterPrec);
             auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
             m_writer->emit("(");
-            if (flagVal == BarrierSemanticFlags::Reorder)
+            NamedBarrierFlag const flags[] = {
+                {"GROUP_SYNC", BarrierSemanticFlags::GroupSync},
+                {"GROUP_SCOPE", BarrierSemanticFlags::GroupScope},
+                {"DEVICE_SCOPE", BarrierSemanticFlags::DeviceScope},
+            };
+            auto remaining = emitNamedBarrierFlags(
+                flagVal,
+                flags,
+                Index(sizeof(flags) / sizeof(flags[0])),
+                0,
+                nullptr);
+            if (remaining != 0)
             {
-                m_writer->emit("REORDER");
-            }
-            else
-            {
-                bool first = true;
-                auto emitFlag = [&](const char* name, uint32_t bit)
-                {
-                    if (flagVal & bit)
-                    {
-                        if (!first)
-                            m_writer->emit(" | ");
-                        m_writer->emit(name);
-                        first = false;
-                    }
-                };
-                emitFlag("GROUP_SYNC", BarrierSemanticFlags::GroupSync);
-                emitFlag("GROUP_SCOPE", BarrierSemanticFlags::GroupScope);
-                emitFlag("DEVICE_SCOPE", BarrierSemanticFlags::DeviceScope);
-                if (first)
-                {
-                    StringBuilder sb;
-                    sb << "0x" << String(flagVal, 16);
-                    getSink()->diagnose(Diagnostics::InvalidBarrierSemanticFlagsValue{
-                        .value = sb.produceString(),
-                        .location = inst->sourceLoc});
-                    m_writer->emit("0");
-                }
+                StringBuilder sb;
+                sb << "0x" << String(flagVal, 16);
+                getSink()->diagnose(Diagnostics::InvalidBarrierSemanticFlagsValue{
+                    .value = sb.produceString(),
+                    .location = inst->sourceLoc});
             }
             m_writer->emit(")");
             return true;

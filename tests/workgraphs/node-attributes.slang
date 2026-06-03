@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
-//TEST:SIMPLE(filecheck=CHK_SPIRV): -target spirv-asm -stage node -entry main
 
-// Test that NodeID, NodeIsProgramEntry, NodeArraySize, AllowSparseNodes compile to dxil and spirv.
+// Test that NodeID, NodeIsProgramEntry, NodeArraySize, AllowSparseNodes compile to dxil.
 
 struct OutputRecord { int value; };
 
@@ -23,4 +22,3 @@ void main(
 
 //CHK_DXIL: !"MyNode", i32 2
 //CHK_DXIL: !"TargetNode", i32 0
-//CHK_SPIRV: OpFunction

@@ -2443,7 +2443,14 @@ err(
     "invalid-barrier-semantic-flags-value",
     31404,
     "invalid 'BarrierSemanticFlags' value",
-    span { loc = "location", message = "unrecognized BarrierSemanticFlags value '~value:String'; expected a combination of GroupSync (0x1), GroupScope (0x2), DeviceScope (0x4), or Reorder (0x0)" }
+    span { loc = "location", message = "unrecognized BarrierSemanticFlags value '~value:String'; expected 0 or a combination of GroupSync (0x1), GroupScope (0x2), and DeviceScope (0x4)" }
+)
+
+err(
+    "node-stage-not-supported-on-target",
+    31405,
+    "node stage is not supported on target",
+    span { loc = "location", message = "node shader stage is not supported for '~target:String' output" }
 )
 
 warning(

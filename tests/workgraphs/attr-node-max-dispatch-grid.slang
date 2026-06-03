@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
-//TEST:SIMPLE(filecheck=CHK_SPIRV): -target spirv-asm -stage node -entry main
 
-// Test that [NodeMaxDispatchGrid(x, y, z)] compiles to dxil and spirv.
+// Test that [NodeMaxDispatchGrid(x, y, z)] compiles to dxil.
 // A broadcasting node with NodeMaxDispatchGrid must declare an input record with SV_DispatchGrid.
 
 struct GridData
@@ -19,4 +18,3 @@ void main(DispatchNodeInputRecord<GridData> input, RWBuffer<int> output)
 }
 
 //CHK_DXIL: i32 16, i32 2, i32 1
-//CHK_SPIRV: OpFunction

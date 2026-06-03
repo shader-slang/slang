@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
-//TEST:SIMPLE(filecheck=CHK_SPIRV): -target spirv-asm -stage node -entry main
 
-// Test that a coalescing-launch node shader compiles to dxil and spirv.
+// Test that a coalescing-launch node shader compiles to dxil.
 
 [shader("node")]
 [NodeLaunch("coalescing")]
@@ -12,4 +11,3 @@ void main(RWBuffer<int> output)
 }
 
 //CHK_DXIL: define void @main()
-//CHK_SPIRV: OpFunction

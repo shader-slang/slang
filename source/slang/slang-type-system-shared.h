@@ -21,7 +21,6 @@ enum BarrierMemoryTypeFlags : uint32_t
 // Values are referenced by hlsl.meta.slang via $() splices and by the HLSL emitter.
 enum BarrierSemanticFlags : uint32_t
 {
-    Reorder = 0x00u,
     GroupSync = 0x01u,
     GroupScope = 0x02u,
     DeviceScope = 0x04u,

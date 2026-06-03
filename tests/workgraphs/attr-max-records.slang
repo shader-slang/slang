@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
-//TEST:SIMPLE(filecheck=CHK_SPIRV): -target spirv-asm -stage node -entry main
 
-// Test that [MaxRecords(n)] is encoded in dxil and the shader compiles to spirv.
+// Test that [MaxRecords(n)] is encoded in dxil.
 
 struct MyRecord
 {
@@ -18,4 +17,3 @@ void main([MaxRecords(4)] NodeOutput<MyRecord> output, RWBuffer<int> buf)
 }
 
 //CHK_DXIL: define void @main()
-//CHK_SPIRV: OpFunction
