@@ -112,6 +112,7 @@ void TextureTypeInfo::writeFuncBody(
             sb << i << "else if (isCombined != 0)\n";
             sb << i << "{\n";
             {
+                sb << i << "let image = __extractImage(this);\n";
                 sb << i << "return spirv_asm\n";
                 BraceScope spirvCombinedScope{i, sb, ";\n"};
                 sb << spirvCombined << "\n";
@@ -580,8 +581,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             StringBuilder spirvCombined;
             {
                 spirvCombined << "OpCapability ImageQuery; ";
-                spirvCombined << "%image:__imageType(this) = OpImage $this; ";
-                generateSpirvAsm(spirvCombined, false, toSlice("%image"));
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                generateSpirvAsm(spirvCombined, false, toSlice("$image"));
             }
 
             StringBuilder spirvDefault;

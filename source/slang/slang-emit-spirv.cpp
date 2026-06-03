@@ -4948,6 +4948,26 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 inst->getOperand(0),
                 inst->getOperand(1));
             break;
+        case kIROp_CombinedTextureSamplerGetTexture:
+            result = emitInst(
+                parent,
+                inst,
+                SpvOpImage,
+                inst->getDataType(),
+                kResultID,
+                inst->getOperand(0));
+            break;
+        case kIROp_ImageTexelPointer:
+            result = emitInst(
+                parent,
+                inst,
+                SpvOpImageTexelPointer,
+                inst->getDataType(),
+                kResultID,
+                inst->getOperand(0),
+                inst->getOperand(1),
+                inst->getOperand(2));
+            break;
         case kIROp_Add:
         case kIROp_Sub:
         case kIROp_Mul:
@@ -10711,91 +10731,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
-    // Propagate NonUniform from IR-backed operands and already-marked asm-local
-    // IDs onto the result of an asm instruction. If the result is non-uniform,
-    // its SpvWord ID is added to both `nonUniformLocalIDs` (for downstream
-    // propagation within the same asm block) and `nonUniformResults` (for
-    // post-block decoration and capability emission).
-    void propagateNonUniformThroughAsmResult(
-        IRSPIRVAsmInst* spvInst,
-        const std::optional<SPIRVCoreGrammarInfo::OpInfo>& opInfo,
-        SpvOp opcode,
-        SpvInst* lastEmitted,
-        Dictionary<UnownedStringSlice, SpvWord>& idMap,
-        HashSet<SpvWord>& nonUniformLocalIDs,
-        List<std::pair<SpvOp, SpvWord>>& nonUniformResults)
-    {
-        bool hasNonUniformOperand = false;
-        for (const auto operand : spvInst->getSPIRVOperands())
-        {
-            if (operand->getOp() == kIROp_SPIRVAsmOperandInst)
-            {
-                auto irVal = operand->getValue();
-                if (irVal && irVal->findDecoration<IRSPIRVNonUniformResourceDecoration>())
-                    hasNonUniformOperand = true;
-            }
-            else if (operand->getOp() == kIROp_SPIRVAsmOperandId)
-            {
-                SpvWord id = 0;
-                auto idName = cast<IRStringLit>(operand->getValue())->getStringSlice();
-                if (idMap.tryGetValue(idName, id) && nonUniformLocalIDs.contains(id))
-                    hasNonUniformOperand = true;
-            }
-        }
-
-        if (!hasNonUniformOperand)
-            return;
-
-        // Only result-producing instructions can carry the decoration.
-        // Void instructions (e.g. `OpStore`, `OpImageWrite`) have no
-        // result <id>; their resource operands were already decorated
-        // where those operands were produced (by Stage 2's Load propagation
-        // for images loaded from non-uniform pointers, or directly as an
-        // IR-backed operand already carrying the decoration from Stage 1).
-        if (!opInfo || opInfo->resultIdIndex == SPIRVCoreGrammarInfo::OpInfo::kNoResultId)
-            return;
-
-        // Locate the result <id> using the grammar's `resultIdIndex`
-        // rather than guessing "the first %id operand". Guessing is
-        // wrong whenever the result *type* is itself a local %id:
-        // the sparse-image intrinsics in `hlsl.meta.slang` emit
-        // `%r:%sparseResultType = OpImageSparse...`, so operand 0 is
-        // the type and operand 1 is the result. `getSPIRVOperands()`
-        // omits the leading opcode word, so `resultIdIndex` (0 or 1)
-        // indexes it directly.
-        SpvWord resultID = 0;
-        auto operands = spvInst->getSPIRVOperands();
-        if (opInfo->resultIdIndex < operands.getCount())
-        {
-            auto resultOperand = operands[opInfo->resultIdIndex];
-            if (resultOperand->getOp() == kIROp_SPIRVAsmOperandResult)
-                resultID = getID(lastEmitted);
-            else if (resultOperand->getOp() == kIROp_SPIRVAsmOperandId)
-            {
-                auto idName = cast<IRStringLit>(resultOperand->getValue())->getStringSlice();
-                idMap.tryGetValue(idName, resultID);
-            }
-        }
-        if (resultID && nonUniformLocalIDs.add(resultID))
-            nonUniformResults.add({opcode, resultID});
-    }
-
     SpvInst* emitSPIRVAsm(SpvInstParent* parent, IRSPIRVAsm* inst)
     {
         SpvInst* last = nullptr;
 
         // This keeps track of the named IDs used in the asm block
         Dictionary<UnownedStringSlice, SpvWord> idMap;
-
-        // Track asm-local IDs whose values are derived from a NonUniform
-        // operand.  Seeded from IR-backed operands that carry
-        // IRSPIRVNonUniformResourceDecoration; propagated transitively
-        // through any instruction whose operand is already in the set.
-        HashSet<SpvWord> nonUniformLocalIDs;
-
-        // Record (opcode, resultID) for non-uniform results so we can
-        // emit the right capability after the asm block.
-        List<std::pair<SpvOp, SpvWord>> nonUniformResults;
 
         for (const auto spvInst : inst->getInsts())
         {
@@ -11287,73 +11228,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         });
                 }
 
-                // Stage 3 of the NonUniform propagation pipeline (see the
-                // overview at the top of
-                // slang-ir-float-non-uniform-resource-index.cpp).
-                //
-                // These spirv_asm blocks are compiler-generated: texture
-                // sampling/fetch lowers to spirv_asm in the core module (see the
-                // `OpSampledImage` / `OpImage` snippets in `hlsl.meta.slang`). When
-                // the texture or sampler feeding such a block is indexed
-                // non-uniformly, Vulkan (VUID-RuntimeSpirv-None-10148) requires the
-                // resource operand actually consumed inside the block -- e.g. the
-                // `OpSampledImage` result -- to carry the `NonUniform` decoration.
-                //
-                // Invariant: an asm instruction's result is non-uniform iff any of
-                // its operands is non-uniform -- either an IR value carrying
-                // `IRSPIRVNonUniformResourceDecoration`, or an asm-local `%id`
-                // already recorded in `nonUniformLocalIDs`. Instructions are visited
-                // in source order and an asm block is a straight-line sequence (no
-                // back-edges among asm-local ids), so a single forward pass reaches
-                // a fixed point.
-                propagateNonUniformThroughAsmResult(
-                    spvInst,
-                    opInfo,
-                    opcode,
-                    last,
-                    idMap,
-                    nonUniformLocalIDs,
-                    nonUniformResults);
             }
-        }
-
-        // Emit the NonUniform decoration for every asm-local result we marked.
-        //
-        // Capability partition: OpSampledImage is the *only* resource type that
-        // is constructed purely inside an asm block (by combining a texture and
-        // sampler), so this loop is the sole site that can require
-        // SampledImageArrayNonUniformIndexing. All other resource kinds enter
-        // the block as IR-backed operands whose capabilities were already
-        // emitted by requireNonUniformIndexingCapabilityForInst() at the point
-        // the operand's IRSPIRVNonUniformResourceDecoration was processed.
-        //
-        // OpImage (extracting the image from a combined sampled image) may also
-        // appear as a non-uniform result, but does not require its own
-        // capability: the descriptor type is still "sampled image" and its
-        // capability was already emitted for the OpSampledImage that produced it.
-        //
-        // This is exhaustive by construction: the asm blocks in hlsl.meta.slang
-        // and glsl.meta.slang only construct OpSampledImage and OpImage; all
-        // other ops are sampling/fetch/write that *consume* resources rather than
-        // construct new resource types. The NOTE comments in those meta files
-        // flag this dependency for future changes.
-        //
-        // The extension and base ShaderNonUniform capability are loop-invariant, so
-        // they are required once here rather than per result.
-        if (nonUniformResults.getCount() != 0)
-        {
-            ensureExtensionDeclarationBeforeSpv15(toSlice("SPV_EXT_descriptor_indexing"));
-            requireSPIRVCapability(SpvCapabilityShaderNonUniform);
-        }
-        for (const auto& [resultOpcode, resultID] : nonUniformResults)
-        {
-            if (resultOpcode == SpvOpSampledImage)
-                requireSPIRVCapability(SpvCapabilitySampledImageArrayNonUniformIndexing);
-            emitOpDecorate(
-                getSection(SpvLogicalSectionID::Annotations),
-                nullptr,
-                resultID,
-                SpvDecorationNonUniform);
         }
 
         for (const auto& [name, id] : idMap)

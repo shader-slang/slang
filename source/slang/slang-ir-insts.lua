@@ -1186,6 +1186,8 @@ local insts = {
 	},
 	-- Store into an Image.
 	{ imageStore = { operands = { { "image" }, { "coord" }, { "value" } } } },
+	-- Form a pointer to a texel of an image for atomic operations.
+	{ ImageTexelPointer = { operands = { { "image" }, { "coord" }, { "sample" } } } },
 	-- Load from a SubpassInput.
 	{ SubpassLoad = { operands = { { "subpassInput" }, { "sample", optional = true } } } },
 	-- Load (almost) arbitrary-type data from a byte-address buffer

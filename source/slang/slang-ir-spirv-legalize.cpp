@@ -2390,6 +2390,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     hasNonUniformDecoration(inst->getOperand(1)))
                     return addNonUniformDecoration(inst);
                 break;
+            case kIROp_CombinedTextureSamplerGetTexture:
+            case kIROp_CombinedTextureSamplerGetSampler:
+                if (hasNonUniformDecoration(inst->getOperand(0)))
+                    return addNonUniformDecoration(inst);
+                break;
+            case kIROp_ImageTexelPointer:
+                if (hasNonUniformDecoration(inst->getOperand(0)))
+                    return addNonUniformDecoration(inst);
+                break;
             default:
                 // Other opcodes (including CastDynamicResource) do not appear
                 // in the IR at this point: function-call specialization inlines
