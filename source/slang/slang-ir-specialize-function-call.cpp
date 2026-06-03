@@ -957,7 +957,7 @@ struct FunctionParameterSpecializationContext
             // Decorations (including IRSPIRVNonUniformResourceDecoration) are not
             // copied from `oldArg` to `newVal` -- this is intentional.
             // The reconstructed access chain carries decorated instructions
-            // that propagateNonUniformAccessChainDecorations will use as seeds
+            // that propagateNonUniformDecorations will use as seeds
             // to re-derive NonUniform on the cast result.
             auto oldBase = oldArg->getOperand(0);
             auto newBase = getSpecializedValueForArg(ioInfo, oldBase);

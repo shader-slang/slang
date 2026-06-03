@@ -123,12 +123,7 @@ void processNonUniformResourceIndex(
                         else if (samp == inst)
                             samp = inst->getOperand(0);
                         else
-                            // Should be structurally unreachable: traverseUses gave
-                            // us this user, so `inst` must be one of its operands,
-                            // and MakeCombinedTextureSampler has exactly two data
-                            // operands (texture, sampler). Kept as a defensive break
-                            // rather than an assertion.
-                            break;
+                            SLANG_UNREACHABLE("NonUniformResourceIndex must be an operand of MakeCombinedTextureSampler");
                         newUser =
                             builder.emitMakeCombinedTextureSampler(user->getFullType(), tex, samp);
                     }

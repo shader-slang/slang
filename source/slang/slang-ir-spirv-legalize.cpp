@@ -2284,7 +2284,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // index used in an access chain. A worklist seeded with already-decorated
     // instructions pushes the decoration downstream through loads, field
     // accesses, and combined-sampler construction.
-    void propagateNonUniformAccessChainDecorations()
+    void propagateNonUniformDecorations()
     {
         List<IRInst*> worklist;
         HashSet<IRInst*> inWorklist;
@@ -2888,7 +2888,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // lowering pass.
         performForceInlining(m_module);
 
-        propagateNonUniformAccessChainDecorations();
+        propagateNonUniformDecorations();
 
         // The above step may produce empty struct types, so we need to lower them out of
         // existence.
