@@ -3540,6 +3540,13 @@ warning(
     span { loc = "decl:Decl", message = "the extension is non-standard and may not work as intended because the generic parameter '~paramName' is not referenced by extension target type '~targetType'" }
 )
 
+err(
+    "default-generic-param-not-allowed-in-extension",
+    30857,
+    "default value on generic parameter '~paramName:Name' is not allowed in an 'extension' declaration; the parameter is bound by unifying with the target type, so the default could never be used",
+    span { loc = "decl:Decl", message = "default value on generic parameter '~paramName' has no effect in an 'extension'" }
+)
+
 --
 -- 309xx: subscripts
 --
