@@ -33359,8 +33359,6 @@ struct EmptyNodeOutput
     {
         __intrinsic_asm ".GroupIncrementOutputCount";
     }
-    /// Completes output production for this handle.
-    void OutputComplete() { __intrinsic_asm ".OutputComplete"; }
 };
 
 /// Array of payload-free output node handles indexed by node array index.

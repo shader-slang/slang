@@ -1166,6 +1166,21 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         return remaining;
     };
 
+    auto tryGetBarrierFlagValue = [&](char const* flagType, uint32_t& outFlagVal) -> bool
+    {
+        auto flagLit = as<IRIntLit>(inst->getOperand(0));
+        if (!flagLit)
+        {
+            getSink()->diagnose(Diagnostics::BarrierFlagsMustBeCompileTimeConstant{
+                .flagType = flagType,
+                .location = inst->sourceLoc});
+            m_writer->emit("(0)");
+            return false;
+        }
+        outFlagVal = (uint32_t)getIntVal(flagLit);
+        return true;
+    };
+
     switch (inst->getOp())
     {
     case kIROp_NodeOutputRecordGetElementPtr:
@@ -1199,7 +1214,10 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_GetEnumBarrierMemoryTypeFlags:
         {
             SLANG_UNUSED(inOuterPrec);
-            auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
+            uint32_t flagVal = 0;
+            if (!tryGetBarrierFlagValue("BarrierMemoryTypeFlags", flagVal))
+                return true;
+
             m_writer->emit("(");
             NamedBarrierFlag const flags[] = {
                 {"UAV_MEMORY", BarrierMemoryTypeFlags::UavMemory},
@@ -1228,7 +1246,10 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_GetEnumBarrierSemanticFlags:
         {
             SLANG_UNUSED(inOuterPrec);
-            auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
+            uint32_t flagVal = 0;
+            if (!tryGetBarrierFlagValue("BarrierSemanticFlags", flagVal))
+                return true;
+
             m_writer->emit("(");
             NamedBarrierFlag const flags[] = {
                 {"GROUP_SYNC", BarrierSemanticFlags::GroupSync},
@@ -1925,12 +1946,25 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>())
             {
                 auto nameHint = structType->findDecoration<IRNameHintDecoration>();
-                SLANG_RELEASE_ASSERT(
-                    nameHint && "work-graph record types must preserve their canonical HLSL name");
+                auto emitRecordTypeName = [&]()
+                {
+                    if (nameHint)
+                    {
+                        m_writer->emit(nameHint->getName());
+                        return;
+                    }
+
+                    SLANG_DIAGNOSE_UNEXPECTED(
+                        getSink(),
+                        structType,
+                        "work-graph record type is missing its canonical HLSL name");
+                    m_writer->emit(getName(structType));
+                };
+
                 if (auto elemDecor =
                         structType->findDecoration<IRWorkGraphRecordElementTypeDecoration>())
                 {
-                    m_writer->emit(nameHint->getName());
+                    emitRecordTypeName();
                     m_writer->emit("<");
                     emitType(elemDecor->getElementType());
                     m_writer->emit(">");
@@ -1939,7 +1973,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 {
                     // Non-generic work-graph type (EmptyNodeOutput, EmptyNodeInput, etc.):
                     // emit the original HLSL name without a template argument.
-                    m_writer->emit(nameHint->getName());
+                    emitRecordTypeName();
                 }
                 return;
             }

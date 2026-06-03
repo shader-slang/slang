@@ -2474,6 +2474,13 @@ err(
     span { loc = "attr:Modifier", message = "attribute '~attrName:Name' is only valid on node shaders" }
 )
 
+err(
+    "barrier-flags-must-be-compile-time-constant",
+    31409,
+    "Barrier flags must be compile-time constants",
+    span { loc = "location", message = "~flagType:String operand to Barrier must be a compile-time constant" }
+)
+
 warning(
     "explicit-uniform-location",
     31104,
