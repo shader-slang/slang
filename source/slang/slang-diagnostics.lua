@@ -1593,6 +1593,13 @@ err(
     span { loc = "inheritance:Decl", message = "cannot conform generic type '~generic:Decl' to dyn interface '~interface:Decl'." }
 )
 
+err(
+    "string-type-not-supported-on-target",
+    33083,
+    "the 'String' type is not supported on the '~target' target; use 'NativeString' instead, or compile with -target host-cpp",
+    span { loc = "location", message = "use of 'String' here" }
+)
+
 -- Conversion diagnostics
 
 err(
