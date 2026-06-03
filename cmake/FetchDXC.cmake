@@ -478,9 +478,7 @@ endif()
 
 if(_dxc_build_from_source)
     set(_dxc_forwarded_config_args "")
-    if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-        set(_dxc_forwarded_config_args "")
-    elseif(
+    if(
         CMAKE_SYSTEM_NAME STREQUAL "Linux"
         OR CMAKE_SYSTEM_NAME STREQUAL "Darwin"
     )
@@ -502,7 +500,7 @@ if(_dxc_build_from_source)
                 CMAKE_OSX_SYSROOT
                 CMAKE_OSX_DEPLOYMENT_TARGET
             )
-                if(DEFINED ${_dxc_osx_var})
+                if(DEFINED ${_dxc_osx_var} AND NOT "${${_dxc_osx_var}}" STREQUAL "")
                     set(_dxc_osx_value "${${_dxc_osx_var}}")
                     string(REPLACE ";" "\\;" _dxc_osx_value "${_dxc_osx_value}")
                     list(
@@ -524,10 +522,10 @@ if(_dxc_build_from_source)
     # to set LLVM_RUNTIME_OUTPUT_INTDIR and LLVM_LIBRARY_OUTPUT_INTDIR, so for
     # multi-config generators the artifacts land under MinSizeRel. Track these
     # subdirectories so byproducts and copy commands point to the right path.
+    get_property(_dxc_parent_is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
     if(CMAKE_GENERATOR MATCHES "Ninja")
         set(_dxc_generator_args -G Ninja)
-        set(_dxc_dll_subdir "bin")
-        set(_dxc_lib_subdir "lib")
+        set(_dxc_inner_is_multi_config OFF)
     else()
         set(_dxc_generator_args -G "${CMAKE_GENERATOR}")
         if(CMAKE_GENERATOR_PLATFORM)
@@ -536,8 +534,15 @@ if(_dxc_build_from_source)
         if(CMAKE_GENERATOR_TOOLSET)
             list(APPEND _dxc_generator_args -T "${CMAKE_GENERATOR_TOOLSET}")
         endif()
+        set(_dxc_inner_is_multi_config "${_dxc_parent_is_multi_config}")
+    endif()
+
+    if(_dxc_inner_is_multi_config)
         set(_dxc_dll_subdir "MinSizeRel/bin")
         set(_dxc_lib_subdir "MinSizeRel/lib")
+    else()
+        set(_dxc_dll_subdir "bin")
+        set(_dxc_lib_subdir "lib")
     endif()
 
     # Step 1: Clone DXC source at Slang configure time.
