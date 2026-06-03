@@ -2353,8 +2353,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     return addNonUniformDecoration(inst);
                 break;
             case kIROp_MakeCombinedTextureSampler:
-                // Propagates chain-derived non-uniformity that the float pass
-                // did not handle directly (e.g. texture loaded from a non-uniform pointer).
+                // Propagates NonUniform from a decorated texture or sampler to the combined result.
                 if (hasNonUniformDecoration(inst->getOperand(0)) ||
                     hasNonUniformDecoration(inst->getOperand(1)))
                     return addNonUniformDecoration(inst);

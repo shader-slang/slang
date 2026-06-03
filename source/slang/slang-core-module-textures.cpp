@@ -581,7 +581,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             StringBuilder spirvCombined;
             {
                 spirvCombined << "OpCapability ImageQuery; ";
-                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not
+                // propagate to asm-local ids.
                 generateSpirvAsm(spirvCombined, false, toSlice("$image"));
             }
 
