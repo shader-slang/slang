@@ -2595,6 +2595,13 @@ err(
     span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected a combination of UavMemory (0x1), GroupSharedMemory (0x2), NodeInputMemory (0x4), OutputMemory (0x8), or AllMemory (0xf)" }
 )
 
+err(
+    "invalid-work-graph-attribute-uint32-value",
+    31406,
+    "invalid work-graph attribute value",
+    span { loc = "location", message = "~attrName:String must be in the range 0 to 0xffffffff, got ~value:Int" }
+)
+
 warning(
     "explicit-uniform-location",
     31104,

@@ -46,6 +46,27 @@ ConstantIntVal* SemanticsVisitor::checkConstantIntVal(Expr* expr)
     return constIntVal;
 }
 
+static bool _checkWorkGraphUInt32AttributeValue(
+    DiagnosticSink* sink,
+    ConstantIntVal* value,
+    Expr* arg,
+    char const* attrName)
+{
+    static const IntegerLiteralValue kMaxUInt32Value = 0xffffffffLL;
+
+    const auto literalValue = value->getValue();
+    if (literalValue < 0 || literalValue > kMaxUInt32Value)
+    {
+        sink->diagnose(Diagnostics::InvalidWorkGraphAttributeUint32Value{
+            .attrName = String(attrName),
+            .value = literalValue,
+            .location = arg->loc});
+        return false;
+    }
+
+    return true;
+}
+
 ConstantIntVal* SemanticsVisitor::checkConstantEnumVal(Expr* expr)
 {
     // First type-check the expression as normal
@@ -525,11 +546,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         auto value = checkConstantIntVal(attr->args[0]);
         if (!value)
             return nullptr;
-        if (value->getValue() < 0)
-        {
-            getSink()->diagnose(Diagnostics::InvalidArraySize{.location = attr->args[0]->loc});
+        if (!_checkWorkGraphUInt32AttributeValue(getSink(), value, attr->args[0], "MaxRecords"))
             return nullptr;
-        }
         maxRecAttr->value = value;
     }
     else if (auto nodeIDAttr = as<NodeIDAttribute>(attr))
@@ -545,9 +563,16 @@ Modifier* SemanticsVisitor::validateAttribute(
         nodeIDAttr->name = name;
         if (argCount == 2)
         {
-            nodeIDAttr->arrayIndex = checkConstantIntVal(attr->args[1]);
-            if (!nodeIDAttr->arrayIndex)
+            auto arrayIndex = checkConstantIntVal(attr->args[1]);
+            if (!arrayIndex)
                 return nullptr;
+            if (!_checkWorkGraphUInt32AttributeValue(
+                    getSink(),
+                    arrayIndex,
+                    attr->args[1],
+                    "NodeID arrayIndex"))
+                return nullptr;
+            nodeIDAttr->arrayIndex = arrayIndex;
         }
         else
         {
@@ -560,11 +585,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         auto count = checkConstantIntVal(attr->args[0]);
         if (!count)
             return nullptr;
-        if (count->getValue() < 0)
-        {
-            getSink()->diagnose(Diagnostics::InvalidArraySize{.location = attr->args[0]->loc});
+        if (!_checkWorkGraphUInt32AttributeValue(getSink(), count, attr->args[0], "NodeArraySize"))
             return nullptr;
-        }
         nodeArraySizeAttr->count = count;
     }
     else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
