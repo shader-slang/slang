@@ -576,11 +576,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         if (!checkLiteralStringVal(attr->args[0], &name))
             return nullptr;
         nodeIDAttr->name = name;
-        nodeIDAttr->arrayIndex = checkNodeAttributeArgInRange(
-            attr->args[1],
-            "NodeID array index",
-            0,
-            kMaxNodeArraySize);
+        nodeIDAttr->arrayIndex =
+            checkNodeAttributeArgInRange(attr->args[1], "NodeID array index", 0, kMaxNodeArraySize);
         if (!nodeIDAttr->arrayIndex)
             return nullptr;
     }
