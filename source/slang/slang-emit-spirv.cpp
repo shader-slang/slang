@@ -6324,21 +6324,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             m = SpvExecutionModeVertexOrderCcw;
                         else if (topologyType == OutputTopologyType::Point)
                             m = SpvExecutionModePointMode;
+                        // OutputTopologyType::Line is represented by the Isolines execution mode
+                        // emitted for the domain decoration.
+                        break;
+                    case Stage::Mesh:
+                        if (topologyType == OutputTopologyType::Triangle)
+                            m = SpvExecutionModeOutputTrianglesEXT;
+                        else if (topologyType == OutputTopologyType::Line)
+                            m = SpvExecutionModeOutputLinesEXT;
+                        else if (topologyType == OutputTopologyType::Point)
+                            m = SpvExecutionModeOutputPoints;
+                        break;
+                    default:
                         break;
                     }
                 }
-                if (m == SpvExecutionModeMax)
-                {
-                    if (topologyType == OutputTopologyType::Triangle)
-                        m = SpvExecutionModeOutputTrianglesEXT;
-                    else if (topologyType == OutputTopologyType::Line)
-                        m = SpvExecutionModeOutputLinesEXT;
-                    else if (topologyType == OutputTopologyType::Point)
-                        m = SpvExecutionModeOutputPoints;
-                }
 
-                SLANG_ASSERT(m != SpvExecutionModeMax);
-                requireSPIRVExecutionMode(decoration, dstID, m);
+                if (m != SpvExecutionModeMax)
+                    requireSPIRVExecutionMode(decoration, dstID, m);
             }
             break;
 
