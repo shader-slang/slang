@@ -1722,16 +1722,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (!inst)
             return false;
 
-        for (auto decoration : inst->getDecorations())
-        {
-            if (auto collection = as<IRMemoryQualifierSetDecoration>(decoration))
-            {
-                IRIntegerValue flags = collection->getMemoryQualifierBit();
-                if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
-                    return true;
-            }
-        }
-        return false;
+        auto collection = inst->findDecoration<IRMemoryQualifierSetDecoration>();
+        if (!collection)
+            return false;
+
+        IRIntegerValue flags = collection->getMemoryQualifierBit();
+        return (flags & MemoryQualifierSetModifier::Flags::kCoherent) != 0;
     }
 
     bool hasCoherentMemoryQualifierAttr(IRInst* type)
