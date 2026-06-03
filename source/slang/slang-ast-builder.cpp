@@ -868,6 +868,11 @@ Val* ASTBuilder::getNoDiffModifierVal()
     return getOrCreate<NoDiffModifierVal>();
 }
 
+Val* ASTBuilder::getCoherentModifierVal()
+{
+    return getOrCreate<CoherentModifierVal>();
+}
+
 UIntSetVal* ASTBuilder::getUIntSetVal(const UIntSet& uintSet)
 {
     // Convert UIntSet buffer to list of ConstantIntVals

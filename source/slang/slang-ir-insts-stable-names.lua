@@ -600,6 +600,7 @@ return {
 	["Attr.unorm"] = 618,
 	["Attr.snorm"] = 619,
 	["Attr.no_diff"] = 620,
+	["Attr.coherent"] = 853,
 	["Attr.nonuniform"] = 621,
 	["Attr.Aligned"] = 622,
 	["Attr.SemanticAttr.userSemantic"] = 623,

@@ -7994,6 +7994,10 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
     {
         return m_astBuilder->getNoDiffModifierVal();
     }
+    else if (as<GloballyCoherentModifier>(modifier))
+    {
+        return m_astBuilder->getCoherentModifierVal();
+    }
     else if (as<ConstModifier>(modifier))
     {
         getSink()->diagnose(Diagnostics::ConstNotAllowedOnType{.location = modifier->loc});
