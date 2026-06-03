@@ -509,12 +509,13 @@ if(_dxc_build_from_source)
     # mirror the parent so the same toolchain is used.
     #
     # LLVM uses CMAKE_CFG_INTDIR (e.g. "." for Ninja, "$(Configuration)" for VS)
-    # to set LLVM_RUNTIME_OUTPUT_INTDIR, so for VS the DLLs land in
-    # <BINARY_DIR>/MinSizeRel/bin/ rather than <BINARY_DIR>/bin/. Track this
-    # in _dxc_dll_subdir so byproducts and copy commands point to the right path.
+    # to set LLVM_RUNTIME_OUTPUT_INTDIR and LLVM_LIBRARY_OUTPUT_INTDIR, so for
+    # multi-config generators the artifacts land under MinSizeRel. Track these
+    # subdirectories so byproducts and copy commands point to the right path.
     if(CMAKE_GENERATOR MATCHES "Ninja")
         set(_dxc_generator_args -G Ninja)
         set(_dxc_dll_subdir "bin")
+        set(_dxc_lib_subdir "lib")
     else()
         set(_dxc_generator_args -G "${CMAKE_GENERATOR}")
         if(CMAKE_GENERATOR_PLATFORM)
@@ -524,6 +525,7 @@ if(_dxc_build_from_source)
             list(APPEND _dxc_generator_args -T "${CMAKE_GENERATOR_TOOLSET}")
         endif()
         set(_dxc_dll_subdir "MinSizeRel/bin")
+        set(_dxc_lib_subdir "MinSizeRel/lib")
     endif()
 
     # Step 1: Clone DXC source at Slang configure time.
@@ -690,8 +692,8 @@ if(_dxc_build_from_source)
             "${_dxc_shared_library_prefix}dxil${_dxc_shared_library_suffix}"
         )
         set(_dxc_src_byproducts
-            "${_dxc_build_dir}/lib/${_dxc_dxcompiler_library_name}"
-            "${_dxc_build_dir}/lib/${_dxc_dxil_library_name}"
+            "${_dxc_build_dir}/${_dxc_lib_subdir}/${_dxc_dxcompiler_library_name}"
+            "${_dxc_build_dir}/${_dxc_lib_subdir}/${_dxc_dxil_library_name}"
         )
     endif()
 
@@ -729,7 +731,9 @@ if(_dxc_build_from_source)
             set(_dxc_shared_library_name
                 "${_dxc_shared_library_prefix}${_lib}${_dxc_shared_library_suffix}"
             )
-            set(_src "${_dxc_build_dir}/lib/${_dxc_shared_library_name}")
+            set(_src
+                "${_dxc_build_dir}/${_dxc_lib_subdir}/${_dxc_shared_library_name}"
+            )
             set(_dst
                 "${CMAKE_BINARY_DIR}/$<CONFIG>/${library_subdir}/${_dxc_shared_library_name}"
             )
