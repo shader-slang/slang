@@ -151,6 +151,13 @@ jobs:
             generators_path="-DSLANG_GENERATORS_PATH=build-platform-generators/bin"
           fi
 
+          cmake_ci_defines=()
+          if [[ "${{ inputs.os }}" == "macos" ]]; then
+            # Keep macOS option sweeps from building DXC from source. The
+            # SLANG_DXC_BUILD_FROM_SOURCE matrix entry still tests OFF.
+            cmake_ci_defines+=("-DSLANG_DXC_BUILD_FROM_SOURCE=OFF")
+          fi
+
           # SLANG_USE_SCCACHE=OFF prevents the env-var auto-activation path in
           # CMakeLists.txt from silently enabling sccache and polluting the
           # shared cache with objects built under non-default CMake options.
@@ -162,6 +169,7 @@ jobs:
               -DSLANG_USE_SCCACHE=OFF \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
               $generators_path \
+              "${cmake_ci_defines[@]}" \
               "-D${option}=${value}" \
               ${{ matrix.extra_cmake_flags || '' }}
           else
@@ -170,6 +178,7 @@ jobs:
               -DSLANG_USE_SCCACHE=OFF \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
               $generators_path \
+              "${cmake_ci_defines[@]}" \
               "-D${option}=${value}" \
               ${{ matrix.extra_cmake_flags || '' }}
           fi
