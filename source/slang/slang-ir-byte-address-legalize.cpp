@@ -242,14 +242,6 @@ struct ByteAddressBufferLegalizationContext
 
     // Returns true if a vectorized load or store of `alignmentVal` bytes at
     // `baseOffset + immediateOffset` is known to be sufficiently aligned.
-    //
-    // As a side effect, this emits `ByteAddressBufferUnaligned` for a dynamic
-    // base offset when an explicit nonzero alignment is known but insufficient
-    // for `alignmentVal`.
-    //
-    // Keep the dynamic base offset and constant nested-field offset separate:
-    // a synthesized add is not an integer literal, so pre-summing them would
-    // hide constant immediate-offset misalignment from this check.
     bool isAligned(
         IRInst* baseOffset,
         IRIntegerValue immediateOffset,
@@ -638,7 +630,12 @@ struct ByteAddressBufferLegalizationContext
                 if (sizeAlignment.size == 8 &&
                     !isAligned(baseOffset, immediateOffset, alignment, sizeAlignment.getStride()))
                 {
-                    return emitLegal64BitLoad(type, buffer, baseOffset, immediateOffset, alignment);
+                    return emitLegalUnaligned64BitLoadFromTwoUInts(
+                        type,
+                        buffer,
+                        baseOffset,
+                        immediateOffset,
+                        alignment);
                 }
             }
 
@@ -718,7 +715,7 @@ struct ByteAddressBufferLegalizationContext
             .emitIntrinsicInst(type, op, elementVals.getCount(), elementVals.getBuffer());
     }
 
-    IRInst* emitLegal64BitLoad(
+    IRInst* emitLegalUnaligned64BitLoadFromTwoUInts(
         IRType* type,
         IRInst* buffer,
         IRInst* baseOffset,
@@ -1536,7 +1533,7 @@ struct ByteAddressBufferLegalizationContext
                 if (sizeAlignment.size == 8 &&
                     !isAligned(baseOffset, immediateOffset, alignment, sizeAlignment.getStride()))
                 {
-                    return emitLegal64BitStore(
+                    return emitLegalUnaligned64BitStoreAsTwoUInts(
                         buffer,
                         baseOffset,
                         immediateOffset,
@@ -1563,7 +1560,7 @@ struct ByteAddressBufferLegalizationContext
         return emitSimpleStore(type, buffer, baseOffset, immediateOffset, value);
     }
 
-    Result emitLegal64BitStore(
+    Result emitLegalUnaligned64BitStoreAsTwoUInts(
         IRInst* buffer,
         IRInst* baseOffset,
         IRIntegerValue immediateOffset,
