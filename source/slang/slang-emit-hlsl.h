@@ -22,8 +22,7 @@ public:
     HLSLSourceEmitter(const Desc& desc)
         : Super(desc), m_extensionTracker(new HLSLExtensionTracker)
     {
-        auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
-        m_sm610OrAbove = targetProfile.getVersion() > ProfileVersion::DX_6_9;
+        m_sm610OrAbove = m_effectiveProfile.getVersion() > ProfileVersion::DX_6_9;
     }
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }

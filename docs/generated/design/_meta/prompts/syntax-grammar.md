@@ -50,6 +50,21 @@ recognizes.
    following the parser's precedence ladder. Cite
    [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) and
    note the heuristic for `<` (generic application vs. comparison).
+   The `Literal` production must enumerate every concrete
+   `LiteralExpr` subclass declared in
+   [slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h)
+   (currently `IntegerLiteralExpr`, `FloatingPointLiteralExpr`,
+   `BoolLiteralExpr`, `NullPtrLiteralExpr`, `NoneLiteralExpr`,
+   `StringLiteralExpr`, and any future siblings), even when the
+   literal is parsed via the keyword syntax-decl table
+   (`_makeParseExpr("true", parseTrueExpr)` and friends in
+   [slang-parser.cpp](../../../../source/slang/slang-parser.cpp))
+   rather than from a distinct token kind. Add a one-sentence note
+   identifying which of those literal forms are lexically
+   `Identifier` tokens (`true`, `false`, `nullptr`, `none`) rather
+   than dedicated token kinds, and do not also list them under
+   keyword-expression productions — a single form belongs to one
+   alternative.
 8. `## Modifiers` — production for the modifier syntax that prefixes
    declarations.
 9. `## Attributes and decorations` — `[attribute]` syntax and how it
@@ -71,6 +86,13 @@ that implements it (e.g. "implemented in `parseDecl`").
 - [ ] Productions for ambiguous constructs (`<` in expressions, type
       vs. value identifiers) include a note explaining how the parser
       disambiguates.
+- [ ] The `Literal` production lists every concrete `LiteralExpr`
+      subclass declared in
+      [slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h),
+      including the ones parsed via the keyword syntax-decl
+      mechanism (`'true'`, `'false'`, `'nullptr'`, `'none'`). No
+      literal form is also duplicated under a `KeywordExpr`-style
+      production.
 - [ ] Document length under 48 KB. If larger, summarize sub-grammars
       and link out to dedicated sub-pages (and propose adding them to
       the manifest).

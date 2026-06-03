@@ -2825,6 +2825,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitMakeMatrixFromScalar(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 inst);
+        case kIROp_CastDescriptorHandleToUInt2:
+        case kIROp_CastUInt2ToDescriptorHandle:
+        case kIROp_CastUInt64ToDescriptorHandle:
+        case kIROp_CastDescriptorHandleToUInt64:
+        case kIROp_GlobalValueRef:
+            {
+                auto inner = ensureInst(inst->getOperand(0));
+                registerInst(inst, inner);
+                return inner;
+            }
         case kIROp_GlobalParam:
             return emitGlobalParam(as<IRGlobalParam>(inst));
         case kIROp_GlobalVar:
@@ -9680,7 +9690,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     visited);
             break;
 
-        case kIROp_PtrType:
         case kIROp_RefParamType:
         case kIROp_BorrowInParamType:
         case kIROp_OutParamType:
@@ -9691,6 +9700,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     targets,
                     found,
                     visited);
+            break;
+
+        case kIROp_PtrType:
+            // A pointer's pointee is not stored inline in the outer container;
+            // it lives in whatever storage class the pointer's address space
+            // names.  Do not recurse through pointers when deciding whether
+            // the outer container needs 8/16-bit-storage capabilities --
+            // otherwise a `uint16_t*` BDA argument in a push-constant block
+            // would spuriously require `StoragePushConstant16` (issue #11096).
+            // The pointee's own storage-class requirements are handled when
+            // that storage class is emitted.
             break;
 
         case kIROp_RateQualifiedType:

@@ -244,6 +244,8 @@ works for any given binary.
 | Option                                | Default                       | Description                                                                                                                              |
 | ------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `SLANG_VERSION`                       | Latest `v*` tag               | The project version, detected using git if available                                                                                     |
+| `SLANG_DXC_BINARY_URL`                | Stable DXC release URL        | URL of the prebuilt DXC binary archive to download; overrides the default release URL and skips GLIBC auto-detection on Linux            |
+| `SLANG_DXC_BUILD_FROM_SOURCE`         | Unset (auto on native Linux x86_64; otherwise prebuilt when available) | `ON`: build DXC from source on Windows, Linux, and macOS; `OFF`: use prebuilt when available; unset: auto-select on native Linux x86_64, otherwise use prebuilt when available (see [DXC GLIBC auto-detection](#dxc-glibc-auto-detection)) |
 | `SLANG_EMBED_CORE_MODULE`             | `TRUE`                        | Build slang with an embedded version of the core module                                                                                  |
 | `SLANG_EMBED_CORE_MODULE_SOURCE`      | `TRUE`                        | Embed the core module source in the binary                                                                                               |
 | `SLANG_ENABLE_DXIL`                   | `TRUE`                        | Enable generating DXIL using DXC                                                                                                         |
@@ -273,6 +275,51 @@ works for any given binary.
 | `SLANG_GENERATORS_PATH`               | ``                            | Path to an installed `all-generators` target for cross compilation                                                                       |
 | `SLANG_IGNORE_ABORT_MSG`              | `FALSE`                       | Suppress the Windows modal abort dialog at compile time (baked into all built executables; recommended for unattended/LLM-driven builds) |
 
+#### DXC GLIBC auto-detection
+
+When `SLANG_DXC_BUILD_FROM_SOURCE` is unset on native Linux x86_64 (and
+`SLANG_DXC_BINARY_URL` is not set), CMake downloads the prebuilt DXC binary at
+configure time and inspects the GLIBC requirements of both `libdxcompiler.so`
+and `libdxil.so`. If either library requires a newer GLIBC than the system
+provides, or if the requirement or system GLIBC version cannot be detected, DXC
+is built from source instead. Successful detection results are cached in stamp
+files so subsequent reconfigures are fast. For example, if a DXC Linux prebuilt
+requires GLIBC 2.38 and the host provides an older GLIBC, CMake selects the
+source-build path. On macOS, Microsoft does not publish a prebuilt DXC package;
+set `-DSLANG_DXC_BUILD_FROM_SOURCE=ON` to build DXC locally. The default macOS
+configuration leaves DXC unavailable to avoid the large clone and build cost.
+
+```mermaid
+flowchart TD
+    Start["Configure DXC support"] --> BuildFromSource{"SLANG_DXC_BUILD_FROM_SOURCE"}
+    BuildFromSource -->|ON| Source["Build DXC from source"]
+    BuildFromSource -->|OFF| Prebuilt["Use a prebuilt binary when available"]
+    BuildFromSource -->|unset| CustomUrl{"SLANG_DXC_BINARY_URL set?"}
+    CustomUrl -->|yes| CustomPrebuilt["Use custom prebuilt URL and skip GLIBC detection"]
+    CustomUrl -->|no| NativeLinux{"Native Linux x86_64?"}
+    NativeLinux -->|yes| Probe["Download Linux prebuilt and inspect GLIBC requirements"]
+    Probe --> Compatible{"Detected requirements are compatible with host GLIBC?"}
+    Compatible -->|yes| LinuxPrebuilt["Use Linux prebuilt binary"]
+    Compatible -->|no or unknown| Source
+    NativeLinux -->|no| OfficialPrebuilt{"Official prebuilt exists for platform?"}
+    OfficialPrebuilt -->|yes| Prebuilt
+    OfficialPrebuilt -->|no| Unavailable["DXC unavailable unless built from source"]
+```
+
+- `ON`: build DXC from source on Windows, Linux, and macOS; on other platforms, DXC is unavailable.
+- `OFF`: use the prebuilt binary when one is available and skip the GLIBC check; on
+  non-x86_64 Linux and macOS, DXC is unavailable unless `SLANG_DXC_BINARY_URL`
+  is set to a custom prebuilt for that architecture/platform.
+- unset on native non-x86_64 Linux (e.g. ARM64): DXC is unavailable because no official prebuilt binary exists; set `ON` to build DXC from source.
+- unset on macOS: DXC is unavailable because no official prebuilt binary exists; set `ON` to build DXC from source.
+- unset while cross-compiling for Linux x86_64: skip GLIBC detection because the target system cannot be probed at configure time.
+
+The source-build path clones DXC plus LLVM/Clang submodules on the first run
+and can take tens of minutes to configure and build; later reconfigures and
+incremental builds use stamp files and build outputs to skip repeated work.
+
+#### Optional backend and test dependencies
+
 The following options relate to optional dependencies for additional backends
 and running additional tests. Left unchanged they are auto detected, however
 they can be set to `OFF` to prevent their usage, or set to `ON` to make it an
@@ -301,6 +348,7 @@ error if they can't be found.
 | `SLANG_USE_SYSTEM_GLSLANG`          | `FALSE`                              | Build using system glslang library instead of the bundled version in [./external](./external)                               |
 | `SLANG_SPIRV_HEADERS_INCLUDE_DIR`   | ``                                   | Use this specific path to SPIR-V headers instead of the bundled version in [./external](./external)                         |
 | `SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC` | `FALSE` (`TRUE` on Windows)          | Enable mimalloc allocator for SPIRV-Tools to improve compilation performance                                                |
+| `SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN` | `TRUE`                             | **Will be removed.** Register the paired SPIRV-Tools `MergeReturnPass` + `InlineExhaustivePass` sequence in the slang-glslang SPIR-V optimizer pipeline; the `TRUE` default preserves existing SPIR-V output, and `FALSE` opts into the temporary workaround for [SPIRV-Tools#6711](https://github.com/KhronosGroup/SPIRV-Tools/issues/6711) |
 | `SLANG_EXCLUDE_DAWN`                | `FALSE` on Windows, `TRUE` elsewhere | Exclude Dawn WebGPU support from the build                                                                                  |
 | `SLANG_EXCLUDE_TINT`                | `FALSE`                              | Exclude slang-tint from the build (only relevant on Windows x64)                                                            |
 | `SLANG_ENABLE_TIME_TRACE`           | `FALSE`                              | Enable Clang time trace profiling for build analysis (Clang only)                                                           |
@@ -314,10 +362,12 @@ There are several options for getting llvm-support:
   - You can set `SLANG_SLANG_LLVM_BINARY_URL` to point to a local
     `libslang-llvm.so/slang-llvm.dll` or set it to a URL of an zip/archive
     containing such a file
-  - If this isn't set then the build system tries to download it from the
-    release on github matching the current tag. If such a tag doesn't exist
-    or doesn't have the correct os\*arch combination then the latest release
-    will be tried.
+  - If this isn't set then the build system constructs the download URL from
+    the current git tag (e.g. `v2025.21`). Git tags must be available locally;
+    if they are missing the build will warn and skip slang-llvm. Fetch them
+    with `git fetch --tags` (or
+    `git fetch https://github.com/shader-slang/slang.git 'refs/tags/*:refs/tags/*'`
+    when cloning from a fork).
   - If `SLANG_SLANG_LLVM_BINARY_URL` is `FETCH_BINARY_IF_POSSIBLE` then in
     the case that a prebuilt binary can't be found then the build will proceed
     as though `DISABLE` was chosen
