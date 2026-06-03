@@ -511,7 +511,11 @@ if(_dxc_build_from_source)
     # to set LLVM_RUNTIME_OUTPUT_INTDIR and LLVM_LIBRARY_OUTPUT_INTDIR, so for
     # multi-config generators the artifacts land under MinSizeRel. Track these
     # subdirectories so byproducts and copy commands point to the right path.
-    get_property(_dxc_parent_is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+    get_property(
+        _dxc_parent_is_multi_config
+        GLOBAL
+        PROPERTY GENERATOR_IS_MULTI_CONFIG
+    )
     if(CMAKE_GENERATOR MATCHES "Ninja")
         set(_dxc_generator_args -G Ninja)
         set(_dxc_inner_is_multi_config OFF)
