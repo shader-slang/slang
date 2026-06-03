@@ -1137,34 +1137,13 @@ static SyntaxDecl* tryLookUpSyntaxDecl(
     }
 }
 
-// Warn when a binding name (variable, parameter, struct field, etc.)
-// collides with a contextual keyword registered as a decl-introducer
-// in `kSyntaxDecls[]` (`extension`, `struct`, `interface`, `func`,
-// `var`, `let`, `enum`, `namespace`, `typealias`, etc.). These
-// tokens lex as `TokenType::Identifier` and are dispatched via
-// `tryParseUsingSyntaxDecl` only when they appear at a decl-start
-// position; in any other position the lookup never runs and the
-// keyword is silently accepted as a name. Subsequent uses of the
-// "variable" then surprise the user — `int extension = 0;` parses
-// fine, but `extension = 1;` (assignment) re-dispatches to
-// `parseExtensionDecl` and fails (#11347). Surfacing the collision
-// at the binding site lets the user rename eagerly. Stays a warning
-// so existing source that happens to use these names keeps building.
-//
-// Filter to syntax classes that produce a `Decl` so we don't flag
-// modifier-style contextual keywords (`in`, `out`, `payload`,
-// `const`, ...) which are only ambiguous in modifier position and
-// commonly appear as parameter / field names in `core.meta.slang`
-// itself.
-// Names that are ambiguous in declaration position even though they are
-// not registered through the `kSyntaxDecls[]` syntax-decl table — they
-// are special-cased earlier in the parser (`_parseSimpleTypeSpec` for
-// `struct` / `class` / `enum` at line ~3174) or are built-in type
-// names that can be redeclared shadowing.
-//
-// Kept in sync with the special-cased branches in `_parseSimpleTypeSpec`
-// and the user-visible decl-introducer set discussed in #11347. Entries
-// must be lower-case and match the literal token text.
+// Names that are ambiguous in declaration position even though they
+// are not registered through the `kSyntaxDecls[]` syntax-decl table —
+// they are special-cased earlier in the parser (`_parseSimpleTypeSpec`
+// for `struct` / `class` / `enum` / `functype` at line ~3174). Kept in
+// sync with the special-cased branches in `_parseSimpleTypeSpec`; if a
+// new special-case is added there, add the keyword here too.
+// Entries must be lower-case and match the literal token text.
 static bool _isContextualKeywordName(UnownedStringSlice const& text)
 {
     static const char* const kKeywords[] = {
@@ -1181,6 +1160,38 @@ static bool _isContextualKeywordName(UnownedStringSlice const& text)
     return false;
 }
 
+// Warn when a variable binding name (`int extension = 0;`,
+// `let extension = 5;`, struct field) collides with a contextual
+// keyword registered as a decl-introducer in `kSyntaxDecls[]`
+// (`extension`, `struct`, `interface`, `func`, `var`, `let`, `enum`,
+// `namespace`, `typealias`, etc.). These tokens lex as
+// `TokenType::Identifier` and are dispatched via
+// `tryParseUsingSyntaxDecl` only when they appear at a decl-start
+// position; in any other position the lookup never runs and the
+// keyword is silently accepted as a name. Subsequent uses of the
+// "variable" then surprise the user — `int extension = 0;` parses
+// fine, but `extension = 1;` (assignment) re-dispatches to
+// `parseExtensionDecl` and fails (#11347). Surfacing the collision
+// at the binding site lets the user rename eagerly. Stays a warning
+// so existing source that happens to use these names keeps building.
+//
+// **Scope** (call sites): hooked at variable-binding read sites only —
+// `parseModernVarDeclBaseCommon` and the variable branch of
+// `ParseDeclaratorDecl`. Function names, function parameters, generic
+// parameter names, and type-alias names are *not* covered here; the
+// existing test corpus uses `func` (and a few similar) as a method
+// name in many places (`tests/diagnostics/private-visibility.slang`,
+// `tests/diagnostics/size-of.slang`, etc.) and warning at function
+// position would force a corpus migration disproportionate to the
+// user-visible benefit (`int func() {}` is unambiguous in practice
+// because the parser is already in member-decl context). Extending
+// coverage to those positions is a separate change.
+//
+// **Filter**: syntax classes that produce a `Decl` only, so we don't
+// flag modifier-style contextual keywords (`in`, `out`, `payload`,
+// `const`, ...) which are only ambiguous in modifier position and
+// commonly appear as parameter / field names in `core.meta.slang`
+// itself.
 static void _maybeWarnNameShadowsKeyword(Parser* parser, NameLoc const& nameAndLoc)
 {
     if (!nameAndLoc.name)
@@ -1189,11 +1200,6 @@ static void _maybeWarnNameShadowsKeyword(Parser* parser, NameLoc const& nameAndL
     if (auto syntaxDecl =
             tryLookUpSyntaxDecl(parser, nameAndLoc.name, LookupMask::Default))
     {
-        // Filter to syntax-classes that produce a `Decl` so we don't
-        // flag modifier-style contextual keywords (`in`, `out`,
-        // `payload`, `const`, ...) which only conflict in modifier
-        // position and commonly appear as parameter / field names in
-        // `core.meta.slang` itself.
         isKeyword = syntaxDecl->syntaxClass.isSubClassOf<Decl>();
     }
     if (!isKeyword)
@@ -3203,6 +3209,11 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     // parsing iff we have one of these kinds of type specifiers and the
     // closing `}` is at the end of its line, as a bit of a special case
     // to allow the common idiom.
+    //
+    // NOTE: keywords matched below (`struct`, `class`, `enum`, `functype`)
+    // are also listed in `_isContextualKeywordName` (above) so the
+    // shadow-keyword warning (#11347) flags `int struct = 0;` etc. If a
+    // new keyword is added here, mirror it there.
     //
     if (parser->LookAheadToken("struct"))
     {
