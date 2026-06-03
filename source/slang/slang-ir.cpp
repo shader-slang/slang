@@ -1460,36 +1460,39 @@ IRInst* mergeCandidateParentsForHoistableInst(IRInst* left, IRInst* right)
         }
     }
 
-    // If neither side dominates the other, the two operands live in
-    // unrelated regions of the IR (e.g. two sibling generic bodies).
-    // The original IR-emission/cloning pipeline should not produce
-    // a hoistable instruction whose operands span two such regions —
-    // that is a real upstream bug (issues #11033, #11182). However,
-    // we have observed it in practice when force-inlining generic
-    // constructors with `__BuiltinFloatingPointType` constraints
-    // before linking.
+    // If neither side is an ancestor of the other, the two operands
+    // live in unrelated regions of the IR (e.g. two sibling generic
+    // bodies under the module). The IR-emission/cloning pipeline is
+    // not supposed to produce a hoistable instruction whose operands
+    // span two such regions — that is a real upstream bug (issues
+    // #11033, #11182). Until that upstream fix lands, walk both
+    // ancestor chains and pick the lowest common ancestor so that
+    // `addHoistableInst`'s `parent->getFirstChild()` below does not
+    // dereference null.
     //
-    // To prevent a hard crash here while the upstream issue is
-    // addressed separately, fall back to the nearest enclosing module
-    // instruction. Module scope is the structural ancestor of both
-    // operands' generics, and gives `addHoistableInst` a non-null
-    // parent so that `parent->getFirstChild()` below does not
-    // dereference null. This is a mitigation, not a correctness fix —
-    // the resulting hoistable inst is still structurally suspect and
-    // the underlying clone path needs the proper remapping fix.
+    // The LCA result is symmetric: `merge(a, b)` and `merge(b, a)`
+    // resolve to the same instruction (the deepest shared ancestor).
+    // For well-formed IR with a single module, the walk terminates at
+    // the common `IRModuleInst` at worst, so the result is always
+    // non-null and `parentNonBlock` does not need an extra null check.
+    //
+    // TODO(#11033, #11182): drop this fallback once the cloneInst /
+    // force-inlining path stops producing hoistable insts whose
+    // operands span unrelated source-IR generics.
     //
     if (!parentNonBlock)
     {
+        HashSet<IRInst*> leftAncestors;
         for (auto ll = leftNonBlock; ll; ll = ll->getParent())
+            leftAncestors.add(ll);
+        for (auto rr = rightNonBlock; rr; rr = rr->getParent())
         {
-            if (as<IRModuleInst>(ll))
+            if (leftAncestors.contains(rr))
             {
-                parentNonBlock = ll;
+                parentNonBlock = rr;
                 break;
             }
         }
-        if (!parentNonBlock)
-            parentNonBlock = leftNonBlock;
     }
 
     IRInst* parent = parentNonBlock;
