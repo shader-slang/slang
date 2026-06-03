@@ -4201,6 +4201,11 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         break;
 
     case TokenType::StringLiteral:
+        // `#line N "filename"` — filename strings legitimately contain `\`
+        // as a Windows path separator, so do not pass a sink: the new
+        // unknown-escape diagnostic (#11291) would false-positive on
+        // every Windows path. The current escape-processing behaviour is
+        // preserved silently.
         file = getStringLiteralTokenValue(AdvanceToken(context));
         break;
 

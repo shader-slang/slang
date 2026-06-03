@@ -1315,6 +1315,11 @@ static void parseFileReferenceDeclBase(Parser* parser, FileReferenceDeclBase* de
     if (peekTokenType(parser) == TokenType::StringLiteral)
     {
         auto nameToken = parser->ReadToken(TokenType::StringLiteral);
+        // Module-name strings (`import "lib/sub"`) may legitimately contain
+        // `\` as a Windows path separator, so do not pass a sink: the new
+        // unknown-escape diagnostic (#11291) would false-positive on every
+        // Windows path. The escape-processing behaviour is preserved
+        // silently.
         auto nameString = getStringLiteralTokenValue(nameToken);
         auto moduleName = getName(parser, nameString);
 
@@ -1382,6 +1387,9 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     else if (parser->LookAheadToken(TokenType::StringLiteral))
     {
         auto nameToken = parser->ReadToken(TokenType::StringLiteral);
+        // See `parseFileReferenceDeclBase` — module/namespace name strings
+        // are filename-shaped and may contain `\` separators on Windows,
+        // so do not pass a sink (#11291).
         decl->nameAndLoc.name =
             parser->getNamePool()->getName(getStringLiteralTokenValue(nameToken));
         decl->nameAndLoc.loc = nameToken.loc;
@@ -6174,7 +6182,8 @@ static Stmt* parseIntrinsicAsmStmt(Parser* parser)
     parser->FillPosition(stmt);
     parser->ReadToken();
 
-    stmt->asmText = getStringLiteralTokenValue(parser->ReadToken(TokenType::StringLiteral));
+    stmt->asmText =
+        getStringLiteralTokenValue(parser->ReadToken(TokenType::StringLiteral), parser->sink);
 
     while (AdvanceIf(parser, TokenType::Comma))
     {
@@ -9632,7 +9641,7 @@ static NodeBase* parseTargetIntrinsicModifier(Parser* parser, void* /*userData*/
                 {
                     const auto t = parser->ReadToken();
                     first ? void(first = false) : modifier->definitionString.append(" ");
-                    modifier->definitionString.append(getStringLiteralTokenValue(t));
+                    modifier->definitionString.append(getStringLiteralTokenValue(t, parser->sink));
                     modifier->isString = true;
                 } while (parser->LookAheadToken(TokenType::StringLiteral));
             }

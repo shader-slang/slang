@@ -9,6 +9,9 @@ tests/diagnostics/lexer/escape-overflow.slang(19): error 10014: escape sequence 
 tests/diagnostics/lexer/escape-overflow.slang(22): error 10014: escape sequence value '0x1FF' is out of range for the literal type (string)
     let s2 = "\777";
              ^~~~~~
+tests/diagnostics/lexer/escape-overflow.slang(28): error 10014: escape sequence value '0xFF' is out of range for the literal type (string)
+    let s3 = "\x10000000ff";
+             ^~~~~~~~~~~~~~
 }
 standard output = {
 }

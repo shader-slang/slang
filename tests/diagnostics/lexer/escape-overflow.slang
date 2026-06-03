@@ -20,4 +20,10 @@ void foo()
 
     // String literal: octal escape exceeds the byte range (`\777` = 0x1FF).
     let s2 = "\777";
+
+    // 9-digit hex literal: forces the running uint32_t accumulator to wrap
+    // around before the final digit, so the post-loop value is < 0xFF (in
+    // fact `0xff` here) but the `overflowed` guard must still fire. Catches
+    // a future regression that drops the wraparound check.
+    let s3 = "\x10000000ff";
 }
