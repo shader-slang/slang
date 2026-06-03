@@ -2277,8 +2277,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return inst->findDecoration<IRSPIRVNonUniformResourceDecoration>() != nullptr;
     }
 
-    // Forward-propagate NonUniform decorations to resource operands consumed
-    // by memory/sampling instructions (Vulkan VUID-RuntimeSpirv-None-10148).
+    // Forward-propagate NonUniform decorations through the IR so that the
+    // actual resource operands consumed by memory/sampling instructions carry
+    // the decoration. Vulkan (VUID-RuntimeSpirv-None-10148) requires NonUniform
+    // on the resource operand of the consuming instruction, not just on the
+    // index used in an access chain. A worklist seeded with already-decorated
+    // instructions pushes the decoration downstream through loads, field
+    // accesses, and combined-sampler construction.
     void propagateNonUniformAccessChainDecorations()
     {
         List<IRInst*> worklist;
