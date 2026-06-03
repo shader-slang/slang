@@ -108,6 +108,8 @@ public:
 
     static ComPtr<ISlangBlob> create(IDxcBlob* blob)
     {
+        if (!blob)
+            return nullptr;
         return ComPtr<ISlangBlob>(new DxcBlob(blob));
     }
 
