@@ -84,7 +84,8 @@ public DType[TransposeA ? InputSize : OutputSize]
 // with PadToTile for dimensions.
 // ---------------------------------------------------------------------------
 
-DType[TransposeA ? InputSize : OutputSize]
+[ForceInline]
+WaveTangledVector<DType, ShMemSize, TransposeA ? PaddedInputSize : PaddedOutputSize, 32, SubgroupCount>
     testTiledMatVecMulImpl<
         DType : __BuiltinFloatingPointType,
         int InputSize,
@@ -97,7 +98,7 @@ DType[TransposeA ? InputSize : OutputSize]
         bool Bias,
         int SubgroupCount,
         bool TransposeA>
-    (DType[InArraySize] inputData,
+    (__constref WaveTangledVector<DType, ShMemSize, InArraySize, 32, SubgroupCount> inputData,
      RWStructuredBuffer<DType>.Handle weightBuffer,
      Optional<RWStructuredBuffer<DType>.Handle> biasBuffer)
         where DType.Differential == DType
@@ -105,17 +106,18 @@ DType[TransposeA ? InputSize : OutputSize]
     typealias Address = BindlessAddress<DType>;
     Address address = Address(weightBuffer);
 
-    static const int K = PaddedInputSize;
-    static const int M = PaddedOutputSize;
     static const int N = 32;
     const int ResultSize = TransposeA ? InputSize : OutputSize;
+    typealias OutputVec = WaveTangledVector<DType, ShMemSize, TransposeA ? PaddedInputSize : PaddedOutputSize, N, SubgroupCount>;
 
     if (TransposeA)
     {
+        static const int K = PaddedInputSize;
+        static const int M = InArraySize;
         // mmaTranspose: input has M elements, result has K elements
         //   CUDA:   result(N,K) = input(N,M) × W^T(M,K)
         //   Vulkan: result(K,N) = W^T(K,M) × input(M,N)
-        DType output[ResultSize];
+        OutputVec output = OutputVec(DType(0));
 
         __target_switch
         {
@@ -125,10 +127,8 @@ DType[TransposeA ? InputSize : OutputSize]
 
             Cuda.DOutMatrix inputMat;
             half inputHalf[M];
-            for (int i = 0; i < InArraySize; i++)
+            for (int i = 0; i < M; i++)
                 inputHalf[i] = __realCast<half>(inputData[i]);
-            for (int i = InArraySize; i < M; i++)
-                inputHalf[i] = half(0);
             let inputPacked = bit_cast<uint[M / 2]>(inputHalf);
             inputMat.fromArrayPacked<M / 2>(inputPacked);
 
@@ -147,10 +147,8 @@ DType[TransposeA ? InputSize : OutputSize]
             typealias Vulkan = TiledMMAVulkan<DType, K, M, N, TargetEnum.SPIR_V, ShMemSize, TransposeA, SubgroupCount>;
 
             DType inputArr[M];
-            for (int i = 0; i < InArraySize; i++)
+            for (int i = 0; i < M; i++)
                 inputArr[i] = inputData[i];
-            for (int i = InArraySize; i < M; i++)
-                inputArr[i] = DType(0);
 
             // Per-warp shmem offset. With tile-row-at-a-time, each warp needs
             // 32 × max(TILE/HalvesPerUint4, TILE/ElemPerUint4_T) uint4 per group.
@@ -167,31 +165,33 @@ DType[TransposeA ? InputSize : OutputSize]
             for (int i = 0; i < ResultSize; i++)
                 output[i] = resultArr[i];
         }
+        case metal:
+        {
+            typealias Metal = TiledMMAMetal<DType, K, M, N, TargetEnum.Metal, ShMemSize, TransposeA, SubgroupCount>;
+
+            let resultVec = Metal.mmaTranspose<Address>(inputData, address);
+            output = bit_cast<OutputVec>(resultVec);
+        }
         }
         return output;
     }
     else
     {
+        static const int K = InArraySize;
+        static const int M = PaddedOutputSize;
         // mma (forward): input has K elements, result has M elements
         typealias MMA = TiledMMAHelper<DType, K, M, N, Target, ShMemSize, TransposeA, SubgroupCount>;
-        typealias InputVec = WaveTangledVector<DType, ShMemSize, K, N, SubgroupCount>;
-
-        InputVec inputVec = InputVec(DType(0));
-        for (int i = 0; i < InArraySize; i++)
-            inputVec[i] = inputData[i];
 
         let resultVec = Bias
-            ? MMA.forward<Address, true>(inputVec, address, Address(biasBuffer.value))
-            : MMA.forward<Address, false>(inputVec, address, none);
+            ? MMA.forward<Address, true>(inputData, address, Address(biasBuffer.value))
+            : MMA.forward<Address, false>(inputData, address, none);
 
-        DType output[ResultSize];
-        for (int i = 0; i < ResultSize; i++)
-            output[i] = resultVec[i];
-        return output;
+        return bit_cast<OutputVec>(resultVec);
     }
 }
 
-public DType[TransposeA ? InputSize : OutputSize]
+[ForceInline]
+public WaveTangledVector<DType, ShMemSize, TransposeA ? PaddedInputSize : PaddedOutputSize, 32, SubgroupCount>
     testTiledMatVecMul<
         DType : __BuiltinFloatingPointType,
         int InputSize,
@@ -203,7 +203,7 @@ public DType[TransposeA ? InputSize : OutputSize]
         bool Bias,
         int SubgroupCount,
         bool TransposeA>
-    (DType[InArraySize] inputData,
+    (__constref WaveTangledVector<DType, ShMemSize, InArraySize, 32, SubgroupCount> inputData,
      RWStructuredBuffer<DType>.Handle weightBuffer,
      Optional<RWStructuredBuffer<DType>.Handle> biasBuffer)
         where DType.Differential == DType
@@ -214,6 +214,8 @@ public DType[TransposeA ? InputSize : OutputSize]
         return testTiledMatVecMulImpl<DType, InputSize, OutputSize, InArraySize, PaddedInputSize, PaddedOutputSize, ShMemSize, TargetEnum.CUDA, Bias, SubgroupCount, TransposeA>(inputData, weightBuffer, biasBuffer);
     case spirv:
         return testTiledMatVecMulImpl<DType, InputSize, OutputSize, InArraySize, PaddedInputSize, PaddedOutputSize, ShMemSize, TargetEnum.SPIR_V, Bias, SubgroupCount, TransposeA>(inputData, weightBuffer, biasBuffer);
+    case metal:
+        return testTiledMatVecMulImpl<DType, InputSize, OutputSize, InArraySize, PaddedInputSize, PaddedOutputSize, ShMemSize, TargetEnum.Metal, Bias, SubgroupCount, TransposeA>(inputData, weightBuffer, biasBuffer);
     }
 }
 

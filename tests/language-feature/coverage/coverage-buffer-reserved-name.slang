@@ -1,7 +1,7 @@
-// Verifies the warning fires when the user's shader declares a global
-// parameter named `__slang_coverage`. The IR coverage pass under
-// `-trace-coverage` synthesizes its own buffer with that name; the
-// user declaration is silently shadowed without this diagnostic.
+// Verifies the error fires when the user's shader declares a global
+// parameter named `__slang_coverage`. The IR coverage pass under any
+// coverage tracing mode synthesizes its own buffer with that name; the
+// user declaration would otherwise be silently shadowed.
 //
 // Regresses if a future refactor drops the reserved-name detection
 // (e.g. renames `findUserDeclaredCoverageBuffer` without updating the
@@ -9,12 +9,18 @@
 // through the linkage's sink).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -trace-coverage -profile cs_5_0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -trace-coverage -trace-coverage-binding 3 0 -profile cs_5_0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -trace-function-coverage -profile cs_5_0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -trace-branch-coverage -profile cs_5_0
 
 RWStructuredBuffer<uint> __slang_coverage;
-//CHECK:                 ^^^^^^^^^^^^^^^^ warning E45100
+//CHECK:                 ^^^^^^^^^^^^^^^^ error E45100
 
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
-    __slang_coverage[0] = 1;
+    if ((tid.x & 1u) != 0u)
+        __slang_coverage[0] = 1;
+    else
+        __slang_coverage[0] = 2;
 }

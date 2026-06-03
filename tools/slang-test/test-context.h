@@ -205,10 +205,12 @@ public:
 
     Slang::IFileCheck* getFileCheck() { return m_fileCheck; };
 
+    /// Invoke after it has been determined that the LLVM render target is enabled
+    SlangResult locateLLVMFileCheck();
+
 protected:
     SlangResult _createJSONRPCConnection(Slang::RefPtr<Slang::JSONRPCConnection>& out);
 
-    SlangResult locateFileCheck();
 
     struct SharedLibraryTool
     {

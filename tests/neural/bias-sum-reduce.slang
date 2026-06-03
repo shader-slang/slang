@@ -1,9 +1,10 @@
 
 // On Vulkan, we can only test float type for now because atomicAdd is not supported for half on our CI machine.
+//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DUNIT_TEST -xslang -DTEST_HALF=0
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DUNIT_TEST -xslang -DTEST_HALF=0
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DUNIT_TEST -xslang -DTEST_HALF=1
 import slang.neural;
 #pragma warning(disable: 41017)
 
@@ -26,14 +27,22 @@ static const int workgroupCount = WorkgroupSize / SubgroupSize;
 static const int InputSize = 8;
 static const int MaxOutputSize = 64;
 
-typealias ShMemSize = SharedMemorySize< DType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, workgroupCount>;
-typealias Layer1 = ShMemSize.OfLayer1<InputSize, MaxOutputSize>;
+typealias Layer1 = SharedMemorySize<
+    DType,
+    TargetEnum.CUDA,
+    ExecutionMode.Training,
+    SubgroupSize,
+    workgroupCount,
+    InputSize,
+    MaxOutputSize>;
 
 void test<int OutputSize>(uint tid, uint resIndex)
 {
-    DType dOut[OutputSize];
+    typealias DOutVec = WaveTangledVector<DType, Layer1, OutputSize, SubgroupSize, workgroupCount>;
+    DType dOutData[OutputSize];
     for (int i = 0; i < OutputSize; i++)
-        dOut[i] = DType((i + 1) * 0.0078125);
+        dOutData[i] = DType((i + 1) * 0.0078125);
+    DOutVec dOut = DOutVec(dOutData);
 
     neural_unittest.testBiasSumReduce<DType, InputSize, OutputSize, Layer1, workgroupCount>(tid, dOut, outputBuffer);
 

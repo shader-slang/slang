@@ -545,6 +545,8 @@ void calcRequiredLoweringPassSet(
             result.nonVectorCompositeSelect = true;
         break;
     case kIROp_IncrementCoverageCounter:
+    case kIROp_IncrementFunctionCoverageCounter:
+    case kIROp_IncrementBranchCoverageCounter:
         result.coverageTracing = true;
         break;
     }
@@ -937,7 +939,7 @@ Result linkAndOptimizeIR(
 
     // Create the post-emit metadata object up-front so that IR passes
     // that need to record reportable data (e.g. `instrumentCoverage`'s
-    // slot → source mapping) can write into it directly. `collectMetadata`
+    // source-entry mapping) can write into it directly. `collectMetadata`
     // later fills in binding / exported-function fields.
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
@@ -1020,14 +1022,14 @@ Result linkAndOptimizeIR(
     // Shader coverage instrumentation. The pass synthesizes
     // `__slang_coverage` as an `IRGlobalParam` directly in the
     // linked program IR, extends the program-scope var layout, and
-    // rewrites counter ops to atomic adds. Runs BEFORE
+    // rewrites coverage marker ops to atomic adds. Runs BEFORE
     // `collectGlobalUniformParameters` so the synthesized buffer
     // gets packed into `GlobalParams` alongside user globals on
     // targets that pack ordinary uniforms (CPU, CUDA).
     //
-    // Counter ops carry source position on their built-in `sourceLoc`,
+    // Coverage markers carry source position on their built-in `sourceLoc`,
     // so this pass is independent of debug-info state. It writes its
-    // slot → source mapping into `metadata`, exposed to hosts via
+    // source-entry mapping into `metadata`, exposed to hosts via
     // ICoverageTracingMetadata.
     if (requiredLoweringPassSet.coverageTracing)
     {
@@ -1078,7 +1080,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(
             instrumentCoverage,
             sink,
-            codeGenContext->shouldTraceCoverage(),
+            codeGenContext->shouldTraceAnyCoverage(),
             explicitBinding,
             explicitSpace,
             reservedSpaces.getBuffer(),
@@ -1179,7 +1181,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(
             finalizeCoverageInstrumentationMetadata,
             sink,
-            codeGenContext->shouldTraceCoverage(),
+            codeGenContext->shouldTraceAnyCoverage(),
             outLinkedIR.globalScopeVarLayout,
             targetRequest,
             *metadata);
@@ -1868,7 +1870,9 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HLSL:
             {
-                auto profile = codeGenContext->getTargetProgram()->getOptionSet().getProfile();
+                auto profile = getEffectiveTargetProfile(
+                    targetProgram->getTargetReq(),
+                    targetProgram->getOptionSet());
                 if (profile.getFamily() == ProfileFamily::DX)
                 {
                     if (profile.getVersion() <= ProfileVersion::DX_5_0)
@@ -2474,7 +2478,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     else
     {
         desc.entryPointStage = Stage::Unknown;
-        desc.effectiveProfile = targetProgram->getOptionSet().getProfile();
+        desc.effectiveProfile =
+            getEffectiveTargetProfile(targetRequest, targetProgram->getOptionSet());
     }
     desc.sourceWriter = &sourceWriter;
 

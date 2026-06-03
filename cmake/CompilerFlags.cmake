@@ -153,12 +153,19 @@ function(set_default_compile_options target)
 
     # Strip the absolute source directory prefix from __FILE__ so that build-machine
     # paths are not baked into the binary's read-only data section.
+    #
+    # On MSVC, /d1trimfile also rewrites source file paths in the PDB (not just
+    # __FILE__), which breaks OpenCppCoverage on Windows coverage CI:
+    # OCC's --sources filter is an absolute path and stops matching slang sources
+    # once their PDB records become relative. Coverage builds are CI-only and
+    # never shipped, so leaking dev paths into __FILE__ there is harmless --
+    # skip the flag entirely when SLANG_ENABLE_COVERAGE is on.
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(
             ${target}
             PRIVATE "-fmacro-prefix-map=${CMAKE_SOURCE_DIR}/="
         )
-    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC" AND NOT SLANG_ENABLE_COVERAGE)
         target_compile_options(
             ${target}
             PRIVATE "/d1trimfile:${CMAKE_SOURCE_DIR}\\"
@@ -218,6 +225,8 @@ function(set_default_compile_options target)
         ${target}
         PRIVATE
             SLANG_ENABLE_DXIL_SUPPORT=$<BOOL:${SLANG_ENABLE_DXIL}>
+            SLANG_ENABLE_WEBGPU=$<BOOL:${SLANG_HAS_WEBGPU_SUPPORT}>
+            SLANG_ENABLE_VALIDATION_VM_BYTECODE=$<BOOL:${SLANG_ENABLE_VALIDATION_VM_BYTECODE}>
             $<$<BOOL:${SLANG_ENABLE_FULL_DEBUG_VALIDATION}>:SLANG_ENABLE_FULL_IR_VALIDATION>
             $<$<BOOL:${SLANG_ENABLE_IR_BREAK_ALLOC}>:SLANG_ENABLE_IR_BREAK_ALLOC>
             $<$<BOOL:${SLANG_ENABLE_DX_ON_VK}>:SLANG_CONFIG_DX_ON_VK>
