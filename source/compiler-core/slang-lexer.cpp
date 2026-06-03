@@ -778,113 +778,47 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
     UnownedStringSlice* outSuffix)
 {
-    FloatingPointLiteralValue value = 0;
-
     const UnownedStringSlice content = token.getContent();
-
-    char const* cursor = content.begin();
+    char const* begin = content.begin();
     char const* end = content.end();
 
-    int radix = _readOptionalBase(&cursor);
-
-    bool seenDot = false;
-    FloatingPointLiteralValue divisor = 1;
-    for (;;)
+    // Slang accepts an HLSL/legacy-MSVC `#INF` infinity literal (e.g.
+    // `1#INF`, `0.#INF`), which `strtod` does not recognise. Detect it
+    // before the strtod call so the value is correctly set to infinity
+    // and the literal's bounds are reported in `outSuffix`.
+    for (char const* p = begin; p < end; ++p)
     {
-        if (*cursor == '.')
+        if (*p == '#')
         {
-            cursor++;
-            seenDot = true;
-            continue;
-        }
-
-        int digit = _maybeReadDigit(&cursor, radix);
-        if (digit < 0)
-            break;
-
-        value = value * radix + digit;
-
-        if (seenDot)
-        {
-            divisor *= radix;
-        }
-    }
-
-    if (*cursor == '#')
-    {
-        // It must be INF
-        const auto inf = toSlice("#INF");
-
-        if (UnownedStringSlice(cursor, end).startsWith(inf))
-        {
-            if (outSuffix)
+            const auto inf = toSlice("#INF");
+            if (UnownedStringSlice(p, end).startsWith(inf))
             {
-                *outSuffix = UnownedStringSlice(cursor + inf.getLength(), end);
+                if (outSuffix)
+                    *outSuffix = UnownedStringSlice(p + inf.getLength(), end);
+                return INFINITY;
             }
-
-            value = INFINITY;
-
-            return value;
+            break;
         }
     }
 
-    // Now read optional exponent
-    if (_isNumberExponent(*cursor, radix))
-    {
-        cursor++;
+    // Hand the literal off to `strtod`, which provides correctly-rounded IEEE
+    // 754 conversion for arbitrarily long digit strings and the C99 hex-float
+    // form `0x1.4p+3`. The previous digit-accumulation loop here used a naive
+    // `value = value * radix + digit` and silently saturated to ±INF for
+    // long-digit literals (#11276, originally observed in #332).
+    //
+    // `strtod` requires a null-terminated buffer; copy `content` into a
+    // `String` (which is null-terminated) and pass that.
+    String buffer(content);
+    char* parseEnd = nullptr;
+    FloatingPointLiteralValue value = strtod(buffer.getBuffer(), &parseEnd);
+    SLANG_ASSERT(parseEnd != nullptr && parseEnd >= buffer.getBuffer());
 
-        bool exponentIsNegative = false;
-        switch (*cursor)
-        {
-        default:
-            break;
-
-        case '-':
-            exponentIsNegative = true;
-            cursor++;
-            break;
-
-        case '+':
-            cursor++;
-            break;
-        }
-
-        int exponentRadix = 10;
-        int exponent = 0;
-
-        for (;;)
-        {
-            int digit = _maybeReadDigit(&cursor, exponentRadix);
-            if (digit < 0)
-                break;
-
-            exponent = exponent * exponentRadix + digit;
-        }
-
-        FloatingPointLiteralValue exponentBase = 10;
-        if (radix == 16)
-        {
-            exponentBase = 2;
-        }
-
-        FloatingPointLiteralValue exponentValue = pow(exponentBase, exponent);
-
-        if (exponentIsNegative)
-        {
-            divisor *= exponentValue;
-        }
-        else
-        {
-            value *= exponentValue;
-        }
-    }
-
-    value /= divisor;
-
+    char const* consumedEnd = begin + (parseEnd - buffer.getBuffer());
+    if (consumedEnd > end)
+        consumedEnd = end;
     if (outSuffix)
-    {
-        *outSuffix = UnownedStringSlice(cursor, end);
-    }
+        *outSuffix = UnownedStringSlice(consumedEnd, end);
 
     return value;
 }
