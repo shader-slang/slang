@@ -1232,15 +1232,6 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 emitFlag("GROUP_SYNC", BarrierSemanticFlags::GroupSync);
                 emitFlag("GROUP_SCOPE", BarrierSemanticFlags::GroupScope);
                 emitFlag("DEVICE_SCOPE", BarrierSemanticFlags::DeviceScope);
-                if (first)
-                {
-                    StringBuilder sb;
-                    sb << "0x" << String(flagVal, 16);
-                    getSink()->diagnose(Diagnostics::InvalidBarrierSemanticFlagsValue{
-                        .value = sb.produceString(),
-                        .location = inst->sourceLoc});
-                    m_writer->emit("0");
-                }
             }
             m_writer->emit(")");
             return true;
