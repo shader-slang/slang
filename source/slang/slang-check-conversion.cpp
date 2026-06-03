@@ -917,6 +917,40 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
             getSink()->diagnoseRaw(
                 Severity::Error,
                 static_cast<char const*>(blob->getBufferPointer()));
+
+            // When the synthesized ctor rejects the initializer list because
+            // non-public members were pruned from its parameter list, explain
+            // which member triggered the asymmetry.  This mirrors the note
+            // emitted on the no-synthesized-ctor branch above (issue #11005).
+            // Guards match that branch: skip if a non-interface base or an
+            // explicit ctor would be the alternative failure cause.
+            bool hasNonInterfaceBase = false;
+            for (auto inheritanceDecl : structDecl->getMembersOfType<InheritanceDecl>())
+            {
+                if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
+                {
+                    hasNonInterfaceBase = true;
+                    break;
+                }
+            }
+            if (!hasNonInterfaceBase && !_hasExplicitConstructor(structDecl, true))
+            {
+                DeclVisibility structVis = getDeclVisibility(structDecl);
+                for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+                {
+                    DeclVisibility memberVis = getDeclVisibility(varDecl);
+                    if (memberVis != structVis)
+                    {
+                        getSink()->diagnose(
+                            Diagnostics::InitializerListMemberVisibilityMismatch{
+                                .memberVis = memberVis,
+                                .type = toType,
+                                .structVis = structVis,
+                                .member = varDecl});
+                        break;
+                    }
+                }
+            }
             return false;
         }
     }
