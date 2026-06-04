@@ -547,6 +547,18 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     {
         if (isDeclRefTypeOf<InterfaceDecl>(selfType))
         {
+            // For an interface *type*, the self/base conformance witnesses are rooted at
+            // the interface's `ThisType` (not at `selfType` as for every other type), so
+            // a concrete conforming type `T : IInterface` can later specialize them via
+            // `This -> T`. i.e. here `DeclRefType(InterfaceDecl)` is treated as a
+            // *requirement template*, not as the *existential box* it also denotes.
+            //
+            // KNOWN LIMITATION (#11469): that dual meaning means using an interface type
+            // as an existential (e.g. a generic argument `Foo<IInterface>`) gets this
+            // `This`-rooted answer, so its conformance witness's `sub` is a standalone
+            // `IInterface.This` -- ill-formed for the box, and a source of non-canonical
+            // type identity. Properly disentangling box vs `ThisType` here is invasive,
+            // so the symptom is normalized downstream instead (#11464 / #11465 / #11468).
             selfIsSelf = visitor.getThisTypeWitness(
                 astBuilder,
                 as<DeclRefType>(selfType)->getDeclRef().as<InterfaceDecl>());
@@ -859,7 +871,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     // as the base.
     //
     // The constraints are discovered purely from the interfaces each anchor type
-    // conforms to (via `getInheritanceInfo(anchor.type).facets`); the relocation
+    // conforms to (via `getInheritanceInfo(anchorType).facets`); the relocation
     // pass guarantees an `associatedtype`'s trailing bound and `where` clauses
     // also appear as such interface-member `GenericTypeConstraintDecl`s.
     //
@@ -890,33 +902,6 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             return cur;
         };
 
-        auto isThisType = [](Type* type) -> bool
-        {
-            if (auto declRefType = as<DeclRefType>(type))
-                return declRefType->getDeclRef().as<ThisTypeDecl>().getDecl() != nullptr;
-            return false;
-        };
-
-        // Match two access chains *structurally* (by the exact sequence of
-        // associated-type decls), not by type equality.
-        //
-        // Type equality is intentionally avoided here: the differential rules
-        // make `T.Differential.Differential` equal to `T.Differential`, so an
-        // equality-based match would treat the constraint subject
-        // `This.Differential.Differential` as matching the access `T.Differential`
-        // and re-expand without bound -- exactly the self-referential case the
-        // `selfChainDepth` guard below exists to stop. Comparing the raw chains
-        // keeps the match purely syntactic and terminating.
-        auto chainsEqual = [](List<Decl*> const& a, List<Decl*> const& b) -> bool
-        {
-            if (a.getCount() != b.getCount())
-                return false;
-            for (Index i = 0; i < a.getCount(); ++i)
-                if (a[i] != b[i])
-                    return false;
-            return true;
-        };
-
         // The depth (number of associated-type lookups) of the access we are
         // computing inheritance for. We never add a base that is a *deeper*
         // associated-type access than `selfType`: an equality constraint such as
@@ -928,27 +913,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         decomposeAssocChain(selfType, selfChain);
         Index selfChainDepth = selfChain.getCount();
 
-        // Collect the ancestor anchors along `selfType`'s lookup chain, pairing
-        // each anchor type with the chain of associated types leading from it
-        // down to `selfType`.
-        // An `AccessChainAnchor` is one ancestor type along `selfType`'s
-        // associated-type lookup chain, paired with the chain of associated
-        // types leading from that ancestor down to `selfType`. For
-        // `selfType == T.TA.TB` the anchors are
-        // `{ type: T.TA, chainToSelf: [TB] }` and
-        // `{ type: T,    chainToSelf: [TA, TB] }`.
-        //
-        // Note `type` is a *conforming type* (e.g. `T`), not an interface -- we
-        // scan the interfaces it conforms to for constraints below. (So this is
-        // deliberately not named after an interface type.)
-        struct AccessChainAnchor
+        // Collect the ancestor anchor types along `selfType`'s lookup chain. For
+        // `selfType == T.TA.TB` the anchors are `T.TA` and `T`. Each anchor is a
+        // *conforming type* (not an interface); we scan the interfaces it conforms
+        // to for constraints below, then re-express each constraint through the
+        // anchor's conformance witness and match its endpoints against `selfType`.
+        List<Type*> anchors;
         {
-            Type* type;
-            List<Decl*> chainToSelf;
-        };
-        List<AccessChainAnchor> anchors;
-        {
-            List<Decl*> trailing;
             Type* cur = selfType;
             for (;;)
             {
@@ -959,25 +930,15 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 auto lookupDeclRef = as<LookupDeclRef>(declRefType->getDeclRef().declRefBase);
                 if (!assocDeclRef || !lookupDeclRef)
                     break;
-
-                List<Decl*> chainToSelf;
-                chainToSelf.add(assocDeclRef.getDecl());
-                chainToSelf.addRange(trailing);
-
-                AccessChainAnchor anchor;
-                anchor.type = lookupDeclRef->getLookupSource();
-                anchor.chainToSelf = chainToSelf;
-                anchors.add(anchor);
-
-                trailing = chainToSelf;
-                cur = anchor.type;
+                cur = lookupDeclRef->getLookupSource();
+                anchors.add(cur);
             }
         }
 
-        for (auto const& anchor : anchors)
+        for (auto anchorType : anchors)
         {
             auto anchorInheritanceInfo =
-                getInheritanceInfo(anchor.type, circularityInfo, ioSkippedIncompleteFacet);
+                getInheritanceInfo(anchorType, circularityInfo, ioSkippedIncompleteFacet);
             for (auto facet : anchorInheritanceInfo.facets)
             {
                 auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>();
@@ -1018,43 +979,50 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
 
                     ensureDecl(&visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
 
-                    // An endpoint denotes `selfType` (anchored at `anchor.type`)
-                    // when it is rooted at the interface's `This` and its chain of
-                    // associated types matches the chain leading from the anchor
-                    // down to `selfType`. For a subtype constraint `sub : sup`
-                    // only the sub endpoint is meaningful; for an equality
-                    // constraint `sub == sup` (which the checker may canonicalize
-                    // in either order) either endpoint may match, and the *other*
-                    // endpoint becomes a base of `selfType`.
-                    List<Decl*> subChain, supChain;
-                    Type* subRoot = constraintDecl->sub.type
-                                        ? decomposeAssocChain(constraintDecl->sub.type, subChain)
-                                        : nullptr;
-                    Type* supRoot = constraintDecl->sup.type
-                                        ? decomposeAssocChain(constraintDecl->sup.type, supChain)
-                                        : nullptr;
-
-                    bool matchOnSub =
-                        subRoot && isThisType(subRoot) && chainsEqual(subChain, anchor.chainToSelf);
-                    bool matchOnSup = constraintDecl->isEqualityConstraint && supRoot &&
-                                      isThisType(supRoot) &&
-                                      chainsEqual(supChain, anchor.chainToSelf);
-                    if (!matchOnSub && !matchOnSup)
-                        continue;
-
                     // Re-express the constraint as a lookup through the witness
                     // that the anchor type conforms to this interface; this
                     // substitutes the interface's `This` with the anchor type, so
-                    // both endpoints are expressed in terms of the anchor.
+                    // both endpoints are expressed as concrete accesses rooted at
+                    // the anchor (e.g. `This.D == This` becomes `T.D == T`).
                     auto lookedUpConstraint =
                         astBuilder->getLookupDeclRef(anchorIsInterfaceWitness, constraintDecl)
                             .as<GenericTypeConstraintDecl>();
                     if (!lookedUpConstraint)
                         continue;
 
-                    Type* baseType = matchOnSub ? getSup(astBuilder, lookedUpConstraint)
-                                                : getSub(astBuilder, lookedUpConstraint);
+                    Type* lookedUpSub = getSub(astBuilder, lookedUpConstraint);
+                    Type* lookedUpSup = getSup(astBuilder, lookedUpConstraint);
+
+                    // A constraint applies to `selfType` when one of its endpoints,
+                    // after substitution, *is* `selfType`. Compare canonical types so
+                    // an endpoint resolved through a concrete witness (e.g. a
+                    // `typealias` binding `FloatElement.DataType -> FloatData`) still
+                    // matches the access. For a subtype constraint `sub : sup` only
+                    // the sub endpoint is meaningful; for an equality constraint
+                    // either endpoint may match (the checker may canonicalize it in
+                    // either order), and the *other* endpoint becomes a base of
+                    // `selfType`. This identity match relies on conformance witnesses
+                    // being canonical -- including that defaulted generic arguments
+                    // have had their witnesses re-rooted; see
+                    // `TryCheckOverloadCandidateConstraints`.
+                    Type* selfCanonical = selfType->getCanonicalType();
+                    bool matchOnSub =
+                        lookedUpSub && lookedUpSub->getCanonicalType()->equals(selfCanonical);
+                    bool matchOnSup = constraintDecl->isEqualityConstraint && lookedUpSup &&
+                                      lookedUpSup->getCanonicalType()->equals(selfCanonical);
+                    if (!matchOnSub && !matchOnSup)
+                        continue;
+
+                    Type* baseType = matchOnSub ? lookedUpSup : lookedUpSub;
                     if (!baseType)
+                        continue;
+
+                    // Skip a trivial self-base. Differential idempotence makes
+                    // `T.Differential.Differential` canonically equal to
+                    // `T.Differential`, so the equality `Differential.Differential ==
+                    // Differential` matches `selfType == T.Differential` on its deeper
+                    // endpoint and would try to add `T.Differential` as its own base.
+                    if (baseType->getCanonicalType()->equals(selfCanonical))
                         continue;
 
                     // Never introduce a base that is a deeper associated-type
@@ -1858,10 +1826,73 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto extractExistentialType = as<ExtractExistentialType>(type))
     {
-        return _getInheritanceInfo(
+        // Forward the `This`-type's inheritance to obtain the correct facet *structure*
+        // (ordering/directness/origins), then canonicalize each conformance witness so it
+        // is rooted at the existential's own canonical witness (`getSubtypeWitness()` ->
+        // ExtractExistentialSubtypeWitness) instead of the `DeclaredSubtypeWitness` the
+        // forwarding produces. This makes the witnesses match those the direct
+        // member-access path builds, so the same access (e.g. `foo.This.Params`) interns
+        // to a single `Type*`. See issue #11464.
+        auto forwarded = _getInheritanceInfo(
             extractExistentialType->getThisTypeDeclRef(),
             extractExistentialType,
             circularityInfo);
+
+        SemanticsVisitor visitor(this);
+        auto selfWitness = extractExistentialType->getSubtypeWitness(); // ee : IFoo
+        auto interfaceType = extractExistentialType->getOriginalInterfaceType();
+        auto ifaceInfo =
+            getInheritanceInfo(interfaceType, circularityInfo, ioSkippedIncompleteFacet);
+
+        auto directFacet = new (arena) Facet::Impl(
+            astBuilder,
+            Facet::Kind::Type,
+            Facet::Directness::Self,
+            DeclRef<Decl>(),
+            extractExistentialType,
+            visitor.createTypeEqualityWitness(extractExistentialType));
+        Facet tail = directFacet;
+        for (auto facet : forwarded.facets)
+        {
+            if (facet->directness == Facet::Directness::Self)
+                continue;
+
+            // Re-root the conformance witness `ee : sup` at the existential's canonical
+            // witness: directly for the opened interface, transitively for its bases.
+            SubtypeWitness* witness = facet->subtypeWitness;
+            Type* sup = witness ? witness->getSup() : nullptr;
+            if (sup == interfaceType)
+            {
+                witness = selfWitness;
+            }
+            else
+            {
+                for (auto ifaceFacet : ifaceInfo.facets)
+                {
+                    if (ifaceFacet->subtypeWitness && ifaceFacet->subtypeWitness->getSup() == sup)
+                    {
+                        witness = astBuilder->getTransitiveSubtypeWitness(
+                            selfWitness,
+                            ifaceFacet->subtypeWitness);
+                        break;
+                    }
+                }
+            }
+
+            auto projectedFacet = new (arena) Facet::Impl(
+                astBuilder,
+                facet->kind,
+                facet->directness,
+                facet->origin.declRef,
+                facet->origin.type,
+                witness);
+            tail->next = projectedFacet;
+            tail = projectedFacet;
+        }
+
+        InheritanceInfo info;
+        info.facets = FacetList(directFacet);
+        return info;
     }
     else if (as<AndType>(type))
     {
