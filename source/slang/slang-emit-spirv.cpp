@@ -4959,23 +4959,50 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 break;
             }
         case kIROp_MakeCombinedTextureSampler:
-            result = emitInst(
-                parent,
-                inst,
-                SpvOpSampledImage,
-                inst->getDataType(),
-                kResultID,
-                inst->getOperand(0),
-                inst->getOperand(1));
+            {
+                // Derive the OpTypeSampledImage from the texture operand so the
+                // image type matches (e.g. depth flag, format).
+                IRBuilder builder(m_irModule);
+                auto texType = as<IRTextureTypeBase>(inst->getOperand(0)->getDataType());
+                auto combinedType = builder.getTextureType(
+                    texType->getElementType(),
+                    texType->getShapeInst(),
+                    texType->getIsArrayInst(),
+                    texType->getIsMultisampleInst(),
+                    texType->getSampleCountInst(),
+                    texType->getAccessInst(),
+                    texType->getIsShadowInst(),
+                    builder.getIntValue(builder.getIntType(), 1),
+                    texType->getFormatInst());
+                result = emitInst(
+                    parent,
+                    inst,
+                    SpvOpSampledImage,
+                    combinedType,
+                    kResultID,
+                    inst->getOperand(0),
+                    inst->getOperand(1));
+            }
             break;
         case kIROp_CombinedTextureSamplerGetTexture:
-            result = emitInst(
-                parent,
-                inst,
-                SpvOpImage,
-                inst->getDataType(),
-                kResultID,
-                inst->getOperand(0));
+            {
+                // Derive the result OpTypeImage from the operand's sampled-image
+                // type so the format matches (e.g. Rgba32ui vs Unknown).
+                IRBuilder builder(m_irModule);
+                auto operandType = as<IRTextureTypeBase>(inst->getOperand(0)->getDataType());
+                auto imageType = builder.getTextureType(
+                    operandType->getElementType(),
+                    operandType->getShapeInst(),
+                    operandType->getIsArrayInst(),
+                    operandType->getIsMultisampleInst(),
+                    operandType->getSampleCountInst(),
+                    operandType->getAccessInst(),
+                    operandType->getIsShadowInst(),
+                    builder.getIntValue(builder.getIntType(), 0),
+                    operandType->getFormatInst());
+                result =
+                    emitInst(parent, inst, SpvOpImage, imageType, kResultID, inst->getOperand(0));
+            }
             break;
         case kIROp_ImageTexelPointer:
             result = emitInst(
