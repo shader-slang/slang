@@ -405,8 +405,24 @@ void calcRequiredLoweringPassSet(
     CodeGenContext* codeGenContext,
     IRInst* inst)
 {
-    if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst))
+    // The autodiff finalization passes (finalizeAutoDiffPass / lowerDiffTypeInfoInsts in
+    // linkAndOptimizeIR) lower or strip these constructs. They can appear in modules that
+    // never call fwd_diff/bwd_diff (e.g. direct DifferentialPair use, or a no_diff type),
+    // so mark autodiff here too; otherwise those passes would be skipped and autodiff IR
+    // would survive into emission.
+    if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst) ||
+        as<IRDifferentialPairTypeBase>(inst) || as<IRMakeDifferentialPairBase>(inst) ||
+        as<IRDifferentialPairGetDifferentialBase>(inst) ||
+        as<IRDifferentialPairGetPrimalBase>(inst) || as<IRDetachDerivative>(inst) ||
+        as<IRAnnotation>(inst))
+    {
         result.autodiff = true;
+    }
+    if (auto attrType = as<IRAttributedType>(inst))
+    {
+        if (attrType->findAttr<IRNoDiffAttr>())
+            result.autodiff = true;
+    }
 
     switch (inst->getOp())
     {
@@ -467,6 +483,7 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
+    case kIROp_DiffTypeInfo:
         result.autodiff = true;
         break;
     case kIROp_VerticesType:
@@ -1283,7 +1300,15 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
     }
 
-    SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+    // finalizeAutoDiffPass walks the whole module and builds an AutoDiffSharedContext. It
+    // only has work to do when the module contains autodiff constructs, which
+    // calcRequiredLoweringPassSet records in requiredLoweringPassSet.autodiff (covering
+    // direct DifferentialPair / no_diff use, not just fwd_diff/bwd_diff). Skip it for
+    // modules with none so they don't pay the per-compile cost.
+    if (requiredLoweringPassSet.autodiff)
+    {
+        SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+    }
     if (requiredLoweringPassSet.matrixSwizzleStore)
         SLANG_PASS(lowerMatrixSwizzleStores);
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
@@ -1292,7 +1317,11 @@ Result linkAndOptimizeIR(
 
     // Lower DiffTypeInfo instructions to MakeTuple.
     // This must happen after specialization since DiffTypeInfo is hoistable.
-    lowerDiffTypeInfoInsts(irModule);
+    // DiffTypeInfo originates from autodiff (calcRequiredLoweringPassSet marks it in
+    // requiredLoweringPassSet.autodiff), so skip the whole-module walk when the module
+    // contains no autodiff constructs.
+    if (requiredLoweringPassSet.autodiff)
+        lowerDiffTypeInfoInsts(irModule);
 
     if (requiredLoweringPassSet.conditionalType)
         SLANG_PASS(lowerConditionalType, sink);
