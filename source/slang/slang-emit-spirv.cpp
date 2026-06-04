@@ -6322,6 +6322,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 const auto topologyType = OutputTopologyType(o->getTopologyType());
 
                 SpvExecutionMode m = SpvExecutionModeMax;
+                bool shouldEmitExecutionMode = true;
                 if (entryPointDecor)
                 {
                     switch (entryPointDecor->getProfile().getStage())
@@ -6334,21 +6335,26 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             m = SpvExecutionModeVertexOrderCcw;
                         else if (topologyType == OutputTopologyType::Point)
                             m = SpvExecutionModePointMode;
+                        // OutputTopologyType::Line is represented by the Isolines execution mode
+                        // emitted for the domain decoration.
+                        else if (topologyType == OutputTopologyType::Line)
+                            shouldEmitExecutionMode = false;
+                        break;
+                    case Stage::Mesh:
+                        if (topologyType == OutputTopologyType::Triangle)
+                            m = SpvExecutionModeOutputTrianglesEXT;
+                        else if (topologyType == OutputTopologyType::Line)
+                            m = SpvExecutionModeOutputLinesEXT;
+                        else if (topologyType == OutputTopologyType::Point)
+                            m = SpvExecutionModeOutputPoints;
+                        break;
+                    default:
                         break;
                     }
                 }
-                if (m == SpvExecutionModeMax)
-                {
-                    if (topologyType == OutputTopologyType::Triangle)
-                        m = SpvExecutionModeOutputTrianglesEXT;
-                    else if (topologyType == OutputTopologyType::Line)
-                        m = SpvExecutionModeOutputLinesEXT;
-                    else if (topologyType == OutputTopologyType::Point)
-                        m = SpvExecutionModeOutputPoints;
-                }
 
-                SLANG_ASSERT(m != SpvExecutionModeMax);
-                requireSPIRVExecutionMode(decoration, dstID, m);
+                if (shouldEmitExecutionMode && m != SpvExecutionModeMax)
+                    requireSPIRVExecutionMode(decoration, dstID, m);
             }
             break;
 

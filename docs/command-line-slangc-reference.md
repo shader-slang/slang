@@ -306,7 +306,7 @@ Reports information about checkpoint contexts used for reverse-mode automatic di
 
 <a id="trace-coverage"></a>
 ### -trace-coverage
-Instrument the shader with per-statement line coverage counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping source coverage entries to counters. 
+Instrument the shader with per-statement line coverage counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-manifest.json` mapping source coverage entries to counters. 
 
 
 <a id="trace-function-coverage"></a>
@@ -333,6 +333,14 @@ Bind the synthesized `__slang_coverage` buffer at an explicit (register index, s
 **-trace-coverage-reserved-space &lt;space&gt;**
 
 Reserve a descriptor set when auto-allocating the synthesized `__slang_coverage` buffer. Use this when the host pipeline layout owns descriptor sets that are not visible in the compiled shader IR. Repeat for multiple spaces; duplicates are idempotent. Applies to Khronos descriptor-set targets. 
+
+
+<a id="coverage-manifest-output"></a>
+### -coverage-manifest-output
+
+**-coverage-manifest-output &lt;path&gt;**
+
+Write shader coverage manifest metadata to an explicit JSON sidecar path. Use this when compiled output is written to stdout or when the build needs a stable manifest path instead of the default `&lt;output&gt;.coverage-manifest.json` sidecar. Requires at least one coverage tracing mode, is not supported for container outputs, and is valid only when exactly one compiled artifact carries coverage metadata. The path must not overlap any emitted artifact path. 
 
 
 <a id="report-dynamic-dispatch-sites"></a>
