@@ -875,12 +875,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     //
     if (declRef.as<AssocTypeDecl>())
     {
-        // The depth of an associated-type access is the number of associated-type
-        // lookups applied to its root type (e.g. `T.A.B` has depth 2, `T` has
-        // depth 0). Only associated-type lookups are counted.
-        auto assocChainDepth = [](Type* type) -> Index
+        // Walk the associated-type lookup chain of `type` from the outermost access
+        // inward, invoking `callback` once per associated-type lookup with that
+        // lookup's source (the type the access is rooted on at that step). For
+        // `T.A.B` it yields `T.A`, then `T`. Only associated-type lookups are
+        // traversed; the walk stops at the first non-assoc-lookup type.
+        auto enumerateLookupSources = [](Type* type, auto&& callback)
         {
-            Index depth = 0;
             Type* cur = type;
             for (;;)
             {
@@ -891,9 +892,18 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 auto lookupDeclRef = as<LookupDeclRef>(declRefType->getDeclRef().declRefBase);
                 if (!assocDeclRef || !lookupDeclRef)
                     break;
-                ++depth;
                 cur = lookupDeclRef->getLookupSource();
+                callback(cur);
             }
+        };
+
+        // The depth of an associated-type access is the number of associated-type
+        // lookups applied to its root type (e.g. `T.A.B` has depth 2, `T` has
+        // depth 0).
+        auto assocChainDepth = [&](Type* type) -> Index
+        {
+            Index depth = 0;
+            enumerateLookupSources(type, [&](Type*) { ++depth; });
             return depth;
         };
 
@@ -911,21 +921,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         // to for constraints below, then re-express each constraint through the
         // anchor's conformance witness and match its endpoints against `selfType`.
         List<Type*> anchors;
-        {
-            Type* cur = selfType;
-            for (;;)
-            {
-                auto declRefType = as<DeclRefType>(cur);
-                if (!declRefType)
-                    break;
-                auto assocDeclRef = declRefType->getDeclRef().as<AssocTypeDecl>();
-                auto lookupDeclRef = as<LookupDeclRef>(declRefType->getDeclRef().declRefBase);
-                if (!assocDeclRef || !lookupDeclRef)
-                    break;
-                cur = lookupDeclRef->getLookupSource();
-                anchors.add(cur);
-            }
-        }
+        enumerateLookupSources(selfType, [&](Type* source) { anchors.add(source); });
 
         for (auto anchorType : anchors)
         {
