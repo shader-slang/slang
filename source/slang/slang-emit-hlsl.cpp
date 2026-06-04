@@ -1900,21 +1900,40 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("uint");
         return;
 
+    case kIROp_DispatchNodeInputRecordType:
+    case kIROp_ThreadNodeInputRecordType:
+    case kIROp_GroupNodeInputRecordsType:
+    case kIROp_EmptyNodeInputType:
+    case kIROp_ThreadNodeOutputRecordsType:
+    case kIROp_GroupNodeOutputRecordsType:
+    case kIROp_NodeOutputType:
+    case kIROp_NodeOutputArrayType:
+    case kIROp_EmptyNodeOutputType:
+    case kIROp_EmptyNodeOutputArrayType:
+        {
+            m_writer->emit(getWorkGraphRecordTypeName(type->getOp()));
+            if (auto elementType = getWorkGraphRecordElementType(type))
+            {
+                m_writer->emit("<");
+                emitType(elementType);
+                m_writer->emit(">");
+            }
+            return;
+        }
+
     case kIROp_StructType:
         {
             auto structType = cast<IRStructType>(type);
-            // Work-graph record types are native HLSL types (e.g. DispatchNodeInputRecord<T>,
-            // NodeOutput<T>, EmptyNodeOutput). Emit them using their original HLSL name so DXC
-            // recognises them; generic variants include the element type as a template argument.
+            // Legacy serialized modules may still contain work-graph record types as decorated
+            // structs. New code lowers them as dedicated intrinsic type opcodes above.
             if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>())
             {
                 auto nameHint = structType->findDecoration<IRNameHintDecoration>();
-                if (auto elemDecor =
-                        structType->findDecoration<IRWorkGraphRecordElementTypeDecoration>())
+                if (auto elementType = getWorkGraphRecordElementType(structType))
                 {
                     m_writer->emit(nameHint ? nameHint->getName() : getName(type));
                     m_writer->emit("<");
-                    emitType(elemDecor->getElementType());
+                    emitType(elementType);
                     m_writer->emit(">");
                 }
                 else

@@ -4461,10 +4461,9 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
         return;
     }
 
-    // Work-graph record types (e.g. DispatchNodeInputRecord<T>, NodeOutput<T>) are native
-    // template types in HLSL/DXC; emitting a struct definition would shadow the built-in
-    // and break DXC's recognition of the type. Suppress both annotated and unannotated
-    // instances — the unannotated base struct should never appear in emitted code.
+    // Legacy serialized modules may still contain work-graph record types as decorated structs.
+    // They are native template types in HLSL/DXC, so emitting a struct definition would shadow
+    // the built-in and break DXC's recognition of the type.
     if (isWorkGraphRecordType(structType))
     {
         return;
@@ -5436,7 +5435,7 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
         emitFuncDecl(cast<IRFunc>(inst));
         break;
     case kIROp_StructType:
-        // Work-graph record types are native HLSL/DXC template types;
+        // Legacy decorated work-graph record structs are native HLSL/DXC template types;
         // forward-declaring them as structs would hide the built-in.
         if (isWorkGraphRecordType(cast<IRType>(inst)))
             break;

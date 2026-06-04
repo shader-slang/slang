@@ -3317,10 +3317,70 @@ IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> eleme
 
 bool isWorkGraphRecordType(IRType* type)
 {
-    auto structType = as<IRStructType>(type);
-    if (!structType)
+    if (!type)
         return false;
-    return structType->findDecoration<IRWorkGraphRecordTypeDecoration>() != nullptr;
+
+    if (getWorkGraphRecordTypeName(type->getOp()))
+        return true;
+
+    auto structType = as<IRStructType>(type);
+    return structType && structType->findDecoration<IRWorkGraphRecordTypeDecoration>();
+}
+
+char const* getWorkGraphRecordTypeName(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_DispatchNodeInputRecordType:
+        return "DispatchNodeInputRecord";
+    case kIROp_ThreadNodeInputRecordType:
+        return "ThreadNodeInputRecord";
+    case kIROp_GroupNodeInputRecordsType:
+        return "GroupNodeInputRecords";
+    case kIROp_EmptyNodeInputType:
+        return "EmptyNodeInput";
+    case kIROp_ThreadNodeOutputRecordsType:
+        return "ThreadNodeOutputRecords";
+    case kIROp_GroupNodeOutputRecordsType:
+        return "GroupNodeOutputRecords";
+    case kIROp_NodeOutputType:
+        return "NodeOutput";
+    case kIROp_NodeOutputArrayType:
+        return "NodeOutputArray";
+    case kIROp_EmptyNodeOutputType:
+        return "EmptyNodeOutput";
+    case kIROp_EmptyNodeOutputArrayType:
+        return "EmptyNodeOutputArray";
+    default:
+        return nullptr;
+    }
+}
+
+IRType* getWorkGraphRecordElementType(IRType* type)
+{
+    if (!type)
+        return nullptr;
+
+    switch (type->getOp())
+    {
+    case kIROp_DispatchNodeInputRecordType:
+    case kIROp_ThreadNodeInputRecordType:
+    case kIROp_GroupNodeInputRecordsType:
+    case kIROp_ThreadNodeOutputRecordsType:
+    case kIROp_GroupNodeOutputRecordsType:
+    case kIROp_NodeOutputType:
+    case kIROp_NodeOutputArrayType:
+        return as<IRType>(type->getOperand(0));
+    default:
+        break;
+    }
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        if (auto elemDecor = structType->findDecoration<IRWorkGraphRecordElementTypeDecoration>())
+            return elemDecor->getElementType();
+    }
+    return nullptr;
 }
 
 } // namespace Slang

@@ -229,6 +229,56 @@ local insts = {
 			},
 			{ Atomic = { struct_name = "AtomicType", operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{
+				WorkGraphRecordTypeBase = {
+					hoistable = true,
+					{
+						DispatchNodeInputRecord = {
+							struct_name = "DispatchNodeInputRecordType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						ThreadNodeInputRecord = {
+							struct_name = "ThreadNodeInputRecordType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						GroupNodeInputRecords = {
+							struct_name = "GroupNodeInputRecordsType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{ EmptyNodeInput = { struct_name = "EmptyNodeInputType" } },
+					{
+						ThreadNodeOutputRecords = {
+							struct_name = "ThreadNodeOutputRecordsType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						GroupNodeOutputRecords = {
+							struct_name = "GroupNodeOutputRecordsType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						NodeOutput = {
+							struct_name = "NodeOutputType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						NodeOutputArray = {
+							struct_name = "NodeOutputArrayType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{ EmptyNodeOutput = { struct_name = "EmptyNodeOutputType" } },
+					{ EmptyNodeOutputArray = { struct_name = "EmptyNodeOutputArrayType" } },
+				},
+			},
+			{
 				BindExistentialsTypeBase = {
 					hoistable = true,
 					{

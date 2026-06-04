@@ -608,6 +608,14 @@ IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> eleme
 /// These types are opaque ABI objects that must survive type legalization unchanged.
 bool isWorkGraphRecordType(IRType* type);
 
+/// Returns the native source-language type name for a work-graph record IR opcode,
+/// or null if `op` is not a work-graph record type.
+char const* getWorkGraphRecordTypeName(IROp op);
+
+/// Returns the element type operand for generic work-graph record types, or null
+/// for non-generic record types.
+IRType* getWorkGraphRecordElementType(IRType* type);
+
 } // namespace Slang
 
 #endif

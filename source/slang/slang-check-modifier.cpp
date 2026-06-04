@@ -46,30 +46,51 @@ ConstantIntVal* SemanticsVisitor::checkConstantIntVal(Expr* expr)
     return constIntVal;
 }
 
-static bool _checkWorkGraphUInt32AttributeValue(
-    DiagnosticSink* sink,
-    IntVal* value,
-    Expr* arg,
-    char const* attrName)
+ConstantIntVal* SemanticsVisitor::checkConstantUInt32Val(Expr* expr)
 {
     static const IntegerLiteralValue kMaxUInt32Value = 0xffffffffLL;
 
-    auto constValue = as<ConstantIntVal>(value);
-    SLANG_ASSERT(constValue);
-    if (!constValue)
-        return false;
+    expr = CheckExpr(expr);
 
-    const auto literalValue = constValue->getValue();
-    if (literalValue < 0 || literalValue > kMaxUInt32Value)
+    auto rawIntVal = CheckIntegerConstantExpression(
+        expr,
+        IntegerConstantExpressionCoercionType::AnyInteger,
+        nullptr,
+        ConstantFoldingKind::CompileTime);
+
+    if (!rawIntVal)
+        return nullptr;
+
+    auto rawConstIntVal = as<ConstantIntVal>(rawIntVal);
+    if (!rawConstIntVal)
     {
-        sink->diagnose(Diagnostics::InvalidWorkGraphAttributeUint32Value{
-            .attrName = String(attrName),
-            .value = literalValue,
-            .location = arg->loc});
-        return false;
+        getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});
+        return nullptr;
     }
 
-    return true;
+    auto rawValue = rawConstIntVal->getValue();
+    if (rawValue < 0 || rawValue > kMaxUInt32Value)
+    {
+        getSink()->diagnose(Diagnostics::TypeMismatch{
+            .expectedType = m_astBuilder->getUIntType(),
+            .actualType = expr->type,
+            .expr = expr});
+        return nullptr;
+    }
+
+    auto coercedIntVal = CheckIntegerConstantExpression(
+        expr,
+        IntegerConstantExpressionCoercionType::SpecificType,
+        m_astBuilder->getUIntType(),
+        ConstantFoldingKind::CompileTime);
+
+    auto coercedConstIntVal = as<ConstantIntVal>(coercedIntVal);
+    if (!coercedConstIntVal)
+    {
+        getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});
+        return nullptr;
+    }
+    return coercedConstIntVal;
 }
 
 ConstantIntVal* SemanticsVisitor::checkConstantEnumVal(Expr* expr)
@@ -530,60 +551,26 @@ Modifier* SemanticsVisitor::validateAttribute(
     else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
-        gridAttr->x = checkConstantIntVal(attr->args[0]);
-        gridAttr->y = checkConstantIntVal(attr->args[1]);
-        gridAttr->z = checkConstantIntVal(attr->args[2]);
+        gridAttr->x = checkConstantUInt32Val(attr->args[0]);
+        gridAttr->y = checkConstantUInt32Val(attr->args[1]);
+        gridAttr->z = checkConstantUInt32Val(attr->args[2]);
         if (!gridAttr->x || !gridAttr->y || !gridAttr->z)
-            return nullptr;
-        if (!_checkWorkGraphUInt32AttributeValue(
-                getSink(),
-                gridAttr->x,
-                attr->args[0],
-                "NodeMaxDispatchGrid x") ||
-            !_checkWorkGraphUInt32AttributeValue(
-                getSink(),
-                gridAttr->y,
-                attr->args[1],
-                "NodeMaxDispatchGrid y") ||
-            !_checkWorkGraphUInt32AttributeValue(
-                getSink(),
-                gridAttr->z,
-                attr->args[2],
-                "NodeMaxDispatchGrid z"))
             return nullptr;
     }
     else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
-        fixedGridAttr->x = checkConstantIntVal(attr->args[0]);
-        fixedGridAttr->y = checkConstantIntVal(attr->args[1]);
-        fixedGridAttr->z = checkConstantIntVal(attr->args[2]);
+        fixedGridAttr->x = checkConstantUInt32Val(attr->args[0]);
+        fixedGridAttr->y = checkConstantUInt32Val(attr->args[1]);
+        fixedGridAttr->z = checkConstantUInt32Val(attr->args[2]);
         if (!fixedGridAttr->x || !fixedGridAttr->y || !fixedGridAttr->z)
-            return nullptr;
-        if (!_checkWorkGraphUInt32AttributeValue(
-                getSink(),
-                fixedGridAttr->x,
-                attr->args[0],
-                "NodeDispatchGrid x") ||
-            !_checkWorkGraphUInt32AttributeValue(
-                getSink(),
-                fixedGridAttr->y,
-                attr->args[1],
-                "NodeDispatchGrid y") ||
-            !_checkWorkGraphUInt32AttributeValue(
-                getSink(),
-                fixedGridAttr->z,
-                attr->args[2],
-                "NodeDispatchGrid z"))
             return nullptr;
     }
     else if (auto maxRecAttr = as<MaxRecordsAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
-        auto value = checkConstantIntVal(attr->args[0]);
+        auto value = checkConstantUInt32Val(attr->args[0]);
         if (!value)
-            return nullptr;
-        if (!_checkWorkGraphUInt32AttributeValue(getSink(), value, attr->args[0], "MaxRecords"))
             return nullptr;
         maxRecAttr->value = value;
     }
@@ -600,14 +587,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         nodeIDAttr->name = name;
         if (argCount == 2)
         {
-            auto arrayIndex = checkConstantIntVal(attr->args[1]);
+            auto arrayIndex = checkConstantUInt32Val(attr->args[1]);
             if (!arrayIndex)
-                return nullptr;
-            if (!_checkWorkGraphUInt32AttributeValue(
-                    getSink(),
-                    arrayIndex,
-                    attr->args[1],
-                    "NodeID arrayIndex"))
                 return nullptr;
             nodeIDAttr->arrayIndex = arrayIndex;
         }
@@ -619,10 +600,8 @@ Modifier* SemanticsVisitor::validateAttribute(
     else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
-        auto count = checkConstantIntVal(attr->args[0]);
+        auto count = checkConstantUInt32Val(attr->args[0]);
         if (!count)
-            return nullptr;
-        if (!_checkWorkGraphUInt32AttributeValue(getSink(), count, attr->args[0], "NodeArraySize"))
             return nullptr;
         nodeArraySizeAttr->count = count;
     }
@@ -1618,6 +1597,10 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::GLSLPrecisionModifier:
     case ASTNodeType::HLSLGroupSharedModifier:
         return modifierType;
+
+    case ASTNodeType::NodeDispatchGridAttribute:
+    case ASTNodeType::NodeMaxDispatchGridAttribute:
+        return ASTNodeType::NodeDispatchGridAttribute;
 
     case ASTNodeType::HLSLStaticModifier:
     case ASTNodeType::ActualGlobalModifier:

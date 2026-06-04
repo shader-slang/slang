@@ -15,10 +15,10 @@ void main(
     [MaxRecords(1)]
 #if defined(NEGATIVE)
     [NodeID("TargetNode", -1)]
-//CHECK_NEGATIVE: NodeID arrayIndex must be in the range 0 to 0xffffffff, got -1
+//CHECK_NEGATIVE: expected an expression of type 'uint', got 'int'
 #elif defined(TOO_LARGE)
     [NodeID("TargetNode", 4294967296)]
-//CHECK_TOO_LARGE: NodeID arrayIndex must be in the range 0 to 0xffffffff, got 4294967296
+//CHECK_TOO_LARGE: expected an expression of type 'uint', got 'int64_t'
 #endif
     NodeOutput<Record> output)
 {

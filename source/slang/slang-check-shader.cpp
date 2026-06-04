@@ -1815,8 +1815,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         return launchAttr && launchAttr->mode == kNodeLaunchModeThread;
     };
 
-    if ((stage == Stage::Compute || stage == Stage::Mesh || stage == Stage::Amplification ||
-         (stage == Stage::Node && !isThreadLaunchNode())) &&
+    bool needsNumThreads = stage == Stage::Compute || stage == Stage::Mesh ||
+                           stage == Stage::Amplification || stage == Stage::Node;
+    if (needsNumThreads && !isThreadLaunchNode() &&
         !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
     {
         auto parentDecl = entryPointFuncDecl->parentDecl;
@@ -1893,11 +1894,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             canHaveVaryingInput = true;
             auto hasMaxGrid = entryPointFuncDecl->findModifier<NodeMaxDispatchGridAttribute>();
             auto hasFixedGrid = entryPointFuncDecl->findModifier<NodeDispatchGridAttribute>();
-            if (hasMaxGrid && hasFixedGrid)
-            {
-                sink->diagnose(
-                    Diagnostics::ConflictingNodeGridAttributes{.decl = entryPointFuncDecl});
-            }
             auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
             if ((hasMaxGrid || hasFixedGrid) && launchAttr &&
                 launchAttr->mode != kNodeLaunchModeBroadcasting)

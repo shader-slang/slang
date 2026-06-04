@@ -852,5 +852,15 @@ return {
 	["Decoration.nodeIsProgramEntry"] = 876,
 	["Decoration.nodeArraySize"] = 877,
 	["Decoration.allowSparseNodes"] = 878,
-	["Decoration.workGraphRecordElementType"] = 879
+	["Decoration.workGraphRecordElementType"] = 879,
+	["Type.WorkGraphRecordTypeBase.DispatchNodeInputRecord"] = 880,
+	["Type.WorkGraphRecordTypeBase.ThreadNodeInputRecord"] = 881,
+	["Type.WorkGraphRecordTypeBase.GroupNodeInputRecords"] = 882,
+	["Type.WorkGraphRecordTypeBase.EmptyNodeInput"] = 883,
+	["Type.WorkGraphRecordTypeBase.ThreadNodeOutputRecords"] = 884,
+	["Type.WorkGraphRecordTypeBase.GroupNodeOutputRecords"] = 885,
+	["Type.WorkGraphRecordTypeBase.NodeOutput"] = 886,
+	["Type.WorkGraphRecordTypeBase.NodeOutputArray"] = 887,
+	["Type.WorkGraphRecordTypeBase.EmptyNodeOutput"] = 888,
+	["Type.WorkGraphRecordTypeBase.EmptyNodeOutputArray"] = 889
 }

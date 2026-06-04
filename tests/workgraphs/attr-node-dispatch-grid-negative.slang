@@ -13,16 +13,16 @@ struct GridData
 [NodeLaunch("broadcasting")]
 #if defined(FIXED_NEGATIVE)
 [NodeDispatchGrid(-1, 1, 1)]
-//CHECK_FIXED_NEGATIVE: NodeDispatchGrid x must be in the range 0 to 0xffffffff, got -1
+//CHECK_FIXED_NEGATIVE: expected an expression of type 'uint', got 'int'
 #elif defined(FIXED_TOO_LARGE)
 [NodeDispatchGrid(4294967296, 1, 1)]
-//CHECK_FIXED_TOO_LARGE: NodeDispatchGrid x must be in the range 0 to 0xffffffff, got 4294967296
+//CHECK_FIXED_TOO_LARGE: expected an expression of type 'uint', got 'int64_t'
 #elif defined(MAX_NEGATIVE)
 [NodeMaxDispatchGrid(-1, 1, 1)]
-//CHECK_MAX_NEGATIVE: NodeMaxDispatchGrid x must be in the range 0 to 0xffffffff, got -1
+//CHECK_MAX_NEGATIVE: expected an expression of type 'uint', got 'int'
 #elif defined(MAX_TOO_LARGE)
 [NodeMaxDispatchGrid(4294967296, 1, 1)]
-//CHECK_MAX_TOO_LARGE: NodeMaxDispatchGrid x must be in the range 0 to 0xffffffff, got 4294967296
+//CHECK_MAX_TOO_LARGE: expected an expression of type 'uint', got 'int64_t'
 #endif
 [numthreads(1, 1, 1)]
 void main(DispatchNodeInputRecord<GridData> input)

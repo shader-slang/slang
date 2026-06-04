@@ -1339,12 +1339,6 @@ class NodeArraySizeAttribute : public Attribute
 };
 
 FIDDLE()
-class WorkGraphRecordTypeAttribute : public Attribute
-{
-    FIDDLE(...)
-};
-
-FIDDLE()
 class MaxVertexCountAttribute : public Attribute
 {
     FIDDLE(...)

@@ -48,14 +48,10 @@ attribute_syntax [NodeArraySize(count: int)] : NodeArraySizeAttribute;
 __attributeTarget(ParamDecl)
 attribute_syntax [AllowSparseNodes] : AllowSparseNodesAttribute;
 
-//@hidden:
-__attributeTarget(StructDecl)
-attribute_syntax [__workGraphRecordType] : WorkGraphRecordTypeAttribute;
-
 /// Read-only input to a broadcasting-launch node shader.
 __generic<T>
 [require(hlsl_spirv)]
-[__workGraphRecordType]
+__intrinsic_type(DispatchNodeInputRecord)
 public struct DispatchNodeInputRecord
 {
     /// Returns the input record value.
@@ -83,7 +79,7 @@ public struct DispatchNodeInputRecord
 /// Read-only input to a thread-launch node shader.
 __generic<T>
 [require(hlsl)]
-[__workGraphRecordType]
+__intrinsic_type(ThreadNodeInputRecord)
 public struct ThreadNodeInputRecord
 {
     public T Get()
@@ -99,7 +95,7 @@ public struct ThreadNodeInputRecord
 /// Read-only input array for a coalescing-launch node shader.
 __generic<T>
 [require(hlsl)]
-[__workGraphRecordType]
+__intrinsic_type(GroupNodeInputRecords)
 public struct GroupNodeInputRecords
 {
     public uint Count()
@@ -127,7 +123,7 @@ public struct GroupNodeInputRecords
 };
 
 [require(hlsl)]
-[__workGraphRecordType]
+__intrinsic_type(EmptyNodeInput)
 public struct EmptyNodeInput
 {
     public uint Count() { __intrinsic_asm ".Count"; }
@@ -136,7 +132,7 @@ public struct EmptyNodeInput
 /// Per-thread output records for node shader output; call OutputComplete() when done writing.
 __generic<T>
 [require(hlsl)]
-[__workGraphRecordType]
+__intrinsic_type(ThreadNodeOutputRecords)
 public struct ThreadNodeOutputRecords
 {
     public Ref<T> Get(uint index = 0)
@@ -169,7 +165,7 @@ public struct ThreadNodeOutputRecords
 /// when done writing.
 __generic<T>
 [require(hlsl)]
-[__workGraphRecordType]
+__intrinsic_type(GroupNodeOutputRecords)
 public struct GroupNodeOutputRecords
 {
     public Ref<T> Get(uint index = 0)
@@ -201,7 +197,7 @@ public struct GroupNodeOutputRecords
 /// Output node handle; use to obtain output record objects for the named output node.
 __generic<T>
 [require(hlsl)]
-[__workGraphRecordType]
+__intrinsic_type(NodeOutput)
 public struct NodeOutput
 {
     public bool IsValid()
@@ -235,7 +231,7 @@ public struct NodeOutput
 /// Array of output node handles indexed by node array index.
 __generic<T>
 [require(hlsl)]
-[__workGraphRecordType]
+__intrinsic_type(NodeOutputArray)
 public struct NodeOutputArray
 {
     public NodeOutput<T> Get(uint index)
@@ -254,7 +250,7 @@ public struct NodeOutputArray
 };
 
 [require(hlsl)]
-[__workGraphRecordType]
+__intrinsic_type(EmptyNodeOutput)
 public struct EmptyNodeOutput
 {
     public bool IsValid() { __intrinsic_asm ".IsValid"; }
@@ -273,7 +269,7 @@ public struct EmptyNodeOutput
 };
 
 [require(hlsl)]
-[__workGraphRecordType]
+__intrinsic_type(EmptyNodeOutputArray)
 public struct EmptyNodeOutputArray
 {
     public EmptyNodeOutput Get(uint index) { __intrinsic_asm ".operator[]"; }

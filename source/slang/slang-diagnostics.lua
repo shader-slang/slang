@@ -2568,13 +2568,6 @@ err(
 )
 
 err(
-    "conflicting-node-grid-attributes",
-    31114,
-    "conflicting node grid attributes",
-    span { loc = "decl:Decl", message = "'[NodeDispatchGrid]' and '[NodeMaxDispatchGrid]' cannot both appear on the same node shader" }
-)
-
-err(
     "node-grid-attribute-requires-broadcasting",
     31115,
     "node grid attribute requires broadcasting launch mode",
@@ -2593,13 +2586,6 @@ err(
     31117,
     "invalid 'BarrierMemoryTypeFlags' value",
     span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected a combination of UavMemory (0x1), GroupSharedMemory (0x2), NodeInputMemory (0x4), NodeOutputMemory (0x8), or AllMemory (0xf)" }
-)
-
-err(
-    "invalid-work-graph-attribute-uint32-value",
-    31118,
-    "invalid work-graph attribute value",
-    span { loc = "location", message = "~attrName:String must be in the range 0 to 0xffffffff, got ~value:Int" }
 )
 
 warning(
