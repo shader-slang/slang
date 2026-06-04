@@ -214,6 +214,14 @@ The higher-order checking actions will synthesize the 'temporary' group of trans
 Invoke resolution will then narrow this down to a single match (`DiffPair<double>, DiffPair<double> -> DiffPair<float>`) by automatically casting the `float`s to `double`s. Once the resolution is complete, 
 we return `InvokeExpr(ForwardDifferentiateExpr(f : double, double -> float), casted_args)` by wrapping the corresponding function in the corresponding higher-order expr
 
+When the operand is a member method expression such as `obj.method`, this type translation treats
+the method receiver as the first explicit parameter of the transformed function. For example,
+`bwd_diff(obj.method)(obj, ...)` type-checks the first argument against the method's implicit
+`this` parameter after applying the usual differentiability rules. A differentiable `this` uses
+the appropriate `DifferentialPair` form, while a `[NoDiffThis]` method receives the receiver as a
+regular value. The higher-order expression does not close over `obj`; after checking, derivative
+lookup is represented as a static derivative member on the selected method.
+
 ## Attributed Types (`no_diff` parameters)
 
 Often, it will be necessary to prevent gradients from propagating through certain parameters, for correctness reasons. For example, values representing random samples are often not differentiated since the result may be mathematically incorrect.

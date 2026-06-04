@@ -160,6 +160,39 @@ void main()
 }
 ```
 
+### Auto-diff on member method expressions
+
+`fwd_diff` and `bwd_diff` can also be applied to member method expressions such as `obj.method`.
+The result differentiates the method, but it does not capture `obj` as a bound receiver. Instead,
+the receiver is passed explicitly as the first argument to the derivative call.
+
+The receiver follows the same rules as the method's implicit `this` parameter. If `this` is
+differentiable, the receiver argument uses the corresponding differential-pair form. If the method
+uses `[NoDiffThis]`, the receiver is passed as a regular, non-differentiated value.
+
+```csharp
+struct Sphere
+{
+    float radius;
+
+    [Differentiable]
+    [NoDiffThis]
+    float distance(float3 p)
+    {
+        return length(p) - radius;
+    }
+}
+
+void main(float3 p)
+{
+    Sphere s = { 1.0 };
+    DifferentialPair<float3> dp = diffPair(p);
+
+    // The first argument is the explicit receiver for `s.distance`.
+    bwd_diff(s.distance)(s, dp, 1.0);
+}
+```
+
 ## Differentiable Type System
 
 Slang will only generate differentiation code for values that have a *differentiable* type.
@@ -667,6 +700,9 @@ struct MyDifferentiableType : IDifferentiable
     float compute(float x) { ... }
 }
 ```
+
+The same `this` treatment applies when a member method is passed to `fwd_diff` or `bwd_diff` as
+`obj.method`: the derivative call receives the method receiver as its first explicit argument.
 
 ### Excluding Struct Members from Differentiation
 
