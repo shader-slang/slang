@@ -108,7 +108,8 @@ if(DXC_DXC_EXECUTABLE)
         TIMEOUT 10
     )
     string(
-        REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+"
+        REGEX MATCH
+        "[0-9]+\\.[0-9]+\\.[0-9]+"
         DXC_VERSION
         "${_dxc_version_output}"
     )
