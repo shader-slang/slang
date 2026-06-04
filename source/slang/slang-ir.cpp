@@ -5583,6 +5583,11 @@ IRInst* IRBuilder::emitElementExtract(IRInst* base, IRInst* index)
     {
         type = vectorType->getElementType();
     }
+    // CoopVec element extraction produces the element type just like vector extraction.
+    else if (auto coopVectorType = as<IRCoopVectorType>(base->getDataType()))
+    {
+        type = coopVectorType->getElementType();
+    }
     else if (auto matrixType = as<IRMatrixType>(base->getDataType()))
     {
         type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());

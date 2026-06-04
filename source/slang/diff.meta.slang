@@ -1942,6 +1942,134 @@ vector<T, N> __mul_p_d(vector<T, N> a, vector<T, N> b)
     return a * b;
 }
 
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__unsafeForceInlineEarly]
+CoopVec<T, N> __mul_p_d(CoopVec<T, N> a, CoopVec<T, N> b)
+{
+    return a * b;
+}
+
+// CoopVec differentials have the same type as their primal values, so common unary
+// derivative rules can reuse element-wise CoopVec multiplication.
+#define COOPVEC_UNARY_DERIVATIVE_IMPL(NAME, FWD_DIFF_FUNC, BWD_DIFF_FUNC)                    \
+    __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
+    [PreferRecompute]                                                                        \
+    [ForwardDerivativeOf(NAME)]                                                              \
+    DifferentialPair<CoopVec<T, N>> __d_##NAME##_coopvec(                                    \
+        DifferentialPair<CoopVec<T, N>> dpx)                                                 \
+    {                                                                                        \
+        typealias ReturnType = CoopVec<T, N>;                                                \
+        return DifferentialPair<ReturnType>(NAME(dpx.p), FWD_DIFF_FUNC);                     \
+    }                                                                                        \
+    __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
+    [PreferRecompute]                                                                        \
+    [BackwardDerivativeOf(NAME)]                                                             \
+    void __d_##NAME##_coopvec(                                                               \
+        inout DifferentialPair<CoopVec<T, N>> dpx, CoopVec<T, N>.Differential dOut)          \
+    {                                                                                        \
+        typealias ReturnType = CoopVec<T, N>;                                                \
+        dpx = diffPair(dpx.p, BWD_DIFF_FUNC);                                                \
+    }
+
+#define COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(NAME, DIFF_FUNC)                                \
+    COOPVEC_UNARY_DERIVATIVE_IMPL(                                                           \
+        NAME,                                                                                 \
+        __mul_p_d(DIFF_FUNC, dpx.d),                                                          \
+        __mul_p_d(DIFF_FUNC, dOut))
+
+// Binary math functions such as min/max use the scalar derivative implementation per
+// component so they keep the same boundary behavior as scalar and vector overloads.
+#define COOPVEC_BINARY_DIFF_IMPL(NAME)                                                       \
+    __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
+    [PreferRecompute]                                                                        \
+    [ForwardDerivativeOf(NAME)]                                                              \
+    DifferentialPair<CoopVec<T, N>> __d_##NAME##_coopvec(                                    \
+        DifferentialPair<CoopVec<T, N>> dpx,                                                  \
+        DifferentialPair<CoopVec<T, N>> dpy)                                                  \
+    {                                                                                        \
+        CoopVec<T, N> result;                                                                \
+        CoopVec<T, N>.Differential d_result;                                                 \
+        [ForceUnroll] for (int i = 0; i < N; ++i)                                            \
+        {                                                                                    \
+            DifferentialPair<T> dp_elem = __d_##NAME(                                        \
+                DifferentialPair<T>(dpx.p[i], __slang_noop_cast<T.Differential>(dpx.d[i])),  \
+                DifferentialPair<T>(dpy.p[i], __slang_noop_cast<T.Differential>(dpy.d[i]))); \
+            result[i] = dp_elem.p;                                                           \
+            d_result[i] = __slang_noop_cast<T>(dp_elem.d);                                   \
+        }                                                                                    \
+        return DifferentialPair<CoopVec<T, N>>(result, d_result);                            \
+    }                                                                                        \
+    __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
+    [PreferRecompute]                                                                        \
+    [BackwardDerivativeOf(NAME)]                                                             \
+    void __d_##NAME##_coopvec(                                                               \
+        inout DifferentialPair<CoopVec<T, N>> dpx,                                           \
+        inout DifferentialPair<CoopVec<T, N>> dpy,                                           \
+        CoopVec<T, N>.Differential dOut)                                                     \
+    {                                                                                        \
+        CoopVec<T, N>.Differential left_d_result, right_d_result;                            \
+        [ForceUnroll] for (int i = 0; i < N; ++i)                                            \
+        {                                                                                    \
+            DifferentialPair<T> left_dp = diffPair(dpx.p[i], T.dzero());                     \
+            DifferentialPair<T> right_dp = diffPair(dpy.p[i], T.dzero());                    \
+            __d_##NAME(left_dp, right_dp, __slang_noop_cast<T.Differential>(dOut[i]));       \
+            left_d_result[i] = __slang_noop_cast<T>(left_dp.d);                              \
+            right_d_result[i] = __slang_noop_cast<T>(right_dp.d);                            \
+        }                                                                                    \
+        dpx = diffPair(dpx.p, left_d_result);                                                \
+        dpy = diffPair(dpy.p, right_d_result);                                               \
+    }
+
+// Ternary math functions follow the same per-component route, producing one CoopVec
+// differential for each differentiable operand.
+#define COOPVEC_TERNARY_DIFF_IMPL(NAME)                                                      \
+    __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
+    [PreferRecompute]                                                                        \
+    [ForwardDerivativeOf(NAME)]                                                              \
+    DifferentialPair<CoopVec<T, N>> __d_##NAME##_coopvec(                                    \
+        DifferentialPair<CoopVec<T, N>> dpx,                                                  \
+        DifferentialPair<CoopVec<T, N>> dpy,                                                  \
+        DifferentialPair<CoopVec<T, N>> dpz)                                                  \
+    {                                                                                        \
+        CoopVec<T, N> result;                                                                \
+        CoopVec<T, N>.Differential d_result;                                                 \
+        [ForceUnroll] for (int i = 0; i < N; ++i)                                            \
+        {                                                                                    \
+            DifferentialPair<T> dp_elem = __d_##NAME(                                        \
+                DifferentialPair<T>(dpx.p[i], __slang_noop_cast<T.Differential>(dpx.d[i])),  \
+                DifferentialPair<T>(dpy.p[i], __slang_noop_cast<T.Differential>(dpy.d[i])),  \
+                DifferentialPair<T>(dpz.p[i], __slang_noop_cast<T.Differential>(dpz.d[i]))); \
+            result[i] = dp_elem.p;                                                           \
+            d_result[i] = __slang_noop_cast<T>(dp_elem.d);                                   \
+        }                                                                                    \
+        return DifferentialPair<CoopVec<T, N>>(result, d_result);                            \
+    }                                                                                        \
+    __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
+    [PreferRecompute]                                                                        \
+    [BackwardDerivativeOf(NAME)]                                                             \
+    void __d_##NAME##_coopvec(                                                               \
+        inout DifferentialPair<CoopVec<T, N>> dpx,                                           \
+        inout DifferentialPair<CoopVec<T, N>> dpy,                                           \
+        inout DifferentialPair<CoopVec<T, N>> dpz,                                           \
+        CoopVec<T, N>.Differential dOut)                                                     \
+    {                                                                                        \
+        CoopVec<T, N>.Differential left_d_result, middle_d_result, right_d_result;           \
+        [ForceUnroll] for (int i = 0; i < N; ++i)                                            \
+        {                                                                                    \
+            DifferentialPair<T> left_dp = diffPair(dpx.p[i], T.dzero());                     \
+            DifferentialPair<T> middle_dp = diffPair(dpy.p[i], T.dzero());                   \
+            DifferentialPair<T> right_dp = diffPair(dpz.p[i], T.dzero());                    \
+            __d_##NAME(left_dp, middle_dp, right_dp,                                         \
+                __slang_noop_cast<T.Differential>(dOut[i]));                                 \
+            left_d_result[i] = __slang_noop_cast<T>(left_dp.d);                              \
+            middle_d_result[i] = __slang_noop_cast<T>(middle_dp.d);                          \
+            right_d_result[i] = __slang_noop_cast<T>(right_dp.d);                            \
+        }                                                                                    \
+        dpx = diffPair(dpx.p, left_d_result);                                                \
+        dpy = diffPair(dpy.p, middle_d_result);                                              \
+        dpz = diffPair(dpz.p, right_d_result);                                               \
+    }
+
 
 /// Detach and set derivatives to zero.
 __generic<T : IDifferentiable>
@@ -1963,20 +2091,33 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(radians, ReturnType(T(0.017453292519943295769236907
 SIMPLE_UNARY_DERIVATIVE_IMPL(degrees, ReturnType(T(57.295779513082320876798154814105)))
 // Exponent
 SIMPLE_UNARY_DERIVATIVE_IMPL(exp, exp(dpx.p))
+// CoopVec versions below mirror the scalar rules for the common element-wise math ops
+// that have direct CoopVec overloads.
+COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(exp, exp(dpx.p))
 SIMPLE_UNARY_DERIVATIVE_IMPL(exp2, exp2(dpx.p)* T(0.69314718055994530941723212145818))
+COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(exp2, exp2(dpx.p) * T(0.69314718055994530941723212145818))
 // sin, sinh
 SIMPLE_UNARY_DERIVATIVE_IMPL(sin, cos(dpx.p))
+COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(sin, cos(dpx.p))
 SIMPLE_UNARY_DERIVATIVE_IMPL(sinh, cosh(dpx.p))
 // cos, cosh
 SIMPLE_UNARY_DERIVATIVE_IMPL(cos, -sin(dpx.p))
+COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(cos, -sin(dpx.p))
 SIMPLE_UNARY_DERIVATIVE_IMPL(cosh, sinh(dpx.p))
 // tan, tanh
 SIMPLE_UNARY_DERIVATIVE_IMPL(tan, T(1.0) / (cos(dpx.p) * cos(dpx.p)))
 SIMPLE_UNARY_DERIVATIVE_IMPL(tanh, T(1.0) / (cosh(dpx.p) * cosh(dpx.p)))
+COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(
+    tanh,
+    ReturnType(T(1.0)) - tanh(dpx.p) * tanh(dpx.p))
 // Logarithm
 SIMPLE_UNARY_DERIVATIVE_IMPL(log, T(1.0) / dpx.p)
+COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(log, ReturnType(T(1.0)) / dpx.p)
 SIMPLE_UNARY_DERIVATIVE_IMPL(log10, T(1.0) / (dpx.p * T(2.3025850929940456840179914546844)))
 SIMPLE_UNARY_DERIVATIVE_IMPL(log2, T(1.0) / (dpx.p * T(0.69314718055994530941723212145818)))
+COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(
+    log2,
+    ReturnType(T(1.0)) / (dpx.p * T(0.69314718055994530941723212145818)))
 // Square root
 SIMPLE_UNARY_DERIVATIVE_IMPL(sqrt, T(0.5) / sqrt(max(ReturnType(T(1e-7)), dpx.p)))
 // Reciprocal
@@ -1989,6 +2130,9 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(asin, T(1.0) / sqrt(T(1.0) - dpx.p * dpx.p))
 SIMPLE_UNARY_DERIVATIVE_IMPL(acos, T(-1.0) / sqrt(T(1.0) - dpx.p * dpx.p))
 // Arc-tan
 SIMPLE_UNARY_DERIVATIVE_IMPL(atan, T(1.0) / (T(1.0) + dpx.p * dpx.p))
+COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(
+    atan,
+    ReturnType(T(1.0)) / (ReturnType(T(1.0)) + dpx.p * dpx.p))
 // Arc-sinh
 SIMPLE_UNARY_DERIVATIVE_IMPL(asinh, T(1.0) / sqrt(dpx.p * dpx.p + T(1.0)))
 // Arc-cosh
@@ -2110,6 +2254,8 @@ void __d_max(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Dif
 }
 
 VECTOR_MATRIX_BINARY_DIFF_IMPL(max)
+// Keep CoopVec min/max derivative tie handling aligned with the scalar implementation.
+COOPVEC_BINARY_DIFF_IMPL(max)
 
 // Minimum
 __generic<T : __BuiltinFloatingPointType>
@@ -2134,6 +2280,7 @@ void __d_min(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Dif
 }
 
 VECTOR_MATRIX_BINARY_DIFF_IMPL(min)
+COOPVEC_BINARY_DIFF_IMPL(min)
 
 // copysign
 __generic<T : __BuiltinFloatingPointType>
@@ -2257,6 +2404,9 @@ void __d_clamp(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpMin, i
     dpMax = diffPair(dpMax.p, dpx.p > dpMax.p ? dOut : T.dzero());
 }
 VECTOR_MATRIX_TERNARY_DIFF_IMPL(clamp)
+// Clamp and fma are still element-wise CoopVec operations, unlike metadata-heavy ops
+// such as matrix/vector products.
+COOPVEC_TERNARY_DIFF_IMPL(clamp)
 
 // fma
 __generic<T : __BuiltinFloatingPointType>
@@ -2279,6 +2429,7 @@ void __d_fma(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, inout
     dpz = diffPair(dpz.p, dOut);
 }
 VECTOR_MATRIX_TERNARY_DIFF_IMPL(fma)
+COOPVEC_TERNARY_DIFF_IMPL(fma)
 
 // mad
 __generic<T : __BuiltinFloatingPointType>

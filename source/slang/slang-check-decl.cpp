@@ -15229,7 +15229,10 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     //   extension<T:IFloat> foo<T> : IForwardDifferentiable<foo<T>> { fwd_diff(...) -> ... { ... }
     //   }
 
-    if (!getOptionSet().getBoolOption(CompilerOptionName::ExperimentalFeature))
+    // Core-module meta code uses __func_extension to attach conditional derivative
+    // witnesses, but user source still needs to opt in to the experimental syntax.
+    if (!getOptionSet().getBoolOption(CompilerOptionName::ExperimentalFeature) &&
+        !isFromCoreModule(decl))
     {
         getSink()->diagnose(
             Diagnostics::FuncExtensionRequiresExperimentalFeature{.location = decl->loc});

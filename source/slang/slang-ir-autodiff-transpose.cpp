@@ -1520,6 +1520,12 @@ struct DiffTransposePass
 
         case kIROp_MakeVector:
             return transposeMakeVector(builder, fwdInst, revValue);
+        // CoopVec construction is element-wise, so reverse-mode gradients split back to
+        // the constructor operands the same way vector construction does.
+        case kIROp_MakeCoopVector:
+            return transposeMakeCoopVector(builder, fwdInst, revValue);
+        case kIROp_MakeCoopVectorFromValuePack:
+            return transposeMakeCoopVectorFromValuePack(builder, fwdInst, revValue);
         case kIROp_MakeVectorFromScalar:
             return transposeMakeVectorFromScalar(builder, fwdInst, revValue);
         case kIROp_MakeMatrixFromScalar:
@@ -1761,6 +1767,82 @@ struct DiffTransposePass
                 1,
                 &revValue),
             fwdMakeVector)});
+    }
+
+    // Split the CoopVec output gradient into one scalar gradient per constructor operand.
+    TranspositionResult transposeMakeCoopVector(
+        IRBuilder* builder,
+        IRInst* fwdMakeCoopVector,
+        IRInst* revValue)
+    {
+        List<RevGradient> gradients;
+        auto coopVectorType = cast<IRCoopVectorType>(fwdMakeCoopVector->getFullType());
+        auto elementType = coopVectorType->getElementType();
+
+        for (UInt ii = 0; ii < fwdMakeCoopVector->getOperandCount(); ii++)
+        {
+            auto gradAtIndex = builder->emitElementExtract(
+                elementType,
+                revValue,
+                builder->getIntValue(builder->getIntType(), ii));
+            gradients.add(RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdMakeCoopVector->getOperand(ii),
+                gradAtIndex,
+                fwdMakeCoopVector));
+        }
+        return TranspositionResult(gradients);
+    }
+
+    // Variadic CoopVec construction may be represented through a value pack; transpose the
+    // gradient either directly to pack elements or back to the pack value when needed.
+    TranspositionResult transposeMakeCoopVectorFromValuePack(
+        IRBuilder* builder,
+        IRInst* fwdMakeCoopVector,
+        IRInst* revValue)
+    {
+        auto pack = fwdMakeCoopVector->getOperand(0);
+        auto packType = cast<IRTypePack>(pack->getDataType());
+
+        if (auto makePack = as<IRMakeValuePack>(pack))
+        {
+            List<RevGradient> gradients;
+            for (UInt ii = 0; ii < makePack->getOperandCount(); ii++)
+            {
+                auto elementType = cast<IRType>(packType->getOperand(ii));
+                auto gradAtIndex = builder->emitElementExtract(
+                    elementType,
+                    revValue,
+                    builder->getIntValue(builder->getIntType(), ii));
+                gradients.add(RevGradient(
+                    RevGradient::Flavor::Simple,
+                    makePack->getOperand(ii),
+                    gradAtIndex,
+                    fwdMakeCoopVector));
+            }
+            return TranspositionResult(gradients);
+        }
+
+        List<IRInst*> gradElements;
+        for (UInt ii = 0; ii < packType->getOperandCount(); ii++)
+        {
+            auto elementType = cast<IRType>(packType->getOperand(ii));
+            auto gradAtIndex = builder->emitElementExtract(
+                elementType,
+                revValue,
+                builder->getIntValue(builder->getIntType(), ii));
+            gradElements.add(gradAtIndex);
+        }
+
+        auto gradPack = builder->emitMakeValuePack(
+            (IRType*)packType,
+            (UInt)gradElements.getCount(),
+            gradElements.getBuffer());
+        return TranspositionResult(List<RevGradient>(RevGradient(
+            RevGradient::Flavor::Simple,
+            pack,
+            gradPack,
+            fwdMakeCoopVector)));
     }
 
     TranspositionResult transposeMakeMatrixFromScalar(

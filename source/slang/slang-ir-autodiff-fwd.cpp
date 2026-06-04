@@ -2445,6 +2445,10 @@ struct ForwardDiffTranslationContext
         case kIROp_MakeVectorFromScalar:
         case kIROp_MakeArray:
         case kIROp_MakeArrayFromElement:
+        // CoopVec constructors preserve differentiable element values just like vector
+        // constructors, so forward-mode AD should translate them instead of rejecting them.
+        case kIROp_MakeCoopVector:
+        case kIROp_MakeCoopVectorFromValuePack:
         case kIROp_MakeTuple:
         case kIROp_MakeOptionalValue:
         case kIROp_MakeResultValue:
@@ -2611,8 +2615,6 @@ struct ForwardDiffTranslationContext
         case kIROp_SizeOf:
         case kIROp_AlignOf:
         case kIROp_Printf:
-        case kIROp_MakeCoopVector:
-        case kIROp_MakeCoopVectorFromValuePack:
         case kIROp_GetCurrentStage:
         case kIROp_GetOffsetPtr:
         case kIROp_IsNullExistential:
