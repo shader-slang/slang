@@ -212,4 +212,10 @@ chat:
   art: false
 
 knowledge_base:
-  opt_out: true
+  opt_out: false
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "REVIEW.md"
+      - "CLAUDE.md"
+      - "AGENTS.md"

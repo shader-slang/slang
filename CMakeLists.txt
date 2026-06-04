@@ -215,6 +215,17 @@ advanced_option(
     ${SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT}
 )
 
+# TODO: Remove this option once SPIRV-Tools fixes the MergeReturnPass UAF:
+# https://github.com/KhronosGroup/SPIRV-Tools/issues/6711
+# Slang tracking issue: https://github.com/shader-slang/slang/issues/11146
+# Keep the source-build default ON to preserve existing SPIR-V output. Builds that need the
+# temporary workaround can set this OFF explicitly until the upstream fix lands.
+advanced_option(
+    SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
+    "Register SPIRV-Tools MergeReturnPass + InlineExhaustivePass in the slang-glslang optimizer pipeline; set OFF to opt into the temporary SPIRV-Tools#6711 workaround"
+    ON
+)
+
 option(
     SLANG_SPIRV_HEADERS_INCLUDE_DIR
     "Provide a specific path for the SPIR-V headers and grammar files"

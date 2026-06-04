@@ -46,6 +46,8 @@ jobs:
 
     env:
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+      # Keep macOS CI from spending time on DXC source builds.
+      SLANG_CI_DXC_BUILD_FROM_SOURCE: ${{ inputs.os == 'macos' && '-DSLANG_DXC_BUILD_FROM_SOURCE=OFF' || '' }}
 
     defaults:
       run:
@@ -203,6 +205,8 @@ jobs:
                 "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}" \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
+                -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
+                $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
@@ -211,6 +215,8 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
+                -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
+                $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             else
@@ -220,6 +226,8 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
+                -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
+                $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             fi
