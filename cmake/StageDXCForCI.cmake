@@ -36,8 +36,7 @@ set(_archive "${_dest}/dxc-prebuilt-archive")
 
 message(STATUS "StageDXCForCI: downloading ${_url}")
 file(
-    DOWNLOAD "${_url}"
-    "${_archive}"
+    DOWNLOAD "${_url}" "${_archive}"
     EXPECTED_HASH "SHA256=${_hash}"
     TLS_VERIFY ON
     STATUS _dl_status
