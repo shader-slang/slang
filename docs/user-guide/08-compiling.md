@@ -1089,7 +1089,7 @@ meanings of their `CompilerOptionValue` encodings.
 | GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entry point. `intValue0` specifies a bool value for the setting. |
 | UseUpToDateBinaryModule | When set will only load precompiled modules if it is up-to-date with its source. `intValue0` specifies a bool value for the setting. |
 | ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).|
-| SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
+| SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`, except `RaytracingAccelerationStructure` entries use the 8-byte `uint64` address stride. |
 | SPIRVSamplerHeapStride | Specifies the byte stride for the sampler descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
 | ForceDXLayout | When set forces the compiler to use DirectX-compatible (HLSL register packing) rules when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
 | ForceCLayout | When set forces the compiler to use C struct layout rules (natural alignment, no HLSL/GLSL padding) when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |

@@ -883,7 +883,8 @@ void initCommandOptions(CommandOptions& options)
          "-spirv-resource-heap-stride",
          "-spirv-resource-heap-stride <stride>",
          "Specify the byte stride for the resource descriptor heap when generating SPIRV with "
-         "spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType)."},
+         "spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType), "
+         "except RaytracingAccelerationStructure entries use an 8-byte uint64 address stride."},
         {OptionKind::SPIRVSamplerHeapStride,
          "-spirv-sampler-heap-stride",
          "-spirv-sampler-heap-stride <stride>",
