@@ -490,6 +490,13 @@ bool legalizeRayTracingPrimitiveIDParamsForEntryPoint(
         {
             auto valueReplacement =
                 emitRayTracingPrimitiveIndexValue(module, builder, primitiveIndexFunc, paramType);
+            if (!valueReplacement)
+            {
+                // Source-level semantic type validation should reject this. Leave malformed IR
+                // untouched rather than replacing uses with a null value.
+                param = nextParam;
+                continue;
+            }
             replacePrimitiveIDParamUses(
                 builder,
                 param,

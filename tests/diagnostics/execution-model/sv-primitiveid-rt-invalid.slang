@@ -15,6 +15,7 @@ struct Payload
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHIT_INOUT):-target hlsl -entry closesthitInOut -stage closesthit
 //DIAGNOSTIC_TEST:SIMPLE(diag=METAL):-target metal -entry closesthitMetalUnsupported -stage closesthit
 //DIAGNOSTIC_TEST:SIMPLE(diag=WGSL):-target wgsl -entry closesthitWGSLUnsupported -stage closesthit
+//DIAGNOSTIC_TEST:SIMPLE(diag=BAD_TYPE):-target hlsl -entry closesthitBadType -stage closesthit
 
 [shader("raygeneration")]
 void raygenMain(uint primitiveID : SV_PrimitiveID)
@@ -73,4 +74,19 @@ void closesthitWGSLUnsupported(uint primitiveID : SV_PrimitiveID)
 //WGSL:                             ^^^^^^^^^^^ unimplemented feature in Slang compiler: SV_PrimitiveID ray-tracing hit-stage inputs are not supported for this target
 {
     uint value = primitiveID;
+}
+
+struct PrimitiveIDWrapper
+{
+    uint value;
+};
+
+[shader("closesthit")]
+void closesthitBadType(
+    inout Payload payload,
+    in BuiltInTriangleIntersectionAttributes attribs,
+    PrimitiveIDWrapper primitiveID : SV_PrimitiveID)
+//BAD_TYPE: type 'PrimitiveIDWrapper' is not valid for system value semantic 'SV_PrimitiveID'; expected 'uint'
+{
+    uint value = primitiveID.value + uint(attribs.barycentrics.x + payload.value);
 }
