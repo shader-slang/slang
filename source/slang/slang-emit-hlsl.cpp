@@ -1923,27 +1923,6 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
     case kIROp_StructType:
         {
-            auto structType = cast<IRStructType>(type);
-            // Legacy serialized modules may still contain work-graph record types as decorated
-            // structs. New code lowers them as dedicated intrinsic type opcodes above.
-            if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>())
-            {
-                auto nameHint = structType->findDecoration<IRNameHintDecoration>();
-                if (auto elementType = getWorkGraphRecordElementType(structType))
-                {
-                    m_writer->emit(nameHint ? nameHint->getName() : getName(type));
-                    m_writer->emit("<");
-                    emitType(elementType);
-                    m_writer->emit(">");
-                }
-                else
-                {
-                    // Non-generic work-graph type (EmptyNodeOutput, EmptyNodeInput, etc.):
-                    // emit the original HLSL name without a template argument.
-                    m_writer->emit(nameHint ? nameHint->getName() : getName(type));
-                }
-                return;
-            }
             m_writer->emit(getName(type));
             return;
         }
