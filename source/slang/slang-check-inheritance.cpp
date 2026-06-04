@@ -1858,10 +1858,73 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto extractExistentialType = as<ExtractExistentialType>(type))
     {
-        return _getInheritanceInfo(
+        // Forward the `This`-type's inheritance to obtain the correct facet *structure*
+        // (ordering/directness/origins), then canonicalize each conformance witness so it
+        // is rooted at the existential's own canonical witness (`getSubtypeWitness()` ->
+        // ExtractExistentialSubtypeWitness) instead of the `DeclaredSubtypeWitness` the
+        // forwarding produces. This makes the witnesses match those the direct
+        // member-access path builds, so the same access (e.g. `foo.This.Params`) interns
+        // to a single `Type*`. See issue #11464.
+        auto forwarded = _getInheritanceInfo(
             extractExistentialType->getThisTypeDeclRef(),
             extractExistentialType,
             circularityInfo);
+
+        SemanticsVisitor visitor(this);
+        auto selfWitness = extractExistentialType->getSubtypeWitness(); // ee : IFoo
+        auto interfaceType = extractExistentialType->getOriginalInterfaceType();
+        auto ifaceInfo =
+            getInheritanceInfo(interfaceType, circularityInfo, ioSkippedIncompleteFacet);
+
+        auto directFacet = new (arena) Facet::Impl(
+            astBuilder,
+            Facet::Kind::Type,
+            Facet::Directness::Self,
+            DeclRef<Decl>(),
+            extractExistentialType,
+            visitor.createTypeEqualityWitness(extractExistentialType));
+        Facet tail = directFacet;
+        for (auto facet : forwarded.facets)
+        {
+            if (facet->directness == Facet::Directness::Self)
+                continue;
+
+            // Re-root the conformance witness `ee : sup` at the existential's canonical
+            // witness: directly for the opened interface, transitively for its bases.
+            SubtypeWitness* witness = facet->subtypeWitness;
+            Type* sup = witness ? witness->getSup() : nullptr;
+            if (sup == interfaceType)
+            {
+                witness = selfWitness;
+            }
+            else
+            {
+                for (auto ifaceFacet : ifaceInfo.facets)
+                {
+                    if (ifaceFacet->subtypeWitness && ifaceFacet->subtypeWitness->getSup() == sup)
+                    {
+                        witness = astBuilder->getTransitiveSubtypeWitness(
+                            selfWitness,
+                            ifaceFacet->subtypeWitness);
+                        break;
+                    }
+                }
+            }
+
+            auto projectedFacet = new (arena) Facet::Impl(
+                astBuilder,
+                facet->kind,
+                facet->directness,
+                facet->origin.declRef,
+                facet->origin.type,
+                witness);
+            tail->next = projectedFacet;
+            tail = projectedFacet;
+        }
+
+        InheritanceInfo info;
+        info.facets = FacetList(directFacet);
+        return info;
     }
     else if (as<AndType>(type))
     {
