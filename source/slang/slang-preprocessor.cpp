@@ -1191,6 +1191,16 @@ struct WarningStateTracker : SourceWarningStateTrackerBase
     Dictionary<int, WarningTimeline> mapDiagnosticIdToTimeline = {};
     List<SourceLoc> stack = {};
 
+    // High-water mark of `Preprocessor::absoluteSourceLocCounter`, carried
+    // across the multiple `preprocessSource` passes that share this tracker
+    // within a single translation unit (one pass for the root file plus one
+    // per `__include`d module file). Each pass seeds its preprocessor counter
+    // from this value at start and writes the new high-water mark back at
+    // end, so absolute locations across passes stay strictly monotonic and
+    // the per-id timeline binary search continues to find the correct push
+    // entry for a `#pragma warning(pop)`.
+    SourceLoc::RawValue absoluteLocCounter = 0;
+
     WarningStateTracker(SourceManager* sourceManager = nullptr)
         : sourceManager(sourceManager)
     {
@@ -5028,6 +5038,19 @@ TokenList preprocessSource(
     preprocessor.warningStateTracker =
         dynamicCast<preprocessor::WarningStateTracker>(desc.sink->getSourceWarningStateTracker());
 
+    // Seed the absolute-loc counter from the shared per-TU tracker so that
+    // locations produced by this pass are strictly larger than any location
+    // produced by earlier passes (root file + previously processed
+    // `__include`d files). Without this, every pass starts at 0 and the
+    // pragma warning timelines (keyed by absolute loc) collide across files,
+    // which can cause `#pragma warning(pop)` in one included file to
+    // silently revert a `#pragma warning(disable: <id>)` in another file.
+    if (preprocessor.warningStateTracker)
+    {
+        preprocessor.absoluteSourceLocCounter =
+            preprocessor.warningStateTracker->absoluteLocCounter;
+    }
+
     // Add builtin macros
     {
         auto namePool = desc.namePool;
@@ -5111,6 +5134,16 @@ TokenList preprocessSource(
     outDetectedLanguage = preprocessor.language;
     if (preprocessor.languageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN)
         outLanguageVersion = preprocessor.languageVersion;
+
+    // Carry the high-water mark forward so the next `preprocessSource` pass
+    // for this translation unit (e.g. an `__include`d module file) starts
+    // its absolute locations strictly after ours.
+    if (preprocessor.warningStateTracker)
+    {
+        preprocessor.warningStateTracker->absoluteLocCounter =
+            preprocessor.absoluteSourceLocCounter;
+    }
+
     return tokens;
 }
 
