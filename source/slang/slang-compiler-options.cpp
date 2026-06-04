@@ -183,6 +183,12 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
 {
     for (auto& kv : options)
     {
+        // This is an output-policy knob (manifest sidecar path), not generated shader code.
+        // Locked by _testCoverageManifestOutputDoesNotAffectCompilerOptionHash; re-including it
+        // would invalidate persistent module caches on every sidecar-path change.
+        if (kv.key == CompilerOptionName::CoverageManifestOutput)
+            continue;
+
         builder.append(kv.key);
         builder.append(kv.value.getCount());
         for (auto& v : kv.value)

@@ -17,10 +17,11 @@
 #                                 (optional; skips auto-detection when set)
 #   SLANG_DXC_BUILD_FROM_SOURCE - ON: build from source when supported; OFF:
 #                                 always use prebuilt when available (skips detection);
-#                                 unset: auto-detect on native Linux x86_64 by
-#                                 downloading the prebuilt binary and inspecting
-#                                 the GLIBC requirements of both libdxcompiler.so
-#                                 and libdxil.so
+#                                 unset: build from source on macOS; auto-detect
+#                                 on native Linux x86_64 by downloading the
+#                                 prebuilt binary and inspecting the GLIBC
+#                                 requirements of both libdxcompiler.so and
+#                                 libdxil.so
 #   SLANG_GITHUB_TOKEN          - GitHub token for authenticated downloads (optional)
 #
 # Requires the following variables to be set by the caller (set in SlangTarget.cmake):
@@ -38,6 +39,11 @@ set(_dxc_windows_sha256 "${SLANG_DXC_WINDOWS_SHA256}")
 set(_dxc_linux_sha256 "${SLANG_DXC_LINUX_SHA256}")
 set(_dxc_windows_url_hash "SHA256=${_dxc_windows_sha256}")
 set(_dxc_linux_url_hash "SHA256=${_dxc_linux_sha256}")
+
+set(_dxc_has_custom_binary_url OFF)
+if(DEFINED SLANG_DXC_BINARY_URL AND NOT SLANG_DXC_BINARY_URL STREQUAL "")
+    set(_dxc_has_custom_binary_url ON)
+endif()
 
 function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
     set(_dxc_header_deps "${ARGN}")
@@ -110,8 +116,19 @@ if(SLANG_DXC_BUILD_FROM_SOURCE)
         )
         return()
     endif()
+elseif(
+    NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
+    AND CMAKE_SYSTEM_NAME STREQUAL "Darwin"
+    AND NOT _dxc_has_custom_binary_url
+)
+    message(
+        STATUS
+        "SLANG_DXC_BUILD_FROM_SOURCE is unset on macOS; building DXC from "
+        "source (${_dxc_version_tag})."
+    )
+    set(_dxc_build_from_source ON)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CROSSCOMPILING)
-    if(DEFINED SLANG_DXC_BINARY_URL)
+    if(_dxc_has_custom_binary_url)
         message(
             STATUS
             "Cross-compiling for Linux: GLIBC auto-detection is skipped; "
@@ -144,7 +161,7 @@ elseif(
     AND NOT SLANG_DXC_BUILD_FROM_SOURCE
     AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
-    AND NOT DEFINED SLANG_DXC_BINARY_URL
+    AND NOT _dxc_has_custom_binary_url
     AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
 )
     # User explicitly disabled the source build on x86_64 Linux; skip
@@ -160,7 +177,7 @@ elseif(
 elseif(
     CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
-    AND DEFINED SLANG_DXC_BINARY_URL
+    AND _dxc_has_custom_binary_url
 )
     # User supplied a custom URL; skip GLIBC auto-detection and use it as-is.
     message(
@@ -172,7 +189,7 @@ elseif(
     NOT DEFINED SLANG_DXC_BUILD_FROM_SOURCE
     AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
-    AND NOT DEFINED SLANG_DXC_BINARY_URL
+    AND NOT _dxc_has_custom_binary_url
     AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
 )
     # Auto-detect: download the prebuilt Linux binary and inspect both
@@ -414,7 +431,7 @@ elseif(
 elseif(
     CMAKE_SYSTEM_NAME STREQUAL "Linux"
     AND NOT CMAKE_CROSSCOMPILING
-    AND NOT DEFINED SLANG_DXC_BINARY_URL
+    AND NOT _dxc_has_custom_binary_url
     AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
 )
     # Non-x86_64 Linux: no prebuilt binary is available for this architecture.
@@ -448,41 +465,23 @@ endif()
 
 if(_dxc_build_from_source)
     set(_dxc_forwarded_config_args "")
-    if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-        set(_dxc_forwarded_config_args "")
-    elseif(
-        CMAKE_SYSTEM_NAME STREQUAL "Linux"
-        OR CMAKE_SYSTEM_NAME STREQUAL "Darwin"
-    )
-        # LLVM_ENABLE_WARNINGS=OFF prevents adding warning flags but does not
-        # actively suppress existing ones. Pass -w via CMAKE_*_FLAGS to silence
-        # all compiler warnings from DXC's source.
-        set(_dxc_c_flags "${CMAKE_C_FLAGS}")
-        set(_dxc_cxx_flags "${CMAKE_CXX_FLAGS}")
-        string(APPEND _dxc_c_flags " -w")
-        string(APPEND _dxc_cxx_flags " -w")
-        set(_dxc_forwarded_config_args
-            "-DCMAKE_C_FLAGS=${_dxc_c_flags}"
-            "-DCMAKE_CXX_FLAGS=${_dxc_cxx_flags}"
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        foreach(
+            _dxc_osx_var
+            CMAKE_OSX_ARCHITECTURES
+            CMAKE_OSX_SYSROOT
+            CMAKE_OSX_DEPLOYMENT_TARGET
         )
-        if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-            foreach(
-                _dxc_osx_var
-                CMAKE_OSX_ARCHITECTURES
-                CMAKE_OSX_SYSROOT
-                CMAKE_OSX_DEPLOYMENT_TARGET
-            )
-                if(DEFINED ${_dxc_osx_var})
-                    set(_dxc_osx_value "${${_dxc_osx_var}}")
-                    string(REPLACE ";" "\\;" _dxc_osx_value "${_dxc_osx_value}")
-                    list(
-                        APPEND
-                        _dxc_forwarded_config_args
-                        "-D${_dxc_osx_var}=${_dxc_osx_value}"
-                    )
-                endif()
-            endforeach()
-        endif()
+            if(DEFINED ${_dxc_osx_var} AND NOT "${${_dxc_osx_var}}" STREQUAL "")
+                set(_dxc_osx_value "${${_dxc_osx_var}}")
+                string(REPLACE ";" "\\;" _dxc_osx_value "${_dxc_osx_value}")
+                list(
+                    APPEND
+                    _dxc_forwarded_config_args
+                    "-D${_dxc_osx_var}=${_dxc_osx_value}"
+                )
+            endif()
+        endforeach()
     endif()
 
     # DXC's build (PredefinedParams.cmake) is designed for a single-config
@@ -494,10 +493,14 @@ if(_dxc_build_from_source)
     # to set LLVM_RUNTIME_OUTPUT_INTDIR and LLVM_LIBRARY_OUTPUT_INTDIR, so for
     # multi-config generators the artifacts land under MinSizeRel. Track these
     # subdirectories so byproducts and copy commands point to the right path.
+    get_property(
+        _dxc_parent_is_multi_config
+        GLOBAL
+        PROPERTY GENERATOR_IS_MULTI_CONFIG
+    )
     if(CMAKE_GENERATOR MATCHES "Ninja")
         set(_dxc_generator_args -G Ninja)
-        set(_dxc_dll_subdir "bin")
-        set(_dxc_lib_subdir "lib")
+        set(_dxc_inner_is_multi_config OFF)
     else()
         set(_dxc_generator_args -G "${CMAKE_GENERATOR}")
         if(CMAKE_GENERATOR_PLATFORM)
@@ -506,8 +509,15 @@ if(_dxc_build_from_source)
         if(CMAKE_GENERATOR_TOOLSET)
             list(APPEND _dxc_generator_args -T "${CMAKE_GENERATOR_TOOLSET}")
         endif()
+        set(_dxc_inner_is_multi_config "${_dxc_parent_is_multi_config}")
+    endif()
+
+    if(_dxc_inner_is_multi_config)
         set(_dxc_dll_subdir "MinSizeRel/bin")
         set(_dxc_lib_subdir "MinSizeRel/lib")
+    else()
+        set(_dxc_dll_subdir "bin")
+        set(_dxc_lib_subdir "lib")
     endif()
 
     # Step 1: Clone DXC source at Slang configure time.
@@ -740,7 +750,7 @@ endif()
 # Prebuilt binary download path.
 # ---------------------------------------------------------------------------
 
-if(NOT DEFINED SLANG_DXC_BINARY_URL)
+if(NOT _dxc_has_custom_binary_url)
     if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         set(SLANG_DXC_BINARY_URL
             "https://github.com/microsoft/DirectXShaderCompiler/releases/download/${_dxc_version_tag}/dxc_${_dxc_release_date}.zip"
@@ -762,7 +772,7 @@ if(NOT DEFINED SLANG_DXC_BINARY_URL)
     endif()
 endif()
 
-if(NOT DEFINED SLANG_DXC_BINARY_URL)
+if(NOT DEFINED SLANG_DXC_BINARY_URL OR SLANG_DXC_BINARY_URL STREQUAL "")
     return()
 endif()
 

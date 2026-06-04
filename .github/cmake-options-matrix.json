@@ -2,7 +2,7 @@
   "include": [
     {
       "option": "SLANG_DXC_BUILD_FROM_SOURCE",
-      "value": "ON"
+      "value": "OFF"
     },
     { "option": "SLANG_EMBED_CORE_MODULE_SOURCE" },
     { "option": "SLANG_EMBED_CORE_MODULE" },

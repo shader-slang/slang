@@ -1,0 +1,43 @@
+schema_version: 1
+id: pack-query-first-last-compiler-crash
+bundle: conformance/generics
+suspected_kind: sigsegv
+title: "[generics] `__first(P)` and `__last(P)` pack-query ops crash slangc (exit 139)"
+observed_at: "2026-06-02T07:02:43+00:00"
+scope: ir
+evidence:
+  command: "./build/Release/bin/slangc /tmp/nonempty3.slang -target hlsl -entry computeMain -stage compute"
+  source_slang: docs/generated/tests/conformance/generics/pack-nonempty-constraint-functional.slang
+  observed_summary: |
+    Calling `__first(args)` on a `expand each T args` pack parameter where `nonempty(T)` is
+    declared causes slangc to crash with exit code 139 (SIGSEGV).  The crash reproduces with
+    both `-target hlsl` and via `slangi`.  The same crash occurs with the equivalent `__last`.
+    `__trimFirst` and `__trimLast` are total operations and were not tested here.
+
+    Minimal repro:
+      int firstOfInts<each T>(expand each T args) where nonempty(T) where T == int {
+          return __first(args);
+      }
+      RWStructuredBuffer<int> outputBuffer;
+      [numthreads(1,1,1)]
+      void computeMain(uint3 id : SV_DispatchThreadID) { outputBuffer[0] = firstOfInts(42, 7); }
+  exit_code: 139
+  stderr_tail: "(no output — process killed by SIGSEGV before producing any stderr)"
+expected:
+  claim: |
+    The doc (generics.md#pack-queries) states that `__first(P)` and `__last(P)` are partial
+    operations that require `P` to be known non-empty, and that `where nonempty(T)` satisfies
+    this requirement.  Calling `__first(args)` in a function with `where nonempty(T)` must
+    compile and execute without crashing.
+  citation_kind: doc
+  citation: docs/language-reference/generics.md
+provenance:
+  agent_model: claude-sonnet-4-6
+  source_commit: 9c1a6a00ef413932805da5b813465a7a9d517fb9
+  doc_anchor: docs/language-reference/generics.md#type-param-packs
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — the syntax matches the doc exactly with separate where clauses."
+    - "Parsing issue: ruled out — slangc compiles the same function successfully without the __first call."
+    - "__first may not be fully implemented in the generic/specialization lowering pass for pack parameters."
