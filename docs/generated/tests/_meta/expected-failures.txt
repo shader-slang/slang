@@ -135,3 +135,12 @@ docs/generated/tests/design/ir-reference/types/array-unsized.slang
 #    test.
 docs/generated/tests/conformance/types-pointer/pointer-arithmetic-spirv-emission.slang
 docs/generated/tests/design/cross-cutting/diagnostics-catalog/29106-spirv-instruction-with-too-many-operands.slang
+
+# Surfaced on nightly run 26936693099 (Linux agentic suite):
+# https://github.com/shader-slang/slang/actions/runs/26936693099
+# (no tracking issue filed yet; pending user triage). The test server
+# dies while running this `-dump-ir`-based test, reported as
+# `JSON RPC failure: waitForResult()` / `hasMessage()`. Only reproduces
+# under the slang-linux-clang-ci container; same `-dump-ir` text-emit
+# class as Cluster C. Test-vs-compiler cause still to be determined.
+docs/generated/tests/design/ir-reference/decorations/struct-with-many-field-decorations.slang
