@@ -2825,6 +2825,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitMakeMatrixFromScalar(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 inst);
+        case kIROp_CastDescriptorHandleToUInt2:
+        case kIROp_CastUInt2ToDescriptorHandle:
+        case kIROp_CastUInt64ToDescriptorHandle:
+        case kIROp_CastDescriptorHandleToUInt64:
+        case kIROp_GlobalValueRef:
+            {
+                auto inner = ensureInst(inst->getOperand(0));
+                registerInst(inst, inner);
+                return inner;
+            }
         case kIROp_GlobalParam:
             return emitGlobalParam(as<IRGlobalParam>(inst));
         case kIROp_GlobalVar:
@@ -4907,6 +4917,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_SPIRVLoadDescriptorFromHeap:
             {
                 auto loadDesc = as<IRSPIRVLoadDescriptorFromHeap>(inst);
+                if (unwrapAttributedType(inst->getDataType())->getOp() ==
+                    kIROp_RaytracingAccelerationStructureType)
+                {
+                    result = emitAccelerationStructureFromDescriptorHeap(
+                        parent,
+                        inst,
+                        loadDesc->getHeap(),
+                        loadDesc->getIndex());
+                    break;
+                }
                 result =
                     emitDescriptorHeapLoad(parent, inst, loadDesc->getHeap(), loadDesc->getIndex());
                 break;
@@ -7127,6 +7147,38 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             *outIsBufferResource = isBufferResource;
 
         return getDescriptorRuntimeArrayType(descriptorElementType);
+    }
+
+    SpvInst* emitAccelerationStructureFromDescriptorHeap(
+        SpvInstParent* parent,
+        IRInst* inst,
+        IRInst* heap,
+        IRInst* index)
+    {
+        requireSPIRVAnyCapability({SpvCapabilityRayTracingKHR, SpvCapabilityRayQueryKHR});
+        ensureAnyExtensionDeclaration(
+            {UnownedStringSlice("SPV_KHR_ray_tracing"), UnownedStringSlice("SPV_KHR_ray_query")});
+
+        IRBuilder builder(m_irModule);
+        builder.setInsertInto(m_irModule->getModuleInst());
+        auto addressType = builder.getUInt64Type();
+        auto valuePtr = emitInst(
+            parent,
+            nullptr,
+            SpvOpUntypedAccessChainKHR,
+            ensureUntypedPointerType(SpvStorageClassUniformConstant),
+            kResultID,
+            getDescriptorHeapBaseType(as<IRType>(unwrapAttributedType(inst->getDataType()))),
+            heap,
+            index);
+        auto address = emitOpLoad(parent, nullptr, addressType, valuePtr);
+        return emitInst(
+            parent,
+            inst,
+            SpvOpConvertUToAccelerationStructureKHR,
+            inst->getDataType(),
+            kResultID,
+            address);
     }
 
     SpvInst* emitDescriptorHeapLoad(
