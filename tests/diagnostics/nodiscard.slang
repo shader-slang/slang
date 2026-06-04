@@ -58,6 +58,15 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
         i++;
     }
 
+    // The result is also discarded in a comma operand of a `for` loop side effect.
+    for (int j = 0; j < 1; t.load(), j++)
+/*diag:
+                                 ^ result of '[nodiscard]' function is discarded
+                                 ^ the result of calling 'load' is discarded; this function is marked '[nodiscard]'.
+*/
+    {
+    }
+
     // `[nodiscard]` on a `void` function does not warn even when discarded.
     t.touch();
 

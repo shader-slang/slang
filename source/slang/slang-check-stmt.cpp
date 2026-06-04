@@ -699,6 +699,21 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
 
 void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
 {
+    // A comma operator in a discarded context discards each of its operands, so recurse
+    // into them (e.g. `for (int i = 0; i < n; t.load(), i++)` discards `t.load()`).
+    if (auto operatorExpr = as<OperatorExpr>(expr))
+    {
+        if (auto func = as<VarExpr>(operatorExpr->functionExpr))
+        {
+            if (func->name && func->name->text == ",")
+            {
+                for (auto arg : operatorExpr->arguments)
+                    maybeDiagnoseDiscardedNodiscardResult(arg);
+                return;
+            }
+        }
+    }
+
     // If the discarded expression is a call to a function marked `[nodiscard]`, warn that
     // the result is being ignored.
     auto invokeExpr = as<InvokeExpr>(expr);
