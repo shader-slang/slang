@@ -436,9 +436,9 @@ SubtypeWitness* SharedSemanticsContext::_specializeInterfaceInheritanceWitness(
 bool SharedSemanticsContext::tryResolveConstraintTypes(
     DeclRef<GenericTypeConstraintDecl> constraintDeclRef)
 {
-    // Try to resolve the endpoint types of a constraint enough to match it during
+    // Try to resolve the `sub`/`sup` types of a constraint enough to match it during
     // inheritance computation. Shared by both constraint scans in
-    // `_calcInheritanceInfo`. For an endpoint that is not yet resolved:
+    // `_calcInheritanceInfo`. For a `sub`/`sup` type that is not yet resolved:
     //
     //   * a *leaf* reference (a bare type-parameter / associated-type name) is safe to
     //     resolve eagerly -- resolving it performs no member lookup on the type
@@ -450,20 +450,20 @@ bool SharedSemanticsContext::tryResolveConstraintTypes(
     //     inheritance and fail with a spurious "member not found" (and poison the
     //     subtype).
     //
-    // Returns true if the endpoints are resolved and the caller may match the
-    // constraint. Returns false if a multi-level endpoint is still unresolved; the
-    // caller then defers the constraint (the scans record it as an in-progress skip so
-    // the frame is reported partial and recomputed later -- see the call sites).
+    // Returns true if the `sub`/`sup` types are resolved and the caller may match the
+    // constraint. Returns false if a multi-level `sub`/`sup` type is still unresolved;
+    // the caller then defers the constraint (the scans record it as an in-progress skip
+    // so the frame is reported partial and recomputed later -- see the call sites).
     SemanticsVisitor visitor(this);
     auto constraintDecl = constraintDeclRef.getDecl();
 
-    auto resolveLeafOrDefer = [&](TypeExp& endpoint) -> bool // true if must defer
+    auto resolveLeafOrDefer = [&](TypeExp& operand) -> bool // true if must defer
     {
-        if (endpoint.type)
+        if (operand.type)
             return false; // already resolved -> observe
-        if (as<MemberExpr>(endpoint.exp))
-            return true;                                      // unresolved multi-level -> defer
-        endpoint = visitor.TranslateTypeNodeForced(endpoint); // leaf -> safe eager resolve
+        if (as<MemberExpr>(operand.exp))
+            return true;                                    // unresolved multi-level -> defer
+        operand = visitor.TranslateTypeNodeForced(operand); // leaf -> safe eager resolve
         return false;
     };
 
@@ -850,8 +850,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     // chain of `selfType` and, at each anchor type, enumerate the interfaces it
     // conforms to and match constraints whose subject (relative to `This`) names
     // exactly the chain of associated types leading from the anchor down to
-    // `selfType`. The opposite endpoint of a matching constraint is added as a
-    // base of `selfType`.
+    // `selfType`. The opposite (`sub`/`sup`) side of a matching constraint is added
+    // as a base of `selfType`.
     //
     // Worked example:
     //

@@ -269,14 +269,16 @@ AutoDiffSharedContext::AutoDiffSharedContext(
             differentiableInterfaceType,
             BuiltinRequirementKind::DAddFunc);
 
-        differentialAssocTypeStructKey = diffTypeEntry->getRequirementKey();
-        differentialAssocTypeWitnessStructKey = diffWitnessEntry->getRequirementKey();
+        differentialAssocTypeStructKey =
+            cast<IRBuiltinRequirementKey>(diffTypeEntry->getRequirementKey());
+        differentialAssocTypeWitnessStructKey =
+            cast<IRBuiltinRequirementKey>(diffWitnessEntry->getRequirementKey());
         differentialAssocTypeWitnessTableType =
             cast<IRWitnessTableType>(diffWitnessEntry->getRequirementVal());
 
-        zeroMethodStructKey = zeroEntry->getRequirementKey();
+        zeroMethodStructKey = cast<IRBuiltinRequirementKey>(zeroEntry->getRequirementKey());
         zeroMethodType = cast<IRFuncType>(zeroEntry->getRequirementVal());
-        addMethodStructKey = addEntry->getRequirementKey();
+        addMethodStructKey = cast<IRBuiltinRequirementKey>(addEntry->getRequirementKey());
         addMethodType = cast<IRFuncType>(addEntry->getRequirementVal());
 
         if (nullDifferentialStructType)
@@ -310,8 +312,10 @@ AutoDiffSharedContext::AutoDiffSharedContext(
             differentiablePtrInterfaceType,
             BuiltinRequirementKind::DifferentialPtrWitness);
 
-        differentialAssocRefTypeStructKey = ptrTypeEntry->getRequirementKey();
-        differentialAssocRefTypeWitnessStructKey = ptrWitnessEntry->getRequirementKey();
+        differentialAssocRefTypeStructKey =
+            cast<IRBuiltinRequirementKey>(ptrTypeEntry->getRequirementKey());
+        differentialAssocRefTypeWitnessStructKey =
+            cast<IRBuiltinRequirementKey>(ptrWitnessEntry->getRequirementKey());
         differentialAssocRefTypeWitnessTableType =
             cast<IRWitnessTableType>(ptrWitnessEntry->getRequirementVal());
 

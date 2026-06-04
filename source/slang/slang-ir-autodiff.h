@@ -68,30 +68,29 @@ struct AutoDiffSharedContext
     // defined inside IDifferential. We use this to lookup the differential
     // type in the conformance table associated with the concrete type.
     //
-    // NOTE: these requirement keys are `IRInst*` rather than `IRStructKey*`
-    // because built-in `IDifferentiable` requirements use the hoistable
-    // `IRBuiltinRequirementKey` (deduplicated by role), which is not an
-    // `IRStructKey`. They are only ever used as witness-table lookup keys, which
-    // accept any `IRInst*`.
-    IRInst* differentialAssocTypeStructKey = nullptr;
+    // These built-in `IDifferentiable` requirement keys are the hoistable
+    // `IRBuiltinRequirementKey` (deduplicated by role) rather than per-interface
+    // `IRStructKey`s, so they are typed as such. They are still usable directly as
+    // witness-table lookup keys (which accept any `IRInst*`).
+    IRBuiltinRequirementKey* differentialAssocTypeStructKey = nullptr;
 
     // The key for the witness that `Differential` associated type conforms to
     // `IDifferential`.
-    IRInst* differentialAssocTypeWitnessStructKey = nullptr;
+    IRBuiltinRequirementKey* differentialAssocTypeWitnessStructKey = nullptr;
     IRWitnessTableType* differentialAssocTypeWitnessTableType = nullptr;
 
     // The struct key for the 'zero()' associated type
     // defined inside IDifferential. We use this to lookup the
     // implementation of zero() for a given type.
     //
-    IRInst* zeroMethodStructKey = nullptr;
+    IRBuiltinRequirementKey* zeroMethodStructKey = nullptr;
     IRFuncType* zeroMethodType = nullptr;
 
     // The struct key for the 'add()' associated type
     // defined inside IDifferential. We use this to lookup the
     // implementation of add() for a given type.
     //
-    IRInst* addMethodStructKey = nullptr;
+    IRBuiltinRequirementKey* addMethodStructKey = nullptr;
     IRFuncType* addMethodType = nullptr;
 
     // Refernce to NullDifferential struct type. These are used
@@ -112,11 +111,11 @@ struct AutoDiffSharedContext
     // defined inside IDifferentialPtrType. We use this to lookup the differential
     // type in the conformance table associated with the concrete type.
     //
-    IRInst* differentialAssocRefTypeStructKey = nullptr;
+    IRBuiltinRequirementKey* differentialAssocRefTypeStructKey = nullptr;
 
     // The key for the witness that `Differential` associated type conforms to
     // `IDifferentialPtrType`.
-    IRInst* differentialAssocRefTypeWitnessStructKey = nullptr;
+    IRBuiltinRequirementKey* differentialAssocRefTypeWitnessStructKey = nullptr;
     IRWitnessTableType* differentialAssocRefTypeWitnessTableType = nullptr;
 
     // Modules that don't use differentiable types
