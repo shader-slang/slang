@@ -1,6 +1,7 @@
 // slang-reflection-api.cpp
 
 #include "../core/slang-basic.h"
+#include "../core/slang-blob.h"
 #include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
@@ -3351,6 +3352,514 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
     }
 
     return false;
+}
+
+static Expr* unwrapDefaultValueExpr(Expr* expr)
+{
+    for (;;)
+    {
+        if (auto typeCastExpr = as<TypeCastExpr>(expr))
+        {
+            if (typeCastExpr->arguments.getCount() == 1)
+            {
+                expr = typeCastExpr->arguments[0];
+                continue;
+            }
+        }
+        if (auto builtinCastExpr = as<BuiltinCastExpr>(expr))
+        {
+            expr = builtinCastExpr->base;
+            continue;
+        }
+        return expr;
+    }
+}
+
+static Count getDefaultValueArgCount(Expr* expr)
+{
+    expr = unwrapDefaultValueExpr(expr);
+    if (auto initializerListExpr = as<InitializerListExpr>(expr))
+        return initializerListExpr->args.getCount();
+    if (auto argExpr = as<ExprWithArgsBase>(expr))
+        return argExpr->arguments.getCount();
+    return 0;
+}
+
+static Expr* getDefaultValueArg(Expr* expr, Index index)
+{
+    expr = unwrapDefaultValueExpr(expr);
+    if (auto initializerListExpr = as<InitializerListExpr>(expr))
+        return initializerListExpr->args[index];
+    if (auto argExpr = as<ExprWithArgsBase>(expr))
+        return argExpr->arguments[index];
+    return nullptr;
+}
+
+template<typename T>
+static void appendDefaultValueBytes(List<uint8_t>& outBytes, T value)
+{
+    const auto offset = outBytes.getCount();
+    outBytes.setCount(offset + sizeof(T));
+    memcpy(outBytes.getBuffer() + offset, &value, sizeof(T));
+}
+
+template<typename T>
+static bool appendIntegerLiteralDefaultValue(IntegerLiteralExpr* expr, List<uint8_t>& outBytes)
+{
+    if (!expr)
+        return false;
+
+    appendDefaultValueBytes(outBytes, T(expr->value));
+    return true;
+}
+
+static bool appendIntegerDefaultValue(
+    BasicExpressionType* type,
+    IntegerLiteralValue value,
+    List<uint8_t>& outBytes)
+{
+    switch (type->getBaseType())
+    {
+    case BaseType::Bool:
+        appendDefaultValueBytes(outBytes, value != 0);
+        return true;
+    case BaseType::Int8:
+        appendDefaultValueBytes(outBytes, int8_t(value));
+        return true;
+    case BaseType::UInt8:
+        appendDefaultValueBytes(outBytes, uint8_t(value));
+        return true;
+    case BaseType::Int16:
+        appendDefaultValueBytes(outBytes, int16_t(value));
+        return true;
+    case BaseType::UInt16:
+        appendDefaultValueBytes(outBytes, uint16_t(value));
+        return true;
+    case BaseType::Int:
+        appendDefaultValueBytes(outBytes, int32_t(value));
+        return true;
+    case BaseType::UInt:
+        appendDefaultValueBytes(outBytes, uint32_t(value));
+        return true;
+    case BaseType::Int64:
+        appendDefaultValueBytes(outBytes, int64_t(value));
+        return true;
+    case BaseType::UInt64:
+        appendDefaultValueBytes(outBytes, uint64_t(value));
+        return true;
+    default:
+        return false;
+    }
+}
+
+template<typename T>
+static bool appendNumericLiteralDefaultValue(
+    IntegerLiteralExpr* intLiteral,
+    FloatingPointLiteralExpr* floatLiteral,
+    List<uint8_t>& outBytes)
+{
+    if (floatLiteral)
+    {
+        appendDefaultValueBytes(outBytes, T(floatLiteral->value));
+        return true;
+    }
+    return appendIntegerLiteralDefaultValue<T>(intLiteral, outBytes);
+}
+
+static bool appendHalfLiteralDefaultValue(
+    IntegerLiteralExpr* intLiteral,
+    FloatingPointLiteralExpr* floatLiteral,
+    List<uint8_t>& outBytes)
+{
+    if (floatLiteral)
+    {
+        appendDefaultValueBytes(outBytes, uint16_t(FloatToHalf(float(floatLiteral->value))));
+        return true;
+    }
+    if (intLiteral)
+    {
+        appendDefaultValueBytes(outBytes, uint16_t(FloatToHalf(float(intLiteral->value))));
+        return true;
+    }
+    return false;
+}
+
+template<typename T>
+static bool appendDefaultConstructedScalarValue(List<uint8_t>& outBytes)
+{
+    appendDefaultValueBytes(outBytes, T(0));
+    return true;
+}
+
+static Type* unwrapDefaultValueType(Type* type)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+    return type;
+}
+
+static bool appendDefaultConstructedValue(Type* type, List<uint8_t>& outBytes);
+static bool appendDefaultValue(Type* type, Expr* expr, List<uint8_t>& outBytes);
+
+static bool appendDefaultValueFromDecl(DeclRef<VarDeclBase> decl, List<uint8_t>& outBytes)
+{
+    auto astBuilder = getModule(decl.getDecl())->getLinkage()->getASTBuilder();
+    if (auto initExpr = decl.getDecl()->initExpr)
+        return appendDefaultValue(getType(astBuilder, decl), initExpr, outBytes);
+
+    return appendDefaultConstructedValue(getType(astBuilder, decl), outBytes);
+}
+
+static bool appendScalarDefaultConstructedValue(BasicExpressionType* type, List<uint8_t>& outBytes)
+{
+    switch (type->getBaseType())
+    {
+    case BaseType::Bool:
+        appendDefaultValueBytes(outBytes, false);
+        return true;
+    case BaseType::Int8:
+    case BaseType::UInt8:
+        return appendDefaultConstructedScalarValue<uint8_t>(outBytes);
+    case BaseType::Int16:
+    case BaseType::UInt16:
+    case BaseType::Half:
+        return appendDefaultConstructedScalarValue<uint16_t>(outBytes);
+    case BaseType::Int:
+    case BaseType::UInt:
+    case BaseType::Float:
+        return appendDefaultConstructedScalarValue<uint32_t>(outBytes);
+    case BaseType::Int64:
+    case BaseType::UInt64:
+    case BaseType::Double:
+        return appendDefaultConstructedScalarValue<uint64_t>(outBytes);
+    default:
+        return false;
+    }
+}
+
+static bool appendScalarDefaultValue(BasicExpressionType* type, Expr* expr, List<uint8_t>& outBytes)
+{
+    expr = unwrapDefaultValueExpr(expr);
+
+    auto intLiteral = as<IntegerLiteralExpr>(expr);
+    auto floatLiteral = as<FloatingPointLiteralExpr>(expr);
+    auto boolLiteral = as<BoolLiteralExpr>(expr);
+
+    switch (type->getBaseType())
+    {
+    case BaseType::Bool:
+        if (boolLiteral)
+        {
+            appendDefaultValueBytes(outBytes, boolLiteral->value);
+            return true;
+        }
+        if (intLiteral)
+        {
+            appendDefaultValueBytes(outBytes, intLiteral->value != 0);
+            return true;
+        }
+        return false;
+
+    case BaseType::Int8:
+        return appendIntegerLiteralDefaultValue<int8_t>(intLiteral, outBytes);
+
+    case BaseType::UInt8:
+        return appendIntegerLiteralDefaultValue<uint8_t>(intLiteral, outBytes);
+
+    case BaseType::Int16:
+        return appendIntegerLiteralDefaultValue<int16_t>(intLiteral, outBytes);
+
+    case BaseType::UInt16:
+        return appendIntegerLiteralDefaultValue<uint16_t>(intLiteral, outBytes);
+
+    case BaseType::Half:
+        return appendHalfLiteralDefaultValue(intLiteral, floatLiteral, outBytes);
+
+    case BaseType::Int:
+        return appendNumericLiteralDefaultValue<int32_t>(intLiteral, floatLiteral, outBytes);
+
+    case BaseType::UInt:
+        return appendNumericLiteralDefaultValue<uint32_t>(intLiteral, floatLiteral, outBytes);
+
+    case BaseType::Int64:
+        return appendNumericLiteralDefaultValue<int64_t>(intLiteral, floatLiteral, outBytes);
+
+    case BaseType::UInt64:
+        return appendNumericLiteralDefaultValue<uint64_t>(intLiteral, floatLiteral, outBytes);
+
+    case BaseType::Float:
+        return appendNumericLiteralDefaultValue<float>(intLiteral, floatLiteral, outBytes);
+
+    case BaseType::Double:
+        return appendNumericLiteralDefaultValue<double>(intLiteral, floatLiteral, outBytes);
+
+    default:
+        return false;
+    }
+}
+
+static bool appendIntegerConstantDefaultValue(IntVal* value, Type* type, List<uint8_t>& outBytes)
+{
+    auto basicType = as<BasicExpressionType>(unwrapDefaultValueType(type));
+    auto constantVal = as<ConstantIntVal>(value);
+    if (!basicType || !constantVal)
+        return false;
+
+    return appendIntegerDefaultValue(basicType, constantVal->getValue(), outBytes);
+}
+
+static bool appendEnumDefaultValue(DeclRef<Decl> declRef, Type* tagType, List<uint8_t>& outBytes)
+{
+    if (auto enumCaseDeclRef = declRef.as<EnumCaseDecl>())
+        return appendIntegerConstantDefaultValue(enumCaseDeclRef.getDecl()->tagVal, tagType, outBytes);
+
+    auto varDecl = as<VarDeclBase>(declRef.getDecl());
+    if (!varDecl)
+        return false;
+
+    if (auto varExpr = as<VarExpr>(varDecl->initExpr))
+        return appendEnumDefaultValue(varExpr->declRef, tagType, outBytes);
+
+    if (varDecl->initExpr)
+        return appendDefaultValue(tagType, varDecl->initExpr, outBytes);
+
+    return appendIntegerConstantDefaultValue(varDecl->val, tagType, outBytes);
+}
+
+static bool appendRepeatedScalarDefaultValue(Type* type, Expr* expr, Index repeatCount, List<uint8_t>& outBytes)
+{
+    auto scalarType = as<BasicExpressionType>(unwrapDefaultValueType(type));
+    if (!scalarType)
+        return false;
+
+    for (Index i = 0; i < repeatCount; ++i)
+    {
+        if (!appendScalarDefaultValue(scalarType, expr, outBytes))
+            return false;
+    }
+    return true;
+}
+
+static bool appendSequentialDefaultValue(
+    Type* elementType,
+    Index elementCount,
+    Expr* expr,
+    List<uint8_t>& outBytes)
+{
+    const auto argCount = getDefaultValueArgCount(expr);
+    if (argCount > elementCount)
+        return false;
+
+    for (Index i = 0; i < elementCount; ++i)
+    {
+        if (i < argCount)
+        {
+            if (!appendDefaultValue(elementType, getDefaultValueArg(expr, i), outBytes))
+                return false;
+        }
+        else if (!appendDefaultConstructedValue(elementType, outBytes))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool appendSequentialDefaultConstructedValue(
+    Type* elementType,
+    Index elementCount,
+    List<uint8_t>& outBytes)
+{
+    for (Index i = 0; i < elementCount; ++i)
+    {
+        if (!appendDefaultConstructedValue(elementType, outBytes))
+            return false;
+    }
+    return true;
+}
+
+static bool appendVectorDefaultValue(VectorExpressionType* vectorType, Expr* expr, List<uint8_t>& outBytes)
+{
+    const auto elementCount = Index(getIntVal(vectorType->getElementCount()));
+    auto elementType = vectorType->getElementType();
+    const auto argCount = getDefaultValueArgCount(expr);
+    if (argCount == 0)
+        return appendRepeatedScalarDefaultValue(elementType, expr, elementCount, outBytes);
+
+    if (argCount == 1 && elementCount > 1)
+        return appendRepeatedScalarDefaultValue(elementType, getDefaultValueArg(expr, 0), elementCount, outBytes);
+
+    return appendSequentialDefaultValue(elementType, elementCount, expr, outBytes);
+}
+
+static bool appendArrayDefaultValue(ArrayExpressionType* arrayType, Expr* expr, List<uint8_t>& outBytes)
+{
+    const auto elementCount = Index(getIntVal(arrayType->getElementCount()));
+    return appendSequentialDefaultValue(arrayType->getElementType(), elementCount, expr, outBytes);
+}
+
+static bool appendMatrixDefaultValue(MatrixExpressionType* matrixType, Expr* expr, List<uint8_t>& outBytes)
+{
+    const auto rowCount = Index(getIntVal(matrixType->getRowCount()));
+    return appendSequentialDefaultValue(matrixType->getRowType(), rowCount, expr, outBytes);
+}
+
+static bool appendStructDefaultValue(DeclRef<AggTypeDecl> aggTypeDeclRef, Expr* expr, List<uint8_t>& outBytes)
+{
+    const auto argCount = getDefaultValueArgCount(expr);
+    Index argIndex = 0;
+
+    auto astBuilder = getModule(aggTypeDeclRef.getDecl())->getLinkage()->getASTBuilder();
+    if (auto structTypeDeclRef = aggTypeDeclRef.as<StructDecl>())
+    {
+        if (auto baseStructType = findBaseStructType(astBuilder, structTypeDeclRef))
+        {
+            if (argIndex < argCount)
+            {
+                if (!appendDefaultValue(baseStructType, getDefaultValueArg(expr, argIndex), outBytes))
+                    return false;
+            }
+            else if (!appendDefaultConstructedValue(baseStructType, outBytes))
+            {
+                return false;
+            }
+            argIndex++;
+        }
+    }
+
+    for (auto field : getMembersOfType<VarDecl>(astBuilder, aggTypeDeclRef, MemberFilterStyle::Instance))
+    {
+        if (argIndex < argCount)
+        {
+            if (!appendDefaultValue(getType(astBuilder, field), getDefaultValueArg(expr, argIndex), outBytes))
+                return false;
+        }
+        else if (!appendDefaultValueFromDecl(field, outBytes))
+        {
+            return false;
+        }
+        argIndex++;
+    }
+
+    return argCount <= argIndex;
+}
+
+static bool appendDefaultValue(Type* type, Expr* expr, List<uint8_t>& outBytes)
+{
+    type = unwrapDefaultValueType(type);
+    expr = unwrapDefaultValueExpr(expr);
+
+    if (as<DefaultConstructExpr>(expr))
+        return appendDefaultConstructedValue(type, outBytes);
+
+    if (auto initializerListExpr = as<InitializerListExpr>(expr))
+    {
+        if (initializerListExpr->args.getCount() == 0)
+            return appendDefaultConstructedValue(type, outBytes);
+    }
+
+    if (auto basicType = as<BasicExpressionType>(type))
+        return appendScalarDefaultValue(basicType, expr, outBytes);
+
+    if (auto vectorType = as<VectorExpressionType>(type))
+        return appendVectorDefaultValue(vectorType, expr, outBytes);
+
+    if (auto matrixType = as<MatrixExpressionType>(type))
+        return appendMatrixDefaultValue(matrixType, expr, outBytes);
+
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return appendArrayDefaultValue(arrayType, expr, outBytes);
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
+        {
+            auto astBuilder = getModule(enumDeclRef.getDecl())->getLinkage()->getASTBuilder();
+            auto tagType = getTagType(astBuilder, enumDeclRef);
+            if (auto declRefExpr = as<DeclRefExpr>(expr))
+            {
+                if (appendEnumDefaultValue(declRefExpr->declRef, tagType, outBytes))
+                    return true;
+            }
+            return appendDefaultConstructedValue(tagType, outBytes);
+        }
+
+        if (auto aggTypeDeclRef = declRefType->getDeclRef().as<AggTypeDecl>())
+            return appendStructDefaultValue(aggTypeDeclRef, expr, outBytes);
+    }
+
+    return false;
+}
+
+static bool appendDefaultConstructedValue(Type* type, List<uint8_t>& outBytes)
+{
+    type = unwrapDefaultValueType(type);
+
+    auto basicType = as<BasicExpressionType>(type);
+    if (basicType)
+        return appendScalarDefaultConstructedValue(basicType, outBytes);
+
+    if (auto vectorType = as<VectorExpressionType>(type))
+    {
+        const auto elementCount = Index(getIntVal(vectorType->getElementCount()));
+        return appendSequentialDefaultConstructedValue(
+            vectorType->getElementType(),
+            elementCount,
+            outBytes);
+    }
+
+    if (auto matrixType = as<MatrixExpressionType>(type))
+    {
+        const auto rowCount = Index(getIntVal(matrixType->getRowCount()));
+        return appendSequentialDefaultConstructedValue(matrixType->getRowType(), rowCount, outBytes);
+    }
+
+    if (auto arrayType = as<ArrayExpressionType>(type))
+    {
+        const auto elementCount = Index(getIntVal(arrayType->getElementCount()));
+        return appendSequentialDefaultConstructedValue(
+            arrayType->getElementType(),
+            elementCount,
+            outBytes);
+    }
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
+        {
+            auto astBuilder = getModule(enumDeclRef.getDecl())->getLinkage()->getASTBuilder();
+            return appendDefaultConstructedValue(getTagType(astBuilder, enumDeclRef), outBytes);
+        }
+
+        if (auto aggTypeDeclRef = declRefType->getDeclRef().as<AggTypeDecl>())
+            return appendStructDefaultValue(aggTypeDeclRef, nullptr, outBytes);
+    }
+
+    return false;
+}
+
+SLANG_API SlangResult
+spReflectionVariable_GetDefaultValueBlob(SlangReflectionVariable* inVar, ISlangBlob** outBlob)
+{
+    if (!inVar || !outBlob)
+        return SLANG_E_INVALID_ARG;
+
+    *outBlob = nullptr;
+
+    auto decl = convert(inVar).getDecl();
+    auto varDecl = as<VarDeclBase>(decl);
+    if (!varDecl || !varDecl->type.type)
+        return SLANG_E_INVALID_ARG;
+
+    if (!varDecl->initExpr)
+        return SLANG_OK;
+
+    List<uint8_t> defaultValueBytes;
+    if (!appendDefaultValue(varDecl->type.type, varDecl->initExpr, defaultValueBytes))
+        return SLANG_E_INVALID_ARG;
+
+    *outBlob = ListBlob::moveCreate(defaultValueBytes).detach();
+    return SLANG_OK;
 }
 
 SLANG_API SlangResult

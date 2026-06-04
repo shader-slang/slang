@@ -715,6 +715,8 @@ extern "C"
     spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t* rs);
     SLANG_API SlangResult
     spReflectionVariable_GetDefaultValueFloat(SlangReflectionVariable* inVar, float* rs);
+    SLANG_API SlangResult
+    spReflectionVariable_GetDefaultValueBlob(SlangReflectionVariable* inVar, ISlangBlob** outBlob);
     SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(
         SlangReflectionVariable* var);
     SLANG_API SlangReflectionVariable* spReflectionVariable_applySpecializations(

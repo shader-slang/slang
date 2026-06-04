@@ -3163,6 +3163,15 @@ struct VariableReflection
         return spReflectionVariable_GetDefaultValueFloat((SlangReflectionVariable*)this, value);
     }
 
+    /// Gets default value bytes for scalar and aggregate variables with explicit initializers.
+    /// If the variable has no explicit initializer, this succeeds with a null blob.
+    /// The returned blob stores values in natural scalar/field order, without constant-buffer
+    /// padding.
+    SlangResult getDefaultValueBlob(ISlangBlob** outBlob)
+    {
+        return spReflectionVariable_GetDefaultValueBlob((SlangReflectionVariable*)this, outBlob);
+    }
+
     GenericReflection* getGenericContainer()
     {
         return (GenericReflection*)spReflectionVariable_GetGenericContainer(
