@@ -1348,9 +1348,42 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
     if not meta:
         issues.append(LintIssue(rel, "error", "missing //META block"))
         return issues
+    is_catalog = "diagnostics-catalog" in spec.dir
     for k in _REQUIRED_TEST_META_KEYS:
+        # doc_section_digest is scoped down for the diagnostics-catalog
+        # bundle: its catalog doc_refs are bare file paths with no anchor,
+        # so the _common.md "anchored doc section" digest is undefined here,
+        # and bundle-level watched_paths_digest already covers catalog source
+        # drift. See shader-slang/slang#11410.
+        if is_catalog and k == "doc_section_digest":
+            continue
         if k not in meta:
             issues.append(LintIssue(rel, "error", f"//META missing key: {k}"))
+    # Warn-only guard against the silent-placeholder failure mode on the
+    # bundles that still require doc_section_digest: an all-zeros or otherwise
+    # malformed value passes the presence check above but is not a real
+    # SHA-256. Warn-only (not error) — a hard reject cannot land while legacy
+    # placeholders may still exist in other bundles. See #11410.
+    if not is_catalog:
+        dsd = meta.get("doc_section_digest", "")
+        if dsd and not re.fullmatch(r"[0-9a-f]{64}", dsd):
+            issues.append(
+                LintIssue(
+                    rel,
+                    "warning",
+                    f"//META doc_section_digest is not a 64-char lowercase"
+                    f" hex SHA-256: {dsd!r}",
+                )
+            )
+        elif dsd == "0" * 64:
+            issues.append(
+                LintIssue(
+                    rel,
+                    "warning",
+                    "//META doc_section_digest is an all-zeros placeholder,"
+                    " not a real SHA-256",
+                )
+            )
     if meta.get("generated", "").lower() != "true":
         issues.append(LintIssue(rel, "error", "//META generated must be true"))
     intent = meta.get("intent", "")
@@ -1436,7 +1469,7 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
             re.search(r"/\*\s*CHECK[^:]*:.*?\^.*?\*/", text, re.DOTALL)
         )
         # Catalog bundle tests use bare numeric for some codes.
-        is_catalog = "diagnostics-catalog" in spec.dir
+        # (is_catalog computed once at the top of this function.)
         has_bare_numeric = is_catalog and bool(
             re.search(r"CHECK[^:]*:\s*\d{4,}\b", text)
         )

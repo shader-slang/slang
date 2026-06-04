@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=618447e4b9ce615a25d2445d39728c7ecfa0f6e722f968e472ff49cddbb04ebb
 //META: purpose=Fires diagnostic E31211 (derivative-group-linear-must-be-multiple-4-for-total-thread-count) -- derivative group linear thread count error
 //META: intent=negative
 //META: pipeline_stage=check

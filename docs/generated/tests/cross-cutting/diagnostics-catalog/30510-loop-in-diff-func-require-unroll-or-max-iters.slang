@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=4c471a8cc08c04ec32fa794345402afdfbb8835d7faedda552618eba646154c6
 //META: purpose=Fires diagnostic E30510 (loop-in-diff-func-require-unroll-or-max-iters) -- loop in differentiable function needs attributes
 //META: intent=negative
 //META: pipeline_stage=check

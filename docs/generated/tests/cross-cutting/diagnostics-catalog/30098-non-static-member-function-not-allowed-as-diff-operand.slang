@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T11:10:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
 //META: purpose=Drop note for E30098 (non-static-member-function-not-allowed-as-diff-operand); see README.md
 //META: intent=negative
 //META: pipeline_stage=check

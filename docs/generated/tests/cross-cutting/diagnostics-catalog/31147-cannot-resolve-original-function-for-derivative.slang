@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=8ae3c6d0df57f1791953fe1f501df3bbf224f6fef7dc4738bc6de09f8d43d1f2
 //META: purpose=Fires diagnostic E31147 (cannot-resolve-original-function-for-derivative) -- cannot resolve original function for derivative
 //META: intent=negative
 //META: pipeline_stage=check

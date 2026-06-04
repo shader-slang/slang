@@ -3,7 +3,6 @@
 //META: generated_at=2026-05-21T08:00:00+00:00
 //META: source_commit=2964da04de136705348240f2bd9affa5f3818226
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=ba6b922e01df917f9f6f4eccdb3ffa20df17395163c3a2687898a58d2ebcab61
 //META: purpose=Fires diagnostic E30814 (base-of-class-must-be-class-or-interface) -- class '~decl:Decl' cannot inherit from type '~baseType:Type' that is neither a class nor an interface
 //META: intent=negative
 //META: pipeline_stage=check
