@@ -326,6 +326,14 @@ struct OverloadCandidate
     // arguments so that we don't have to repeat work across checking
     // phases. Currently this is only needed for generics.
     SubstitutionSet subst;
+
+    // For a generic candidate, the number of leading ordinary generic arguments
+    // that were supplied explicitly (as opposed to filled from a parameter's
+    // default). `TryCheckOverloadCandidateConstraints` hands this prefix to the
+    // generic constraint solver so defaults and witness arguments are resolved by
+    // the solver's fixpoint -- the same path used for inferred generic arguments
+    // -- rather than a separate linear pass. -1 until computed.
+    Index explicitGenericArgCount = -1;
 };
 
 struct ResolvedOperatorOverload
@@ -3014,7 +3022,13 @@ public:
         GenericInferenceContext&& inferenceContext,
         DeclRef<GenericDecl> genericDeclRef,
         ArrayView<Val*> providedOrdinaryArgs,
-        ConversionCost& outBaseCost);
+        ConversionCost& outBaseCost,
+        // When true, `providedOrdinaryArgs` are arguments written explicitly in a
+        // generic application and are treated as fixed caller input even when one
+        // happens to equal a parameter's own default-substitution self-reference.
+        // The inference path leaves this false so such self-references remain
+        // replaceable placeholders for a more concrete solution.
+        bool argsAreExplicitlyProvided = false);
 
 
     // State related to overload resolution for a call

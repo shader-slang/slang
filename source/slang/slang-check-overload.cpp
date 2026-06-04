@@ -390,6 +390,13 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     Index aa = 0;
     for (auto memberRef : getMembers(m_astBuilder, genericDeclRef))
     {
+        // Capture how many ordinary arguments were supplied explicitly, the first
+        // time we reach a parameter with no remaining explicit argument (the rest
+        // are defaults). Positional arguments make the explicit args a prefix, so
+        // this is the boundary the constraint solver later treats as "provided".
+        if (aa >= matchedArgs.getCount() && candidate.explicitGenericArgCount < 0)
+            candidate.explicitGenericArgCount = checkedArgs.getCount();
+
         if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
         {
             if (aa >= matchedArgs.getCount())
@@ -689,6 +696,10 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             continue;
         }
     }
+
+    // Every ordinary argument was supplied explicitly (no defaults filled).
+    if (candidate.explicitGenericArgCount < 0)
+        candidate.explicitGenericArgCount = checkedArgs.getCount();
 
     auto genSubst = m_astBuilder->getGenericAppDeclRef(genericDeclRef, checkedArgs.getArrayView());
     candidate.subst = SubstitutionSet(genSubst);
@@ -1098,6 +1109,88 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
 
     auto substArgs = tryGetGenericArguments(candidate.subst, genericDeclRef.getDecl());
     SLANG_ASSERT(substArgs.getCount());
+
+    // Resolve defaults and witness arguments through the generic constraint
+    // solver -- the same fixpoint loop used for inferred generic arguments --
+    // instead of the per-constraint linear pass below. The solver is handed only
+    // the explicitly-provided ordinary prefix; it fills defaulted arguments and,
+    // critically, re-roots any conformance witness a default embeds (e.g.
+    // `U = T.DataType` carrying a `T : IElement` witness) onto the witness
+    // arguments it solves, propagating updates to dependents until fixpoint. The
+    // linear pass cannot do this -- it processes constraints once in declaration
+    // order. On solver failure we fall through to that pass, which re-derives the
+    // failing constraint to emit a precise diagnostic (the solver reports none).
+    //
+    // The solver's `setProvidedArg` requires an outermost generic when ordinary
+    // arguments are provided, so a nested generic application keeps the linear
+    // pass for now.
+    bool genericIsOutermost = true;
+    for (auto p = genericDeclRef.getDecl()->parentDecl; p; p = p->parentDecl)
+    {
+        if (as<GenericDecl>(p))
+        {
+            genericIsOutermost = false;
+            break;
+        }
+    }
+
+    Index explicitCount = candidate.explicitGenericArgCount;
+    if (explicitCount < 0 || explicitCount > substArgs.getCount())
+        explicitCount = substArgs.getCount();
+
+    // Resolve defaults and witness arguments through the generic constraint
+    // solver -- the same fixpoint loop used for inferred generic arguments --
+    // rather than the per-constraint linear pass below. The solver blocks each
+    // default until its dependencies (including witnesses) are ready, substitutes
+    // the pristine default through the full substitution (re-rooting any
+    // conformance witness the default embeds onto the solved witness arguments),
+    // and wakes dependents on progress until fixpoint. The linear pass cannot do
+    // this -- it visits constraints once in declaration order.
+    //
+    // We pass only the explicitly-provided ordinary prefix and mark it as explicit
+    // input, so the solver fills the remaining defaults itself and does not mistake
+    // a user-written self-reference argument (e.g. forming `Foo<U, accessOther,
+    // addrSpace>` inside `Foo`, where the `addrSpace` argument is `Foo`'s own
+    // parameter) for a replaceable placeholder.
+    //
+    // On solver failure we fall through to the per-constraint loop, which
+    // re-derives the failing constraint to emit a precise diagnostic (the solver
+    // reports none). The solver's `setProvidedArg` requires an outermost generic
+    // when ordinary arguments are provided, so a nested generic application keeps
+    // the linear pass for now.
+    if (genericIsOutermost)
+    {
+        ShortList<Val*> providedOrdinaryArgs;
+        for (Index i = 0; i < explicitCount; i++)
+            providedOrdinaryArgs.add(substArgs[i]);
+
+        GenericInferenceContext inferenceContext;
+        inferenceContext.genericDecl = genericDeclRef.getDecl();
+
+        ConversionCost solveCost = kConversionCost_None;
+        auto solved = trySolveGenericArguments(
+            _Move(inferenceContext),
+            genericDeclRef,
+            providedOrdinaryArgs.getArrayView().arrayView,
+            solveCost,
+            /* argsAreExplicitlyProvided: */ true);
+        if (solved)
+        {
+            auto solvedArgs =
+                tryGetGenericArguments(SubstitutionSet(solved), genericDeclRef.getDecl());
+            candidate.subst =
+                SubstitutionSet(m_astBuilder->getGenericAppDeclRef(genericDeclRef, solvedArgs));
+            // Note: deliberately do not fold `solveCost` into `conversionCostSum`
+            // here. The previous per-constraint validation added no conformance
+            // cost at this stage, and doing so shifts overload ranking (e.g.
+            // breaks ties that should stay ambiguous).
+            return true;
+        }
+        // Solver failed: in real mode fall through so the per-constraint loop can
+        // emit a precise diagnostic; in just-trying mode reject the candidate.
+        if (context.mode == OverloadResolveContext::Mode::JustTrying)
+            return false;
+    }
 
     ShortList<Val*> newArgs;
     for (auto arg : substArgs)
