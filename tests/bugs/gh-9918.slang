@@ -1,3 +1,4 @@
+//  TODO(#9675): Re-enable once the SPIRV-Tools ADCE pass is restored.
 //  DISABLED: SPIRV-Tools ADCE pass is temporarily disabled (see #9675).
 //  This test requires ADCE for SPIRV optimization to produce expected output.
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry entry_mesh
@@ -69,7 +70,9 @@ void mesh_fn<V : VertexI, P : PrimitiveI>(
 
     if (tig < numPrimitives) {
         triangles[tig] = uint3(0, 1, 2);
-        primitives[tig].set_tint(float3(1, 0, 0));
+        P p;
+        p.set_tint(float3(1, 0, 0));
+        primitives[tig] = p;
     }
 }
 

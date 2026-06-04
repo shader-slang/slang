@@ -6,7 +6,10 @@
 //CHECK_HLSL: out vertices Vertex
 //CHECK_HLSL: out indices uint3
 //CHECK_HLSL: out primitives Primitive
-//DXIL: define void @
+//CHECK_HLSL-NOT: out vertices out
+//CHECK_HLSL-NOT: out indices out
+//CHECK_HLSL-NOT: out primitives out
+//DXIL: define void @main(
 
 struct Payload
 {

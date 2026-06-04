@@ -2243,14 +2243,10 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             }
         }
 
-        const char* prefix =
-            as<IRVerticesDecoration>(modifier)
-                ? "out vertices "
-            : as<IRIndicesDecoration>(modifier)
-                ? "out indices "
-            : as<IRPrimitivesDecoration>(modifier)
-                ? "out primitives "
-                : nullptr;
+        const char* prefix = as<IRVerticesDecoration>(modifier)     ? "out vertices "
+                             : as<IRIndicesDecoration>(modifier)    ? "out indices "
+                             : as<IRPrimitivesDecoration>(modifier) ? "out primitives "
+                                                                    : nullptr;
         SLANG_ASSERT(prefix && "Unhandled type of mesh output decoration");
 
         auto valueType = paramType;
@@ -2354,14 +2350,10 @@ void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
         // HLSL-specific `out vertices` token sequence is emitted as one unit.
         // Keep the canonical spelling here for any non-parameter declarations
         // that still carry mesh output decorations.
-        const char* s =
-            as<IRVerticesDecoration>(modifier)
-                ? "out vertices "
-            : as<IRIndicesDecoration>(modifier)
-                ? "out indices "
-            : as<IRPrimitivesDecoration>(modifier)
-                ? "out primitives "
-                : nullptr;
+        const char* s = as<IRVerticesDecoration>(modifier)     ? "out vertices "
+                        : as<IRIndicesDecoration>(modifier)    ? "out indices "
+                        : as<IRPrimitivesDecoration>(modifier) ? "out primitives "
+                                                               : nullptr;
         SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
         m_writer->emit(s);
     }
