@@ -398,6 +398,8 @@ static IRInst* emitRayTracingPrimitiveIndexValue(
     IRType* valueType = paramType;
     if (auto borrowInParamType = as<IRBorrowInParamType>(valueType))
         valueType = borrowInParamType->getValueType();
+    else if (auto ptrType = as<IRPtrTypeBase>(valueType))
+        valueType = ptrType->getValueType();
 
     auto primitiveIndexCall = builder.emitCallInst(
         builder.getUIntType(),
@@ -483,6 +485,11 @@ bool legalizeRayTracingPrimitiveIDParamsForEntryPoint(
         if (auto borrowInParamType = as<IRBorrowInParamType>(valueType))
         {
             valueType = borrowInParamType->getValueType();
+            needsAddressReplacement = true;
+        }
+        else if (auto ptrType = as<IRPtrTypeBase>(valueType))
+        {
+            valueType = ptrType->getValueType();
             needsAddressReplacement = true;
         }
 
