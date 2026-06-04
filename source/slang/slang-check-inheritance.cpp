@@ -758,9 +758,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         visitor.calcThisType(interfaceDeclRef));
                 }
 
-                // The only case we will ever see a GenericTypeConstraintDecl inside a AggTypeDecl
-                // is when AggTypeDecl is a associatedtype decl. In this case, we will only lookup
-                // the type constraint if the constraint is on the associated type itself.
+                // A GenericTypeConstraintDecl reaches this point either as a member of an
+                // `associatedtype` declaration or, for an interface, as a direct `__constraint`
+                // member. It only contributes a base of the type currently being checked when its
+                // subject denotes that type: for an `associatedtype` the subject must reference the
+                // associated type itself (so a subject that is not even a `VarExpr` cannot match
+                // and is skipped below), and for an interface the subject must be the bare `This`
+                // (handled by the interface guard further down).
                 //
                 auto genericTypeConstraintDeclRef =
                     typeConstraintDeclRef.as<GenericTypeConstraintDecl>();
