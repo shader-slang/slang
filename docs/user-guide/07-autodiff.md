@@ -160,39 +160,6 @@ void main()
 }
 ```
 
-### Auto-diff on member method expressions
-
-`fwd_diff` and `bwd_diff` can also be applied to member method expressions such as `obj.method`.
-The result differentiates the method, but it does not capture `obj`. Instead, the object value is
-passed explicitly as the first argument to the derivative call.
-
-That first argument follows the same rules as the method's implicit `this` parameter. If `this` is
-differentiable, the first argument uses the corresponding differential-pair form. If the method
-uses `[NoDiffThis]`, the object value is passed as a regular, non-differentiated value.
-
-```csharp
-struct Sphere
-{
-    float radius;
-
-    [Differentiable]
-    [NoDiffThis]
-    float distance(float3 p)
-    {
-        return length(p) - radius;
-    }
-}
-
-void main(float3 p)
-{
-    Sphere s = { 1.0 };
-    DifferentialPair<float3> dp = diffPair(p);
-
-    // The first argument supplies `this` for `s.distance`.
-    bwd_diff(s.distance)(s, dp, 1.0);
-}
-```
-
 ## Differentiable Type System
 
 Slang will only generate differentiation code for values that have a *differentiable* type.
@@ -488,6 +455,39 @@ void sin_bwd(inout DifferentialPair<float> dpx, float dresult) { /* ... */ }
 
 User-defined derivatives also work for generic functions, member functions, accessors, and more.
 See the reference section for the [`[ForwardDerivative(fn)]`](https://shader-slang.org/stdlib-reference/attributes/forwardderivative-07.html) and [`[BackwardDerivative(fn)]`](https://shader-slang.org/stdlib-reference/attributes/backwardderivative-08) attributes for more.
+
+## Auto-diff on member method expressions
+
+`fwd_diff` and `bwd_diff` can also be applied to member method expressions such as `obj.method`.
+The result differentiates the method, but it does not capture `obj`. Instead, the object value is
+passed explicitly as the first argument to the derivative call.
+
+That first argument follows the same rules as the method's implicit `this` parameter. If `this` is
+differentiable, the first argument uses the corresponding differential-pair form. If the method
+uses `[NoDiffThis]`, the object value is passed as a regular, non-differentiated value.
+
+```csharp
+struct Sphere
+{
+    float radius;
+
+    [Differentiable]
+    [NoDiffThis]
+    float distance(float3 p)
+    {
+        return length(p) - radius;
+    }
+}
+
+void main(float3 p)
+{
+    Sphere s = { 1.0 };
+    DifferentialPair<float3> dp = diffPair(p);
+
+    // The first argument supplies `this` for `s.distance`.
+    bwd_diff(s.distance)(s, dp, 1.0);
+}
+```
 
 ## Using Auto-diff with Generics
 Automatic differentiation works seamlessly with generically-defined types and methods.
