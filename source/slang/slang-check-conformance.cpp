@@ -315,13 +315,13 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // Re-root the witness onto the queried `subType` so the returned witness satisfies
         // the invariant `result->getSub() == subType`; this yields a well-formed,
         // box-rooted witness instead of one anchored at a free-floating `ThisType`.
-        if (auto declWitness = as<DeclaredSubtypeWitness>(witness))
+        if (auto boxWitness = as<DeclaredSubtypeWitness>(witness))
         {
-            if (declWitness->getSub() != subType)
+            if (boxWitness->getSub() != subType)
                 return m_astBuilder->getDeclaredSubtypeWitness(
                     subType,
-                    declWitness->getSup(),
-                    declWitness->getDeclRef());
+                    boxWitness->getSup(),
+                    boxWitness->getDeclRef());
         }
         return witness;
     }
