@@ -149,7 +149,7 @@ public:
     RefPtr<Linkage> linkage;
     Dictionary<String, DocumentDiagnostics> diagnostics;
     ASTMarkup* getOrCreateMarkupAST(ModuleDecl* module);
-    SLANG_API Module* getOrLoadModule(String path);
+    Module* getOrLoadModule(String path);
     void ensureWorkspaceFlavor(UnownedStringSlice path);
     MacroDefinitionContentAssistInfo* tryGetMacroDefinition(UnownedStringSlice name);
 };
@@ -190,7 +190,7 @@ public:
 
     void init(List<URI> rootDirURI, slang::IGlobalSession* globalSession);
     void invalidate();
-    SLANG_API WorkspaceVersion* getCurrentVersion();
+    WorkspaceVersion* getCurrentVersion();
     WorkspaceVersion* getCurrentCompletionVersion() { return currentCompletionVersion.Ptr(); }
     WorkspaceVersion* createVersionForCompletion();
 

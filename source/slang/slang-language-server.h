@@ -114,28 +114,27 @@ public:
     {
     }
 
-    SLANG_API SlangResult init(const LanguageServerProtocol::InitializeParams& args);
-    SLANG_API SlangResult
-    didOpenTextDocument(const LanguageServerProtocol::DidOpenTextDocumentParams& args);
-    SLANG_API SlangResult
-    didCloseTextDocument(const LanguageServerProtocol::DidCloseTextDocumentParams& args);
-    SLANG_API SlangResult
-    didChangeTextDocument(const LanguageServerProtocol::DidChangeTextDocumentParams& args);
-    SLANG_API LanguageServerResult<LanguageServerProtocol::Hover> hover(
+    SlangResult init(const LanguageServerProtocol::InitializeParams& args);
+    SlangResult didOpenTextDocument(const LanguageServerProtocol::DidOpenTextDocumentParams& args);
+    SlangResult didCloseTextDocument(
+        const LanguageServerProtocol::DidCloseTextDocumentParams& args);
+    SlangResult didChangeTextDocument(
+        const LanguageServerProtocol::DidChangeTextDocumentParams& args);
+    LanguageServerResult<LanguageServerProtocol::Hover> hover(
         const LanguageServerProtocol::HoverParams& args);
-    SLANG_API LanguageServerResult<List<LanguageServerProtocol::Location>> gotoDefinition(
+    LanguageServerResult<List<LanguageServerProtocol::Location>> gotoDefinition(
         const LanguageServerProtocol::DefinitionParams& args);
 
-    SLANG_API LanguageServerResult<CompletionResult> completion(
+    LanguageServerResult<CompletionResult> completion(
         const LanguageServerProtocol::CompletionParams& args);
-    SLANG_API LanguageServerResult<LanguageServerProtocol::CompletionItem> completionResolve(
+    LanguageServerResult<LanguageServerProtocol::CompletionItem> completionResolve(
         const LanguageServerProtocol::CompletionItem& args,
         const LanguageServerProtocol::TextEditCompletionItem& editItem);
-    SLANG_API LanguageServerResult<LanguageServerProtocol::SemanticTokens> semanticTokens(
+    LanguageServerResult<LanguageServerProtocol::SemanticTokens> semanticTokens(
         const LanguageServerProtocol::SemanticTokensParams& args);
-    SLANG_API LanguageServerResult<LanguageServerProtocol::SignatureHelp> signatureHelp(
+    LanguageServerResult<LanguageServerProtocol::SignatureHelp> signatureHelp(
         const LanguageServerProtocol::SignatureHelpParams& args);
-    SLANG_API LanguageServerResult<List<LanguageServerProtocol::DocumentSymbol>> documentSymbol(
+    LanguageServerResult<List<LanguageServerProtocol::DocumentSymbol>> documentSymbol(
         const LanguageServerProtocol::DocumentSymbolParams& args);
     LanguageServerResult<List<LanguageServerProtocol::InlayHint>> inlayHint(
         const LanguageServerProtocol::InlayHintParams& args);
