@@ -4571,7 +4571,10 @@ struct IBindlessResourceMetadata : public ISlangCastable
         {0x88, 0x64, 0x32, 0x28, 0xa4, 0x07, 0x7a, 0x83})
 
     /// Returns true when the compiled target IR still contains a bindless
-    /// descriptor-heap/resource-handle path after target-specific lowering.
+    /// descriptor-heap/resource-handle path after target-specific lowering. This is a
+    /// code-generation signal, not a complete cross-target host binding policy; targets
+    /// that lower descriptor handles to native resource handles or addresses may not require
+    /// an explicit descriptor-heap binding even when this returns true.
     virtual SLANG_NO_THROW bool SLANG_MCALL usesBindlessResourceHeap() = 0;
 };
     #define SLANG_UUID_IBindlessResourceMetadata IBindlessResourceMetadata::getTypeGuid()

@@ -1047,8 +1047,15 @@ extern "C"
         SlangCompileRequest* request,
         int translationUnitIndex);
 
-    /** Get the descriptor set/space index allocated for the bindless resource heap.
-     *  Returns -1 if the program does not use bindless resource heap.
+    /** Get the descriptor set/space index reserved for the bindless resource heap.
+     *
+     * This is a layout/reflection reservation made before final target lowering and
+     * optimization. It can remain non-negative even when the emitted target code no
+     * longer uses a bindless heap/resource-handle path. Query `IBindlessResourceMetadata`
+     * from target metadata to determine whether such a path survived in the compiled
+     * target IR.
+     *
+     * Returns -1 only when no bindless heap space was reserved for the program layout.
      */
     SLANG_API SlangInt spReflection_getBindlessSpaceIndex(SlangReflection* reflection);
 #ifdef __cplusplus

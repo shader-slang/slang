@@ -172,8 +172,8 @@ static bool _instUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
     case kIROp_SPIRVLoadTexelPointerFromHeap:
     case kIROp_SPIRVResourceHeap:
     case kIROp_SPIRVSamplerHeap:
-        // SPIR-V legalization normally runs after metadata collection; these cases are retained
-        // as heap-resource opcode checks per the PR's reviewer directive.
+        // SPIR-V legalization normally runs after metadata collection. Keep these in the
+        // heap-resource opcode set so metadata stays conservative if collection order changes.
         return true;
     case kIROp_CastDescriptorHandleToResource:
         // Producing a descriptor handle does not imply heap use; consuming one as a resource does.
