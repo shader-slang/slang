@@ -710,9 +710,12 @@ extern "C"
         SlangReflectionVariable* var,
         SlangSession* globalSession,
         char const* name);
+    /** DEPRECATED: use `spReflectionVariable_GetDefaultValueBlob` instead. */
     SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inVar);
+    /** DEPRECATED: use `spReflectionVariable_GetDefaultValueBlob` instead. */
     SLANG_API SlangResult
     spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t* rs);
+    /** DEPRECATED: use `spReflectionVariable_GetDefaultValueBlob` instead. */
     SLANG_API SlangResult
     spReflectionVariable_GetDefaultValueFloat(SlangReflectionVariable* inVar, float* rs);
     SLANG_API SlangResult
