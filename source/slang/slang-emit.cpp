@@ -9,6 +9,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-writer.h"
+#include "slang-capability.h"
 #include "slang-check-out-of-bound-access.h"
 #include "slang-emit-c-like.h"
 #include "slang-emit-cpp.h"
@@ -2410,7 +2411,16 @@ Result linkAndOptimizeIR(
     int bindlessSpaceIndex = -1;
     if (auto programLayout = targetProgram->getExistingLayout())
         bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
-    SLANG_PASS(collectMetadata, bindlessSpaceIndex, *metadata);
+    else if (requiredLoweringPassSet.dynamicResourceHeap)
+        bindlessSpaceIndex =
+            (int)targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
+    auto treatDescriptorHandleResourceCastsAsHeapUse =
+        targetRequest->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV);
+    SLANG_PASS(
+        collectMetadata,
+        bindlessSpaceIndex,
+        treatDescriptorHandleResourceCastsAsHeapUse,
+        *metadata);
 
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);

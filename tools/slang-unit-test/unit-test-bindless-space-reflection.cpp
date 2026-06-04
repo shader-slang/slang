@@ -28,6 +28,49 @@ static BindlessSpaceExpectation _expectAnyReservedBindlessSpace()
     return {true, false, 0};
 }
 
+static const char* _getTextureHandleSource()
+{
+    return R"(
+        RWStructuredBuffer<float> gOutput;
+
+        struct P
+        {
+            Texture2D.Handle t;
+        };
+
+        ParameterBlock<P> p1;
+
+        [Shader("compute")]
+        [NumThreads(1, 1, 1)]
+        void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            gOutput[0] = p1.t.Load(int3(0, 0, 0)).x;
+        }
+    )";
+}
+
+static const char* _getTextureSamplerHandleSource()
+{
+    return R"(
+        RWStructuredBuffer<float> gOutput;
+
+        struct P
+        {
+            Texture2D.Handle t;
+            SamplerState.Handle s;
+        };
+
+        ParameterBlock<P> p1;
+
+        [Shader("compute")]
+        [NumThreads(2, 2, 1)]
+        void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            gOutput[0] = p1.t.Sample(p1.s, float2(0.0f, 0.0f)).x;
+        }
+    )";
+}
+
 static void _checkBindlessSpaceReflection(
     const char* userSource,
     BindlessSpaceExpectation bindlessSpaceExpectation,
@@ -35,14 +78,28 @@ static void _checkBindlessSpaceReflection(
     const slang::CompilerOptionEntry* compilerOptions = nullptr,
     uint32_t compilerOptionCount = 0,
     SlangCompileTarget targetFormat = SLANG_SPIRV,
-    const char* profileName = "spirv_1_5")
+    const char* profileName = "spirv_1_5",
+    const char* targetCapabilityName = nullptr)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
+    slang::CompilerOptionEntry targetCapabilityOption = {};
+
     slang::TargetDesc targetDesc = {};
     targetDesc.format = targetFormat;
-    targetDesc.profile = globalSession->findProfile(profileName);
+    if (profileName)
+        targetDesc.profile = globalSession->findProfile(profileName);
+    if (targetCapabilityName)
+    {
+        auto capability = globalSession->findCapability(targetCapabilityName);
+        SLANG_CHECK(capability != SLANG_CAPABILITY_UNKNOWN);
+        targetCapabilityOption.name = slang::CompilerOptionName::Capability;
+        targetCapabilityOption.value.kind = slang::CompilerOptionValueKind::Int;
+        targetCapabilityOption.value.intValue0 = int32_t(capability);
+        targetDesc.compilerOptionEntries = &targetCapabilityOption;
+        targetDesc.compilerOptionEntryCount = 1;
+    }
 
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
@@ -234,31 +291,78 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithTexelPointerHeap)
 
 SLANG_UNIT_TEST(bindlessSpaceMetadataHLSLResourceAndSamplerHandles)
 {
-    const char* userSource = R"(
-        RWStructuredBuffer<float> gOutput;
-
-        struct P
-        {
-            Texture2D.Handle t;
-            SamplerState.Handle s;
-        };
-
-        ParameterBlock<P> p1;
-
-        [Shader("compute")]
-        [NumThreads(1, 1, 1)]
-        void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-        {
-            gOutput[0] = p1.t.Sample(p1.s, float2(0.0f, 0.0f)).x;
-        }
-    )";
-
     _checkBindlessSpaceReflection(
-        userSource,
+        _getTextureSamplerHandleSource(),
         _expectAnyReservedBindlessSpace(),
         true,
         nullptr,
         0,
         SLANG_HLSL,
         "sm_6_6");
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapResourceAndSamplerHandles)
+{
+    _checkBindlessSpaceReflection(
+        _getTextureSamplerHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        true,
+        nullptr,
+        0,
+        SLANG_SPIRV,
+        "spirv_1_5",
+        "spvDescriptorHeapEXT");
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVNVResourceHandle)
+{
+    _checkBindlessSpaceReflection(
+        _getTextureHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        true,
+        nullptr,
+        0,
+        SLANG_SPIRV,
+        "spirv_1_5",
+        "spvBindlessTextureNV");
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataWGSLDynamicResourceHeap)
+{
+    _checkBindlessSpaceReflection(
+        _getTextureHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        true,
+        nullptr,
+        0,
+        SLANG_WGSL,
+        nullptr);
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataNativeHandleCasts)
+{
+    _checkBindlessSpaceReflection(
+        _getTextureHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        false,
+        nullptr,
+        0,
+        SLANG_METAL,
+        "metal");
+    _checkBindlessSpaceReflection(
+        _getTextureHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        false,
+        nullptr,
+        0,
+        SLANG_CUDA_SOURCE,
+        nullptr);
+    _checkBindlessSpaceReflection(
+        _getTextureHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        false,
+        nullptr,
+        0,
+        SLANG_CPP_SOURCE,
+        "sm_5_0");
 }

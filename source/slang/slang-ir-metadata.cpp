@@ -154,7 +154,10 @@ static bool _isBindlessResourceHeapGlobalParam(IRInst* inst, int bindlessSpaceIn
     return descriptorTableSlotSize && descriptorTableSlotSize->getSize().isInfinite();
 }
 
-static bool _instUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
+static bool _instUsesBindlessResourceHeap(
+    IRInst* inst,
+    int bindlessSpaceIndex,
+    bool treatDescriptorHandleResourceCastsAsHeapUse)
 {
     if (_isBindlessResourceHeapGlobalParam(inst, bindlessSpaceIndex))
         return true;
@@ -169,19 +172,30 @@ static bool _instUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
     case kIROp_SPIRVResourceHeap:
     case kIROp_SPIRVSamplerHeap:
         return true;
+    case kIROp_CastDescriptorHandleToResource:
+        return treatDescriptorHandleResourceCastsAsHeapUse;
     default:
         return false;
     }
 }
 
-static bool _subtreeUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
+static bool _subtreeUsesBindlessResourceHeap(
+    IRInst* inst,
+    int bindlessSpaceIndex,
+    bool treatDescriptorHandleResourceCastsAsHeapUse)
 {
-    if (_instUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
+    if (_instUsesBindlessResourceHeap(
+            inst,
+            bindlessSpaceIndex,
+            treatDescriptorHandleResourceCastsAsHeapUse))
         return true;
 
     for (auto child : inst->getChildren())
     {
-        if (_subtreeUsesBindlessResourceHeap(child, bindlessSpaceIndex))
+        if (_subtreeUsesBindlessResourceHeap(
+                child,
+                bindlessSpaceIndex,
+                treatDescriptorHandleResourceCastsAsHeapUse))
             return true;
     }
 
@@ -263,6 +277,7 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
 void collectMetadata(
     const IRModule* irModule,
     int bindlessSpaceIndex,
+    bool treatDescriptorHandleResourceCastsAsHeapUse,
     ArtifactPostEmitMetadata& outMetadata)
 {
     // Scan the instructions looking for global resource declarations
@@ -270,7 +285,10 @@ void collectMetadata(
     bool usesBindlessResourceHeap = false;
     for (const auto& inst : irModule->getGlobalInsts())
     {
-        if (!usesBindlessResourceHeap && _subtreeUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
+        if (!usesBindlessResourceHeap && _subtreeUsesBindlessResourceHeap(
+                                             inst,
+                                             bindlessSpaceIndex,
+                                             treatDescriptorHandleResourceCastsAsHeapUse))
             usesBindlessResourceHeap = true;
 
         if (auto func = as<IRFunc>(inst))
