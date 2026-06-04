@@ -3164,7 +3164,7 @@ struct VariableReflection
         return findAttributeByName(globalSession, name);
     }
 
-    /// Deprecated: use getDefaultValueBlob instead.
+    /// Deprecated: call getDefaultValueBlob and check for a null blob instead.
     SLANG_DEPRECATED bool hasDefaultValue()
     {
         return spReflectionVariable_HasDefaultValue((SlangReflectionVariable*)this);
@@ -3188,10 +3188,19 @@ struct VariableReflection
         return spReflectionVariable_GetDefaultValueFloat((SlangReflectionVariable*)this, value);
     }
 
-    /// Gets default value bytes for scalar and aggregate variables with explicit initializers.
-    /// If the variable has no explicit initializer, this succeeds with a null blob.
-    /// The returned blob stores values in natural scalar/field order, without constant-buffer
-    /// padding.
+    /// Gets default initializer bytes for variables with representable initializers.
+    ///
+    /// If the variable has no explicit initializer, this succeeds with a null blob. On success with
+    /// an initializer, `outBlob` receives an `ISlangBlob*` with an added reference.
+    ///
+    /// Supported types include scalar values, vectors, matrices, fixed-size arrays,
+    /// structs/aggregates, and enums. The returned blob stores scalar-layout bytes in natural
+    /// scalar/field order without aggregate padding; bool values are emitted as 4-byte values to
+    /// match Slang's GPU scalar layout. Matrices are emitted row-by-row, struct base fields are
+    /// emitted before derived fields, and enum values use the enum's underlying tag type.
+    ///
+    /// Returns SLANG_E_INVALID_ARG for invalid arguments and SLANG_E_NOT_AVAILABLE when an
+    /// initializer cannot be represented as a default-value blob.
     SlangResult getDefaultValueBlob(ISlangBlob** outBlob)
     {
         return spReflectionVariable_GetDefaultValueBlob((SlangReflectionVariable*)this, outBlob);
