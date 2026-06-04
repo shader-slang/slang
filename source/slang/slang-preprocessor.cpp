@@ -1191,6 +1191,13 @@ struct WarningStateTracker : SourceWarningStateTrackerBase
     Dictionary<int, WarningTimeline> mapDiagnosticIdToTimeline = {};
     List<SourceLoc> stack = {};
 
+    // Running absolute-location counter, persisted across the separate `preprocessSource`
+    // passes that share this tracker (each `__include`d file is preprocessed in its own
+    // pass with a fresh `Preprocessor`). Persisting it keeps the timeline's absolute-location
+    // axis globally monotonic across files, instead of every pass restarting from 0 and
+    // colliding in the shared timeline (shader-slang/slang#11473).
+    SourceLoc::RawValue persistedAbsoluteSourceLocCounter = 0;
+
     WarningStateTracker(SourceManager* sourceManager = nullptr)
         : sourceManager(sourceManager)
     {
@@ -5028,6 +5035,13 @@ TokenList preprocessSource(
     preprocessor.warningStateTracker =
         dynamicCast<preprocessor::WarningStateTracker>(desc.sink->getSourceWarningStateTracker());
 
+    // Continue the absolute-location axis from the previous pass that shared this tracker.
+    if (preprocessor.warningStateTracker)
+    {
+        preprocessor.absoluteSourceLocCounter =
+            preprocessor.warningStateTracker->persistedAbsoluteSourceLocCounter;
+    }
+
     // Add builtin macros
     {
         auto namePool = desc.namePool;
@@ -5087,6 +5101,13 @@ TokenList preprocessSource(
     }
 
     finalCheckPragmaWarnings(&preprocessor);
+
+    // Hand the advanced counter back so the next `__include` pass continues the axis.
+    if (preprocessor.warningStateTracker)
+    {
+        preprocessor.warningStateTracker->persistedAbsoluteSourceLocCounter =
+            preprocessor.absoluteSourceLocCounter;
+    }
 
     // debugging: build the pre-processed source back together
 #if 0
