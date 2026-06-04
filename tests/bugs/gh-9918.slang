@@ -5,6 +5,10 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -entry entry_mesh
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -entry entry_mesh
 
+// BorrowInOut/E54005 coverage for write-only mesh output reads lives in
+// tests/diagnostics/mesh-shader-output-read.slang. This test covers mesh-output
+// parameter emission for GLSL/HLSL.
+
 //CHECK_SPIRV: OpEntryPoint
 //CHECK_GLSL: void main()
 //CHECK_HLSL: void entry_mesh(
