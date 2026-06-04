@@ -15,7 +15,7 @@ class SlangCoverageToLcovTests(unittest.TestCase):
     def run_converter(self, manifest, counters_text="", check=True):
         with tempfile.TemporaryDirectory() as td:
             td_path = pathlib.Path(td)
-            manifest_path = td_path / "shader.coverage-mapping.json"
+            manifest_path = td_path / "shader.coverage-manifest.json"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
             return subprocess.run(

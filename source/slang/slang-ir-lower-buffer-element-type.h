@@ -18,6 +18,7 @@ enum class BufferElementTypeLoweringPolicyKind
     Default,
     KhronosTarget,
     MetalParameterBlock,
+    MetalPointerLowering,
     WGSL,
     LLVM
 };
