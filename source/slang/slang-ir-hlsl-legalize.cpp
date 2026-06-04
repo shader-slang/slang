@@ -161,6 +161,7 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
 
 void legalizeRayTracingParametersForHLSL(IRModule* module)
 {
+    List<IRFunc*> funcs;
     List<IRFunc*> primitiveIDEntryPoints;
 
     for (auto globalInst : module->getGlobalInsts())
@@ -171,6 +172,11 @@ void legalizeRayTracingParametersForHLSL(IRModule* module)
         if (!func)
             continue;
 
+        funcs.add(func);
+    }
+
+    for (auto func : funcs)
+    {
         searchChildrenForForceVarIntoStructTemporarily(module, func);
 
         auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();

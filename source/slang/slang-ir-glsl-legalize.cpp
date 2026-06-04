@@ -3081,7 +3081,8 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 void consolidateRayTracingParameters(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
-    IRFunc* func)
+    IRFunc* func,
+    IRFunc*& primitiveIndexFunc)
 {
     auto builder = context->getBuilder();
     auto firstBlock = func->getFirstBlock();
@@ -3097,7 +3098,6 @@ void consolidateRayTracingParameters(
         stage == Stage::Intersection || stage == Stage::AnyHit || stage == Stage::ClosestHit;
     if (isRayTracingHitStage && !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
     {
-        IRFunc* primitiveIndexFunc = nullptr;
         legalizeRayTracingPrimitiveIDParamsForEntryPoint(
             builder->getModule(),
             func,
@@ -4831,7 +4831,8 @@ void legalizeEntryPointForGLSL(
     IRModule* module,
     IRFunc* func,
     CodeGenContext* codeGenContext,
-    ShaderExtensionTracker* glslExtensionTracker)
+    ShaderExtensionTracker* glslExtensionTracker,
+    IRFunc*& primitiveIndexFunc)
 {
     auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
     SLANG_ASSERT(entryPointDecor);
@@ -4935,7 +4936,7 @@ void legalizeEntryPointForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        consolidateRayTracingParameters(&context, codeGenContext, func);
+        consolidateRayTracingParameters(&context, codeGenContext, func, primitiveIndexFunc);
         break;
     default:
         break;
@@ -5082,9 +5083,16 @@ void legalizeEntryPointsForGLSL(
     CodeGenContext* context,
     ShaderExtensionTracker* glslExtensionTracker)
 {
+    IRFunc* primitiveIndexFunc = nullptr;
     for (auto func : funcs)
     {
-        legalizeEntryPointForGLSL(session, module, func, context, glslExtensionTracker);
+        legalizeEntryPointForGLSL(
+            session,
+            module,
+            func,
+            context,
+            glslExtensionTracker,
+            primitiveIndexFunc);
     }
 
     assignRayPayloadHitObjectAttributeLocations(module);
