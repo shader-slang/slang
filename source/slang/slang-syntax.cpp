@@ -895,16 +895,17 @@ Type* DeclRefType::create(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
     }
     else if (as<ThisTypeDecl>(declRef.getDecl()))
     {
-        if (as<DirectDeclRef>(declRef.declRefBase))
-        {
-            declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
-
-            return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
-        }
-        else if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+        // A reference to a `ThisTypeDecl` must always be represented as a `ThisType`,
+        // never as a plain `DeclRefType`. Otherwise the same logical `This` type can
+        // exist as two distinct `Type*`s (e.g. a `ThisType` built from a `DirectDeclRef`
+        // vs. a `DeclRefType` built from a `MemberDeclRef` for a substituted interface),
+        // breaking type-identity comparison. See issue #11465.
+        if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
         {
             return lookupDeclRef->getWitness()->getSub();
         }
+        declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
+        return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
     }
     else if (auto typedefDecl = as<TypeDefDecl>(declRef.getDecl()))
     {

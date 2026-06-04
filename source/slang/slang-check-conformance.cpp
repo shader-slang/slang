@@ -306,7 +306,24 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
 
         // Conveniently, the `facet` stores a pre-computed witness for the
         // subtype relationship, which we can use here.
-        return as<SubtypeWitness>(facet->subtypeWitness->resolve());
+        auto witness = as<SubtypeWitness>(facet->subtypeWitness->resolve());
+
+        // `getInheritanceInfo` for an interface *type* roots its facet witnesses at the
+        // interface's `ThisType` (treating the type as a requirement template; see #11469).
+        // When the query `subType` is the interface (existential box) itself, the facet
+        // witness's `sub` is the standalone `ThisType`, not the box we were asked about.
+        // Re-root the witness onto the queried `subType` so the returned witness satisfies
+        // the invariant `result->getSub() == subType`; this yields a well-formed,
+        // box-rooted witness instead of one anchored at a free-floating `ThisType`.
+        if (auto declWitness = as<DeclaredSubtypeWitness>(witness))
+        {
+            if (declWitness->getSub() != subType)
+                return m_astBuilder->getDeclaredSubtypeWitness(
+                    subType,
+                    declWitness->getSup(),
+                    declWitness->getDeclRef());
+        }
+        return witness;
     }
     //
     // TODO: We could expand upon the test using the facet list above
