@@ -10,22 +10,14 @@
 namespace Slang
 {
 
-/// Get the bindless descriptor set/space index used by dynamic-resource-heap lowering.
-/// Prefer the layout reservation so the synthesized heap binding stays consistent with
-/// reflection data.
+/// Get the bindless descriptor set/space index from the program layout.
+/// This index was allocated during layout generation (before DCE),
+/// ensuring consistency with reflection data.
 UInt getBindlessSpaceIndex(TargetProgram* targetProgram)
 {
-    // Public code-generation paths create layout before this pass runs, but keep the
-    // nullable query so internal/pre-layout callers can still use the option fallback below.
-    if (auto programLayout = targetProgram->getLayoutIfAvailable())
-    {
-        SLANG_ASSERT(programLayout->bindlessSpaceIndex >= 0);
-        return (UInt)programLayout->bindlessSpaceIndex;
-    }
-
-    // Defensive fallback for internal pre-layout invocations: use the user-specified index or
-    // the option default.
-    return (UInt)targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
+    auto programLayout = targetProgram->getExistingLayout();
+    SLANG_ASSERT(programLayout->bindlessSpaceIndex >= 0);
+    return (UInt)programLayout->bindlessSpaceIndex;
 }
 
 IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(

@@ -161,19 +161,14 @@ static bool _instUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
 
     switch (inst->getOp())
     {
-    case kIROp_GetDynamicResourceHeap:
-        // Metadata is normally collected after lowerDynamicResourceHeap replaces this intrinsic
-        // with a synthetic global param, but keep the opcode check in sync with the heap signal
-        // in case an internal metadata walk ever runs before that lowering.
     case kIROp_LoadResourceDescriptorFromHeap:
     case kIROp_LoadSamplerDescriptorFromHeap:
-        // These target-independent heap loads can still be present when metadata is collected.
     case kIROp_SPIRVLoadDescriptorFromHeap:
     case kIROp_SPIRVLoadTexelPointerFromHeap:
     case kIROp_SPIRVResourceHeap:
     case kIROp_SPIRVSamplerHeap:
-        // SPIR-V legalization normally runs after metadata collection. Keep these in the
-        // heap-resource opcode set so metadata stays conservative if collection order changes.
+        // Target-independent and SPIR-V descriptor-heap ops can still be present when metadata
+        // is collected; SPIR-V descriptor-heap extension tests cover these cases.
         return true;
     case kIROp_CastDescriptorHandleToResource:
         // Producing a descriptor handle does not imply heap use; consuming one as a resource does.

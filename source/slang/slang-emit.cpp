@@ -2411,13 +2411,6 @@ Result linkAndOptimizeIR(
     int bindlessSpaceIndex = -1;
     if (auto programLayout = targetProgram->getLayoutIfAvailable())
         bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
-    else if (requiredLoweringPassSet.dynamicResourceHeap)
-    {
-        // Component metadata requests create layout before code generation, but this keeps
-        // metadata conservative for internal codegen paths that reach this point first.
-        bindlessSpaceIndex =
-            (int)targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
-    }
     SLANG_PASS(collectMetadata, bindlessSpaceIndex, *metadata);
 
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
