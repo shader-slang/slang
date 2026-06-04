@@ -7,6 +7,7 @@
 //TEST:SIMPLE(filecheck=ISECT_DXIL):-target dxil-assembly -entry main_isect -stage intersection -profile sm_6_5
 //TEST:SIMPLE(filecheck=AHIT_DXIL):-target dxil-assembly -entry main_ahit -stage anyhit -profile sm_6_5
 //TEST:SIMPLE(filecheck=CHIT_DXIL):-target dxil-assembly -entry main_chit -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=MULTI_DXIL):-target dxil-assembly -entry main_isect -stage intersection -entry main_chit -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=ISECT_CUDA):-target cuda -entry main_isect_cuda -stage intersection
 //TEST:SIMPLE(filecheck=AHIT_CUDA):-target cuda -entry main_ahit -stage anyhit
 //TEST:SIMPLE(filecheck=CHIT_CUDA):-target cuda -entry main_chit -stage closesthit
@@ -83,6 +84,7 @@ void main_chit(
 
 // CHIT_DXIL: call i32 @dx.op.primitiveIndex.i32
 // CHIT_DXIL: sitofp i32
+// MULTI_DXIL-COUNT-2: call i32 @dx.op.primitiveIndex.i32
 
 // CHIT_CUDA: __global__ void __closesthit__main_chit
 // CHIT_CUDA-NOT: pid
