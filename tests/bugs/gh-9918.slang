@@ -10,6 +10,7 @@
 // parameter emission for GLSL/HLSL.
 
 //CHECK_SPIRV: OpEntryPoint
+//CHECK_GLSL: perprimitiveEXT
 //CHECK_GLSL: void main()
 //CHECK_HLSL: void entry_mesh(
 //CHECK_HLSL: out indices uint3

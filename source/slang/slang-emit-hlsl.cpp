@@ -2232,6 +2232,8 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
         if (!func || !func->findDecoration<IREntryPointDecoration>())
             return false;
 
+        // HLSL mesh-output parameter syntax is only valid on mesh entry points.
+        // Helper functions that receive mesh outputs are legalized to ordinary array params.
         auto paramName = getName(param);
         auto paramType = param->getDataType();
 
