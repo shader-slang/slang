@@ -5056,19 +5056,27 @@ struct HigherOrderInvokeExprCheckingActions
         return nullptr;
     }
 
-    // Extract the implicit `this` type for a statically-referenced non-static
-    // member method (e.g. `Type::method`).  Returns a null QualType for free
-    // functions, static methods, constructors, and member methods referenced
-    // by name within their own type (e.g. `[BackwardDerivativeOf(f)]`).
+    // Extract the explicit receiver parameter type for a non-static member method
+    // used as the operand of a higher-order operator.
+    //
+    // A method reference spelled as `Type::method` uses the method's declared
+    // `this` type. A method reference spelled as `value.method` uses the checked
+    // type of `value`; the derivative callable is static, so the receiver must be
+    // provided as the first argument at the derivative call site.
+    //
+    // Returns a null QualType for free functions, static methods, constructors, and
+    // member methods referenced by name within their own type (e.g.
+    // `[BackwardDerivativeOf(f)]`).
     QualType getThisTypeForBaseFunc(SemanticsVisitor* semantics, Expr* funcExpr)
     {
         auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
-        // Only produce a this-type when the method is accessed via Type::method
-        // (StaticMemberExpr). When referenced by name within the same struct
-        // (plain DeclRefExpr), the derivative is itself a member method and
-        // the this parameter is handled implicitly.
-        if (!as<StaticMemberExpr>(innerExpr))
+
+        // Only member references can contribute a receiver parameter. A plain
+        // DeclRefExpr inside the same type still means "use the current implicit
+        // this", so the differentiated function remains an instance member.
+        if (!as<MemberExpr>(innerExpr) && !as<StaticMemberExpr>(innerExpr))
             return QualType();
+
         if (auto declRefExpr = as<DeclRefExpr>(innerExpr))
         {
             auto declRef = declRefExpr->declRef;
@@ -5085,7 +5093,33 @@ struct HigherOrderInvokeExprCheckingActions
                 if (!callableDecl->hasModifier<HLSLStaticModifier>() &&
                     !as<ConstructorDecl>(callableDecl))
                 {
-                    return getTypeForThisExpr(semantics, callableDeclRef);
+                    // Ask the method declaration how its implicit `this` is passed.
+                    // For example, a mutating method needs a writable receiver, while a
+                    // [NoDiffThis] method usually passes `this` by value.
+                    auto declaredThisType = getTypeForThisExpr(semantics, callableDeclRef);
+                    if (!declaredThisType.type)
+                        return QualType();
+
+                    if (auto memberExpr = as<MemberExpr>(innerExpr))
+                    {
+                        // For `value.method`, the receiver argument should have the
+                        // checked type of `value`. This is important for generic/interface
+                        // receivers: `shape.distance` in a `S : IShape3D` function should
+                        // expect `S`, not the interface requirement's `This` type.
+                        //
+                        // Preserve the declared l-value-ness so the generated
+                        // derivative signature still matches the method's `this`
+                        // parameter passing mode.
+                        return QualType(
+                            memberExpr->baseExpression->type.type,
+                            declaredThisType.isLeftValue);
+                    }
+                    else
+                    {
+                        // For `Type::method`, there is no receiver expression to inspect,
+                        // so use the method's declared/specialized `this` type directly.
+                        return declaredThisType;
+                    }
                 }
             }
         }
