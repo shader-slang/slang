@@ -2352,17 +2352,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 if (hasNonUniformDecoration(inst->getOperand(0)))
                     return addNonUniformDecoration(inst);
                 break;
-            case kIROp_MakeCombinedTextureSampler:
-                // Propagates NonUniform from a decorated texture or sampler to the combined result.
-                if (hasNonUniformDecoration(inst->getOperand(0)) ||
-                    hasNonUniformDecoration(inst->getOperand(1)))
-                    return addNonUniformDecoration(inst);
-                break;
-            case kIROp_CombinedTextureSamplerGetTexture:
-            case kIROp_CombinedTextureSamplerGetSampler:
-                if (hasNonUniformDecoration(inst->getOperand(0)))
-                    return addNonUniformDecoration(inst);
-                break;
             case kIROp_ImageTexelPointer:
                 if (hasNonUniformDecoration(inst->getOperand(0)))
                     return addNonUniformDecoration(inst);

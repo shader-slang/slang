@@ -4,6 +4,51 @@
 
 namespace Slang
 {
+// Walk back through resource-creating ops to find and decorate the
+// access-chain index that is the source of non-uniformity.
+static void decorateNonUniformChain(IRInst* operand, const std::function<void(IRInst*)>& decorate)
+{
+    if (auto gep = as<IRGetElementPtr>(operand))
+    {
+        decorate(gep->getOperand(1));
+    }
+    else if (auto getElement = as<IRGetElement>(operand))
+    {
+        decorate(getElement->getOperand(1));
+    }
+    else if (auto load = as<IRLoad>(operand))
+    {
+        auto addr = load->getOperand(0);
+        if (auto addrGep = as<IRGetElementPtr>(addr))
+            decorate(addrGep->getOperand(1));
+        else if (auto addrGetElement = as<IRGetElement>(addr))
+            decorate(addrGetElement->getOperand(1));
+        else
+        {
+            decorate(operand);
+            decorate(addr);
+        }
+    }
+    else if (auto makeCombined = as<IRMakeCombinedTextureSampler>(operand))
+    {
+        decorate(operand);
+        decorateNonUniformChain(makeCombined->getOperand(0), decorate);
+        decorateNonUniformChain(makeCombined->getOperand(1), decorate);
+    }
+    else if (
+        as<IRCombinedTextureSamplerGetTexture>(operand) ||
+        as<IRCombinedTextureSamplerGetSampler>(operand) ||
+        operand->getOp() == kIROp_ImageTexelPointer)
+    {
+        decorate(operand);
+        decorateNonUniformChain(operand->getOperand(0), decorate);
+    }
+    else
+    {
+        decorate(operand);
+    }
+}
+
 void processNonUniformResourceIndex(
     IRInst* nonUniformResourceIndexInst,
     NonUniformResourceIndexFloatMode floatMode)
@@ -132,8 +177,38 @@ void processNonUniformResourceIndex(
                 case kIROp_Load:
                     if (floatMode != NonUniformResourceIndexFloatMode::SPIRV)
                         break;
-                    // Replace load(nonUniformRes(x)), into nonUniformRes(load(x))
                     newUser = builder.emitLoad(user->getFullType(), inst->getOperand(0));
+                    break;
+                case kIROp_MakeCombinedTextureSampler:
+                    {
+                        auto tex = user->getOperand(0);
+                        auto samp = user->getOperand(1);
+                        if (tex == inst)
+                            tex = inst->getOperand(0);
+                        else if (samp == inst)
+                            samp = inst->getOperand(0);
+                        else
+                            SLANG_UNREACHABLE("NonUniformResourceIndex must be an operand of "
+                                              "MakeCombinedTextureSampler");
+                        newUser =
+                            builder.emitMakeCombinedTextureSampler(user->getFullType(), tex, samp);
+                    }
+                    break;
+                case kIROp_CombinedTextureSamplerGetTexture:
+                case kIROp_CombinedTextureSamplerGetSampler:
+                case kIROp_ImageTexelPointer:
+                    {
+                        ShortList<IRInst*> operands;
+                        for (UInt i = 0; i < user->getOperandCount(); i++)
+                            operands.add(
+                                user->getOperand(i) == inst ? inst->getOperand(0)
+                                                            : user->getOperand(i));
+                        newUser = builder.emitIntrinsicInst(
+                            user->getFullType(),
+                            user->getOp(),
+                            operands.getCount(),
+                            operands.getArrayView().getBuffer());
+                    }
                     break;
                 default:
                     // Ignore for all other unknown insts.
@@ -159,6 +234,10 @@ void processNonUniformResourceIndex(
                 case kIROp_CastDescriptorHandleToUInt2:
                 case kIROp_GetElement:
                 case kIROp_Swizzle:
+                case kIROp_MakeCombinedTextureSampler:
+                case kIROp_CombinedTextureSamplerGetTexture:
+                case kIROp_CombinedTextureSamplerGetSampler:
+                case kIROp_ImageTexelPointer:
                     resWorkList.add(nonuniformUser);
                     break;
                 };
@@ -182,10 +261,10 @@ void processNonUniformResourceIndex(
             inst->removeAndDeallocate();
             continue;
         }
-        // For each of the `NonUniformResourceIndex` inst that remain, decorate the base inst
-        // with a [NonUniformResource] decoration. For SPIR-V we want the decoration on the
-        // index used in access chains, so prefer decorating index operands for getElement/
-        // getElementPtr (and loads of those).
+        // For each remaining `NonUniformResourceIndex` inst, walk back through
+        // the operand chain to find and decorate the access-chain index. For
+        // resource-creating ops (MakeCombinedTextureSampler, etc.) also
+        // decorate the op itself, then recurse into its source operand.
         auto operand = inst->getOperand(0);
         auto type = operand->getDataType();
         if (isResourceType(type) || isPointerToResourceType(type))
@@ -196,36 +275,7 @@ void processNonUniformResourceIndex(
                 if (!value->findDecoration<IRSPIRVNonUniformResourceDecoration>())
                     builder.addSPIRVNonUniformResourceDecoration(value);
             };
-
-            if (auto gep = as<IRGetElementPtr>(operand))
-            {
-                decorate(gep->getOperand(1));
-            }
-            else if (auto getElement = as<IRGetElement>(operand))
-            {
-                decorate(getElement->getOperand(1));
-            }
-            else if (auto load = as<IRLoad>(operand))
-            {
-                auto addr = load->getOperand(0);
-                if (auto addrGep = as<IRGetElementPtr>(addr))
-                {
-                    decorate(addrGep->getOperand(1));
-                }
-                else if (auto addrGetElement = as<IRGetElement>(addr))
-                {
-                    decorate(addrGetElement->getOperand(1));
-                }
-                else
-                {
-                    decorate(operand);
-                    decorate(addr);
-                }
-            }
-            else
-            {
-                decorate(operand);
-            }
+            decorateNonUniformChain(operand, decorate);
         }
         inst->replaceUsesWith(operand);
         inst->removeAndDeallocate();
