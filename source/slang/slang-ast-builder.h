@@ -447,6 +447,14 @@ public:
 
     DeclRef<Decl> getLookupDeclRef(Type* base, SubtypeWitness* subtypeWitness, Decl* declToLookup)
     {
+        // A `LookupDeclRef`'s lookup source is determined by its witness: we look up
+        // `declToLookup` in the type that `subtypeWitness` proves conforms to the
+        // interface declaring it. Always use `subtypeWitness->getSub()` as the source so
+        // the source and witness stay consistent; a caller-supplied `base` that disagrees
+        // (e.g. the interface type when the witness is rooted at its `This`) would
+        // otherwise produce a malformed `LookupDeclRef` and break type identity.
+        if (subtypeWitness)
+            base = subtypeWitness->getSub();
         auto result = getOrCreate<LookupDeclRef>(declToLookup, base, subtypeWitness);
         return result;
     }
