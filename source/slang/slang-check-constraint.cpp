@@ -655,12 +655,6 @@ enum class ArgState
     // being checked. Default generic arguments must not replace it.
     CallerProvidedOrdinaryArg,
 
-    // The current ordinary argument is the same parameter that owns the
-    // argument position, such as `T` for the `T` parameter. It is usable in a
-    // dependent substitution, but local inference or a default generic argument
-    // may still provide a more specific value.
-    DependentOrdinaryArg,
-
     // Ordinary solver constraints produced this ordinary argument.
     SolvedOrdinaryArg,
 
@@ -716,8 +710,7 @@ struct ArgInfo
     ShortList<QualType, 8>& getTypeConstraints()
     {
         SLANG_ASSERT(
-            m_state == ArgState::DefaultSubstitutionArg ||
-            m_state == ArgState::DependentOrdinaryArg || m_state == ArgState::SolvedOrdinaryArg ||
+            m_state == ArgState::DefaultSubstitutionArg || m_state == ArgState::SolvedOrdinaryArg ||
             m_state == ArgState::DefaultGenericArg || m_state == ArgState::EmptyPackArg);
         return m_typeConstraints;
     }
@@ -2267,7 +2260,6 @@ private:
         switch (state)
         {
         case ArgState::CallerProvidedOrdinaryArg:
-        case ArgState::DependentOrdinaryArg:
         case ArgState::SolvedOrdinaryArg:
         case ArgState::DefaultGenericArg:
         case ArgState::EmptyPackArg:

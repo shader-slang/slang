@@ -1110,20 +1110,6 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
     auto substArgs = tryGetGenericArguments(candidate.subst, genericDeclRef.getDecl());
     SLANG_ASSERT(substArgs.getCount());
 
-    // Resolve defaults and witness arguments through the generic constraint
-    // solver -- the same fixpoint loop used for inferred generic arguments --
-    // instead of the per-constraint linear pass below. The solver is handed only
-    // the explicitly-provided ordinary prefix; it fills defaulted arguments and,
-    // critically, re-roots any conformance witness a default embeds (e.g.
-    // `U = T.DataType` carrying a `T : IElement` witness) onto the witness
-    // arguments it solves, propagating updates to dependents until fixpoint. The
-    // linear pass cannot do this -- it processes constraints once in declaration
-    // order. On solver failure we fall through to that pass, which re-derives the
-    // failing constraint to emit a precise diagnostic (the solver reports none).
-    //
-    // The solver's `setProvidedArg` requires an outermost generic when ordinary
-    // arguments are provided, so a nested generic application keeps the linear
-    // pass for now.
     bool genericIsOutermost = true;
     for (auto p = genericDeclRef.getDecl()->parentDecl; p; p = p->parentDecl)
     {
