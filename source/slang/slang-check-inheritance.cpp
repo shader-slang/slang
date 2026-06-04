@@ -547,6 +547,18 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     {
         if (isDeclRefTypeOf<InterfaceDecl>(selfType))
         {
+            // For an interface *type*, the self/base conformance witnesses are rooted at
+            // the interface's `ThisType` (not at `selfType` as for every other type), so
+            // a concrete conforming type `T : IInterface` can later specialize them via
+            // `This -> T`. i.e. here `DeclRefType(InterfaceDecl)` is treated as a
+            // *requirement template*, not as the *existential box* it also denotes.
+            //
+            // KNOWN LIMITATION (#11469): that dual meaning means using an interface type
+            // as an existential (e.g. a generic argument `Foo<IInterface>`) gets this
+            // `This`-rooted answer, so its conformance witness's `sub` is a standalone
+            // `IInterface.This` -- ill-formed for the box, and a source of non-canonical
+            // type identity. Properly disentangling box vs `ThisType` here is invasive,
+            // so the symptom is normalized downstream instead (#11464 / #11465 / #11468).
             selfIsSelf = visitor.getThisTypeWitness(
                 astBuilder,
                 as<DeclRefType>(selfType)->getDeclRef().as<InterfaceDecl>());
