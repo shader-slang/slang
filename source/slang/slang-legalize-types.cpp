@@ -1214,7 +1214,14 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
                     context->getBuilder()->getAttributedType(legalBaseType.getSimple(), attrs));
             }
         default:
-            // Attributes cannot currently wrap decomposed legalized types.
+            // Memory qualifiers affect code generation, so do not silently drop them if an
+            // unsupported type ever decomposes during legalization.
+            for (auto attr : attributedType->getAllAttrs())
+            {
+                if (as<IRMemoryQualifierSetAttr>(attr))
+                    SLANG_UNEXPECTED(
+                        "memory qualifier attributes cannot wrap decomposed legalized types");
+            }
             return legalBaseType;
         }
     }
