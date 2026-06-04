@@ -2228,6 +2228,10 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
         if (!modifier)
             return false;
 
+        auto func = getParentFunc(param);
+        if (!func || !func->findDecoration<IREntryPointDecoration>())
+            return false;
+
         auto paramName = getName(param);
         auto paramType = param->getDataType();
 
@@ -2344,19 +2348,6 @@ void HLSLSourceEmitter::emitPackOffsetModifier(
 
 void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
-    if (auto modifier = varInst->findDecoration<IRMeshOutputDecoration>())
-    {
-        // Function parameters are handled in emitSimpleFuncParamImpl so the
-        // HLSL-specific `out vertices` token sequence is emitted as one unit.
-        // Keep the canonical spelling here for any non-parameter declarations
-        // that still carry mesh output decorations.
-        const char* s = as<IRVerticesDecoration>(modifier)     ? "out vertices "
-                        : as<IRIndicesDecoration>(modifier)    ? "out indices "
-                        : as<IRPrimitivesDecoration>(modifier) ? "out primitives "
-                                                               : nullptr;
-        SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
-        m_writer->emit(s);
-    }
     if (varInst->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
         // DXC requires that mesh payload parameters have "in" specified
