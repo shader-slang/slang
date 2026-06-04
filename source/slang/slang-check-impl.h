@@ -3022,13 +3022,7 @@ public:
         GenericInferenceContext&& inferenceContext,
         DeclRef<GenericDecl> genericDeclRef,
         ArrayView<Val*> providedOrdinaryArgs,
-        ConversionCost& outBaseCost,
-        // When true, `providedOrdinaryArgs` are arguments written explicitly in a
-        // generic application and are treated as fixed caller input even when one
-        // happens to equal a parameter's own default-substitution self-reference.
-        // The inference path leaves this false so such self-references remain
-        // replaceable placeholders for a more concrete solution.
-        bool argsAreExplicitlyProvided = false);
+        ConversionCost& outBaseCost);
 
 
     // State related to overload resolution for a call

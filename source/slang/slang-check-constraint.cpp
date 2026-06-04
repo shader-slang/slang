@@ -885,10 +885,7 @@ public:
     // Install caller-provided ordinary arguments for one generic declaration.
     // Call this during solver setup, before `solve()`, when the use site
     // supplied ordinary generic arguments.
-    bool setProvidedArg(
-        GenericDecl* genericDecl,
-        ArrayView<Val*> providedOrdinaryArgs,
-        bool argsAreExplicitlyProvided = false)
+    bool setProvidedArg(GenericDecl* genericDecl, ArrayView<Val*> providedOrdinaryArgs)
     {
         if (providedOrdinaryArgs.getCount() == 0)
             return true;
@@ -906,7 +903,7 @@ public:
             if (argIndex < 0 || argIndex >= providedOrdinaryArgs.getCount())
                 continue;
 
-            if (!setProvidedArg(member, providedOrdinaryArgs[argIndex], argsAreExplicitlyProvided))
+            if (!setProvidedArg(member, providedOrdinaryArgs[argIndex]))
                 return false;
         }
         return true;
@@ -915,28 +912,23 @@ public:
 private:
     // Install one caller-provided ordinary argument into the live argument list.
     // This method is part of solver setup and must be called before `solve()`.
-    bool setProvidedArg(Decl* paramDecl, Val* arg, bool argsAreExplicitlyProvided = false)
+    bool setProvidedArg(Decl* paramDecl, Val* arg)
     {
         SLANG_ASSERT(!m_hasStartedSolving);
         if (!m_isInitialized || m_hasStartedSolving)
             return false;
 
-        // Some internal callers provide the parameter's own default
-        // substitution arg, such as `T` for the `T` parameter, only to preserve
-        // a dependent declaration shape. That value is ready for substitution,
-        // but it is not fixed user input, so later inference may still replace
-        // it. An explicit generic application, by contrast, means the user wrote
-        // that argument -- even a self-reference like passing an enclosing
-        // generic's own parameter is fixed input and must not be replaced by the
-        // parameter's default.
-        auto argState =
-            (!argsAreExplicitlyProvided && isDefaultSubstitutionArgForParam(paramDecl, arg))
-                ? ArgState::DependentOrdinaryArg
-                : ArgState::CallerProvidedOrdinaryArg;
-
+        // Every argument installed here is fixed caller input -- an explicitly
+        // written generic argument, which may legitimately be a self-reference
+        // (e.g. passing an enclosing generic's own parameter). It is therefore a
+        // `CallerProvidedOrdinaryArg` that defaults and inference must not
+        // override. Replaceable placeholders -- abstract self-lookups inside
+        // interface bodies and the like -- are never routed through this method;
+        // the solver seeds those itself as `DefaultSubstitutionArg` during
+        // constraint collection.
         if (!setCurrentArg(paramDecl, arg))
             return false;
-        setArgState(paramDecl, argState);
+        setArgState(paramDecl, ArgState::CallerProvidedOrdinaryArg);
         return true;
     }
 
@@ -2246,25 +2238,6 @@ private:
         return true;
     }
 
-    // Return true if an argument is the default substitution arg for a parameter.
-    bool isDefaultSubstitutionArgForParam(Decl* paramDecl, Val* arg)
-    {
-        // A type parameter's default substitution arg is a direct type reference
-        // to itself, such as `DeclRefType(T)` for `T`.
-        if (auto declRefType = as<DeclRefType>(arg))
-            return declRefType->getDeclRef().getDecl() == paramDecl;
-
-        // A value parameter's default substitution arg is an integer decl-ref to
-        // itself. Casts can be inserted while checking integer expressions, so
-        // peel them before comparing the referenced declaration.
-        if (auto intVal = as<IntVal>(arg))
-        {
-            if (auto declRefIntVal = getDeclRefIntValIgnoringCasts(intVal))
-                return declRefIntVal->getDeclRef().getDecl() == paramDecl;
-        }
-        return false;
-    }
-
     // Return the current state for an argument.
     ArgState getArgState(Decl* argDecl)
     {
@@ -3040,8 +3013,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveGenericArguments(
     GenericInferenceContext&& inferenceContext,
     DeclRef<GenericDecl> genericDeclRef,
     ArrayView<Val*> providedOrdinaryArgs,
-    ConversionCost& outBaseCost,
-    bool argsAreExplicitlyProvided)
+    ConversionCost& outBaseCost)
 {
     // The solver reads generic members while collecting ordinary constraints,
     // default generic arguments, and witness constraints. The generic
@@ -3061,10 +3033,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveGenericArguments(
         auto outermostGenericDecl = getOutermostGenericDecl(genericDecl);
         SLANG_ASSERT(outermostGenericDecl == genericDecl);
 
-        if (!solver.setProvidedArg(
-                outermostGenericDecl,
-                providedOrdinaryArgs,
-                argsAreExplicitlyProvided))
+        if (!solver.setProvidedArg(outermostGenericDecl, providedOrdinaryArgs))
             return DeclRef<Decl>();
     }
 

@@ -1147,11 +1147,12 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
     // and wakes dependents on progress until fixpoint. The linear pass cannot do
     // this -- it visits constraints once in declaration order.
     //
-    // We pass only the explicitly-provided ordinary prefix and mark it as explicit
-    // input, so the solver fills the remaining defaults itself and does not mistake
-    // a user-written self-reference argument (e.g. forming `Foo<U, accessOther,
+    // We pass only the explicitly-provided ordinary prefix; `setProvidedArg`
+    // installs each as fixed caller input (a `CallerProvidedOrdinaryArg`), so a
+    // user-written self-reference argument -- e.g. forming `Foo<U, accessOther,
     // addrSpace>` inside `Foo`, where the `addrSpace` argument is `Foo`'s own
-    // parameter) for a replaceable placeholder.
+    // parameter -- is not overridden by that parameter's default. The solver then
+    // fills the remaining defaults itself.
     //
     // On solver failure we fall through to the per-constraint loop, which
     // re-derives the failing constraint to emit a precise diagnostic (the solver
@@ -1172,8 +1173,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
             _Move(inferenceContext),
             genericDeclRef,
             providedOrdinaryArgs.getArrayView().arrayView,
-            solveCost,
-            /* argsAreExplicitlyProvided: */ true);
+            solveCost);
         if (solved)
         {
             auto solvedArgs =

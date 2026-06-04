@@ -875,13 +875,12 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     //
     if (declRef.as<AssocTypeDecl>())
     {
-        // Decompose an associated-type access into the ordered list of
-        // associated-type declarations applied to its root type, appending them
-        // in natural (outermost-first) order to `outChain` and returning the
-        // root. Only associated-type lookups are traversed.
-        auto decomposeAssocChain = [](Type* type, List<Decl*>& outChain) -> Type*
+        // The depth of an associated-type access is the number of associated-type
+        // lookups applied to its root type (e.g. `T.A.B` has depth 2, `T` has
+        // depth 0). Only associated-type lookups are counted.
+        auto assocChainDepth = [](Type* type) -> Index
         {
-            List<Decl*> reversed;
+            Index depth = 0;
             Type* cur = type;
             for (;;)
             {
@@ -892,24 +891,19 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 auto lookupDeclRef = as<LookupDeclRef>(declRefType->getDeclRef().declRefBase);
                 if (!assocDeclRef || !lookupDeclRef)
                     break;
-                reversed.add(assocDeclRef.getDecl());
+                ++depth;
                 cur = lookupDeclRef->getLookupSource();
             }
-            for (Index i = reversed.getCount() - 1; i >= 0; --i)
-                outChain.add(reversed[i]);
-            return cur;
+            return depth;
         };
 
-        // The depth (number of associated-type lookups) of the access we are
-        // computing inheritance for. We never add a base that is a *deeper*
-        // associated-type access than `selfType`: an equality constraint such as
-        // `Differential.Differential == Differential` would otherwise make
-        // `T.Differential` claim `T.Differential.Differential` as a base, which
-        // re-expands without bound. Only the reduce-to-shallower direction of an
-        // equality is useful for member lookup, and it terminates.
-        List<Decl*> selfChain;
-        decomposeAssocChain(selfType, selfChain);
-        Index selfChainDepth = selfChain.getCount();
+        // The depth of the access we are computing inheritance for. We never add a
+        // base that is a *deeper* associated-type access than `selfType`: an
+        // equality constraint such as `Differential.Differential == Differential`
+        // would otherwise make `T.Differential` claim `T.Differential.Differential`
+        // as a base, which re-expands without bound. Only the reduce-to-shallower
+        // direction of an equality is useful for member lookup, and it terminates.
+        Index selfChainDepth = assocChainDepth(selfType);
 
         // Collect the ancestor anchor types along `selfType`'s lookup chain. For
         // `selfType == T.TA.TB` the anchors are `T.TA` and `T`. Each anchor is a
@@ -1026,9 +1020,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     // Never introduce a base that is a deeper associated-type
                     // access than `selfType`; that is the non-terminating
                     // direction of a self-referential equality constraint.
-                    List<Decl*> baseChain;
-                    decomposeAssocChain(baseType, baseChain);
-                    if (baseChain.getCount() > selfChainDepth)
+                    if (assocChainDepth(baseType) > selfChainDepth)
                         continue;
 
                     // Break *benevolent* equality cycles. An equality such as
