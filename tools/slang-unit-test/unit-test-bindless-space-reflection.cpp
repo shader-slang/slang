@@ -93,6 +93,22 @@ static const char* _getSamplerHandleSource()
     )";
 }
 
+static const char* _getNoDescriptorHandleSource()
+{
+    return R"(
+        RWStructuredBuffer<float> gInput;
+        RWStructuredBuffer<float> gOutput;
+
+        [Shader("compute")]
+        [NumThreads(4, 1, 1)]
+        void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            uint tid = dispatchThreadID.x;
+            gOutput[tid] = gInput[tid] + 1.0f;
+        }
+    )";
+}
+
 static void _checkBindlessSpaceReflection(
     const char* userSource,
     BindlessSpaceExpectation bindlessSpaceExpectation,
@@ -102,7 +118,9 @@ static void _checkBindlessSpaceReflection(
     SlangCompileTarget targetFormat = SLANG_SPIRV,
     const char* profileName = "spirv_1_5",
     const char* targetCapabilityName = nullptr,
-    bool queryMetadataBeforeLayout = false)
+    // Query metadata before this helper explicitly asks for layout. The public metadata API is
+    // still expected to realize layout internally, so the metadata and reflected reservation agree.
+    bool queryMetadataBeforeExplicitLayout = false)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -177,7 +195,7 @@ static void _checkBindlessSpaceReflection(
         }
     };
 
-    if (!queryMetadataBeforeLayout)
+    if (!queryMetadataBeforeExplicitLayout)
         checkBindlessSpaceLayout();
 
     ComPtr<slang::IMetadata> metadata;
@@ -191,7 +209,7 @@ static void _checkBindlessSpaceReflection(
     SLANG_CHECK_ABORT(bindlessMetadata != nullptr);
     SLANG_CHECK(bindlessMetadata->usesBindlessResourceHeap() == expectedUsesBindlessResourceHeap);
 
-    if (queryMetadataBeforeLayout)
+    if (queryMetadataBeforeExplicitLayout)
         checkBindlessSpaceLayout();
 }
 
@@ -276,22 +294,26 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithUnboundedResourceArrayInRequestedSpace)
 
 SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandle)
 {
-    const char* userSource = R"(
-        RWStructuredBuffer<float> gInput;
-        RWStructuredBuffer<float> gOutput;
-
-        [Shader("compute")]
-        [NumThreads(4, 1, 1)]
-        void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
-        {
-            uint tid = dispatchThreadID.x;
-            gOutput[tid] = gInput[tid] + 1.0f;
-        }
-    )";
-
     // Reflection still reserves a stable bindless space for descriptor-handle-capable
     // targets, but post-emit metadata reports that no bindless heap path survived.
-    _checkBindlessSpaceReflection(userSource, _expectAnyReservedBindlessSpace(), false);
+    _checkBindlessSpaceReflection(
+        _getNoDescriptorHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        false);
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandleBeforeExplicitLayout)
+{
+    _checkBindlessSpaceReflection(
+        _getNoDescriptorHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        false,
+        nullptr,
+        0,
+        SLANG_SPIRV,
+        "spirv_1_5",
+        nullptr,
+        true);
 }
 
 SLANG_UNIT_TEST(bindlessSpaceMetadataWithStrippedNameHints)
