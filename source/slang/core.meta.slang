@@ -4542,7 +4542,6 @@ attribute_syntax [nonmutating] : NonmutatingAttribute;
 /// t.load(); // warning: result of '[nodiscard]' function is discarded.
 /// let loaded = t.load(); // OK
 /// ```
-/// The C++ spelling `[[nodiscard]]` is also accepted.
 ///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [nodiscard] : NoDiscardAttribute;

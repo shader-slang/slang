@@ -10,9 +10,13 @@ struct MyType
     [nodiscard]
     MyType load() { MyType r; r.val = 42; return r; }
 
-    // The C++ `[[nodiscard]]` spelling is also accepted.
-    [[nodiscard]]
+    [nodiscard]
     int compute() { return val * 2; }
+
+    // `[nodiscard]` on a `void` function has no result to discard, so discarding
+    // a call to it never warns.
+    [nodiscard]
+    void touch() {}
 
     int regular() { return val; }
 }
@@ -43,6 +47,19 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
             ^ result of '[nodiscard]' function is discarded
             ^ the result of calling 'freeFunc' is discarded; this function is marked '[nodiscard]'.
 */
+
+    // The result is discarded in a `for` loop's side-effect expression too.
+    for (int i = 0; i < 1; t.load())
+/*diag:
+                                 ^ result of '[nodiscard]' function is discarded
+                                 ^ the result of calling 'load' is discarded; this function is marked '[nodiscard]'.
+*/
+    {
+        i++;
+    }
+
+    // `[nodiscard]` on a `void` function does not warn even when discarded.
+    t.touch();
 
     // Storing the result is fine, no warning.
     let loaded = t.load();

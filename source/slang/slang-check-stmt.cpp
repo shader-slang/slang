@@ -295,6 +295,9 @@ void SemanticsStmtVisitor::visitForStmt(ForStmt* stmt)
         SemanticsContext sideEffectContext = withInForLoopSideEffect();
         SemanticsExprVisitor subExprVisitor(sideEffectContext);
         stmt->sideEffectExpression = subExprVisitor.CheckExpr(stmt->sideEffectExpression);
+
+        // A `for` loop's side-effect expression also discards its result.
+        maybeDiagnoseDiscardedNodiscardResult(stmt->sideEffectExpression);
     }
     subContext.checkStmt(stmt->statement);
 
@@ -691,22 +694,35 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
     if (isDanglingEquality)
         getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = stmt->expression});
 
+    maybeDiagnoseDiscardedNodiscardResult(stmt->expression);
+}
+
+void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
+{
     // If the discarded expression is a call to a function marked `[nodiscard]`, warn that
     // the result is being ignored.
-    if (auto invokeExpr = as<InvokeExpr>(stmt->expression))
+    auto invokeExpr = as<InvokeExpr>(expr);
+    if (!invokeExpr)
+        return;
+
+    // A `void`-returning function has no result to discard, so `[nodiscard]` on it never
+    // warns (matching C++ behavior).
+    if (invokeExpr->type.type && invokeExpr->type.type->equals(m_astBuilder->getVoidType()))
+        return;
+
+    auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
+    if (!funcDeclRefExpr)
+        return;
+
+    auto calleeDecl = funcDeclRefExpr->declRef.getDecl();
+    if (!calleeDecl)
+        return;
+
+    if (calleeDecl->findModifier<NoDiscardAttribute>())
     {
-        if (auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr))
-        {
-            if (auto calleeDecl = funcDeclRefExpr->declRef.getDecl())
-            {
-                if (calleeDecl->findModifier<NoDiscardAttribute>())
-                {
-                    getSink()->diagnose(Diagnostics::DiscardedNodiscardResult{
-                        .name = calleeDecl->getName(),
-                        .expr = invokeExpr});
-                }
-            }
-        }
+        getSink()->diagnose(Diagnostics::DiscardedNodiscardResult{
+            .name = calleeDecl->getName(),
+            .expr = invokeExpr});
     }
 }
 
