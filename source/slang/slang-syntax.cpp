@@ -895,16 +895,15 @@ Type* DeclRefType::create(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
     }
     else if (as<ThisTypeDecl>(declRef.getDecl()))
     {
-        if (as<DirectDeclRef>(declRef.declRefBase))
-        {
-            declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
-
-            return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
-        }
-        else if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+        if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
         {
             return lookupDeclRef->getWitness()->getSub();
         }
+        // A `MemberDeclRef` base (the `This` of a substituted generic interface) must also
+        // intern as `ThisType`; the generic `DeclRefType` fall-through below would otherwise
+        // yield a second, non-identical representation, breaking type-identity comparison.
+        declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
+        return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
     }
     else if (auto typedefDecl = as<TypeDefDecl>(declRef.getDecl()))
     {
