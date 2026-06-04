@@ -101,15 +101,26 @@ Rules (applied in order, before any posting):
 
 6. **CI-enforced drops:** Drop formatting/style issues (`./extras/formatting.sh`) and anything already caught by existing CI.
 
-7. **Respect prior maintainer verdicts — but only while they are still valid.** If `tmp/prior-review-threads.json` exists, match each candidate finding against prior threads on the same `path` (±8 lines, or the same symbol/function if code moved). Suppress a candidate **only when ALL of these hold**:
-   - a prior thread raised an equivalent claim, **and**
-   - a non-Claude author replied **declining, deferring, or explaining** it ("won't fix", "by design", "intentional", "unfixable", "no such target", "the diagnostic test is exhaustive", …), **and**
-   - **the verdict is still valid for the current code** — i.e. the code the verdict was about has NOT materially changed since the reply. Treat the verdict as **stale (do not suppress, re-evaluate normally)** if any of:
-     - the prior thread is marked `outdated: true` in the JSON (its anchored line changed), **or**
-     - the current `tmp/pr-diff.patch` touches the lines/symbol the verdict was about, **or**
-     - the finding now rests on different evidence than the prior thread addressed.
+7. **Don't re-post a finding the maintainer already dismissed.** The cleanup step writes prior findings to `tmp/prior-review-threads.json` (no file → skip this rule). Each entry has this shape:
 
-   When suppressing, mark the row **Drop** with `Suppressed: prior verdict by @user` in the table, and add the finding to the folded **Suppressed** section of the review body (see Review Body Format) — one row with its location, a one-line description, and a short paraphrase of the maintainer's reply. This keeps suppression transparent without re-posting the inline comment. **Exception:** keep a 🔴 Bug whose evidence quote shows a concrete wrong output the reply did not actually rebut — state why the reply does not cover it. A prior thread with **no** human reply never suppresses (the point may have been missed); re-surface it at most once. A missing JSON file means "no prior verdicts" — proceed normally.
+   ```json
+   {
+     "path": "tests/.../foo.slang",
+     "line": 99,
+     "outdated": false,
+     "finding": "<the bot's earlier comment text>",
+     "humanReplies": [
+       { "user": "<maintainer>", "body": "<maintainer's reply>" }
+     ]
+   }
+   ```
+
+   `outdated` is `true` when newer commits changed those lines since the reply (GitHub re-anchored the thread). DROP a candidate finding when **ALL** of these hold:
+   - a prior entry made the same point on the same code (same `path`, within ±8 lines), **and**
+   - its `humanReplies` is non-empty and a maintainer dismissed or explained it ("won't fix", "by design", "no such target", "the diagnostic test is exhaustive", …), **and**
+   - that entry has **`"outdated": false`**. If `"outdated": true`, the verdict is stale (the code changed since the reply) — re-review the finding normally instead.
+
+   Always KEEP a 🔴 Bug whose evidence shows a concrete wrong result the reply did not address. If `humanReplies` is empty, nobody responded — you may post the finding once. When you drop a finding here, mark the row **Drop** with `Suppressed: prior verdict by @<user>` and list it in the folded **Suppressed** section of the review body (see Review Body Format).
 
 A finding that fails any rule above is marked Drop in the table. Do not post Drop rows. Do not post findings that were not in the table.
 
