@@ -418,8 +418,9 @@ SlangResult ByteCodeInterpreter::prepareModuleForExecution()
                     execOpernad.section = (uint8_t**)&m_currentWorkingSet;
                     break;
                 case kSlangByteCodeSectionStrings:
-                    execOpernad.section = (uint8_t**)&m_stringLitsPtr;
+                    execOpernad.section = reinterpret_cast<uint8_t**>(&m_stringLitsPtr);
                     execOpernad.offset *= sizeof(const char*);
+                    execOpernad.size = sizeof(const char*);
                     break;
                 case kSlangByteCodeSectionImmediate:
                 case kSlangByteCodeSectionFuncs:

@@ -388,7 +388,6 @@ class _MiniYaml:
 @dataclass
 class BundleSpec:
     key: str
-    prompt: str  # path relative to _meta/
     source_doc: str  # workspace-relative
     watched_paths: list[str]
     depends_on: list[str] = field(default_factory=list)
@@ -399,6 +398,13 @@ class BundleSpec:
     def dir(self) -> str:
         """Workspace-relative bundle directory."""
         return f"docs/generated/tests/{self.key}"
+
+    @property
+    def prompt(self) -> str:
+        """Workspace-relative per-bundle prompt path. Co-located with the
+        bundle as `_prompt.md` (derived from `dir`, not stored in the
+        manifest)."""
+        return f"{self.dir}/_prompt.md"
 
 
 @dataclass
@@ -429,7 +435,6 @@ def load_manifest() -> Manifest:
             raise SystemExit(f"bundle {key!r} has no source_doc")
         spec = BundleSpec(
             key=key,
-            prompt=str(entry["prompt"]),
             source_doc=str(source_doc),
             watched_paths=[str(p) for p in watched],
             depends_on=[str(d) for d in entry.get("depends_on") or []],
@@ -691,7 +696,11 @@ def lint_expected_failures() -> list[LintIssue]:
     # line or another link comment resets the group. This lets one
     # tracking-issue cover a block of paths without repeating the link.
     active_link = False
-    link_re = re.compile(r"(https?://|github\.com|#\d+|issues/)")
+    # Accept either a real tracking-issue link (URLs, github.com, #NNN,
+    # issues/...) OR a campaign-mode pending-finding reference (e.g.
+    # "Pending: ..._meta/findings/<id>.yaml"). The latter is converted
+    # to a real URL at human-triage time; see _common.md § Campaign mode.
+    link_re = re.compile(r"(https?://|github\.com|#\d+|issues/|_meta/findings/)")
 
     for lineno, raw in enumerate(path.read_text().splitlines(), start=1):
         s = raw.strip()
@@ -1570,7 +1579,7 @@ def cmd_show(args: argparse.Namespace) -> int:
         raise SystemExit(f"unknown bundle: {args.bundle}")
     print(f"bundle:          {spec.key}")
     print(f"dir:             {spec.dir}")
-    print(f"prompt:          _meta/{spec.prompt}")
+    print(f"prompt:          {spec.prompt}")
     print(f"source_doc:      {spec.source_doc}")
     doc_path = REPO_ROOT / spec.source_doc
     print(
@@ -1649,17 +1658,17 @@ def cmd_index(args: argparse.Namespace) -> int:
 
     # Section assignment by path prefix.
     section_for = {
-        "architecture/": "Architecture",
-        "pipeline/": "Pipeline",
-        "syntax-reference/": "Syntax reference",
-        "cross-cutting/": "Cross-cutting",
-        "ast-reference/": "AST reference",
-        "name-resolution/": "Name resolution",
-        "ir-reference/": "IR reference",
-        "target-pipelines/": "Target pipelines",
+        "conformance/": "Conformance (language reference)",
+        "design/pipeline/": "Pipeline",
+        "design/syntax-reference/": "Syntax reference",
+        "design/cross-cutting/": "Cross-cutting",
+        "design/ast-reference/": "AST reference",
+        "design/name-resolution/": "Name resolution",
+        "design/ir-reference/": "IR reference",
+        "design/target-pipelines/": "Target pipelines",
     }
     section_order = [
-        "Architecture",
+        "Conformance (language reference)",
         "Pipeline",
         "Syntax reference",
         "Cross-cutting",
@@ -1717,11 +1726,11 @@ def cmd_index(args: argparse.Namespace) -> int:
         out.append("| --- | ---: | --- |")
         for spec in grouped[section]:
             count = bundle_counts.get(spec.key, 0)
-            # Relative link from INDEX.md (at docs/generated/tests/INDEX.md)
-            # to source_doc (workspace-relative path under docs/generated/design/).
-            # Strip the shared `docs/generated/` prefix and prepend `../`:
-            #   docs/generated/tests/INDEX.md -> ../design/<...>.md
-            doc_link = "../" + spec.source_doc.removeprefix("docs/generated/")
+            # Relative link from INDEX.md (in docs/generated/tests/) to the
+            # source_doc (workspace-relative). Handles both source roots:
+            #   docs/generated/design/<...>  -> ../design/<...>
+            #   docs/language-reference/<...> -> ../../language-reference/<...>
+            doc_link = os.path.relpath(spec.source_doc, "docs/generated/tests")
             out.append(
                 f"| [`{spec.key}`]({spec.key}/README.md) | {count} |"
                 f" [`{spec.source_doc}`]({doc_link}) |"
@@ -2095,6 +2104,208 @@ def cmd_verify(args: argparse.Namespace) -> int:
             print(f"  {line}")
 
     return 1 if failed else 0
+
+
+# --------------------------------------------------------------------------
+# lang-ref-coverage — measure how much of docs/language-reference/ is
+# anchored by tests; derive the lang-ref ↔ design-doc mapping
+# --------------------------------------------------------------------------
+
+
+def _gh_slug(heading_text: str) -> str:
+    """Compute a GitHub-flavored markdown heading anchor.
+
+    Approximation of the algorithm GitHub uses to render `## Foo Bar`
+    as `#foo-bar`:
+    - lowercase
+    - replace runs of whitespace with `-`
+    - strip characters outside [a-z0-9-_]
+    - leading hyphens kept, but consecutive hyphens collapsed
+    """
+    s = heading_text.strip().lower()
+    s = re.sub(r"[`*_~]", "", s)  # strip markdown emphasis
+    s = re.sub(r"\s+", "-", s)
+    s = re.sub(r"[^a-z0-9\-_]", "", s)
+    s = re.sub(r"-+", "-", s)
+    return s
+
+
+def _enumerate_lang_ref_anchors() -> dict[str, list[tuple[int, str, str]]]:
+    """Walk docs/language-reference/*.md. For each file, return a list
+    of (lineno, level, anchor_id) tuples — one per heading.
+
+    Returns a dict keyed by workspace-relative path.
+    """
+    lang_ref_dir = REPO_ROOT / "docs" / "language-reference"
+    if not lang_ref_dir.is_dir():
+        return {}
+    out: dict[str, list[tuple[int, str, str]]] = {}
+    for md in sorted(lang_ref_dir.glob("*.md")):
+        rel = _rel_to_repo(md)
+        anchors: list[tuple[int, str, str]] = []
+        text = md.read_text()
+        # Match both ATX headings (## Foo) and Setext (Foo\n----).
+        lines = text.splitlines()
+        i = 0
+        while i < len(lines):
+            ln = lines[i]
+            # ATX heading
+            m = re.match(r"^(#{1,6})\s+(.+?)\s*#*\s*$", ln)
+            if m:
+                level = m.group(1)
+                txt = m.group(2)
+                # Strip an explicit `{#anchor}` extension if present
+                m2 = re.search(r"\{#([\w\-]+)\}\s*$", txt)
+                if m2:
+                    aid = m2.group(1).lower()
+                    txt = re.sub(r"\s*\{#[\w\-]+\}\s*$", "", txt)
+                else:
+                    aid = _gh_slug(txt)
+                anchors.append((i + 1, level, aid))
+            else:
+                # Setext-style: a non-blank line followed by ==== or ----
+                if i + 1 < len(lines):
+                    nxt = lines[i + 1]
+                    if ln.strip() and re.match(r"^=+\s*$", nxt):
+                        anchors.append((i + 1, "#", _gh_slug(ln)))
+                        i += 2
+                        continue
+                    if ln.strip() and re.match(r"^-+\s*$", nxt) and not ln.startswith("-"):
+                        anchors.append((i + 1, "##", _gh_slug(ln)))
+                        i += 2
+                        continue
+            i += 1
+        out[rel] = anchors
+    return out
+
+
+def _collect_test_doc_refs() -> dict[str, list[str]]:
+    """Walk every *.slang under docs/generated/tests/ and collect the
+    `//META: doc_ref=` value. Returns a dict mapping path -> list of
+    workspace-relative test paths that cite it.
+
+    Bundle source_doc values are also collected (as bundle-level
+    citations) so the mapping query can join them.
+    """
+    out: dict[str, list[str]] = {}
+    tests_root = REPO_ROOT / "docs" / "generated" / "tests"
+    for slang in tests_root.rglob("*.slang"):
+        if any(part.startswith("_meta") for part in slang.parts):
+            continue
+        try:
+            head = slang.read_text()
+        except OSError:
+            continue
+        m = re.search(r"//META: doc_ref=(\S+)", head)
+        if m:
+            ref = m.group(1)
+            out.setdefault(ref, []).append(_rel_to_repo(slang))
+    return out
+
+
+def cmd_lang_ref_coverage(args: argparse.Namespace) -> int:
+    """Report how much of docs/language-reference/ has at least one test
+    anchored to it. Each `##` / `###` heading is a "claim slot".
+
+    Outputs:
+    - per-file coverage (covered anchors / total anchors)
+    - the uncovered work queue
+    - implied lang-ref ↔ design-doc mapping (from bundle context)
+    """
+    anchors = _enumerate_lang_ref_anchors()
+    test_refs = _collect_test_doc_refs()
+
+    # `test_refs` maps `path#anchor` strings to test paths. Bucket
+    # citations by lang-ref file and anchor id.
+    cited_anchors_by_file: dict[str, dict[str, list[str]]] = {}
+    for ref, paths in test_refs.items():
+        if not ref.startswith("docs/language-reference/"):
+            continue
+        if "#" in ref:
+            file_part, frag = ref.split("#", 1)
+        else:
+            file_part, frag = ref, ""
+        cited_anchors_by_file.setdefault(file_part, {}).setdefault(frag, []).extend(paths)
+
+    total_anchors = 0
+    total_covered = 0
+    per_file: list[tuple[str, int, int]] = []  # (path, covered, total)
+    uncovered: list[tuple[str, str]] = []  # (path, anchor_id)
+    for path, slots in anchors.items():
+        slot_ids = {aid for _ln, _lv, aid in slots if aid}
+        cited_here = set(cited_anchors_by_file.get(path, {}).keys())
+        covered_here = slot_ids & cited_here
+        n_total = len(slot_ids)
+        n_cov = len(covered_here)
+        total_anchors += n_total
+        total_covered += n_cov
+        per_file.append((path, n_cov, n_total))
+        for aid in sorted(slot_ids - cited_here):
+            uncovered.append((path, aid))
+
+    # Header
+    print(f"language-reference coverage: {total_covered} / {total_anchors}"
+          f" anchors ({100.0 * total_covered / max(1, total_anchors):.1f}%)\n")
+
+    print("Per-file:")
+    for path, n_cov, n_total in per_file:
+        if n_total == 0:
+            print(f"  {n_cov:>3}/{n_total:<3}        {path}")
+        else:
+            pct = 100.0 * n_cov / n_total
+            print(f"  {n_cov:>3}/{n_total:<3}  {pct:5.1f}%  {path}")
+
+    if args.list_uncovered:
+        print()
+        print("Uncovered anchors (work queue):")
+        for path, aid in uncovered:
+            print(f"  {path}#{aid}")
+
+    if args.mapping:
+        print()
+        print("lang-ref → design-doc mapping (from bundle context):")
+        # For each test that cites a lang-ref anchor, look up the
+        # bundle it lives in and that bundle's source_doc. If the
+        # bundle's source_doc is a design-doc, record an edge.
+        manifest = load_manifest()
+        # Build path → source_doc lookup for the bundle a test lives in.
+        # The bundle key is the workspace-relative directory prefix.
+        def bundle_for(test_path: str) -> BundleSpec | None:
+            prefix = "docs/generated/tests/"
+            if not test_path.startswith(prefix):
+                return None
+            rest = test_path[len(prefix):]
+            # Try progressively shorter prefixes against the manifest.
+            parts = rest.split("/")
+            for cut in range(len(parts), 0, -1):
+                key = "/".join(parts[:cut])
+                if key in manifest.bundles:
+                    return manifest.bundles[key]
+            return None
+
+        edges: dict[tuple[str, str], int] = {}
+        for ref, paths in test_refs.items():
+            if not ref.startswith("docs/language-reference/"):
+                continue
+            for tp in paths:
+                spec = bundle_for(tp)
+                if spec is None:
+                    continue
+                bundle_doc = spec.source_doc
+                if bundle_doc.startswith("docs/generated/design/"):
+                    edge = (ref, bundle_doc)
+                    edges[edge] = edges.get(edge, 0) + 1
+
+        if not edges:
+            print("  (no edges yet — no test cites lang-ref from inside a"
+                  " design-doc bundle.)")
+        else:
+            for (lang_ref, design_doc), n in sorted(edges.items()):
+                print(f"  {lang_ref}\n    ↔ {design_doc}  ({n} test(s))")
+
+    # Exit code 0 when called purely informationally; 1 when --gate-on
+    # is set and coverage is below the gate threshold (future expansion).
+    return 0
 
 
 # --------------------------------------------------------------------------
@@ -2746,6 +2957,28 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_verify.set_defaults(func=cmd_verify)
+
+    p_lrc = sub.add_parser(
+        "lang-ref-coverage",
+        help=(
+            "report how many heading-anchors in docs/language-reference/"
+            " have at least one test anchored to them"
+        ),
+    )
+    p_lrc.add_argument(
+        "--list-uncovered",
+        action="store_true",
+        help="dump the full list of uncovered anchors (the work queue)",
+    )
+    p_lrc.add_argument(
+        "--mapping",
+        action="store_true",
+        help=(
+            "show the implied lang-ref ↔ design-doc mapping derived"
+            " from bundle source_doc context"
+        ),
+    )
+    p_lrc.set_defaults(func=cmd_lang_ref_coverage)
 
     p_idx = sub.add_parser(
         "index",
