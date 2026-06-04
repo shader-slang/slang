@@ -101,7 +101,8 @@ static void _checkBindlessSpaceReflection(
     uint32_t compilerOptionCount = 0,
     SlangCompileTarget targetFormat = SLANG_SPIRV,
     const char* profileName = "spirv_1_5",
-    const char* targetCapabilityName = nullptr)
+    const char* targetCapabilityName = nullptr,
+    bool queryMetadataBeforeLayout = false)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
@@ -157,20 +158,26 @@ static void _checkBindlessSpaceReflection(
     compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
     SLANG_CHECK(linkedProgram != nullptr);
 
-    auto programLayout = linkedProgram->getLayout();
-    SLANG_CHECK(programLayout != nullptr);
+    auto checkBindlessSpaceLayout = [&]()
+    {
+        auto programLayout = linkedProgram->getLayout();
+        SLANG_CHECK(programLayout != nullptr);
 
-    auto bindlessSpaceIndex = programLayout->getBindlessSpaceIndex();
-    if (bindlessSpaceExpectation.expectsReservedSpace)
-    {
-        SLANG_CHECK(bindlessSpaceIndex >= 0);
-        if (bindlessSpaceExpectation.expectsExactSpaceIndex)
-            SLANG_CHECK(bindlessSpaceIndex == bindlessSpaceExpectation.exactSpaceIndex);
-    }
-    else
-    {
-        SLANG_CHECK(bindlessSpaceIndex == -1);
-    }
+        auto bindlessSpaceIndex = programLayout->getBindlessSpaceIndex();
+        if (bindlessSpaceExpectation.expectsReservedSpace)
+        {
+            SLANG_CHECK(bindlessSpaceIndex >= 0);
+            if (bindlessSpaceExpectation.expectsExactSpaceIndex)
+                SLANG_CHECK(bindlessSpaceIndex == bindlessSpaceExpectation.exactSpaceIndex);
+        }
+        else
+        {
+            SLANG_CHECK(bindlessSpaceIndex == -1);
+        }
+    };
+
+    if (!queryMetadataBeforeLayout)
+        checkBindlessSpaceLayout();
 
     ComPtr<slang::IMetadata> metadata;
     SLANG_CHECK(
@@ -182,6 +189,9 @@ static void _checkBindlessSpaceReflection(
         metadata->castAs(slang::IBindlessResourceMetadata::getTypeGuid()));
     SLANG_CHECK(bindlessMetadata != nullptr);
     SLANG_CHECK(bindlessMetadata->usesBindlessResourceHeap() == expectedUsesBindlessResourceHeap);
+
+    if (queryMetadataBeforeLayout)
+        checkBindlessSpaceLayout();
 }
 
 SLANG_UNIT_TEST(bindlessSpaceReflection)
@@ -228,6 +238,39 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithUnboundedResourceArray)
     )";
 
     _checkBindlessSpaceReflection(userSource, _expectAnyReservedBindlessSpace(), false);
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithUnboundedResourceArrayInRequestedSpace)
+{
+    const char* userSource = R"(
+        Texture2D<float4> gTextures[] : register(t0, space0);
+        RWStructuredBuffer<float> gOutput : register(u0, space1);
+
+        [Shader("compute")]
+        [NumThreads(1, 1, 1)]
+        void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            gOutput[0] = gTextures[0].Load(int3(0, 0, 0)).x;
+        }
+    )";
+
+    slang::CompilerOptionEntry bindlessSpaceOption = {};
+    bindlessSpaceOption.name = slang::CompilerOptionName::BindlessSpaceIndex;
+    bindlessSpaceOption.value.kind = slang::CompilerOptionValueKind::Int;
+    bindlessSpaceOption.value.intValue0 = 0;
+
+    // The user array occupies the requested bindless space, so layout reservation moves the
+    // system bindless space to the next free space instead of treating the user array as a heap.
+    _checkBindlessSpaceReflection(
+        userSource,
+        _expectReservedBindlessSpaceAt(2),
+        false,
+        &bindlessSpaceOption,
+        1,
+        SLANG_SPIRV,
+        "spirv_1_5",
+        nullptr,
+        true);
 }
 
 SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandle)
@@ -305,6 +348,34 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithTexelPointerHeap)
             uint previousValue;
             InterlockedAdd(p1.t[dispatchThreadID.xy], 1, previousValue);
             gOutput[0] = previousValue;
+        }
+    )";
+
+    _checkBindlessSpaceReflection(userSource, _expectReservedBindlessSpaceAt(2), true);
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithHelperFunctionHandleUse)
+{
+    const char* userSource = R"(
+        RWStructuredBuffer<float> gOutput;
+
+        struct P
+        {
+            Texture2D.Handle t;
+        };
+
+        ParameterBlock<P> p1;
+
+        float readTexture(Texture2D.Handle textureHandle)
+        {
+            return textureHandle.Load(int3(0, 0, 0)).x;
+        }
+
+        [Shader("compute")]
+        [NumThreads(1, 1, 1)]
+        void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            gOutput[0] = readTexture(p1.t);
         }
     )";
 
