@@ -215,12 +215,12 @@ Invoke resolution will then narrow this down to a single match (`DiffPair<double
 we return `InvokeExpr(ForwardDifferentiateExpr(f : double, double -> float), casted_args)` by wrapping the corresponding function in the corresponding higher-order expr
 
 When the operand is a member method expression such as `obj.method`, this type translation treats
-the method receiver as the first explicit parameter of the transformed function. For example,
-`bwd_diff(obj.method)(obj, ...)` type-checks the first argument against the method's implicit
-`this` parameter after applying the usual differentiability rules. A differentiable `this` uses
-the appropriate `DifferentialPair` form, while a `[NoDiffThis]` method receives the receiver as a
-regular value. The higher-order expression does not close over `obj`; after checking, derivative
-lookup is represented as a static derivative member on the selected method.
+the method's implicit `this` value as the first explicit parameter of the transformed function. For
+example, `bwd_diff(obj.method)(obj, ...)` type-checks the first argument against the method's
+implicit `this` parameter after applying the usual differentiability rules. A differentiable `this`
+uses the appropriate `DifferentialPair` form, while a `[NoDiffThis]` method receives the object
+value as a regular argument. The higher-order expression does not close over `obj`; after checking,
+derivative lookup is represented as a static derivative member on the selected method.
 
 ## Attributed Types (`no_diff` parameters)
 
