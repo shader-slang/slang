@@ -5036,6 +5036,17 @@ TokenList preprocessSource(
         dynamicCast<preprocessor::WarningStateTracker>(desc.sink->getSourceWarningStateTracker());
 
     // Continue the absolute-location axis from the previous pass that shared this tracker.
+    //
+    // Correctness relies on a pass-ordering invariant the timeline depends on but cannot check:
+    // `preprocessSource` runs once per file, in include order, so the seeded ranges are disjoint
+    // and absolute-location order matches include/program order. That is exactly what keeps
+    // `WarningTimeline::addEntry`'s strictly-increasing insert guard (`location >
+    // maxKnownLocation`) satisfied across files. Each file is preprocessed at most once per
+    // tracker: `Linkage::findAndIncludeFile` de-dupes via the module's included-source-file map. If
+    // a pass ever ran out of include order, or a file were re-preprocessed against the same
+    // tracker, the seeded range could overlap a prior file's range and `#pragma warning` state
+    // would be mis-resolved *silently* (entries dropped on the `PragmaWarningCannotInsertHere`
+    // path, or a wrong suppression).
     if (preprocessor.warningStateTracker)
     {
         preprocessor.absoluteSourceLocCounter =
@@ -5102,9 +5113,15 @@ TokenList preprocessSource(
 
     finalCheckPragmaWarnings(&preprocessor);
 
-    // Hand the advanced counter back so the next `__include` pass continues the axis.
+    // Hand the advanced counter back so the next `__include` pass continues the axis. The counter
+    // only ever advances within a pass (pushInputFile/popInputFile add non-negative offsets), so
+    // it must not drop below the value seeded above; assert that so a future change that breaks the
+    // monotonic handoff fails loudly instead of silently corrupting warning state.
     if (preprocessor.warningStateTracker)
     {
+        SLANG_ASSERT(
+            preprocessor.absoluteSourceLocCounter >=
+            preprocessor.warningStateTracker->persistedAbsoluteSourceLocCounter);
         preprocessor.warningStateTracker->persistedAbsoluteSourceLocCounter =
             preprocessor.absoluteSourceLocCounter;
     }
