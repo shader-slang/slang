@@ -72,7 +72,7 @@ jobs:
     env:
       # Keep macOS option sweeps from building DXC from source. The
       # SLANG_DXC_BUILD_FROM_SOURCE matrix entry still tests OFF.
-      SLANG_CI_EXTRA_CMAKE_FLAGS: ${{ inputs.os == 'macos' && '-DSLANG_DXC_BUILD_FROM_SOURCE=OFF' || '' }}
+      SLANG_CI_DXC_BUILD_FROM_SOURCE: ${{ inputs.os == 'macos' && '-DSLANG_DXC_BUILD_FROM_SOURCE=OFF' || '' }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
@@ -166,7 +166,7 @@ jobs:
               -DSLANG_USE_SCCACHE=OFF \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
               $generators_path \
-              $SLANG_CI_EXTRA_CMAKE_FLAGS \
+              $SLANG_CI_DXC_BUILD_FROM_SOURCE \
               "-D${option}=${value}" \
               ${{ matrix.extra_cmake_flags || '' }}
           else
@@ -175,7 +175,7 @@ jobs:
               -DSLANG_USE_SCCACHE=OFF \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
               $generators_path \
-              $SLANG_CI_EXTRA_CMAKE_FLAGS \
+              $SLANG_CI_DXC_BUILD_FROM_SOURCE \
               "-D${option}=${value}" \
               ${{ matrix.extra_cmake_flags || '' }}
           fi
