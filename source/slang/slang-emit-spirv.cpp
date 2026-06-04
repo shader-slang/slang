@@ -6343,11 +6343,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                 }
 
-                if (shouldEmitExecutionMode)
-                {
-                    SLANG_ASSERT(m != SpvExecutionModeMax);
+                if (shouldEmitExecutionMode && m != SpvExecutionModeMax)
                     requireSPIRVExecutionMode(decoration, dstID, m);
-                }
             }
             break;
 
