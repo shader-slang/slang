@@ -215,10 +215,30 @@ SLANG_UNIT_TEST(linkTimeStaticConstIntReflection)
         return value;
     };
 
+    auto getStaticIntBlob = [&](const char* typeName, const char* varName) -> int32_t
+    {
+        auto type = programLayout->findTypeByName(typeName);
+        SLANG_CHECK_ABORT(type != nullptr);
+
+        auto valueVar = programLayout->findVarByNameInType(type, varName);
+        SLANG_CHECK_ABORT(valueVar != nullptr);
+
+        ComPtr<slang::IBlob> blob;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(valueVar->getDefaultValueBlob(blob.writeRef())));
+        SLANG_CHECK_ABORT(blob != nullptr);
+        SLANG_CHECK_ABORT(blob->getBufferSize() == sizeof(int32_t));
+        return ((const int32_t*)blob->getBufferPointer())[0];
+    };
+
     SLANG_CHECK(getStaticInt("StaticConstCarrier<5>", "Value") == 6);
     SLANG_CHECK(getStaticInt("NestedCarrier<5>", "Value") == 9);
     SLANG_CHECK(getStaticInt("TypeCarrier<float,5>", "Value") == 10);
     SLANG_CHECK(getStaticInt("LiteralCarrier", "Value") == 23);
+
+    SLANG_CHECK(getStaticIntBlob("StaticConstCarrier<5>", "Value") == 6);
+    SLANG_CHECK(getStaticIntBlob("NestedCarrier<5>", "Value") == 9);
+    SLANG_CHECK(getStaticIntBlob("TypeCarrier<float,5>", "Value") == 10);
+    SLANG_CHECK(getStaticIntBlob("LiteralCarrier", "Value") == 23);
 }
 
 SLANG_UNIT_TEST(defaultValueBlobReflection)
@@ -230,6 +250,12 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
         {
             public float3 baseOrDiffuseColor = 1.0f;
             public int materialID = -1;
+        }
+
+        public enum TopMode : int
+        {
+            C = 4,
+            D = 6,
         }
 
         public struct Defaults
@@ -256,18 +282,52 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
                 B = 3,
             }
 
+            public enum ByteMode : uint8_t
+            {
+                Low = 2,
+                High = 250,
+            }
+
             public static const float ScalarFloat = 1.5f;
             public static const int ScalarInt = -7;
+            public static const bool ScalarBool = true;
+            public static const bool ScalarBoolFromInt = 1;
+            public static const bool ScalarBoolFalse = false;
+            public static const bool ScalarBoolFromIntZero = 0;
+            public static const int ScalarIntFromBool = true;
+            public static const float ScalarFloatFromBool = false;
+            public static const half ScalarHalf = half(0.5f);
+            public static const double ScalarDouble = 3.25;
+            public static const int8_t ScalarInt8 = -5;
+            public static const uint8_t ScalarUInt8 = 250;
+            public static const int16_t ScalarInt16 = -300;
+            public static const uint16_t ScalarUInt16 = 65000;
+            public static const uint ScalarUInt = 0xDEADBEEFu;
+            public static const int64_t ScalarInt64 = 0x100000001LL;
+            public static const uint64_t ScalarUInt64 = 0xFFFFFFFF00000001ULL;
+            public static const intptr_t ScalarIntPtr = -11;
+            public static const uintptr_t ScalarUIntPtr = 13;
+            typedef float3 AliasFloat3;
+            public static const AliasFloat3 AliasVector = float3(9.0f, 10.0f, 11.0f);
             public static const float3 VectorFloat = float3(1.0f, 2.0f, 1.5f);
             public static const float3 VectorSplat = float3(4.0f);
             public static const int3 VectorInt = int3(1, -2, 3);
             public static const float3 VectorPartial = { 5.0f, 6.0f };
+            public static const float3 VectorDefault = {};
             public static const float2x3 MatrixValue = { float3(1.0f, 2.0f, 3.0f), float3(4.0f, 5.0f, 6.0f) };
+            public static const float2x3 MatrixDefault = {};
             public static const int ArrayValue[3] = { 1, 2 };
+            public static const int ArrayDefault[3] = {};
+            public static const int LargeArray[16777217] = { 1 };
             public static const Pair StructPartial = { 5.0f };
             public static const Pair StructDefault = {};
             public static const Derived DerivedDefault = {};
+            public static const Derived DerivedExplicit = { 3 };
             public static const Mode EnumValue = Mode.B;
+            public static const Mode EnumAlias = EnumValue;
+            public static const Mode EnumCast = Mode(5);
+            public static const Mode EnumDefault = {};
+            public static const ByteMode ByteEnumValue = ByteMode.High;
             public Derived ValueWithoutInitializer;
         }
         )";
@@ -304,6 +364,8 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
     SLANG_CHECK_ABORT(defaultsType != nullptr);
     auto materialConstantsType = programLayout->findTypeByName("MaterialConstants");
     SLANG_CHECK_ABORT(materialConstantsType != nullptr);
+    auto topModeType = programLayout->findTypeByName("TopMode");
+    SLANG_CHECK_ABORT(topModeType != nullptr);
 
     auto getDefaultBlob = [&](const char* varName) -> ComPtr<slang::IBlob>
     {
@@ -354,6 +416,81 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
     SLANG_CHECK(scalarInt->getBufferSize() == sizeof(int32_t));
     SLANG_CHECK(((const int32_t*)scalarInt->getBufferPointer())[0] == -7);
 
+    auto scalarBool = getDefaultBlob("ScalarBool");
+    SLANG_CHECK(scalarBool->getBufferSize() == sizeof(uint32_t));
+    SLANG_CHECK(((const uint32_t*)scalarBool->getBufferPointer())[0] == 1);
+
+    auto scalarBoolFromInt = getDefaultBlob("ScalarBoolFromInt");
+    SLANG_CHECK(scalarBoolFromInt->getBufferSize() == sizeof(uint32_t));
+    SLANG_CHECK(((const uint32_t*)scalarBoolFromInt->getBufferPointer())[0] == 1);
+
+    auto scalarBoolFalse = getDefaultBlob("ScalarBoolFalse");
+    SLANG_CHECK(scalarBoolFalse->getBufferSize() == sizeof(uint32_t));
+    SLANG_CHECK(((const uint32_t*)scalarBoolFalse->getBufferPointer())[0] == 0);
+
+    auto scalarBoolFromIntZero = getDefaultBlob("ScalarBoolFromIntZero");
+    SLANG_CHECK(scalarBoolFromIntZero->getBufferSize() == sizeof(uint32_t));
+    SLANG_CHECK(((const uint32_t*)scalarBoolFromIntZero->getBufferPointer())[0] == 0);
+
+    auto scalarIntFromBool = getDefaultBlob("ScalarIntFromBool");
+    SLANG_CHECK(scalarIntFromBool->getBufferSize() == sizeof(int32_t));
+    SLANG_CHECK(((const int32_t*)scalarIntFromBool->getBufferPointer())[0] == 1);
+
+    auto scalarFloatFromBool = getDefaultBlob("ScalarFloatFromBool");
+    SLANG_CHECK(scalarFloatFromBool->getBufferSize() == sizeof(float));
+    SLANG_CHECK(((const float*)scalarFloatFromBool->getBufferPointer())[0] == 0.0f);
+
+    auto scalarHalf = getDefaultBlob("ScalarHalf");
+    SLANG_CHECK(scalarHalf->getBufferSize() == sizeof(uint16_t));
+    SLANG_CHECK(((const uint16_t*)scalarHalf->getBufferPointer())[0] == 0x3800);
+
+    auto scalarDouble = getDefaultBlob("ScalarDouble");
+    SLANG_CHECK(scalarDouble->getBufferSize() == sizeof(double));
+    SLANG_CHECK(((const double*)scalarDouble->getBufferPointer())[0] == 3.25);
+
+    auto scalarInt8 = getDefaultBlob("ScalarInt8");
+    SLANG_CHECK(scalarInt8->getBufferSize() == sizeof(int8_t));
+    SLANG_CHECK(((const int8_t*)scalarInt8->getBufferPointer())[0] == -5);
+
+    auto scalarUInt8 = getDefaultBlob("ScalarUInt8");
+    SLANG_CHECK(scalarUInt8->getBufferSize() == sizeof(uint8_t));
+    SLANG_CHECK(((const uint8_t*)scalarUInt8->getBufferPointer())[0] == 250);
+
+    auto scalarInt16 = getDefaultBlob("ScalarInt16");
+    SLANG_CHECK(scalarInt16->getBufferSize() == sizeof(int16_t));
+    SLANG_CHECK(((const int16_t*)scalarInt16->getBufferPointer())[0] == -300);
+
+    auto scalarUInt16 = getDefaultBlob("ScalarUInt16");
+    SLANG_CHECK(scalarUInt16->getBufferSize() == sizeof(uint16_t));
+    SLANG_CHECK(((const uint16_t*)scalarUInt16->getBufferPointer())[0] == 65000);
+
+    auto scalarUInt = getDefaultBlob("ScalarUInt");
+    SLANG_CHECK(scalarUInt->getBufferSize() == sizeof(uint32_t));
+    SLANG_CHECK(((const uint32_t*)scalarUInt->getBufferPointer())[0] == 0xDEADBEEF);
+
+    auto scalarInt64 = getDefaultBlob("ScalarInt64");
+    SLANG_CHECK(scalarInt64->getBufferSize() == sizeof(int64_t));
+    SLANG_CHECK(((const int64_t*)scalarInt64->getBufferPointer())[0] == 0x100000001LL);
+
+    auto scalarUInt64 = getDefaultBlob("ScalarUInt64");
+    SLANG_CHECK(scalarUInt64->getBufferSize() == sizeof(uint64_t));
+    SLANG_CHECK(((const uint64_t*)scalarUInt64->getBufferPointer())[0] == 0xFFFFFFFF00000001ULL);
+
+    auto scalarIntPtr = getDefaultBlob("ScalarIntPtr");
+    SLANG_CHECK(scalarIntPtr->getBufferSize() == sizeof(intptr_t));
+    SLANG_CHECK(((const intptr_t*)scalarIntPtr->getBufferPointer())[0] == -11);
+
+    auto scalarUIntPtr = getDefaultBlob("ScalarUIntPtr");
+    SLANG_CHECK(scalarUIntPtr->getBufferSize() == sizeof(uintptr_t));
+    SLANG_CHECK(((const uintptr_t*)scalarUIntPtr->getBufferPointer())[0] == 13);
+
+    auto aliasVector = getDefaultBlob("AliasVector");
+    SLANG_CHECK(aliasVector->getBufferSize() == sizeof(float) * 3);
+    auto aliasVectorData = (const float*)aliasVector->getBufferPointer();
+    SLANG_CHECK(aliasVectorData[0] == 9.0f);
+    SLANG_CHECK(aliasVectorData[1] == 10.0f);
+    SLANG_CHECK(aliasVectorData[2] == 11.0f);
+
     auto vectorFloat = getDefaultBlob("VectorFloat");
     SLANG_CHECK(vectorFloat->getBufferSize() == sizeof(float) * 3);
     auto vectorFloatData = (const float*)vectorFloat->getBufferPointer();
@@ -382,11 +519,24 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
     SLANG_CHECK(vectorPartialData[1] == 6.0f);
     SLANG_CHECK(vectorPartialData[2] == 0.0f);
 
+    auto vectorDefault = getDefaultBlob("VectorDefault");
+    SLANG_CHECK(vectorDefault->getBufferSize() == sizeof(float) * 3);
+    auto vectorDefaultData = (const float*)vectorDefault->getBufferPointer();
+    SLANG_CHECK(vectorDefaultData[0] == 0.0f);
+    SLANG_CHECK(vectorDefaultData[1] == 0.0f);
+    SLANG_CHECK(vectorDefaultData[2] == 0.0f);
+
     auto matrixValue = getDefaultBlob("MatrixValue");
     SLANG_CHECK(matrixValue->getBufferSize() == sizeof(float) * 6);
     auto matrixData = (const float*)matrixValue->getBufferPointer();
     for (int i = 0; i < 6; ++i)
         SLANG_CHECK(matrixData[i] == float(i + 1));
+
+    auto matrixDefault = getDefaultBlob("MatrixDefault");
+    SLANG_CHECK(matrixDefault->getBufferSize() == sizeof(float) * 6);
+    auto matrixDefaultData = (const float*)matrixDefault->getBufferPointer();
+    for (int i = 0; i < 6; ++i)
+        SLANG_CHECK(matrixDefaultData[i] == 0.0f);
 
     auto arrayValue = getDefaultBlob("ArrayValue");
     SLANG_CHECK(arrayValue->getBufferSize() == sizeof(int32_t) * 3);
@@ -394,6 +544,17 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
     SLANG_CHECK(arrayData[0] == 1);
     SLANG_CHECK(arrayData[1] == 2);
     SLANG_CHECK(arrayData[2] == 0);
+
+    auto arrayDefault = getDefaultBlob("ArrayDefault");
+    SLANG_CHECK(arrayDefault->getBufferSize() == sizeof(int32_t) * 3);
+    auto arrayDefaultData = (const int32_t*)arrayDefault->getBufferPointer();
+    SLANG_CHECK(arrayDefaultData[0] == 0);
+    SLANG_CHECK(arrayDefaultData[1] == 0);
+    SLANG_CHECK(arrayDefaultData[2] == 0);
+
+    ComPtr<slang::IBlob> largeArray;
+    SLANG_CHECK(getDefaultBlobResult("LargeArray", largeArray) == SLANG_E_NOT_AVAILABLE);
+    SLANG_CHECK(largeArray == nullptr);
 
     auto structPartial = getDefaultBlob("StructPartial");
     SLANG_CHECK(structPartial->getBufferSize() == sizeof(float) + sizeof(int32_t));
@@ -415,13 +576,54 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
     SLANG_CHECK(derivedBaseData[1] == 8.0f);
     SLANG_CHECK(*(const int32_t*)(derivedDefaultBytes + sizeof(float) * 2) == 9);
 
+    auto derivedExplicit = getDefaultBlob("DerivedExplicit");
+    SLANG_CHECK(derivedExplicit->getBufferSize() == sizeof(float) * 2 + sizeof(int32_t));
+    auto derivedExplicitBytes = (const uint8_t*)derivedExplicit->getBufferPointer();
+    auto derivedExplicitBaseData = (const float*)derivedExplicitBytes;
+    SLANG_CHECK(derivedExplicitBaseData[0] == 7.0f);
+    SLANG_CHECK(derivedExplicitBaseData[1] == 8.0f);
+    SLANG_CHECK(*(const int32_t*)(derivedExplicitBytes + sizeof(float) * 2) == 3);
+
     auto enumValue = getDefaultBlob("EnumValue");
     SLANG_CHECK(enumValue->getBufferSize() == sizeof(int32_t));
     SLANG_CHECK(((const int32_t*)enumValue->getBufferPointer())[0] == 3);
 
+    auto enumAlias = getDefaultBlob("EnumAlias");
+    SLANG_CHECK(enumAlias->getBufferSize() == sizeof(int32_t));
+    SLANG_CHECK(((const int32_t*)enumAlias->getBufferPointer())[0] == 3);
+
+    auto enumCast = getDefaultBlob("EnumCast");
+    SLANG_CHECK(enumCast->getBufferSize() == sizeof(int32_t));
+    SLANG_CHECK(((const int32_t*)enumCast->getBufferPointer())[0] == 5);
+
+    auto enumDefault = getDefaultBlob("EnumDefault");
+    SLANG_CHECK(enumDefault->getBufferSize() == sizeof(int32_t));
+    SLANG_CHECK(((const int32_t*)enumDefault->getBufferPointer())[0] == 0);
+
+    auto byteEnumValue = getDefaultBlob("ByteEnumValue");
+    SLANG_CHECK(byteEnumValue->getBufferSize() == sizeof(uint8_t));
+    SLANG_CHECK(((const uint8_t*)byteEnumValue->getBufferPointer())[0] == 250);
+
+    SLANG_CHECK_ABORT(topModeType->getFieldCount() == 2);
+    auto enumCase = topModeType->getFieldByIndex(1);
+    SLANG_CHECK_ABORT(enumCase != nullptr);
+    ComPtr<slang::IBlob> enumCaseBlob;
+    SLANG_CHECK(SLANG_SUCCEEDED(enumCase->getDefaultValueBlob(enumCaseBlob.writeRef())));
+    SLANG_CHECK(enumCaseBlob->getBufferSize() == sizeof(int32_t));
+    SLANG_CHECK(((const int32_t*)enumCaseBlob->getBufferPointer())[0] == 6);
+
     ComPtr<slang::IBlob> valueWithoutInitializer;
     SLANG_CHECK(SLANG_SUCCEEDED(getDefaultBlobResult("ValueWithoutInitializer", valueWithoutInitializer)));
     SLANG_CHECK(valueWithoutInitializer == nullptr);
+
+    ComPtr<slang::IBlob> invalidArgBlob;
+    SLANG_CHECK(
+        spReflectionVariable_GetDefaultValueBlob(nullptr, invalidArgBlob.writeRef()) ==
+        SLANG_E_INVALID_ARG);
+    SLANG_CHECK(
+        spReflectionVariable_GetDefaultValueBlob(
+            (SlangReflectionVariable*)programLayout->findVarByNameInType(defaultsType, "ScalarFloat"),
+            nullptr) == SLANG_E_INVALID_ARG);
 }
 
 
