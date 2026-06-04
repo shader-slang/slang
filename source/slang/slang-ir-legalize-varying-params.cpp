@@ -37,6 +37,19 @@ SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticN
     return systemValueSemanticName;
 }
 
+bool isRayTracingHitStage(Stage stage)
+{
+    switch (stage)
+    {
+    case Stage::Intersection:
+    case Stage::AnyHit:
+    case Stage::ClosestHit:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // This pass implements logic to "legalize" the varying parameter
 // signature of an entry point.
 //
@@ -326,6 +339,170 @@ IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType)
         return nullptr;
     }
     return builder.emitCast(toType, val);
+}
+
+static bool isPrimitiveIDSystemValueParam(IRParam* param)
+{
+    if (auto semanticDecor = param->findDecoration<IRSemanticDecoration>())
+    {
+        if (semanticDecor->getSemanticName().caseInsensitiveEquals(toSlice("sv_primitiveid")))
+            return true;
+    }
+
+    auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecor)
+        return false;
+
+    auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+    if (!varLayout)
+        return false;
+
+    auto systemValueAttr = varLayout->findSystemValueSemanticAttr();
+    if (!systemValueAttr)
+        return false;
+
+    return systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid"));
+}
+
+static IRFunc* getRayTracingPrimitiveIndexFunc(IRModule* module, IRFunc*& primitiveIndexFunc)
+{
+    if (primitiveIndexFunc)
+        return primitiveIndexFunc;
+
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+
+    primitiveIndexFunc = builder.createFunc();
+    builder.setDataType(primitiveIndexFunc, builder.getFuncType(0, nullptr, builder.getUIntType()));
+    builder.addTargetIntrinsicDecoration(
+        primitiveIndexFunc,
+        CapabilitySet(CapabilityName::hlsl),
+        UnownedTerminatedStringSlice("PrimitiveIndex"));
+    builder.addTargetIntrinsicDecoration(
+        primitiveIndexFunc,
+        CapabilitySet(CapabilityName::cuda),
+        UnownedTerminatedStringSlice("optixGetPrimitiveIndex"));
+    return primitiveIndexFunc;
+}
+
+static IRInst* emitRayTracingPrimitiveIndexValue(
+    IRModule* module,
+    IRBuilder& builder,
+    IRFunc*& primitiveIndexFunc,
+    IRType* paramType)
+{
+    IRType* valueType = paramType;
+    if (auto borrowInParamType = as<IRBorrowInParamType>(valueType))
+        valueType = borrowInParamType->getValueType();
+
+    auto primitiveIndexCall = builder.emitCallInst(
+        builder.getUIntType(),
+        getRayTracingPrimitiveIndexFunc(module, primitiveIndexFunc),
+        0,
+        nullptr);
+
+    if (valueType == builder.getUIntType())
+        return primitiveIndexCall;
+
+    return tryConvertValue(builder, primitiveIndexCall, valueType);
+}
+
+static void replacePrimitiveIDParamUses(
+    IRBuilder& builder,
+    IRParam* param,
+    IRInst* valueReplacement,
+    IRType* valueType,
+    bool needsAddressReplacement)
+{
+    IRInst* addressReplacement = nullptr;
+    auto getAddressReplacement = [&]()
+    {
+        if (!addressReplacement)
+        {
+            addressReplacement = builder.emitVar(valueType);
+            builder.emitStore(addressReplacement, valueReplacement);
+        }
+        return addressReplacement;
+    };
+
+    traverseUses(
+        param,
+        [&](IRUse* use)
+        {
+            auto user = use->getUser();
+            if (auto load = as<IRLoad>(user))
+            {
+                if (load->getPtr() == param)
+                {
+                    load->replaceUsesWith(valueReplacement);
+                    load->removeAndDeallocate();
+                    return;
+                }
+            }
+
+            builder.replaceOperand(
+                use,
+                needsAddressReplacement ? getAddressReplacement() : valueReplacement);
+        });
+}
+
+bool legalizeRayTracingPrimitiveIDParamsForEntryPoint(
+    IRModule* module,
+    IRFunc* entryPointFunc,
+    IRFunc*& primitiveIndexFunc)
+{
+    auto entryPointDecor = entryPointFunc->findDecoration<IREntryPointDecoration>();
+    if (!entryPointDecor || !isRayTracingHitStage(entryPointDecor->getProfile().getStage()))
+        return false;
+
+    auto firstBlock = entryPointFunc->getFirstBlock();
+    if (!firstBlock)
+        return false;
+
+    IRBuilder builder(module);
+    builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+
+    bool modifiedFuncType = false;
+    for (auto param = firstBlock->getFirstParam(); param;)
+    {
+        auto nextParam = param->getNextParam();
+
+        if (!isPrimitiveIDSystemValueParam(param))
+        {
+            param = nextParam;
+            continue;
+        }
+
+        auto paramType = param->getFullType();
+        IRType* valueType = paramType;
+        bool needsAddressReplacement = false;
+        if (auto borrowInParamType = as<IRBorrowInParamType>(valueType))
+        {
+            valueType = borrowInParamType->getValueType();
+            needsAddressReplacement = true;
+        }
+
+        if (param->hasUses())
+        {
+            auto valueReplacement =
+                emitRayTracingPrimitiveIndexValue(module, builder, primitiveIndexFunc, paramType);
+            replacePrimitiveIDParamUses(
+                builder,
+                param,
+                valueReplacement,
+                valueType,
+                needsAddressReplacement);
+        }
+
+        param->removeAndDeallocate();
+        modifiedFuncType = true;
+        param = nextParam;
+    }
+
+    if (modifiedFuncType)
+        fixUpFuncType(entryPointFunc);
+
+    return modifiedFuncType;
 }
 
 
@@ -1097,6 +1274,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     IRGlobalParam* threadIdxGlobalParam = nullptr;
     IRGlobalParam* blockIdxGlobalParam = nullptr;
     IRGlobalParam* blockDimGlobalParam = nullptr;
+    IRFunc* primitiveIndexFunc = nullptr;
 
     // All of our system values will be exposed with the
     // `uint3` type, and we'll cache a pointer to that
@@ -2021,6 +2199,20 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             return createLegalizedSystemVaryingValInst(info, groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
             return createLegalizedSystemVaryingValInst(info, dispatchThreadID);
+        case SystemValueSemanticName::PrimitiveID:
+            {
+                if (!isRayTracingHitStage(m_stage))
+                    return diagnoseUnsupportedSystemVal(info);
+
+                IRBuilder builder(m_module);
+                builder.setInsertBefore(m_firstOrdinaryInst);
+                auto primitiveIndex = emitRayTracingPrimitiveIndexValue(
+                    m_module,
+                    builder,
+                    primitiveIndexFunc,
+                    info.type);
+                return LegalizedVaryingVal::makeValue(primitiveIndex);
+            }
         default:
             return diagnoseUnsupportedSystemVal(info);
         }

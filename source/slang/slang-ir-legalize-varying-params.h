@@ -96,4 +96,11 @@ enum class SystemValueSemanticName
 
 SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticName);
 
+bool isRayTracingHitStage(Stage stage);
+
+bool legalizeRayTracingPrimitiveIDParamsForEntryPoint(
+    IRModule* module,
+    IRFunc* entryPointFunc,
+    IRFunc*& primitiveIndexFunc);
+
 } // namespace Slang

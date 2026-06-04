@@ -3,11 +3,10 @@
 
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-
-#include <functional>
 
 namespace Slang
 {
@@ -57,50 +56,6 @@ static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
 {
     if (!type->findDecoration<IRRayPayloadDecoration>())
         builder.addRayPayloadDecoration(type);
-}
-
-static bool isPrimitiveIDSystemValueParam(IRParam* param)
-{
-    if (auto semanticDecor = param->findDecoration<IRSemanticDecoration>())
-    {
-        if (semanticDecor->getSemanticName().caseInsensitiveEquals(toSlice("sv_primitiveid")))
-            return true;
-    }
-
-    auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
-    if (!layoutDecor)
-        return false;
-
-    auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
-    if (!varLayout)
-        return false;
-
-    auto systemValueAttr = varLayout->findSystemValueSemanticAttr();
-    if (!systemValueAttr)
-        return false;
-
-    return systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid"));
-}
-
-static IRFunc* getRayTracingPrimitiveIndexFunc(IRModule* module, IRFunc*& primitiveIndexFunc)
-{
-    if (primitiveIndexFunc)
-        return primitiveIndexFunc;
-
-    IRBuilder builder(module);
-    builder.setInsertInto(module->getModuleInst());
-
-    primitiveIndexFunc = builder.createFunc();
-    builder.setDataType(primitiveIndexFunc, builder.getFuncType(0, nullptr, builder.getUIntType()));
-    builder.addTargetIntrinsicDecoration(
-        primitiveIndexFunc,
-        CapabilitySet(CapabilityName::hlsl),
-        UnownedTerminatedStringSlice("PrimitiveIndex"));
-    builder.addTargetIntrinsicDecoration(
-        primitiveIndexFunc,
-        CapabilitySet(CapabilityName::cuda),
-        UnownedTerminatedStringSlice("optixGetPrimitiveIndex"));
-    return primitiveIndexFunc;
 }
 
 void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* inst)
@@ -204,16 +159,28 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
     }
 }
 
-void legalizeNonStructParameterToStructForHLSL(IRModule* module)
+void legalizeRayTracingParametersForHLSL(IRModule* module)
 {
+    List<IRFunc*> primitiveIDEntryPoints;
+
     for (auto globalInst : module->getGlobalInsts())
     {
         // Only process functions - at this stage generics are already resolved,
         // and the search only handles Block and Call children.
-        if (globalInst->getOp() != kIROp_Func)
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
             continue;
-        searchChildrenForForceVarIntoStructTemporarily(module, globalInst);
+
+        searchChildrenForForceVarIntoStructTemporarily(module, func);
+
+        auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
+        if (entryPointDecor && isRayTracingHitStage(entryPointDecor->getProfile().getStage()))
+            primitiveIDEntryPoints.add(func);
     }
+
+    IRFunc* primitiveIndexFunc = nullptr;
+    for (auto func : primitiveIDEntryPoints)
+        legalizeRayTracingPrimitiveIDParamsForEntryPoint(module, func, primitiveIndexFunc);
 }
 
 void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
@@ -302,116 +269,6 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
             makeStructInst->replaceUsesWith(newMakeStruct);
             makeStructInst->removeAndDeallocate();
         }
-    }
-}
-
-void legalizeRayTracingPrimitiveIDParam(IRModule* module)
-{
-    IRFunc* primitiveIndexFunc = nullptr;
-    List<IRFunc*> entryPointsToProcess;
-
-    for (auto globalInst : module->getGlobalInsts())
-    {
-        auto func = as<IRFunc>(globalInst);
-        if (!func)
-            continue;
-
-        auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
-        if (!entryPointDecor)
-            continue;
-
-        switch (entryPointDecor->getProfile().getStage())
-        {
-        case Stage::Intersection:
-        case Stage::AnyHit:
-        case Stage::ClosestHit:
-            break;
-        default:
-            continue;
-        }
-
-        auto firstBlock = func->getFirstBlock();
-        if (!firstBlock)
-            continue;
-
-        entryPointsToProcess.add(func);
-    }
-
-    for (auto func : entryPointsToProcess)
-    {
-        auto firstBlock = func->getFirstBlock();
-
-        IRBuilder builder(module);
-        builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
-
-        bool modifiedFuncType = false;
-        for (auto param = firstBlock->getFirstParam(); param;)
-        {
-            auto nextParam = param->getNextParam();
-
-            if (!isPrimitiveIDSystemValueParam(param))
-            {
-                param = nextParam;
-                continue;
-            }
-
-            if (param->hasUses())
-            {
-                auto primitiveIndexCall = builder.emitCallInst(
-                    builder.getUIntType(),
-                    getRayTracingPrimitiveIndexFunc(module, primitiveIndexFunc),
-                    0,
-                    nullptr);
-
-                IRInst* valueReplacement = primitiveIndexCall;
-                auto paramType = param->getFullType();
-                auto valueType = paramType;
-                auto borrowInParamType = as<IRBorrowInParamType>(valueType);
-                if (borrowInParamType)
-                    valueType = borrowInParamType->getValueType();
-
-                if (valueType != builder.getUIntType())
-                    valueReplacement = builder.emitCast(valueType, primitiveIndexCall);
-
-                IRInst* addressReplacement = nullptr;
-                auto getAddressReplacement = [&]()
-                {
-                    if (!addressReplacement)
-                    {
-                        addressReplacement = builder.emitVar(valueType);
-                        builder.emitStore(addressReplacement, valueReplacement);
-                    }
-                    return addressReplacement;
-                };
-
-                traverseUses(
-                    param,
-                    [&](IRUse* use)
-                    {
-                        auto user = use->getUser();
-                        if (auto load = as<IRLoad>(user))
-                        {
-                            if (load->getPtr() == param)
-                            {
-                                load->replaceUsesWith(valueReplacement);
-                                load->removeAndDeallocate();
-                                return;
-                            }
-                        }
-
-                        builder.replaceOperand(
-                            use,
-                            borrowInParamType ? getAddressReplacement() : valueReplacement);
-                    });
-            }
-
-            param->removeAndDeallocate();
-            modifiedFuncType = true;
-            param = nextParam;
-        }
-
-        if (modifiedFuncType)
-            fixUpFuncType(func);
     }
 }
 

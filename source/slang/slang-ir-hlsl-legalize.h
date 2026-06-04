@@ -12,10 +12,8 @@ class Session;
 struct IRFunc;
 struct IRModule;
 
-void legalizeNonStructParameterToStructForHLSL(IRModule* module);
+void legalizeRayTracingParametersForHLSL(IRModule* module);
 
 void legalizeEmptyRayPayloadsForHLSL(IRModule* module);
-
-void legalizeRayTracingPrimitiveIDParam(IRModule* module);
 
 } // namespace Slang

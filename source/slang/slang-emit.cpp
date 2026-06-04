@@ -1586,14 +1586,6 @@ Result linkAndOptimizeIR(
         SLANG_PASS(inlineGlobalConstantsForLegalization);
     }
 
-    // For DXIL and CUDA/OptiX: rewrite SV_PrimitiveID hit-stage params to the
-    // target PrimitiveIndex intrinsic before backend entry-point emission drops
-    // system-value parameters.
-    if (isD3DTarget(targetRequest) || isCUDATarget(targetRequest))
-    {
-        SLANG_PASS(legalizeRayTracingPrimitiveIDParam);
-    }
-
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
@@ -1646,11 +1638,12 @@ Result linkAndOptimizeIR(
             SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
         }
 
-        // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
-        // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
+        // For DXIL/HLSL ray tracing: rewrite parameters that need backend
+        // intrinsics or temporary structs before existential layout removes
+        // empty struct parameters.
         if (isD3DTarget(targetRequest))
         {
-            SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+            SLANG_PASS(legalizeRayTracingParametersForHLSL);
         }
 
         if (requiredLoweringPassSet.existentialTypeLayout)
