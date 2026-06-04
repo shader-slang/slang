@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-single-return.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
@@ -3094,24 +3095,20 @@ void consolidateRayTracingParameters(
     auto stage = context->getStage();
     const bool isRayTracingHitStage =
         stage == Stage::Intersection || stage == Stage::AnyHit || stage == Stage::ClosestHit;
+    if (isRayTracingHitStage && !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
+    {
+        IRFunc* primitiveIndexFunc = nullptr;
+        legalizeRayTracingPrimitiveIDParamsForEntryPoint(
+            builder->getModule(),
+            func,
+            primitiveIndexFunc);
+    }
 
     for (auto param = firstBlock->getFirstParam(); param; param = param->getNextParam())
     {
         auto paramLayout = findVarLayout(param);
         if (!isVaryingParameter(paramLayout))
             continue;
-
-        // Direct SPIR-V also reaches this pass for ray-tracing entry points.
-        // Only the GLSL/glslang path needs SV_PrimitiveID kept out of payload
-        // and hit-attribute consolidation so it can lower through gl_PrimitiveID.
-        if (isRayTracingHitStage && !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
-        {
-            if (auto systemValueAttr = paramLayout->findSystemValueSemanticAttr())
-            {
-                if (systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid")))
-                    continue;
-            }
-        }
 
         builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
         if (as<IROutParamType>(param->getDataType()) ||
@@ -4228,28 +4225,15 @@ void legalizeEntryPointParameterForGLSL(
     // to a single variable, and we can lower reads/writes of it
     // directly, rather than introduce an intermediate temporary.
     //
-    bool isRayTracingPrimitiveIDSystemValueParam = false;
-    if (!codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
-    {
-        if (auto systemValueAttr = paramLayout->findSystemValueSemanticAttr())
-        {
-            isRayTracingPrimitiveIDSystemValueParam =
-                systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid"));
-        }
-    }
-
     switch (stage)
     {
     default:
         break;
 
     case Stage::AnyHit:
+    case Stage::Callable:
     case Stage::ClosestHit:
     case Stage::Intersection:
-        if (!isRayTracingPrimitiveIDSystemValueParam)
-            return;
-        break;
-    case Stage::Callable:
     case Stage::Miss:
     case Stage::RayGeneration:
         return;

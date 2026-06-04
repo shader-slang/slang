@@ -380,6 +380,10 @@ static IRFunc* getRayTracingPrimitiveIndexFunc(IRModule* module, IRFunc*& primit
         UnownedTerminatedStringSlice("PrimitiveIndex"));
     builder.addTargetIntrinsicDecoration(
         primitiveIndexFunc,
+        CapabilitySet(CapabilityName::glsl),
+        UnownedTerminatedStringSlice("(gl_PrimitiveID)"));
+    builder.addTargetIntrinsicDecoration(
+        primitiveIndexFunc,
         CapabilitySet(CapabilityName::cuda),
         UnownedTerminatedStringSlice("optixGetPrimitiveIndex"));
     return primitiveIndexFunc;
