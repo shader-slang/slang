@@ -1,27 +1,34 @@
 //TEST:INTERPRET(filecheck=CHECK):
 
-// Regression for shader-slang/slang#11465.
+// Smoke / lowering guard related to shader-slang/slang#11465.
 //
-// The `This` type of a *substituted* generic interface (e.g. `IFoo<int>`) is reached
-// through a `MemberDeclRef` base, whereas the `This` reached through a `DirectDeclRef`
-// base is built as a `ThisType`. Before the fix these interned to two distinct `Type*`
-// for the same `ThisTypeDecl`, breaking pointer-identity type comparison. This test
-// exercises a substituted generic interface that has both an associated type and a
-// `This`-returning requirement, used through a generic constraint `where U : IFoo<int>`,
-// so the `MemberDeclRef`-based `This` is constructed, specialized and lowered.
+// #11465 is an internal `Type*`-identity invariant: the `This` of a substituted generic
+// interface (reached via a `MemberDeclRef` base) must intern as the same `ThisType` as the
+// `DirectDeclRef` path. That pointer-identity split is NOT observable from `.slang` surface —
+// type comparison falls back to structural matching — so this test passes with AND without the
+// fix; it does not fail-first. Its role is to guard that associated-type access and a
+// `This`-returning requirement through a *substituted* generic interface (`IFoo<int>`) — the
+// construction path #11465 concerns — still compiles, specializes and runs. The identity
+// invariant itself is guarded by the interfaces/generics suite plus `getOrCreate`'s interning
+// semantics (see the PR description).
+
+interface ISummable
+{
+    int sum();
+}
 
 interface IFoo<T>
 {
-    associatedtype Params;
+    associatedtype Params : ISummable;
     Params getParams();
-    int score();
     This combineWith(This other);
 }
 
-struct Pair
+struct Pair : ISummable
 {
     int a;
     int b;
+    int sum() { return a + b; }
 }
 
 struct FooImpl<T> : IFoo<T>
@@ -35,19 +42,22 @@ struct FooImpl<T> : IFoo<T>
         p.b = 4;
         return p;
     }
-    int score() { return this.tag; }
     This combineWith(This other)
     {
         FooImpl<T> r;
-        r.tag = this.score() + other.score();
+        r.tag = this.tag + other.tag;
         return r;
     }
 }
 
+// `U : IFoo<int>` constrains on a substituted generic interface. Through `U` we reach both the
+// `This`-returning requirement (`combineWith`) and the associated type (`getParams` →
+// `U.Params`) — i.e. the `MemberDeclRef`-based `This` and associated-type access of #11465.
 int run<U>(U a, U b) where U : IFoo<int>
 {
     U combined = a.combineWith(b);
-    return combined.score();
+    let p = combined.getParams();
+    return p.sum(); // Pair { 3, 4 }.sum() == 7
 }
 
 bool test()

@@ -899,9 +899,12 @@ Type* DeclRefType::create(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
         {
             return lookupDeclRef->getWitness()->getSub();
         }
-        // A `MemberDeclRef` base (the `This` of a substituted generic interface) must also
-        // intern as `ThisType`; the generic `DeclRefType` fall-through below would otherwise
-        // yield a second, non-identical representation, breaking type-identity comparison.
+        // Intern the `This` of an interface as `ThisType` for every non-`LookupDeclRef` base.
+        // `getOrCreate` keys on (syntax class, operand), so a single `ThisTypeDecl` operand
+        // reached as both `ThisType` and plain `DeclRefType` would yield two non-identical
+        // pointers. `DirectDeclRef` is behaviorally unchanged (it already ran these lines);
+        // `MemberDeclRef` (the `This` of a substituted generic interface) previously fell
+        // through to the generic `getOrCreate<DeclRefType>` below — the bug this unifies.
         declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
         return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
     }
