@@ -61,6 +61,9 @@ public:
         return m_layout;
     }
 
+    /// Get the layout if it has already been generated.
+    ProgramLayout* getLayoutIfAvailable() { return m_layout; }
+
     /// Get the compiled code for an entry point on the target.
     ///
     /// If this is the first time that code generation has

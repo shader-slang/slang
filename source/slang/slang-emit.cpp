@@ -2409,7 +2409,7 @@ Result linkAndOptimizeIR(
     }
 
     int bindlessSpaceIndex = -1;
-    if (auto programLayout = targetProgram->getExistingLayout())
+    if (auto programLayout = targetProgram->getLayoutIfAvailable())
         bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
     else if (requiredLoweringPassSet.dynamicResourceHeap)
         bindlessSpaceIndex =

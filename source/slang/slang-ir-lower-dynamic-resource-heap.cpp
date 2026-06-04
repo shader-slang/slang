@@ -17,7 +17,7 @@ UInt getBindlessSpaceIndex(TargetProgram* targetProgram)
 {
     // Get the bindless space index from the program layout.
     // This is always allocated during generateParameterBindings().
-    if (auto programLayout = targetProgram->getExistingLayout())
+    if (auto programLayout = targetProgram->getLayoutIfAvailable())
     {
         SLANG_ASSERT(programLayout->bindlessSpaceIndex >= 0);
         return (UInt)programLayout->bindlessSpaceIndex;
@@ -58,9 +58,11 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
         }
     }
 
+    if (workList.getCount() == 0)
+        return;
+
     // If there are GetDynamicResourceHeap instructions, verify that the target
     // supports descriptor_handle capability.
-    if (workList.getCount() > 0)
     {
         auto targetCaps = targetProgram->getTargetReq()->getTargetCaps();
         if (targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(
