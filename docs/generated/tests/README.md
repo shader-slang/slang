@@ -1,10 +1,13 @@
 # Agentic Test Suite
 
-This directory contains an agent-generated, agent-maintained test suite
-that mirrors the LLM-generated architectural documentation in
-[`../design/`](../design/). Each test in this
-tree is anchored to a documentation claim, and the suite is rebuilt
-when the docs change.
+This directory contains an agent-generated, agent-maintained test suite.
+Each test is anchored to a documentation claim, and the suite is rebuilt
+when the docs change. Bundles are organised by **role**:
+
+- **`conformance/`** — anchored to the authoritative human-written spec
+  at [`docs/language-reference/`](../../language-reference/).
+- **`design/`** — anchored to the reverse-engineered architectural
+  documentation in [`../design/`](../design/).
 
 The suite is **additive** — it does not replace the hand-written
 `tests/` suite, and it runs **nightly only**, not per PR.
@@ -12,26 +15,30 @@ The suite is **additive** — it does not replace the hand-written
 **Where to look next:**
 
 - [`INDEX.md`](INDEX.md) — bundle-by-bundle navigation table with per-bundle test counts and links to each bundle's `README.md`.
+- [`_meta/PIPELINE.md`](_meta/PIPELINE.md) — end-to-end pipeline: doc inputs, generation stages, outputs, operator interaction points, and feedback loops into the docs.
 - [`_meta/regenerate.md`](_meta/regenerate.md) — operator workflow.
 - [`_meta/prompts/_common.md`](_meta/prompts/_common.md) — universal rules every generation agent inherits.
 
 ## Layout
 
-| Subtree             | Purpose                                                                                |
-| ------------------- | -------------------------------------------------------------------------------------- |
-| `pipeline/`         | Tests anchored to the compilation-pipeline docs (lex → emit)                           |
-| `syntax-reference/` | Tests anchored to the syntax / grammar / keywords docs                                 |
-| `ast-reference/`    | Tests anchored to the AST node reference                                               |
-| `ir-reference/`     | Tests anchored to the IR opcode reference                                              |
-| `name-resolution/`  | Tests anchored to scoping / lookup / overload-resolution docs                          |
-| `cross-cutting/`    | Tests anchored to diagnostics, IR instruction set, targets, etc.                       |
-| `target-pipelines/` | Tests anchored to per-target (SPIR-V/HLSL/Metal/WGSL/CUDA) end-to-end docs             |
-| `_meta/`            | Pipeline infrastructure: manifest, prompts, schemas, freshness + findings state, driver |
+| Subtree                    | Purpose                                                                                                                                                  |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `conformance/`             | Tests anchored to the **authoritative human-written spec** at `docs/language-reference/`. Outranks the `design/` bundles when both cover the same claim. |
+| `design/pipeline/`         | Tests anchored to the compilation-pipeline docs (lex → emit)                                                                                             |
+| `design/syntax-reference/` | Tests anchored to the syntax / grammar / keywords docs                                                                                                   |
+| `design/ast-reference/`    | Tests anchored to the AST node reference                                                                                                                 |
+| `design/ir-reference/`     | Tests anchored to the IR opcode reference                                                                                                                |
+| `design/name-resolution/`  | Tests anchored to scoping / lookup / overload-resolution docs                                                                                            |
+| `design/cross-cutting/`    | Tests anchored to diagnostics, IR instruction set, targets, etc.                                                                                         |
+| `design/target-pipelines/` | Tests anchored to per-target (SPIR-V/HLSL/Metal/WGSL/CUDA) end-to-end docs                                                                               |
+| `_meta/`                   | Pipeline infrastructure: manifest, prompts, schemas, freshness + findings state, driver                                                                  |
 
-The directory structure mirrors `docs/generated/design/` for every
+The `design/` subtree mirrors `docs/generated/design/` for every
 **behaviorally normative** doc: each `docs/generated/design/<section>/<doc>.md`
 that specifies compiler behavior has a corresponding bundle at
-`docs/generated/tests/<section>/<doc>/` (no `.md` suffix on the directory).
+`docs/generated/tests/design/<section>/<doc>/` (no `.md` suffix on
+the directory). The `conformance/` subtree similarly mirrors
+`docs/language-reference/` one bundle per normative doc.
 
 Descriptive / architectural docs are exempt — `docs/generated/design/architecture/*.md`,
 the glossary, and the navigation-only index docs describe the system but
@@ -47,6 +54,7 @@ Each bundle directory contains:
 
 ```
 <bundle>/
+├── _prompt.md         # The generation prompt for this bundle (co-located)
 ├── README.md          # YAML front-matter + claims/tests index
 ├── <test>.slang       # Test file with a //META header + a //TEST directive
 ├── <test>.expected    # Optional checked-in expected output
@@ -82,29 +90,34 @@ expansion contract.
 The framework rolls out across several phases. The list below records
 what is implemented today versus what is scaffolded or planned:
 
-| Phase                  | Description                                                              | Status                                              |
-| ---------------------- | ------------------------------------------------------------------------ | --------------------------------------------------- |
-| A                      | Framework scaffold (driver, schemas, prompts, manifest)                  | implemented                                         |
-| B1                     | Bootstrap generation across 47 bundles                                   | implemented                                         |
-| B1.5 / B1.6 / B1.7     | Boundary expansion, coverage-driven refinement, diagnostics-catalog sweep | implemented                                         |
-| B2                     | `slang-test -test-dir docs/generated/tests` wired into a nightly job     | implemented                                         |
-| C                      | Cross-link pass — bundles consume each other's READMEs                   | planned                                             |
-| D                      | Review + remediation against a non-Claude model                          | scaffolded (schemas, prompts, state file in place)  |
-| E                      | Coverage-driven expansion loop                                           | scaffolded (driver subcommands stub the data flow)  |
-| F                      | Structured compiler-bug findings + operator-driven filing                | implemented                                         |
+| Phase              | Description                                                               | Status                                             |
+| ------------------ | ------------------------------------------------------------------------- | -------------------------------------------------- |
+| A                  | Framework scaffold (driver, schemas, prompts, manifest)                   | implemented                                        |
+| B1                 | Bootstrap generation across 47 bundles                                    | implemented                                        |
+| B1.5 / B1.6 / B1.7 | Boundary expansion, coverage-driven refinement, diagnostics-catalog sweep | implemented                                        |
+| B2                 | `slang-test -test-dir docs/generated/tests` wired into a nightly job      | implemented                                        |
+| C                  | Cross-link pass — bundles consume each other's READMEs                    | planned                                            |
+| D                  | Review + remediation against a non-Claude model                           | scaffolded (schemas, prompts, state file in place) |
+| E                  | Coverage-driven expansion loop                                            | scaffolded (driver subcommands stub the data flow) |
+| F                  | Structured compiler-bug findings + operator-driven filing                 | implemented                                        |
 
 ## Trust model
 
-- The source code is authoritative.
-- The hand-written `tests/` suite is authoritative for the behaviors
-  it covers.
-- The docs in [`../design/`](../design/) are
-  the spec this suite checks against. They may drift from source; the
-  doc-side regeneration loop closes that drift.
-- Tests under `docs/generated/tests/` are valid only to the extent that their
-  cited docs are valid. A failing agentic test means one of:
-  doc says X but compiler does not-X (compiler bug **or** doc bug),
-  or the test is wrong (regenerate).
+- **`docs/language-reference/`** is the authoritative spec — the
+  human-written description of what Slang behaviour _should be_.
+  Bundles under `conformance/` anchor to this. When the language
+  reference and the compiler disagree, the test is the honest signal;
+  the human triage step decides which side is wrong.
+- **`docs/generated/design/`** is reverse-engineered from the actual
+  compiler source and may codify bugs. Bundles under `design/`
+  anchor to it. A failing test there is most likely a regression in
+  already-known behaviour.
+- The hand-written `tests/` suite is authoritative for the behaviours
+  it covers (separate from this suite).
+- A failing agentic test means one of: doc says X but compiler does
+  not-X (compiler bug **or** doc bug), or the test is wrong
+  (regenerate). When the cited doc is under `conformance/`, a real
+  spec/compiler disagreement should be filed as a finding.
 
 ## Running the suite
 
@@ -170,7 +183,7 @@ four canonical sections, in this order:
    `gpu-metal-toolchain`, …), or a terminal category
    (`link-stage-only`, `out-of-bundle`, `deprecated`, …).
 4. `## Doc gaps observed` — `Anchor | Kind | Gap | Suggested
-   addition` table. The feedback channel into doc regeneration. Rows
+addition` table. The feedback channel into doc regeneration. Rows
    are aggregated by `regenerate.py doc-gaps` and consumed by the
    doc-regen workflow.
 
@@ -217,8 +230,8 @@ A failing test should not be hand-edited. Instead:
 
 - If the **doc** is wrong, file a prompt-improvement task against
   `docs/generated/design/_meta/prompts/<...>.md`.
-- If the **prompt** that produced the bundle is wrong, file an issue
-  against `docs/generated/tests/_meta/prompts/<bundle>.md`.
+- If the **prompt** that produced the bundle is wrong, edit the
+  bundle's co-located `docs/generated/tests/<bundle>/_prompt.md`.
 - If the **manifest** is wrong (missing a watched path, wrong source
   doc), edit `docs/generated/tests/_meta/manifest.yaml`.
 - If the **compiler** is wrong, write a finding YAML to
