@@ -777,24 +777,18 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     if (!genericTypeConstraintDeclRef.getDecl()->sub.type && !as<VarExpr>(subExpr))
                         continue;
 
-                    // Interface-level constraints declared via `__constraint` are direct members
-                    // of the interface. Only a constraint whose subject is the bare `This` type
-                    // (e.g. `__constraint This : IExtra`) refines the interface's own set of bases
-                    // here. Constraints on inherited associated types (e.g.
-                    // `__constraint This.DataType == This`) are surfaced when computing the
-                    // inheritance of the corresponding associated-type access, so we must not
-                    // eagerly process (and recursively check) them while enumerating the
-                    // interface's bases -- doing so would form a cycle when the subject names an
-                    // inherited associated type.
+                    // An interface-level `__constraint` (a direct `GenericTypeConstraintDecl`
+                    // member of the interface) never refines the interface's *own* set of
+                    // bases. Its subject is required to be one of the interface's associated
+                    // types -- e.g. `__constraint This.DataType == This` -- whose effect is
+                    // surfaced when computing the inheritance of the corresponding
+                    // associated-type access (`T.DataType`), not here. (A bare-`This` subject
+                    // such as `__constraint This : IBar` is rejected during checking; see
+                    // `visitGenericTypeConstraintDecl`.) So we must not process such a
+                    // constraint while enumerating the interface's bases: eagerly checking it
+                    // would recurse into the inheritance of an associated type and form a cycle.
                     if (containerDeclRef.as<InterfaceDecl>())
-                    {
-                        auto subVarExpr = as<VarExpr>(subExpr);
-                        bool subjectIsThis =
-                            subVarExpr && subVarExpr->name ==
-                                              astBuilder->getSharedASTBuilder()->getThisTypeName();
-                        if (!subjectIsThis)
-                            continue;
-                    }
+                        continue;
                 }
 
                 visitor.ensureDecl(

@@ -4044,6 +4044,22 @@ bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     //
     if (auto subDeclRef = isDeclRefTypeOf<Decl>(type.type))
     {
+        // The bare `This` type is never a valid constraint subject. A constraint
+        // refines a generic parameter or one of an interface's (possibly nested)
+        // associated types -- e.g. `This.A : IFoo` or `This.A == X` -- not the
+        // conforming type itself. Giving an interface a base is the job of an
+        // inheritance clause (`interface IFoo : IBar`); writing it as
+        // `__constraint This : IBar` is ill-formed (it is a checked predicate over
+        // the very base set being computed, which would cycle), so reject it here.
+        // For an equality constraint this also makes the canonical-order check
+        // place the associated-type side first (so `A == This` keeps `A` as the
+        // subject and treats `This` only as the right-hand side).
+        if (subDeclRef.as<ThisTypeDecl>())
+        {
+            if (sink)
+                sink->diagnose(Diagnostics::ConstraintSubjectCannotBeThisType{.typeExp = type.exp});
+            return false;
+        }
         if (subDeclRef.getDecl()->parentDecl == decl->parentDecl)
         {
             // OK, sub type is one of the generic parameter type.
@@ -4301,6 +4317,24 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
 
     if (!decl->sub.type)
         decl->sub = TranslateTypeNodeForced(decl->sub);
+
+    // The subject of an interface `__constraint` must be one of the interface's
+    // (possibly nested) associated types, e.g. `This.A` -- never the bare `This`
+    // type. A constraint on `This` itself is what an inheritance clause expresses
+    // (`interface IFoo : IBar`); written as a `__constraint` it is a checked
+    // predicate over the very base set being computed, which is ill-formed (it
+    // would otherwise surface as a cyclic-reference error). Reject it here, before
+    // that cyclic inheritance query is ever attempted, and error the constraint so
+    // it contributes nothing downstream.
+    if (as<InterfaceDecl>(decl->parentDecl) && as<ThisType>(decl->sub.type))
+    {
+        getSink()->diagnose(
+            Diagnostics::ConstraintSubjectCannotBeThisType{.typeExp = decl->sub.exp});
+        decl->sub.type = m_astBuilder->getErrorType();
+        decl->sup = TypeExp(m_astBuilder->getErrorType());
+        return;
+    }
+
     if (!decl->sup.type)
     {
         if (as<CallableDecl>(decl->parentDecl))
