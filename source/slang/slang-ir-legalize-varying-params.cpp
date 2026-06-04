@@ -2229,6 +2229,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     builder,
                     primitiveIndexFunc,
                     info.type);
+                if (!primitiveIndex)
+                    return diagnoseUnsupportedSystemVal(info);
                 return LegalizedVaryingVal::makeValue(primitiveIndex);
             }
         default:
