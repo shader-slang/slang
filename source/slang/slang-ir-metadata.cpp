@@ -164,6 +164,8 @@ static bool _instUsesBindlessResourceHeap(
 
     switch (inst->getOp())
     {
+    // Metadata is normally collected after lowerDynamicResourceHeap replaces this intrinsic, but
+    // keep the direct opcode check as defensive coverage for pre-final-lowering metadata walks.
     case kIROp_GetDynamicResourceHeap:
     case kIROp_LoadResourceDescriptorFromHeap:
     case kIROp_LoadSamplerDescriptorFromHeap:
