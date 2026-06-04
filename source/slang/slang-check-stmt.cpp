@@ -690,6 +690,24 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
     }
     if (isDanglingEquality)
         getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = stmt->expression});
+
+    // If the discarded expression is a call to a function marked `[nodiscard]`, warn that
+    // the result is being ignored.
+    if (auto invokeExpr = as<InvokeExpr>(stmt->expression))
+    {
+        if (auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr))
+        {
+            if (auto calleeDecl = funcDeclRefExpr->declRef.getDecl())
+            {
+                if (calleeDecl->findModifier<NoDiscardAttribute>())
+                {
+                    getSink()->diagnose(Diagnostics::DiscardedNodiscardResult{
+                        .name = calleeDecl->getName(),
+                        .expr = invokeExpr});
+                }
+            }
+        }
+    }
 }
 
 void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)

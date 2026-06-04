@@ -701,7 +701,7 @@ interface IForwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
     [MaybeDifferentiable]
-    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff 
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff
 };
 
 // Core library interfaces:
@@ -718,10 +718,10 @@ __magic_type(BwdDiffFuncInterfaceType)
 [__FunctionInterface]
 interface IBackwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
-    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType))
     associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
 
-    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType)) 
+    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType))
     associatedtype MinimalContext; // -> minimal_context_type
 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
@@ -1322,7 +1322,7 @@ $}
         {
             return a + b;
         }
-        
+
 ${
         break;
     }
@@ -2455,7 +2455,7 @@ extension matrix<T,N,M,L> : IFloat
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
     __init(float v) { this = matrix<T,N,M>(T(v)); }
-    
+
     /// Initialize a matrix where all elements have the same scalar `value`.
     [OverloadRank(-1)]
     [Differentiable]
@@ -4524,6 +4524,28 @@ attribute_syntax [mutating] : MutatingAttribute;
 ///
 __attributeTarget(AccessorDecl)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
+
+/// Marks a function whose return value should not be discarded. When a call to a
+/// function marked with `[nodiscard]` is used as a statement and its result is
+/// ignored, the compiler emits a warning.
+/// @remarks
+/// This is useful for functions that look like they mutate the object they are called
+/// on, but instead return a result. For example, a member function `Load` that returns
+/// the loaded value rather than mutating `this`:
+/// ```
+/// struct MyType
+/// {
+///    [nodiscard]
+///    MyType load() { ... }
+/// }
+/// MyType t;
+/// t.load(); // warning: result of '[nodiscard]' function is discarded.
+/// let loaded = t.load(); // OK
+/// ```
+/// The C++ spelling `[[nodiscard]]` is also accepted.
+///
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [nodiscard] : NoDiscardAttribute;
 
 /// @internal
 /// Marks a member function to make `this` argument passed by const reference.
