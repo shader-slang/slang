@@ -105,7 +105,8 @@ static void _checkBindlessSpaceReflection(
     bool queryMetadataBeforeLayout = false)
 {
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     slang::CompilerOptionEntry targetCapabilityOption = {};
 
@@ -131,7 +132,7 @@ static void _checkBindlessSpaceReflection(
     sessionDesc.compilerOptionEntryCount = compilerOptionCount;
 
     ComPtr<slang::ISession> session;
-    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagnosticBlob;
     auto module = session->loadModuleFromSourceString(
@@ -139,11 +140,11 @@ static void _checkBindlessSpaceReflection(
         "test.slang",
         userSource,
         diagnosticBlob.writeRef());
-    SLANG_CHECK(module != nullptr);
+    SLANG_CHECK_ABORT(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
     module->findEntryPointByName("computeMain", entryPoint.writeRef());
-    SLANG_CHECK(entryPoint != nullptr);
+    SLANG_CHECK_ABORT(entryPoint != nullptr);
 
     ComPtr<slang::IComponentType> compositeProgram;
     slang::IComponentType* components[] = {module, entryPoint.get()};
@@ -152,16 +153,16 @@ static void _checkBindlessSpaceReflection(
         2,
         compositeProgram.writeRef(),
         diagnosticBlob.writeRef());
-    SLANG_CHECK(compositeProgram != nullptr);
+    SLANG_CHECK_ABORT(compositeProgram != nullptr);
 
     ComPtr<slang::IComponentType> linkedProgram;
     compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
-    SLANG_CHECK(linkedProgram != nullptr);
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
 
     auto checkBindlessSpaceLayout = [&]()
     {
         auto programLayout = linkedProgram->getLayout();
-        SLANG_CHECK(programLayout != nullptr);
+        SLANG_CHECK_ABORT(programLayout != nullptr);
 
         auto bindlessSpaceIndex = programLayout->getBindlessSpaceIndex();
         if (bindlessSpaceExpectation.expectsReservedSpace)
@@ -180,14 +181,14 @@ static void _checkBindlessSpaceReflection(
         checkBindlessSpaceLayout();
 
     ComPtr<slang::IMetadata> metadata;
-    SLANG_CHECK(
+    SLANG_CHECK_ABORT(
         linkedProgram->getTargetMetadata(0, metadata.writeRef(), diagnosticBlob.writeRef()) ==
         SLANG_OK);
-    SLANG_CHECK(metadata != nullptr);
+    SLANG_CHECK_ABORT(metadata != nullptr);
 
     auto bindlessMetadata = static_cast<slang::IBindlessResourceMetadata*>(
         metadata->castAs(slang::IBindlessResourceMetadata::getTypeGuid()));
-    SLANG_CHECK(bindlessMetadata != nullptr);
+    SLANG_CHECK_ABORT(bindlessMetadata != nullptr);
     SLANG_CHECK(bindlessMetadata->usesBindlessResourceHeap() == expectedUsesBindlessResourceHeap);
 
     if (queryMetadataBeforeLayout)
