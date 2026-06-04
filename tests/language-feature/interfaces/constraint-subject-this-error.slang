@@ -18,3 +18,13 @@ interface IFoo
 //diag:          ^^^^ the subject of a constraint cannot be the 'This' type
 //diag:          ^^^^ constrain an associated type such as 'This.A' here, or use an inheritance clause (e.g. 'interface IFoo : IBar') to give an interface a base
 }
+
+// The same rule applies to the equality form: a bare `This` subject is rejected
+// regardless of whether the constraint is a subtype (`:`) or an equality (`==`).
+interface IFooEq
+{
+    associatedtype A;
+    __constraint This == A;
+//diag:          ^^^^ the subject of a constraint cannot be the 'This' type
+//diag:          ^^^^ constrain an associated type such as 'This.A' here, or use an inheritance clause (e.g. 'interface IFoo : IBar') to give an interface a base
+}
