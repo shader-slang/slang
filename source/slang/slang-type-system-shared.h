@@ -7,7 +7,8 @@ namespace Slang
 {
 
 // Memory type flags for the work-graph Barrier() intrinsic (SM 6.8, first argument).
-// Values are referenced by hlsl.meta.slang via $() splices and by the HLSL emitter.
+// Keep these values in sync with experimental/workgraph.slang; the HLSL emitter also
+// compares against these values when emitting named Barrier constants.
 enum BarrierMemoryTypeFlags : uint32_t
 {
     UavMemory = 0x01u,
@@ -18,7 +19,8 @@ enum BarrierMemoryTypeFlags : uint32_t
 };
 
 // Semantic flags for the work-graph Barrier() intrinsic (SM 6.8, second argument).
-// Values are referenced by hlsl.meta.slang via $() splices and by the HLSL emitter.
+// Keep these values in sync with experimental/workgraph.slang; the HLSL emitter also
+// compares against these values when emitting named Barrier constants.
 enum BarrierSemanticFlags : uint32_t
 {
     Reorder = 0x00u,

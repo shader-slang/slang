@@ -1,11 +1,14 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_NEGATIVE,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DNEGATIVE
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_TOO_LARGE,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DTOO_LARGE
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_NEGATIVE_CONST,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DNEGATIVE_CONST
 import experimental.workgraph;
 
 struct Record
 {
     int value;
 };
+
+static const int kNegativeMaxRecords = -1;
 
 [shader("node")]
 [NodeLaunch("broadcasting")]
@@ -17,6 +20,9 @@ void main([MaxRecords(-1)] NodeOutput<Record> output)
 #elif defined(TOO_LARGE)
 void main([MaxRecords(4294967296)] NodeOutput<Record> output)
 //CHECK_TOO_LARGE: expected an expression of type 'uint', got 'int64_t'
+#elif defined(NEGATIVE_CONST)
+void main([MaxRecords(kNegativeMaxRecords)] NodeOutput<Record> output)
+//CHECK_NEGATIVE_CONST: expected an expression of type 'uint', got 'int'
 #endif
 {
 }

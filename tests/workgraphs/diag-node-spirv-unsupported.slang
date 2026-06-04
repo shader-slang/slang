@@ -11,7 +11,7 @@ struct Record
 [NodeDispatchGrid(1, 1, 1)]
 [numthreads(1, 1, 1)]
 void main(DispatchNodeInputRecord<Record> input, RWBuffer<int> output)
-//CHECK: entrypoint 'main' uses features that are not available in '_node' stage for 'spirv' compilation target.
+//CHECK: entrypoint 'main' uses features that are not available in 'node' stage for 'spirv' compilation target.
 {
     output[0] = input.Get().value;
 }

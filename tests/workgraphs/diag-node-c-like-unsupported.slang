@@ -14,13 +14,13 @@ void main()
 }
 
 #if defined(CPP_TARGET)
-//CHECK_CPP: entrypoint 'main' uses features that are not available in '_node' stage for 'cpp' compilation target.
+//CHECK_CPP: entrypoint 'main' uses features that are not available in 'node' stage for 'cpp' compilation target.
 #elif defined(CUDA_TARGET)
-//CHECK_CUDA: entrypoint 'main' uses features that are not available in '_node' stage for 'cuda' compilation target.
+//CHECK_CUDA: entrypoint 'main' uses features that are not available in 'node' stage for 'cuda' compilation target.
 #elif defined(GLSL_TARGET)
-//CHECK_GLSL: entrypoint 'main' uses features that are not available in '_node' stage for 'glsl' compilation target.
+//CHECK_GLSL: entrypoint 'main' uses features that are not available in 'node' stage for 'glsl' compilation target.
 #elif defined(METAL_TARGET)
-//CHECK_METAL: entrypoint 'main' uses features that are not available in '_node' stage for 'metal' compilation target.
+//CHECK_METAL: entrypoint 'main' uses features that are not available in 'node' stage for 'metal' compilation target.
 #elif defined(WGSL_TARGET)
-//CHECK_WGSL: entrypoint 'main' uses features that are not available in '_node' stage for 'wgsl' compilation target.
+//CHECK_WGSL: entrypoint 'main' uses features that are not available in 'node' stage for 'wgsl' compilation target.
 #endif

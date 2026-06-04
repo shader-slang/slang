@@ -216,6 +216,7 @@ public:
         }                                                  \
     }
 
+/// D3D12-specific shader program extension.
 class IShaderProgramD3D12 : public ISlangUnknown
 {
     SLANG_COM_INTERFACE(
@@ -224,6 +225,9 @@ class IShaderProgramD3D12 : public ISlangUnknown
         0x4de3,
         {0xb1, 0x02, 0x4f, 0x0e, 0x8b, 0xa3, 0x45, 0x11})
 public:
+    /// Returns the program root signature as an `ID3D12RootSignature*` through
+    /// `outRootSignature`. The returned COM object is AddRef'd by the callee; the caller
+    /// owns that reference and must Release it.
     virtual SLANG_NO_THROW Result SLANG_MCALL getRootSignature(void** outRootSignature) = 0;
 };
 #define SLANG_UUID_IShaderProgramD3D12                     \
@@ -1989,6 +1993,7 @@ public:
     dispatchComputeIndirect(IBufferResource* cmdBuffer, Offset offset) = 0;
 };
 
+/// D3D12-specific compute command encoder extension.
 class IComputeCommandEncoderD3D12 : public ISlangUnknown
 {
     SLANG_COM_INTERFACE(
@@ -1998,6 +2003,9 @@ class IComputeCommandEncoderD3D12 : public ISlangUnknown
         {0x90, 0xab, 0x35, 0x1d, 0x6a, 0x9a, 0x20, 0xc8});
 
 public:
+    /// Binds `rootObject` as compute root parameters using `program`'s D3D12 root signature
+    /// without binding an `ID3D12PipelineState`. Use this path for work-graph state objects,
+    /// which cannot use `bindPipelineWithRootObject`.
     virtual SLANG_NO_THROW Result SLANG_MCALL
     bindRootObjectAsCompute(IShaderProgram* program, IShaderObject* rootObject) = 0;
 };

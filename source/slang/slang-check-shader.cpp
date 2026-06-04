@@ -2156,6 +2156,15 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     for (auto& use : signatureStructUses)
         entryPointInferredCaps.nonDestructiveJoin(use.structDecl->inferredCapabilityRequirements);
 
+    auto getStageNameForDiagnostic = [](CapabilityAtom stage) -> UnownedStringSlice
+    {
+        // `node` is represented internally by `_node` so the public alias can include the
+        // required shader-model capability. Diagnostics should still use the public stage name.
+        if (stage == CapabilityAtom::_node)
+            return capabilityNameToString(CapabilityName::node);
+        return capabilityNameToString((CapabilityName)stage);
+    };
+
     for (auto target : linkage->targets)
     {
         auto targetCaps = target->getTargetCaps();
@@ -2170,7 +2179,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 linkage->m_optionSet,
                 DiagnosticCategory::Capability,
                 Diagnostics::EntryPointUsesUnavailableCapability{
-                    .stage = capabilityNameToString((CapabilityName)stageTarget),
+                    .stage = getStageNameForDiagnostic(stageTarget),
                     .target = capabilityNameToString((CapabilityName)compileTarget),
                     .decl = entryPointFuncDecl});
             continue;
@@ -2185,7 +2194,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 linkage->m_optionSet,
                 DiagnosticCategory::Capability,
                 Diagnostics::EntryPointUsesUnavailableCapability{
-                    .stage = capabilityNameToString((CapabilityName)stageTarget),
+                    .stage = getStageNameForDiagnostic(stageTarget),
                     .target = capabilityNameToString((CapabilityName)compileTarget),
                     .decl = entryPointFuncDecl});
 
