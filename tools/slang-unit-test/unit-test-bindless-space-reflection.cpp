@@ -392,7 +392,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataNativeHandleCasts)
     _checkBindlessSpaceReflection(
         _getTextureHandleSource(),
         _expectAnyReservedBindlessSpace(),
-        false,
+        true,
         nullptr,
         0,
         SLANG_METAL,
@@ -400,7 +400,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataNativeHandleCasts)
     _checkBindlessSpaceReflection(
         _getTextureHandleSource(),
         _expectAnyReservedBindlessSpace(),
-        false,
+        true,
         nullptr,
         0,
         SLANG_CUDA_SOURCE,
@@ -408,7 +408,7 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataNativeHandleCasts)
     _checkBindlessSpaceReflection(
         _getTextureHandleSource(),
         _expectAnyReservedBindlessSpace(),
-        false,
+        true,
         nullptr,
         0,
         SLANG_CPP_SOURCE,

@@ -20,7 +20,6 @@ void collectCooperativeMetadata(
 void collectMetadata(
     const IRModule* irModule,
     int bindlessSpaceIndex,
-    bool treatDescriptorHandleResourceCastsAsHeapUse,
     ArtifactPostEmitMetadata& outMetadata);
 
 } // namespace Slang

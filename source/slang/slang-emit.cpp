@@ -2414,13 +2414,7 @@ Result linkAndOptimizeIR(
     else if (requiredLoweringPassSet.dynamicResourceHeap)
         bindlessSpaceIndex =
             (int)targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
-    auto treatDescriptorHandleResourceCastsAsHeapUse =
-        targetRequest->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV);
-    SLANG_PASS(
-        collectMetadata,
-        bindlessSpaceIndex,
-        treatDescriptorHandleResourceCastsAsHeapUse,
-        *metadata);
+    SLANG_PASS(collectMetadata, bindlessSpaceIndex, *metadata);
 
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
