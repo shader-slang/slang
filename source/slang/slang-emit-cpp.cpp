@@ -945,11 +945,6 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(
             m_writer->emit(")]\n");
             break;
         }
-    case Stage::Node:
-        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-            .operation = "C++ node shader stage",
-            .location = irFunc->sourceLoc});
-        break;
     default:
         break;
     }
@@ -1004,13 +999,6 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
             func->findDecoration<IREntryPointDecoration>();
         entryPointDecor)
     {
-        if (entryPointDecor->getProfile().getStage() == Stage::Node)
-        {
-            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-                .operation = "C++ node shader stage",
-                .location = func->sourceLoc});
-        }
-
         // Note: we currently emit multiple functions to represent an entry point
         // on CPU/CUDA, and these all bottleneck through the actual `IRFunc`
         // here as a workhorse.

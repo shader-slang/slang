@@ -511,9 +511,7 @@ def geometry : stage;
 /// [Stage]
 def dispatch : stage;
 
-/// Work-graph node stage
-/// [Stage]
-def node : stage;
+def _node : stage;
 
 def _raygen : stage;
 alias _raygeneration = _raygen;
@@ -1506,6 +1504,10 @@ alias task = _amplification + _meshshading;
 /// Amplification shader stage & mesh shader capabilities
 /// [Stage]
 alias amplification = _amplification + _meshshading;
+
+/// Work-graph node stage
+/// [Stage]
+alias node = _node + _sm_6_8;
 
 // shader stage groups
 /// Collection of all shader stages

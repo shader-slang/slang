@@ -2160,14 +2160,26 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
+        auto compileTarget = target->getTargetCaps().getCompileTarget();
+        auto stageTarget = stageCapabilitySet.getTargetStage();
         targetCaps.join(stageCapabilitySet);
+        if (targetCaps.isInvalid())
+        {
+            maybeDiagnose(
+                sink,
+                linkage->m_optionSet,
+                DiagnosticCategory::Capability,
+                Diagnostics::EntryPointUsesUnavailableCapability{
+                    .stage = capabilityNameToString((CapabilityName)stageTarget),
+                    .target = capabilityNameToString((CapabilityName)compileTarget),
+                    .decl = entryPointFuncDecl});
+            continue;
+        }
         if (targetCaps.isIncompatibleWith(entryPointInferredCaps))
         {
             // Incompatable means we don't support a set of abstract atoms.
             // Diagnose that we lack support for 'stage' and 'target' atoms with our provided
             // entry-point
-            auto compileTarget = target->getTargetCaps().getCompileTarget();
-            auto stageTarget = stageCapabilitySet.getTargetStage();
             maybeDiagnose(
                 sink,
                 linkage->m_optionSet,

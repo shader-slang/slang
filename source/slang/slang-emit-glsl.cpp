@@ -125,8 +125,6 @@ SlangResult GLSLSourceEmitter::init()
             _requireSPIRVVersion(SemanticVersion(1, 4));
             break;
         }
-    case Stage::Node:
-        break;
     default:
         break;
     }
@@ -1533,11 +1531,6 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
     case Stage::Mesh:
     case Stage::Amplification:
         emitLocalSizeLayout();
-        break;
-    case Stage::Node:
-        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-            .operation = "GLSL node shader stage",
-            .location = irFunc->sourceLoc});
         break;
     default:
         break;

@@ -14,13 +14,13 @@ void main()
 }
 
 #if defined(CPP_TARGET)
-//CHECK_CPP: intrinsic operation 'C++ node shader stage' is not supported for the current target.
+//CHECK_CPP: entrypoint 'main' uses features that are not available in '_node' stage for 'cpp' compilation target.
 #elif defined(CUDA_TARGET)
-//CHECK_CUDA: intrinsic operation 'CUDA node shader stage' is not supported for the current target.
+//CHECK_CUDA: entrypoint 'main' uses features that are not available in '_node' stage for 'cuda' compilation target.
 #elif defined(GLSL_TARGET)
-//CHECK_GLSL: intrinsic operation 'GLSL node shader stage' is not supported for the current target.
+//CHECK_GLSL: entrypoint 'main' uses features that are not available in '_node' stage for 'glsl' compilation target.
 #elif defined(METAL_TARGET)
-//CHECK_METAL: intrinsic operation 'Metal node shader stage' is not supported for the current target.
+//CHECK_METAL: entrypoint 'main' uses features that are not available in '_node' stage for 'metal' compilation target.
 #elif defined(WGSL_TARGET)
-//CHECK_WGSL: intrinsic operation 'WGSL node shader stage' is not supported for the current target.
+//CHECK_WGSL: entrypoint 'main' uses features that are not available in '_node' stage for 'wgsl' compilation target.
 #endif

@@ -4461,14 +4461,6 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
         return;
     }
 
-    // Legacy serialized modules may still contain work-graph record types as decorated structs.
-    // They are native template types in HLSL/DXC, so emitting a struct definition would shadow
-    // the built-in and break DXC's recognition of the type.
-    if (isWorkGraphRecordType(structType))
-    {
-        return;
-    }
-
     m_writer->emit("struct ");
 
     emitPostKeywordTypeAttributes(structType);
@@ -5173,12 +5165,6 @@ void CLikeSourceEmitter::ensureInstOperand(
 
 void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, IRInst* inst)
 {
-    // SPIR-V asm blocks and their sub-instructions are opaque to C-like targets.
-    // Their operands may reference the enclosing function (e.g. $main), which
-    // would cause a false circularity in the emit ordering. Skip them entirely.
-    if (inst->getOp() == kIROp_SPIRVAsm)
-        return;
-
     ensureInstOperand(ctx, inst->getFullType());
 
     UInt operandCount = inst->operandCount;
@@ -5435,10 +5421,6 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
         emitFuncDecl(cast<IRFunc>(inst));
         break;
     case kIROp_StructType:
-        // Legacy decorated work-graph record structs are native HLSL/DXC template types;
-        // forward-declaring them as structs would hide the built-in.
-        if (isWorkGraphRecordType(cast<IRType>(inst)))
-            break;
         m_writer->emit("struct ");
         m_writer->emit(getName(inst));
         m_writer->emit(";\n");

@@ -248,11 +248,6 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
         emitRequiredThreadsPerThreadgroup();
         m_writer->emit("[[object]] ");
         break;
-    case Stage::Node:
-        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-            .operation = "Metal node shader stage",
-            .location = irFunc->sourceLoc});
-        break;
     default:
         SLANG_ABORT_COMPILATION("unsupported stage.");
     }

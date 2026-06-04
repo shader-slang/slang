@@ -422,18 +422,6 @@ void CUDASourceEmitter::emitParameterGroupImpl(
     m_writer->emit(" (&SLANG_globalParams)\n");
 }
 
-void CUDASourceEmitter::emitEntryPointAttributesImpl(
-    IRFunc* irFunc,
-    IREntryPointDecoration* entryPointDecor)
-{
-    if (entryPointDecor->getProfile().getStage() == Stage::Node)
-    {
-        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-            .operation = "CUDA node shader stage",
-            .location = irFunc->sourceLoc});
-    }
-}
-
 void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 {
     if (!inst)
