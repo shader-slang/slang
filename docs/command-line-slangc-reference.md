@@ -62,6 +62,10 @@ The space between - D and &lt;name&gt; is optional. If no &lt;value&gt; is speci
 
 Save the source file dependency list in a file. 
 
+Uses Makefile dependency syntax: &lt;output&gt;: &lt;dep&gt; &lt;dep...&gt; 
+
+When no [-o](#o) is given, - is used as the make target (output goes to stdout). 
+
 
 <a id="entry"></a>
 ### -entry
