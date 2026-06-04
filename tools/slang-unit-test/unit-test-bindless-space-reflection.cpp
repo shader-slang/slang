@@ -71,6 +71,28 @@ static const char* _getTextureSamplerHandleSource()
     )";
 }
 
+static const char* _getSamplerHandleSource()
+{
+    return R"(
+        Texture2D gTexture;
+        RWStructuredBuffer<float> gOutput;
+
+        struct P
+        {
+            SamplerState.Handle s;
+        };
+
+        ParameterBlock<P> p1;
+
+        [Shader("compute")]
+        [NumThreads(2, 2, 1)]
+        void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            gOutput[0] = gTexture.Sample(p1.s, float2(0.0f, 0.0f)).x;
+        }
+    )";
+}
+
 static void _checkBindlessSpaceReflection(
     const char* userSource,
     BindlessSpaceExpectation bindlessSpaceExpectation,
@@ -305,6 +327,32 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapResourceAndSamplerHandle
 {
     _checkBindlessSpaceReflection(
         _getTextureSamplerHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        true,
+        nullptr,
+        0,
+        SLANG_SPIRV,
+        "spirv_1_5",
+        "spvDescriptorHeapEXT");
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapResourceHandle)
+{
+    _checkBindlessSpaceReflection(
+        _getTextureHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        true,
+        nullptr,
+        0,
+        SLANG_SPIRV,
+        "spirv_1_5",
+        "spvDescriptorHeapEXT");
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataSPIRVDescriptorHeapSamplerHandle)
+{
+    _checkBindlessSpaceReflection(
+        _getSamplerHandleSource(),
         _expectAnyReservedBindlessSpace(),
         true,
         nullptr,
