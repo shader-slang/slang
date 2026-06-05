@@ -87,6 +87,9 @@ protected:
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout) SLANG_OVERRIDE;
     virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamsImpl(IRFunc* func) SLANG_OVERRIDE;
+    virtual void emitEntryPointAttributesImpl(
+        IRFunc* irFunc,
+        IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
     virtual void emitInterpolationModifiersImpl(
         IRInst* varInst,
         IRType* valueType,

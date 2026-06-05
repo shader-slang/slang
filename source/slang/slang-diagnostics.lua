@@ -2588,6 +2588,13 @@ err(
     span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected a combination of UavMemory (0x1), GroupSharedMemory (0x2), NodeInputMemory (0x4), NodeOutputMemory (0x8), or AllMemory (0xf)" }
 )
 
+err(
+    "allow-sparse-nodes-requires-node-output-array",
+    31118,
+    "invalid 'AllowSparseNodes' target",
+    span { loc = "attr:Modifier", message = "'[AllowSparseNodes]' is only valid on NodeOutputArray parameters" }
+)
+
 warning(
     "explicit-uniform-location",
     31104,

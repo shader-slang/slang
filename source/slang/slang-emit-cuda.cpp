@@ -422,6 +422,16 @@ void CUDASourceEmitter::emitParameterGroupImpl(
     m_writer->emit(" (&SLANG_globalParams)\n");
 }
 
+void CUDASourceEmitter::emitEntryPointAttributesImpl(
+    IRFunc* irFunc,
+    IREntryPointDecoration* entryPointDecor)
+{
+    SLANG_UNUSED(irFunc);
+    SLANG_UNUSED(entryPointDecor);
+    // CUDA entry points are emitted through emitFunctionPreambleImpl. Suppress the C++ emitter's
+    // numthreads comment and SLANG_PRELUDE_EXPORT marker.
+}
+
 void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 {
     if (!inst)

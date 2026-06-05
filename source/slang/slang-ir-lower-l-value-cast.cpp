@@ -57,6 +57,9 @@ struct LValueCastLoweringContext
         auto ptrA = as<IRPtrTypeBase>(a);
         auto ptrB = as<IRPtrTypeBase>(b);
 
+        // HLSL work-graph Barrier flag diagnostics can leave enum/integer value casts wrapped in
+        // the l-value cast ops. Those are not pointer l-value casts, so this pass leaves them for
+        // target-specific expression emission instead of asserting here.
         if (!ptrA || !ptrB)
             return false;
 
@@ -180,7 +183,9 @@ struct LValueCastLoweringContext
 
         if (!toPtrType || !fromPtrType)
         {
-            // If either type is not a pointer type, we cannot process this L-value cast
+            // If either type is not a pointer type, this is a value-cast wrapper rather than a
+            // pointer l-value cast. For example, HLSL work-graph Barrier flag diagnostics strip
+            // these wrappers at emission time.
             return;
         }
 

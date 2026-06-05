@@ -820,6 +820,13 @@ bool isBuiltinParameterType(Type* type)
 // which have no dedicated AST type class but carry an `IntrinsicTypeModifier`.
 static bool isIntrinsicTypeWithOp(Type* type, IROp op)
 {
+    if (!type)
+        return false;
+
+    type = as<Type>(type->resolve());
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
     auto declRefType = as<DeclRefType>(type);
     if (!declRefType)
         return false;
@@ -1909,6 +1916,15 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     for (const auto& param : entryPointFuncDecl->getParameters())
     {
+        if (auto allowSparseNodesAttr = param->findModifier<AllowSparseNodesAttribute>())
+        {
+            if (!isIntrinsicTypeWithOp(param->getType(), kIROp_NodeOutputArrayType))
+            {
+                sink->diagnose(Diagnostics::AllowSparseNodesRequiresNodeOutputArray{
+                    .attr = allowSparseNodesAttr});
+            }
+        }
+
         if (isUniformParameterType(param->getType()))
         {
             // Automatically add `uniform` modifier to entry point parameters.
