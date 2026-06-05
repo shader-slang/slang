@@ -4964,6 +4964,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 // image type matches (e.g. depth flag, format).
                 IRBuilder builder(m_irModule);
                 auto texType = as<IRTextureTypeBase>(inst->getOperand(0)->getDataType());
+                SLANG_ASSERT(texType);
                 auto combinedType = builder.getTextureType(
                     texType->getElementType(),
                     texType->getShapeInst(),
@@ -4990,6 +4991,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 // type so the format matches (e.g. Rgba32ui vs Unknown).
                 IRBuilder builder(m_irModule);
                 auto operandType = as<IRTextureTypeBase>(inst->getOperand(0)->getDataType());
+                SLANG_ASSERT(operandType);
                 auto imageType = builder.getTextureType(
                     operandType->getElementType(),
                     operandType->getShapeInst(),

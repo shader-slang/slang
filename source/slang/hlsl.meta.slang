@@ -2288,6 +2288,9 @@ _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,1,format> __makeCombin
     _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format> texture,
     SamplerState sampler);
 
+// Separate overload for SamplerComparisonState (same IR op -- the sampler
+// type distinction exists only at the Slang level for type checking;
+// SamplerState and SamplerComparisonState have no shared base type).
 __intrinsic_op($(kIROp_MakeCombinedTextureSampler))
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,1,format> __makeCombinedTextureSamplerComparison(

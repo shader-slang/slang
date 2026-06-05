@@ -2,10 +2,43 @@
 
 #include "slang-ir-util.h"
 
+// NonUniform propagation for SPIR-V
+// ==================================
+//
+// When a shader indexes a resource array with NonUniformResourceIndex(idx),
+// Vulkan (VUID-RuntimeSpirv-None-10148) requires the NonUniform decoration
+// on the resource operand consumed by the sampling/memory instruction.
+//
+// Two passes cooperate to achieve this:
+//
+// 1. Float pass (this file, called during SPIR-V legalization):
+//    Bubbles the NonUniformResourceIndex wrapper outward through the
+//    use-def chain (GetElement, Load, MakeCombinedTextureSampler,
+//    CombinedTextureSamplerGetTexture, ImageTexelPointer, etc.).
+//    When the wrapper reaches an instruction the pass cannot float
+//    through (e.g. the spirv_asm boundary), the decoration phase
+//    walks back through the chain via decorateNonUniformChain to
+//    attach IRSPIRVNonUniformResourceDecoration to the index and
+//    all intermediate resource-creating ops.
+//
+// 2. Legalize propagation (propagateNonUniformDecorations in
+//    slang-ir-spirv-legalize.cpp): A single forward linear scan
+//    that runs after processGlobalParam rewrites getElement to
+//    getElementPtr. Syncs NonUniform between access-chain indices
+//    and their instructions (bidirectional), and forward-propagates
+//    through Load and FieldAddress/FieldExtract to reach the final
+//    resource operand.
+//
+// Resource-creating ops (MakeCombinedTextureSampler,
+// CombinedTextureSamplerGetTexture, ImageTexelPointer) are handled
+// exclusively by the float pass. The legalize propagation handles
+// access chains, loads, and field accesses.
+
 namespace Slang
 {
 // Walk back through resource-creating ops to find and decorate the
 // access-chain index that is the source of non-uniformity.
+// Terminates because the IR operand graph is acyclic (SSA dominance order).
 static void decorateNonUniformChain(IRInst* operand, const std::function<void(IRInst*)>& decorate)
 {
     if (auto gep = as<IRGetElementPtr>(operand))
@@ -133,6 +166,8 @@ void processNonUniformResourceIndex(
                     // because only the SPIR-V backend requires the NonUniform
                     // decoration on the access index itself -- other targets do not
                     // model per-index NonUniform and would produce spurious wrappers.
+                    // Both operands cannot be the same NonUniformResourceIndex
+                    // (base is array-typed, index is integer-typed).
                     if (user->getOperand(0) == inst)
                     {
                         // Replace getElement(nonUniformRes(obj), i), into

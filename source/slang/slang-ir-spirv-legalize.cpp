@@ -2258,10 +2258,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     }
 
     // Propagate NonUniform decorations after legalization rewrites.
-    // Ensures both access-chain ops and their index operands carry the
-    // decoration (bidirectional sync from #9871), and forward-propagates
-    // through loads and field accesses so the resource operand consumed
-    // by memory/sampling instructions is decorated per VUID-RuntimeSpirv-None-10148.
+    // Complements the float pass in slang-ir-float-non-uniform-resource-index.cpp
+    // (see the architectural overview there). This handles post-rewrite
+    // propagation: bidirectional sync between access-chain indices and
+    // instructions, and forward propagation through loads and field accesses.
+    // Resource-creating ops (MakeCombinedTextureSampler, etc.) are handled
+    // by the float pass, not here.
+    //
+    // Single forward pass suffices because IR instructions are in dominance
+    // order (producers before consumers).
     void propagateNonUniformDecorations()
     {
         for (auto globalInst : m_module->getGlobalInsts())
@@ -2280,6 +2285,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     case kIROp_GetElementPtr:
                     case kIROp_RWStructuredBufferGetElementPtr:
                         {
+                            // Bidirectional: if any of base, index, or inst is
+                            // decorated, ensure both index and inst carry it.
+                            // The base check handles inner access chains (e.g.
+                            // structured buffer element pointers) that derive
+                            // from a decorated outer access chain.
                             auto baseOperand = inst->getOperand(0);
                             auto indexOperand = inst->getOperand(1);
                             auto baseDecorated =
@@ -2323,6 +2333,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         }
                         break;
                     default:
+                        // MakeCombinedTextureSampler, CombinedTextureSamplerGetTexture,
+                        // ImageTexelPointer, and GetLegalizedSPIRVGlobalParamAddr are
+                        // intentionally absent -- handled by the float pass.
                         break;
                     }
                 }
