@@ -169,6 +169,8 @@ IR-pass pipeline:
   or `performMandatoryEarlyInlining` run, and what gates them?".
 - [04c-layout-ir.md](04c-layout-ir.md) — `TargetProgram::createIRModuleForLayout`
   builds a separate, per-target IR module whose only contents are
-  `IRLayoutDecoration`s on stub globals and entry points. It does
-  not run the mandatory passes above and is not fed into
-  `linkAndOptimizeIR`.
+  `IRLayoutDecoration`s on stub globals and entry points. It is not
+  the executable per-translation-unit module and does not run the
+  mandatory passes above, but an existing layout module is considered
+  by `linkIR` (`slang-ir-link.cpp` lines 2120-2127) so its
+  layout-decorated global symbols participate in linking.

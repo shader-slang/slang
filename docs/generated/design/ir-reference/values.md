@@ -129,8 +129,8 @@ and `Poison`; only its concrete children are listed here.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `logicalAnd` | `And` | `left, right` | | `InfixExpr` (`&&`) | Short-circuit logical AND. |
-| `logicalOr` | `Or` | `left, right` | | `InfixExpr` (`\|\|`) | Short-circuit logical OR. |
+| `logicalAnd` | `And` | `left, right` | | `InfixExpr` (`&&`) | Boolean AND of two already-evaluated `bool` operands; short-circuiting is handled by control flow during lowering, not by this opcode. |
+| `logicalOr` | `Or` | `left, right` | | `InfixExpr` (`\|\|`) | Boolean OR of two already-evaluated `bool` operands; short-circuiting is handled by control flow during lowering, not by this opcode. |
 | `select` | `Select` | `condition, trueResult, falseResult` | | `SelectExpr` and ternary `cond ? a : b` lowering | Branch-free conditional selection. |
 
 ### Comparison

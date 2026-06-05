@@ -122,8 +122,8 @@ declarations live in
 | Opcode | `struct_name` | Operands | Notes |
 | --- | --- | --- | --- |
 | `Int`, `Float`, `Bool`, ... | `IntType`, `FloatType`, `BoolType`, ... | — | Basic scalar types; see [../ir-reference/types.md](../ir-reference/types.md). |
-| `vector` | `VectorType` | `elementType, elementCount` | Vector types; hoistable. |
-| `matrix` | `MatrixType` | `elementType, rowCount, columnCount, layout` | Matrix types; hoistable. |
+| `Vec` | `VectorType` | `elementType, elementCount` | Vector types; hoistable. |
+| `Mat` | `MatrixType` | `elementType, rowCount, columnCount, layout` | Matrix types; hoistable. |
 | `Array` | `ArrayType` | `elementType, elementCount` | Fixed-size array; hoistable. |
 | `Ptr` | `PtrType` | `valueType, accessQualifier?, addressSpace?, dataLayout?` | Pointer type; hoistable. |
 | `Texture` | — | `elementType, shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format` | Texture types; hoistable. |
@@ -158,7 +158,7 @@ declarations live in
 | --- | --- | --- | --- |
 | `block` | `IRBlock` | parent of `Param`s and instructions | Basic block; first N children are `Param`s. |
 | `param` | `IRParam` | (variadic) | Block or function parameter; replaces SSA `phi`. |
-| `branch` / `condBranch` / `ifElse` / `switch` / `loop` | — | (terminator-specific) | Terminators in the `TerminatorInst` family. |
+| `unconditionalBranch` / `conditionalBranch` / `ifElse` / `switch` / `loop` | — | (terminator-specific) | Terminators in the `TerminatorInst` family. |
 | `return_val` / `unreachable` / `discard` | — | (terminator-specific) | Return and exit terminators. |
 | `RequirePrelude`, `RequireTargetExtension`, `Printf`, `StaticAssert`, ... | — | (variadic) | Other control-flow / backend-hint opcodes. |
 | (...see [../ir-reference/control-flow.md](../ir-reference/control-flow.md) for the full list) | | | |
@@ -240,6 +240,22 @@ The semantics of these flags and the consequences for IR transformation
 covered in [../../../design/ir.md](../../../design/ir.md). Pass authors
 **must** read that document before writing transformations that mutate
 the IR.
+
+## Decorations
+
+A number of opcodes are conceptually *decorations*: every entry in the
+`Decoration` family in
+[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) (the
+`*Decoration` opcodes such as `NameHintDecoration` and
+`TargetIntrinsicDecoration`) is modeled as an ordinary `IRInst`,
+wrapped by `IRDecoration` in
+[slang-ir.h](../../../../source/slang/slang-ir.h). A decoration does
+not sit in a block's instruction stream; it is attached to a host
+instruction's decoration list and reached via
+`IRInst::getFirstDecoration`, annotating the host with metadata
+(names, linkage, layout, target-intrinsic spellings) without
+producing a value. The full per-opcode catalog is in
+[../ir-reference/decorations.md](../ir-reference/decorations.md).
 
 ## Module versioning and opcode insertion
 

@@ -204,9 +204,10 @@ implements several context-sensitive rules:
 - **Raw string literals.** A string opened with `R"delimiter(` is
   closed only by `)delimiter"` for an arbitrary `delimiter`. Inside,
   newlines and backslashes are taken literally — no escape processing
-  is performed. Implementation lives in `slang-lexer.cpp` (raw-string
-  prefix detection around line 1025 and termination around line
-  1427).
+  is performed. Implementation lives in `_lexRawStringLiteralBody`
+  (`slang-lexer.cpp` lines 1025-1072, with the closing-delimiter
+  termination check at lines 1050-1053), invoked from the
+  string-literal dispatch at line 1471.
 - **Numeric literal suffixes.** Suffix characters (`u`, `l`, `f`,
   `h`, ...) are kept as part of the literal token's raw text. The
   parser / checker decodes them when interpreting the value.

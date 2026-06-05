@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T13:46:25+00:00
+reviewed_at: 2026-06-05T14:15:42+00:00
 target_doc: pipeline/02-parse-ast.md
 target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
 target_doc_watched_paths_digest: d21a76a8273d89c3084ce7ab14317bb6c3306843578006bdf09a9bc0860cfb4a
-source_commit: 05132edd86435f217f95634406f85184e58991f8
+source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
 checklist:
   factual_accuracy: pass
   cross_references: pass

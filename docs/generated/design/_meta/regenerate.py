@@ -360,6 +360,31 @@ def _yaml_to_str(val) -> str:
     return str(val)
 
 
+def _parse_iso_datetime(val) -> _dt.datetime | None:
+    """Parse an ISO 8601 timestamp from YAML/JSON state into UTC."""
+    if val is None:
+        return None
+    if isinstance(val, _dt.datetime):
+        dt = val
+    else:
+        text = _yaml_to_str(val).strip()
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        try:
+            dt = _dt.datetime.fromisoformat(text)
+        except ValueError:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_dt.timezone.utc)
+    return dt.astimezone(_dt.timezone.utc)
+
+
+def _timestamp_after(lhs, rhs) -> bool:
+    lhs_dt = _parse_iso_datetime(lhs)
+    rhs_dt = _parse_iso_datetime(rhs)
+    return lhs_dt is not None and rhs_dt is not None and lhs_dt > rhs_dt
+
+
 def _is_claude_family(model: str | None) -> bool:
     """True if `model` self-identifies as part of the Claude / Anthropic family.
 
@@ -949,6 +974,7 @@ def lint_remediation_report(
 
     review_ref = fm.get("review_report")
     review_fm: dict | None = None
+    remediation_matches_current_review = True
     if not isinstance(review_ref, str) or not review_ref.strip():
         issues.append(
             LintIssue(rel, "error", "review_report must be a non-empty string")
@@ -984,6 +1010,10 @@ def lint_remediation_report(
                             f" remediation target_doc {target!r}",
                         )
                     )
+                if _timestamp_after(
+                    review_fm.get("reviewed_at"), fm.get("remediated_at")
+                ):
+                    remediation_matches_current_review = False
 
     actions = fm.get("actions")
     action_sum: int | None = 0
@@ -1005,7 +1035,11 @@ def lint_remediation_report(
             elif action_sum is not None:
                 action_sum += v
 
-    if review_fm is not None and action_sum is not None:
+    if (
+        remediation_matches_current_review
+        and review_fm is not None
+        and action_sum is not None
+    ):
         review_fc = _coerce_int(review_fm.get("finding_count"))
         if review_fc is not None and review_fc != action_sum:
             issues.append(
@@ -1031,7 +1065,11 @@ def lint_remediation_report(
             )
         else:
             review_ids: set[str] = set()
-            if review_fm is not None and isinstance(review_ref, str):
+            if (
+                remediation_matches_current_review
+                and review_fm is not None
+                and isinstance(review_ref, str)
+            ):
                 # Pull finding IDs from the review's Findings table.
                 rv_body = review_text[review_text.find("\n---\n") + 5 :]
                 rv_sections = _split_sections(rv_body)
@@ -1176,6 +1214,10 @@ def _compute_review_status(
     if last_remediated is None:
         return "reviewed-pending-remediation"
     if last_remediated.get("review_report_ref") != last_reviewed.get("report_path"):
+        return "reviewed-pending-remediation"
+    if _timestamp_after(
+        last_reviewed.get("reviewed_at"), last_remediated.get("remediated_at")
+    ):
         return "reviewed-pending-remediation"
     return "remediated"
 

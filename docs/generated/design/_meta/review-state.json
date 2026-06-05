@@ -9,24 +9,24 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T21:00:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/architecture/dependency-graph.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/architecture/dependency-graph.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/generated/design/_meta/reviews/architecture/dependency-graph.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T14:11:45+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
-          "major": 1,
-          "minor": 1,
+          "major": 0,
+          "minor": 2,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "30983b1eac237a20bb36b39636936cb7cb3bc5b003a6f2f819545a3ac80fb871"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "d562c492ff7426404fd8fcd584e73aade50ea9e87ab0386d9d3448c420d06cb9"
       }
     },
     "architecture/module-map.md": {
@@ -34,28 +34,28 @@
         "actions": {
           "deferred": 0,
           "escalated": 0,
-          "fixed": 2,
+          "fixed": 1,
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T21:00:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/architecture/module-map.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/architecture/module-map.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 2,
+        "finding_count": 1,
         "report_path": "docs/generated/design/_meta/reviews/architecture/module-map.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T14:11:45+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
           "major": 1,
-          "minor": 1,
+          "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "f11187e79ffaa9e1c1966046a9bb76df4bb33cabc81ba4f496d6f224fcf0ca12"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "3e84425a669764ca340ed7a1190856897496ac2f667956b0a8228b11c7f4ab35"
       }
     },
     "architecture/overview.md": {
@@ -63,28 +63,28 @@
         "actions": {
           "deferred": 0,
           "escalated": 0,
-          "fixed": 0,
+          "fixed": 1,
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-28T09:03:07+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/architecture/overview.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/architecture/overview.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 0,
+        "finding_count": 1,
         "report_path": "docs/generated/design/_meta/reviews/architecture/overview.md.review.md",
-        "reviewed_at": "2026-05-28T09:03:07+00:00",
+        "reviewed_at": "2026-06-05T14:19:16+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
-          "major": 0,
+          "major": 1,
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "9cc1ac7cb67ffc5d742af5e8ded1381487ab6109",
-        "target_doc_watched_paths_digest": "523d4a2878184499b9f5e8fce9e6f73b1da8dbb5fe081b2ecc44b29ae8e980e3"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "e5d3ec001daa5764cbb9fd0fabb552621df4ce64926121102bf19a375fa9d517"
       }
     },
     "ast-reference/base.md": {
@@ -121,135 +121,19 @@
         "actions": {
           "deferred": 0,
           "escalated": 0,
-          "fixed": 0,
+          "fixed": 1,
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-28T09:03:07+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/ast-reference/declarations.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/ast-reference/declarations.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 0,
+        "finding_count": 1,
         "report_path": "docs/generated/design/_meta/reviews/ast-reference/declarations.md.review.md",
-        "reviewed_at": "2026-05-28T09:03:07+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 0,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "9cc1ac7cb67ffc5d742af5e8ded1381487ab6109",
-        "target_doc_watched_paths_digest": "a2217d02da7f2680d73efe9d3b894939543b9dd5ba9d5ebd665f3da62641c2f4"
-      }
-    },
-    "ast-reference/expressions.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 0,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-28T09:03:07+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/ast-reference/expressions.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/ast-reference/expressions.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 0,
-        "report_path": "docs/generated/design/_meta/reviews/ast-reference/expressions.md.review.md",
-        "reviewed_at": "2026-05-28T09:03:07+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 0,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "9cc1ac7cb67ffc5d742af5e8ded1381487ab6109",
-        "target_doc_watched_paths_digest": "2c95fac86190d3096ef9459a727d2536a788f979789ce16c457446379c7e499f"
-      }
-    },
-    "ast-reference/index.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 1,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-15T18:00:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/ast-reference/index.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/ast-reference/index.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 1,
-        "report_path": "docs/generated/design/_meta/reviews/ast-reference/index.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 0,
-          "minor": 1,
-          "nit": 0
-        },
-        "target_doc_source_commit": "12bdd912949ee692a11a757b5829fe3ef819bebc",
-        "target_doc_watched_paths_digest": "93ae42ace19ae6731e173284d4ae34f4cb35be0cf408f0e32f578fb2a2cc5501"
-      }
-    },
-    "ast-reference/modifiers.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 0,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-28T09:03:07+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/ast-reference/modifiers.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/ast-reference/modifiers.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 0,
-        "report_path": "docs/generated/design/_meta/reviews/ast-reference/modifiers.md.review.md",
-        "reviewed_at": "2026-05-28T09:03:07+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 0,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "9cc1ac7cb67ffc5d742af5e8ded1381487ab6109",
-        "target_doc_watched_paths_digest": "b73ab2763cf90e18015e6beb407b431f76d9344148801d3a27089be1611f45e2"
-      }
-    },
-    "ast-reference/statements.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 1,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-15T18:00:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/ast-reference/statements.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/ast-reference/statements.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 1,
-        "report_path": "docs/generated/design/_meta/reviews/ast-reference/statements.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T14:18:11+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
@@ -257,8 +141,124 @@
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "12bdd912949ee692a11a757b5829fe3ef819bebc",
-        "target_doc_watched_paths_digest": "12add2d77eb534b6741b9633b4251590baf28be0de7f2554aacada789942f5ec"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "4fbff6632ead047a5c7b8f1f94ae347684e102e096ad26276f0083b8dab39d3e"
+      }
+    },
+    "ast-reference/expressions.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/ast-reference/expressions.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/ast-reference/expressions.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 2,
+        "report_path": "docs/generated/design/_meta/reviews/ast-reference/expressions.md.review.md",
+        "reviewed_at": "2026-06-05T14:18:11+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 0,
+          "minor": 2,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "0d26ac1f4551507e46c4f987f6ed9056ef663fb2db265a373049f3b0d384bd13"
+      }
+    },
+    "ast-reference/index.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/ast-reference/index.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/ast-reference/index.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 0,
+        "report_path": "docs/generated/design/_meta/reviews/ast-reference/index.md.review.md",
+        "reviewed_at": "2026-06-05T14:18:11+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 0,
+          "minor": 0,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "cbccfa6aafcc9d4307bb48a229affc8e0177c1211a2813463404fd1e5ba4f6be"
+      }
+    },
+    "ast-reference/modifiers.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/ast-reference/modifiers.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/ast-reference/modifiers.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 1,
+        "report_path": "docs/generated/design/_meta/reviews/ast-reference/modifiers.md.review.md",
+        "reviewed_at": "2026-06-05T14:58:02+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 1,
+          "minor": 0,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "27e8704d639742ca3f3a7523ba881ce0c549f37a2ecf72d2fba11ec9fd4e0064"
+      }
+    },
+    "ast-reference/statements.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 3,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/ast-reference/statements.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/ast-reference/statements.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 3,
+        "report_path": "docs/generated/design/_meta/reviews/ast-reference/statements.md.review.md",
+        "reviewed_at": "2026-06-05T14:58:02+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 2,
+          "minor": 1,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "ba11abbe597dfa9416ac8424c666530b1e926d860fa6eba7e8b1c87f6ff4863c"
       }
     },
     "ast-reference/types.md": {
@@ -324,60 +324,31 @@
         "actions": {
           "deferred": 0,
           "escalated": 0,
-          "fixed": 0,
+          "fixed": 1,
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-28T09:03:07+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/cross-cutting/core-module.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/cross-cutting/core-module.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 0,
+        "finding_count": 1,
         "report_path": "docs/generated/design/_meta/reviews/cross-cutting/core-module.md.review.md",
-        "reviewed_at": "2026-05-28T09:03:07+00:00",
+        "reviewed_at": "2026-06-05T14:19:16+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
           "major": 0,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "9cc1ac7cb67ffc5d742af5e8ded1381487ab6109",
-        "target_doc_watched_paths_digest": "5945bacf4c9d96f2589a494589832a219c29d05fac941ffa13504c7d08cf982a"
-      }
-    },
-    "cross-cutting/diagnostics.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 2,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-15T18:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/cross-cutting/diagnostics.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/cross-cutting/diagnostics.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 2,
-        "report_path": "docs/generated/design/_meta/reviews/cross-cutting/diagnostics.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 1,
           "minor": 1,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "81f47a822a99f93b8701131d76480cb13010b16d56d184d434ff385df559169e"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "19ad329c51b4e53e37b131c94d49631623fa525a7de092b35d5852c27a4bca02"
       }
     },
-    "cross-cutting/ir-instructions.md": {
+    "cross-cutting/diagnostics.md": {
       "last_remediated": {
         "actions": {
           "deferred": 0,
@@ -386,24 +357,53 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T18:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/cross-cutting/diagnostics.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/cross-cutting/diagnostics.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 1,
+        "report_path": "docs/generated/design/_meta/reviews/cross-cutting/diagnostics.md.review.md",
+        "reviewed_at": "2026-06-05T14:19:16+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 0,
+          "minor": 1,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "24e450b5284e7561c4747314f08b296074a7d11c69ff4f5fd11f38e74126be29"
+      }
+    },
+    "cross-cutting/ir-instructions.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/cross-cutting/ir-instructions.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/cross-cutting/ir-instructions.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 1,
+        "finding_count": 2,
         "report_path": "docs/generated/design/_meta/reviews/cross-cutting/ir-instructions.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T14:58:30+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
-          "major": 1,
+          "major": 2,
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "a7b1c184243cc33ab7365f1e766ae76123f4e9039f529babd0a030cb03949933"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "2e16e4101249030a9cd977caed2ab437622083f3808b536a0a0e81f0c47cf487"
       }
     },
     "cross-cutting/serialization.md": {
@@ -441,27 +441,27 @@
           "deferred": 0,
           "escalated": 0,
           "fixed": 1,
-          "rejected_bogus": 1,
+          "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T18:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/cross-cutting/targets.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/cross-cutting/targets.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 2,
+        "finding_count": 1,
         "report_path": "docs/generated/design/_meta/reviews/cross-cutting/targets.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T14:58:30+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
           "major": 1,
-          "minor": 1,
+          "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "4cd99452519c5be61ce5cca85589b24210e710c615e711767e7bd28139fcadbd"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "44ece489c777e2db22b80fbab38fd7ce4eb6569d58ded6c76fe63d582db24928"
       }
     },
     "glossary.md": {
@@ -469,31 +469,60 @@
         "actions": {
           "deferred": 0,
           "escalated": 0,
-          "fixed": 2,
+          "fixed": 3,
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T21:15:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/glossary.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/glossary.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 2,
+        "finding_count": 3,
         "report_path": "docs/generated/design/_meta/reviews/glossary.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T14:58:30+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
           "major": 0,
-          "minor": 2,
+          "minor": 3,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "7176a22219b18c44d0407a900615049a6a078771700ca274d01d15aeb88bc3ad"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "3ec0150df965938276956bf39ea384534b1949417b8bac7832d9895d4ccada91"
       }
     },
     "ir-reference/control-flow.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/ir-reference/control-flow.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/control-flow.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 0,
+        "report_path": "docs/generated/design/_meta/reviews/ir-reference/control-flow.md.review.md",
+        "reviewed_at": "2026-06-05T15:05:36+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 0,
+          "minor": 0,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586"
+      }
+    },
+    "ir-reference/decorations.md": {
       "last_remediated": {
         "actions": {
           "deferred": 0,
@@ -502,15 +531,15 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T17:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/ir-reference/control-flow.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/control-flow.md.review.md"
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/ir-reference/decorations.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/decorations.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 1,
-        "report_path": "docs/generated/design/_meta/reviews/ir-reference/control-flow.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "report_path": "docs/generated/design/_meta/reviews/ir-reference/decorations.md.review.md",
+        "reviewed_at": "2026-06-05T15:05:36+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
@@ -518,37 +547,8 @@
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
-      }
-    },
-    "ir-reference/decorations.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 0,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-15T17:05:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/ir-reference/decorations.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/decorations.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 0,
-        "report_path": "docs/generated/design/_meta/reviews/ir-reference/decorations.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 0,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "4efe93afbd22f4572d6d334ca82947cebf8058c7572291261103fd18aa04f6bd"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "156c66694255ff678fb0eaa18abd2bb50bfa9979d070210c7bb229025fcd0b6b"
       }
     },
     "ir-reference/differentiation.md": {
@@ -556,28 +556,28 @@
         "actions": {
           "deferred": 0,
           "escalated": 0,
-          "fixed": 0,
+          "fixed": 1,
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-28T09:03:07+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/ir-reference/differentiation.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/differentiation.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 0,
+        "finding_count": 1,
         "report_path": "docs/generated/design/_meta/reviews/ir-reference/differentiation.md.review.md",
-        "reviewed_at": "2026-05-28T09:03:07+00:00",
+        "reviewed_at": "2026-06-05T15:05:36+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
           "major": 0,
-          "minor": 0,
+          "minor": 1,
           "nit": 0
         },
-        "target_doc_source_commit": "9cc1ac7cb67ffc5d742af5e8ded1381487ab6109",
-        "target_doc_watched_paths_digest": "901d192b17338b4a7dc882dff1bea2cd6f2750dad1694a5f0787288344552a33"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586"
       }
     },
     "ir-reference/generics-and-existentials.md": {
@@ -589,24 +589,24 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T17:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/ir-reference/generics-and-existentials.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/generics-and-existentials.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/generated/design/_meta/reviews/ir-reference/generics-and-existentials.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T15:05:36+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
-          "major": 2,
-          "minor": 0,
+          "major": 1,
+          "minor": 1,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586"
       }
     },
     "ir-reference/index.md": {
@@ -616,26 +616,26 @@
           "escalated": 0,
           "fixed": 1,
           "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
+          "rejected_out_of_scope": 1
         },
-        "remediated_at": "2026-05-15T17:45:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/ir-reference/index.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/index.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 1,
+        "finding_count": 2,
         "report_path": "docs/generated/design/_meta/reviews/ir-reference/index.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T15:05:51+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
-          "critical": 1,
-          "major": 0,
+          "critical": 0,
+          "major": 2,
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "44cc076396b4503f18997a6be579c3163209ab7a24f87f3aae489b26a3963cbd"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "9221d4167460d8aa57ead3a905a1ce4b763de1371a68088ad1f20133ed887720"
       }
     },
     "ir-reference/metadata.md": {
@@ -647,15 +647,15 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T17:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/ir-reference/metadata.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/metadata.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/generated/design/_meta/reviews/ir-reference/metadata.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T15:05:51+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
@@ -663,11 +663,40 @@
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "4efe93afbd22f4572d6d334ca82947cebf8058c7572291261103fd18aa04f6bd"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "156c66694255ff678fb0eaa18abd2bb50bfa9979d070210c7bb229025fcd0b6b"
       }
     },
     "ir-reference/misc.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/ir-reference/misc.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/misc.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 1,
+        "report_path": "docs/generated/design/_meta/reviews/ir-reference/misc.md.review.md",
+        "reviewed_at": "2026-06-05T15:05:51+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 1,
+          "minor": 0,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586"
+      }
+    },
+    "ir-reference/resources-and-atomics.md": {
       "last_remediated": {
         "actions": {
           "deferred": 0,
@@ -676,27 +705,27 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T17:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/ir-reference/misc.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/misc.md.review.md"
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/ir-reference/resources-and-atomics.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/resources-and-atomics.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 3,
-        "report_path": "docs/generated/design/_meta/reviews/ir-reference/misc.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "report_path": "docs/generated/design/_meta/reviews/ir-reference/resources-and-atomics.md.review.md",
+        "reviewed_at": "2026-06-05T15:05:51+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
-          "major": 3,
-          "minor": 0,
+          "major": 2,
+          "minor": 1,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586"
       }
     },
-    "ir-reference/resources-and-atomics.md": {
+    "ir-reference/structure.md": {
       "last_remediated": {
         "actions": {
           "deferred": 0,
@@ -705,15 +734,15 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T17:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/ir-reference/resources-and-atomics.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/resources-and-atomics.md.review.md"
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/ir-reference/structure.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/structure.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 2,
-        "report_path": "docs/generated/design/_meta/reviews/ir-reference/resources-and-atomics.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "report_path": "docs/generated/design/_meta/reviews/ir-reference/structure.md.review.md",
+        "reviewed_at": "2026-06-05T15:06:28+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
@@ -721,37 +750,8 @@
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
-      }
-    },
-    "ir-reference/structure.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 1,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-15T17:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/ir-reference/structure.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/structure.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 1,
-        "report_path": "docs/generated/design/_meta/reviews/ir-reference/structure.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 1,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586"
       }
     },
     "ir-reference/types.md": {
@@ -759,28 +759,28 @@
         "actions": {
           "deferred": 0,
           "escalated": 0,
-          "fixed": 1,
+          "fixed": 2,
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T17:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/ir-reference/types.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/types.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 1,
+        "finding_count": 2,
         "report_path": "docs/generated/design/_meta/reviews/ir-reference/types.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T15:06:28+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
-          "major": 1,
+          "major": 2,
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586"
       }
     },
     "ir-reference/values.md": {
@@ -788,28 +788,28 @@
         "actions": {
           "deferred": 0,
           "escalated": 0,
-          "fixed": 3,
+          "fixed": 1,
           "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
+          "rejected_out_of_scope": 1
         },
-        "remediated_at": "2026-05-15T17:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/ir-reference/values.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/ir-reference/values.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 3,
+        "finding_count": 2,
         "report_path": "docs/generated/design/_meta/reviews/ir-reference/values.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T15:06:28+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
-          "major": 3,
+          "major": 2,
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586"
       }
     },
     "name-resolution/index.md": {
@@ -821,15 +821,15 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T19:00:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/name-resolution/index.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/name-resolution/index.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/generated/design/_meta/reviews/name-resolution/index.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T14:19:45+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
@@ -837,8 +837,8 @@
           "minor": 1,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "6ebf89cec5003af621b64dff064087207dc7299f8872526b3a08d82df64fd1e6"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "74f38318a36443c037d6981bf35771b5568a81348341a8264dae6148131877f4"
       }
     },
     "name-resolution/lookup.md": {
@@ -850,24 +850,24 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T19:00:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/name-resolution/lookup.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/name-resolution/lookup.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 2,
         "report_path": "docs/generated/design/_meta/reviews/name-resolution/lookup.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T14:19:45+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
-          "major": 2,
-          "minor": 0,
+          "major": 1,
+          "minor": 1,
           "nit": 0
         },
-        "target_doc_source_commit": "12bdd912949ee692a11a757b5829fe3ef819bebc",
-        "target_doc_watched_paths_digest": "0f6a6813ac215b2f02942be90ab761d8979a0ae51be857c45bd14bd32a88b0d0"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "f2b871e4496ed32a327e98986317cc4eb48691d204aad2e863ea2eebf51fc801"
       }
     },
     "name-resolution/overload-resolution.md": {
@@ -879,15 +879,15 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T19:00:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/name-resolution/overload-resolution.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/name-resolution/overload-resolution.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 3,
         "report_path": "docs/generated/design/_meta/reviews/name-resolution/overload-resolution.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T14:19:45+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
@@ -895,40 +895,11 @@
           "minor": 1,
           "nit": 0
         },
-        "target_doc_source_commit": "12bdd912949ee692a11a757b5829fe3ef819bebc",
-        "target_doc_watched_paths_digest": "8d205b22cafc669a98c4f58847addad46d1ed75557279ca4e4e51b8586320f26"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "4b84c7f99f5cc6586a2852af0165acc8c35f69765bd0593a6595e5852f1750ec"
       }
     },
     "name-resolution/scopes.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 2,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-15T19:00:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/name-resolution/scopes.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/name-resolution/scopes.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 2,
-        "report_path": "docs/generated/design/_meta/reviews/name-resolution/scopes.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 2,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "12bdd912949ee692a11a757b5829fe3ef819bebc",
-        "target_doc_watched_paths_digest": "8e9260091e2657583e4bc366281ab8bdfb22377d4a78add7b8687c1ba66cd75b"
-      }
-    },
-    "name-resolution/visibility.md": {
       "last_remediated": {
         "actions": {
           "deferred": 0,
@@ -937,27 +908,114 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T19:00:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/name-resolution/scopes.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/name-resolution/scopes.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 3,
+        "report_path": "docs/generated/design/_meta/reviews/name-resolution/scopes.md.review.md",
+        "reviewed_at": "2026-06-05T14:56:42+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 1,
+          "minor": 2,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "fd3d948ba51668efc2bdab940c9ced97bfd743835e43a3a4ae3b6a3a358cd405"
+      }
+    },
+    "name-resolution/visibility.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 1,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/name-resolution/visibility.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/name-resolution/visibility.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 3,
+        "finding_count": 2,
         "report_path": "docs/generated/design/_meta/reviews/name-resolution/visibility.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T14:56:42+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
-          "major": 3,
-          "minor": 0,
+          "major": 1,
+          "minor": 1,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "7334450582d01cf1d273acf69603e1a99298f518a80c10f85a058fb506f75ff0"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "7f835b0f4fb5f3c95c0f2466c182e4c6530306b32626d162568da304471b39ae"
       }
     },
     "pipeline/01-lex-preprocess.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/pipeline/01-lex-preprocess.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/01-lex-preprocess.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 0,
+        "report_path": "docs/generated/design/_meta/reviews/pipeline/01-lex-preprocess.md.review.md",
+        "reviewed_at": "2026-06-05T14:15:42+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 0,
+          "minor": 0,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "d4bd494cb1d65db3267f95b7fe9d71ef78fa007b6d665f13b0fe9a4d8b383145"
+      }
+    },
+    "pipeline/02-parse-ast.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 0,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/pipeline/02-parse-ast.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/02-parse-ast.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 0,
+        "report_path": "docs/generated/design/_meta/reviews/pipeline/02-parse-ast.md.review.md",
+        "reviewed_at": "2026-06-05T14:15:42+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 0,
+          "minor": 0,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "d21a76a8273d89c3084ce7ab14317bb6c3306843578006bdf09a9bc0860cfb4a"
+      }
+    },
+    "pipeline/03-semantic-check.md": {
       "last_remediated": {
         "actions": {
           "deferred": 0,
@@ -966,27 +1024,27 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T19:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/pipeline/01-lex-preprocess.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/01-lex-preprocess.md.review.md"
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/pipeline/03-semantic-check.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/03-semantic-check.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 2,
-        "report_path": "docs/generated/design/_meta/reviews/pipeline/01-lex-preprocess.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "report_path": "docs/generated/design/_meta/reviews/pipeline/03-semantic-check.md.review.md",
+        "reviewed_at": "2026-06-05T14:15:42+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
-          "critical": 0,
+          "critical": 1,
           "major": 1,
-          "minor": 1,
+          "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "3da83a82d83ad1b0fbd58465ed3a89d2880533dd",
-        "target_doc_watched_paths_digest": "ffca628ccbe37729fbf4b931ff5a00d755e36eb2c4c24e63869e5ee91bba63b3"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "a7f01f5c13a93b4962311b4a8303731a575df2231fa88c54d62f0ee4ce433cb4"
       }
     },
-    "pipeline/02-parse-ast.md": {
+    "pipeline/04-ast-to-ir.md": {
       "last_remediated": {
         "actions": {
           "deferred": 0,
@@ -995,15 +1053,15 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T19:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/pipeline/02-parse-ast.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/02-parse-ast.md.review.md"
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/pipeline/04-ast-to-ir.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/04-ast-to-ir.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 1,
-        "report_path": "docs/generated/design/_meta/reviews/pipeline/02-parse-ast.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "report_path": "docs/generated/design/_meta/reviews/pipeline/04-ast-to-ir.md.review.md",
+        "reviewed_at": "2026-06-05T14:56:27+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
@@ -1011,98 +1069,11 @@
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "3da83a82d83ad1b0fbd58465ed3a89d2880533dd",
-        "target_doc_watched_paths_digest": "799ebd5687158b54f5b05c7af11525c7a9fdec1c4d76519bd51ffdb180085561"
-      }
-    },
-    "pipeline/03-semantic-check.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 0,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-15T17:05:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/pipeline/03-semantic-check.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/03-semantic-check.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 0,
-        "report_path": "docs/generated/design/_meta/reviews/pipeline/03-semantic-check.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 0,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "47917e9e7bbd0d4c7cec93d02043b25787343696017d2490659c825a87e68dbe"
-      }
-    },
-    "pipeline/04-ast-to-ir.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 0,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-15T17:05:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/pipeline/04-ast-to-ir.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/04-ast-to-ir.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 0,
-        "report_path": "docs/generated/design/_meta/reviews/pipeline/04-ast-to-ir.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 0,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "fcfe91e111a6ac8caf6474a3c896282098f36eaaf23bfc11208dcafc53594873"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "9ab5063bb78269f0497d90eee21d470b180a0ade8c090e36af38aa4c444758ed"
       }
     },
     "pipeline/04b-pre-link-passes.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 0,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-15T17:05:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/pipeline/04b-pre-link-passes.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/04b-pre-link-passes.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 0,
-        "report_path": "docs/generated/design/_meta/reviews/pipeline/04b-pre-link-passes.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 0,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "7f4e296a80f6a59ce95b5faccef2ae071beeb30e11f234e93ea2f89f30aa8f17"
-      }
-    },
-    "pipeline/04c-layout-ir.md": {
       "last_remediated": {
         "actions": {
           "deferred": 0,
@@ -1111,24 +1082,53 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T19:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/pipeline/04b-pre-link-passes.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/04b-pre-link-passes.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 2,
+        "report_path": "docs/generated/design/_meta/reviews/pipeline/04b-pre-link-passes.md.review.md",
+        "reviewed_at": "2026-06-05T14:56:27+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 1,
+          "minor": 1,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "18c422c7671f2e36b802b77eaab4617e384c7719e835466116d64fcc7c9bd423"
+      }
+    },
+    "pipeline/04c-layout-ir.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/pipeline/04c-layout-ir.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/04c-layout-ir.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 2,
+        "finding_count": 1,
         "report_path": "docs/generated/design/_meta/reviews/pipeline/04c-layout-ir.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T14:56:27+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
-          "major": 0,
-          "minor": 2,
+          "major": 1,
+          "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "07b911645ab895c59decdcc25c6c56ee245833af",
-        "target_doc_watched_paths_digest": "e038ce8b26af34313cbb735372967b47c8a59d14ba4b479adca77628797061b1"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "17a141b9faa0ddd9e6fc9cf12a80084dc633df2e889700f9139cdd980e671b52"
       }
     },
     "pipeline/05-ir-passes.md": {
@@ -1140,24 +1140,24 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T19:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/pipeline/05-ir-passes.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/05-ir-passes.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/generated/design/_meta/reviews/pipeline/05-ir-passes.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T14:54:00+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
-          "major": 1,
-          "minor": 0,
+          "major": 0,
+          "minor": 1,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "8749b5a60327ef9aea96c0b02a10d643c2d39d04195e7cbd40904b69dabc7f6e"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "c7ceb8f7138b0d1f8d9559d2e33d3bfbcf92dade0e6bafe75a6e9dd8ace9f07f"
       }
     },
     "pipeline/06-emit.md": {
@@ -1169,15 +1169,15 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-28T09:03:07+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/pipeline/06-emit.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/06-emit.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 0,
         "report_path": "docs/generated/design/_meta/reviews/pipeline/06-emit.md.review.md",
-        "reviewed_at": "2026-05-28T09:03:07+00:00",
+        "reviewed_at": "2026-06-05T14:54:00+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
@@ -1185,156 +1185,11 @@
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "9cc1ac7cb67ffc5d742af5e8ded1381487ab6109",
-        "target_doc_watched_paths_digest": "a36bfc191a0ab4adb9168e61c6ea332b786bc78e7f29a88ec21d3e53fc1f4f9b"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "6dc28f908084269f31c6e55e648ebd8307ae6b527db79dfc00f74b5e82c5c6ed"
       }
     },
     "pipeline/overview.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 3,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-15T19:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/pipeline/overview.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/overview.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 3,
-        "report_path": "docs/generated/design/_meta/reviews/pipeline/overview.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 1,
-          "minor": 2,
-          "nit": 0
-        },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "c42e276adc6581c33bb4effaa5201418aa07fde812042c885eb713bf657774c6"
-      }
-    },
-    "syntax-reference/grammar.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 0,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-28T09:03:07+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/syntax-reference/grammar.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/syntax-reference/grammar.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 0,
-        "report_path": "docs/generated/design/_meta/reviews/syntax-reference/grammar.md.review.md",
-        "reviewed_at": "2026-05-28T09:03:07+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 0,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "9cc1ac7cb67ffc5d742af5e8ded1381487ab6109",
-        "target_doc_watched_paths_digest": "efb8ab286d2af640625fcafb908ce136336ff108b6497606b860e7586cad9f95"
-      }
-    },
-    "syntax-reference/keywords-and-builtins.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 0,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-28T09:03:07+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/syntax-reference/keywords-and-builtins.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/syntax-reference/keywords-and-builtins.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 0,
-        "report_path": "docs/generated/design/_meta/reviews/syntax-reference/keywords-and-builtins.md.review.md",
-        "reviewed_at": "2026-05-28T09:03:07+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 0,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "9cc1ac7cb67ffc5d742af5e8ded1381487ab6109",
-        "target_doc_watched_paths_digest": "c14a0f34a0411eb654010a94f1366a4724d201d82e68f7e9547e3782269541fd"
-      }
-    },
-    "syntax-reference/tokens.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 2,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-15T20:00:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/syntax-reference/tokens.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/syntax-reference/tokens.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 2,
-        "report_path": "docs/generated/design/_meta/reviews/syntax-reference/tokens.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 2,
-          "minor": 0,
-          "nit": 0
-        },
-        "target_doc_source_commit": "3da83a82d83ad1b0fbd58465ed3a89d2880533dd",
-        "target_doc_watched_paths_digest": "e2c6f1441dbe013ee44a514220f358519fb7666c14bf549fa51c11558ff1dd3e"
-      }
-    },
-    "target-pipelines/cuda.md": {
-      "last_remediated": {
-        "actions": {
-          "deferred": 0,
-          "escalated": 0,
-          "fixed": 2,
-          "rejected_bogus": 0,
-          "rejected_out_of_scope": 0
-        },
-        "remediated_at": "2026-05-15T20:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/target-pipelines/cuda.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/target-pipelines/cuda.md.review.md"
-      },
-      "last_reviewed": {
-        "finding_count": 2,
-        "report_path": "docs/generated/design/_meta/reviews/target-pipelines/cuda.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
-        "reviewer_model": "gpt-5.5",
-        "severity_breakdown": {
-          "critical": 0,
-          "major": 1,
-          "minor": 1,
-          "nit": 0
-        },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "a0dbd58860550ec4de9722b99c186511cb3c877a447630a808184906b9592c17"
-      }
-    },
-    "target-pipelines/hlsl.md": {
       "last_remediated": {
         "actions": {
           "deferred": 0,
@@ -1343,24 +1198,169 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T20:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
-        "report_path": "docs/generated/design/_meta/remediations/target-pipelines/hlsl.md.remediation.md",
-        "review_report_ref": "docs/generated/design/_meta/reviews/target-pipelines/hlsl.md.review.md"
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/pipeline/overview.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/pipeline/overview.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 1,
-        "report_path": "docs/generated/design/_meta/reviews/target-pipelines/hlsl.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "report_path": "docs/generated/design/_meta/reviews/pipeline/overview.md.review.md",
+        "reviewed_at": "2026-06-05T14:54:00+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 0,
+          "minor": 0,
+          "nit": 1
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "2b1f264a09ca0945624e60f437a309169a899a6be06ea582244f6b6933989b9c"
+      }
+    },
+    "syntax-reference/grammar.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 4,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/syntax-reference/grammar.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/syntax-reference/grammar.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 4,
+        "report_path": "docs/generated/design/_meta/reviews/syntax-reference/grammar.md.review.md",
+        "reviewed_at": "2026-06-05T14:58:02+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 4,
+          "minor": 0,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "1084d6ac21281bc1db256e51bd36ad00a4bce0602ec9747f43e80e7a14436e98"
+      }
+    },
+    "syntax-reference/keywords-and-builtins.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/syntax-reference/keywords-and-builtins.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/syntax-reference/keywords-and-builtins.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 2,
+        "report_path": "docs/generated/design/_meta/reviews/syntax-reference/keywords-and-builtins.md.review.md",
+        "reviewed_at": "2026-06-05T14:58:02+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
           "major": 1,
-          "minor": 0,
+          "minor": 1,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "37fe61fef33084d2ef7676b9897a7ef8dc2cd50f8e3b6afdd3b425f68b07b571"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "20804753dbe34bcc88e551a3b9b9e42d42729a73662c7d2065776e63a87d47a1"
+      }
+    },
+    "syntax-reference/tokens.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 1,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/syntax-reference/tokens.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/syntax-reference/tokens.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 1,
+        "report_path": "docs/generated/design/_meta/reviews/syntax-reference/tokens.md.review.md",
+        "reviewed_at": "2026-06-05T14:58:02+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 0,
+          "major": 0,
+          "minor": 1,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "f22ca582d91fc2387de917c9eb2e492cd1590365f14fadabe1615dec6bfac4b6"
+      }
+    },
+    "target-pipelines/cuda.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 7,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/target-pipelines/cuda.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/target-pipelines/cuda.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 7,
+        "report_path": "docs/generated/design/_meta/reviews/target-pipelines/cuda.md.review.md",
+        "reviewed_at": "2026-06-05T15:05:26+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 1,
+          "major": 4,
+          "minor": 2,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "697128ce2b824225966f830d21ac028faff0ac0feee6366f3549b55ad9f0d9b1"
+      }
+    },
+    "target-pipelines/hlsl.md": {
+      "last_remediated": {
+        "actions": {
+          "deferred": 0,
+          "escalated": 0,
+          "fixed": 2,
+          "rejected_bogus": 0,
+          "rejected_out_of_scope": 0
+        },
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
+        "report_path": "docs/generated/design/_meta/remediations/target-pipelines/hlsl.md.remediation.md",
+        "review_report_ref": "docs/generated/design/_meta/reviews/target-pipelines/hlsl.md.review.md"
+      },
+      "last_reviewed": {
+        "finding_count": 2,
+        "report_path": "docs/generated/design/_meta/reviews/target-pipelines/hlsl.md.review.md",
+        "reviewed_at": "2026-06-05T15:05:26+00:00",
+        "reviewer_model": "gpt-5.5",
+        "severity_breakdown": {
+          "critical": 1,
+          "major": 0,
+          "minor": 1,
+          "nit": 0
+        },
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "60ecd47fa50d35c35f1d4882efbb315be0fbf4a8c6dfcb71f79634016ea11275"
       }
     },
     "target-pipelines/index.md": {
@@ -1372,15 +1372,15 @@
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T20:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/target-pipelines/index.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/target-pipelines/index.md.review.md"
       },
       "last_reviewed": {
         "finding_count": 1,
         "report_path": "docs/generated/design/_meta/reviews/target-pipelines/index.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T15:05:26+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
           "critical": 0,
@@ -1388,37 +1388,37 @@
           "minor": 1,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "562a0873aae2e59ee7743d5a1b0d436fb33c759dbcab165ff574e19fbf111219"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "79d77df3a1037f04643bcb85b77033ae0519e608f7d87b8700499b1d91026561"
       }
     },
     "target-pipelines/metal.md": {
       "last_remediated": {
         "actions": {
-          "deferred": 0,
+          "deferred": 1,
           "escalated": 0,
-          "fixed": 1,
+          "fixed": 3,
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T20:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/target-pipelines/metal.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/target-pipelines/metal.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 1,
+        "finding_count": 4,
         "report_path": "docs/generated/design/_meta/reviews/target-pipelines/metal.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T15:06:52+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
-          "critical": 0,
-          "major": 1,
+          "critical": 1,
+          "major": 3,
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "59b29fcbbfe59eacb0391650227da5c7ea157b2029936330229cf5160050a70b"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "751b986b2d853e8242f650fcb4a698ce747155b40fac3ebc58e2361363790674"
       }
     },
     "target-pipelines/spirv.md": {
@@ -1426,28 +1426,28 @@
         "actions": {
           "deferred": 0,
           "escalated": 0,
-          "fixed": 1,
+          "fixed": 4,
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T20:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/target-pipelines/spirv.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/target-pipelines/spirv.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 1,
+        "finding_count": 4,
         "report_path": "docs/generated/design/_meta/reviews/target-pipelines/spirv.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T15:06:52+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
-          "critical": 0,
+          "critical": 1,
           "major": 1,
-          "minor": 0,
+          "minor": 2,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "53da5869f5a58254bbc9a0c88fc65eedfa8ce235904015ea404b227a8501d13e"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "45c7187ec9e14c4b9df481b096e07d7166024478913e182332f481afa116f29f"
       }
     },
     "target-pipelines/wgsl.md": {
@@ -1455,28 +1455,28 @@
         "actions": {
           "deferred": 0,
           "escalated": 0,
-          "fixed": 1,
+          "fixed": 3,
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-05-15T20:30:00+00:00",
-        "remediator_model": "claude-opus-4.7",
+        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/target-pipelines/wgsl.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/target-pipelines/wgsl.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 1,
+        "finding_count": 3,
         "report_path": "docs/generated/design/_meta/reviews/target-pipelines/wgsl.md.review.md",
-        "reviewed_at": "2026-05-15T16:50:36+00:00",
+        "reviewed_at": "2026-06-05T15:06:52+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
-          "critical": 0,
+          "critical": 1,
           "major": 0,
-          "minor": 1,
+          "minor": 2,
           "nit": 0
         },
-        "target_doc_source_commit": "e75b9a3d03659cefb39882da3adecb2eb8751e0d",
-        "target_doc_watched_paths_digest": "323d0d6bf3081ae64a8d0fdc99266b419b8fb4f43b1b32319dc97caae7f78a6c"
+        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_watched_paths_digest": "f76d76915e55fca2f6089859682d44515d2961d21271a2b24e0eda6e9187f22f"
       }
     }
   },

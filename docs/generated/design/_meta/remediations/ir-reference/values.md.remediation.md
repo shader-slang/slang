@@ -1,15 +1,15 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T17:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-05T15:45:00Z
 target_doc: ir-reference/values.md
 review_report: ../../reviews/ir-reference/values.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
 actions:
-  fixed: 3
+  fixed: 1
   rejected_bogus: 0
-  rejected_out_of_scope: 0
+  rejected_out_of_scope: 1
   deferred: 0
   escalated: 0
 ---
@@ -18,16 +18,16 @@ actions:
 
 ## Summary
 
-Three major findings addressed: removed the `Undefined`
-grouping-parent row, added the missing concrete value-like opcodes
-in two new sub-tables ("Strings and native pointers", "Object and
-CUDA helpers"), and added a comprehensive
-`### Constexpr arithmetic and casts` sub-table.
+Of two findings, one was fixed and one was rejected as out-of-scope.
+The `logicalAnd` / `logicalOr` short-circuit wording was corrected to
+describe ordinary two-operand boolean ops. The missing-opcodes finding
+was rejected because all four opcodes are already owned by
+more-specific sibling pages; duplicating them here would violate the
+coverage rule.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-ir-insts.lua:857-894` shows `Undefined` as the grouping parent of `LoadFromUninitializedMemory` and `Poison`; it is not itself an opcode. | Removed the `Undefined` row from `### Undefined and default-construct` and added a one-sentence note above the table identifying it as the grouping parent of the two remaining concrete rows. |
-| F-002 | fixed | `source/slang/slang-ir-insts.lua:946`, `:1067`, and `:1139-1149` define `allocObj`, `CUDA_LDG`, `getNativeStr`, `makeString`, `getNativePtr`, `getManagedPtrWriteRef`, `ManagedPtrAttach`, and `ManagedPtrDetach` as concrete value-producing opcodes. | Added `### Strings and native pointers` with `makeString`, `getNativeStr`, `getNativePtr`, `getManagedPtrWriteRef`, `ManagedPtrAttach`, `ManagedPtrDetach`; added `### Object and CUDA helpers` with `allocObj` and `CUDA_LDG`. Both sub-tables inserted between "Memory" and "Aggregate constructors". |
-| F-003 | fixed | `source/slang/slang-ir-insts.lua:3142-3174` defines `constexprAdd` through `constexprEnumCast` as hoistable arithmetic / cast variants used for `IntVal`-class lowering. | Added `### Constexpr arithmetic and casts` between "Result / Optional / Conditional helpers" and "Notable opcodes", with rows for all 29 constexpr opcodes. |
+| F-001 | rejected-out-of-scope | `_common.md:259-264` coverage rule lists a straddling opcode in the more-specific family only. `packAnyValue`/`unpackAnyValue` are owned by `ir-reference/generics-and-existentials.md` (and already cross-linked from values.md `## See also`), `makeValuePack` by `ir-reference/misc.md`, and `makeCombinedTextureSampler` by `ir-reference/resources-and-atomics.md`. Adding rows here would duplicate; the alternative (prompt/manifest revision) is outside the editable target doc. | — |
+| F-002 | fixed | `source/slang/slang-ir-insts.lua:1465-1471` defines `logicalAnd`/`logicalOr` as two-operand (`left, right`) ops; `source/slang/slang-ir.cpp:6730-6739` emits `kIROp_And`/`kIROp_Or` from already-supplied operands. IR has no short-circuit. | Rewrote both row summaries to describe boolean AND/OR over already-evaluated operands and removed "Short-circuit". |

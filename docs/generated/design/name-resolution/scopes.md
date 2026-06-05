@@ -31,8 +31,8 @@ Scopes are declared in
 [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h). Scope
 construction during parsing happens in
 [slang-parser.cpp](../../../../source/slang/slang-parser.cpp); the
-`addSiblingScopeForContainerDecl` helper used by both the parser and
-the checker is defined in
+`addSiblingScopeForContainerDecl` helper used by semantic-checking and
+session/module setup code is defined in
 [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp).
 
 ## Concepts
@@ -90,6 +90,7 @@ parent. Citations point at the concrete class in the header.
 | `ScopeDecl` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (line 590) | `ContainerDecl::ownedScope`; attached to a `ScopeStmt` |
 | `BlockStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (line 41) | `ScopeStmt::scopeDecl` |
 | `ForStmt`, `UnscopedForStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (lines 216-231) | `ScopeStmt::scopeDecl`; `UnscopedForStmt` reuses the parent scope for HLSL compatibility |
+| `WhileStmt`, `DoWhileStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (lines 234-247) | `ScopeStmt::scopeDecl` (via `LoopStmt` -> `BreakableStmt` -> `ScopeStmt`) |
 | `CompileTimeForStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (line 251) | `ScopeStmt::scopeDecl` |
 | `GpuForeachStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (line 198) | `ScopeStmt::scopeDecl` |
 | `BreakableStmt` subclasses (`SwitchStmt`, `TargetSwitchStmt`, `StageSwitchStmt`) | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (line 100 onward) | `ScopeStmt::scopeDecl` |
@@ -100,8 +101,8 @@ parent. Citations point at the concrete class in the header.
 Several AST nodes do *not* own a fresh scope even though syntactically
 they look like they might:
 
-- `IfStmt` and `WhileStmt` / `DoWhileStmt` do not own a scope; their
-  block bodies parse as `BlockStmt`s that own one. `if (let x = ...)`
+- `IfStmt` does not own a scope; its branch bodies parse as
+  `BlockStmt`s that own one. `if (let x = ...)`
   is the exception: `Parser::parseIfLetStatement`
   ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
   6820) synthesizes additional `ScopeDecl`s for the unwrapped
@@ -225,8 +226,8 @@ but are still created at parse time:
 
 ### Scope walking order during lookup
 
-Lookup walks the chain in a fixed order, defined by the entry points
-in [slang-lookup.h](../../../../source/slang/slang-lookup.h):
+Lookup walks the chain in a fixed order, defined by the lookup entry
+points (see [lookup.md](lookup.md)):
 
 1. Visit `currentScope` itself: its `containerDecl`'s direct members.
 2. Walk `currentScope->nextSibling` until null, repeating step 1 for

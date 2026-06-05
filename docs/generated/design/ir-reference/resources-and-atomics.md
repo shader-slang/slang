@@ -94,7 +94,7 @@ flowchart TD
 | `imageSubscript` | — | `image, coord, sampleCoord?` | | `IndexExpr` on a `RWTexture*` in `slang-lower-to-ir.cpp` | Returns a pointer-like value for a texel of an image; used as the lvalue side of `image[coord] = ...`. |
 | `imageLoad` | — | `image, coord, auxCoord1?, auxCoord2?` | | `Texture*::Load` method invocations | Loads a texel from an image. |
 | `imageStore` | — | `image, coord, value` | | `RWTexture*` element-store lowering | Stores a value to a texel of an image. |
-| `SubpassLoad` | `SubpassLoad` | `subpassInput, sample?` | | `SubpassInput*::SubpassLoad` method (raster-input attachment access) | Loads a fragment-shader input attachment value. On Vulkan / SPIR-V this maps to `OpImageRead` on the `SubpassInput` storage class. On Metal, `legalizeSubpassInputsForMetal` (Phase C of [../target-pipelines/metal.md](../target-pipelines/metal.md)) rewrites this opcode into a `[[color(N)]]` fragment-input parameter; a multisampled subpass load (`sample` operand present) is diagnosed as unsupported on Metal. The optional `sample` operand selects an MSAA sample. |
+| `SubpassLoad` | `SubpassLoad` | `subpassInput, sample?` | | `SubpassInput*::SubpassLoad` method (raster-input attachment access) | Loads a fragment-shader input attachment value; the optional `sample` operand selects an MSAA sample. Per-target lowering is covered in [../pipeline/06-emit.md](../pipeline/06-emit.md). |
 | `MetalCastToDepthTexture` | — | `texture` | | (synthesized) | Metal-backend-specific cast from a regular texture to a depth texture. |
 | `IsTextureAccess` | — | (variadic, `min=1`) | | (synthesized) | True if the operand was produced by a texture-access opcode; used by the texture-access legalization pass. |
 | `IsTextureScalarAccess` | — | (variadic, `min=1`) | | (synthesized) | True if the texture access yields a scalar element. |
@@ -153,6 +153,8 @@ flowchart TD
 | `global_param` | — | (variadic) | G | Module-scope shader parameter declarations (see also [structure.md](structure.md)) | Module-scope shader parameter (uniform, push-constant, descriptor binding). |
 | `GetWorkGroupSize` | — | — | H | (synthesized; materialized during `translateGlobalVaryingVar`) | Returns the workgroup size of the calling entry point. |
 | `GetCurrentStage` | — | — | | (synthesized) | Returns the pipeline stage of the calling entry point. |
+| `GetPerVertexInputArray` | — | `ref` | H | (synthesized) | Returns the per-vertex input array for a `pervertex` / per-vertex varying input. |
+| `ResolveVaryingInputRef` | — | `ref` | H | (synthesized) | Placeholder reference to a varying input; the `resolveVaryingInputRef` pass rewrites it to the actual `global_param`. |
 
 ### Mesh-shader outputs
 
@@ -273,9 +275,21 @@ The coordinate operand carries the full coordinate vector
 (including array slice for array textures); subsequent optional
 operands carry sample index and offset where the underlying API
 supports them. Both opcodes are produced by lowering `image[coord]`
-expressions and `image[coord] = value` assignments. Backends emit
-these as `OpImageRead` / `OpImageWrite` (SPIR-V), `t.Load(...)` /
-`t[coord] = ...` (HLSL), etc.
+expressions and `image[coord] = value` assignments. How each backend
+emits them is covered in [../pipeline/06-emit.md](../pipeline/06-emit.md).
+
+### `sample` and `sampleGrad`
+
+In this source revision the texture-sampling shortcuts are `sample`
+and `sampleGrad`. `sample(texture, sampler, coord)` is the
+*implicit-LOD* form: the mip level is selected automatically from
+screen-space derivatives, so it is only valid where derivatives are
+available. `sampleGrad(texture, sampler, coord, gradX, ...)` is the
+*explicit-gradient* form: the caller supplies the `gradX` / `gradY`
+derivative vectors that drive LOD selection, plus optional trailing
+operands (offset, bias). A fixed explicit-LOD sample is expressed
+through the ordinary core-module sampling intrinsics rather than a
+dedicated opcode in this revision.
 
 ### `rwstructuredBufferGetElementPtr`
 
@@ -326,12 +340,12 @@ a typed array of descriptors.
 
 ### `ControlBarrier` vs `GroupMemoryBarrierWithGroupSync`
 
-`ControlBarrier` is the generic synchronization barrier that the
-backend turns into the right concrete instruction for its target
-(`OpControlBarrier` for SPIR-V, `GroupMemoryBarrierWithGroupSync`
-for HLSL fallback, etc.). `GroupMemoryBarrierWithGroupSync` is
-the dedicated opcode for the HLSL spelling — most modern code uses
-`ControlBarrier` and lets the backend decide.
+`ControlBarrier` is the generic synchronization barrier; each
+backend turns it into the concrete fence/barrier instruction for
+its target (see [../pipeline/06-emit.md](../pipeline/06-emit.md)).
+`GroupMemoryBarrierWithGroupSync` is the dedicated opcode for the
+HLSL spelling — most modern code uses `ControlBarrier` and lets the
+backend decide.
 
 ## See also
 

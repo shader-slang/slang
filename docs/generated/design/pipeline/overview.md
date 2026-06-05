@@ -21,13 +21,13 @@ mapped Slang's pipeline onto its source layout.
 
 ```mermaid
 flowchart LR
-    Source[Source files] --> Lex[Lex / Preprocess]
-    Lex --> Parse[Parse to AST]
-    Parse --> Check[Semantic check]
-    Check --> Lower[AST to IR]
-    Lower --> Passes[IR passes]
-    Passes --> Emit[Emit]
-    Emit --> Artefact[Target artefact]
+    source[Source files] --> lexPreprocess[Lex / Preprocess]
+    lexPreprocess --> parse[Parse to AST]
+    parse --> semanticCheck[Semantic check]
+    semanticCheck --> lower[AST to IR]
+    lower --> irPasses[IR passes]
+    irPasses --> emit[Emit]
+    emit --> targetArtifact[Target artefact]
 ```
 
 The diagram is conceptual — actual control flow weaves checking and

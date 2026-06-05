@@ -428,23 +428,19 @@ through two different lookup paths (e.g. via a transparent member
 inheritance edges in member lookup) will appear twice in the result.
 Downstream code that needs uniqueness is responsible for filtering:
 [overload-resolution.md](overload-resolution.md) does so via
-`CompareLookupResultItems` during candidate ranking, and
-visibility filtering in `TryCheckOverloadCandidateVisibility`
-(see [visibility.md](visibility.md)) drops duplicates that point at
-identical visible declarations. There is intentionally no
-deduplication inside lookup itself — keeping every breadcrumb path
+`CompareLookupResultItems` during candidate ranking. There is
+intentionally no deduplication inside lookup itself — keeping every
+breadcrumb path
 visible is what lets later phases produce accurate ambiguity
 diagnostics.
 
 ### Module and namespace
 
 Multiple `namespace Foo {}` declarations in the same module collapse
-into the same `NamespaceDecl` — the parser explicitly reuses the
-first one it finds in the parent via
-  `parentDecl->getDirectMemberDeclsOfName(name)`
-  ([slang-parser.cpp lines
-  4086-4180](../../../../source/slang/slang-parser.cpp)). Cross-module
-  sibling namespaces are linked into the lookup chain by
+into the same `NamespaceDecl` — the parser reuses the first one it
+finds in the parent rather than creating a new scope (see
+[scopes.md](scopes.md) for how the parser threads namespace scopes).
+Cross-module sibling namespaces are linked into the lookup chain by
   `addSiblingScopeForContainerDecl` during semantic checking
   ([slang-check-decl.cpp line
   16408](../../../../source/slang/slang-check-decl.cpp)). `UsingDecl`

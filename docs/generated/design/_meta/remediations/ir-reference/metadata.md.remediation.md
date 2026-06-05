@@ -1,11 +1,11 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T17:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-05T15:45:00Z
 target_doc: ir-reference/metadata.md
 review_report: ../../reviews/ir-reference/metadata.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
 actions:
   fixed: 2
   rejected_bogus: 0
@@ -18,15 +18,14 @@ actions:
 
 ## Summary
 
-Two major findings addressed: SPIR-V asm Opcode cells now use the
-Lua entry names (`__truncate`, `__entryPoint`, ...) and the three
-grouping-parent rows (`SemanticAttr`, `LayoutResourceInfoAttr`,
-`SPIRVAsmOperand`) have been replaced with inline notes alongside
-their concrete children.
+Both findings were fixed; none were rejected, deferred, or escalated.
+A debug-info row now cites its introducing IR pass, and the
+`## Notable opcodes` section gained the two prompt-required callouts
+that were missing.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-ir-insts.lua:2823-2858` defines the asm operands by their `__truncate` / `__entryPoint` / `__sampledType` / `__imageType` / `__sampledImageType` Lua keys; the C++ wrapper names belong in the wrapper column. | Renamed the five Opcode cells in the SPIR-V inline-asm table to their Lua entry names; preserved the C++ wrapper column. |
-| F-002 | fixed | `source/slang/slang-ir-insts.lua:2685-2694` and `:2756-2862` show `SemanticAttr`, `LayoutResourceInfoAttr`, and `SPIRVAsmOperand` as grouping-only parents with no IR opcode of their own. | Removed the three grouping-parent rows; folded their identity into a short parenthetical on the first concrete child row in each table (`userSemantic`, `size`, `SPIRVAsmOperandLiteral`). |
+| F-001 | fixed | `ir-reference-metadata.md:64` requires at least one debug-info row to cite the introducing pass; `DebugValue` is created by `emitDebugValue` at `source/slang/slang-ir-insert-debug-value-store.cpp:175,212`. | Changed the `DebugValue` row `AST origin` cell from `(synthesized)` to cite `emitDebugValue` in `slang-ir-insert-debug-value-store.cpp`. |
+| F-002 | fixed | `ir-reference-metadata.md:42-46` requires `Layout` and `DebugScope` notable coverage; both were absent. `Layout` parent at `source/slang/slang-ir-insts.lua:2652`; `DebugScope` at `:2767` with operands `scope, inlinedAt` per `source/slang/slang-ir-insts.h:2664-2669`. | Added `### Layout` (parent, relation to `LayoutDecoration`) and `### DebugScope` (operand pair, scope nesting) notable callouts. |

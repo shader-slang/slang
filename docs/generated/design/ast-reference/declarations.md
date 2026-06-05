@@ -131,7 +131,7 @@ carry no FIDDLE concrete tag. Concrete leaves below.
 | `HasDiffTypeInfoConstraintDecl` | `Decl` | `type: TypeExp` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | Differentiable-type constraint. |
 | `EmptyDecl` | `Decl` | (no additional state) | (none) | An empty declaration that exists only to carry modifiers (e.g. GLSL `layout(...) in;`). |
 | `SyntaxDecl` | `Decl` | `syntaxClass: SyntaxClass<NodeBase>`, `parseCallback: SyntaxParseCallback` | (none) | Binds a keyword to a parser callback; see `## Notable nodes` and [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md). |
-| `AttributeDecl` | `ContainerDecl` | `syntaxClass: SyntaxClass<NodeBase>` | [attribute](../syntax-reference/grammar.md#modifiers-and-attributes) | Declares an attribute (`[name(args)]`); its body is the parameter list. |
+| `AttributeDecl` | `ContainerDecl` | `syntaxClass: SyntaxClass<NodeBase>` | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | Declares an attribute (`[name(args)]`); its body is the parameter list. |
 
 ## Notable nodes
 

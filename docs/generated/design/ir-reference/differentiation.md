@@ -30,7 +30,7 @@ and `DifferentialPairGetPrimalBase`. The bulk of the
 differentiation-operator opcodes (`ForwardDifferentiate`,
 `BackwardDifferentiate`, the propagate / primal / remat variants,
 and the legacy-bridge opcodes) live under the `TranslateBase`
-hoistable group at line ~2592. Two additional opcodes that are
+hoistable group at line ~2592. Three additional opcodes that are
 specific to checkpointing — `checkpointObj`,
 `ReportCheckpointStore`, and `loopExitValue` — live in the
 value-producing section (around lines ~1480-1487). A handful of

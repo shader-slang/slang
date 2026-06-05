@@ -75,8 +75,10 @@ flowchart TD
 `BreakableStmt`s carry a `UniqueStmtIDNode* uniqueID` that
 `ChildStmt`s reference via `targetOuterStmtID`. `UniqueStmtIDNode` is
 declared in this header as a `Decl` subclass for serialization
-convenience, even though it is not a real declaration; it is excluded
-from the `## Nodes` table because it is not parsed as a statement.
+convenience, even though it is not a real declaration; it is listed in
+the `## Nodes` table as a helper because the header declares it with
+`FIDDLE()`, even though it is not in the `Stmt` hierarchy and is not
+parsed as a statement.
 
 ## Nodes
 
@@ -108,7 +110,7 @@ from the `## Nodes` table because it is not parsed as a statement.
 | `ReturnStmt` | `Stmt` | `expression: Expr*` | [return](../syntax-reference/grammar.md#statements) | `return` (optionally with an expression). |
 | `DeferStmt` | `Stmt` | `statement: Stmt*` | [defer](../syntax-reference/grammar.md#statements) | `defer S;`; lowered to scope-exit handlers in the IR. |
 | `ThrowStmt` | `Stmt` | `expression: Expr*` | [throw](../syntax-reference/grammar.md#statements) | `throw e;` for errorable functions. |
-| `CatchStmt` | `Stmt` | `errorVar: ParamDecl*`, `tryBody: Stmt*`, `handleBody: Stmt*` | [try-catch](../syntax-reference/grammar.md#statements) | `try { ... } catch (e) { ... }` block; `errorVar == null` means a catch-all. |
+| `CatchStmt` | `Stmt` | `errorVar: ParamDecl*`, `tryBody: Stmt*`, `handleBody: Stmt*` | [do-catch](../syntax-reference/grammar.md#statements) | `do { ... } catch (e) { ... }`; `tryBody` is the protected body, `handleBody` the handler; `errorVar == null` means a catch-all. |
 | `ExpressionStmt` | `Stmt` | `expression: Expr*` | [expression stmt](../syntax-reference/grammar.md#statements) | An expression used for its side effects (`f();`, `a = b;`). |
 | `RequireCapabilityStmt` | `Stmt` | `requiredCaps: List<Token>` | [require_capability](../syntax-reference/grammar.md#statements) | Statement-level capability requirement scoped to the enclosing function. |
 | `UniqueStmtIDNode` | `Decl` | (no parsed state) | (none) | Synthesized identity helper that gives a statement a stable unique id; used by serialization and control-flow tracking rather than parsed as a statement. |
@@ -152,6 +154,13 @@ expression) so that a `DeclStmt` can introduce loop variables.
 `UnscopedForStmt` is the legacy HLSL form that does not scope the
 loop variable to the body.
 
+### ReturnStmt
+
+`return` is both a control-flow terminator and the carrier of the
+function's result: `ReturnStmt::expression` is the returned `Expr*`,
+or null for a bare `return` in a `void` function. The checker matches
+the expression against the enclosing function's declared return type.
+
 ### CompileTimeForStmt
 
 A range-based for whose bounds must be compile-time constants
@@ -186,21 +195,27 @@ holds both the protected body (`tryBody`) and the handler
 catch handler has a fully-typed local variable. A null `errorVar`
 denotes a catch-all that does not bind the error value.
 
-### DeclStmt and ExpressionStmt
+### DeclStmt, ExpressionStmt, and EmptyStmt
 
-These two boilerplate wrappers exist so that the statement grammar
+These boilerplate wrappers exist so that the statement grammar
 remains uniform. `DeclStmt` lets any `DeclBase` appear in a statement
 position (the canonical use is a local-variable declaration);
 `ExpressionStmt` lets an arbitrary `Expr` be used for its side
-effects. The checker validates each kind separately.
+effects. The checker validates each kind separately. `EmptyStmt` is
+the node the parser emits for a bare `;`, so an empty statement slot
+(for example, a loop body that is just `;`) still has a concrete
+`Stmt`.
 
-### LabelStmt and BreakStmt::targetLabel
+### LabelStmt, BreakStmt, ContinueStmt, and DiscardStmt
 
 Slang supports labeled statements and labeled breaks. `LabelStmt`
 attaches a label token to an inner statement; `BreakStmt::targetLabel`
 optionally names the enclosing labeled loop or switch to break out
 of. Resolution of `targetLabel` to a `BreakableStmt::uniqueID` is
-done by the checker.
+done by the checker. `ContinueStmt` is the sibling `JumpStmt` that
+restarts the nearest enclosing loop. `DiscardStmt` is a
+fragment-shader-only control-flow statement (`discard`) that kills the
+current pixel and carries no operands.
 
 ### RequireCapabilityStmt
 

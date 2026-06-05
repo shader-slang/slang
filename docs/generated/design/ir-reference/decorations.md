@@ -374,6 +374,17 @@ Its single integer operand is the `kIROp_*` tag of the
 implementing opcode; the inliner uses it to replace calls with
 direct opcode emission when the target supports it.
 
+### `branch` / `flatten` / `loopControl`
+
+These are the control-flow hint decorations. `branch` and
+`flatten` attach to a conditional (from the `[branch]` /
+`[flatten]` attributes) and select the divergent vs. predicated
+emission strategy; `loopControl` records the unroll / loop mode
+(from `[unroll]` / `[loop]`). They carry no IR semantics of their
+own — they flow through unchanged and are consumed by the backend
+emit step to choose the corresponding target control-flow
+construct.
+
 ### `KeepAliveDecoration`
 
 `KeepAliveDecoration` is the DCE-suppression decoration. Insts

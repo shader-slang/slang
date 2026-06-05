@@ -39,6 +39,10 @@ than living in a single contiguous group:
   `extractExistentialType`, `extractExistentialWitnessTable`,
   `isNullExistential`, `extractTaggedUnionTag`,
   `extractTaggedUnionPayload` appear around lines ~2491-2516.
+- The type-flow specialization opcodes (`TypeSet` / `FuncSet` /
+  `WitnessTableSet` / `GenericSet` and their elements,
+  `GetDispatcher`, the tagged-union and tag operations, and the
+  specialization keys) appear around lines ~2916-3162.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The
@@ -125,20 +129,20 @@ processing.
 
 ### Witness tables and witness facts
 
-The structural opcodes that back interface dispatch are documented
-in [structure.md](structure.md); only the ones the dispatch path
-consumes directly are summarized here.
+These opcodes back interface dispatch. Their structural (container)
+role is documented in [structure.md](structure.md); the rows below
+give the shapes the dispatch path (`lookupWitness`, specialization)
+consumes.
 
-- `witness_table`, `witness_table_entry`, and `interface_req_entry`
-  store the requirement-to-implementation mapping that
-  `lookupWitness` walks. See
-  [structure.md — witness tables and witness facts](structure.md).
-- `thisTypeWitness` and `TypeEqualityWitness` are placeholder
-  witnesses used by the type system to certify self-conformance and
-  type equality.
-- `key` (`StructKey`) and `indexedFieldKey` identify the
-  requirement slots that witness tables key on; documented in
-  [structure.md — struct internals](structure.md).
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `witness_table` | — | (children: `witness_table_entry`) | H | `InheritanceDecl` lowering in `slang-lower-to-ir.cpp` | Maps each interface requirement key to its concrete implementation; `lookupWitness` walks it. |
+| `witness_table_entry` | — | `requirementKey, satisfyingVal` | | (synthesized) | One row of a `witness_table`. |
+| `interface_req_entry` | `InterfaceRequirementEntry` | `requirementKey, requirementVal` | G | (synthesized in `InterfaceDecl` lowering) | One requirement slot on the interface side. |
+| `thisTypeWitness` | — | `type` | | (synthesized inside `InterfaceDecl` lowering) | Placeholder witness that `ThisType` conforms to the enclosing interface. |
+| `TypeEqualityWitness` | — | `subType, superType` | H | (synthesized) | Placeholder witness certifying two types are equal. |
+| `key` | `StructKey` | — | G | Member-name lowering in `slang-lower-to-ir.cpp` | Identity for a requirement slot that witness tables key on. |
+| `indexedFieldKey` | — | `baseType, index` | H | (synthesized) | Synthetic key for an unnamed (tuple-like) requirement slot. |
 
 ### Runtime type information
 

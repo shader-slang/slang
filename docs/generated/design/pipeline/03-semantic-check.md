@@ -67,7 +67,6 @@ Every file collaborates through `SemanticsContext` /
 | [slang-check-constraint.cpp](../../../../source/slang/slang-check-constraint.cpp) | Generic constraint solving (`where`-clauses, witness inference) |
 | [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp) | Validates `Val` substitution after generic resolution |
 | [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp) | Entry-point checks: stage-specific signatures, parameter rules |
-| [slang-check-out-of-bound-access.cpp](../../../../source/slang/slang-check-out-of-bound-access.cpp) | Static detection of literal out-of-bound array indexing |
 
 ## Two-pass interaction with the parser
 
@@ -89,6 +88,9 @@ on demand. The deeper rationale is in
 
 Name resolution produces `DeclRef`s — a decl plus a substitution that
 records how its generic and outer-context parameters have been bound.
+The concrete `DeclRefBase` operations (`DirectDeclRef`, `LookupDeclRef`,
+and substitution application) are implemented in
+[slang-ast-decl-ref.cpp](../../../../source/slang/slang-ast-decl-ref.cpp).
 The algorithmic rules — scope construction, the lookup algorithm,
 shadowing, visibility filtering, and overload resolution — live in
 the dedicated [../name-resolution/](../name-resolution) subtree.

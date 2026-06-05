@@ -118,7 +118,7 @@ flowchart TD
   nvGate -- no --> vMod
 ```
 
-| # | Call | File | Gate | Notes |
+| # | Pass | File | Gate | Notes |
 |---|---|---|---|---|
 | A1 | `IRModule::create(session)` | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) | always | Creates the empty module that the rest of the pipeline mutates. |
 | A2 | `module->setName(moduleDecl->getName())` | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) | always | Records the module's source-level name. |
@@ -156,7 +156,7 @@ flowchart TD
   diGate -- yes --> idvs
 ```
 
-| # | Call | File | Gate | Notes |
+| # | Pass | File | Gate | Notes |
 |---|---|---|---|---|
 | B1 | `prelinkIR(translationUnit->module, module, externalSymbolsToPrelink)` | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) | always | Imports `[unsafeForceInlineEarly]` bodies and the `externalSymbolsToPrelink` set so they are available to later passes. Distinct from the post-link `linkIR` driven by `linkAndOptimizeIR`. |
 | B2 | `lowerErrorHandling(module, sink)` | [slang-ir-lower-error-handling.cpp](../../../../source/slang/slang-ir-lower-error-handling.cpp) | always | Rewrites throwing functions to return `Result<T,E>`; translates `tryCall` into `call` + `ifElse`. |
@@ -194,7 +194,7 @@ flowchart TD
   liGate -- no --> inlineLoop
 ```
 
-| # | Call | File | Gate | Notes |
+| # | Pass | File | Gate | Notes |
 |---|---|---|---|---|
 | C1 | `constructSSA(module)` | [slang-ir-ssa.cpp](../../../../source/slang/slang-ir-ssa.cpp) | always | Promotes addressable locals to SSA temporaries module-wide. |
 | C2 | `applySparseConditionalConstantPropagation(module, nullptr, sink)` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | always | SCCP over the freshly constructed SSA. |
@@ -255,7 +255,7 @@ flowchart TD
   vMod --> bmn
 ```
 
-| # | Call | File | Gate | Notes |
+| # | Pass | File | Gate | Notes |
 |---|---|---|---|---|
 | D1 | `checkForRecursiveTypes(module, sink)` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation` | Disallows recursive type definitions. |
 | D2 | early return on error | [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) | `sink->getErrorCount() != 0` | If D1 (or any earlier diagnostic) raised an error, Phase D exits before propagation and the later passes. |
@@ -338,15 +338,18 @@ flowchart TD
   endGate -- no --> done
 ```
 
-The outer `for(;;)` terminates when `performMandatoryEarlyInlining`
-reports `changed == false` and no inner-cluster pass mutates the
-module. The inner per-modified-function cluster
-(`constructSSA` → `applySparseConditionalConstantPropagation` →
-`peepholeOptimize` → `simplifyCFG` with `getFast()` →
-`eliminateDeadCode`) only runs when `!minimumOptimizations`; in
-that mode each pass's return value feeds back into `changed`, so
-the outer loop continues iterating as long as **any** of those
-five inner passes reports progress on **any** modified function.
+The outer `for(;;)` reuses a single `changed` flag.
+`performMandatoryEarlyInlining` sets it first; if inlining reports
+`false`, the `if (changed)` block is skipped and the loop breaks
+immediately. If inlining reports `true`, `changed` is then
+**overwritten** by the `peepholeOptimizeGlobalScope` result — the
+inlining `true` is not carried directly into the termination
+test — and, when `!minimumOptimizations`, the per-modified-function
+cluster (`constructSSA` → `applySparseConditionalConstantPropagation`
+→ `peepholeOptimize` → `simplifyCFG` with `getFast()`) OR-assigns
+its results into `changed` (the trailing `eliminateDeadCode` call
+does not). The loop breaks once this final `changed` value is
+`false`.
 
 The per-function DCE sweep at C5 (line 14914-14918) iterates over
 functions but not over passes — it is one pipeline step whose

@@ -237,9 +237,11 @@ explicitly.
 : An IR instruction whose value depends only on its operands, marked
   `hoistable = true` in
   [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua). Such
-  instructions are deduplicated globally inside an `IRModule` and live
-  at the module scope rather than inside a function body — this is how
-  Slang represents types and other "value" entities in SSA form. The
+  instructions are deduplicated and hoisted as far toward the module
+  scope of an `IRModule` as their operands allow — module scope when
+  nothing constrains them, otherwise the innermost parent that defines
+  an operand. This is how Slang represents types and other "value"
+  entities in SSA form. The
   per-opcode catalog flags every hoistable opcode with `H` in its
   flags column; see for instance
   [ir-reference/types.md](ir-reference/types.md) (every Type opcode is
@@ -561,7 +563,6 @@ explicitly.
   checker can re-walk it.
 
   See: [name-resolution/scopes.md](name-resolution/scopes.md)
-  External: https://en.wikipedia.org/wiki/Scope_(computer_science)
 
 **session** `[Slang]`
 : The top-level compiler instance that owns global state shared across
@@ -638,20 +639,6 @@ explicitly.
 
   See: [cross-cutting/targets.md](cross-cutting/targets.md)
 
-**target legalization driver** `[Slang]`
-: A target-specific IR pass that runs inside `linkAndOptimizeIR` and
-  performs the bulk of the target's pre-emit transformations as a
-  single pass call. Examples are `legalizeIRForSPIRV`
-  ([slang-ir-spirv-legalize.cpp](../../../source/slang/slang-ir-spirv-legalize.cpp)),
-  `legalizeIRForMetal`
-  ([slang-ir-metal-legalize.cpp](../../../source/slang/slang-ir-metal-legalize.cpp)),
-  and `legalizeIRForWGSL`
-  ([slang-ir-wgsl-legalize.cpp](../../../source/slang/slang-ir-wgsl-legalize.cpp)).
-  Not every target has one; HLSL and CUDA do their target-specific
-  work through individual `SLANG_PASS` calls instead.
-
-  See: [target-pipelines/index.md](target-pipelines/index.md)
-
 **target intrinsic** `[Slang]`
 : A function whose implementation is supplied as a per-target
   expression rather than as Slang body. Declared in the core module
@@ -666,6 +653,20 @@ explicitly.
 
   See: [ir-reference/decorations.md](ir-reference/decorations.md),
   [cross-cutting/targets.md](cross-cutting/targets.md)
+
+**target legalization driver** `[Slang]`
+: A target-specific IR pass that runs inside `linkAndOptimizeIR` and
+  performs the bulk of the target's pre-emit transformations as a
+  single pass call. Examples are `legalizeIRForSPIRV`
+  ([slang-ir-spirv-legalize.cpp](../../../source/slang/slang-ir-spirv-legalize.cpp)),
+  `legalizeIRForMetal`
+  ([slang-ir-metal-legalize.cpp](../../../source/slang/slang-ir-metal-legalize.cpp)),
+  and `legalizeIRForWGSL`
+  ([slang-ir-wgsl-legalize.cpp](../../../source/slang/slang-ir-wgsl-legalize.cpp)).
+  Not every target has one; HLSL and CUDA do their target-specific
+  work through individual `SLANG_PASS` calls instead.
+
+  See: [target-pipelines/index.md](target-pipelines/index.md)
 
 **terminator instruction** `[Slang]`
 : The last instruction in an `IRBlock`; it decides what runs next

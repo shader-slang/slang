@@ -91,7 +91,7 @@ From the comments at the top of
   `glsl` is a code-gen-target atom.
 - A *capability name* is a Boolean expression — a disjunction of
   conjunctions of atoms. Example: `raytracing` expands to
-  `glsl + _GL_EXT_ray_tracing | spirv_1_4 + SPV_KHR_ray_tracing | hlsl + _sm_6_4`.
+  `GL_EXT_ray_tracing | _sm_6_3 | cuda`.
 - An *abstract* capability does not introduce an atom; it defines a
   "keyhole" that other atoms populate. `target` and `stage` are
   distinct keyholes; an atom derived directly from an abstract

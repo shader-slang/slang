@@ -168,6 +168,20 @@ concrete children are listed here.
 | `TreatAsDynamicUniform` | — | `value` | | (synthesized) | Annotation cast marking a value as dynamically uniform; affects target legalization. |
 | `GetLegalizedSPIRVGlobalParamAddr` | — | (variadic, `min=1`) | | (synthesized) | Returns the legalized address of a global parameter for the SPIR-V backend. |
 
+### Variable struct-wrapping legalization
+
+Concrete children of the `ForceVarIntoStructTemporarilyBase` parent.
+They wrap a variable so a callee that expects a struct receives one;
+the `slang-ir-hlsl-legalize.cpp` pass either unwraps the argument
+(when its base type is already a `StructType`) or materializes a
+temporary single-field struct and copies the value back for
+`out`/`inout` parameters.
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `ForceVarIntoStructTemporarily` | — | `var` | | core-module `__forceVarIntoStructTemporarily` intrinsic | Forces a variable to be passed as a struct temporary; legalized by `slang-ir-hlsl-legalize.cpp`. |
+| `ForceVarIntoRayPayloadStructTemporarily` | — | `var` | | core-module ray-payload intrinsic | Same as above, additionally adding the `RayPayload` decoration and default payload access qualifiers to the wrapping struct. |
+
 ### Annotations
 
 Generic annotation opcodes used by IR passes to attach extra

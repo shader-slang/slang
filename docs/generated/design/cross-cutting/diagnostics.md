@@ -219,8 +219,10 @@ governed by the `SLANG_ASSERT` environment variable (see
 `system`, `debugbreak`, `release-assert-only`, or unset). On Windows
 the build option `SLANG_IGNORE_ABORT_MSG` further suppresses modal
 abort dialogs in unattended runs. These mechanisms are independent of
-the diagnostic sink but interact with it: a release-assert that fires
-typically calls into the sink before terminating.
+the diagnostic sink: `SLANG_ASSERT` / `SLANG_RELEASE_ASSERT` route
+through `::Slang::handleAssert` rather than the sink. The sink-based
+internal-error path is the `SLANG_INTERNAL_ERROR`,
+`SLANG_UNIMPLEMENTED`, and `SLANG_DIAGNOSE_UNEXPECTED` macros above.
 
 ## Adding a new diagnostic
 

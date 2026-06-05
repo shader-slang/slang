@@ -160,10 +160,12 @@ and the per-area Lua tables under
 ## Compilation request lifecycle
 
 A Slang compilation flows through a small set of central objects whose
-declarations are clustered in
-[include/slang.h](../../../../include/slang.h) and the
-`slang-*-request.h` / `slang-module.h` headers under
-[source/slang/](../../../../source/slang).
+declarations are spread across
+[include/slang.h](../../../../include/slang.h) and several headers under
+[source/slang/](../../../../source/slang) — including
+`slang-translation-unit.h`, `slang-session.h`, `slang-target.h`,
+`slang-compile-request.h`, `slang-end-to-end-request.h`, and
+`slang-module.h`.
 
 - `Session` — process-wide compiler state. Owns built-in modules, the
   AST builder, and the global type-checking environment. The COM-style
@@ -191,8 +193,11 @@ declarations are clustered in
 - `FrontEndCompileRequest` — drives the front-end (parse, check, lower
   to IR) for a set of translation units. Declared in
   [slang-compile-request.h](../../../../source/slang/slang-compile-request.h).
-- `BackEndCompileRequest` — drives the back-end (IR passes, emit) for a
-  set of entry points and targets.
+- `CodeGenContext` — drives the back-end (IR passes, emit) for a set of
+  entry points and targets. Declared in
+  [slang-code-gen.h](../../../../source/slang/slang-code-gen.h); it
+  replaces the historical `BackEndCompileRequest` object that earlier
+  revisions named here.
 - `EndToEndCompileRequest` — the umbrella object behind a single
   `slangc` invocation, declared separately in
   `slang-end-to-end-request.h`.

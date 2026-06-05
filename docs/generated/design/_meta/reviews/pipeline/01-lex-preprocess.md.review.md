@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T13:46:25+00:00
+reviewed_at: 2026-06-05T14:15:42+00:00
 target_doc: pipeline/01-lex-preprocess.md
 target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
 target_doc_watched_paths_digest: d4bd494cb1d65db3267f95b7fe9d71ef78fa007b6d665f13b0fe9a4d8b383145
-source_commit: 05132edd86435f217f95634406f85184e58991f8
+source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
 checklist:
   factual_accuracy: pass
   cross_references: pass

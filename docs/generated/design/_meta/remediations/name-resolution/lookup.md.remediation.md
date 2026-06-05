@@ -1,11 +1,11 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T19:00:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-05T15:45:00Z
 target_doc: name-resolution/lookup.md
 review_report: ../../reviews/name-resolution/lookup.md.review.md
-target_doc_source_commit_before: 5b3ff4ef03c6a7b8c4e1a98a16d18ae2b66b8c5e
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
 actions:
   fixed: 2
   rejected_bogus: 0
@@ -18,14 +18,11 @@ actions:
 
 ## Summary
 
-Both findings addressed: the manifest watched-paths gap is closed,
-and the missing-information finding about lookup-level deduplication
-is documented in a new sub-section under "Container-level overload
-accumulation".
+The review reported two findings, both fixed by editing the target doc (manifest watched-path expansion is out of this stage's scope, so the alternative in-doc remedies the reviewer offered were applied). F-001: the namespace-collapse paragraph cited unwatched `slang-parser.cpp`; the citation was replaced with a link to `scopes.md`, where parser scope construction is in scope. F-002: the claim that `TryCheckOverloadCandidateVisibility` "drops duplicates" was removed because the function (`source/slang/slang-check-overload.cpp:265-287`) only tests visibility and returns false for invisible candidates, never deduplicating.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | The page documents `AddToLookupResult` behavior; the absence of any dedupe step is a load-bearing fact that callers (overload resolution, visibility filtering) rely on. | Added a new `#### Deduplication: there isn't any at the LookupResult level` block under `### Container-level overload accumulation`, with code citations to `AddToLookupResult` lines 95-125 and pointers to overload-resolution and visibility for the downstream handling. |
-| F-002 | fixed | Runbook "Manifest gaps" pattern: the doc legitimately cites these files but they were absent from `watched_paths`. | Added `source/slang/slang-check-decl.cpp`, `slang-check-stmt.cpp`, `slang-check-expr.cpp`, and `include/slang.h` to the `name-resolution/lookup.md` `watched_paths` in `_meta/manifest.yaml`. |
+| F-001 | fixed | `slang-parser.cpp` is not in this doc's watched paths; editing the manifest is out of remediation scope, so the reviewer's alternative (link `scopes.md`) was used. | Replaced the `slang-parser.cpp` lines 4086-4180 citation with a prose link to `scopes.md` for parser namespace scope threading. |
+| F-002 | fixed | `TryCheckOverloadCandidateVisibility` (`source/slang/slang-check-overload.cpp:275-286`) only calls `isDeclVisibleFromScope` and returns false when invisible; it does not compare decls or deduplicate. | Removed the "visibility filtering ... drops duplicates" clause; kept the accurate `CompareLookupResultItems` ranking note. |

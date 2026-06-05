@@ -160,8 +160,7 @@ The individual steps:
    defaults can pad up to `allowed`; variadic parameters allow any
    count >= `required`. Failures in `ForReal` mode emit
    `not-enough-arguments-for-call` /
-   `too-many-arguments-for-call` (from
-   [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua));
+   `too-many-arguments-for-call`;
    in `JustTrying` mode the candidate is dropped silently.
 2. **`TryCheckOverloadCandidateFixity`**
    ([slang-check-overload.cpp line
@@ -414,12 +413,11 @@ A `PartiallyAppliedGenericExpr` carries the bound substitution and
 the unresolved generic parameters; the surrounding context (for
 example, an explicit type ascription, a later
 `GenericAppExpr<...>`, or another argument that pins the type) is
-expected to close the remaining holes. If the AST reaches lowering
-with a `PartiallyAppliedGenericExpr` still unresolved, the lowerer
-in
-[slang-lower-to-ir.cpp line
-5757](../../../../source/slang/slang-lower-to-ir.cpp) reports an
-internal-compiler error rather than emitting code.
+expected to close the remaining holes. Overload resolution treats a
+fully resolved generic application as an invariant once checking
+completes; how an unresolved residual is handled by later phases is
+documented in
+[../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md).
 
 ## Operator overloading
 
@@ -465,11 +463,18 @@ overload reject a `const` left operand.
   `ambiguous-overload-with-args` (39999), depending on whether the
   callee name is known. Each tied candidate is shown as a separate
   note.
-- **No candidate is `Applicable`.** The single highest-scoring
-  candidate's `Status` says which step failed first; the resolver
-  re-runs the pipeline in `ForReal` mode on that candidate so the
-  user sees the most-specific diagnostic (a per-argument coercion
-  failure rather than a generic "no overload" message).
+- **No candidate is `Applicable`.** When a single candidate scores
+  best, its `Status` says which step failed first and the resolver
+  re-runs the pipeline in `ForReal` mode on that candidate (via
+  `CompleteOverloadCandidate`) so the user sees the most-specific
+  diagnostic (a per-argument coercion failure rather than a generic
+  "no overload" message). When several non-applicable candidates tie
+  for best, the resolver instead emits
+  `NoApplicableOverloadForNameWithArgs` (or `NoApplicableWithArgs`
+  when the callee name is unknown) directly, without calling
+  `CompleteOverloadCandidate`
+  ([slang-check-overload.cpp lines
+  3216-3232](../../../../source/slang/slang-check-overload.cpp)).
 - **Generic-argument inference failure.** The candidate ends at
   `Status::GenericArgumentInferenceFailed`.
   `CompleteOverloadCandidate` emits
@@ -512,11 +517,12 @@ overload reject a `const` left operand.
   resolver recreates the candidate from the cached `decl`. The
   cache is a performance optimization only — correctness does not
   depend on it.
-- **`PartiallyAppliedGenericExpr` left unresolved.** The lowerer
-  rejects it ([slang-lower-to-ir.cpp line
-  5757](../../../../source/slang/slang-lower-to-ir.cpp)); the user-
-  facing surface is "internal compiler error". This is a
-  correctness invariant on the resolver, not a feature.
+- **`PartiallyAppliedGenericExpr` left unresolved.** Overload
+  resolution relies on the surrounding context closing the remaining
+  generic holes; leaving a residual unresolved is a correctness
+  invariant violation, not a feature. Downstream handling is
+  described in
+  [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md).
 
 ## See also
 

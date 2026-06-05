@@ -130,7 +130,7 @@ mapping.
 | `DebugSource` | — | (variadic, `min=3`) | H | (synthesized) | Records the path and contents of a source file. |
 | `DebugLine` | — | (variadic, `min=5`) | | (synthesized) | Pins an instruction to a source line/column range. |
 | `DebugVar` | — | `name, type, scope, location` | | (synthesized) | Declares a user-visible variable for the debugger. |
-| `DebugValue` | — | (variadic, `min=2`) | | (synthesized) | Reports the current value of a `DebugVar`. |
+| `DebugValue` | — | (variadic, `min=2`) | | `emitDebugValue` in `slang-ir-insert-debug-value-store.cpp` | Reports the current value of a `DebugVar`. |
 | `DebugInlinedAt` | — | (variadic, `min=5`) | | (synthesized) | Records a callsite for inlined code. |
 | `DebugFunction` | — | (variadic, `min=5`) | | (synthesized) | Declares a function for the debugger (name, scope, file). |
 | `DebugInlinedVariable` | — | (variadic, `min=2`) | | (synthesized) | Declares a variable inside an inlined function instance. |
@@ -173,6 +173,18 @@ more `SPIRVAsmOperand` opcodes.
 
 ## Notable opcodes
 
+### `Layout`
+
+`Layout` is the abstract parent of the entire layout-opcode family;
+it never appears as a leaf instruction itself — only its children
+(`varLayout`, `typeLayout`, `EntryPointLayout`, ...) are emitted.
+The link that connects a laid-out variable, type, or entry-point
+inst back to its computed layout is the `LayoutDecoration` opcode
+documented in [decorations.md](decorations.md): the decoration's
+operand is one of the concrete `Layout` children listed above. So a
+reader walking IR follows a `layout` decoration to reach the
+offset / size / binding data held by a `varLayout` or `typeLayout`.
+
 ### `varLayout` and `EntryPointLayout`
 
 `varLayout` is the per-variable layout record produced by the layout
@@ -203,6 +215,18 @@ emits one `DebugLine` per change in source location, in the order
 they should be reported to a debugger; it is *not* attached as a
 decoration so that the location can flow with the instruction even
 across CFG transformations.
+
+### `DebugScope`
+
+`DebugScope(scope, inlinedAt)` opens a debug lexical scope. Its
+first operand references the enclosing scope — a `DebugFunction`
+for a function-level scope, or another `DebugScope` for a nested
+block — so scopes nest by chaining the `scope` operand up to the
+owning `DebugFunction`. The second operand records the inlining
+context (a `DebugInlinedAt`, or empty when the code is not
+inlined). The companion `DebugNoScope` marks instructions that
+sit outside any debug scope so the debugger does not associate
+them with the surrounding lexical region.
 
 ### `EmbeddedDownstreamIR`
 

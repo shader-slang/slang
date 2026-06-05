@@ -127,6 +127,9 @@ column on each family page.
   — how IR modules are serialized.
 - [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md)
   — IR instructions carry `SourceLoc`s through the diagnostic system.
+- [../cross-cutting/targets.md](../cross-cutting/targets.md) — the
+  target backends that consume legalized IR, and the per-target
+  legalization that shapes which opcodes survive to emission.
 - [../glossary.md](../glossary.md) — definitions of `IRInst`, `IROp`,
   `IRBuilder`, `IRModule`, `parent instruction`, `terminator
   instruction`, `block parameter`, `decoration`, `hoistable

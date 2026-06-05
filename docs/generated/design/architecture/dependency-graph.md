@@ -26,8 +26,9 @@ specific subsystem.
 External dependencies (`miniz`, `lz4_static`, `Threads::Threads`,
 `unordered_dense`, `SPIRV-Headers`, `SPIRV-Tools-opt`, `SPIRV-Tools-link`,
 `SPIRV`, `glslang`, `${CMAKE_DL_LIBS}`) are omitted from the diagram
-to keep it focused on internal structure. They are listed in the
-notes per node.
+to keep it focused on internal structure. The most significant ones
+are summarized in the notes per node below; the per-node notes are
+not an exhaustive list of every external link dependency.
 
 ```mermaid
 flowchart TB
@@ -100,7 +101,7 @@ above without ordinary `LINK_WITH_*` edges:
 - **`source/slang-llvm/`** — has no `CMakeLists.txt` of its own.
   `slang-llvm` is produced out-of-tree (or downloaded as a prebuilt
   binary controlled by `SLANG_SLANG_LLVM_FLAVOR` in the root
-  [CMakeLists.txt](../../../../CMakeLists.txt) around line 355); no
+  [CMakeLists.txt](../../../../CMakeLists.txt) around line 366); no
   in-source target links against it directly.
 
 ## Edge citations

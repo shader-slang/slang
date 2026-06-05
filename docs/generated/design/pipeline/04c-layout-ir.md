@@ -67,10 +67,12 @@ guarantees this module does (and does not) provide.
   IR generation — that is, after all the
   [04-ast-to-ir.md](04-ast-to-ir.md) and
   [04b-pre-link-passes.md](04b-pre-link-passes.md) work has
-  finished for every translation unit involved. It is **not** fed
-  into `linkAndOptimizeIR`; it is consumed directly by reflection
-  and by callers (such as the linker or downstream tools) that
-  need a layout-decorated view of the program.
+  finished for every translation unit involved. It is **not** the
+  executable per-translation-unit IR and does not run the pre-link
+  mandatory optimization sequence; it is consumed by reflection and
+  by `linkIR`, which adds an existing layout module to its module
+  list so layout-decorated global symbols participate in linking
+  (`slang-ir-link.cpp` lines 2120-2127).
 
 ## Construction flow
 
@@ -196,10 +198,12 @@ just attached are what the rest of the program will query.
   `Module::m_irModule` is produced by `generateIRForTranslationUnit`
   (see [04b-pre-link-passes.md](04b-pre-link-passes.md)); the
   layout IR module is built separately by `createIRModuleForLayout`.
-- **Not** fed into `linkAndOptimizeIR`. The post-link target
-  legalization pipelines documented under
-  [../target-pipelines/](../target-pipelines) consume the per-module
-  IR, not the layout IR.
+- **Not** the executable IR optimized by `linkAndOptimizeIR`. The
+  post-link target legalization pipelines documented under
+  [../target-pipelines/](../target-pipelines) operate on the
+  per-module IR; `linkIR` does, however, pull an existing layout
+  module into its symbol set so its `IRLayoutDecoration`s are visible
+  during linking (`slang-ir-link.cpp` lines 2120-2127).
 - **No function bodies for user-defined functions.** The entry-point
   `IRFunc` instances are stubs; their only purpose is to anchor an
   `IRLayoutDecoration` and (for SPIR-V / Metal) capability

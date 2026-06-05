@@ -80,9 +80,10 @@ is responsible for actually calling the lookup entry points,
 filtering the results, and ranking overloads; the four pages here
 document the rules those calls follow.
 
-Downstream, the resolved `DeclRef` flows into AST-to-IR lowering
-([../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md)) where
-breadcrumb chains are turned into concrete IR access patterns.
+Downstream, the resolved `DeclRef` — with any breadcrumb chain
+already expanded into concrete AST access expressions during semantic
+checking (see [lookup.md](lookup.md)) — flows into AST-to-IR lowering
+([../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md)).
 Cross-cutting consumers of `DeclRef` are documented in
 [../cross-cutting/ir-instructions.md](../cross-cutting/ir-instructions.md).
 

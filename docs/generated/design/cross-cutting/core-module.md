@@ -101,8 +101,8 @@ The full set of declarations covers scalar / vector / matrix types,
 operator overloads (mapped to IR opcodes via
 `__intrinsic_op` / `__target_intrinsic` modifiers — see
 [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md)),
-implicit conversions, ranges and iterators, and the `Optional`,
-`Result`, `Tuple` types.
+implicit conversions, ranges and iterators, and the `Optional`
+and `Tuple` types.
 
 The HLSL meta-module layers in HLSL-named texture / sampler / buffer
 types and the corresponding intrinsics so that HLSL code compiles

@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T21:00:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-05T15:45:00Z
 target_doc: architecture/module-map.md
 review_report: ../../reviews/architecture/module-map.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
 actions:
-  fixed: 2
+  fixed: 1
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,15 +18,18 @@ actions:
 
 ## Summary
 
-Both findings addressed: the manifest's `watched_paths` for the
-module-map page now covers `*.cpp` files in `source/{core,
-compiler-core, slang}/` so cited rows are inside the watched set,
-and the `Linkage` row points at `slang-session.h` / `.cpp` while a
-new `Linkable components` row covers the `slang-linkable.h` cluster.
+The single major finding was fixed (fixed=1; no rejections, deferrals,
+or escalations). F-001 reported that seven `source/` subdirectories were
+collapsed into one two-column catch-all table instead of receiving their
+own level-2 sections with the prompt-required `Logical unit | Files |
+Responsibility` columns. The catch-all section was split into one
+level-2 section per subdirectory, matching the per-subdirectory heading
+convention already used by the rest of the page; each new section has a
+single-row three-column table citing representative files that resolve
+at the source commit.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Runbook "Manifest gaps" pattern: the page legitimately cites `slang-*.cpp` implementation files but they were not watched. | Expanded `architecture/module-map.md` `watched_paths` in `_meta/manifest.yaml` to add `source/slang/slang-*.cpp`, `source/compiler-core/slang-*.cpp`, and `source/core/slang-*.cpp`. |
-| F-002 | fixed | `Linkage` is declared in `slang-session.h`, not `slang-linkable.h`; the previous row mixed up the two concerns. | Split the `Linkage` row into three rows: `Linkage` (citing `slang-session.h` / `.cpp` as the per-configuration scope behind `slang::ISession`), `Linkable components` (citing `slang-linkable.h` / `slang-linkable-impl.cpp` for the `IComponentType` cluster), and `Session (global)` (citing `slang-global-session.h` / `.cpp` for the process-wide singleton). |
+| F-001 | fixed | The module-map prompt (`docs/generated/design/_meta/prompts/architecture-module-map.md:23-31,66-67`) requires each overview logical-unit group its own level-2 section with the three-column table; the catch-all used a two-column Subdirectory/Role table. | Replaced `## Other source/ subdirectories` with seven level-2 sections (`slang-llvm`, `slang-glslang`, `slang-dispatcher`, `slang-rt`, `slang-record-replay`, `slang-wasm`, `slangc`), each with a Logical unit / Files / Responsibility table. |

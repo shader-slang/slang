@@ -222,6 +222,32 @@ function also enforces that a decl's visibility cannot exceed its
 parent container's; violations produce
 `decl-cannot-have-higher-visibility` (code 30601).
 
+### Interaction with `extern` and `export`
+
+The `extern` and `export` modifiers are distinct from the
+`public` / `internal` / `private` classification and do not change a
+decl's `DeclVisibility`; instead they affect lookup or cross-module
+reachability directly:
+
+- `ExternModifier`
+  ([slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h)
+  line 100) and `ExtensionExternVarModifier` (line 231) mark `extern`
+  decls. `DeclPassesLookupMask`
+  ([slang-lookup.cpp](../../../../source/slang/slang-lookup.cpp)
+  lines 41-54) always drops `ExtensionExternVarModifier` decls from
+  lookup, and drops an `ExternModifier` member whose parent is an
+  `ExtensionDecl`, so those `extern` members are hidden from lookup
+  regardless of their visibility keyword.
+- `HLSLExportModifier` (line 112) marks a decl `[export]` for linkage;
+  it records linkage intent and does not by itself raise a decl's
+  `DeclVisibility`.
+- `ExportedModifier` (line 142) on an `import` controls transitive
+  cross-module reachability: `isModuleReachableViaExportedImports`
+  ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+  lines 8928-8954) only follows imports marked with `ExportedModifier`,
+  so an `__exported import` re-exports the imported module while a
+  plain `import` does not.
+
 ### Generic parameters, accessors, and synthesized members
 
 `getDeclVisibility` collapses the visibility of generic parameters
