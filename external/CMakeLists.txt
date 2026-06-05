@@ -319,6 +319,7 @@ if(
             INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}/imgui"
         )
     endif()
+    add_supported_cxx_flags(imgui INTERFACE -Wno-nontrivial-memcall)
 
     # stb
     add_library(stb INTERFACE)
@@ -341,6 +342,11 @@ if(SLANG_ENABLE_SLANG_RHI)
     set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
     set(SLANG_RHI_ENABLE_NVAPI ${SLANG_ENABLE_NVAPI})
     set(SLANG_RHI_ENABLE_WGPU ${SLANG_HAS_WEBGPU_SUPPORT})
+    if(SLANG_ENABLE_DXIL AND NOT DEFINED SLANG_RHI_FETCH_DXC)
+        # Slang's FetchDXC.cmake owns DXC download/build/deployment in this
+        # configuration, so prevent slang-rhi from fetching its own copy.
+        set(SLANG_RHI_FETCH_DXC OFF)
+    endif()
 
     # CoopVec requires the preview Agility SDK that supports SM 6.10
     #set(SLANG_RHI_AGILITY_SDK_VERSION D3D12_PREVIEW_SDK_VERSION)

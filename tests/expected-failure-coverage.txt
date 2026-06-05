@@ -2,22 +2,26 @@
 # =========================
 # This file uses slang-test's `-expected-failure-list` semantics: tests
 # listed here are expected to FAIL (not skipped). slang-test still runs
-# them and just reclassifies a failing exit as expected. That works for
-# the macOS entries below (cross-dylib exception RTTI mismatch returns a
-# clean failure), but it does NOT help when a test crashes the slang-test
-# process itself -- the runner dies before any classification step.
+# them and just reclassifies a failing exit as expected. That only helps
+# when a test returns a clean failing exit code; it does NOT help when a
+# test crashes the slang-test process itself -- the runner dies before
+# any classification step.
 #
-# Crash-mode skips therefore live elsewhere: as `-exclude-prefix`
-# arguments in `.github/workflows/ci-slang-coverage.yml`. As of writing:
+# Crash-mode skips therefore live elsewhere: as workflow-level filters in
+# `.github/workflows/ci-slang-coverage.yml`. As of writing:
 #   - slang-unit-test-tool/RecordReplayApiTypeOperations  (Windows / OCC)
 #   - tests/autodiff/global-param-hoisting                (Windows / OCC,
 #                                                          intermittent crash)
+#   - generated synthetic LLVM runtime variants           (macOS / LLVM
+#                                                          coverage crash)
 # Update both this file and the workflow when adding a new coverage-only
 # skip.
 
-# macOS only: tests that throw and catch C++ exceptions across shared library
-# boundaries fail when running in-process (server-count=1) due to cross-dylib
-# exception RTTI mismatch. Coverage CI uses server-count=1 for profiling.
-slang-unit-test-tool/replayContextSyncModeMismatch.internal
-slang-unit-test-tool/replayContextPlaybackOutputMismatch.internal
-slang-unit-test-tool/replayContextTypeMismatch.internal
+# Run 26813684019 (sequential reproducer with -server-count 1):
+# SIGSEGV in slang-test immediately after
+# design/ir-reference/metadata/type-layout-base.slang passes. The same
+# test is already listed in expected-failures.txt (it fails on the
+# uninstrumented Linux nightly); coverage instrumentation
+# escalates that failure into a SIGSEGV inside the slang-test
+# orchestrator, which kills the rest of the suite.
+docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-buffer-element.slang

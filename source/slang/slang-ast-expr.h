@@ -91,6 +91,9 @@ class LiteralExpr : public Expr
     // The token that was used to express the literal. This can be
     // used to get the raw text of the literal, including any suffix.
     Token token;
+
+    // The suffix type is used to mark the literal type until a proper AST
+    // expression type is attached.
     FIDDLE() BaseType suffixType = BaseType::Void;
 };
 
@@ -99,6 +102,24 @@ class IntegerLiteralExpr : public LiteralExpr
 {
     FIDDLE(...)
     FIDDLE() IntegerLiteralValue value;
+
+    // The signed minimum integer exception. When true, the integer literal may
+    // be negated to express the minimum integer value.
+    //
+    // This is used for graceful handling of numeric expressions such as:
+    // - 2147483648           (INT_MIN)
+    // - 9223372036854775808  (INT64_MIN)
+    //
+    // True if the integer literal:
+    // - uses the decimal base
+    // - does not have the unsigned suffix
+    // - is a candidate for minimum signed integer
+    //
+    // This is used by parsePrefixExpr() to fix the type after negation (e.g.,
+    // -2147483648 back from Int64 to Int).
+    //
+    // See also docs/language-reference/expressions-literal.md
+    FIDDLE() bool signedMinimumIntException;
 };
 
 FIDDLE()
@@ -779,6 +800,17 @@ class BackwardDifferentiateExpr : public DifferentiateExpr
     FIDDLE(...)
 };
 
+/// An expression of the form `__apply(fn)` to access the
+/// apply-for-backward version of the function `fn`.
+/// Used in __func_extension to define a custom forward pass
+/// that returns a context for the backward pass.
+///
+FIDDLE()
+class ApplyForBwdExpr : public DifferentiateExpr
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class FuncAsTypeExpr : public Expr
 {
@@ -912,8 +944,8 @@ class PackBranchTypeExpr : public Expr
     FIDDLE() TypeExp nonEmptyType;
 };
 
-/// An expression that applies a generic to arguments for some,
-/// but not all, of its explicit parameters.
+/// An expression that applies a generic after only some of its ordinary
+/// arguments have been provided.
 ///
 FIDDLE()
 class PartiallyAppliedGenericExpr : public Expr
@@ -926,8 +958,10 @@ public:
     /// The generic being applied
     DeclRef<GenericDecl> baseGenericDeclRef;
 
-    /// A substitution that includes the generic arguments known so far
-    List<Val*> knownGenericArgs;
+    /// Ordinary arguments already provided by the partial generic application.
+    /// Witness arguments are deliberately not stored here; they are formed only
+    /// after the remaining ordinary arguments are inferred.
+    List<Val*> providedOrdinaryArgs;
 };
 
 

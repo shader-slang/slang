@@ -1,0 +1,126 @@
+# Uncovered diagnostic codes — bucket 3 of 5
+# 123 codes in this bucket. Range 31225..40012.
+# code	severity	name	message
+31225	err	static-const-variable-requires-initializer	missing initializer for static const
+31226	err	static-const-global-non-constant-init	static const global initializer must be a compile-time constant
+31230	err	removed-modifier-usage	use of removed modifier
+31231	warning	deprecated-modifier-usage	use of deprecated modifier
+31400	err	decl-not-allowed-in-context	declaration not allowed in this context
+32000	err	invalid-enum-tag-type	invalid enum tag type
+32003	err	unexpected-enum-tag-expr	unexpected enum tag expression
+32006	warning	enum-case-implicit-tag-value-overflow	implicit enum case value overflows underlying tag type
+33070	err	expected-function	expected a function
+33072	err	cannot-have-generic-dyn-interface	dyn interfaces cannot be generic
+33073	err	cannot-have-associated-type-in-dyn-interface	dyn interfaces cannot have associatedType members
+33074	err	cannot-have-generic-method-in-dyn-interface	dyn interfaces cannot have generic methods
+33075	err	cannot-have-mutating-method-in-dyn-interface	dyn interfaces cannot have [mutating] methods
+33076	err	cannot-have-differentiable-method-in-dyn-interface	dyn interfaces cannot have [Differentiable] methods
+33077	err	dyn-interface-cannot-inherit-non-dyn-interface	dyn interface inheritance error
+33078	err	cannot-use-extension-to-make-type-conform-to-dyn-interface	extension cannot conform to dyn interface
+33079	err	cannot-have-unsized-member-when-inheriting-dyn-interface	unsized member with dyn interface inheritance
+33080	err	cannot-have-opaque-member-when-inheriting-dyn-interface	opaque member with dyn interface inheritance
+33081	err	cannot-have-non-copyable-member-when-inheriting-dyn-interface	non-copyable member with dyn interface inheritance
+33082	err	cannot-conform-generic-to-dyn-interface	generic type cannot conform to dyn interface
+33180	err	cannot-specialize-generic-with-existential	cannot specialize generic with existential type
+36005	err	invalid-visibility-modifier-on-type-of-decl	visibility modifier not allowed
+36100	err	conflicting-capability-due-to-use-of-decl	conflicting capability requirement
+36101	err	conflicting-capability-due-to-statement	conflicting capability requirement
+36102	err	conflicting-capability-due-to-statement-enclosing-func	conflicting capability requirement
+36104	err	use-of-undeclared-capability	undeclared capability used
+36105	err	unknown-capability	unknown capability
+36106	err	expect-capability	expect a capability name
+36108	err	decl-has-dependencies-not-compatible-on-target	dependencies not compatible on target
+36109	err	invalid-target-switch-case	invalid target_switch case
+36110	err	use-of-undeclared-capability-of-interface-requirement	capability incompatible with interface
+36112	warning	entry-point-and-profile-are-incompatible	entry point incompatible with profile
+36113	warning	using-internal-capability-name	using internal capability name
+36114	err	use-of-undeclared-capability-of-inheritance-decl	capability incompatible with supertype
+36116	err	capability-has-multiple-stages	capability targets multiple stages
+36117	err	decl-has-dependencies-not-compatible-on-stage	dependencies not compatible on stage
+36118	err	sub-type-has-subset-of-abstract-atoms-to-super-type	subtype missing target/stage support
+36119	err	requirment-has-subset-of-abstract-atoms-to-implementation	requirement missing target/stage support
+36120	err	target-switch-cap-cases-conflict	capability cases conflict in target_switch
+38000	err	entry-point-function-not-found	no function found matching entry point name '~name'
+38005	err	expected-type-for-specialization-arg	expected a type as argument for specialization parameter
+38006	warning	specified-stage-doesnt-match-attribute	entry point stage mismatch
+38008	err	specialization-parameter-of-name-not-specialized	no specialization argument was provided for specialization parameter
+38009	err	expected-value-of-type-for-specialization-arg	expected a constant value for specialization parameter
+38010	warning	unhandled-mod-on-entry-point-parameter	modifier on entry point parameter is unsupported
+38011	err	entry-point-cannot-return-resource-type	entry point cannot return type that contains resource types
+38012	err	entry-point-cannot-return-array-type	entry point cannot return array type
+38013	err	specialization-parameter-not-specialized	no specialization argument was provided for specialization parameter
+38021	err	type-argument-for-generic-parameter-does-not-conform-to-interface	type argument doesn't conform to interface
+38022	err	cannot-specialize-global-generic-to-itself	cannot specialize global type parameter to itself
+38023	err	cannot-specialize-global-generic-to-another-generic-param	cannot specialize using another global type parameter
+38024	err	invalid-dispatch-thread-id-type	invalid SV_DispatchThreadID type
+38025	err	mismatch-specialization-arguments	wrong number of specialization arguments
+38028	err	invalid-form-of-specialization-arg	invalid specialization argument form
+38029	err	type-argument-does-not-conform-to-interface	type argument doesn't conform to interface
+38031	err	invalid-use-of-no-diff	invalid 'no_diff' usage
+38032	warning	use-of-no-diff-on-differentiable-func	'no_diff' on differentiable function has no meaning
+38033	err	cannot-use-no-diff-in-non-differentiable-func	'no_diff' in non-differentiable function
+38034	err	cannot-use-borrow-in-on-differentiable-parameter	'borrow in' on differentiable parameter
+38035	err	encountered-non-differentiable-function-during-higher-order-diff	cannot propagate through non-differentiable function
+38036	err	cannot-use-constref-on-differentiable-member-method	'[constref]' on differentiable member method
+38040	warning	non-uniform-entry-point-parameter-treated-as-uniform	entry point parameter treated as uniform
+38041	err	int-val-from-non-int-spec-const-encountered	cannot cast non-integer specialization constant to integer
+38042	err	implicit-type-coerce-constraint-with-non-implicit-conversion	implicit conversion constraint not satisfied
+38043	err	type-coerce-constraint-missing-conversion	type coerce constraint not satisfied
+38045	err	geometry-shader-missing-output-stream	geometry shader missing output stream parameter
+38046	err	geometry-shader-missing-max-vertex-count	geometry shader missing [maxvertexcount] attribute
+38047	err	mesh-shader-missing-output-topology	mesh shader missing [outputtopology] attribute
+38048	err	mesh-shader-missing-outputs	mesh shader missing OutputVertices/OutputIndices output
+38050	err	invalid-entry-point-varying-type	type cannot be used as entry-point varying parameter or return type
+38051	err	invalid-entry-point-varying-type-for-target	type cannot be used as entry-point varying for this target
+38052	warning	vertex-shader-missing-sv-position	vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic
+38100	err	type-doesnt-implement-interface-requirement	missing interface member
+38101	err	this-expression-outside-of-type-decl	'this' used outside aggregate type
+38103	err	this-type-outside-of-type-decl	'This' used outside aggregate type
+38104	err	return-val-not-available	'__return_val' not available
+38105	err	member-does-not-match-requirement-signature	interface requirement mismatch
+38106	err	member-return-type-mismatch	return type mismatch
+38107	err	generic-signature-does-not-match-requirement	generic signature mismatch
+38108	err	parameter-direction-does-not-match-requirement	parameter direction mismatch
+38109	warning	non-copyable-type-cannot-conform-to-interface	non-copyable interface conformance is not fully supported
+38200	err	recursive-module-import	recursive module import
+38201	err	glsl-module-not-available	'glsl' module not available
+38203	err	vector-with-disallowed-element-type-encountered	disallowed vector element type
+38204	err	cannot-use-resource-type-in-structured-buffer	resource type in StructuredBuffer
+38205	err	recursive-types-found-in-structured-buffer	recursive type in structured buffer
+38206	err	vector-with-invalid-element-count-encountered	invalid vector element count
+39000	err	conflicting-explicit-bindings-for-parameter	conflicting explicit bindings
+39001	warning	parameter-bindings-overlap	explicit binding overlap
+39007	err	unknown-register-class	unknown register class
+39008	err	expected-a-register-index	expected a register index
+39009	err	expected-space	expected 'space'
+39010	err	expected-space-index	expected a register space index after 'space'
+39011	err	invalid-component-mask	invalid register component mask
+39012	warning	requested-bindless-space-index-unavailable	bindless space index unavailable
+39013	warning	register-modifier-but-no-vulkan-layout	D3D register without Vulkan binding
+39014	err	unexpected-specifier-after-space	unexpected specifier after register space
+39015	err	whole-space-parameter-requires-zero-binding	whole descriptor set requires binding 0
+39017	err	dont-expect-out-parameters-for-stage	stage does not support out/inout parameters
+39018	err	dont-expect-in-parameters-for-stage	stage does not support in parameters
+39019	warning	global-uniform-not-expected	implicit global shader parameter
+39020	err	too-many-shader-record-constant-buffers	too many shader record constant buffers
+39022	warning	vk-index-without-vk-location	vk::index without vk::location
+39023	err	mixing-implicit-and-explicit-binding-for-varying-params	mixing implicit and explicit varying bindings
+39025	err	conflicting-vulkan-inferred-binding-for-parameter	conflicting Vulkan inferred binding
+39026	err	matrix-layout-modifier-on-non-matrix-type	matrix layout modifier on non-matrix type
+39027	err	get-attribute-at-vertex-must-refer-to-per-vertex-input	'GetAttributeAtVertex' must reference vertex input
+39028	err	not-valid-varying-parameter	not a valid varying parameter
+39029	warning	register-modifier-but-no-vk-binding-nor-shift	D3D register without Vulkan binding or shift
+39030	err	target-does-not-support-descriptor-handle	target does not support 'DescriptorHandle' types
+39031	err	class-type-not-supported	class types are not supported in type layout
+39071	warning	binding-attribute-ignored-on-uniform	binding attribute ignored
+39998	err	generic-evaluation-recursion-limit-exceeded	recursive generic evaluation exceeded maximum depth
+40000	err	ray-payload-field-missing-access-qualifiers	ray payload field missing access qualifiers
+40001	err	ray-payload-invalid-stage-in-access-qualifier	invalid stage name in ray payload access qualifier
+40004	warning	integer-literal-too-large	integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+40005	warning	integer-literal-truncated	integer literal truncated
+40006	err	unimplemented-system-value-semantic	unknown system-value semantic
+40008	err	invalid-l-value-for-ref-parameter	the form of this l-value argument is not valid for a `ref` parameter
+40009	warning	float-literal-unrepresentable	floating-point literal unrepresentable
+40010	warning	float-literal-too-small	floating-point literal too small
+40011	note	overload-candidate	candidate: ~candidate
+40012	err	need-compile-time-constant	expected a compile-time constant

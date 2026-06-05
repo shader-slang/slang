@@ -98,6 +98,14 @@ type:
   kind: Scalar
 ```
 
+`getName()` and `getFullName()` return the structural type name without any
+type-level modifier wrappers (`no_diff`, `unorm`, `snorm`, ...). For example,
+a `no_diff float3` parameter and a `unorm float4` field both reflect with the
+underlying structural kind (`Scalar`/`Vector`) and a name that omits the
+modifier. To inspect a modifier on a specific declaration, use
+`findModifier()` on the owning `VariableReflection` /
+`FunctionReflection`.
+
 Additional information can be queried from a `TypeReflection`, depending on its kind:
 
 ```c++

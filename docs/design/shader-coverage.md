@@ -50,7 +50,7 @@ primitive:
   side-channel that records the source-entry semantic intent for the
   current coverage mode.
   `ICoverageTracingMetadata` (and its on-disk twin
-  `.coverage-mapping.json`) is that channel.
+  `.coverage-manifest.json`) is that channel.
 
 The two channels carry complementary data — binding info answers
 "where" and attribution answers "what." A host needs both: without
@@ -62,11 +62,23 @@ and that fact is preserved in the metadata and JSON sidecar. The
 LCOV conversion step then applies gcov-style reporting rules by
 filtering those entries out of line-oriented output.
 
-Future branch, function, and source-region coverage should grow this
-attribution side of the design, not the binding side. In particular,
-`ISyntheticResourceMetadata` should remain about hidden resource
-binding, while richer source-based coverage metadata can describe how
-runtime counters map to source regions, functions, and branch outcomes.
+Terminology:
+
+- **Coverage manifest** means the canonical JSON payload produced by
+  `slang_writeCoverageManifestJson`.
+- **Coverage manifest sidecar** means that JSON payload written to disk
+  next to a compiled artifact, normally as
+  `<output>.coverage-manifest.json`.
+- **`-coverage-manifest-output`** is the slangc option that overrides
+  the sidecar path; it controls output location only, not
+  instrumentation.
+
+Line, function, branch, and future source-region coverage should grow
+this attribution side of the design, not the binding side. In
+particular, `ISyntheticResourceMetadata` should remain about hidden
+resource binding, while richer source-based coverage metadata describes
+how runtime counters map to source regions, functions, and branch
+outcomes.
 
 ### Buffer synthesis at IR-pass time
 
@@ -89,8 +101,8 @@ owns the rest of the feature:
   values consult `ICoverageTracingMetadata`.
 - **Self-contained pass.** `slang-ir-coverage-instrument.cpp` owns
   buffer creation, layout assignment, target-policy selection,
-  counter-op rewriting, and metadata recording. Disabling
-  `-trace-coverage` keeps the rest of the compiler unaware of the
+  marker-op rewriting, and metadata recording. Disabling all coverage
+  tracing options keeps the rest of the compiler unaware of the
   feature's existence.
 
 Hosts integrate by reading the hidden binding record from
@@ -103,21 +115,35 @@ resource.
 Pipeline architecture
 ---------------------
 
-Enabling `-trace-coverage` runs three pipeline stages:
+Enabling one or more coverage tracing options runs three pipeline
+stages:
+
+For a focused description of exactly where line, function, and branch
+counters are inserted, with examples, see
+[`shader-coverage-counter-placement.md`](shader-coverage-counter-placement.md).
 
 1. **AST lowering** (`source/slang/slang-lower-to-ir.cpp`). Before
-   each *executable* statement is lowered to IR, the front-end
-   emits an `IncrementCoverageCounter` IR op:
-   - The op is opaque (zero operands, void return) — it doesn't
-     reference a buffer at this point. The IR coverage pass will
-     rewrite it later.
-   - Purely structural compound statements (`BlockStmt`, `SeqStmt`,
-     `EmptyStmt`) are filtered to keep counter density proportional
-     to real execution events.
-   - The op's source position rides on the standard per-instruction
-     `sourceLoc` field — no operands, no debug decoration — so it
-     survives `stripDebugInfo` and every IR transform that preserves
-     operands (inline, clone, link).
+   source code is lowered to IR, the front-end emits semantic marker
+   ops:
+   - `-trace-coverage` emits `IncrementCoverageCounter` before each
+     executable statement. Purely structural compound statements
+     (`BlockStmt`, `SeqStmt`, `EmptyStmt`) are filtered to keep line
+     counter density proportional to real execution events.
+   - `-trace-function-coverage` emits
+     `IncrementFunctionCoverageCounter` at user-authored function
+     entry.
+   - `-trace-branch-coverage` emits
+     `IncrementBranchCoverageCounter` for `if` / `else` arms and
+     loop-condition true/false arms (`for`, `while`, `do while`) and
+     source `switch` case/default dispatch arms, including the
+     implicit no-match default path when no `default` label exists.
+     Expression-level short-circuit and ternary branches are not
+     instrumented yet.
+   - Marker ops are opaque void IR instructions. They do not reference
+     a buffer at this point; the IR coverage pass rewrites them later.
+   - The marker source position rides on the standard per-instruction
+     `sourceLoc` field, so it survives `stripDebugInfo` and every IR
+     transform that preserves operands (inline, clone, link).
 
 2. **IR pass** (`source/slang/slang-ir-coverage-instrument.cpp`).
    Runs after `linkIR` has produced the linked-program IR, and
@@ -129,9 +155,14 @@ Enabling `-trace-coverage` runs three pipeline stages:
      Metal, `DescriptorTableSlot` for Khronos / SPIR-V / GLSL. For
      CPU and CUDA targets it additionally reports `Uniform` size,
      which the global-uniform packaging pass uses to fold the buffer
-     into the standard `GlobalParams` struct. WGSL targets currently
-     skip instrumentation entirely (warning E45102) until the
-     synthesized type is wrapped in `Atomic<...>`.
+     into the standard `GlobalParams` struct. WGSL and LLVM-emitted
+     CPU targets currently skip instrumentation entirely (warning
+     E45102) until their coverage atomic lowering paths are supported.
+   - **Reserves the implementation resource name `__slang_coverage`**
+     whenever any coverage tracing mode is enabled. User shaders that
+     declare a global parameter with that name now fail code generation
+     with error E45100; rename the user declaration or compile without
+     coverage tracing.
    - **Picks a (set, binding)** — either honoring
      `-trace-coverage-binding <reg> <space>` if supplied, or
      auto-allocating a non-conflicting location for the chosen
@@ -154,17 +185,17 @@ Enabling `-trace-coverage` runs three pipeline stages:
      uniforms (CPU, CUDA). Graphics targets don't pack and the
      extension is a no-op for them; the buffer flows through emit
      as a standalone `IRGlobalParam`.
-   - **Assigns a counter slot to each `IncrementCoverageCounter`
-     op** for the current exact line mode (per-inst UID —
-     consecutive index in traversal order; multiple ops on the same
-     source line get distinct slots and are aggregated by the LCOV
-     exporter).
+   - **Assigns a counter slot to each coverage marker op** (per-inst
+     UID, consecutive index in traversal order). Multiple line markers
+     on the same source line get distinct slots and are aggregated by
+     the LCOV exporter. Function and branch markers produce their own
+     `CoverageEntryInfo::kind` values and use the same counter buffer.
    - **Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
      Relaxed)`**.
    - **Records source entries on the artifact's
      `ICoverageTracingMetadata` and the synthesized buffer binding on
      `ISyntheticResourceMetadata`.** A source entry is unattributable when its
-     `IncrementCoverageCounter` op carried an invalid `sourceLoc`, or
+     marker op carried an invalid `sourceLoc`, or
      one whose humane-loc has no positive line — typically because the
      underlying statement came from code synthesis (autodiff reverse-
      mode, generic specialization, struct constructor synthesis)
@@ -179,27 +210,27 @@ Enabling `-trace-coverage` runs three pipeline stages:
    - SPIR-V → `OpAtomicIAdd`
    - GLSL → `atomicAdd`
    - Metal → Metal atomic builtins
-   - WGSL → not reached today; coverage instrumentation is skipped
-     before rewrite for WGSL targets
+   - WGSL / LLVM-emitted CPU targets → not reached today; coverage
+     instrumentation is skipped before rewrite for these targets
    - CUDA → `atomicAdd`
-   - CPU → `_slang_atomic_add_u32` prelude helper (GCC/Clang
+   - CPU source → `_slang_atomic_add_u32` prelude helper (GCC/Clang
      `__atomic_fetch_add`, MSVC `_InterlockedExchangeAdd`)
 
-The `IncrementCoverageCounter` op is side-effectful by default in
-DCE analysis, so it survives optimizations untouched until the
-coverage pass rewrites it.
+Coverage marker ops are side-effectful by default in DCE analysis, so
+they survive optimizations untouched until the coverage pass rewrites
+them.
 
 Where each stage lives
 ----------------------
 
 | Path | Role |
 |---|---|
-| `source/slang/slang-ir-coverage-instrument.{h,cpp}` | IR pass — synthesizes the buffer, extends program-scope layout, rewrites counter ops, writes metadata |
-| `source/slang/slang-ir-insts.lua` | Declares the `IncrementCoverageCounter` IR op |
-| `source/slang/slang-lower-to-ir.cpp` | Emits counter ops during AST lowering; filters `BlockStmt` / `SeqStmt` / `EmptyStmt` |
+| `source/slang/slang-ir-coverage-instrument.{h,cpp}` | IR pass — synthesizes the buffer, extends program-scope layout, rewrites marker ops, writes metadata |
+| `source/slang/slang-ir-insts.lua` | Declares the line/function/branch coverage marker IR ops |
+| `source/slang/slang-lower-to-ir.cpp` | Emits marker ops during AST lowering; filters structural statements for line coverage |
 | `source/slang/slang-emit.cpp` | Integrates the pass into the pipeline + allocates metadata + plumbs `-trace-coverage-binding` / `-trace-coverage-reserved-space` |
-| `source/slang/slang-options.cpp` | Registers the `-trace-coverage`, `-trace-coverage-binding`, and `-trace-coverage-reserved-space` CLI flags |
-| `source/slang/slang-end-to-end-request.cpp` | Writes the `.coverage-mapping.json` sidecar from slangc |
+| `source/slang/slang-options.cpp` | Registers the coverage tracing CLI flags |
+| `source/slang/slang-end-to-end-request.cpp` | Writes the `.coverage-manifest.json` sidecar from slangc |
 | `include/slang.h` | `slang::ICoverageTracingMetadata` public interface |
 | `source/compiler-core/slang-artifact-associated-impl.{h,cpp}` | `ArtifactPostEmitMetadata` implements the interface |
 | `prelude/slang-cpp-prelude.h` | CPU-target atomic helpers (`_slang_atomic_add_u32/i32`) |
@@ -231,7 +262,7 @@ binding.
 
 A companion free function — `slang_writeCoverageManifestJson` —
 serializes an `ICoverageTracingMetadata` to the canonical
-`.coverage-mapping.json` shape on demand. When the same metadata object
+`.coverage-manifest.json` shape on demand. When the same metadata object
 also supports `ISyntheticResourceMetadata` (the normal Slang artifact
 case), the serializer includes the buffer binding fields as well:
 `space` / `binding` for descriptor-backed targets and
@@ -243,11 +274,12 @@ hosts that consume the typed accessors don't need it.
 
 Today the in-tree consumer is:
 
-- **`slangc` itself** — its `_maybeWriteCoverageMapping` calls
-  `slang_writeCoverageManifestJson` and writes the bytes to disk.
-  This is what makes the metadata API + manifest shape *one*
-  contract, not two: `slangc` is its own first consumer of the
-  public serializer.
+- **`slangc` itself** — its `_maybeWriteCoverageManifest` calls
+  `slang_writeCoverageManifestJson` and writes the bytes to disk,
+  either as `<output>.coverage-manifest.json` for normal file outputs
+  or at the explicit `-coverage-manifest-output <path>`. This is what
+  makes the metadata API + manifest shape *one* contract, not two:
+  `slangc` is its own first consumer of the public serializer.
 
 A reference end-to-end host integration that uses both the typed
 metadata path and `slang_writeCoverageManifestJson` is planned as a
@@ -258,7 +290,7 @@ don't exist in-tree today: slangpy bindings, in-engine compile
 pipelines, custom test runners that JIT-compile shaders. They're
 the audience the API shape is designed for.
 
-### Cross-process / offline consumers — `<output>.coverage-mapping.json`
+### Cross-process / offline consumers — `<output>.coverage-manifest.json`
 
 The other audience runs *later*, possibly on a different machine,
 without Slang linked: a runtime dispatching the precompiled shader;
@@ -267,7 +299,7 @@ LCOV; a custom dashboard. By the time these consumers run, the
 `slangc` invocation that produced the artifact has long since
 exited, so the in-process API is unreachable. They need the
 metadata frozen to disk in a language-agnostic format. The
-`<output>.coverage-mapping.json` sidecar is that disk form.
+`<output>.coverage-manifest.json` sidecar is that disk form.
 
 This is the pre-built-shader pattern: shaders are compiled offline,
 binaries plus sidecars ship with the game engine, DCC tool, or
@@ -330,7 +362,7 @@ the hidden resource binding from `ISyntheticResourceMetadata` and
 source-entry attribution from `ICoverageTracingMetadata`,
 and declares the slot in its own pipeline-layout / root-signature code.
 No file I/O is involved; the
-`.coverage-mapping.json` sidecar is not produced or read.
+`.coverage-manifest.json` sidecar is not produced or read.
 
 The host is free to consume the source-entry attribution in whatever
 shape suits it — write its own LCOV, feed an internal dashboard,
@@ -343,9 +375,9 @@ Audience: workflows that compile shaders offline (typically via
 or in a process where Slang isn't linked. Game engines shipping
 with prebuilt shaders, vendor runtimes, CI pipelines.
 
-`slangc` writes `<output>.coverage-mapping.json` next to each
-compiled artifact when `-trace-coverage` is on. The sidecar is the
-on-disk serialization of the coverage attribution plus synthetic
+`slangc` writes `<output>.coverage-manifest.json` next to each compiled
+artifact when any coverage mode emits source entries. The sidecar is
+the on-disk serialization of the coverage attribution plus synthetic
 resource binding metadata. The dispatching host reads the sidecar,
 declares the slot in its pipeline layout, and proceeds as in workflow
 A. The Python LCOV converter under `tools/shader-coverage/` consumes
@@ -354,7 +386,7 @@ the same sidecar later when converting readback counters to LCOV.
 ### Convenience layers (planned follow-up)
 
 A helper library could provide a C ABI that handles
-`.coverage-mapping.json` parsing, counter accumulation across
+`.coverage-manifest.json` parsing, counter accumulation across
 dispatches, and LCOV serialization for hosts that want LCOV output
 without implementing the format themselves. It would not be required
 for either workflow above.
@@ -362,31 +394,39 @@ for either workflow above.
 Roadmap
 -------
 
-The current implementation provides line coverage instrumentation
-end-to-end across all Slang backends. Directions scoped for follow-
-up work, grouped by category. Per-test attribution and branch
-coverage are the highest-leverage near-term picks.
+The current implementation provides line, function-entry, and initial
+branch-arm coverage instrumentation end-to-end across supported Slang
+backends. WGSL is intentionally skipped by the current coverage
+instrumentation path. Directions scoped for follow-up work, grouped by
+category. Per-test attribution and source-region coverage are the
+highest-leverage near-term picks.
 
 `ICoverageTracingMetadata` is intentionally source-entry based rather
-than LCOV-line-only. Today line coverage emits one entry per counter,
-with `CoverageEntryInfo::kind == Line`,
-`counterMode == Count`, and `counterIndex` pointing at the runtime
-counter slot. The same object already has room for future branch,
-function, and lower-density region entries: ranges, function names,
-and branch site/arm ids live on `CoverageEntryInfo`, while
-`getCounterCount()` continues to describe the size of the runtime
-counter buffer. `CoverageCounterMode` currently defines only `Count`;
-additional counter interpretations should be appended when a concrete
-mode is implemented. LCOV remains a compatibility export (`DA:`,
-`FN/FNDA:`, `BRDA:`), not the only internal coverage model.
+than LCOV-line-only. Today line, function, and branch coverage emit one
+entry per counter, with `counterMode == Count` and `counterIndex`
+pointing at the runtime counter slot. This is an implementation detail
+of the current producers, not a permanent metadata contract. The same
+object already has room for future lower-density region entries:
+source ranges, function names, and branch site/arm ids live on
+`CoverageEntryInfo`, while `getCounterCount()` continues to describe
+the size of the runtime counter buffer. Region entries may later use
+direct counters, shared counters, derived counter expressions, or
+counterless metadata entries represented through tail-extended fields
+or a derived metadata interface. `CoverageCounterMode` currently
+defines only `Count`; additional counter interpretations such as
+binary hit/not-hit and warp/group-aggregated modes should be appended
+when a concrete mode is implemented. LCOV remains a
+compatibility export (`DA:`, `FN/FNDA:`, `BRDA:`), not the only
+internal coverage model.
 
-### New LCOV record types
+### LCOV record expansion
 
-Capabilities the LCOV format already names that the current
-implementation does not yet emit.
+Capabilities the LCOV format names beyond line `DA:` records.
 
-- **Branch coverage** (`BRDA:` records). Per-branch-arm counters,
-  represented through richer source coverage metadata before export.
+- **Branch coverage** (`BRDA:` records). Initial support covers
+  `if`/`else`, loop-condition true/false arms, and source `switch`
+  case/default dispatch arms, including the implicit no-match default
+  path when no `default` label exists.
 - **Function coverage** (`FN:` / `FNH:` records). Per-function-entry
   counters with function names and source ranges.
 - **Per-test attribution** (`TN:` groupings). Extends

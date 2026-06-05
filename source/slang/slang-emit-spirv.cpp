@@ -1618,9 +1618,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
                 if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
                     return SpvStorageClassHitObjectAttributeNV;
-                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
-                    return SpvStorageClassHitObjectAttributeEXT;
-                return SpvStorageClassHitObjectAttributeNV;
+                return SpvStorageClassHitObjectAttributeEXT;
             }
         case AddressSpace::HitAttribute:
             return SpvStorageClassHitAttributeKHR;
@@ -2734,9 +2732,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_HitObjectType:
             {
                 // Check NV first (more specific) since NV derives from EXT in the
-                // capability hierarchy. If we checked EXT first, it would always
-                // match when NV is specified, causing a type/op mismatch
-                // (OpTypeHitObjectEXT=5313 vs OpTypeHitObjectNV=5281).
+                // capability hierarchy. If no SER capability was explicitly requested,
+                // default to EXT to match capability inference and target-switch fallback.
                 auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
                 if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
                 {
@@ -2755,9 +2752,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else
                 {
                     ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
-                    return emitOpTypeHitObject(inst);
+                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
+                    return emitOpTypeHitObjectEXT(inst);
                 }
             }
 
@@ -2828,6 +2825,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitMakeMatrixFromScalar(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 inst);
+        case kIROp_CastDescriptorHandleToUInt2:
+        case kIROp_CastUInt2ToDescriptorHandle:
+        case kIROp_CastUInt64ToDescriptorHandle:
+        case kIROp_CastDescriptorHandleToUInt64:
+        case kIROp_GlobalValueRef:
+            {
+                auto inner = ensureInst(inst->getOperand(0));
+                registerInst(inst, inner);
+                return inner;
+            }
         case kIROp_GlobalParam:
             return emitGlobalParam(as<IRGlobalParam>(inst));
         case kIROp_GlobalVar:
@@ -4910,6 +4917,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_SPIRVLoadDescriptorFromHeap:
             {
                 auto loadDesc = as<IRSPIRVLoadDescriptorFromHeap>(inst);
+                if (unwrapAttributedType(inst->getDataType())->getOp() ==
+                    kIROp_RaytracingAccelerationStructureType)
+                {
+                    result = emitAccelerationStructureFromDescriptorHeap(
+                        parent,
+                        inst,
+                        loadDesc->getHeap(),
+                        loadDesc->getIndex());
+                    break;
+                }
                 result =
                     emitDescriptorHeapLoad(parent, inst, loadDesc->getHeap(), loadDesc->getIndex());
                 break;
@@ -6305,6 +6322,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 const auto topologyType = OutputTopologyType(o->getTopologyType());
 
                 SpvExecutionMode m = SpvExecutionModeMax;
+                bool shouldEmitExecutionMode = true;
                 if (entryPointDecor)
                 {
                     switch (entryPointDecor->getProfile().getStage())
@@ -6317,21 +6335,26 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             m = SpvExecutionModeVertexOrderCcw;
                         else if (topologyType == OutputTopologyType::Point)
                             m = SpvExecutionModePointMode;
+                        // OutputTopologyType::Line is represented by the Isolines execution mode
+                        // emitted for the domain decoration.
+                        else if (topologyType == OutputTopologyType::Line)
+                            shouldEmitExecutionMode = false;
+                        break;
+                    case Stage::Mesh:
+                        if (topologyType == OutputTopologyType::Triangle)
+                            m = SpvExecutionModeOutputTrianglesEXT;
+                        else if (topologyType == OutputTopologyType::Line)
+                            m = SpvExecutionModeOutputLinesEXT;
+                        else if (topologyType == OutputTopologyType::Point)
+                            m = SpvExecutionModeOutputPoints;
+                        break;
+                    default:
                         break;
                     }
                 }
-                if (m == SpvExecutionModeMax)
-                {
-                    if (topologyType == OutputTopologyType::Triangle)
-                        m = SpvExecutionModeOutputTrianglesEXT;
-                    else if (topologyType == OutputTopologyType::Line)
-                        m = SpvExecutionModeOutputLinesEXT;
-                    else if (topologyType == OutputTopologyType::Point)
-                        m = SpvExecutionModeOutputPoints;
-                }
 
-                SLANG_ASSERT(m != SpvExecutionModeMax);
-                requireSPIRVExecutionMode(decoration, dstID, m);
+                if (shouldEmitExecutionMode && m != SpvExecutionModeMax)
+                    requireSPIRVExecutionMode(decoration, dstID, m);
             }
             break;
 
@@ -6383,8 +6406,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else
                 {
                     ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
                 }
                 isRayTracingObject = true;
                 break;
@@ -7105,6 +7128,38 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             *outIsBufferResource = isBufferResource;
 
         return getDescriptorRuntimeArrayType(descriptorElementType);
+    }
+
+    SpvInst* emitAccelerationStructureFromDescriptorHeap(
+        SpvInstParent* parent,
+        IRInst* inst,
+        IRInst* heap,
+        IRInst* index)
+    {
+        requireSPIRVAnyCapability({SpvCapabilityRayTracingKHR, SpvCapabilityRayQueryKHR});
+        ensureAnyExtensionDeclaration(
+            {UnownedStringSlice("SPV_KHR_ray_tracing"), UnownedStringSlice("SPV_KHR_ray_query")});
+
+        IRBuilder builder(m_irModule);
+        builder.setInsertInto(m_irModule->getModuleInst());
+        auto addressType = builder.getUInt64Type();
+        auto valuePtr = emitInst(
+            parent,
+            nullptr,
+            SpvOpUntypedAccessChainKHR,
+            ensureUntypedPointerType(SpvStorageClassUniformConstant),
+            kResultID,
+            getDescriptorHeapBaseType(as<IRType>(unwrapAttributedType(inst->getDataType()))),
+            heap,
+            index);
+        auto address = emitOpLoad(parent, nullptr, addressType, valuePtr);
+        return emitInst(
+            parent,
+            inst,
+            SpvOpConvertUToAccelerationStructureKHR,
+            inst->getDataType(),
+            kResultID,
+            address);
     }
 
     SpvInst* emitDescriptorHeapLoad(
@@ -9683,7 +9738,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     visited);
             break;
 
-        case kIROp_PtrType:
         case kIROp_RefParamType:
         case kIROp_BorrowInParamType:
         case kIROp_OutParamType:
@@ -9694,6 +9748,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     targets,
                     found,
                     visited);
+            break;
+
+        case kIROp_PtrType:
+            // A pointer's pointee is not stored inline in the outer container;
+            // it lives in whatever storage class the pointer's address space
+            // names.  Do not recurse through pointers when deciding whether
+            // the outer container needs 8/16-bit-storage capabilities --
+            // otherwise a `uint16_t*` BDA argument in a push-constant block
+            // would spuriously require `StoragePushConstant16` (issue #11096).
+            // The pointee's own storage-class requirements are handled when
+            // that storage class is emitted.
             break;
 
         case kIROp_RateQualifiedType:

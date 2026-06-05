@@ -17,6 +17,44 @@ Key directories:
 - `cmake/`: CMake helpers.
 - `external/`: vendored dependencies.
 
+## Repository-Local Skills
+
+This repository stores local agent skills under `.claude/skills/`. Codex and other non-Claude
+harnesses should still consult those `SKILL.md` files when a user asks for the workflow they
+describe.
+
+Review-related skills:
+- `slang-review-clarity-workflow`: coordinate the end-to-end clarity review workflow.
+- `slang-review-clarity`: generate high-level clarity and explainability review candidates.
+- `slang-review-fine-grained-clarity`: generate line-by-line name/comment/type/function
+  consistency review candidates.
+- `slang-review-consolidate-candidates`: merge candidate files and resolve duplicates,
+  overlap, and superseded comments.
+- `slang-review-scope-filter`: conservatively filter candidate comments to issues the PR
+  author can reasonably own before posting.
+- `slang-review-resolve-judgment-calls`: resolve uncertain candidates with focused follow-up
+  analysis before posting.
+- `slang-review-post-github`: post filtered candidates as one proper GitHub PR review.
+
+## WSL and Windows Tooling
+
+When working in this repository from WSL on Windows, use Windows-native developer tools by
+default unless the user explicitly asks for the WSL/Linux version.
+
+- Use `git.exe`, not bare `git`. These worktrees use Windows path conventions; WSL Git can
+  corrupt or misinterpret worktree state, and Windows Git has much better file I/O performance
+  on this checkout.
+- When the `slang-build` skill invokes CMake, use `cmake.exe`, not bare `cmake`, for
+  Windows-hosted configure and build commands. Windows CMake can find Visual Studio 2026 and
+  the Windows toolchains required by the `vs2026` preset.
+- Use `gh.exe` instead of bare `gh` when GitHub CLI commands need to share the same
+  Windows-native Git and credential context.
+- Convert WSL paths before passing them to Windows tools, for example `wslpath -w "$path"`.
+  Convert paths printed by Windows tools back before using them in shell commands, for example
+  `wslpath -u "$win_path"`.
+- If a required `.exe` tool is unavailable, stop and report it instead of silently falling back
+  to the WSL/Linux tool.
+
 ## Build, Test, and Development Commands
 
 Slang build setup is platform-specific, especially under WSL. For compiler builds, use the
@@ -45,6 +83,26 @@ the directory for the selected configuration:
 
 On Windows-hosted builds, use the `.exe` suffix if that is the generated binary name.
 
+## Include Path Conventions
+
+Prefer direct paths over relative traversal in `#include` directives. The `source/` directory is
+on the compiler include path (exposed by the `core` CMake target), so cross-module headers are
+reachable without `../`:
+
+```cpp
+// Preferred in new code
+#include "core/slang-string.h"
+#include "compiler-core/slang-source-loc.h"
+
+// Existing code still uses the relative form; do not change it purely for style
+#include "../core/slang-string.h"
+#include "../compiler-core/slang-source-loc.h"
+```
+
+New files should use direct paths. Existing files need not be converted purely for style, but may
+be opportunistically updated when the file is already being substantially modified for other
+reasons (e.g., a security fix or feature addition touching many lines).
+
 ## Coding Style & Naming Conventions
 
 Formatting:
@@ -59,6 +117,14 @@ Conventions:
 - Use `UpperCamelCase` for types and `lowerCamelCase` for values.
 - Use `SLANG_`-prefixed `SCREAMING_SNAKE_CASE` for macros.
 - Prefer comments that explain why code exists.
+
+## Shell Scripts
+
+Scripts under `extras/` (and other repository shell scripts) must run on bash 3.2, the version
+Apple ships as `/bin/bash` on macOS. Avoid bash 4+ only features such as `${var,,}`/`${var^^}`
+case conversion, associative arrays (`declare -A`), `mapfile`/`readarray`, and namerefs
+(`local -n`). Prefer portable equivalents (for example, lowercase with
+`tr '[:upper:]' '[:lower:]'`). Validate with `bash -n script.sh` under the system bash.
 
 ## Testing Guidelines
 

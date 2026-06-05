@@ -3,6 +3,11 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
 
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+// TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
+
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_8_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
@@ -19,11 +24,15 @@ typealias DType = half;
 typealias DType = float;
 #endif
 
-// TEST_INPUT: set inputBuffer = ubuffer(stride=4, count=8192)
-uniform RWStructuredBuffer<DType>.Handle inputBuffer;
+struct TestBuffers
+{
+    RWStructuredBuffer<DType>.Handle inputBuffer;
+    RWStructuredBuffer<DType>.Handle biasBuffer;
+}
 
-// TEST_INPUT: set biasBuffer = ubuffer(stride=4, count=64)
-uniform RWStructuredBuffer<DType>.Handle biasBuffer;
+// TEST_INPUT: set buffers.inputBuffer = ubuffer(stride=4, count=8192)
+// TEST_INPUT: set buffers.biasBuffer = ubuffer(stride=4, count=64)
+ParameterBlock<TestBuffers> buffers;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -37,82 +46,22 @@ public struct TestShMemSize : ISharedMemorySize {
 static const uint OffsetA = 0;
 static const uint OffsetB = 256;
 
-// Clear the weight buffer region used by a PaddedSize x PaddedSize tiled matrix.
-void clearWeightBuffer<int PaddedSize>(uint tid)
+void testImpl<int InputSize, int OutputSize, TargetEnum Target>(uint tid, int resIndex)
 {
-    static const int TotalElements = PaddedSize * PaddedSize;
-    static const int NumIters = (TotalElements + BatchSize - 1) / BatchSize;
+    static const int PaddedInputSize = PadToTargetTile<InputSize, Target>.Value;
+    static const int PaddedOutputSize = PadToTargetTile<OutputSize, Target>.Value;
 
-    [ForceUnroll]
-    for (int iter = 0; iter < NumIters; iter++)
-    {
-        int index = iter * BatchSize + tid;
-        if (index < TotalElements)
-            inputBuffer[index] = DType(0);
-    }
-}
-
-// Write an identity matrix in tiled layout.
-// The weight matrix is PaddedSize x PaddedSize (both multiples of 16),
-// but only the top-left InputSize x InputSize has the identity.
-//
-// Tiled layout addressing for element (row, col):
-//   tileRow   = row / 16
-//   tileCol   = col / 16
-//   NTileCols = PaddedSize / 16
-//   tileIndex = tileRow * NTileCols + tileCol
-//   offset    = tileIndex * 256 + (row % 16) * 16 + (col % 16)
-void identityWeightMatrixTiled<int InputSize, int PaddedSize>(uint tid, bool clear = false)
-{
-    static const int TileSize = 16;
-    static const int NTileCols = PaddedSize / TileSize;
-
-    if (clear)
-    {
-        clearWeightBuffer<PaddedSize>(tid);
-        return;
-    }
-
-    clearWeightBuffer<PaddedSize>(tid);
-    AllMemoryBarrierWithGroupSync();
-
-    static const int NumDiagIters = (InputSize + BatchSize - 1) / BatchSize;
-
-    [ForceUnroll]
-    for (int iter = 0; iter < NumDiagIters; iter++)
-    {
-        int row = iter * BatchSize + tid;
-        if (row >= InputSize)
-            break;
-
-        int tileRow = row / TileSize;
-        int tileCol = row / TileSize;
-        int localRow = row % TileSize;
-        int localCol = row % TileSize;
-        int tileIndex = tileRow * NTileCols + tileCol;
-        int offset = tileIndex * TileSize * TileSize + localRow * TileSize + localCol;
-        inputBuffer[offset] = DType(1);
-    }
-
-    AllMemoryBarrierWithGroupSync();
-    convertTiledToNativeB<DType, PaddedSize, PaddedSize, BatchSize>(tid, inputBuffer);
-}
-
-void test<int InputSize, int OutputSize>(uint tid, int resIndex)
-{
-    static const int PaddedInputSize = PadToTile<InputSize>.Value;
-    static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
-
-    DType inputData[InputSize];
+    typealias InputVec = WaveTangledVector<DType, TestShMemSize, PaddedInputSize, SubgroupSize, 1>;
+    InputVec inputData = InputVec(DType(0));
     for (int i = 0; i < InputSize; i++)
         inputData[i] = DType(tid + 1);
 
 #if TEST_BIAS
-    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, InputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, true, 1, false>(
-        inputData, inputBuffer, Optional<RWStructuredBuffer<DType>.Handle>(biasBuffer));
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, true, 1, false>(
+        inputData, buffers.inputBuffer, Optional<RWStructuredBuffer<DType>.Handle>(buffers.biasBuffer));
 #else
-    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, InputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 1, false>(
-        inputData, inputBuffer, none);
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 1, false>(
+        inputData, buffers.inputBuffer, none);
 #endif
 
     bool res = true;
@@ -135,61 +84,72 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
         outputBuffer[resIndex] = res ? 1 : 0;
 }
 
+void test<int InputSize, int OutputSize>(uint tid, int resIndex)
+{
+    __target_switch
+    {
+    case cuda:
+        testImpl<InputSize, OutputSize, TargetEnum.CUDA>(tid, resIndex);
+        return;
+    case spirv:
+        testImpl<InputSize, OutputSize, TargetEnum.SPIR_V>(tid, resIndex);
+        return;
+    case metal:
+        testImpl<InputSize, OutputSize, TargetEnum.Metal>(tid, resIndex);
+        return;
+    }
+}
+
 [numthreads(BatchSize, 1, 1)]
 [shader("compute")]
-void computeMain(uint tid : SV_DispatchThreadID)
+void computeMain(uint tid : SV_GroupIndex)
 {
-    initBias<DType, 64, BatchSize>(tid, biasBuffer);
+    initBias<DType, 64, BatchSize>(tid, buffers.biasBuffer);
 
-    // 4x4 (padded to 16x16)
+    // 4x4 (target-padded)
     {
-        identityWeightMatrixTiled<4, 16>(tid);
+        identityWeightMatrixTiled<DType, 4, BatchSize, false>(tid, buffers.inputBuffer);
         AllMemoryBarrierWithGroupSync();
         test<4, 4>(tid, 0);
-        identityWeightMatrixTiled<4, 16>(tid, true);
         AllMemoryBarrierWithGroupSync();
     }
 
-    // 8x8 (padded to 16x16)
+    // 8x8 (target-padded)
     {
-        identityWeightMatrixTiled<8, 16>(tid);
+        identityWeightMatrixTiled<DType, 8, BatchSize, false>(tid, buffers.inputBuffer);
         AllMemoryBarrierWithGroupSync();
         test<8, 8>(tid, 1);
-        identityWeightMatrixTiled<8, 16>(tid, true);
         AllMemoryBarrierWithGroupSync();
     }
 
-    // 16x16 (already aligned)
+    // 16x16 (target-padded)
     {
-        identityWeightMatrixTiled<16, 16>(tid);
+        identityWeightMatrixTiled<DType, 16, BatchSize, false>(tid, buffers.inputBuffer);
         AllMemoryBarrierWithGroupSync();
         test<16, 16>(tid, 2);
-        identityWeightMatrixTiled<16, 16>(tid, true);
         AllMemoryBarrierWithGroupSync();
     }
 
-    // 32x32 (already aligned)
+    // 32x32 (target-padded)
     {
-        identityWeightMatrixTiled<32, 32>(tid);
+        identityWeightMatrixTiled<DType, 32, BatchSize, false>(tid, buffers.inputBuffer);
         AllMemoryBarrierWithGroupSync();
         test<32, 32>(tid, 3);
-        identityWeightMatrixTiled<32, 32>(tid, true);
         AllMemoryBarrierWithGroupSync();
     }
 
-    // 64x64 (already aligned)
+    // 64x64 (target-padded)
     {
-        identityWeightMatrixTiled<64, 64>(tid);
+        identityWeightMatrixTiled<DType, 64, BatchSize, false>(tid, buffers.inputBuffer);
         AllMemoryBarrierWithGroupSync();
         test<64, 64>(tid, 4);
-        identityWeightMatrixTiled<64, 64>(tid, true);
         AllMemoryBarrierWithGroupSync();
     }
 
-    // BUFFER: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
+    // BUFFER: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
+    // BUFFER-NEXT: {{^}}1{{$}}
 }
 //

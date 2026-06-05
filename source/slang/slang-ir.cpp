@@ -3424,6 +3424,31 @@ IRInst* IRBuilder::emitIncrementCoverageCounter()
     return emitIntrinsicInst(getVoidType(), kIROp_IncrementCoverageCounter, 0, nullptr);
 }
 
+IRInst* IRBuilder::emitIncrementFunctionCoverageCounter(
+    UnownedStringSlice functionName,
+    UnownedStringSlice functionMangledName)
+{
+    IRInst* args[] = {
+        getStringValue(functionName),
+        getStringValue(functionMangledName),
+    };
+    return emitIntrinsicInst(getVoidType(), kIROp_IncrementFunctionCoverageCounter, 2, args);
+}
+
+IRInst* IRBuilder::emitIncrementBranchCoverageCounter(
+    IRIntegerValue branchSiteID,
+    IRIntegerValue branchArmID,
+    IRIntegerValue branchArmKind)
+{
+    auto uintType = getUIntType();
+    IRInst* args[] = {
+        getIntValue(uintType, branchSiteID),
+        getIntValue(uintType, branchArmID),
+        getIntValue(uintType, branchArmKind),
+    };
+    return emitIntrinsicInst(getVoidType(), kIROp_IncrementBranchCoverageCounter, 3, args);
+}
+
 IRInst* IRBuilder::emitDebugVar(
     IRType* type,
     IRInst* source,

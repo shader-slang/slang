@@ -2882,6 +2882,26 @@ static NodeBase* parseBackwardDifferentiate(Parser* parser, void* /* unused */)
     return parseBackwardDifferentiate(parser);
 }
 
+/// Parse an expression of the form __apply(fn) where fn is an
+/// identifier pointing to a function.
+static Expr* parseApplyForBwd(Parser* parser)
+{
+    ApplyForBwdExpr* applyExpr = parser->astBuilder->create<ApplyForBwdExpr>();
+
+    parser->ReadToken(TokenType::LParent);
+
+    applyExpr->baseFunction = parser->ParseExpression();
+
+    parser->ReadToken(TokenType::RParent);
+
+    return applyExpr;
+}
+
+static NodeBase* parseApplyForBwd(Parser* parser, void* /* unused */)
+{
+    return parseApplyForBwd(parser);
+}
+
 static Expr* parseFuncAsTypeExpr(Parser* parser)
 {
     // Parse an expr of the form `__func_as_type(fn)`
@@ -3920,6 +3940,63 @@ static NodeBase* parseExtensionDecl(Parser* parser, void* /*userData*/)
             parseOptionalInheritanceClause(parser, decl);
             maybeParseGenericConstraints(parser, genericParent);
             parseDeclBody(parser, decl);
+            return decl;
+        });
+}
+
+static NodeBase* parseFuncExtensionDecl(Parser* parser, void* /*userData*/)
+{
+    return parseOptGenericDecl(
+        parser,
+        [&](GenericDecl* genericParent)
+        {
+            FuncExtensionDecl* decl = parser->astBuilder->create<FuncExtensionDecl>();
+            parser->FillPosition(decl);
+
+            // Parse the target as a higher-order expression via keyword dispatch.
+            // e.g. "fwd_diff(foo<T>)" dispatches to parseForwardDifferentiate,
+            // "bwd_diff(foo)" dispatches to parseBackwardDifferentiate, etc.
+            // We use syntax-decl lookup to avoid hard-coding operator names.
+            Expr* targetExpr = nullptr;
+            if (!tryParseUsingSyntaxDecl(parser, &targetExpr))
+            {
+                parser->diagnose(Diagnostics::UnexpectedToken{
+                    .tokenType = TokenTypeToString(peekTokenType(parser)),
+                    .location = peekToken(parser).getLoc()});
+                return decl;
+            }
+            decl->targetExpr = targetExpr;
+
+            // Parse function signature: (params) -> ReturnType { body }
+            FuncDecl* innerFunc = parser->astBuilder->create<FuncDecl>();
+            parser->FillPosition(innerFunc);
+
+            parser->PushScope(innerFunc);
+            parseModernParamList(parser, innerFunc);
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
+
+            if (AdvanceIf(parser, "throws"))
+            {
+                innerFunc->errorType = parser->ParseTypeExp();
+            }
+            if (AdvanceIf(parser, TokenType::RightArrow))
+            {
+                innerFunc->returnType = parser->ParseTypeExp();
+            }
+            maybeParseGenericConstraints(parser, genericParent);
+
+            parser->PushScope(funcScope);
+            innerFunc->body = parseOptBody(parser);
+            if (auto blockStmt = as<BlockStmt>(innerFunc->body))
+                innerFunc->closingSourceLoc = blockStmt->closingSourceLoc;
+            else if (auto unparsedStmt = as<UnparsedStmt>(innerFunc->body))
+                innerFunc->closingSourceLoc = unparsedStmt->tokens.getLast().getLoc();
+            parser->PopScope();
+
+            // `FuncExtensionDecl` is not a container; semantic checking assigns
+            // the parent when it moves this function into the generated extension.
+            decl->innerFunc = innerFunc;
             return decl;
         });
 }
@@ -7831,63 +7908,6 @@ static IntegerLiteralValue _fixIntegerLiteral(
     return value;
 }
 
-static BaseType _determineNonSuffixedIntegerLiteralType(
-    IntegerLiteralValue value,
-    bool isDecimalBase,
-    Token* token,
-    DiagnosticSink* sink)
-{
-    const uint64_t rawValue = (uint64_t)value;
-
-    /// Non-suffixed integer literal types
-    ///
-    /// The type is the first from the following list in which the value can fit:
-    /// - For decimal bases:
-    ///     - `int`
-    ///     - `int64_t`
-    /// - For non-decimal bases:
-    ///     - `int`
-    ///     - `uint`
-    ///     - `int64_t`
-    ///     - `uint64_t`
-    ///
-    /// The lexer scans the negative(-) part of literal separately, and the value part here
-    /// is always positive hence it is sufficient to only compare with the maximum limits.
-    BaseType baseType;
-    if (rawValue <= INT32_MAX)
-    {
-        baseType = BaseType::Int;
-    }
-    else if ((rawValue <= UINT32_MAX) && !isDecimalBase)
-    {
-        baseType = BaseType::UInt;
-    }
-    else if (rawValue <= INT64_MAX)
-    {
-        baseType = BaseType::Int64;
-    }
-    else
-    {
-        baseType = BaseType::UInt64;
-
-        // Emit warning if the value is too large for signed 64-bit, regardless of base
-
-        // There is an edge case here where 9223372036854775808 or INT64_MAX + 1
-        // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and is
-        // valid. Unfortunately because the lexer handles the negative(-) part of the literal
-        // separately it is impossible to know whether the literal has a negative sign or not.
-        // We emit the warning and initially process it as a uint64 anyways, and the negative
-        // sign will be properly parsed and the value will still be properly stored as a
-        // negative INT64_MIN.
-
-        // Decimal integer is too large to be represented as signed.
-        // Output warning that it is represented as unsigned instead.
-        sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
-    }
-
-    return baseType;
-}
-
 static bool _isCast(Parser* parser, Expr* expr)
 {
     if (as<PointerTypeExpr>(expr))
@@ -8085,6 +8105,250 @@ static Expr* parseLambdaExpr(Parser* parser)
     return lambdaExpr;
 }
 
+enum class IntegerLiteralWidthSuffix
+{
+    None,
+    Long,
+    LongLong,
+    Pointer,
+};
+
+enum class IntegerLiteralUnsignedSuffix
+{
+    None,
+    Unsigned
+};
+
+// See docs/language-reference/expressions-literal.md for the rules.
+static BaseType _determineIntegerLiteralType(
+    IntegerLiteralValue value,
+    bool isDecimalBase,
+    IntegerLiteralWidthSuffix widthSuffix,
+    IntegerLiteralUnsignedSuffix unsignedSuffix,
+    Token* token,
+    DiagnosticSink* sink,
+    bool* outSignedMinimumIntException)
+{
+    const uint64_t rawValue = static_cast<uint64_t>(value);
+    *outSignedMinimumIntException = false;
+
+    if (isDecimalBase)
+    {
+        switch (widthSuffix)
+        {
+        case IntegerLiteralWidthSuffix::None:
+        case IntegerLiteralWidthSuffix::Long:
+            if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
+            {
+                if (rawValue <= INT32_MAX)
+                {
+                    return BaseType::Int;
+                }
+                else if (rawValue == static_cast<uint64_t>(INT32_MAX) + 1U)
+                {
+                    // This literal is eligible for demotion back to Int if
+                    // prefixed by unary minus.
+                    *outSignedMinimumIntException = true;
+                    return BaseType::Int64;
+                }
+            }
+            else
+            {
+                if (rawValue <= UINT32_MAX)
+                    return BaseType::UInt;
+            }
+
+            // fall-through
+        case IntegerLiteralWidthSuffix::LongLong:
+            if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
+            {
+                if (rawValue <= INT64_MAX)
+                {
+                    return BaseType::Int64;
+                }
+                else if (rawValue == static_cast<uint64_t>(INT64_MAX) + 1U)
+                {
+                    // Diagnostics is deferred to SemanticsExprVisitor, since we
+                    // might still the get unary minus treatment, which is fine.
+                    *outSignedMinimumIntException = true;
+                }
+                else if (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 2U))
+                {
+                    // This is always overflowing.
+                    sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
+                }
+            }
+
+            return BaseType::UInt64;
+
+        case IntegerLiteralWidthSuffix::Pointer:
+            if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
+            {
+                if (rawValue <= INT64_MAX)
+                {
+                    return BaseType::IntPtr;
+                }
+                else if (rawValue == static_cast<uint64_t>(INT64_MAX) + 1U)
+                {
+                    // Diagnostics is deferred to SemanticsExprVisitor, since we
+                    // might still the get unary minus treatment, which is fine.
+                    *outSignedMinimumIntException = true;
+                }
+                else if (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 2U))
+                {
+                    // This is always overflowing.
+                    sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
+                }
+            }
+
+            return BaseType::UIntPtr;
+
+        default:
+            SLANG_ASSERT(!"Unhandled width suffix");
+            break;
+        }
+    }
+    else
+    {
+        switch (widthSuffix)
+        {
+        case IntegerLiteralWidthSuffix::None:
+        case IntegerLiteralWidthSuffix::Long:
+            if ((unsignedSuffix == IntegerLiteralUnsignedSuffix::None) && (rawValue <= INT32_MAX))
+                return BaseType::Int;
+
+            if (rawValue <= UINT32_MAX)
+                return BaseType::UInt;
+
+            // fall-through
+        case IntegerLiteralWidthSuffix::LongLong:
+            if ((unsignedSuffix == IntegerLiteralUnsignedSuffix::None) && (rawValue <= INT64_MAX))
+                return BaseType::Int64;
+
+            return BaseType::UInt64;
+
+        case IntegerLiteralWidthSuffix::Pointer:
+            return unsignedSuffix == IntegerLiteralUnsignedSuffix::None ? BaseType::IntPtr
+                                                                        : BaseType::UIntPtr;
+
+        default:
+            SLANG_ASSERT(!"Unhandled width suffix");
+            break;
+        }
+    }
+
+    // fall-back in case asserts fall through
+    return unsignedSuffix == IntegerLiteralUnsignedSuffix::None ? BaseType::Int64
+                                                                : BaseType::UInt64;
+}
+
+static Expr* parseIntegerLiteralExpr(Parser* parser)
+{
+    IntegerLiteralExpr* constExpr = parser->astBuilder->create<IntegerLiteralExpr>();
+    parser->FillPosition(constExpr);
+
+    auto token = parser->tokenReader.advanceToken();
+    constExpr->token = token;
+
+    UnownedStringSlice suffix;
+    bool isDecimalBase{};
+    bool hasOverflowed{};
+    IntegerLiteralWidthSuffix widthSuffix{IntegerLiteralWidthSuffix::None};
+    IntegerLiteralUnsignedSuffix unsignedSuffix{IntegerLiteralUnsignedSuffix::None};
+
+    IntegerLiteralValue value =
+        getIntegerLiteralValue(token, parser->sink, &suffix, &isDecimalBase, &hasOverflowed);
+
+    // Look at any suffix on the value
+    char const* suffixCursor = suffix.begin();
+    const char* const suffixEnd = suffix.end();
+    bool unknownSuffix{};
+
+    // First, parse suffix
+    while (suffixCursor != suffixEnd)
+    {
+        const char suffixChar = *suffixCursor++;
+
+        switch (suffixChar)
+        {
+        case 'l':
+        case 'L':
+            if (widthSuffix != IntegerLiteralWidthSuffix::None)
+            {
+                unknownSuffix = true; // width already specified
+                break;
+            }
+
+            // check if the next char is also 'l'/'L' (case matched), then
+            // the type is LongLong
+            if ((suffixCursor != suffixEnd) && (*suffixCursor == suffixChar))
+            {
+                suffixCursor++;
+                widthSuffix = IntegerLiteralWidthSuffix::LongLong;
+            }
+            else
+            {
+                widthSuffix = IntegerLiteralWidthSuffix::Long;
+            }
+            break;
+
+        case 'u':
+        case 'U':
+            if (unsignedSuffix == IntegerLiteralUnsignedSuffix::None)
+                unsignedSuffix = IntegerLiteralUnsignedSuffix::Unsigned;
+            else
+                unknownSuffix = true; // double 'U'
+            break;
+
+        case 'z':
+        case 'Z':
+            if (widthSuffix != IntegerLiteralWidthSuffix::None)
+            {
+                unknownSuffix = true; // width already specified
+                break;
+            }
+
+            widthSuffix = IntegerLiteralWidthSuffix::Pointer;
+            break;
+
+        default:
+            unknownSuffix = true;
+            break;
+        }
+    }
+
+    if (unknownSuffix)
+    {
+        parser->sink->diagnose(Diagnostics::InvalidIntegerLiteralSuffix{
+            .suffix = String(suffix),
+            .location = token.loc});
+    }
+
+    BaseType suffixBaseType;
+    bool signedMinimumIntException{false};
+    if (!hasOverflowed)
+    {
+        suffixBaseType = _determineIntegerLiteralType(
+            value,
+            isDecimalBase,
+            widthSuffix,
+            unsignedSuffix,
+            &token,
+            parser->sink,
+            &signedMinimumIntException);
+    }
+    else
+    {
+        suffixBaseType = BaseType::UInt64;
+    }
+
+    constExpr->value = value;
+    constExpr->suffixType = suffixBaseType;
+    constExpr->signedMinimumIntException = signedMinimumIntException;
+
+    return constExpr;
+}
+
 static Expr* parseAtomicExpr(Parser* parser)
 {
     switch (peekTokenType(parser))
@@ -8277,127 +8541,7 @@ static Expr* parseAtomicExpr(Parser* parser)
         }
 
     case TokenType::IntegerLiteral:
-        {
-            IntegerLiteralExpr* constExpr = parser->astBuilder->create<IntegerLiteralExpr>();
-            parser->FillPosition(constExpr);
-
-            auto token = parser->tokenReader.advanceToken();
-            constExpr->token = token;
-
-            UnownedStringSlice suffix;
-            bool isDecimalBase;
-            bool hasOverflowed;
-            IntegerLiteralValue value = getIntegerLiteralValue(
-                token,
-                parser->sink,
-                &suffix,
-                &isDecimalBase,
-                &hasOverflowed);
-
-            // Look at any suffix on the value
-            char const* suffixCursor = suffix.begin();
-            const char* const suffixEnd = suffix.end();
-            const bool suffixExists = (suffixCursor != suffixEnd);
-
-            // Mark as void, taken as an error
-            BaseType suffixBaseType = BaseType::Void;
-            if (suffixExists)
-            {
-                int lCount = 0;
-                int uCount = 0;
-                int zCount = 0;
-                int unknownCount = 0;
-                while (suffixCursor < suffixEnd)
-                {
-                    switch (*suffixCursor++)
-                    {
-                    case 'l':
-                    case 'L':
-                        lCount++;
-                        break;
-
-                    case 'u':
-                    case 'U':
-                        uCount++;
-                        break;
-
-                    case 'z':
-                    case 'Z':
-                        zCount++;
-                        break;
-
-                    default:
-                        unknownCount++;
-                        break;
-                    }
-                }
-
-                if (unknownCount)
-                {
-                    parser->sink->diagnose(Diagnostics::InvalidIntegerLiteralSuffix{
-                        .suffix = String(suffix),
-                        .location = token.loc});
-                    suffixBaseType = BaseType::Int;
-                }
-                // `u` or `ul` suffix -> `uint`
-                else if (uCount == 1 && (lCount <= 1) && zCount == 0)
-                {
-                    suffixBaseType = BaseType::UInt;
-                }
-                // `l` suffix on integer -> `int` (== `long`)
-                else if (lCount == 1 && !uCount && zCount == 0)
-                {
-                    suffixBaseType = BaseType::Int;
-                }
-                // `ull` suffix -> `uint64_t`
-                else if (uCount == 1 && lCount == 2 && zCount == 0)
-                {
-                    suffixBaseType = BaseType::UInt64;
-                }
-                // `ll` suffix -> `int64_t`
-                else if (uCount == 0 && lCount == 2 && zCount == 0)
-                {
-                    suffixBaseType = BaseType::Int64;
-                }
-                else if (uCount == 0 && zCount == 1)
-                {
-                    suffixBaseType = BaseType::IntPtr;
-                }
-                else if (uCount == 1 && zCount == 1)
-                {
-                    suffixBaseType = BaseType::UIntPtr;
-                }
-                // TODO: do we need suffixes for smaller integer types?
-                else
-                {
-                    parser->sink->diagnose(Diagnostics::InvalidIntegerLiteralSuffix{
-                        .suffix = String(suffix),
-                        .location = token.loc});
-                    suffixBaseType = BaseType::Int;
-                }
-            }
-            else if (!hasOverflowed)
-            {
-                suffixBaseType = _determineNonSuffixedIntegerLiteralType(
-                    value,
-                    isDecimalBase,
-                    &token,
-                    parser->sink);
-            }
-            else
-            {
-                suffixBaseType = BaseType::UInt64;
-            }
-
-            value = _fixIntegerLiteral(suffixBaseType, value, &token, parser->sink);
-
-
-            constExpr->value = value;
-            constExpr->suffixType = suffixBaseType;
-
-            return constExpr;
-        }
-
+        return parseIntegerLiteralExpr(parser);
 
     case TokenType::FloatingPointLiteral:
         {
@@ -9351,16 +9495,64 @@ static Expr* parsePrefixExpr(Parser* parser)
                 IntegerLiteralExpr* newLiteral =
                     parser->astBuilder->create<IntegerLiteralExpr>(*intLit);
 
-                IntegerLiteralValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
-
-                // Need to get the basic type, so we can fit to underlying type
-                if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))
+                // Special case handling for for minimum signed integers, e.g.,
+                // (-2147483648): fix the type to fit the value.
+                //
+                // See docs/language-reference/expressions-literal.md for details.
+                if (newLiteral->signedMinimumIntException && tokenType == TokenType::OpSub)
                 {
-                    value =
-                        _fixIntegerLiteral(basicExprType->getBaseType(), value, nullptr, nullptr);
+                    if (newLiteral->value == -static_cast<int64_t>(INT_MIN))
+                    {
+                        newLiteral->value = INT_MIN;
+                        newLiteral->suffixType = BaseType::Int;
+                    }
+                    else if (newLiteral->value == INT64_MIN)
+                    {
+                        if (newLiteral->suffixType == BaseType::UIntPtr)
+                            newLiteral->suffixType = BaseType::IntPtr;
+                        else
+                            newLiteral->suffixType = BaseType::Int64;
+                    }
+                    else
+                    {
+                        SLANG_ASSERT(!"Unhandled exceptional case of signed minimum integers");
+                    }
+
+                    newLiteral->signedMinimumIntException = false;
+                }
+                else
+                {
+                    IntegerLiteralValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
+
+                    // Check if we need to diagnose the signed minimum int special case here. This
+                    // won't be detected by SemanticsExprVisitor, because the literal value is no
+                    // longer INT64_MIN after folding.
+                    //
+                    // Diagnostics are not triggered when the base type is Int64, which is a
+                    // legitimate type. (Diagnostics are triggered for Uint64 and UIntPtr after
+                    // signed-to-unsigned fallback.)
+                    if (newLiteral->signedMinimumIntException &&
+                        newLiteral->suffixType != BaseType::Int64)
+                    {
+                        parser->sink->diagnose(
+                            Diagnostics::IntegerLiteralTooLarge{.location = intLit->loc});
+                    }
+
+                    newLiteral->signedMinimumIntException = false;
+
+                    // Need to get the basic type, so we can fit to underlying type
+                    if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))
+                    {
+                        value = _fixIntegerLiteral(
+                            basicExprType->getBaseType(),
+                            value,
+                            nullptr,
+                            nullptr);
+                    }
+
+                    newLiteral->value = value;
                 }
 
-                newLiteral->value = value;
                 return newLiteral;
             }
             else if (auto floatLit = as<FloatingPointLiteralExpr>(arg))
@@ -10201,6 +10393,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("__generic", parseGenericDecl),
     _makeParseDecl("__extension", parseExtensionDecl),
     _makeParseDecl("extension", parseExtensionDecl),
+    _makeParseDecl("__func_extension", parseFuncExtensionDecl),
     _makeParseDecl("__init", parseConstructorDecl),
     _makeParseDecl("__subscript", parseSubscriptDecl),
     _makeParseDecl("property", parsePropertyDecl),
@@ -10338,6 +10531,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("__func_as_type", parseFuncAsTypeExpr),
     _makeParseExpr("fwd_diff", parseForwardDifferentiate),
     _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
+    _makeParseExpr("__apply", parseApplyForBwd),
     _makeParseExpr("__dispatch_kernel", parseDispatchKernel),
     _makeParseExpr("sizeof", parseSizeOfExpr),
     _makeParseExpr("alignof", parseAlignOfExpr),

@@ -1096,17 +1096,46 @@ local insts = {
 			{ atomicDec = { operands = { { "ptr" } } } },
 		},
 	},
-	-- Emitted at AST lowering when `-trace-coverage` is on. The
-	-- instruction has no operands; its source position is carried on
-	-- the standard per-instruction `sourceLoc` field, which is always
-	-- preserved and never stripped by `stripDebugInfo`. The coverage-
-	-- instrument IR pass later rewrites each occurrence into an atomic
-	-- add on the IR-synthesized `__slang_coverage` buffer; counter slots are
-	-- assigned one-per-op in traversal order. Host-side tooling reads
-	-- source coverage entries and aggregates line entries when producing LCOV.
-	-- Inherent side-effect semantics keep the optimizer from deleting
-	-- or hoisting this op.
+	-- Emitted at AST lowering when line coverage is on. The instruction
+	-- has no operands; its source position is carried on the standard
+	-- per-instruction `sourceLoc` field, which is always preserved and
+	-- never stripped by `stripDebugInfo`. The coverage-instrument IR pass
+	-- later rewrites each coverage marker into an atomic add on the IR-
+	-- synthesized `__slang_coverage` buffer. The current line/function/
+	-- branch producers assign one direct counter per marker; future
+	-- source-region coverage can keep using marker metadata without
+	-- preserving that one-to-one lowering. Host-side tooling reads
+	-- source coverage entries and projects them to LCOV records.
+	-- Inherent side-effect semantics keep the optimizer from deleting or
+	-- hoisting these ops.
 	{ IncrementCoverageCounter = {} },
+	-- Function-entry coverage marker. The marker's sourceLoc points at
+	-- the function declaration/body start. Display and mangled names are
+	-- carried as operands so later IR passes do not need AST access.
+	{
+		IncrementFunctionCoverageCounter =
+		{
+			operands =
+			{
+				{ "functionName", "IRStringLit" },
+				{ "functionMangledName", "IRStringLit" },
+			}
+		}
+	},
+	-- Branch-arm coverage marker. SourceLoc points at the branch
+	-- condition. Site/arm ids are local to the emitted metadata object;
+	-- semantic arm kind lets LCOV export distinguish true/false/case.
+	{
+		IncrementBranchCoverageCounter =
+		{
+			operands =
+			{
+				{ "branchSiteID", "IRIntLit" },
+				{ "branchArmID", "IRIntLit" },
+				{ "branchArmKind", "IRIntLit" },
+			}
+		}
+	},
 	-- Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 	-- currently accumulated derivative to pass to some dOut argument in a nested call.
 	{ LoadReverseGradient = { operands = { { "value" } } } },
@@ -2595,6 +2624,10 @@ local insts = {
 		{ SynthesizedBackwardDerivativeWitnessTable = { min_operands = 1 } },
 		{ MakeIDifferentiableWitness = { min_operands = 1 } },
 		{ SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc = { min_operands = 2 } },
+
+		-- For user-provided apply (__func_extension __apply(fn)).
+		-- Identity remat for when MinimalContext == BwdCallable.
+		{ IdentityRemat = { min_operands = 1 } },
 	} },
 	{ DispatchKernel = { operands = { { "baseFn" }, { "threadGroupSize" }, { "dispatchSize" } } } },
 	{

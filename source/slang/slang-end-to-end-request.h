@@ -383,16 +383,32 @@ public:
 private:
     String _getWholeProgramPath(TargetRequest* targetReq);
     String _getEntryPointPath(TargetRequest* targetReq, Index entryPointIndex);
+    String _getExplicitCoverageManifestPath();
+    bool _hasExplicitCoverageManifestPath();
 
     /// Maybe write the artifact to the path (if set), or stdout (if there is no container or path)
     SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
+    /// Returns the path slangc would use for a separate-debug-info artifact for this
+    /// target/artifact pair, or empty if none will be emitted. Used by both the debug artifact
+    /// writer and coverage-manifest preflight collision checks. Empty means either separate debug
+    /// info is disabled or the target did not produce a debug artifact.
+    String _getDebugArtifactPath(
+        TargetProgram* targetProgram,
+        const String& path,
+        IArtifact* artifact);
     SlangResult _maybeWriteDebugArtifact(
         TargetProgram* targetProgram,
         const String& path,
         IArtifact* artifact);
-    /// If the artifact carries shader-coverage tracing data, write
-    /// `<path>.coverage-mapping.json` next to the compiled output.
-    SlangResult _maybeWriteCoverageMapping(const String& path, IArtifact* artifact);
+    /// Preflight-validates explicit `-coverage-manifest-output` before any artifact write. Walks
+    /// the command-line whole-program or per-entry-point outputs for all targets and emits E45109,
+    /// E45110, or E45112 when the explicit sidecar path cannot be written unambiguously.
+    SlangResult _validateCoverageManifestOutputPaths();
+    /// If the artifact carries shader-coverage tracing data, write its JSON manifest sidecar. By
+    /// default writes `<path>.coverage-manifest.json` next to file outputs.
+    /// `-coverage-manifest-output <path>` overrides that location and also works for stdout
+    /// artifacts.
+    SlangResult _maybeWriteCoverageManifest(const String& path, IArtifact* artifact);
     SlangResult _writeArtifact(const String& path, IArtifact* artifact);
 
     /// Adds any extra settings to complete a targetRequest
