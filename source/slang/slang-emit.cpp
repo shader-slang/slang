@@ -2411,7 +2411,14 @@ Result linkAndOptimizeIR(
     int bindlessSpaceIndex = -1;
     if (auto programLayout = targetProgram->getLayoutIfAvailable())
         bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
-    SLANG_PASS(collectMetadata, bindlessSpaceIndex, *metadata);
+    bool shouldTreatDescriptorHandleResourceCastsAsHeapUse =
+        target != CodeGenTarget::SPIRV ||
+        targetRequest->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV);
+    SLANG_PASS(
+        collectMetadata,
+        bindlessSpaceIndex,
+        shouldTreatDescriptorHandleResourceCastsAsHeapUse,
+        *metadata);
 
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
