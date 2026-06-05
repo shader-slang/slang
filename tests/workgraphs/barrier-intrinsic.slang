@@ -1,4 +1,5 @@
-//TEST:SIMPLE(filecheck=CHK): -target dxil-asm -stage node -entry main -profile lib_6_8 -experimental-feature
+//TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8 -experimental-feature
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature
 import experimental.workgraph;
 
 // Test that Barrier() emits the correct DXIL intrinsic with proper flag values.
@@ -18,6 +19,9 @@ void main(RWBuffer<int> buf)
     Barrier(BarrierMemoryTypeFlags.ALL_MEMORY, BarrierSemanticFlags.GROUP_SYNC);
 }
 
-//CHK: dx.op.barrierByMemoryType(i32 244, i32 1, i32 1)
-//CHK: dx.op.barrierByMemoryType(i32 244, i32 13, i32 6)
-//CHK: dx.op.barrierByMemoryType(i32 244, i32 15, i32 1)
+//CHK_DXIL: dx.op.barrierByMemoryType(i32 244, i32 1, i32 1)
+//CHK_DXIL: dx.op.barrierByMemoryType(i32 244, i32 13, i32 6)
+//CHK_DXIL: dx.op.barrierByMemoryType(i32 244, i32 15, i32 1)
+//CHK_HLSL: Barrier((UAV_MEMORY), (GROUP_SYNC));
+//CHK_HLSL: Barrier((UAV_MEMORY | NODE_INPUT_MEMORY | NODE_OUTPUT_MEMORY), (GROUP_SCOPE | DEVICE_SCOPE));
+//CHK_HLSL: Barrier((ALL_MEMORY), (GROUP_SYNC));

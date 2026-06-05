@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8 -experimental-feature
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature
 import experimental.workgraph;
 
 // Test that a coalescing-launch node shader compiles to dxil.
@@ -12,3 +13,4 @@ void main(RWBuffer<int> output)
 }
 
 //CHK_DXIL: define void @main()
+//CHK_HLSL: [NodeLaunch("coalescing")]
