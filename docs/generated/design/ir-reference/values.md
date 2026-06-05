@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
+model: claude-opus-4.8
+generated_at: 2026-06-05T10:25:25+00:00
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -29,14 +29,14 @@ The opcodes documented here are spread through
 - `Constant` group at line ~838 (literals).
 - `Undefined` group at line ~857 plus `defaultConstruct` at line
   ~899.
-- Memory and field opcodes at lines ~1056-1066 and ~1122-1136.
-- Arithmetic, comparison, bit and logical ops at lines ~1392-1447.
-- Conversion opcodes at lines ~2486-2509.
+- Memory and field opcodes at lines ~1056-1066 and ~1151-1166.
+- Arithmetic, comparison, bit and logical ops at lines ~1423-1478.
+- Conversion opcodes at lines ~2510-2538.
 - Result / Optional / Conditional makers and getters at lines
   ~1020-1030.
 - Aggregate constructors (`makeVector`, `makeMatrix`, `makeArray`,
   `makeStruct`, `makeTuple`, ...) at lines ~948-970.
-- Swizzle / reshape opcodes at lines ~1238-1289.
+- Swizzle / reshape opcodes at lines ~1267-1318.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). Builder

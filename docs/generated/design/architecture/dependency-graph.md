@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:30:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 30983b1eac237a20bb36b39636936cb7cb3bc5b003a6f2f819545a3ac80fb871
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: d562c492ff7426404fd8fcd584e73aade50ea9e87ab0386d9d3448c420d06cb9
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 

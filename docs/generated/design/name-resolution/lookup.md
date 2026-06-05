@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-12T11:51:05+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 0f6a6813ac215b2f02942be90ab761d8979a0ae51be857c45bd14bd32a88b0d0
+model: claude-opus-4.8
+generated_at: 2026-06-05T10:25:25+00:00
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: f2b871e4496ed32a327e98986317cc4eb48691d204aad2e863ea2eebf51fc801
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -145,22 +145,22 @@ flowchart TB
 
 `lookUp`
 ([slang-lookup.cpp](../../../../source/slang/slang-lookup.cpp) lines
-1062-1082) builds a `LookupRequest` and calls
+1072-1092) builds a `LookupRequest` and calls
 `_lookUpInScopes`
 ([slang-lookup.cpp](../../../../source/slang/slang-lookup.cpp) lines
-777-1060). The implementation does the following, in order:
+787-1070). The implementation does the following, in order:
 
 1. **Iterate over scopes.** The outer loop walks
    `request.scope` to `request.endScope` via the `parent` chain
    ([slang-lookup.cpp line
-   792](../../../../source/slang/slang-lookup.cpp)). `endScope` is
+   802](../../../../source/slang/slang-lookup.cpp)). `endScope` is
    usually null, so the walk terminates at the module root.
 2. **Iterate over sibling scopes.** At each scope, the inner loop
    walks `nextSibling` from the current link so that sibling
    `NamespaceDecl`s and imported-module scopes are consulted at the
    same level
    ([slang-lookup.cpp line
-   797](../../../../source/slang/slang-lookup.cpp)).
+   807](../../../../source/slang/slang-lookup.cpp)).
 3. **Skip dummy and re-visited file scopes.** A null
    `containerDecl` is a sentinel that links siblings; it is
    skipped. The first `FileDecl` encountered is remembered, and
@@ -168,7 +168,7 @@ flowchart TB
    avoid duplicate hits when multiple includes converge on the same
    file
    ([slang-lookup.cpp lines
-   810-820](../../../../source/slang/slang-lookup.cpp)).
+   820-830](../../../../source/slang/slang-lookup.cpp)).
 4. **Dispatch on container kind.** If the `containerDecl` is an
    `AggTypeDeclBase` — i.e. lookup is happening *inside* a type,
    `struct`, `interface`, or `extension` — the request is rewritten
@@ -176,24 +176,24 @@ flowchart TB
    a `Breadcrumb::Kind::This` breadcrumb that records the implicit
    `this`/`This` of the enclosing decl
    ([slang-lookup.cpp lines
-   842-921](../../../../source/slang/slang-lookup.cpp)). Otherwise the
+   852-931](../../../../source/slang/slang-lookup.cpp)). Otherwise the
    request falls through to
    `_lookUpDirectAndTransparentMembers`
    ([slang-lookup.cpp lines
-   922-936](../../../../source/slang/slang-lookup.cpp)).
+   932-946](../../../../source/slang/slang-lookup.cpp)).
 5. **Update `thisParameterMode`.** Before stepping to the parent
    scope, the loop updates `thisParameterMode` based on the
    container's modifiers — `[mutating]`, `[ref]`, `static`, and
    `__init` change the kind of `this` that any breadcrumb recorded
    in an outer scope must use
    ([slang-lookup.cpp lines
-   967-1041](../../../../source/slang/slang-lookup.cpp)).
+   977-1051](../../../../source/slang/slang-lookup.cpp)).
 6. **Short-circuit on a non-overloadable hit.** After visiting one
    scope and its siblings, if the result is valid and either
    non-overloaded or not overloadable, lookup stops walking
    outwards
    ([slang-lookup.cpp lines
-   1043-1056](../../../../source/slang/slang-lookup.cpp)). Functions and
+   1053-1066](../../../../source/slang/slang-lookup.cpp)). Functions and
    generics are overloadable, so they continue to accumulate
    candidates from outer scopes; types and variables do not.
 7. **Result.** The accumulated `LookupResult` is returned.
@@ -234,7 +234,7 @@ flowchart TB
 `lookUpMember(astBuilder, semantics, name, type, sourceScope, mask,
 options)`
 ([slang-lookup.cpp](../../../../source/slang/slang-lookup.cpp) lines
-1084-1097) is the entry point for `obj.name`. It calls
+1094-1107) is the entry point for `obj.name`. It calls
 `_lookUpMembersInType`, which dispatches on the type shape:
 
 - **`DeclRefType`.** Lookup recurses into the underlying decl
@@ -243,14 +243,14 @@ options)`
   `PackBranchType`.** Lookup uses the canonical type and re-enters
   the facets walk for the canonicalized form
   ([slang-lookup.cpp lines
-  615-676](../../../../source/slang/slang-lookup.cpp)).
+  625-686](../../../../source/slang/slang-lookup.cpp)).
 - **`ModifiedType`.** Modifiers are transparent to lookup
   ([slang-lookup.cpp lines
-  631-643](../../../../source/slang/slang-lookup.cpp)).
+  641-653](../../../../source/slang/slang-lookup.cpp)).
 - **`ExtractExistentialType`.** The implicit `ThisType` of the
   underlying interface is the target of lookup
   ([slang-lookup.cpp lines
-  677-692](../../../../source/slang/slang-lookup.cpp)).
+  687-702](../../../../source/slang/slang-lookup.cpp)).
 - **`AndType`.** Unexpected at lookup time;
   `visitGenericTypeConstraintDecl` is supposed to have flattened it
   earlier.
@@ -258,7 +258,7 @@ options)`
 **Inheritance walk.** When the target is a `DeclRefType`, lookup
 delegates to `_lookupMembersInSuperTypeFacets`
 ([slang-lookup.cpp lines
-393-566](../../../../source/slang/slang-lookup.cpp)), which iterates the
+393-576](../../../../source/slang/slang-lookup.cpp)), which iterates the
 `InheritanceInfo::facets` precomputed in
 [slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp).
 Each facet is a `(declRef, type, subtypeWitness)` tuple representing
@@ -283,13 +283,13 @@ For each facet the function:
 **Pointer auto-dereference.** Before the per-type dispatch above,
 `_lookUpMembersInSuperTypeImpl`
 ([slang-lookup.cpp lines
-568-599](../../../../source/slang/slang-lookup.cpp)) calls
+578-609](../../../../source/slang/slang-lookup.cpp)) calls
 `getPointedToTypeIfCanImplicitDeref(superType)`. If the type is a
 pointer-like Slang type and `NoDeref` is not set, a `Deref`
 breadcrumb is prepended and lookup recurses on the pointee. The
 `_lookUpInScopes` dispatcher
 ([slang-lookup.cpp line
-908](../../../../source/slang/slang-lookup.cpp)) forces `NoDeref` when
+918](../../../../source/slang/slang-lookup.cpp)) forces `NoDeref` when
 the enclosing scope is an `ExtensionDecl` so that the extension's
 `This` refers to the extension target itself, not the pointed-to
 type.
@@ -300,11 +300,11 @@ type.
 breadcrumb is suppressed because the substitution already encodes
 the navigation
 ([slang-lookup.cpp lines
-880-895](../../../../source/slang/slang-lookup.cpp)).
+890-905](../../../../source/slang/slang-lookup.cpp)).
 `InterfaceDefaultImplDecl` triggers a special path that looks up in
 the explicit `This` parameter instead of the interface itself
 ([slang-lookup.cpp lines
-938-965](../../../../source/slang/slang-lookup.cpp)).
+948-975](../../../../source/slang/slang-lookup.cpp)).
 
 ### Transparent members
 
@@ -408,7 +408,7 @@ overload set. The chain is implemented by the
 790](../../../../source/slang/slang-ast-base.h)), populated at
 `addDirectMemberDecl`
 ([slang-ast-decl.cpp line
-285](../../../../source/slang/slang-ast-decl.cpp)) and queried by
+363](../../../../source/slang/slang-ast-decl.cpp)) and queried by
 `ContainerDecl::getDirectMemberDeclsOfName`
 ([slang-ast-decl.cpp line
 326](../../../../source/slang/slang-ast-decl.cpp)). The lookup side
@@ -441,13 +441,13 @@ diagnostics.
 Multiple `namespace Foo {}` declarations in the same module collapse
 into the same `NamespaceDecl` — the parser explicitly reuses the
 first one it finds in the parent via
-`parentDecl->getDirectMemberDeclsOfName(name)`
-([slang-parser.cpp lines
-4075-4096](../../../../source/slang/slang-parser.cpp)). Cross-module
-sibling namespaces are linked into the lookup chain by
-`addSiblingScopeForContainerDecl` during semantic checking
-([slang-check-decl.cpp line
-15598](../../../../source/slang/slang-check-decl.cpp)). `UsingDecl`
+  `parentDecl->getDirectMemberDeclsOfName(name)`
+  ([slang-parser.cpp lines
+  4086-4180](../../../../source/slang/slang-parser.cpp)). Cross-module
+  sibling namespaces are linked into the lookup chain by
+  `addSiblingScopeForContainerDecl` during semantic checking
+  ([slang-check-decl.cpp line
+  16408](../../../../source/slang/slang-check-decl.cpp)). `UsingDecl`
 captures the current scope at parse time and injects names at check
 time via the same sibling-scope mechanism.
 
@@ -457,11 +457,11 @@ A user-provided extension member can shadow an interface default
 implementation. The relevant special case is
 `InterfaceDefaultImplDecl`
 ([slang-ast-decl.h line
-926](../../../../source/slang/slang-ast-decl.h)): when lookup is
+944](../../../../source/slang/slang-ast-decl.h)): when lookup is
 performed from inside one, the algorithm skips the interface decl
 itself and looks up in the explicit `This` parameter instead
 ([slang-lookup.cpp lines
-938-965](../../../../source/slang/slang-lookup.cpp)), so a witness
+948-975](../../../../source/slang/slang-lookup.cpp)), so a witness
 override on a conforming type wins over the default.
 
 ### Keyword vs identifier
@@ -497,7 +497,7 @@ does not pass through the `GenericDecl`.
   result resolves to multiple decls (e.g. two types with the same
   name reachable via different sibling scopes), the checker emits
   diagnostic `ambiguous-reference` (`slang-diagnostics.lua` line
-  3611, code 39999) at the use site.
+  3731, code 39999) at the use site.
 - **Forward reference inside a `BlockStmt`.** Using `b` before its
   `DeclStmt` reaches the lookup with `hiddenFromLookup = true`;
   `_isUncheckedLocalVar` skips the decl, so lookup returns either
@@ -529,11 +529,11 @@ does not pass through the `GenericDecl`.
   flattening bug; `_lookUpMembersInSuperTypeImpl` triggers
   `SLANG_UNEXPECTED("AndType should have been flattened ...")`
   ([slang-lookup.cpp lines
-  693-697](../../../../source/slang/slang-lookup.cpp)).
+  703-707](../../../../source/slang/slang-lookup.cpp)).
 - **`IgnoreForLookupModifier` on a base.** The synthetic tag-type
   inheritance on enums carries this modifier
   ([slang-check-decl.cpp line
-  11436](../../../../source/slang/slang-check-decl.cpp)) so the
+  11713](../../../../source/slang/slang-check-decl.cpp)) so the
   underlying integer type is not surfaced as a base interface when
   looking up enum members.
 

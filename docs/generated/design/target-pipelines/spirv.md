@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T14:35:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 53da5869f5a58254bbc9a0c88fc65eedfa8ce235904015ea404b227a8501d13e
+model: claude-opus-4.8
+generated_at: 2026-06-05T12:53:09Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 45c7187ec9e14c4b9df481b096e07d7166024478913e182332f481afa116f29f
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -15,7 +15,7 @@ direct-emit path. The corresponding `CodeGenTarget` values are
 `CodeGenTarget::SPIRV` and `CodeGenTarget::SPIRVAssembly`, and the
 precondition is `targetProgram->shouldEmitSPIRVDirectly() == true`.
 The legacy via-GLSL path (`isKhronosTarget && !emitSpirvDirectly`)
-is not the subject of this page: it diverges at line ~2229 of
+is not the subject of this page: it diverges at line ~2286 of
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) where
 `legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL` runs only in
 that mode, and the rest of the via-GLSL flow belongs to the
@@ -33,19 +33,19 @@ tables below; that filter is documented per-phase.
 ## Source
 
 - [slang-emit.cpp](../../../../source/slang/slang-emit.cpp)
-  — `linkAndOptimizeIR` (line ~893) is the orchestrator;
-  `emitSPIRVForEntryPointsDirectly` (line ~3122) is the SPIR-V
-  entry point; `createArtifactFromIR` (line ~2957) wraps the
+  — `linkAndOptimizeIR` (line ~895) is the orchestrator;
+  `emitSPIRVForEntryPointsDirectly` (line ~3198) is the SPIR-V
+  entry point; `createArtifactFromIR` (line ~3033) wraps the
   post-emit downstream chain (spirv-link, spirv-val,
   `optimizeSPIRV` currently disabled by `#if 0`).
 - [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)
-  — `emitSPIRVFromIR` (line ~11314) calls `legalizeIRForSPIRV`,
+  — `emitSPIRVFromIR` (line ~11387) calls `legalizeIRForSPIRV`,
   iterates the forward-declared-pointer fixup loop, and emits the
   SPIR-V words.
 - [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp)
-  — `legalizeIRForSPIRV` (line 2977) is the top-level legalizer;
-  `legalizeSPIRV` (line 2738) drives `SPIRVLegalizationContext::processModule`;
-  `simplifyIRForSpirvLegalization` (line 2751) is the iterative
+  — `legalizeIRForSPIRV` (line 3104) is the top-level legalizer;
+  `legalizeSPIRV` (line 2865) drives `SPIRVLegalizationContext::processModule`;
+  `simplifyIRForSpirvLegalization` (line 2878) is the iterative
   simplification loop (outer bound 8, inner bound 16);
   `removeUnreachableCodeAfterDiscardForOpKill` and
   `insertFragmentShaderInterlock` are SPIR-V-specific finalization
@@ -82,7 +82,7 @@ for Phase D, which starts inside `linkAndOptimizeIR`
 
 ## Phase A: Link and entry-point prep
 
-Spans roughly lines 928-1205 of
+Spans roughly lines 931-1208 of
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp). The phase
 takes the just-linked IR module, runs structural validators, and
 prepares the entry-point shape: global varying variables, coverage
@@ -159,10 +159,10 @@ Validation calls `validateIRModuleIfEnabled` run after most
 | 7 | `fixEntryPointCallsites` | [slang-ir-fix-entrypoint-callsite.cpp](../../../../source/slang/slang-ir-fix-entrypoint-callsite.cpp) | (always) | |
 | 8 | `replaceGlobalConstants` | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) | (always) | |
 | 9 | `bindExistentialSlots` | [slang-ir-bind-existentials.cpp](../../../../source/slang/slang-ir-bind-existentials.cpp) | `reqSet.bindExistential` | |
-| 10 | `instrumentCoverage` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Writes coverage metadata via the `ArtifactPostEmitMetadata` pointer created in line ~941. |
+| 10 | `instrumentCoverage` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Writes coverage metadata via the `ArtifactPostEmitMetadata` pointer created in line ~944. |
 | 11 | `collectGlobalUniformParameters` | [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/slang-ir-collect-global-uniforms.cpp) | (always) | |
 | 12 | `checkEntryPointDecorations` | [slang-ir-entry-point-decorations.cpp](../../../../source/slang/slang-ir-entry-point-decorations.cpp) | (always) | |
-| 13 | `addDenormalModeDecorations` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper inside `slang-emit.cpp` (line ~678). |
+| 13 | `addDenormalModeDecorations` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper inside `slang-emit.cpp` (line ~681). |
 | 14 | `collectEntryPointUniformParams` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, SPIR-V via `default` arm) | |
 | 15 | `moveEntryPointUniformParamsToGlobalScope` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, SPIR-V via `default` arm) | |
 | 16 | `removeTorchAndCUDAEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | (always, SPIR-V via `default` arm) | |
@@ -171,14 +171,14 @@ Validation calls `validateIRModuleIfEnabled` run after most
 | 19 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | Runs early so enum casts don't block specialization. |
 
 Filtered out for SPIR-V in this phase: the
-`!isKhronosTarget && reqSet.glslSSBO` branch (line 979,
+`!isKhronosTarget && reqSet.glslSSBO` branch (line 983,
 `lowerGLSLShaderStorageBufferObjectsToStructuredBuffers`); the
 `CUDASource` / `CUDAHeader` arm of the entry-point-param switch
 (`collectOptiXEntryPointUniformParams`).
 
 ## Phase B: Specialization and type legalization
 
-Spans roughly lines 1207-1773 of
+Spans roughly lines 1210-1752 of
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp). The phase
 runs the main simplification pass, drives generic / existential
 specialization, finalizes autodiff, lowers high-level types
@@ -382,7 +382,7 @@ flowchart TD
 | 25 | `checkForInvalidShaderParameterType` | [slang-ir-check-shader-parameter-type.cpp](../../../../source/slang/slang-ir-check-shader-parameter-type.cpp) | `shouldRunNonEssentialValidation()` | |
 | 26 | `inferAnyValueSizeWhereNecessary` | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | (always) | |
 | 27 | `unpinWitnessTables` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/slang-ir-strip-legalization-insts.cpp) | (always) | |
-| 28 | `lowerSumVectorMatrixInsts` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper at line ~801. |
+| 28 | `lowerSumVectorMatrixInsts` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper at line ~804. |
 | 29 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!fastIRSimplificationOptions.minimalOptimization` | `fastIRSimplificationOptions`. |
 | 30 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `minimalOptimization && reqSet.generics` | Alternative to pass 29 in minimal-opt mode. |
 | 31 | `lowerTaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | Sets `reqSet.reinterpret = true` if it returns `true`. |
@@ -440,7 +440,7 @@ Metal switch arm).
 
 ## Phase C: SPIR-V legalization, lowering, phi elimination
 
-Spans roughly lines 1798-2413 of
+Spans roughly lines 1897-2483 of
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp). The phase
 runs the byte-address-buffer legalization (with SPIR-V-specific
 options), the entry-point parameter rewriting shared with GLSL,
@@ -589,11 +589,11 @@ flowchart TD
 | 32 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | `shouldTrackLiveness()` | Liveness mode gating. |
 | 33 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../../source/slang/slang-ir-eliminate-phis.cpp) | (always) | SPIR-V-specific: `eliminateCompositeTypedPhiOnly = false`, `useRegisterAllocation = true`. |
 | 34 | `LivenessUtil::addRangeEnds` | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | `shouldTrackLiveness()` | |
-| 35 | `applyGLSLLiveness` | [slang-ir-glsl-liveness.cpp](../../../../source/slang/slang-ir-glsl-liveness.cpp) | `shouldTrackLiveness() && isKhronosTarget(targetRequest)` ([slang-emit.cpp lines 2347-2352](../../../../source/slang/slang-emit.cpp)) | Khronos-targets-only pass that translates the `IRLiveRangeStart`/`IRLiveRangeEnd` markers from the previous two rows into the GLSL/SPIR-V liveness encoding. SPIR-V direct-emit and SPIR-V via-GLSL both reach this row because the gate is `isKhronosTarget`, not the direct-emit predicate. |
+| 35 | `applyGLSLLiveness` | [slang-ir-glsl-liveness.cpp](../../../../source/slang/slang-ir-glsl-liveness.cpp) | `shouldTrackLiveness() && isKhronosTarget(targetRequest)` ([slang-emit.cpp lines 2355-2360](../../../../source/slang/slang-emit.cpp)) | Khronos-targets-only pass that translates the `IRLiveRangeStart`/`IRLiveRangeEnd` markers from the previous two rows into the GLSL/SPIR-V liveness encoding. SPIR-V direct-emit and SPIR-V via-GLSL both reach this row because the gate is `isKhronosTarget`, not the direct-emit predicate. |
 | 36 | `replaceLocationIntrinsicsWithRaytracingObject` | [slang-ir-early-raytracing-intrinsic-simplification.cpp](../../../../source/slang/slang-ir-early-raytracing-intrinsic-simplification.cpp) | `isKhronosTarget && emitSpirvDirectly` | |
 | 37 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | After phi elimination. |
 | 38 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | Captures cooperative types that survive lowering. |
-| 39 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `getBoolOption(EmbedDownstreamIR)` | Static helper at line ~630. |
+| 39 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `getBoolOption(EmbedDownstreamIR)` | Static helper at line ~633. |
 | 40 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | Final pass that fills binding / exported-function fields on `metadata`. |
 | 41 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | Last `SLANG_PASS` in `linkAndOptimizeIR`. |
 
@@ -620,16 +620,16 @@ inside `legalizeIRForSPIRV`); the `CPPSource` /
 ## Phase D: IR-to-SPIR-V emit, simplification loop, downstream tools
 
 Starts immediately after `linkAndOptimizeIR` returns to
-`emitSPIRVForEntryPointsDirectly` (line ~3122 of
+`emitSPIRVForEntryPointsDirectly` (line ~3198 of
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp)). The
-SPIR-V backend in `emitSPIRVFromIR` (line ~11314 of
+SPIR-V backend in `emitSPIRVFromIR` (line ~11387 of
 [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp))
-calls the top-level `legalizeIRForSPIRV` (line 2977 of
+calls the top-level `legalizeIRForSPIRV` (line 3104 of
 [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp))
 which runs the SPIR-V-specific IR passes and the iterative
 `simplifyIRForSpirvLegalization` loop. After SPIR-V word emission
 the artifact passes through the optional downstream chain in
-`createArtifactFromIR` (line ~2957): `spirv-link` for embedded-
+`createArtifactFromIR` (line ~3033): `spirv-link` for embedded-
 module merging and `spirv-val` for validation.
 
 ```mermaid
@@ -820,7 +820,7 @@ Two iterative passes execute in the SPIR-V pipeline. No other
 
 ### `simplifyIRForSpirvLegalization` (Phase D, step 5)
 
-Defined at line 2751 of
+Defined at line 2878 of
 [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp).
 
 - Outer loop: `while (changed && iterationCounter < kMaxIterations)`
@@ -846,7 +846,7 @@ loops settle within 2-3 outer iterations.
 
 ### Forward-declared pointer fixup (Phase D, step 12)
 
-Defined around line 11475 of
+Defined around line 11550 of
 [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp).
 
 - Form: `do { ... } while (context.m_forwardDeclaredPointers.getCount() != 0)`.
@@ -863,7 +863,7 @@ Defined around line 11475 of
 ### `legalizeIRForSPIRV`
 
 The single SPIR-V-only entry point inside `emitSPIRVFromIR`,
-defined at line 2977 of
+defined at line 3104 of
 [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp).
 It is *not* a single pass: it sequences `legalizeSPIRV`
 (`SPIRVLegalizationContext::processModule`) followed by the
@@ -876,7 +876,7 @@ distinct row in the Phase D table.
 
 ### `eliminatePhis` with SPIR-V-specific options
 
-At line ~2267 of [slang-emit.cpp](../../../../source/slang/slang-emit.cpp)
+At line ~2321 of [slang-emit.cpp](../../../../source/slang/slang-emit.cpp)
 the construction of `PhiEliminationOptions` checks
 `isKhronosTarget(targetRequest) && emitSpirvDirectly` and sets
 `eliminateCompositeTypedPhiOnly = false` and
@@ -894,7 +894,7 @@ specializes functions whose arguments are values loaded from an
 immutable location. The second invocation (Phase C, step 26) runs
 only when `isKhronosTarget && emitSpirvDirectly`, and runs *after*
 `lowerBufferElementTypeToStorageType`. The rationale, captured in
-the comment at line ~2200 of `slang-emit.cpp`, is the SPIR-V rule
+the comment at line ~2257 of `slang-emit.cpp`, is the SPIR-V rule
 2.16.1 that disallows passing an access chain as a function
 argument when the `VariablePointer` capability is not declared. The
 second invocation eliminates any access-chain arguments that arose
@@ -902,7 +902,7 @@ from buffer-element-type lowering.
 
 ### Deferred address-space propagation
 
-At lines ~2178-2192 of `slang-emit.cpp` the address-space
+At lines ~2238-2246 of `slang-emit.cpp` the address-space
 specialization runs for GLSL, Metal, and WGSL, but `not` for
 SPIR-V:
 
@@ -921,7 +921,7 @@ having to undo a GLSL-style legalization first.
 ### `legalizeEntryPointsForGLSL` despite the name
 
 Phase C step 3 runs `legalizeEntryPointsForGLSL` for SPIR-V too
-(line ~1928 of `slang-emit.cpp` selects on `case GLSL` /
+(line ~1984 of `slang-emit.cpp` selects on `case GLSL` /
 `case SPIRV` / `case SPIRVAssembly`). The name reflects history:
 when the only Khronos path was via GLSL, the pass lived under that
 namespace; SPIR-V direct emit reuses it because the entry-point
@@ -932,15 +932,15 @@ SPIR-V depending on `target`.
 ### `transformParamsToConstRef` on the SPIR-V arm
 
 The same pass is reached via two different switch arms in
-`linkAndOptimizeIR`. The SPIR-V arm (line ~2039) runs it
-unconditionally; the CUDA / Metal / CPU arm (line ~2050) runs it
+`linkAndOptimizeIR`. The SPIR-V arm (line ~2094) runs it
+unconditionally; the CUDA / Metal / CPU arm (line ~2108) runs it
 only when the target is CPU, CUDA, or Metal. For SPIR-V it
 ensures that struct-typed parameters are passed by const reference,
 which avoids unnecessary copies in the emitted code.
 
 ### Downstream spirv-link / spirv-val / spirv-opt chain
 
-`createArtifactFromIR` (line ~2910 of `slang-emit.cpp`) wires up
+`createArtifactFromIR` (line ~3033 of `slang-emit.cpp`) wires up
 three downstream tools:
 
 - **spirv-link** runs only when there is more than one input
@@ -958,7 +958,7 @@ three downstream tools:
 - **spirv-opt** is invoked via the generic downstream-compile
   path (`downstreamOptions.targetType = SLANG_SPIRV`,
   `downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV`).
-  The earlier in-source `optimizeSPIRV` call at lines 2931-2937
+  The earlier in-source `optimizeSPIRV` call at line 3055
   is currently inside a `#if 0` block and never executes — it is
   shown in Phase D's diagram for documentation only.
 

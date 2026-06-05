@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-28T08:22:13+00:00
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-watched_paths_digest: 901d192b17338b4a7dc882dff1bea2cd6f2750dad1694a5f0787288344552a33
+model: claude-opus-4.8
+generated_at: 2026-06-05T10:25:25+00:00
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -30,10 +30,10 @@ and `DifferentialPairGetPrimalBase`. The bulk of the
 differentiation-operator opcodes (`ForwardDifferentiate`,
 `BackwardDifferentiate`, the propagate / primal / remat variants,
 and the legacy-bridge opcodes) live under the `TranslateBase`
-hoistable group at line ~2561. Two additional opcodes that are
+hoistable group at line ~2592. Two additional opcodes that are
 specific to checkpointing — `checkpointObj`,
 `ReportCheckpointStore`, and `loopExitValue` — live in the
-value-producing section (around lines 1448-1465). A handful of
+value-producing section (around lines ~1480-1487). A handful of
 related opcodes are documented in sibling pages: the differential
 pair *types* are in [types.md](types.md); generic-annotation opcodes
 that mark differentiable types (`DifferentiableTypeAnnotation`,

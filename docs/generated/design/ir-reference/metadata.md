@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4efe93afbd22f4572d6d334ca82947cebf8058c7572291261103fd18aa04f6bd
+model: claude-opus-4.8
+generated_at: 2026-06-05T10:25:25+00:00
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 156c66694255ff678fb0eaa18abd2bb50bfa9979d070210c7bb229025fcd0b6b
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -25,9 +25,9 @@ IR pass.
 
 The four families live in distinct Lua entry groups in
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
-`Layout` at line ~2617, `Attr` at line ~2650, the `Debug*` opcodes
-between lines ~2712 and ~2747, and `SPIRVAsmOperand` (with the
-parent `SPIRVAsm` block) starting at line ~2751. C++ wrappers (where
+`Layout` at line ~2652, `Attr` at line ~2685, the `Debug*` opcodes
+between lines ~2747 and ~2785, and `SPIRVAsmOperand` (with the
+parent `SPIRVAsm` block) starting at line ~2786. C++ wrappers (where
 they exist) are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The
 infrastructure used by these opcodes (op flags, `IRBuilder` helpers)

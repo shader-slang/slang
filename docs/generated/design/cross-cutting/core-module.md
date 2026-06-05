@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-28T08:29:27+00:00
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-watched_paths_digest: 5945bacf4c9d96f2589a494589832a219c29d05fac941ffa13504c7d08cf982a
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 19ad329c51b4e53e37b131c94d49631623fa525a7de092b35d5852c27a4bca02
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -150,6 +150,7 @@ The single standard module shipping today is the **neural** module:
   `mma-tiled-layout-helper.slang`,
   `mma-tiled-metal.slang`,
   `mma-tiled-vulkan.slang`,
+  `network-parameter-layout-converter.slang`,
   `permuto-encoder.slang`,
   `shared-memory-pool.slang`,
   `vectorized-reader.slang`,

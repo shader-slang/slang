@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4efe93afbd22f4572d6d334ca82947cebf8058c7572291261103fd18aa04f6bd
+model: claude-opus-4.8
+generated_at: 2026-06-05T10:25:25+00:00
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 156c66694255ff678fb0eaa18abd2bb50bfa9979d070210c7bb229025fcd0b6b
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,7 +12,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 This page is the per-opcode reference for the `Decoration` family —
 the largest single family in
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua),
-spanning lines ~1591-2454. Decorations attach metadata to other IR
+spanning lines ~1623-2484. Decorations attach metadata to other IR
 instructions: names, layout binding, control-flow hints,
 target-specific intrinsic spellings, capability requirements,
 inlining preferences, autodiff markers, and so on.
@@ -25,7 +25,7 @@ decoration says about it.
 
 The opcodes live under the top-level `Decoration` entry of
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) at
-line ~1591. Per-opcode info (names, operand counts) is registered
+line ~1623. Per-opcode info (names, operand counts) is registered
 in
 [slang-ir-insts-info.cpp](../../../../source/slang/slang-ir-insts-info.cpp).
 C++ wrappers are declared in

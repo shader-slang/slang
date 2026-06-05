@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-28T08:23:43+00:00
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-watched_paths_digest: efb8ab286d2af640625fcafb908ce136336ff108b6497606b860e7586cad9f95
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 1084d6ac21281bc1db256e51bd36ad00a4bce0602ec9747f43e80e7a14436e98
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -312,22 +312,22 @@ Stmt            ::= Block
                   | DeclStmt | ExprStmt | EmptyStmt
 
 Block           ::= '{' Stmt* '}'                              -- parseBlockStmt
-IfStmt          ::= 'if' '(' Expr ')' Stmt ('else' Stmt)?      -- around line 6358
+IfStmt          ::= 'if' '(' Expr ')' Stmt ('else' Stmt)?      -- around line 6457
 ForStmt         ::= 'for' '(' (DeclStmt | ExprStmt | ';') Expr? ';' Expr? ')' Stmt
-                                                              -- around line 6298
-WhileStmt       ::= 'while' '(' Expr ')' Stmt                  -- around line 6898
-DoWhileStmt     ::= 'do' Stmt 'while' '(' Expr ')' ';'         -- around line 6373
-DoCatchStmt     ::= 'do' Stmt 'catch' '(' Param ')' Block      -- slang-parser.cpp:6919-6967
+                                                              -- around line 6468
+WhileStmt       ::= 'while' '(' Expr ')' Stmt                  -- around line 6470
+DoWhileStmt     ::= 'do' Stmt 'while' '(' Expr ')' ';'         -- around line 6472
+DoCatchStmt     ::= 'do' Stmt 'catch' '(' Param ')' Block      -- slang-parser.cpp:7044-7063
 
-SwitchStmt      ::= 'switch' '(' Expr ')' '{' SwitchCase* '}'  -- around line 6014
+SwitchStmt      ::= 'switch' '(' Expr ')' '{' SwitchCase* '}'  -- around line 6487
 SwitchCase      ::= ('case' Expr ':' | 'default' ':') Stmt*
 
-BreakStmt       ::= 'break' IDENT? ';'                          -- around line 6979
-ContinueStmt    ::= 'continue' IDENT? ';'                       -- around line 6992
-ReturnStmt      ::= 'return' Expr? ';'                          -- around line 7001
-DiscardStmt     ::= 'discard' ';'                               -- around line 6381
-DeferStmt       ::= 'defer' Stmt                                -- around line 6406
-ThrowStmt       ::= 'throw' Expr ';'                            -- around line 6414
+BreakStmt       ::= 'break' IDENT? ';'                          -- around line 6474
+ContinueStmt    ::= 'continue' IDENT? ';'                       -- around line 6476
+ReturnStmt      ::= 'return' Expr? ';'                          -- around line 6478
+DiscardStmt     ::= 'discard' ';'                               -- around line 6480
+DeferStmt       ::= 'defer' Stmt                                -- around line 6505
+ThrowStmt       ::= 'throw' Expr ';'                            -- around line 6513
 
 DeclStmt        ::= Decl
 ExprStmt        ::= Expr ';'

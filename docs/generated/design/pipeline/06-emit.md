@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-28T08:29:27+00:00
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-watched_paths_digest: a36bfc191a0ab4adb9168e61c6ea332b786bc78e7f29a88ec21d3e53fc1f4f9b
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 6dc28f908084269f31c6e55e648ebd8307ae6b527db79dfc00f74b5e82c5c6ed
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -31,7 +31,7 @@ modifying a target backend.
 ## Emit dispatcher
 
 The dispatch happens in `emitEntryPointsSourceFromIR`
-([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2418 at
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2487 at
 `source_commit`) plus the variants invoked when targeting non-textual
 formats. The dispatcher:
 

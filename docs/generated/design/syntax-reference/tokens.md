@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-07T14:35:56+00:00
-source_commit: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-watched_paths_digest: e2c6f1441dbe013ee44a514220f358519fb7666c14bf549fa51c11558ff1dd3e
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: f22ca582d91fc2387de917c9eb2e492cd1590365f14fadabe1615dec6bfac4b6
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -210,6 +210,15 @@ implements several context-sensitive rules:
 - **Numeric literal suffixes.** Suffix characters (`u`, `l`, `f`,
   `h`, ...) are kept as part of the literal token's raw text. The
   parser / checker decodes them when interpreting the value.
+- **Leading-zero floating-point continuations.** A bare `0` followed
+  by a base-10 exponent (`0e10`, `0E5`, `0e+1`, `0e-3`) or by the
+  legacy MSVC infinity form (`0#INF`) is lexed as a
+  `FloatingPointLiteral`, matching the `1e10` / `1#INF` forms. The
+  `default:` arm of the `0` branch in `_lexTokenImpl`
+  ([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp))
+  consults `_maybeLexNumberExponent` before falling back to an
+  `IntegerLiteral`; without it the exponent would be swallowed as an
+  integer suffix.
 - **Block-comment handling.** `BlockComment` tokens cover the entire
   `/* ... */` range; nested block comments are not supported.
 - **Identifier / keyword classification.** Every keyword arrives at

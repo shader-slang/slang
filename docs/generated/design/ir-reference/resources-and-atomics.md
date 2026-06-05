@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:15:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -26,32 +26,34 @@ opcodes.
 The opcodes documented here are scattered through
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
 
-- `AtomicOperation` group at line ~1071, plus
-  `IncrementCoverageCounter` (also synthesized as an atomic add) at
-  line ~1109.
+- `AtomicOperation` group at line ~1071, plus the coverage markers
+  `IncrementCoverageCounter` (line ~1111),
+  `IncrementFunctionCoverageCounter` (line ~1116), and
+  `IncrementBranchCoverageCounter` (line ~1129), each also synthesized
+  as an atomic add.
 - Image and texture access opcodes (`imageSubscript`, `imageLoad`,
-  `imageStore`) at lines ~1150-1159.
+  `imageStore`) at lines ~1180-1188.
 - Buffer access opcodes (`byteAddressBufferLoad/Store`,
   `structuredBuffer*`, `rwstructuredBuffer*`,
-  `StructuredBufferAppend/Consume/GetDimensions`) at lines ~1167-1212.
+  `StructuredBufferAppend/Consume/GetDimensions`) at lines ~1198-1243.
 - Resource modifiers and queries (`nonUniformResourceIndex`,
-  `getNaturalStride`, `castDynamicResource`) at lines ~1137 and
-  ~1214-1215.
-- Mesh-shader outputs at lines ~1216-1222.
+  `getNaturalStride`, `castDynamicResource`) at lines ~1166 and
+  ~1245-1246.
+- Mesh-shader outputs at lines ~1251-1257.
 - Texture-sampling shortcuts (`sample`, `sampleGrad`) and
-  wave-intrinsic mask ops at lines ~1471-1478.
+  wave-intrinsic mask ops at lines ~1502-1509.
 - Memory barriers (`GroupMemoryBarrierWithGroupSync`,
-  `ControlBarrier`) at lines ~1479-1480.
-- Raytracing-payload accessors at lines ~1485-1500.
-- Texture-access tagging helpers at lines ~1519-1525.
+  `ControlBarrier`) at lines ~1510-1511.
+- Raytracing-payload accessors at lines ~1516-1544.
+- Texture-access tagging helpers at lines ~1550-1556.
 - Descriptor-heap and buffer-pointer helpers at lines ~978-998 and
-  ~2611-2615.
+  ~2640-2644.
 - Combined sampler accessors at lines ~1031-1032; combined-sampler
   constructor at line ~1000.
 - `GetWorkGroupSize`, `GetCurrentStage` (entry-point introspection)
   at lines ~1052-1054.
 - `BindingQuery` (`getRegisterIndex`, `getRegisterSpace`) at line
-  ~1576.
+  ~1609.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The
@@ -196,7 +198,9 @@ enum IRMemoryOrder
 | `atomicMax` | — | `ptr, val` | | `InterlockedMax` intrinsic | Atomic maximum. |
 | `atomicInc` | — | `ptr` | | `InterlockedAdd` (with `1` constant) | Atomic increment. |
 | `atomicDec` | — | `ptr` | | `InterlockedAdd` (with `-1` constant) | Atomic decrement. |
-| `IncrementCoverageCounter` | — | — | | (synthesized when `-trace-coverage` is on) | Marker rewritten to `atomicAdd` on the synthesized coverage buffer; documented in the Lua comment block. |
+| `IncrementCoverageCounter` | — | — | | (synthesized when line coverage is on) | Line-coverage marker rewritten to `atomicAdd` on the synthesized coverage buffer; documented in the Lua comment block. |
+| `IncrementFunctionCoverageCounter` | — | `functionName, functionMangledName` | | (synthesized when function coverage is on) | Function-entry coverage marker; carries display and mangled names as operands so later passes need no AST access. |
+| `IncrementBranchCoverageCounter` | — | `branchSiteID, branchArmID, branchArmKind` | | (synthesized when branch coverage is on) | Branch-arm coverage marker; site/arm ids are local to the emitted metadata and the arm kind distinguishes true/false/case for LCOV export. |
 | `MetalAtomicCast` | — | (variadic, `min=1`) | | (synthesized for Metal backend) | Cast to the atomic-typed view of a value, required by Metal. |
 
 ### Barriers and synchronization

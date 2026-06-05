@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T14:30:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 8749b5a60327ef9aea96c0b02a10d643c2d39d04195e7cbd40904b69dabc7f6e
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: c7ceb8f7138b0d1f8d9559d2e33d3bfbcf92dade0e6bafe75a6e9dd8ace9f07f
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -23,10 +23,11 @@ headings are approximate (precise at `source_commit`).
 
 The orchestrator is `linkAndOptimizeIR` in
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (declared
-around line 892 at `source_commit`). It is called by
-`emitEntryPointsSourceFromIR` (line 2365) and by the variants used
-when emitting LLVM, VM, or other non-textual targets (calls visible
-near lines 2508, 3083, 3124, 3178). The function:
+around line 895 at `source_commit`). It is called by
+`emitEntryPointsSourceFromIR` (defined at line 2487; the call is at
+line 2631) and by the variants used when emitting LLVM, VM, or other
+non-textual targets (calls visible near lines 3206, 3247, 3301). The
+function:
 
 1. Links the per-translation-unit IR modules together (using
    [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp)).

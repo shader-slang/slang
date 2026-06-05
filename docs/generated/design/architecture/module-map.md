@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:30:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: f11187e79ffaa9e1c1966046a9bb76df4bb33cabc81ba4f496d6f224fcf0ca12
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 3e84425a669764ca340ed7a1190856897496ac2f667956b0a8228b11c7f4ab35
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -82,6 +82,7 @@ lives in the [pipeline](../pipeline) and
 | --- | --- | --- |
 | Front-end compile request | [slang-compile-request.h](../../../../source/slang/slang-compile-request.h), `slang-compile-request.cpp` | Drives parsing, checking, lowering for a translation unit |
 | End-to-end compile request | `slang-end-to-end-request.cpp` | Backs a single `slangc` / public-API compile invocation |
+| Repro capture and replay | `slang-repro.h`, `slang-repro.cpp`, `slang-repro-validator.h`, `slang-repro-validator.cpp` | Serializes a compile request for `-extract-repro` / `-load-repro`; the validator checks repro inputs before they are used |
 | Module | [slang-module.h](../../../../source/slang/slang-module.h), `slang-module.cpp` | Holds AST + IR for a translation unit; implements `IModule` |
 | Module library | `slang-module-library.h`, `slang-module-library.cpp` | Bundles compiled modules into reusable libraries |
 | Linkage | `slang-session.h`, `slang-session.cpp` | The class behind the public `slang::ISession` — a per-configuration scope owning search paths, target settings, and the source manager |
