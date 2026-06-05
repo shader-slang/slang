@@ -2352,10 +2352,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 if (hasNonUniformDecoration(inst->getOperand(0)))
                     return addNonUniformDecoration(inst);
                 break;
-            case kIROp_ImageTexelPointer:
-                if (hasNonUniformDecoration(inst->getOperand(0)))
-                    return addNonUniformDecoration(inst);
-                break;
             default:
                 // CastDynamicResource is inlined by specialization before this pass.
                 SLANG_ASSERT(inst->getOp() != kIROp_CastDynamicResource);

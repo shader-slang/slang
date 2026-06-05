@@ -38,7 +38,8 @@ static void decorateNonUniformChain(IRInst* operand, const std::function<void(IR
     else if (
         as<IRCombinedTextureSamplerGetTexture>(operand) ||
         as<IRCombinedTextureSamplerGetSampler>(operand) ||
-        operand->getOp() == kIROp_ImageTexelPointer)
+        operand->getOp() == kIROp_ImageTexelPointer ||
+        operand->getOp() == kIROp_GetLegalizedSPIRVGlobalParamAddr)
     {
         decorate(operand);
         decorateNonUniformChain(operand->getOperand(0), decorate);
@@ -179,6 +180,19 @@ void processNonUniformResourceIndex(
                         break;
                     newUser = builder.emitLoad(user->getFullType(), inst->getOperand(0));
                     break;
+                case kIROp_GetLegalizedSPIRVGlobalParamAddr:
+                    if (floatMode != NonUniformResourceIndexFloatMode::SPIRV)
+                        break;
+                    {
+                        auto operand = inst->getOperand(0);
+                        IRInst* operands[] = {operand};
+                        newUser = builder.emitIntrinsicInst(
+                            user->getFullType(),
+                            kIROp_GetLegalizedSPIRVGlobalParamAddr,
+                            1,
+                            operands);
+                    }
+                    break;
                 case kIROp_MakeCombinedTextureSampler:
                     {
                         auto tex = user->getOperand(0);
@@ -230,6 +244,7 @@ void processNonUniformResourceIndex(
                 case kIROp_IntCast:
                 case kIROp_GetElementPtr:
                 case kIROp_Load:
+                case kIROp_GetLegalizedSPIRVGlobalParamAddr:
                 case kIROp_NonUniformResourceIndex:
                 case kIROp_CastDescriptorHandleToUInt2:
                 case kIROp_GetElement:
