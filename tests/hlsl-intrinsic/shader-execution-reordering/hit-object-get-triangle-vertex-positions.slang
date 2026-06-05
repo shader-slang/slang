@@ -1,5 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderEXT
 
+// HitObject.GetTriangleVertexPositions is Vulkan-EXT only and lowers to the
+// result-producing OpHitObjectGetIntersectionTriangleVertexPositionsEXT (opcode 5307),
+// which requires the ray tracing position fetch extension.
+
 // CHECK-DAG: OpExtension "SPV_KHR_ray_tracing_position_fetch"
 // CHECK-DAG: OpCapability RayTracingPositionFetchKHR
 // CHECK-DAG: OpExtension "SPV_EXT_shader_invocation_reorder"
@@ -10,7 +14,7 @@
 uniform RaytracingAccelerationStructure scene;
 
 //TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
-RWStructuredBuffer<uint> outputBuffer;
+RWStructuredBuffer<float> outputBuffer;
 
 struct MyPayload { float4 color; };
 
@@ -26,8 +30,8 @@ void rayGenerationMain()
     MyPayload payload = { float4(0) };
     HitObject hit = HitObject::TraceRay(scene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, payload);
 
-    float3 positions[3];
-    hit.GetTriangleVertexPositions(positions);
+    // Returned by value (float3[3]), matching RayQuery.CommittedGetIntersectionTriangleVertexPositions.
+    float3 positions[3] = hit.GetTriangleVertexPositions();
 
-    outputBuffer[0] = uint(positions[0].x + positions[1].y + positions[2].z);
+    outputBuffer[0] = positions[0].x + positions[1].y + positions[2].z;
 }
