@@ -74,8 +74,7 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
     }
 
     UInt bindlessSpaceIndex = 0;
-    if (!tryGetBindlessSpaceIndex(targetProgram, bindlessSpaceIndex))
-        return;
+    SLANG_RELEASE_ASSERT(tryGetBindlessSpaceIndex(targetProgram, bindlessSpaceIndex));
 
     for (auto inst : workList)
     {
