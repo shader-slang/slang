@@ -1,0 +1,173 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "CB",
+            "binding": {"kind": "constantBuffer", "index": 0},
+            "type": {
+                "kind": "constantBuffer",
+                "elementType": {
+                    "kind": "struct",
+                    "fields": [
+                        {
+                            "name": "passed",
+                            "type": {
+                                "kind": "struct",
+                                "name": "Inner",
+                                "fields": [
+                                    {
+                                        "name": "a",
+                                        "type": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
+                                    },
+                                    {
+                                        "name": "b",
+                                        "type": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
+                                    },
+                                    {
+                                        "name": "c",
+                                        "type": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 8, "size": 4, "elementStride": 0}
+                                    },
+                                    {
+                                        "name": "d",
+                                        "type": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
+                                    }
+                                ]
+                            },
+                            "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 0}
+                        },
+                        {
+                            "name": "unused",
+                            "type": {
+                                "kind": "vector",
+                                "elementCount": 4,
+                                "elementType": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32"
+                                }
+                            },
+                            "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
+                        }
+                    ]
+                },
+                "containerVarLayout": {
+                    "binding": {"kind": "constantBuffer", "index": 0}
+                },
+                "elementVarLayout": {
+                    "type": {
+                        "kind": "struct",
+                        "fields": [
+                            {
+                                "name": "passed",
+                                "type": {
+                                    "kind": "struct",
+                                    "name": "Inner",
+                                    "fields": [
+                                        {
+                                            "name": "a",
+                                            "type": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            },
+                                            "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
+                                        },
+                                        {
+                                            "name": "b",
+                                            "type": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            },
+                                            "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
+                                        },
+                                        {
+                                            "name": "c",
+                                            "type": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            },
+                                            "binding": {"kind": "uniform", "offset": 8, "size": 4, "elementStride": 0}
+                                        },
+                                        {
+                                            "name": "d",
+                                            "type": {
+                                                "kind": "scalar",
+                                                "scalarType": "float32"
+                                            },
+                                            "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
+                                        }
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 0}
+                            },
+                            {
+                                "name": "unused",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                },
+                                "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
+                            }
+                        ]
+                    },
+                    "binding": {"kind": "uniform", "offset": 0, "size": 32, "elementStride": 0}
+                }
+            }
+        },
+        {
+            "name": "outBuf",
+            "binding": {"kind": "unorderedAccess", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "float32"
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage": "compute",
+            "threadGroupSize": [1, 1, 1],
+            "bindings": [
+                {
+                    "name": "CB",
+                    "binding": {"kind": "constantBuffer", "index": 0, "used": 1},
+                    "usedByteRanges": [
+                        {"offset": 0, "size": 16}
+                    ]
+                },
+                {
+                    "name": "outBuf",
+                    "binding": {"kind": "unorderedAccess", "index": 0, "used": 1}
+                }
+            ]
+        }
+    ]
+}
+}

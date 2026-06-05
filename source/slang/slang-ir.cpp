@@ -1072,7 +1072,10 @@ void IRTupleTypeLayout::Builder::addAttrsImpl(List<IRInst*>& ioOperands)
 
 void IRArrayTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
 {
+    auto irBuilder = getIRBuilder();
     ioOperands.add(m_elementTypeLayout);
+    ioOperands.add(
+        irBuilder->getIntValue(irBuilder->getIntType(), IRIntegerValue(m_uniformStride)));
 }
 
 //

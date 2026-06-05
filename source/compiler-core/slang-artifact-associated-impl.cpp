@@ -355,10 +355,19 @@ SlangResult ArtifactPostEmitMetadata::isParameterLocationUsed(
     // yields SLANG_E_NOT_AVAILABLE.
     if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
     {
+        // Track whether the queried space was seen at all. A space with no
+        // matching entry is one the pass produced no information for
+        // (uniform tracking never ran for this artifact, or it ran but
+        // never reached this space), so a fall through to outUsed = false
+        // would fabricate an authoritative "not used" from nothing. Only a
+        // space we actually recorded an entry for can yield a trustworthy
+        // false; otherwise we must report not available.
+        bool anyEntryForSpace = false;
         for (const auto& entry : m_uniformParamUsage)
         {
             if (entry.parentSpace != spaceIndex)
                 continue;
+            anyEntryForSpace = true;
             if (entry.isUntracked)
                 return SLANG_E_NOT_AVAILABLE;
             for (const auto& r : entry.usedRanges)
@@ -370,6 +379,8 @@ SlangResult ArtifactPostEmitMetadata::isParameterLocationUsed(
                 }
             }
         }
+        if (!anyEntryForSpace)
+            return SLANG_E_NOT_AVAILABLE;
         outUsed = false;
         return SLANG_OK;
     }

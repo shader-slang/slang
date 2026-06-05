@@ -55,6 +55,7 @@
 // sort and sweep at the end is O(N log N) total per param.
 #include "slang-ir-byte-granularity-usage.h"
 
+#include "../compiler-core/slang-artifact-associated.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -193,10 +194,18 @@ static void _collectByteRangesReadFromValue(
                     auto elemLayout = arrayLayout->getElementTypeLayout();
                     UInt elemSize = 0;
                     bool elemFinite = _tryGetUniformByteSize(elemLayout, elemSize);
+                    // The per element byte position is index times the
+                    // array's uniform stride, not the element's natural
+                    // size. Under the constant buffer rules those differ
+                    // for under aligned element types (a float[N] strides
+                    // by 16, not 4), so using the natural size would point
+                    // at the wrong byte and silently miss a real read.
+                    UInt elemStride = arrayLayout->getUniformStride();
                     // Fallback. Runtime index, unbounded element type,
-                    // or zero size element. Cannot resolve a single
-                    // element to narrow to.
-                    if (!indexLit || !elemFinite || elemSize == 0)
+                    // zero size element, or unknown stride. Without a
+                    // trustworthy element position we cannot narrow, so
+                    // widen to the whole array region.
+                    if (!indexLit || !elemFinite || elemSize == 0 || elemStride == 0)
                     {
                         outRanges.add({currentOffset, currentSize});
                         break;
@@ -204,7 +213,7 @@ static void _collectByteRangesReadFromValue(
                     _collectByteRangesReadFromValue(
                         user,
                         elemLayout,
-                        currentOffset + UInt(getIntVal(indexLit)) * elemSize,
+                        currentOffset + UInt(getIntVal(indexLit)) * elemStride,
                         outRanges);
                     break;
                 }
@@ -367,14 +376,21 @@ collectApproximateByteGranularityUsageInformationForParameterGroups(const IRModu
         // than a silent collision with binding zero.
         auto cbAttr = varLayout->findOffsetAttr(LayoutResourceKind::ConstantBuffer);
         auto dtAttr = varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot);
-        if (!cbAttr && !dtAttr)
+        UniformParentBinding parent = selectUniformParentBinding(
+            cbAttr != nullptr,
+            info.parentSpace,
+            cbAttr ? cbAttr->getOffset() : 0,
+            dtAttr != nullptr,
+            info.parentSpace,
+            dtAttr ? dtAttr->getOffset() : 0);
+        if (!parent.found)
         {
             info.parentBindingIndex = 0;
             info.isUntracked = true;
             result.add(_Move(info));
             continue;
         }
-        info.parentBindingIndex = cbAttr ? cbAttr->getOffset() : dtAttr->getOffset();
+        info.parentBindingIndex = parent.bindingIndex;
         info.isUntracked = false;
 
         UInt elementByteSize = 0;

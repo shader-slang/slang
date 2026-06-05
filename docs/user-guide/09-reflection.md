@@ -1567,8 +1567,18 @@ unsigned calculateParameterStageMask(
     for(int i = 0; i < entryPointCount; ++i)
     {
         bool isUsed = false;
-        entryPoints[i].metadata->isParameterLocationUsed(
+        SlangResult result = entryPoints[i].metadata->isParameterLocationUsed(
             layoutUnit, offset.space, offset.value, isUsed);
+
+        // A `SLANG_E_NOT_AVAILABLE` result means usage could not be
+        // determined for this location -- for example an untracked
+        // parameter category, or uniform storage whose used byte range is
+        // unavailable. The API contract requires treating an undetermined
+        // result as *used*, so the parameter is conservatively bound
+        // rather than incorrectly stripped.
+        if(result == SLANG_E_NOT_AVAILABLE)
+            isUsed = true;
+
         if(isUsed)
         {
             mask |= 1 << unsigned(entryPoints[i].stage);
@@ -1577,6 +1587,12 @@ unsigned calculateParameterStageMask(
     return mask;
 }
 ```
+
+The result code of `isParameterLocationUsed()` is significant and must not be ignored.
+A result of `SLANG_OK` means the `isUsed` output is authoritative.
+A result of `SLANG_E_NOT_AVAILABLE` means usage could *not* be determined for the queried location -- for example because the parameter belongs to a category the metadata does not track, or because it occupies uniform storage whose used byte range is unavailable (see [Uniform Parameters](#uniform-parameters) below).
+In that case the API makes no claim either way, and callers must conservatively treat the location as used so that a genuinely-used parameter is never stripped.
+Reading only the `isUsed` output without checking the result would incorrectly treat such undetermined locations as unused.
 
 The application can then incorporate this logic into a loop over the layout units consumed by a parameter:
 
@@ -1624,6 +1640,32 @@ void printVarLayout(
     }
     // ...
 }
+```
+
+### Uniform Parameters
+
+For the `SLANG_PARAMETER_CATEGORY_UNIFORM` layout unit, the `registerIndex` argument to `isParameterLocationUsed()` is interpreted as the *byte offset* of the queried field within its space, rather than a register index.
+The query reports the location as used when any tracked read of the constant buffer overlaps that byte offset.
+
+Because usage is tracked per byte within a space, the query cannot distinguish between multiple constant buffers that share the same space.
+When several constant buffers occupy one space, a field may be reported as used if a sibling buffer's used range happens to cover the same byte offset.
+This over-reporting is always *safe*: the worst outcome is binding a parameter that was not strictly required, and a genuinely-used field is never reported as unused.
+
+When uniform usage cannot be tracked at byte granularity at all -- for example a push-constant block, or uniform storage whose extent is unbounded -- the query returns `SLANG_E_NOT_AVAILABLE` for every offset in that block, and callers should treat the whole block as used.
+
+The same information is available through the JSON reflection output (`-reflection-json`).
+Within each entry point's `bindings` array, a uniform parameter carries a `usedByteRanges` array of `{"offset": <byte>, "size": <byte>}` objects describing exactly which bytes are read:
+
+```json
+"usedByteRanges": [
+    {"offset": 0, "size": 64}
+]
+```
+
+When byte-range tracking is unavailable for a parameter, the JSON instead reports `usedByteRangesUnavailable: true`, mirroring the `SLANG_E_NOT_AVAILABLE` result from the C++ API:
+
+```json
+"usedByteRangesUnavailable": true
 ```
 
 ### Target-Specific Limitations

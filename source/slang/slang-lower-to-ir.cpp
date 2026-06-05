@@ -15158,7 +15158,10 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
     else if (auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
     {
         auto irElementTypeLayout = lowerTypeLayout(context, arrayTypeLayout->elementTypeLayout);
-        IRArrayTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
+        IRArrayTypeLayout::Builder builder(
+            context->irBuilder,
+            irElementTypeLayout,
+            UInt(arrayTypeLayout->uniformStride.getValidValue()));
         return _lowerTypeLayoutCommon(&builder, arrayTypeLayout);
     }
     else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))

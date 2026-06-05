@@ -1186,10 +1186,29 @@ struct IRArrayTypeLayout : IRTypeLayout
 
     IRTypeLayout* getElementTypeLayout() { return cast<IRTypeLayout>(getOperand(0)); }
 
+    // The uniform byte stride between consecutive elements. Under the
+    // constant buffer and std140 rules this is the element size rounded up
+    // to the array alignment, which is not the element's natural size (a
+    // float[N] in a cbuffer strides by 16 bytes, not 4). Returns 0 when the
+    // stride is unknown, which happens for array layouts synthesized
+    // without uniform layout (resource or varying arrays) and for modules
+    // serialized before the stride was tracked. A caller doing byte math
+    // from this must treat 0 as unknown and fall back to a conservative
+    // answer rather than assuming a packed stride.
+    UInt getUniformStride()
+    {
+        if (getOperandCount() > 1)
+            if (auto strideLit = as<IRIntLit>(getOperand(1)))
+                return UInt(strideLit->getValue());
+        return 0;
+    }
+
     struct Builder : Super::Builder
     {
-        Builder(IRBuilder* irBuilder, IRTypeLayout* elementTypeLayout)
-            : Super::Builder(irBuilder), m_elementTypeLayout(elementTypeLayout)
+        Builder(IRBuilder* irBuilder, IRTypeLayout* elementTypeLayout, UInt uniformStride)
+            : Super::Builder(irBuilder)
+            , m_elementTypeLayout(elementTypeLayout)
+            , m_uniformStride(uniformStride)
         {
         }
 
@@ -1200,6 +1219,7 @@ struct IRArrayTypeLayout : IRTypeLayout
         void addOperandsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
 
         IRTypeLayout* m_elementTypeLayout;
+        UInt m_uniformStride;
     };
 };
 

@@ -143,6 +143,45 @@ struct UniformParamUsage
     bool isUntracked;
 };
 
+// Result of resolving a uniform bearing param's parent binding identity.
+// found is false when the param carries neither a constant buffer nor a
+// descriptor slot binding, in which case there is no parent to scope its
+// byte ranges against.
+struct UniformParentBinding
+{
+    UInt space;
+    UInt bindingIndex;
+    bool found;
+};
+
+// Choose the (space, bindingIndex) that identifies a uniform bearing
+// param's parent constant buffer or parameter block. A constant buffer
+// can expose a ConstantBuffer binding (D3D b register), a
+// DescriptorTableSlot binding (Vulkan/SPIR-V descriptor), or both.
+//
+// The IR pass that records byte ranges and the reflection emitter that
+// reports them must agree on this key, or the ranges silently fail to
+// match. Both route through this one rule: prefer the ConstantBuffer
+// binding when present, otherwise the DescriptorTableSlot binding,
+// otherwise report not found. Presence is decided by the caller (the
+// layout actually carries an offset for that category), never by
+// treating a zero offset as absent: a zero offset is a real binding
+// (register b0, descriptor binding 0).
+inline UniformParentBinding selectUniformParentBinding(
+    bool hasConstantBuffer,
+    UInt constantBufferSpace,
+    UInt constantBufferIndex,
+    bool hasDescriptorTableSlot,
+    UInt descriptorTableSlotSpace,
+    UInt descriptorTableSlotIndex)
+{
+    if (hasConstantBuffer)
+        return {constantBufferSpace, constantBufferIndex, true};
+    if (hasDescriptorTableSlot)
+        return {descriptorTableSlotSpace, descriptorTableSlotIndex, true};
+    return {0, 0, false};
+}
+
 class IArtifactPostEmitMetadata : public slang::IMetadata
 {
 public:
