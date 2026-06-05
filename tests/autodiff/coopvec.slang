@@ -1,4 +1,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type -g0
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -output-using-type -profile cs_6_9 -Xslang... -Xdxc -Vd -X.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
 // CHECK: type: float
 // CHECK-NEXT: 3.000000
@@ -41,6 +43,34 @@
 // CHECK-NEXT: 10.27168
 // CHECK-NEXT: 15.4075
 // CHECK-NEXT: 20.5433
+// CHECK-NEXT: 1.000000
+// CHECK-NEXT: 5.000000
+// CHECK-NEXT: 11.000000
+// CHECK-NEXT: 19.000000
+// CHECK-NEXT: 3.000000
+// CHECK-NEXT: 11.000000
+// CHECK-NEXT: 23.000000
+// CHECK-NEXT: 39.000000
+// CHECK-NEXT: 9.000000
+// CHECK-NEXT: 16.000000
+// CHECK-NEXT: 25.000000
+// CHECK-NEXT: 36.000000
+// CHECK-NEXT: 6.000000
+// CHECK-NEXT: 80.000000
+// CHECK-NEXT: 1000.000000
+// CHECK-NEXT: 12000.000000
+// CHECK-NEXT: 7.500000
+// CHECK-NEXT: 8.000000
+// CHECK-NEXT: 19.000000
+// CHECK-NEXT: 34.000000
+// CHECK-NEXT: 3.000000
+// CHECK-NEXT: 30.000000
+// CHECK-NEXT: 500.000000
+// CHECK-NEXT: 7000.000000
+// CHECK-NEXT: 2.000000
+// CHECK-NEXT: 30.000000
+// CHECK-NEXT: 400.000000
+// CHECK-NEXT: 5000.000000
 
 typealias FloatCoopVec4 = CoopVec<float, 4>;
 typealias DPFloatCoopVec4 = DifferentialPair<FloatCoopVec4>;
@@ -78,7 +108,31 @@ FloatCoopVec4 testAdditionalMath(FloatCoopVec4 x)
     return exp2(x) + tanh(x) + log(one + x) + log2(one + x) + atan(x);
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+// Covers forward-mode arithmetic derivatives on native CoopVec operands.
+[ForwardDifferentiable]
+FloatCoopVec4 testForwardArithmetic(FloatCoopVec4 x, FloatCoopVec4 y)
+{
+    return (x + y) * (x - y) - (x / y);
+}
+
+// Reuses the same CoopVec value on both sides of each arithmetic operation, guarding
+// against reverse-mode inout aliasing dropping one of the two contributions.
+[BackwardDifferentiable]
+FloatCoopVec4 testSameOperandArithmetic(FloatCoopVec4 x)
+{
+    return (x + x) + (x - x) + (x * x) + (x / x);
+}
+
+// Covers the element-wise binary and ternary derivative macros for CoopVec.
+[BackwardDifferentiable]
+FloatCoopVec4 testMinMaxClampFma(FloatCoopVec4 x, FloatCoopVec4 y)
+{
+    let lo = FloatCoopVec4(1.5);
+    let hi = FloatCoopVec4(4.5);
+    return min(x, y) + max(x, y) + clamp(x, lo, hi) + fma(x, y, FloatCoopVec4(1.0));
+}
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -140,5 +194,47 @@ void computeMain()
 
         primal.store(outputBuffer, 128);
         dx.d.store(outputBuffer, 144);
+    }
+
+    {
+        // Forward-mode arithmetic checks both primal and tangent outputs.
+        let x = FloatCoopVec4(2.0, 3.0, 4.0, 5.0);
+        let y = FloatCoopVec4(1.0, 1.0, 1.0, 1.0);
+        let xT = FloatCoopVec4(1.0, 2.0, 3.0, 4.0);
+        let yT = FloatCoopVec4(1.0, 1.0, 1.0, 1.0);
+
+        let result = fwd_diff(testForwardArithmetic)(diffPair(x, xT), diffPair(y, yT));
+
+        result.p.store(outputBuffer, 160);
+        result.d.store(outputBuffer, 176);
+    }
+
+    {
+        // Same-operand reverse-mode arithmetic catches accidental loss of one input path.
+        let x = FloatCoopVec4(2.0, 3.0, 4.0, 5.0);
+        let dOut = FloatCoopVec4(1.0, 10.0, 100.0, 1000.0);
+
+        let primal = testSameOperandArithmetic(x);
+        var dx = DPFloatCoopVec4(x, FloatCoopVec4(0.0, 0.0, 0.0, 0.0));
+        bwd_diff(testSameOperandArithmetic)(dx, dOut);
+
+        primal.store(outputBuffer, 192);
+        dx.d.store(outputBuffer, 208);
+    }
+
+    {
+        // min/max/clamp/fma derivatives cover binary/ternary CoopVec AD macro expansions.
+        let x = FloatCoopVec4(1.0, 2.0, 3.0, 4.0);
+        let y = FloatCoopVec4(2.0, 1.0, 3.0, 5.0);
+        let dOut = FloatCoopVec4(1.0, 10.0, 100.0, 1000.0);
+
+        let primal = testMinMaxClampFma(x, y);
+        var dx = DPFloatCoopVec4(x, FloatCoopVec4(0.0, 0.0, 0.0, 0.0));
+        var dy = DPFloatCoopVec4(y, FloatCoopVec4(0.0, 0.0, 0.0, 0.0));
+        bwd_diff(testMinMaxClampFma)(dx, dy, dOut);
+
+        primal.store(outputBuffer, 224);
+        dx.d.store(outputBuffer, 240);
+        dy.d.store(outputBuffer, 256);
     }
 }

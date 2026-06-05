@@ -2,6 +2,19 @@
 
 // Floating-point CoopVec types are differentiable, but integer CoopVec types should not be.
 
+// Non-float32 CoopVec element types covered by __BuiltinFloatingPointType should be accepted.
+[Differentiable]
+CoopVec<half, 4> halfParam(CoopVec<half, 4> x)
+{
+    return x + x;
+}
+
+[Differentiable]
+CoopVec<double, 4> doubleParam(CoopVec<double, 4> x)
+{
+    return x + x;
+}
+
 // Returning an integer CoopVec from a differentiable function should fail once AD tries to
 // form the integer CoopVec differential pair.
 [Differentiable]
