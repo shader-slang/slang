@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-05T13:46:37+00:00
 target_doc: target-pipelines/cuda.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: a0dbd58860550ec4de9722b99c186511cb3c877a447630a808184906b9592c17
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: 697128ce2b824225966f830d21ac028faff0ac0feee6366f3549b55ad9f0d9b1
+source_commit: 05132edd86435f217f95634406f85184e58991f8
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -13,25 +13,26 @@ checklist:
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 2
+finding_count: 1
 severity_breakdown:
-  critical: 0
-  major: 1
-  minor: 1
+  critical: 1
+  major: 0
+  minor: 0
   nit: 0
 ---
 
 # Review report for target-pipelines/cuda.md
 
 ## Summary
-The page is structurally lint-clean, but review found 2 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The CUDA page has the required target-pipeline shape and all checked relative links resolve at the recorded source commit. One ordering error remains: three reachable `SLANG_PASS` calls are documented in Phase A even though the source runs them later in Phase C.
 
 ## Items checked
-- Checked required target-pipeline sections, Phase B/C target arms, target-specific legalizer/emit entry points, downstream tool path, and relative links.
+- Read `regenerate.py show target-pipelines/cuda.md`, the CUDA prompt, `_common.md`, and dependency docs.
+- Checked front matter, required sections, and the CUDA-specific `CUDASource` / `CUDAHeader` / `PTX` branches against `source_commit` `52339028a2aa703271533454c6b9528a534bac31`.
+- Resolved all 155 relative links in the page at the recorded source commit.
+- Spot-checked CUDA claims for OptiX uniform collection, skipped entry-point uniform movement, `synthesizeActiveMask`, CUDA varying-param legalization, `lowerImmutableBufferLoadForCUDA`, `shouldLegalizeExistentialAndResourceTypes = false`, and nvrtc downstream handling.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | lines 371-456 | The Phase C diagram/table omit liveness marker passes reachable when liveness tracking is enabled. | `source/slang/slang-emit.cpp:2307-2325` runs `LivenessUtil::addVariableRangeStarts` and `LivenessUtil::addRangeEnds` around `eliminatePhis`. | Add both liveness passes to Phase C with the `codeGenContext->shouldTrackLiveness()` gate. |
-| F-002 | minor | lines 533-540 | The adjacent-target note says `PyTorchCppBinding` emits through `CPPSourceEmitter`, but source constructs `TorchCppSourceEmitter`. | `source/slang/slang-emit.cpp:2523-2525` assigns `sourceEmitter = new TorchCppSourceEmitter(desc)`. | Change the note to name `TorchCppSourceEmitter`. |
+| F-001 | critical | `## Phase A: Link and entry-point prep` and `## Phase C: CUDA legalization, lowering, phi elimination` | The Phase A diagram/table place `translateGlobalVaryingVar`, `resolveVaryingInputRef`, and `fixEntryPointCallsites` before uniform collection, but `linkAndOptimizeIR` runs those passes later in Phase C, after the target-specific active-mask / texture-format region and before entry-point legalization. This makes the ordered CUDA pipeline materially wrong. | `source/slang/slang-emit.cpp:1955-1962` runs `translateGlobalVaryingVar`, `resolveVaryingInputRef`, and `fixEntryPointCallsites` in the Phase C range, not in the Phase A range around `source/slang/slang-emit.cpp:982-1001`. | Move those three nodes and table rows from Phase A to Phase C, placing them after the CUDA `synthesizeActiveMask` / filtered `resolveTextureFormat` point and before `legalizeEntryPointVaryingParamsForCUDA`; update the Phase A prose and numbering accordingly. |

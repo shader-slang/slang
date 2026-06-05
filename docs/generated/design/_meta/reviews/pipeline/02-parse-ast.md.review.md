@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-05T13:46:25+00:00
 target_doc: pipeline/02-parse-ast.md
-target_doc_source_commit: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-target_doc_watched_paths_digest: 799ebd5687158b54f5b05c7af11525c7a9fdec1c4d76519bd51ffdb180085561
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: d21a76a8273d89c3084ce7ab14317bb6c3306843578006bdf09a9bc0860cfb4a
+source_commit: 05132edd86435f217f95634406f85184e58991f8
 checklist:
   factual_accuracy: pass
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
   source_alignment: pass
   front_matter_validity: pass
-finding_count: 1
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 1
+  major: 0
   minor: 0
   nit: 0
 ---
@@ -24,13 +24,13 @@ severity_breakdown:
 # Review report for pipeline/02-parse-ast.md
 
 ## Summary
-The page is structurally lint-clean, but review found 1 finding; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+No findings were identified in this pass. The document has the required sections, its links resolve, and the sampled parser and AST data-model claims match the recorded source commit.
 
 ## Items checked
-- Checked `parseSourceFile`, `parseUnparsedStmt`, `UnparsedStmt`, syntax-declaration lookup, `NodeBase`, `SyntaxClass`, and `ASTBuilder` allocation/value uniquing.
+- Ran `regenerate.py show pipeline/02-parse-ast.md` and reviewed the manifest entry, per-doc prompt, resolved watched files, and dependency on `pipeline/01-lex-preprocess.md`.
+- Verified front matter fields and resolved all 31 relative links.
+- Checked `parseSourceFile`, `parseUnparsedStmt`, `TokenReader` cursor/lookahead APIs, `UnparsedStmt` creation, deferred body parsing, and generic-application speculation in `slang-parser.cpp`.
+- Checked `SyntaxParseInfo` / `getSyntaxParseInfos`, base-language syntax population, `NodeBase`, `FIDDLE`, `SyntaxClass`-based `as<T>`, major AST families, and `ASTBuilder` allocation/type uniquing claims.
 
 ## Findings
-
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | major | document structure | Required sections `## Generics ambiguity` and `## Modifier parsing` are absent as top-level headings; related content is folded under other headings. | `docs/generated/design/_meta/prompts/pipeline-02-parse-ast.md` requires those sections. | Add or rename sections to `## Generics ambiguity` and `## Modifier parsing`, moving existing relevant content under them. |
+(no findings)

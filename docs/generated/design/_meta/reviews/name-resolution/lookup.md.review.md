@@ -1,37 +1,40 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-05T13:46:17+00:00
 target_doc: name-resolution/lookup.md
-target_doc_source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-target_doc_watched_paths_digest: 0f6a6813ac215b2f02942be90ab761d8979a0ae51be857c45bd14bd32a88b0d0
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: f2b871e4496ed32a327e98986317cc4eb48691d204aad2e863ea2eebf51fc801
+source_commit: 05132edd86435f217f95634406f85184e58991f8
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: partial
-  style_consistency: partial
+  completeness: pass
+  style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 2
+finding_count: 1
 severity_breakdown:
   critical: 0
-  major: 2
-  minor: 0
+  major: 0
+  minor: 1
   nit: 0
 ---
 
 # Review report for name-resolution/lookup.md
 
 ## Summary
-The page is structurally lint-clean, but review found 2 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The lookup page is broadly accurate and covers the required concepts, algorithm sections, shadowing rules, and failure modes. I found one watched-path alignment issue: a namespace-shadowing claim cites `slang-parser.cpp`, but that file is not in this page's resolved watched files.
 
 ## Items checked
-- Checked lookup entry points, `LookupMask`, `LookupOptions`, breadcrumb kinds, unqualified/member lookup steps, transparent-member injection, shadowing rules, and edge cases.
+- Ran `regenerate.py show name-resolution/lookup.md` and checked the manifest entry, prompt, 11 resolved watched files, and depends-on docs.
+- Verified the target front matter fields, required section order, and the lookup prompt's required `## Shadowing rules` section.
+- Checked all 75 relative links for resolution and spot-checked peer links against `scopes.md`, `visibility.md`, `overload-resolution.md`, `ast-reference/values.md`, and `glossary.md`.
+- Verified 55 source line-citation references against source at `52339028a2aa703271533454c6b9528a534bac31`, including `LookupMask`, `LookupOptions`, breadcrumbs, `_lookUpInScopes`, `_lookUpDirectAndTransparentMembers`, `AddToLookupResult`, and block-local shadowing.
+- Spot-checked more than 10 factual claims about scope walking, sibling scopes, transparent members, interface default implementations, and lookup failure behavior.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Algorithm` and edge cases | Required deduplication behavior is not covered, and source `AddToLookupResult` appends results without deduping by `DeclRef`. | `docs/generated/design/_meta/prompts/name-resolution-lookup.md` requires deduplication coverage; `source/slang/slang-lookup.cpp:95-125` appends lookup items. | Document the actual no-dedupe accumulation behavior or identify the real dedupe site if elsewhere in watched files. |
-| F-002 | major | multiple sections | The page cites non-watched files despite the name-resolution watched-path rule. | The `lookup.md` manifest entry excludes cited files such as `slang-ast-decl.cpp`, `slang-check-inheritance.cpp`, `slang-check-stmt.cpp`, `slang-check-decl.cpp`, and `slang-diagnostics.lua`. | Expand watched paths or remove/replace those citations with watched-file evidence. |
+| F-001 | minor | `## Shadowing rules`, `### Module and namespace` | The page cites `slang-parser.cpp` for namespace collapse, but `slang-parser.cpp` is not one of this doc's resolved watched files. Because the claim depends on an unwatched source file, changes to `parseNamespaceDecl` would not affect this page's watched-path digest. | `docs/generated/design/_meta/manifest.yaml:417-430` lists the watched paths and omits `source/slang/slang-parser.cpp`; the cited implementation is `source/slang/slang-parser.cpp:4086`. | Add `source/slang/slang-parser.cpp` to `name-resolution/lookup.md` watched paths, or replace this source citation with a link to `scopes.md` where parser scope construction is already in scope. |

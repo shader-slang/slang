@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-05T13:46:25+00:00
 target_doc: pipeline/05-ir-passes.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 8749b5a60327ef9aea96c0b02a10d643c2d39d04195e7cbd40904b69dabc7f6e
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: c7ceb8f7138b0d1f8d9559d2e33d3bfbcf92dade0e6bafe75a6e9dd8ace9f07f
+source_commit: 05132edd86435f217f95634406f85184e58991f8
 checklist:
   factual_accuracy: pass
   cross_references: pass
@@ -24,13 +24,15 @@ severity_breakdown:
 # Review report for pipeline/05-ir-passes.md
 
 ## Summary
-The page is structurally lint-clean, but review found 1 finding; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The pass catalog is factually consistent with the sampled source files and all links resolve, but review found one prompt-completeness issue. The required `## Adding a new pass` and `## Pass utilities` sections are present, but they appear in the reverse order from the required structure.
 
 ## Items checked
-- Checked the `linkAndOptimizeIR` anchor, representative pass files across categories, target-sensitive ordering caveat, pre-link and target-pipeline cross-links, and the adding-a-pass checklist.
+- Ran `regenerate.py show pipeline/05-ir-passes.md` and reviewed the manifest entry, prompt, resolved watched files, and dependency on `pipeline/04-ast-to-ir.md`.
+- Verified front matter fields and resolved all 185 relative links.
+- Checked `linkAndOptimizeIR` line anchors and call sites in `slang-emit.cpp`, the recorded count of `slang-ir-*.cpp` files, and representative pass files across linking, validation, cleanup, specialization, autodiff, legalization, entry-point, layout, target-specific, instrumentation, and utility categories.
+- Verified cross-links to `04b`, `04c`, target pipelines, `06-emit`, design IR docs, tests, and the adding-a-pass checklist.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | document structure | The prompt requires a top-level `## Pass utilities` section, but the document has only `### Shared utilities (not passes)` nested under `## Pass categories`. | `docs/generated/design/_meta/prompts/pipeline-05-ir-passes.md` requires `## Pass utilities`. | Promote or rename the shared-utilities subsection to `## Pass utilities`. |
+| F-001 | major | document structure, `## Pass utilities` and `## Adding a new pass` | The prompt's required structure lists `## Adding a new pass` before `## Pass utilities`, but the document places `## Pass utilities` first and `## Adding a new pass` afterward. | `docs/generated/design/_meta/prompts/pipeline-05-ir-passes.md:55-60` requires `## Adding a new pass` followed by `## Pass utilities`; `docs/generated/design/pipeline/05-ir-passes.md` has `## Pass utilities` at line 316 and `## Adding a new pass` at line 330. | Move `## Adding a new pass` before `## Pass utilities`, preserving the existing content. |

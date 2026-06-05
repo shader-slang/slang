@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-05T13:46:25+00:00
 target_doc: pipeline/04-ast-to-ir.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: fcfe91e111a6ac8caf6474a3c896282098f36eaaf23bfc11208dcafc53594873
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: 9ab5063bb78269f0497d90eee21d470b180a0ade8c090e36af38aa4c444758ed
+source_commit: 05132edd86435f217f95634406f85184e58991f8
 checklist:
   factual_accuracy: pass
   cross_references: pass
@@ -24,11 +24,13 @@ severity_breakdown:
 # Review report for pipeline/04-ast-to-ir.md
 
 ## Summary
-No findings were identified in this pass. The page matched its prompt contract and the sampled source claims checked during review.
+No findings were identified in this pass. The lowering overview conforms to its prompt and the sampled IRBuilder, lowering-driver, and AST-to-IR mapping claims are source-aligned.
 
 ## Items checked
-- Checked `generateIRForTranslationUnit`, specialized component and conformance IR generation, IR module creation, `IRBuilder` flags, representative AST-to-IR mappings, and adjacent 04b/04c descriptions.
+- Ran `regenerate.py show pipeline/04-ast-to-ir.md` and reviewed the manifest entry, prompt, resolved watched files, and dependencies on `pipeline/03-semantic-check.md` and `cross-cutting/ir-instructions.md`.
+- Verified front matter fields and resolved all 19 relative links.
+- Checked `generateIRForTranslationUnit`, `generateIRForSpecializedComponentType`, `generateIRForTypeConformance`, `IRBuilder`, `kIROpFlag_Hoistable`, `kIROpFlag_Global`, and the generated `IROp` enum include path.
+- Spot-checked representative lowering mappings for declarations, statements, expressions, generics, witness tables, block parameters, diagnostics, module-level outputs, and adjacent `04b` / `04c` pipeline descriptions.
 
 ## Findings
-
 (no findings)

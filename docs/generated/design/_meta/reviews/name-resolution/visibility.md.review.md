@@ -1,38 +1,40 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-05T13:46:17+00:00
 target_doc: name-resolution/visibility.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 7334450582d01cf1d273acf69603e1a99298f518a80c10f85a058fb506f75ff0
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: 7f835b0f4fb5f3c95c0f2466c182e4c6530306b32626d162568da304471b39ae
+source_commit: 05132edd86435f217f95634406f85184e58991f8
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: partial
-  style_consistency: partial
+  completeness: pass
+  style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 3
+finding_count: 1
 severity_breakdown:
   critical: 0
-  major: 3
-  minor: 0
+  major: 0
+  minor: 1
   nit: 0
 ---
 
 # Review report for name-resolution/visibility.md
 
 ## Summary
-The page is structurally lint-clean, but review found 3 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The visibility page matches the required structure and its main claims about modifiers, defaults, filtering, diagnostics, and edge cases are source-backed. I found one watched-path issue: the page cites the overload visibility step in `slang-check-overload.cpp`, but that file is not watched for this doc.
 
 ## Items checked
-- Checked visibility modifiers, `DeclVisibility`, default visibility logic, lookup/overload visibility filters, diagnostics, and edge cases.
+- Ran `regenerate.py show name-resolution/visibility.md` and checked the manifest entry, prompt, nine resolved watched files, and depends-on docs.
+- Verified front matter, required section order, `## Source`, `## Concepts`, `## Rules`, `## Edge cases and failure modes`, and `## See also`.
+- Checked all 35 relative links for resolution, including source links, peer name-resolution links, AST reference links, and glossary links.
+- Verified 23 source line-citation references against source at `52339028a2aa703271533454c6b9528a534bac31`, including `VisibilityModifier`, `DeclVisibility`, `ModuleDecl::defaultVisibility`, `getDeclVisibility`, `filterLookupResultByVisibilityAndDiagnose`, `isDeclVisibleFromScope`, `checkVisibility`, and `IgnoreForLookupModifier`.
+- Spot-checked more than 10 factual claims about per-keyword semantics, legacy versus modern defaults, private extension access, effective type visibility, diagnostics, synthesized visibility propagation, and language-version interaction.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Source` / visibility filtering | The page’s core visibility filter evidence lives in `slang-check-expr.cpp`, but that file is not watched for this page. | The `visibility.md` manifest entry excludes `source/slang/slang-check-expr.cpp`; the filter is in `source/slang/slang-check-expr.cpp:1079-1244`. | Add `slang-check-expr.cpp` to watched paths or restrict the page to watched sources and call out the missing path. |
-| F-002 | major | `## Concepts` | The page says the default language version is `SLANG_LANGUAGE_VERSION_2025` for sessions that do not override it, but public defaults still define `SLANG_LANGUAGE_VERSION_DEFAULT = SLANG_LANGUAGE_VERSION_LEGACY`; `SessionDesc::minLanguageVersion` is 2025. | `include/slang.h:5403-5405` defines the language default; `include/slang.h:5420-5421` defines `minLanguageVersion`. | Distinguish the language default from the minimum supported language version. |
-| F-003 | major | multiple sections | The page cites several non-watched paths. | The `visibility.md` manifest entry excludes cited files such as `slang-ast-support-types.h`, `include/slang.h`, `slang-check-expr.cpp`, `slang-lookup.cpp`, and `slang-diagnostics.lua`. | Expand watched paths or remove unsupported claims. |
+| F-001 | minor | `## Source` and `### Where visibility is filtered` | The page cites `slang-check-overload.cpp` for `TryCheckOverloadCandidateVisibility`, but `slang-check-overload.cpp` is not in this doc's resolved watched files. Changes to the overload-time visibility hook would not affect this page's watched-path digest. | `docs/generated/design/_meta/manifest.yaml:437-448` lists the watched paths and omits `source/slang/slang-check-overload.cpp`; the cited hook is `source/slang/slang-check-overload.cpp:265`. | Add `source/slang/slang-check-overload.cpp` to the watched paths, or move the overload-specific citation to `overload-resolution.md` and keep this page to watched visibility sources. |

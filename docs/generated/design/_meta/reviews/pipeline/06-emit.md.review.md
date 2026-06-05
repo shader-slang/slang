@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-28T09:03:07+00:00
+reviewed_at: 2026-06-05T13:46:25+00:00
 target_doc: pipeline/06-emit.md
-target_doc_source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-target_doc_watched_paths_digest: a36bfc191a0ab4adb9168e61c6ea332b786bc78e7f29a88ec21d3e53fc1f4f9b
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: 6dc28f908084269f31c6e55e648ebd8307ae6b527db79dfc00f74b5e82c5c6ed
+source_commit: 05132edd86435f217f95634406f85184e58991f8
 checklist:
   factual_accuracy: pass
   cross_references: pass
@@ -24,17 +24,13 @@ severity_breakdown:
 # Review report for pipeline/06-emit.md
 
 ## Summary
-No findings were identified in this follow-up review. The prior front-matter / freshness-ledger findings have been remediated, and the sampled source claims checked in this pass are supported by the source tree.
+No findings were identified in this pass. The emission overview satisfies the required sections, all links resolve, and the sampled dispatcher/backend claims match the recorded source commit.
 
 ## Items checked
-- Checked front matter against `_meta/freshness.json` and current digest after remediation of the stale/fresh ledger mismatch.
-- Verified the target document front matter against `docs/generated/design/_meta/freshness.json` and the current `regenerate.py digest` result.
-- Ran the generated-doc linter before and after updating the review records.
+- Ran `regenerate.py show pipeline/06-emit.md` and reviewed the manifest entry, prompt, resolved watched files, and dependency on `pipeline/05-ir-passes.md`.
+- Verified front matter fields and resolved all 75 relative links.
+- Checked `linkAndOptimizeIR`, `emitEntryPointsSourceFromIR`, `SourceWriter`, line directive/source map APIs, precedence helper links, dependency-file output, backend include coverage, and C-like/shared-base claims.
+- Spot-checked HLSL, GLSL, SPIR-V, Metal, WGSL, C++, CUDA, Torch, LLVM, VM, and Slang round-trip backend subsections against existing `slang-emit-*` files and prelude paths.
 
 ## Findings
-
 (no findings)
-
-## No-issues notes
-- The document front matter now matches the freshness ledger entry.
-- The current digest computed by `regenerate.py digest` matches the document front matter.
