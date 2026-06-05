@@ -17,4 +17,11 @@
 # Update both this file and the workflow when adding a new coverage-only
 # skip.
 
-# No current coverage expected failures.
+# Run 26813684019 (sequential reproducer with -server-count 1):
+# SIGSEGV in slang-test immediately after
+# design/ir-reference/metadata/type-layout-base.slang passes. The same
+# test is already listed in expected-failures.txt (it fails on the
+# uninstrumented Linux nightly); coverage instrumentation
+# escalates that failure into a SIGSEGV inside the slang-test
+# orchestrator, which kills the rest of the suite.
+docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-buffer-element.slang

@@ -174,6 +174,9 @@ struct Lexer
 String getStringLiteralTokenValue(Token const& token);
 String getFileNameTokenValue(Token const& token);
 
+// Note about integer literal values. This is the underlying storage type, but
+// integer literals are reinterpreted as unsigned when necessary, based on the
+// type expression.
 typedef int64_t IntegerLiteralValue;
 typedef double FloatingPointLiteralValue;
 

@@ -63,9 +63,68 @@ namespace Slang
 
 #if SLANG_ENABLE_DXIL_SUPPORT
 
+// Adapts a DXC `IDxcBlob` to a genuine Slang `ISlangBlob`.
+//
+// DXC's `IDxcBlob` and Slang's `ISlangBlob` are layout-compatible COM
+// interfaces (both `IUnknown` plus a buffer pointer/size getter), and the code
+// here used to reinterpret-cast an `IDxcBlob*` to `ISlangBlob*` and call
+// `ISlangBlob`'s virtuals on it. That is undefined behaviour: the object is not
+// actually an `ISlangBlob`, and UBSan's `-fsanitize=vptr` flags it (member call
+// on an object that is not of type `ISlangBlob`) once DXC is built from source
+// and is visible to the sanitizer. This adapter keeps a reference to the
+// underlying `IDxcBlob` and forwards the accessors, so the data also outlives
+// any artifact representation that stores the blob.
+//
+// Usage: anywhere code would otherwise reinterpret-cast an `IDxcBlob*` to
+// `ISlangBlob*`, write `DxcBlob::create(dxcBlob)` instead. The constructor is
+// private so callers must go through the factory. The factory returns
+// `ComPtr<ISlangBlob>` (not `ComPtr<DxcBlob>`) on purpose — callers should
+// never reach through the adapter to the underlying `IDxcBlob`.
+//
+// TODO: three `IDxcBlob ↔ ISlangBlob` puns intentionally remain in this file
+// after this fix and still warrant attention:
+//   - `DxcIncludeHandler::LoadSource`: reverse-direction pun in
+//     `*outSource = (IDxcBlob*)blob.detach();`. DXC owns the outparam;
+//     wrapping it would require an `IDxcLibrary`-backed real-DXC-blob factory
+//     that isn't plumbed into this file today.
+//   - `DXCDownstreamCompiler::compile`: round-trip pun in both directions —
+//     `(ISlangBlob*)dxcResultBlob.get()` into `libraryBlobs`, then
+//     `(IDxcBlob*)libraryBlobs[i].get()` back out into
+//     `IDxcLinker::RegisterLibrary`. Same blocker as `LoadSource`.
+// All three are UB strictly speaking; UBSan happens not to flag them today
+// because of how those code paths are exercised, not because they are safe.
+class DxcBlob : public BlobBase
+{
+public:
+    // ISlangBlob
+    SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE
+    {
+        return m_blob->GetBufferPointer();
+    }
+    SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE
+    {
+        return m_blob->GetBufferSize();
+    }
+
+    static ComPtr<ISlangBlob> create(IDxcBlob* blob)
+    {
+        if (!blob)
+            return nullptr;
+        return ComPtr<ISlangBlob>(new DxcBlob(blob));
+    }
+
+private:
+    explicit DxcBlob(IDxcBlob* blob)
+        : m_blob(blob)
+    {
+        SLANG_ASSERT(blob);
+    }
+    ComPtr<IDxcBlob> m_blob;
+};
+
 static UnownedStringSlice _getSlice(IDxcBlob* blob)
 {
-    return StringUtil::getSlice((ISlangBlob*)blob);
+    return StringUtil::getSlice(DxcBlob::create(blob));
 }
 
 // IDxcIncludeHandler
@@ -741,7 +800,8 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
 
     if (dxcResultBlob)
     {
-        artifact->addRepresentationUnknown((ISlangBlob*)dxcResultBlob.get());
+        ComPtr<ISlangBlob> resultRep = DxcBlob::create(dxcResultBlob);
+        artifact->addRepresentationUnknown(resultRep);
     }
 
     // If asking for PDB extract it.
@@ -778,7 +838,8 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
                         }
                     }
 
-                    pdbArtifact->addRepresentationUnknown((ISlangBlob*)pdbBlob.get());
+                    ComPtr<ISlangBlob> pdbRep = DxcBlob::create(pdbBlob);
+                    pdbArtifact->addRepresentationUnknown(pdbRep);
 
                     // Associate it
                     artifact->addAssociated(pdbArtifact);
@@ -832,8 +893,7 @@ SlangResult DXCDownstreamCompiler::convert(
 
     auto artifact = ArtifactUtil::createArtifact(to);
 
-    // Is compatible with ISlangBlob
-    ISlangBlob* disassemblyBlob = (ISlangBlob*)dxcResultBlob.get();
+    ComPtr<ISlangBlob> disassemblyBlob = DxcBlob::create(dxcResultBlob);
     artifact->addRepresentationUnknown(disassemblyBlob);
 
     *outArtifact = artifact.detach();

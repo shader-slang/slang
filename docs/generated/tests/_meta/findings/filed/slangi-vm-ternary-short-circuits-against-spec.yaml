@@ -1,0 +1,51 @@
+schema_version: 1
+id: slangi-vm-ternary-short-circuits-against-spec
+bundle: language-reference/expressions-operators
+suspected_kind: wrong-codegen
+title: "[slangi] `?:` short-circuits in VM, contra language-reference spec"
+observed_at: 2026-06-01T14:30:00+00:00
+scope: cpp
+evidence:
+  command: ./build/Release/bin/slangi <repro.slang>
+  source_slang: docs/generated/tests/language-reference/expressions-operators/conditional-does-not-short-circuit.slang
+  observed_summary: |
+    The conditional operator `?:` short-circuits under the `slangi`
+    bytecode interpreter: with `cond = true`, the expression
+    `cond ? bump(counter) : bump(counter)` increments `counter` once
+    instead of twice. The language reference explicitly states that
+    Slang's `?:` does NOT short-circuit (`expressions-operators.md`,
+    `#conditional-expression` section): "Slang currently follows the
+    precedent of HLSL where `?:` does not short-circuit."
+    The HLSL emit (verified via `slangc -target hlsl`) does emit
+    both `bump(counter)` calls, so the frontend respects the spec;
+    only the slangi VM short-circuits.
+  exit_code: 0
+  minimized_repro: |
+    //TEST:INTERPRET(filecheck=CHECK):
+    int bump(inout int counter) { counter++; return counter; }
+    void main()
+    {
+        int counter = 0;
+        bool cond = true;
+        int picked = cond ? bump(counter) : bump(counter);
+        //CHECK: counter=2
+        printf("counter=%d\n", counter);   // slangi prints counter=1
+    }
+expected:
+  claim: |
+    Per the language reference, `?:` does not short-circuit — both
+    branches must be evaluated regardless of the condition value.
+    With two `bump(counter)` calls (one per branch), `counter` must
+    reach 2.
+  citation_kind: doc
+  citation: docs/language-reference/expressions-operators.md
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: d25453d7f0b4867db4cb5eabf34fb6cd088cf596
+  doc_anchor: docs/language-reference/expressions-operators.md#conditional-expression
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Spec is wrong: the doc note acknowledges HLSL precedent and 'currently' (with a note that the rule may change). Per current spec, no short-circuit is required. Compiler can be wrong relative to current spec even if 'currently' suggests the rule is provisional."
+    - "Compiler is correct: ruled out by inspecting `-target hlsl` emit, which shows BOTH `bump_0(counter_1)` calls. The frontend respects the spec; the VM does not."
+    - "Same root cause as #11375 / #11402: all three are slangi-VM-only divergences from the spec/frontend. May or may not share a code path."

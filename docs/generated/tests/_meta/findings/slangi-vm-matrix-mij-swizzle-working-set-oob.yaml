@@ -1,0 +1,39 @@
+schema_version: 1
+id: slangi-vm-matrix-mij-swizzle-working-set-oob
+bundle: conformance/expressions-member-access
+suspected_kind: wrong-codegen
+title: "[slangi] matrix `_mij` swizzle triggers working-set OOB"
+observed_at: 2026-06-01T17:00:00+00:00
+scope: cpp
+evidence:
+  command: ./build/Release/bin/slangi <repro.slang>
+  source_slang: docs/generated/tests/language-reference/expressions-member-access/matrix-mij-zero-based.slang
+  observed_summary: |
+    Reading a matrix element via the documented zero-based
+    `_mij` swizzle (e.g. `m._m12` for row 1 column 2) under
+    slangi triggers:
+      VM operand access out of bounds in working set section:
+      offset=20 size=36 sectionSize=48.
+    The doc lists `_mij` as a supported swizzle form. The
+    error class is the same family as the pre-existing
+    constants-section OOB (#11375) but on the working-set
+    section.
+  exit_code: 5
+expected:
+  claim: |
+    The language reference's #matrix-swizzles section documents
+    `m._mij` (zero-based) and `_RC` (one-based) as supported
+    swizzle forms. Reading `m._m12` of a 3x3 matrix initialized
+    `{ 10,11,12, 20,21,22, 30,31,32 }` must produce 22.
+  citation_kind: doc
+  citation: docs/language-reference/expressions-member-access.md
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: d25453d7f0b4867db4cb5eabf34fb6cd088cf596
+  doc_anchor: docs/language-reference/expressions-member-access.md#matrix-swizzles
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — `m._mij` is documented as a supported swizzle form, and direct subscript (`m[1][2]`) on the same matrix works in the sibling bundle's `matrix-elem-access.slang` test."
+    - "Frontend bug: not yet verified via -target hlsl; the symptom shape (VM operand OOB) is characteristic of the slangi VM, similar to other findings in this campaign."
+    - "Related to other slangi VM findings (#11402, #11403, plus the unfiled pending findings on vector-scalar broadcast and swizzle-assign). Likely a shared root cause around how the VM emitter handles matrix/swizzle IR instructions."

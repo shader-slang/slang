@@ -8,98 +8,127 @@ See [`_meta/regenerate.md`](_meta/regenerate.md) for the operator workflow.
 
 ## Suite totals
 
-- **Bundles:** 44
-- **Total `.slang` tests:** 2683
+- **Bundles:** 68
+- **Total `.slang` tests:** 3069
 
-| Intent | Count |
-| --- | --- |
-| `functional` | 910 |
-| `boundary` | 632 |
-| `negative` | 590 |
-| `expansion` | 439 |
-| `stress` | 111 |
-| `regression` | 1 |
+| Intent       | Count |
+| ------------ | ----- |
+| `functional` | 1214  |
+| `boundary`   | 684   |
+| `negative`   | 622   |
+| `expansion`  | 437   |
+| `stress`     | 111   |
+| `regression` | 1     |
 
 ## Bundles by section
 
+### Conformance (language reference)
+
+| Bundle                                                                                                                     | Tests | Source doc                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------- | ----: | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`conformance/basics-execution-divergence-reconvergence`](conformance/basics-execution-divergence-reconvergence/README.md) |     8 | [`docs/language-reference/basics-execution-divergence-reconvergence.md`](../../language-reference/basics-execution-divergence-reconvergence.md) |
+| [`conformance/basics-memory-model-address-spaces`](conformance/basics-memory-model-address-spaces/README.md)               |    20 | [`docs/language-reference/basics-memory-model-address-spaces.md`](../../language-reference/basics-memory-model-address-spaces.md)               |
+| [`conformance/basics-memory-model-consistency`](conformance/basics-memory-model-consistency/README.md)                     |    20 | [`docs/language-reference/basics-memory-model-consistency.md`](../../language-reference/basics-memory-model-consistency.md)                     |
+| [`conformance/basics-memory-model-special-topics`](conformance/basics-memory-model-special-topics/README.md)               |     9 | [`docs/language-reference/basics-memory-model-special-topics.md`](../../language-reference/basics-memory-model-special-topics.md)               |
+| [`conformance/basics-program-execution`](conformance/basics-program-execution/README.md)                                   |    10 | [`docs/language-reference/basics-program-execution.md`](../../language-reference/basics-program-execution.md)                                   |
+| [`conformance/declarations`](conformance/declarations/README.md)                                                           |    43 | [`docs/language-reference/declarations.md`](../../language-reference/declarations.md)                                                           |
+| [`conformance/expressions-identifier`](conformance/expressions-identifier/README.md)                                       |    10 | [`docs/language-reference/expressions-identifier.md`](../../language-reference/expressions-identifier.md)                                       |
+| [`conformance/expressions-initializer`](conformance/expressions-initializer/README.md)                                     |     9 | [`docs/language-reference/expressions-initializer.md`](../../language-reference/expressions-initializer.md)                                     |
+| [`conformance/expressions-literal`](conformance/expressions-literal/README.md)                                             |    12 | [`docs/language-reference/expressions-literal.md`](../../language-reference/expressions-literal.md)                                             |
+| [`conformance/expressions-member-access`](conformance/expressions-member-access/README.md)                                 |     5 | [`docs/language-reference/expressions-member-access.md`](../../language-reference/expressions-member-access.md)                                 |
+| [`conformance/expressions-operator-precedence`](conformance/expressions-operator-precedence/README.md)                     |    25 | [`docs/language-reference/expressions-operator-precedence.md`](../../language-reference/expressions-operator-precedence.md)                     |
+| [`conformance/expressions-operators`](conformance/expressions-operators/README.md)                                         |    10 | [`docs/language-reference/expressions-operators.md`](../../language-reference/expressions-operators.md)                                         |
+| [`conformance/expressions-this`](conformance/expressions-this/README.md)                                                   |     6 | [`docs/language-reference/expressions-this.md`](../../language-reference/expressions-this.md)                                                   |
+| [`conformance/generics`](conformance/generics/README.md)                                                                   |    45 | [`docs/language-reference/generics.md`](../../language-reference/generics.md)                                                                   |
+| [`conformance/lexical-structure`](conformance/lexical-structure/README.md)                                                 |     8 | [`docs/language-reference/lexical-structure.md`](../../language-reference/lexical-structure.md)                                                 |
+| [`conformance/statements`](conformance/statements/README.md)                                                               |    36 | [`docs/language-reference/statements.md`](../../language-reference/statements.md)                                                               |
+| [`conformance/types-array`](conformance/types-array/README.md)                                                             |     6 | [`docs/language-reference/types-array.md`](../../language-reference/types-array.md)                                                             |
+| [`conformance/types-enum`](conformance/types-enum/README.md)                                                               |     5 | [`docs/language-reference/types-enum.md`](../../language-reference/types-enum.md)                                                               |
+| [`conformance/types-extension`](conformance/types-extension/README.md)                                                     |     5 | [`docs/language-reference/types-extension.md`](../../language-reference/types-extension.md)                                                     |
+| [`conformance/types-fundamental-integer`](conformance/types-fundamental-integer/README.md)                                 |     8 | [`docs/language-reference/types-fundamental.md`](../../language-reference/types-fundamental.md)                                                 |
+| [`conformance/types-interface`](conformance/types-interface/README.md)                                                     |    30 | [`docs/language-reference/types-interface.md`](../../language-reference/types-interface.md)                                                     |
+| [`conformance/types-pointer`](conformance/types-pointer/README.md)                                                         |    19 | [`docs/language-reference/types-pointer.md`](../../language-reference/types-pointer.md)                                                         |
+| [`conformance/types-struct`](conformance/types-struct/README.md)                                                           |    31 | [`docs/language-reference/types-struct.md`](../../language-reference/types-struct.md)                                                           |
+| [`conformance/types-vector-and-matrix`](conformance/types-vector-and-matrix/README.md)                                     |     9 | [`docs/language-reference/types-vector-and-matrix.md`](../../language-reference/types-vector-and-matrix.md)                                     |
+
 ### Pipeline
 
-| Bundle | Tests | Source doc |
-| --- | ---: | --- |
-| [`pipeline/01-lex-preprocess`](pipeline/01-lex-preprocess/README.md) | 43 | [`docs/generated/design/pipeline/01-lex-preprocess.md`](../design/pipeline/01-lex-preprocess.md) |
-| [`pipeline/02-parse-ast`](pipeline/02-parse-ast/README.md) | 20 | [`docs/generated/design/pipeline/02-parse-ast.md`](../design/pipeline/02-parse-ast.md) |
-| [`pipeline/03-semantic-check`](pipeline/03-semantic-check/README.md) | 77 | [`docs/generated/design/pipeline/03-semantic-check.md`](../design/pipeline/03-semantic-check.md) |
-| [`pipeline/04-ast-to-ir`](pipeline/04-ast-to-ir/README.md) | 125 | [`docs/generated/design/pipeline/04-ast-to-ir.md`](../design/pipeline/04-ast-to-ir.md) |
-| [`pipeline/04b-pre-link-passes`](pipeline/04b-pre-link-passes/README.md) | 16 | [`docs/generated/design/pipeline/04b-pre-link-passes.md`](../design/pipeline/04b-pre-link-passes.md) |
-| [`pipeline/04c-layout-ir`](pipeline/04c-layout-ir/README.md) | 13 | [`docs/generated/design/pipeline/04c-layout-ir.md`](../design/pipeline/04c-layout-ir.md) |
-| [`pipeline/05-ir-passes`](pipeline/05-ir-passes/README.md) | 109 | [`docs/generated/design/pipeline/05-ir-passes.md`](../design/pipeline/05-ir-passes.md) |
-| [`pipeline/06-emit`](pipeline/06-emit/README.md) | 42 | [`docs/generated/design/pipeline/06-emit.md`](../design/pipeline/06-emit.md) |
-| [`pipeline/overview`](pipeline/overview/README.md) | 7 | [`docs/generated/design/pipeline/overview.md`](../design/pipeline/overview.md) |
+| Bundle                                                                                 | Tests | Source doc                                                                                           |
+| -------------------------------------------------------------------------------------- | ----: | ---------------------------------------------------------------------------------------------------- |
+| [`design/pipeline/01-lex-preprocess`](design/pipeline/01-lex-preprocess/README.md)     |    43 | [`docs/generated/design/pipeline/01-lex-preprocess.md`](../design/pipeline/01-lex-preprocess.md)     |
+| [`design/pipeline/02-parse-ast`](design/pipeline/02-parse-ast/README.md)               |    20 | [`docs/generated/design/pipeline/02-parse-ast.md`](../design/pipeline/02-parse-ast.md)               |
+| [`design/pipeline/03-semantic-check`](design/pipeline/03-semantic-check/README.md)     |    77 | [`docs/generated/design/pipeline/03-semantic-check.md`](../design/pipeline/03-semantic-check.md)     |
+| [`design/pipeline/04-ast-to-ir`](design/pipeline/04-ast-to-ir/README.md)               |   125 | [`docs/generated/design/pipeline/04-ast-to-ir.md`](../design/pipeline/04-ast-to-ir.md)               |
+| [`design/pipeline/04b-pre-link-passes`](design/pipeline/04b-pre-link-passes/README.md) |    16 | [`docs/generated/design/pipeline/04b-pre-link-passes.md`](../design/pipeline/04b-pre-link-passes.md) |
+| [`design/pipeline/04c-layout-ir`](design/pipeline/04c-layout-ir/README.md)             |    13 | [`docs/generated/design/pipeline/04c-layout-ir.md`](../design/pipeline/04c-layout-ir.md)             |
+| [`design/pipeline/05-ir-passes`](design/pipeline/05-ir-passes/README.md)               |   109 | [`docs/generated/design/pipeline/05-ir-passes.md`](../design/pipeline/05-ir-passes.md)               |
+| [`design/pipeline/06-emit`](design/pipeline/06-emit/README.md)                         |    42 | [`docs/generated/design/pipeline/06-emit.md`](../design/pipeline/06-emit.md)                         |
+| [`design/pipeline/overview`](design/pipeline/overview/README.md)                       |     7 | [`docs/generated/design/pipeline/overview.md`](../design/pipeline/overview.md)                       |
 
 ### Syntax reference
 
-| Bundle | Tests | Source doc |
-| --- | ---: | --- |
-| [`syntax-reference/grammar`](syntax-reference/grammar/README.md) | 37 | [`docs/generated/design/syntax-reference/grammar.md`](../design/syntax-reference/grammar.md) |
-| [`syntax-reference/keywords-and-builtins`](syntax-reference/keywords-and-builtins/README.md) | 56 | [`docs/generated/design/syntax-reference/keywords-and-builtins.md`](../design/syntax-reference/keywords-and-builtins.md) |
-| [`syntax-reference/tokens`](syntax-reference/tokens/README.md) | 34 | [`docs/generated/design/syntax-reference/tokens.md`](../design/syntax-reference/tokens.md) |
+| Bundle                                                                                                     | Tests | Source doc                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------------ |
+| [`design/syntax-reference/grammar`](design/syntax-reference/grammar/README.md)                             |    37 | [`docs/generated/design/syntax-reference/grammar.md`](../design/syntax-reference/grammar.md)                             |
+| [`design/syntax-reference/keywords-and-builtins`](design/syntax-reference/keywords-and-builtins/README.md) |    56 | [`docs/generated/design/syntax-reference/keywords-and-builtins.md`](../design/syntax-reference/keywords-and-builtins.md) |
+| [`design/syntax-reference/tokens`](design/syntax-reference/tokens/README.md)                               |    34 | [`docs/generated/design/syntax-reference/tokens.md`](../design/syntax-reference/tokens.md)                               |
 
 ### Cross-cutting
 
-| Bundle | Tests | Source doc |
-| --- | ---: | --- |
-| [`cross-cutting/core-module`](cross-cutting/core-module/README.md) | 77 | [`docs/generated/design/cross-cutting/core-module.md`](../design/cross-cutting/core-module.md) |
-| [`cross-cutting/diagnostics`](cross-cutting/diagnostics/README.md) | 50 | [`docs/generated/design/cross-cutting/diagnostics.md`](../design/cross-cutting/diagnostics.md) |
-| [`cross-cutting/diagnostics-catalog`](cross-cutting/diagnostics-catalog/README.md) | 323 | [`docs/generated/design/cross-cutting/diagnostics.md`](../design/cross-cutting/diagnostics.md) |
-| [`cross-cutting/ir-instructions`](cross-cutting/ir-instructions/README.md) | 125 | [`docs/generated/design/cross-cutting/ir-instructions.md`](../design/cross-cutting/ir-instructions.md) |
-| [`cross-cutting/serialization`](cross-cutting/serialization/README.md) | 10 | [`docs/generated/design/cross-cutting/serialization.md`](../design/cross-cutting/serialization.md) |
-| [`cross-cutting/targets`](cross-cutting/targets/README.md) | 36 | [`docs/generated/design/cross-cutting/targets.md`](../design/cross-cutting/targets.md) |
+| Bundle                                                                                           | Tests | Source doc                                                                                             |
+| ------------------------------------------------------------------------------------------------ | ----: | ------------------------------------------------------------------------------------------------------ |
+| [`design/cross-cutting/core-module`](design/cross-cutting/core-module/README.md)                 |    77 | [`docs/generated/design/cross-cutting/core-module.md`](../design/cross-cutting/core-module.md)         |
+| [`design/cross-cutting/diagnostics`](design/cross-cutting/diagnostics/README.md)                 |    50 | [`docs/generated/design/cross-cutting/diagnostics.md`](../design/cross-cutting/diagnostics.md)         |
+| [`design/cross-cutting/diagnostics-catalog`](design/cross-cutting/diagnostics-catalog/README.md) |   323 | [`docs/generated/design/cross-cutting/diagnostics.md`](../design/cross-cutting/diagnostics.md)         |
+| [`design/cross-cutting/ir-instructions`](design/cross-cutting/ir-instructions/README.md)         |   125 | [`docs/generated/design/cross-cutting/ir-instructions.md`](../design/cross-cutting/ir-instructions.md) |
+| [`design/cross-cutting/serialization`](design/cross-cutting/serialization/README.md)             |     9 | [`docs/generated/design/cross-cutting/serialization.md`](../design/cross-cutting/serialization.md)     |
+| [`design/cross-cutting/targets`](design/cross-cutting/targets/README.md)                         |    36 | [`docs/generated/design/cross-cutting/targets.md`](../design/cross-cutting/targets.md)                 |
 
 ### AST reference
 
-| Bundle | Tests | Source doc |
-| --- | ---: | --- |
-| [`ast-reference/base`](ast-reference/base/README.md) | 12 | [`docs/generated/design/ast-reference/base.md`](../design/ast-reference/base.md) |
-| [`ast-reference/declarations`](ast-reference/declarations/README.md) | 46 | [`docs/generated/design/ast-reference/declarations.md`](../design/ast-reference/declarations.md) |
-| [`ast-reference/expressions`](ast-reference/expressions/README.md) | 103 | [`docs/generated/design/ast-reference/expressions.md`](../design/ast-reference/expressions.md) |
-| [`ast-reference/modifiers`](ast-reference/modifiers/README.md) | 29 | [`docs/generated/design/ast-reference/modifiers.md`](../design/ast-reference/modifiers.md) |
-| [`ast-reference/statements`](ast-reference/statements/README.md) | 50 | [`docs/generated/design/ast-reference/statements.md`](../design/ast-reference/statements.md) |
-| [`ast-reference/types`](ast-reference/types/README.md) | 109 | [`docs/generated/design/ast-reference/types.md`](../design/ast-reference/types.md) |
-| [`ast-reference/values`](ast-reference/values/README.md) | 11 | [`docs/generated/design/ast-reference/values.md`](../design/ast-reference/values.md) |
+| Bundle                                                                             | Tests | Source doc                                                                                       |
+| ---------------------------------------------------------------------------------- | ----: | ------------------------------------------------------------------------------------------------ |
+| [`design/ast-reference/base`](design/ast-reference/base/README.md)                 |    12 | [`docs/generated/design/ast-reference/base.md`](../design/ast-reference/base.md)                 |
+| [`design/ast-reference/declarations`](design/ast-reference/declarations/README.md) |    46 | [`docs/generated/design/ast-reference/declarations.md`](../design/ast-reference/declarations.md) |
+| [`design/ast-reference/expressions`](design/ast-reference/expressions/README.md)   |   103 | [`docs/generated/design/ast-reference/expressions.md`](../design/ast-reference/expressions.md)   |
+| [`design/ast-reference/modifiers`](design/ast-reference/modifiers/README.md)       |    29 | [`docs/generated/design/ast-reference/modifiers.md`](../design/ast-reference/modifiers.md)       |
+| [`design/ast-reference/statements`](design/ast-reference/statements/README.md)     |    50 | [`docs/generated/design/ast-reference/statements.md`](../design/ast-reference/statements.md)     |
+| [`design/ast-reference/types`](design/ast-reference/types/README.md)               |   109 | [`docs/generated/design/ast-reference/types.md`](../design/ast-reference/types.md)               |
+| [`design/ast-reference/values`](design/ast-reference/values/README.md)             |    11 | [`docs/generated/design/ast-reference/values.md`](../design/ast-reference/values.md)             |
 
 ### Name resolution
 
-| Bundle | Tests | Source doc |
-| --- | ---: | --- |
-| [`name-resolution/lookup`](name-resolution/lookup/README.md) | 24 | [`docs/generated/design/name-resolution/lookup.md`](../design/name-resolution/lookup.md) |
-| [`name-resolution/overload-resolution`](name-resolution/overload-resolution/README.md) | 24 | [`docs/generated/design/name-resolution/overload-resolution.md`](../design/name-resolution/overload-resolution.md) |
-| [`name-resolution/scopes`](name-resolution/scopes/README.md) | 25 | [`docs/generated/design/name-resolution/scopes.md`](../design/name-resolution/scopes.md) |
-| [`name-resolution/visibility`](name-resolution/visibility/README.md) | 16 | [`docs/generated/design/name-resolution/visibility.md`](../design/name-resolution/visibility.md) |
+| Bundle                                                                                               | Tests | Source doc                                                                                                         |
+| ---------------------------------------------------------------------------------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------ |
+| [`design/name-resolution/lookup`](design/name-resolution/lookup/README.md)                           |    24 | [`docs/generated/design/name-resolution/lookup.md`](../design/name-resolution/lookup.md)                           |
+| [`design/name-resolution/overload-resolution`](design/name-resolution/overload-resolution/README.md) |    24 | [`docs/generated/design/name-resolution/overload-resolution.md`](../design/name-resolution/overload-resolution.md) |
+| [`design/name-resolution/scopes`](design/name-resolution/scopes/README.md)                           |    25 | [`docs/generated/design/name-resolution/scopes.md`](../design/name-resolution/scopes.md)                           |
+| [`design/name-resolution/visibility`](design/name-resolution/visibility/README.md)                   |    16 | [`docs/generated/design/name-resolution/visibility.md`](../design/name-resolution/visibility.md)                   |
 
 ### IR reference
 
-| Bundle | Tests | Source doc |
-| --- | ---: | --- |
-| [`ir-reference/control-flow`](ir-reference/control-flow/README.md) | 37 | [`docs/generated/design/ir-reference/control-flow.md`](../design/ir-reference/control-flow.md) |
-| [`ir-reference/decorations`](ir-reference/decorations/README.md) | 64 | [`docs/generated/design/ir-reference/decorations.md`](../design/ir-reference/decorations.md) |
-| [`ir-reference/differentiation`](ir-reference/differentiation/README.md) | 16 | [`docs/generated/design/ir-reference/differentiation.md`](../design/ir-reference/differentiation.md) |
-| [`ir-reference/generics-and-existentials`](ir-reference/generics-and-existentials/README.md) | 39 | [`docs/generated/design/ir-reference/generics-and-existentials.md`](../design/ir-reference/generics-and-existentials.md) |
-| [`ir-reference/metadata`](ir-reference/metadata/README.md) | 24 | [`docs/generated/design/ir-reference/metadata.md`](../design/ir-reference/metadata.md) |
-| [`ir-reference/misc`](ir-reference/misc/README.md) | 10 | [`docs/generated/design/ir-reference/misc.md`](../design/ir-reference/misc.md) |
-| [`ir-reference/resources-and-atomics`](ir-reference/resources-and-atomics/README.md) | 99 | [`docs/generated/design/ir-reference/resources-and-atomics.md`](../design/ir-reference/resources-and-atomics.md) |
-| [`ir-reference/structure`](ir-reference/structure/README.md) | 22 | [`docs/generated/design/ir-reference/structure.md`](../design/ir-reference/structure.md) |
-| [`ir-reference/types`](ir-reference/types/README.md) | 125 | [`docs/generated/design/ir-reference/types.md`](../design/ir-reference/types.md) |
-| [`ir-reference/values`](ir-reference/values/README.md) | 127 | [`docs/generated/design/ir-reference/values.md`](../design/ir-reference/values.md) |
+| Bundle                                                                                                     | Tests | Source doc                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------------ |
+| [`design/ir-reference/control-flow`](design/ir-reference/control-flow/README.md)                           |    37 | [`docs/generated/design/ir-reference/control-flow.md`](../design/ir-reference/control-flow.md)                           |
+| [`design/ir-reference/decorations`](design/ir-reference/decorations/README.md)                             |    64 | [`docs/generated/design/ir-reference/decorations.md`](../design/ir-reference/decorations.md)                             |
+| [`design/ir-reference/differentiation`](design/ir-reference/differentiation/README.md)                     |    16 | [`docs/generated/design/ir-reference/differentiation.md`](../design/ir-reference/differentiation.md)                     |
+| [`design/ir-reference/generics-and-existentials`](design/ir-reference/generics-and-existentials/README.md) |    39 | [`docs/generated/design/ir-reference/generics-and-existentials.md`](../design/ir-reference/generics-and-existentials.md) |
+| [`design/ir-reference/metadata`](design/ir-reference/metadata/README.md)                                   |    24 | [`docs/generated/design/ir-reference/metadata.md`](../design/ir-reference/metadata.md)                                   |
+| [`design/ir-reference/misc`](design/ir-reference/misc/README.md)                                           |    10 | [`docs/generated/design/ir-reference/misc.md`](../design/ir-reference/misc.md)                                           |
+| [`design/ir-reference/resources-and-atomics`](design/ir-reference/resources-and-atomics/README.md)         |    99 | [`docs/generated/design/ir-reference/resources-and-atomics.md`](../design/ir-reference/resources-and-atomics.md)         |
+| [`design/ir-reference/structure`](design/ir-reference/structure/README.md)                                 |    22 | [`docs/generated/design/ir-reference/structure.md`](../design/ir-reference/structure.md)                                 |
+| [`design/ir-reference/types`](design/ir-reference/types/README.md)                                         |   125 | [`docs/generated/design/ir-reference/types.md`](../design/ir-reference/types.md)                                         |
+| [`design/ir-reference/values`](design/ir-reference/values/README.md)                                       |   127 | [`docs/generated/design/ir-reference/values.md`](../design/ir-reference/values.md)                                       |
 
 ### Target pipelines
 
-| Bundle | Tests | Source doc |
-| --- | ---: | --- |
-| [`target-pipelines/cuda`](target-pipelines/cuda/README.md) | 61 | [`docs/generated/design/target-pipelines/cuda.md`](../design/target-pipelines/cuda.md) |
-| [`target-pipelines/hlsl`](target-pipelines/hlsl/README.md) | 143 | [`docs/generated/design/target-pipelines/hlsl.md`](../design/target-pipelines/hlsl.md) |
-| [`target-pipelines/metal`](target-pipelines/metal/README.md) | 73 | [`docs/generated/design/target-pipelines/metal.md`](../design/target-pipelines/metal.md) |
-| [`target-pipelines/spirv`](target-pipelines/spirv/README.md) | 132 | [`docs/generated/design/target-pipelines/spirv.md`](../design/target-pipelines/spirv.md) |
-| [`target-pipelines/wgsl`](target-pipelines/wgsl/README.md) | 62 | [`docs/generated/design/target-pipelines/wgsl.md`](../design/target-pipelines/wgsl.md) |
+| Bundle                                                                     | Tests | Source doc                                                                               |
+| -------------------------------------------------------------------------- | ----: | ---------------------------------------------------------------------------------------- |
+| [`design/target-pipelines/cuda`](design/target-pipelines/cuda/README.md)   |    61 | [`docs/generated/design/target-pipelines/cuda.md`](../design/target-pipelines/cuda.md)   |
+| [`design/target-pipelines/hlsl`](design/target-pipelines/hlsl/README.md)   |   143 | [`docs/generated/design/target-pipelines/hlsl.md`](../design/target-pipelines/hlsl.md)   |
+| [`design/target-pipelines/metal`](design/target-pipelines/metal/README.md) |    72 | [`docs/generated/design/target-pipelines/metal.md`](../design/target-pipelines/metal.md) |
+| [`design/target-pipelines/spirv`](design/target-pipelines/spirv/README.md) |   131 | [`docs/generated/design/target-pipelines/spirv.md`](../design/target-pipelines/spirv.md) |
+| [`design/target-pipelines/wgsl`](design/target-pipelines/wgsl/README.md)   |    62 | [`docs/generated/design/target-pipelines/wgsl.md`](../design/target-pipelines/wgsl.md)   |
 
 ## Catalog snapshot
 
