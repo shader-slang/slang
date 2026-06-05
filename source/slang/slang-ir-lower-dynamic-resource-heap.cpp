@@ -21,7 +21,6 @@ bool tryGetBindlessSpaceIndex(TargetProgram* targetProgram, UInt& outBindlessSpa
 
     // Do not fall back to the requested option here; only layout knows the
     // bindless space that was actually reserved after conflict resolution.
-    SLANG_ASSERT(programLayout->bindlessSpaceIndex >= 0);
     if (programLayout->bindlessSpaceIndex < 0)
         return false;
 
