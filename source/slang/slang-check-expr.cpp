@@ -5064,12 +5064,12 @@ struct HigherOrderInvokeExprCheckingActions
         return nullptr;
     }
 
-    // Extract the explicit receiver parameter type for a non-static member method
+    // Extract the explicit `this` parameter type for a non-static member method
     // used as the operand of a higher-order operator.
     //
     // A method reference spelled as `Type::method` uses the method's declared
     // `this` type. A method reference spelled as `value.method` uses the checked
-    // type of `value`; the derivative callable is static, so the receiver must be
+    // type of `value`; the derivative callable is static, so that value must be
     // provided as the first argument at the derivative call site.
     //
     // Returns a null QualType for free functions, static methods, constructors, and
@@ -5079,7 +5079,7 @@ struct HigherOrderInvokeExprCheckingActions
     {
         auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
 
-        // Only member references can contribute a receiver parameter. A plain
+        // Only member references can contribute an explicit `this` parameter. A plain
         // DeclRefExpr inside the same type still means "use the current implicit
         // this", so the differentiated function remains an instance member.
         if (!as<MemberExpr>(innerExpr) && !as<StaticMemberExpr>(innerExpr))
@@ -5102,7 +5102,7 @@ struct HigherOrderInvokeExprCheckingActions
                     !as<ConstructorDecl>(callableDecl))
                 {
                     // Ask the method declaration how its implicit `this` is passed.
-                    // For example, a mutating method needs a writable receiver, while a
+                    // For example, a mutating method needs writable `this`, while a
                     // [NoDiffThis] method usually passes `this` by value.
                     auto declaredThisType = getTypeForThisExpr(semantics, callableDeclRef);
                     if (!declaredThisType.type)
@@ -5110,9 +5110,9 @@ struct HigherOrderInvokeExprCheckingActions
 
                     if (auto memberExpr = as<MemberExpr>(innerExpr))
                     {
-                        // For `value.method`, the receiver argument should have the
+                        // For `value.method`, the explicit `this` argument should have the
                         // checked type of `value`. This is important for generic/interface
-                        // receivers: `shape.distance` in a `S : IShape3D` function should
+                        // values: `shape.distance` in a `S : IShape3D` function should
                         // expect `S`, not the interface requirement's `This` type.
                         //
                         // Preserve the declared l-value-ness so the generated
@@ -5124,7 +5124,7 @@ struct HigherOrderInvokeExprCheckingActions
                     }
                     else
                     {
-                        // For `Type::method`, there is no receiver expression to inspect,
+                        // For `Type::method`, there is no object expression to inspect,
                         // so use the method's declared/specialized `this` type directly.
                         return declaredThisType;
                     }

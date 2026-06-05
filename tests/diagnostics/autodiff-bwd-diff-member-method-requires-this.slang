@@ -21,7 +21,7 @@ void test(float3 p)
     Sphere s = {1.0};
     var dp = diffPair(p);
 
-    // Missing explicit receiver argument: expected spelling is
+    // Missing explicit `this` argument: expected spelling is
     // `__bwd_diff(s.distance)(s, dp, 1.0)`.
     __bwd_diff(s.distance)(dp, 1.0);
 // CHECK: not enough arguments to call
