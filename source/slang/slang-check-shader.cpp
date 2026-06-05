@@ -1826,8 +1826,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         if (auto numThreadsAttr = entryPointFuncDecl->findModifier<NumThreadsAttribute>())
         {
-            sink->diagnose(Diagnostics::NumThreadsDisallowedOnThreadLaunchNode{
-                .attr = numThreadsAttr});
+            sink->diagnose(
+                Diagnostics::NumThreadsDisallowedOnThreadLaunchNode{.attr = numThreadsAttr});
         }
     }
 
