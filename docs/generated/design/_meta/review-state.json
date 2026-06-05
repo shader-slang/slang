@@ -1395,29 +1395,29 @@
     "target-pipelines/metal.md": {
       "last_remediated": {
         "actions": {
-          "deferred": 1,
+          "deferred": 0,
           "escalated": 0,
           "fixed": 3,
           "rejected_bogus": 0,
           "rejected_out_of_scope": 0
         },
-        "remediated_at": "2026-06-05T15:45:00+00:00",
+        "remediated_at": "2026-06-05T17:00:14+00:00",
         "remediator_model": "claude-opus-4.8",
         "report_path": "docs/generated/design/_meta/remediations/target-pipelines/metal.md.remediation.md",
         "review_report_ref": "docs/generated/design/_meta/reviews/target-pipelines/metal.md.review.md"
       },
       "last_reviewed": {
-        "finding_count": 4,
+        "finding_count": 3,
         "report_path": "docs/generated/design/_meta/reviews/target-pipelines/metal.md.review.md",
-        "reviewed_at": "2026-06-05T15:06:52+00:00",
+        "reviewed_at": "2026-06-05T16:52:54+00:00",
         "reviewer_model": "gpt-5.5",
         "severity_breakdown": {
-          "critical": 1,
+          "critical": 0,
           "major": 3,
           "minor": 0,
           "nit": 0
         },
-        "target_doc_source_commit": "52339028a2aa703271533454c6b9528a534bac31",
+        "target_doc_source_commit": "43e8ca0cef30f575bd1750589b2c7cd9f2b6e030",
         "target_doc_watched_paths_digest": "751b986b2d853e8242f650fcb4a698ce747155b40fac3ebc58e2361363790674"
       }
     },

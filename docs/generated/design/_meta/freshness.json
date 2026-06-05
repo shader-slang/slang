@@ -289,9 +289,9 @@
       "watched_paths_digest": "db6544c2e757fba058e7319e82a23008dc2204340eb1634d34ff6dd1a0aef57e"
     },
     "target-pipelines/metal.md": {
-      "generated_at": "2026-06-05T16:44:19+00:00",
+      "generated_at": "2026-06-05T17:00:36+00:00",
       "model": "claude-opus-4.8",
-      "source_commit": "43e8ca0cef30f575bd1750589b2c7cd9f2b6e030",
+      "source_commit": "76c9a59695365016093e84dd12b5fc57d1e751d8",
       "watched_paths_digest": "751b986b2d853e8242f650fcb4a698ce747155b40fac3ebc58e2361363790674"
     },
     "target-pipelines/spirv.md": {
