@@ -144,3 +144,16 @@ docs/generated/tests/design/cross-cutting/diagnostics-catalog/29106-spirv-instru
 # under the slang-linux-clang-ci container; same `-dump-ir` text-emit
 # class as Cluster C. Test-vs-compiler cause still to be determined.
 docs/generated/tests/design/ir-reference/decorations/struct-with-many-field-decorations.slang
+
+# Re-added after nightly run 26997297493 surfaced this test as FAILED:
+# https://github.com/shader-slang/slang/actions/runs/26997297493
+# (no tracking issue filed yet; pending user triage).
+#
+# This entry was previously listed under Cluster C with a comment noting
+# that the cluster's tests "flip between FAILED and PASS across runs."
+# It was removed after run 26934884546 observed it passing (along with
+# three sibling tests) — a single-pass removal that the cluster's own
+# comment warned against ("let multiple consecutive clean runs drive
+# removal, not a single observed pass"). Re-adding here so the next
+# flip back to FAILED doesn't turn the nightly red again.
+docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buffer-load-negative-index-literal.slang
