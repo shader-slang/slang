@@ -2107,6 +2107,9 @@ public:
         return &m_annotationLookupCache;
     }
 
+    IRInst* getCachedUnitPoisonVal() const { return m_cachedUnitPoisonVal; }
+    void setCachedUnitPoisonVal(IRInst* inst) { m_cachedUnitPoisonVal = inst; }
+
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
     {
         IRAnalysis* analysis = m_mapInstToAnalysis.tryGetValue(func);
@@ -2239,6 +2242,9 @@ private:
 
     // (inst, association-kind) -> associated-inst
     Dictionary<AnnotationCacheKey, IRAnnotation*> m_annotationLookupCache;
+
+    // Lazily-created module-scope void poison value used as a placeholder for weak references.
+    IRInst* m_cachedUnitPoisonVal = nullptr;
 };
 
 

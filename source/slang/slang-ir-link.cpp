@@ -90,6 +90,7 @@ struct IRSpecContextBase
     List<IRModule*> irModules;
 
     HashSet<UnownedStringSlice> deferredWitnessTableEntryKeys;
+    HashSet<IRInst*> globalsWithClonedAnnotations;
     List<RefPtr<WitnessTableCloneInfo>> witnessTables;
 
     IRSpecSymbol* findSymbols(UnownedStringSlice mangledName)
@@ -201,6 +202,9 @@ static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRI
     // body. Only explicitly chase use-list annotations for module-scope instructions, where the
     // annotations are not children of the cloned instruction itself.
     if (!originalInst->getParent() || originalInst->getParent()->getOp() != kIROp_ModuleInst)
+        return;
+
+    if (!context->globalsWithClonedAnnotations.add(originalInst))
         return;
 
     traverseUsers<IRAnnotation>(

@@ -1342,9 +1342,25 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
 
 IRInst* getUnitPoisonVal(IRBuilder* builder, IRModule* module)
 {
+    auto moduleInst = module->getModuleInst();
+
+    // DCE can ask for this placeholder many times, so keep the canonical
+    // module-scope void poison value on the module instead of scanning globals.
+    if (auto cachedInst = module->getCachedUnitPoisonVal())
+    {
+        // If a pass detached or replaced the cached instruction, fall back to
+        // the old scan/create path and refresh the cache.
+        if (cachedInst->getParent() == moduleInst && cachedInst->getOp() == kIROp_Poison &&
+            cachedInst->getDataType() && cachedInst->getDataType()->getOp() == kIROp_VoidType)
+        {
+            return cachedInst;
+        }
+        module->setCachedUnitPoisonVal(nullptr);
+    }
+
     IRInst* undefInst = nullptr;
 
-    for (auto inst : module->getModuleInst()->getChildren())
+    for (auto inst : moduleInst->getChildren())
     {
         if (inst->getOp() == kIROp_Poison && inst->getDataType() &&
             inst->getDataType()->getOp() == kIROp_VoidType)
@@ -1359,6 +1375,7 @@ IRInst* getUnitPoisonVal(IRBuilder* builder, IRModule* module)
         builder->setInsertAfter(voidType);
         undefInst = builder->emitPoison(voidType);
     }
+    module->setCachedUnitPoisonVal(undefInst);
     return undefInst;
 }
 
@@ -1648,21 +1665,6 @@ bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions opti
     return false;
 }
 
-// Enumerate any associated functions of 'func'
-// that might be used by a pass (e.g. auto-diff)
-//
-template<typename TFunc>
-void forEachAssociatedCallee(IRInst* callee, TFunc callback)
-{
-    traverseUsers<IRAnnotation>(
-        callee,
-        [&](IRAnnotation* annotation)
-        {
-            if (annotation->getTarget() == callee)
-                callback(annotation->getInst());
-        });
-}
-
 bool doesCalleeHaveSideEffect(IRInst* callee)
 {
     bool sideEffect = !isNoSideEffectCallee(callee);
@@ -1679,13 +1681,26 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
     //
     if (!sideEffect)
     {
-        forEachAssociatedCallee(
-            callee,
-            [&](IRInst* associatedCallee)
+        if (auto module = callee->getModule())
+        {
+            IRBuilder builder(module);
+            const AnnotationKind associatedCalleeAnnotationKinds[] = {
+                AnnotationKind::ForwardDerivative,
+                AnnotationKind::BackwardDerivativeApply,
+                AnnotationKind::BackwardDerivativeContextRemat,
+                AnnotationKind::BackwardDerivativePropagate,
+            };
+
+            for (auto kind : associatedCalleeAnnotationKinds)
             {
-                sideEffect |= !isNoSideEffectCallee(associatedCallee);
-                return;
-            });
+                if (auto associatedCallee = builder.tryLookupAnnotation(callee, kind))
+                {
+                    sideEffect |= !isNoSideEffectCallee(associatedCallee);
+                    if (sideEffect)
+                        break;
+                }
+            }
+        }
     }
 
     return sideEffect;
