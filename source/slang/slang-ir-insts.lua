@@ -1992,9 +1992,20 @@ local insts = {
 					struct_name = "AllowSparseNodesDecoration",
 				},
 			},
-				{
-					availableInDownstreamIR = { struct_name = "AvailableInDownstreamIRDecoration", min_operands = 1 },
+			{
+				workGraphRecordType = {
+					struct_name = "WorkGraphRecordTypeDecoration",
 				},
+			},
+			{
+				workGraphRecordElementType = {
+					struct_name = "WorkGraphRecordElementTypeDecoration",
+					operands = { { "elementType", "IRType" } },
+				},
+			},
+			{
+				availableInDownstreamIR = { struct_name = "AvailableInDownstreamIRDecoration", min_operands = 1 },
+			},
 			{
 				GeometryInputPrimitiveTypeDecoration = {
 					{

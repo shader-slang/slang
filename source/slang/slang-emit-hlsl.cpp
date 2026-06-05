@@ -11,6 +11,25 @@
 namespace Slang
 {
 
+static IRInst* getBarrierFlagValueInst(IRInst* inst)
+{
+    while (inst->getOp() == kIROp_InOutImplicitCast || inst->getOp() == kIROp_OutImplicitCast)
+        inst = inst->getOperand(0);
+    return inst;
+}
+
+bool HLSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_InOutImplicitCast:
+    case kIROp_OutImplicitCast:
+        return true;
+    default:
+        return Super::shouldFoldInstIntoUseSites(inst);
+    }
+}
+
 
 void HLSLSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
@@ -1124,6 +1143,11 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
+    case kIROp_InOutImplicitCast:
+    case kIROp_OutImplicitCast:
+        emitOperand(inst->getOperand(0), inOuterPrec);
+        return true;
+
     case kIROp_SubpassLoad:
         {
             auto subpassLoad = as<IRSubpassLoad>(inst);
@@ -1145,7 +1169,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_GetEnumBarrierMemoryTypeFlags:
         {
             SLANG_UNUSED(inOuterPrec);
-            auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
+            auto flagVal = (uint32_t)getIntVal(getBarrierFlagValueInst(inst->getOperand(0)));
             const uint32_t knownFlags =
                 BarrierMemoryTypeFlags::UavMemory | BarrierMemoryTypeFlags::GroupSharedMemory |
                 BarrierMemoryTypeFlags::NodeInputMemory | BarrierMemoryTypeFlags::NodeOutputMemory;
@@ -1198,7 +1222,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_GetEnumBarrierSemanticFlags:
         {
             SLANG_UNUSED(inOuterPrec);
-            auto flagVal = (uint32_t)getIntVal(inst->getOperand(0));
+            auto flagVal = (uint32_t)getIntVal(getBarrierFlagValueInst(inst->getOperand(0)));
             const uint32_t knownFlags = BarrierSemanticFlags::GroupSync |
                                         BarrierSemanticFlags::GroupScope |
                                         BarrierSemanticFlags::DeviceScope;
@@ -1923,6 +1947,27 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
     case kIROp_StructType:
         {
+            auto structType = cast<IRStructType>(type);
+            // Legacy serialized modules may still contain work-graph record types as decorated
+            // structs. New code lowers them as dedicated intrinsic type opcodes above.
+            if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>())
+            {
+                auto nameHint = structType->findDecoration<IRNameHintDecoration>();
+                if (auto elementType = getWorkGraphRecordElementType(structType))
+                {
+                    m_writer->emit(nameHint ? nameHint->getName() : getName(type));
+                    m_writer->emit("<");
+                    emitType(elementType);
+                    m_writer->emit(">");
+                }
+                else
+                {
+                    // Non-generic work-graph type (EmptyNodeOutput, EmptyNodeInput, etc.):
+                    // emit the original HLSL name without a template argument.
+                    m_writer->emit(nameHint ? nameHint->getName() : getName(type));
+                }
+                return;
+            }
             m_writer->emit(getName(type));
             return;
         }

@@ -3323,7 +3323,8 @@ bool isWorkGraphRecordType(IRType* type)
     if (getWorkGraphRecordTypeName(type->getOp()))
         return true;
 
-    return false;
+    auto structType = as<IRStructType>(type);
+    return structType && structType->findDecoration<IRWorkGraphRecordTypeDecoration>();
 }
 
 char const* getWorkGraphRecordTypeName(IROp op)
@@ -3374,6 +3375,11 @@ IRType* getWorkGraphRecordElementType(IRType* type)
         break;
     }
 
+    if (auto structType = as<IRStructType>(type))
+    {
+        if (auto elemDecor = structType->findDecoration<IRWorkGraphRecordElementTypeDecoration>())
+            return elemDecor->getElementType();
+    }
     return nullptr;
 }
 

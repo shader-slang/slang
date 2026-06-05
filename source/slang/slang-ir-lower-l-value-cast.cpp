@@ -57,8 +57,8 @@ struct LValueCastLoweringContext
         auto ptrA = as<IRPtrTypeBase>(a);
         auto ptrB = as<IRPtrTypeBase>(b);
 
-        // They must both be pointers...
-        SLANG_ASSERT(ptrA && ptrB);
+        if (!ptrA || !ptrB)
+            return false;
 
         a = ptrA->getValueType();
         b = ptrB->getValueType();
