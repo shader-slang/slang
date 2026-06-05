@@ -109,7 +109,7 @@ When a proposal contains backward breaking changes, then:
 #[11175](https://github.com/shader-slang/slang/issues/11175). This is a potentially significant breaking
 change that requires following the specification proposal process.
 
-Tentatively, the enumerations are going to be removed in Slang 2028. The current default language is 2025 at
+Tentatively, the unscoped enumerations are going to be removed in Slang 2028. The current default language is 2025 at
 the time of writing. The next steps:
 
 1. Write a language specification proposal.
@@ -125,13 +125,12 @@ the time of writing. The next steps:
 
 ## GitHub Process
 
-The GitHub process is straightforward: file a GitHub issue with "Language Maturity" issue type. Implement the
-fixes. See GitHub issue #[11216](https://github.com/shader-slang/slang/issues/11216) for an example.
+The GitHub process is straightforward: file a GitHub issue with "Language Maturity" issue type, and submit a pull request. See GitHub issue #[11216](https://github.com/shader-slang/slang/issues/11216) for an example.
 
 ## Checklist for Implementing Changes Related to Slang Language
 
 1. Implement the feature.
-   - For a staged behavior syntax change, use the language version to select the behavior. See
+   - For a staged syntax change, use the language version to select the behavior. See
      https://github.com/shader-slang/slang/blob/fbf41e87a3493bfe4417b3b3a92c814dde391960/source/slang/slang-parser.cpp#L5907
      for an example.
    - For a staged standard module change, use attributes
