@@ -637,7 +637,12 @@ if(_dxc_build_from_source)
                 # command. Passing it here covers single-config generators (Ninja).
                 -DCMAKE_BUILD_TYPE=MinSizeRel -DHLSL_COPY_GENERATED_SOURCES=OFF
                 -DLLVM_INCLUDE_TESTS=OFF -DCLANG_INCLUDE_TESTS=OFF
-                -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_forwarded_config_args}
+                -DLLVM_ENABLE_WARNINGS=OFF
+                # Apple Clang 21+ (Xcode 26+) marks std::is_nothrow_constructible
+                # with [[_Clang::__no_specializations__]], turning DXC's LLVM
+                # StringRef specializations into hard errors.
+                "-DCMAKE_CXX_FLAGS=-Wno-invalid-specialization"
+                ${_dxc_forwarded_config_args}
                 -Wno-dev
             RESULT_VARIABLE _dxc_configure_result
             OUTPUT_VARIABLE _dxc_configure_output
