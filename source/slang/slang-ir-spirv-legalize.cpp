@@ -2257,119 +2257,75 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    // Adds the NonUniform decoration to `inst` if it is not already present.
-    // Returns true iff a *new* decoration was added (false if it was already
-    // decorated). The worklist uses `inWorklist` for termination (each
-    // instruction processed at most once); this return value is used for
-    // *completeness* -- downstream users are only enqueued when a new decoration
-    // was actually added, ensuring propagation continues exactly where needed.
-    bool addNonUniformDecoration(IRInst* inst)
-    {
-        if (inst->findDecoration<IRSPIRVNonUniformResourceDecoration>())
-            return false;
-        IRBuilder builder(inst);
-        builder.addSPIRVNonUniformResourceDecoration(inst);
-        return true;
-    }
-
-    bool hasNonUniformDecoration(IRInst* inst)
-    {
-        return inst->findDecoration<IRSPIRVNonUniformResourceDecoration>() != nullptr;
-    }
-
-    // Forward-propagate NonUniform decorations through the IR so that the
-    // actual resource operands consumed by memory/sampling instructions carry
-    // the decoration. Vulkan (VUID-RuntimeSpirv-None-10148) requires NonUniform
-    // on the resource operand of the consuming instruction, not just on the
-    // index used in an access chain. A worklist seeded with already-decorated
-    // instructions pushes the decoration downstream through loads, field
-    // accesses, and combined-sampler construction.
+    // Propagate NonUniform decorations after legalization rewrites.
+    // Ensures both access-chain ops and their index operands carry the
+    // decoration (bidirectional sync from #9871), and forward-propagates
+    // through loads and field accesses so the resource operand consumed
+    // by memory/sampling instructions is decorated per VUID-RuntimeSpirv-None-10148.
     void propagateNonUniformDecorations()
     {
-        List<IRInst*> worklist;
-        HashSet<IRInst*> inWorklist;
-
-        // Seed: collect all instructions that already carry NonUniform.
         for (auto globalInst : m_module->getGlobalInsts())
         {
             auto func = as<IRFunc>(globalInst);
             if (!func)
                 continue;
+
             for (auto block : func->getBlocks())
             {
                 for (auto inst : block->getChildren())
                 {
-                    if (hasNonUniformDecoration(inst))
+                    switch (inst->getOp())
                     {
-                        worklist.add(inst);
-                        inWorklist.add(inst);
+                    case kIROp_GetElement:
+                    case kIROp_GetElementPtr:
+                    case kIROp_RWStructuredBufferGetElementPtr:
+                        {
+                            auto baseOperand = inst->getOperand(0);
+                            auto indexOperand = inst->getOperand(1);
+                            auto baseDecorated =
+                                baseOperand
+                                    ->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                                nullptr;
+                            auto indexDecorated =
+                                indexOperand
+                                    ->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                                nullptr;
+                            auto instDecorated =
+                                inst->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                                nullptr;
+                            if (!baseDecorated && !indexDecorated && !instDecorated)
+                                break;
+                            IRBuilder builder(inst);
+                            builder.setInsertBefore(inst);
+                            if (!indexDecorated)
+                                builder.addSPIRVNonUniformResourceDecoration(indexOperand);
+                            if (!instDecorated)
+                                builder.addSPIRVNonUniformResourceDecoration(inst);
+                        }
+                        break;
+                    case kIROp_FieldAddress:
+                    case kIROp_FieldExtract:
+                        if (inst->getOperand(0)
+                                ->findDecoration<IRSPIRVNonUniformResourceDecoration>() &&
+                            !inst->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                        {
+                            IRBuilder builder(inst);
+                            builder.addSPIRVNonUniformResourceDecoration(inst);
+                        }
+                        break;
+                    case kIROp_Load:
+                        if (inst->getOperand(0)
+                                ->findDecoration<IRSPIRVNonUniformResourceDecoration>() &&
+                            !inst->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                        {
+                            IRBuilder builder(inst);
+                            builder.addSPIRVNonUniformResourceDecoration(inst);
+                        }
+                        break;
+                    default:
+                        break;
                     }
                 }
-            }
-        }
-
-        auto enqueueUsers = [&](IRInst* inst)
-        {
-            for (auto use = inst->firstUse; use; use = use->nextUse)
-            {
-                auto user = use->getUser();
-                if (!inWorklist.contains(user))
-                {
-                    worklist.add(user);
-                    inWorklist.add(user);
-                }
-            }
-        };
-
-        // Decide whether `inst` derives a non-uniform resource from a non-uniform
-        // operand, and if so decorate it. Returns true only when a new decoration
-        // was added (so its users are worth visiting). Each case below encodes how
-        // non-uniformity flows for that opcode:
-        auto tryPropagate = [&](IRInst* inst) -> bool
-        {
-            if (hasNonUniformDecoration(inst))
-                return false;
-            switch (inst->getOp())
-            {
-            case kIROp_GetElement:
-            case kIROp_GetElementPtr:
-            case kIROp_RWStructuredBufferGetElementPtr:
-                if (hasNonUniformDecoration(inst->getOperand(0)) ||
-                    hasNonUniformDecoration(inst->getOperand(1)))
-                    return addNonUniformDecoration(inst);
-                break;
-            case kIROp_FieldAddress:
-            case kIROp_FieldExtract:
-                // A field of a non-uniform aggregate is non-uniform. Only the
-                // aggregate base (operand 0) matters; the field key is a constant.
-                if (hasNonUniformDecoration(inst->getOperand(0)))
-                    return addNonUniformDecoration(inst);
-                break;
-            case kIROp_Load:
-                // Loading through a non-uniform pointer yields a non-uniform
-                // value -- this is the step that carries the decoration onto the
-                // resource value finally consumed by a sampling/memory op.
-                if (hasNonUniformDecoration(inst->getOperand(0)))
-                    return addNonUniformDecoration(inst);
-                break;
-            default:
-                // CastDynamicResource is inlined by specialization before this pass.
-                SLANG_ASSERT(inst->getOp() != kIROp_CastDynamicResource);
-                break;
-            }
-            return false;
-        };
-
-        for (Index i = 0; i < worklist.getCount(); i++)
-        {
-            auto inst = worklist[i];
-            if (hasNonUniformDecoration(inst))
-            {
-                enqueueUsers(inst);
-            }
-            else if (tryPropagate(inst))
-            {
-                enqueueUsers(inst);
             }
         }
     }
