@@ -29,4 +29,5 @@ void main(
 //CHK_HLSL: EmptyNodeInput input_0
 //CHK_HLSL: EmptyNodeOutput outputA_0
 //CHK_HLSL: EmptyNodeOutputArray outputArr_0
+//CHK_HLSL: input_0.Count()
 //CHK_HLSL: outputA_0.ThreadIncrementOutputCount(1U);
