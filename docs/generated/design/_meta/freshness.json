@@ -193,10 +193,10 @@
       "watched_paths_digest": "fd3d948ba51668efc2bdab940c9ced97bfd743835e43a3a4ae3b6a3a358cd405"
     },
     "name-resolution/visibility.md": {
-      "generated_at": "2026-06-05T16:19:42+00:00",
+      "generated_at": "2026-06-05T16:36:38+00:00",
       "model": "claude-opus-4.8",
-      "source_commit": "fb192be9f5b3b58555e034599e072158e5c48dfd",
-      "watched_paths_digest": "7f835b0f4fb5f3c95c0f2466c182e4c6530306b32626d162568da304471b39ae"
+      "source_commit": "43e8ca0cef30f575bd1750589b2c7cd9f2b6e030",
+      "watched_paths_digest": "f47f029a35571b69c1d8b36ac366e5ac795aba8af348d1363f1871834e699314"
     },
     "pipeline/01-lex-preprocess.md": {
       "generated_at": "2026-06-05T09:52:53+00:00",
@@ -289,9 +289,9 @@
       "watched_paths_digest": "db6544c2e757fba058e7319e82a23008dc2204340eb1634d34ff6dd1a0aef57e"
     },
     "target-pipelines/metal.md": {
-      "generated_at": "2026-06-05T16:19:45+00:00",
+      "generated_at": "2026-06-05T16:44:19+00:00",
       "model": "claude-opus-4.8",
-      "source_commit": "fb192be9f5b3b58555e034599e072158e5c48dfd",
+      "source_commit": "43e8ca0cef30f575bd1750589b2c7cd9f2b6e030",
       "watched_paths_digest": "751b986b2d853e8242f650fcb4a698ce747155b40fac3ebc58e2361363790674"
     },
     "target-pipelines/spirv.md": {

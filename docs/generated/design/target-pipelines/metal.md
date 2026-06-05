@@ -1,8 +1,8 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T13:18:56Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
+generated_at: 2026-06-05T16:44:02Z
+source_commit: 43e8ca0cef30f575bd1750589b2c7cd9f2b6e030
 watched_paths_digest: 751b986b2d853e8242f650fcb4a698ce747155b40fac3ebc58e2361363790674
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
@@ -178,33 +178,53 @@ Metal-specific decisions:
 ```mermaid
 flowchart TD
   s1[simplifyIR default]
+  vuGate{"getBoolOption(ValidateUniformity)"}
   vu[validateUniformity]
   sML[specializeMatrixLayout]
+  fscGate{"!shouldPerformMinimumOptimizations"}
   fSC[fuseCallsToSaturatedCooperation]
+  adGate{reqSet.autodiff}
   cAP[checkAutodiffPatterns]
   dCC[diagnoseCircularConformances]
+  sdGate{"!isSpecializationDisabled()"}
   sM[specializeModule]
+  hofGate{reqSet.higherOrderFunc}
   sHOP[specializeHigherOrderParameters]
   fADP[finalizeAutoDiffPass]
+  mssGate{reqSet.matrixSwizzleStore}
   lMSS[lowerMatrixSwizzleStores]
   dce1[eliminateDeadCode]
   fS[finalizeSpecialization]
   lDTI[lowerDiffTypeInfoInsts]
+  ctGate{reqSet.conditionalType}
   lCT[lowerConditionalType]
+  roGate{reqSet.optionalType}
   lRO[lowerReinterpretOptional]
+  nevGate1{shouldRunNonEssentialValidation}
   cONU[checkForOptionalNoneUsage]
+  otGate{reqSet.optionalType}
   lOT[lowerOptionalType]
+  rtGate{reqSet.resultType}
   lRT[lowerResultType]
   reqSet2[calcRequiredLoweringPassSet]
   dUR[detectUninitializedResources]
+  raidGate{removeAvailableInDownstreamIR}
   rAIDD[removeAvailableInDownstreamModuleDecorations]
-  checks["checkForRecursive* checkForOutOfBoundAccess<br/>checkForMissingReturns checkForInvalidShaderParameterType"]
+  nevGate2{shouldRunNonEssentialValidation}
+  cRT[checkForRecursiveTypes]
+  cRF[checkForRecursiveFunctions]
+  cOBA[checkForOutOfBoundAccess]
+  mrGate{reqSet.missingReturn}
+  cMR[checkForMissingReturns]
+  cISPT[checkForInvalidShaderParameterType]
   iAVS[inferAnyValueSizeWhereNecessary]
   uPWT[unpinWitnessTables]
   lSVMI[lowerSumVectorMatrixInsts]
+  minOptGate1{"!minimalOptimization"}
   s2a[simplifyIR fast]
   lTUT[lowerTaggedUnionTypes]
   lUUT[lowerUntaggedUnionTypes]
+  reinterpretGate{reqSet.reinterpret}
   lR[lowerReinterpret]
   lSIDC[lowerSequentialIDTagCasts]
   lTI[lowerTagInsts]
@@ -213,26 +233,34 @@ flowchart TD
   lE[lowerExistentials]
   rWUI[removeWeakUseInsts]
   pTIN[performTypeInlining]
+  nevGate3{shouldRunNonEssentialValidation}
   cGSHI[checkGetStringHashInsts]
   dce4[eliminateDeadCode]
   lTu[lowerTuples]
   gAVMF[generateAnyValueMarshallingFunctions]
+  ssGate{reqSet.specializeStageSwitch}
   sSS[specializeStageSwitch]
   lCV[lowerCooperativeVectors]
   pFI1[performForceInlining]
+  minOptGate2{"!minimalOptimization"}
   s2b[simplifyIR default]
   lACSB[lowerAppendConsumeStructuredBuffers]
+  ctsGate{reqSet.combinedTextureSamplers}
   lCTS[lowerCombinedTextureSamplers]
   lEA[legalizeEmptyArray]
   lVT[legalizeVectorTypes]
+  existGate{shouldLegalizeExistentialAndResourceTypes}
   iGC[inlineGlobalConstantsForLegalization]
   lBETST_Metal["lowerBufferElementTypeToStorageType<br/>(MetalParameterBlock policy)"]
+  etlGate{reqSet.existentialTypeLayout}
   lETL[legalizeExistentialTypeLayout]
   vSBRT[validateStructuredBufferResourceTypes]
   lRTR[legalizeResourceTypes]
   lET_Metal["legalizeEmptyTypes (Metal arm)"]
   lMT[legalizeMatrixTypes]
+  minOptGate3{"!minimalOptimization"}
   s2c[simplifyIR fast]
+  drhGate{reqSet.dynamicResourceHeap}
   lDRH[lowerDynamicResourceHeap]
   sRU[specializeResourceUsage]
   sFBLA1[specializeFuncsForBufferLoadArgs]
@@ -241,11 +269,79 @@ flowchart TD
   cSA[checkStaticAssert]
   wCBE[wrapCBufferElementsForMetal]
 
-  s1 --> vu --> sML --> fSC --> cAP --> dCC --> sM --> sHOP --> fADP --> lMSS --> dce1 --> fS --> lDTI --> lCT --> lRO --> cONU --> lOT --> lRT --> reqSet2 --> dUR --> rAIDD --> checks --> iAVS --> uPWT --> lSVMI --> s2a --> lTUT --> lUUT --> lR --> lSIDC --> lTI --> lTT --> dce3 --> lE --> rWUI --> pTIN --> cGSHI --> dce4 --> lTu --> gAVMF --> sSS --> lCV --> pFI1 --> s2b --> lACSB --> lCTS --> lEA --> lVT --> iGC --> lBETST_Metal --> lETL --> vSBRT --> lRTR --> lET_Metal --> lMT --> s2c --> lDRH --> sRU --> sFBLA1 --> dBL --> sAP --> cSA --> wCBE
+  s1 --> vuGate
+  vuGate -->|true| vu --> sML
+  vuGate -->|false| sML
+  sML --> fscGate
+  fscGate -->|true| fSC --> adGate
+  fscGate -->|false| adGate
+  adGate -->|true| cAP --> dCC
+  adGate -->|false| dCC
+  dCC --> sdGate
+  sdGate -->|true| sM --> hofGate
+  sdGate -->|false| hofGate
+  hofGate -->|true| sHOP --> fADP
+  hofGate -->|false| fADP
+  fADP --> mssGate
+  mssGate -->|true| lMSS --> dce1
+  mssGate -->|false| dce1
+  dce1 --> fS --> lDTI --> ctGate
+  ctGate -->|true| lCT --> roGate
+  ctGate -->|false| roGate
+  roGate -->|true| lRO --> nevGate1
+  roGate -->|false| nevGate1
+  nevGate1 -->|true| cONU --> otGate
+  nevGate1 -->|false| otGate
+  otGate -->|true| lOT --> rtGate
+  otGate -->|false| rtGate
+  rtGate -->|true| lRT --> reqSet2
+  rtGate -->|false| reqSet2
+  reqSet2 --> dUR --> raidGate
+  raidGate -->|true| rAIDD --> nevGate2
+  raidGate -->|false| nevGate2
+  nevGate2 -->|true| cRT --> cRF --> cOBA --> mrGate
+  nevGate2 -->|false| iAVS
+  mrGate -->|true| cMR --> cISPT
+  mrGate -->|false| cISPT
+  cISPT --> iAVS
+  iAVS --> uPWT --> lSVMI --> minOptGate1
+  minOptGate1 -->|true| s2a --> lTUT
+  minOptGate1 -->|false| lTUT
+  lTUT --> lUUT --> reinterpretGate
+  reinterpretGate -->|true| lR --> lSIDC
+  reinterpretGate -->|false| lSIDC
+  lSIDC --> lTI --> lTT --> dce3 --> lE --> rWUI --> pTIN --> nevGate3
+  nevGate3 -->|true| cGSHI --> dce4
+  nevGate3 -->|false| dce4
+  dce4 --> lTu --> gAVMF --> ssGate
+  ssGate -->|true| sSS --> lCV
+  ssGate -->|false| lCV
+  lCV --> pFI1 --> minOptGate2
+  minOptGate2 -->|true| s2b --> lACSB
+  minOptGate2 -->|false| lACSB
+  lACSB --> ctsGate
+  ctsGate -->|true| lCTS --> lEA
+  ctsGate -->|false| lEA
+  lEA --> lVT --> existGate
+  existGate -->|true| iGC --> lBETST_Metal --> etlGate
+  existGate -->|false| etlGate
+  etlGate -->|true| lETL --> vSBRT
+  etlGate -->|false| vSBRT
+  vSBRT --> lRTR --> lET_Metal --> lMT --> minOptGate3
+  minOptGate3 -->|true| s2c --> drhGate
+  minOptGate3 -->|false| drhGate
+  drhGate -->|true| lDRH --> sRU
+  drhGate -->|false| sRU
+  sRU --> sFBLA1 --> dBL --> sAP --> cSA --> wCBE
 ```
 
-(Conditional gates are omitted from the diagram for readability;
-see the conditional-gates table below for the full set.)
+Diamonds are conditional gates: the `true` arm runs the gated pass
+and the `false` arm falls through. Target-constant gates that are
+always taken for Metal (e.g. `isMetalTarget`, `target != HLSL`,
+`!isCpuLikeTarget`, the Metal arms of the legalization switches) are
+drawn as unconditional nodes, per the filtered-branch convention for
+target-pipeline diagrams. The companion table below lists every pass
+with its exact gate expression.
 
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |

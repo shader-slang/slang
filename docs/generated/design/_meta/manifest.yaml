@@ -443,6 +443,7 @@ documents:
       - source/slang/slang-check-decl.cpp
       - source/slang/slang-check-modifier.cpp
       - source/slang/slang-check-expr.cpp
+      - source/slang/slang-check-overload.cpp
       - source/slang/slang-lookup.cpp
       - source/slang/slang-diagnostics.lua
       - include/slang.h
