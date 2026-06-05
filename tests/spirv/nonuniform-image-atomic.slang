@@ -8,6 +8,8 @@
 // CHECK-DAG: %[[AC:[A-Za-z0-9_]+]] = OpAccessChain %{{[A-Za-z0-9_]+}} %images %[[IDX:[A-Za-z0-9_]+]]
 // CHECK-DAG: OpDecorate %[[IDX]] NonUniform
 // CHECK-DAG: OpDecorate %[[AC]] NonUniform
+// CHECK-DAG: %[[PTR:[A-Za-z0-9_]+]] = OpImageTexelPointer %{{[A-Za-z0-9_]+}} %[[AC]]
+// CHECK-DAG: OpDecorate %[[PTR]] NonUniform
 
 RWTexture2D<uint> images[8];
 

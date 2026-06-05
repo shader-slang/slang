@@ -328,6 +328,25 @@ void processNonUniformResourceIndex(
             decorateNonUniformChain(operand, decorate);
         }
         inst->replaceUsesWith(operand);
+
+        // After replacing uses, any ImageSubscript that consumed the
+        // NonUniformResourceIndex wrapper now uses the operand directly.
+        // Propagate NonUniform forward so the texel pointer emitted for
+        // the ImageSubscript carries the decoration for atomic operations
+        // (VUID-RuntimeSpirv-None-10148).
+        if (isResourceType(type) || isPointerToResourceType(type))
+        {
+            IRBuilder builder(operand);
+            for (auto use = operand->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (user->getOp() == kIROp_ImageSubscript &&
+                    !user->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                {
+                    builder.addSPIRVNonUniformResourceDecoration(user);
+                }
+            }
+        }
         inst->removeAndDeallocate();
     }
 }
