@@ -24181,29 +24181,46 @@ struct HitObject
         }
     }
 
-    /// Returns the world-space vertex positions of the triangle that was hit.
-    /// Valid if the hit object represents a triangle hit.
+        /// GLSL helper: fetches the triangle vertex positions into an out array.
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_ray_tracing_position_fetch)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    [__NoSideEffect]
+    void __glslGetTriangleVertexPositions(out float3 arr[3])
+    {
+        __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+        __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+        __intrinsic_asm "hitObjectGetIntersectionTriangleVertexPositionsEXT($0, $1)";
+    }
+
+        /// Returns the world-space vertex positions of the triangle that was hit.
+        /// Valid if the hit object represents a triangle hit.
+        ///
+        /// **Vulkan EXT only.** Requires the ray tracing position fetch extension
+        /// (`SPV_KHR_ray_tracing_position_fetch` / `GL_EXT_ray_tracing_position_fetch`).
+        /// @return Array of three vertex positions in world space.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_ray_tracing_position_fetch)
     [ForceInline]
     [require(glsl_spirv, ser_raygen_closesthit_miss)]
-    void GetTriangleVertexPositions(out float3 positions[3])
+    [__NoSideEffect]
+    float3[3] GetTriangleVertexPositions()
     {
+        typedef float3[3] float3Arr3;
         __target_switch
         {
-        case _GL_EXT_shader_invocation_reorder:
-            __intrinsic_asm "hitObjectGetIntersectionTriangleVertexPositionsEXT($0, $1)";
+        case glsl:
+            float3 output[3];
+            __glslGetTriangleVertexPositions(output);
+            return output;
         case spirv:
-            typedef float3[3] float3Arr3;
-            positions = spirv_asm
+            return spirv_asm
             {
                 OpExtension "SPV_KHR_ray_tracing_position_fetch";
                 OpCapability RayTracingPositionFetchKHR;
                 OpExtension "SPV_EXT_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderEXT;
-                result: $$float3Arr3 = OpHitObjectGetIntersectionTriangleVertexPositionsEXT &this;
+                result:$$float3Arr3 = OpHitObjectGetIntersectionTriangleVertexPositionsEXT &this;
             };
         }
     }

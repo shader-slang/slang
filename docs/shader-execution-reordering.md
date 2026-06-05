@@ -561,7 +561,7 @@ Returns the world-space vertex positions of the triangle that was hit. Valid if 
 ## Signature
 
 ```
-void HitObject.GetTriangleVertexPositions(out float3 positions[3]);
+float3[3] HitObject.GetTriangleVertexPositions();
 ```
 
 --------------------------------------------------------------------------------
