@@ -1,0 +1,10 @@
+*.html
+*.log
+*.png
+*.pyc
+*.svg
+__pycache__/
+corpus/
+gen/
+releases/
+results/
