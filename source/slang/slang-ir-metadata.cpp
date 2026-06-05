@@ -289,11 +289,10 @@ void collectMetadata(
     bool usesBindlessResourceHeap = false;
     for (const auto& inst : irModule->getGlobalInsts())
     {
-        if (!usesBindlessResourceHeap &&
-            _subtreeUsesBindlessResourceHeap(
-                inst,
-                bindlessSpaceIndex,
-                shouldTreatDescriptorHandleResourceCastsAsHeapUse))
+        if (!usesBindlessResourceHeap && _subtreeUsesBindlessResourceHeap(
+                                             inst,
+                                             bindlessSpaceIndex,
+                                             shouldTreatDescriptorHandleResourceCastsAsHeapUse))
             usesBindlessResourceHeap = true;
 
         if (auto func = as<IRFunc>(inst))

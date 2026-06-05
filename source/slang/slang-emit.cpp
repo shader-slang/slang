@@ -2412,7 +2412,7 @@ Result linkAndOptimizeIR(
     if (auto programLayout = targetProgram->getLayoutIfAvailable())
         bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
     bool shouldTreatDescriptorHandleResourceCastsAsHeapUse =
-        target != CodeGenTarget::SPIRV ||
+        !isSPIRV(target) ||
         targetRequest->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV);
     SLANG_PASS(
         collectMetadata,
