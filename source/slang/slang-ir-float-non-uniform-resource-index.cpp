@@ -46,6 +46,17 @@ namespace Slang
 // Walk back through resource-creating ops to find and decorate the
 // access-chain index that is the source of non-uniformity.
 // Terminates because the IR operand graph is acyclic (SSA dominance order).
+//
+// Two op kinds get deliberately asymmetric treatment:
+//  - Access-chain ops (GetElementPtr/GetElement, and the address inside a
+//    Load): decorate only the *index* operand -- the index is the source of
+//    non-uniformity, and the access chain / load itself is decorated later by
+//    the forward scan in propagateNonUniformDecorations.
+//  - Resource-creating ops (MakeCombinedTextureSampler,
+//    CombinedTextureSamplerGetTexture/GetSampler, ImageTexelPointer,
+//    GetLegalizedSPIRVGlobalParamAddr): decorate the produced resource value
+//    itself and recurse into its operand to reach the underlying index, since
+//    the forward scan does not handle these ops.
 static void decorateNonUniformChain(IRInst* operand, const std::function<void(IRInst*)>& decorate)
 {
     if (auto gep = as<IRGetElementPtr>(operand))
@@ -94,15 +105,14 @@ void processNonUniformResourceIndex(
     IRInst* nonUniformResourceIndexInst,
     NonUniformResourceIndexFloatMode floatMode)
 {
-    // float `NonUniformResourceIndex()` to right before the access operation
-    // by walking up the use-def chain
-    // from nonUniformResource inst of an index to an array of buffer or
-    // texture def all the way to the leaf operations. To be precise:
-    // - go through GEP and see if it calls an intrinsic function,
-    //   then decorate the address itself (GetElementPtr)
-    // - go through GEP to identify the pointer access and the Loads that it
-    //   accesses (GetElementPtr -> Load), then decorate the load instruction.
-    // - go through IntCasts to deal with u32 -> i32 / vice-versa (IntCast)
+    // Float `NonUniformResourceIndex()` outward along the use-def chain, from
+    // the wrapped index toward the leaf operation that consumes the resource,
+    // then decorate the resulting chain. The processing switch below enumerates
+    // the full set of op kinds this floats through (GetElementPtr, GetElement,
+    // Load, IntCast, MakeCombinedTextureSampler, CombinedTextureSamplerGet*,
+    // ImageTexelPointer, GetLegalizedSPIRVGlobalParamAddr, ...); see the
+    // architecture overview at the top of this file for how the float pass and
+    // the legalize forward scan divide the work.
     List<IRInst*> resWorkList;
 
     // Handle cases when `nonUniformResourceIndexInst` inst is wrapped around

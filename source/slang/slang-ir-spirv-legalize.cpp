@@ -1393,6 +1393,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             else if (auto loadDescriptor = as<IRSPIRVLoadDescriptorFromHeap>(image))
             {
+                // Descriptor heaps and NonUniform:
+                // NonUniform is not propagated onto this heap texel pointer.
+                // SPIRVLoadTexelPointerFromHeap is handled by neither the float
+                // pass nor propagateNonUniformDecorations. Today that is harmless
+                // because image atomics on descriptor-heap resources are rejected
+                // by the atomic-destination validator (E41403, see
+                // validateAtomicOperations in slang-ir-validate.cpp), so this op
+                // never reaches an atomic that would require the decoration. If
+                // heap image atomics are ever enabled, NonUniform handling for
+                // this op must be added in tandem.
                 auto texelPtr = builder.emitSPIRVLoadTexelPointerFromHeap(
                     newPtrType,
                     loadDescriptor->getHeap(),
@@ -2285,10 +2295,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     case kIROp_GetElementPtr:
                     case kIROp_RWStructuredBufferGetElementPtr:
                         {
-                            // Bidirectional: if any of base, index, or inst is
-                            // decorated, ensure both index and inst carry it.
-                            // The base check handles inner access chains (e.g.
-                            // structured buffer element pointers) that derive
+                            // Contract (VUID-RuntimeSpirv-None-10148): the
+                            // resource operand consumed by the access (the final
+                            // OpAccessChain result) must be NonUniform. So when a
+                            // base, index, or inst on this chain is decorated, we
+                            // decorate the whole derived chain -- both the index
+                            // and this inst -- to guarantee the consumed result
+                            // carries NonUniform. Decorating the index when only
+                            // the base is non-uniform is spec-compliance for the
+                            // derived access chain, not a claim that the index is
+                            // itself non-uniform (it may be a fixed field offset).
+                            // The base check propagates into inner access chains
+                            // (e.g. structured-buffer element pointers) derived
                             // from a decorated outer access chain.
                             auto baseOperand = inst->getOperand(0);
                             auto indexOperand = inst->getOperand(1);
@@ -2329,9 +2347,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         // kIROp_ImageTexelPointer IR inst), so the NonUniform
                         // decoration required for image atomics
                         // (VUID-RuntimeSpirv-None-10148) must land on this inst.
-                        // Forward-propagate from the image operand, which the
-                        // load HACK in processImageSubscript has already rewired
-                        // to the decorated access-chain pointer.
+                        // Forward-propagate from the image operand. For the array
+                        // access paths this targets, processImageSubscript's load
+                        // HACK has rewired operand 0 to the decorated access-chain
+                        // pointer, so the operand carries NonUniform here. Note
+                        // that HACK only fires when the image operand is a Load;
+                        // if it is not (the HACK's stated failure mode), operand 0
+                        // is left unchanged and may be undecorated, in which case
+                        // this propagates nothing -- the same limitation the HACK
+                        // already carries, not a new one introduced here.
                         if (inst->getOperand(0)
                                 ->findDecoration<IRSPIRVNonUniformResourceDecoration>() &&
                             !inst->findDecoration<IRSPIRVNonUniformResourceDecoration>())
@@ -2353,6 +2377,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         // MakeCombinedTextureSampler, CombinedTextureSamplerGetTexture,
                         // ImageTexelPointer, and GetLegalizedSPIRVGlobalParamAddr are
                         // intentionally absent -- handled by the float pass.
+                        // SPIRVLoadTexelPointerFromHeap is also absent and is not
+                        // handled anywhere: the descriptor-heap image-atomic path
+                        // that would need it is rejected by E41403 (see the note
+                        // in processImageSubscript), so it is currently unreachable.
                         break;
                     }
                 }
