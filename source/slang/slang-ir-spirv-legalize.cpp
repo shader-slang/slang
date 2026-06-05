@@ -2261,9 +2261,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // Complements the float pass in slang-ir-float-non-uniform-resource-index.cpp
     // (see the architectural overview there). This handles post-rewrite
     // propagation: bidirectional sync between access-chain indices and
-    // instructions, and forward propagation through loads and field accesses.
-    // Resource-creating ops (MakeCombinedTextureSampler, etc.) are handled
-    // by the float pass, not here.
+    // instructions, and forward propagation through loads, field accesses,
+    // and image subscripts. Resource-creating ops (MakeCombinedTextureSampler,
+    // etc.) are handled by the float pass, not here.
     //
     // Single forward pass suffices because IR instructions are in dominance
     // order (producers before consumers).
@@ -2315,6 +2315,23 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         break;
                     case kIROp_FieldAddress:
                     case kIROp_FieldExtract:
+                        if (inst->getOperand(0)
+                                ->findDecoration<IRSPIRVNonUniformResourceDecoration>() &&
+                            !inst->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                        {
+                            IRBuilder builder(inst);
+                            builder.addSPIRVNonUniformResourceDecoration(inst);
+                        }
+                        break;
+                    case kIROp_ImageSubscript:
+                        // ImageSubscript lowers directly to SpvOpImageTexelPointer
+                        // at emit time (it is never turned into a
+                        // kIROp_ImageTexelPointer IR inst), so the NonUniform
+                        // decoration required for image atomics
+                        // (VUID-RuntimeSpirv-None-10148) must land on this inst.
+                        // Forward-propagate from the image operand, which the
+                        // load HACK in processImageSubscript has already rewired
+                        // to the decorated access-chain pointer.
                         if (inst->getOperand(0)
                                 ->findDecoration<IRSPIRVNonUniformResourceDecoration>() &&
                             !inst->findDecoration<IRSPIRVNonUniformResourceDecoration>())

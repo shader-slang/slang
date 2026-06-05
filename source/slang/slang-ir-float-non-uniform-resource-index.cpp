@@ -26,13 +26,20 @@
 //    that runs after processGlobalParam rewrites getElement to
 //    getElementPtr. Syncs NonUniform between access-chain indices
 //    and their instructions (bidirectional), and forward-propagates
-//    through Load and FieldAddress/FieldExtract to reach the final
-//    resource operand.
+//    through Load, FieldAddress/FieldExtract, and ImageSubscript to
+//    reach the final resource operand.
 //
 // Resource-creating ops (MakeCombinedTextureSampler,
 // CombinedTextureSamplerGetTexture, ImageTexelPointer) are handled
 // exclusively by the float pass. The legalize propagation handles
-// access chains, loads, and field accesses.
+// access chains, loads, field accesses, and image subscripts.
+//
+// ImageSubscript is a forward case (not a float-pass case) because it
+// is never converted to a kIROp_ImageTexelPointer IR inst -- it lowers
+// directly to SpvOpImageTexelPointer at emit time, so the decoration
+// must land on the ImageSubscript inst itself. This mirrors how the
+// HLSL `RWTexture[coord]` __ref-accessor atomic path differs from the
+// GLSL imageAtomic* path that uses kIROp_ImageTexelPointer directly.
 
 namespace Slang
 {
@@ -317,7 +324,14 @@ void processNonUniformResourceIndex(
         // decorate the op itself, then recurse into its source operand.
         auto operand = inst->getOperand(0);
         auto type = operand->getDataType();
-        if (isResourceType(type) || isPointerToResourceType(type))
+        // An ImageTexelPointer (from the GLSL imageAtomic* path) has a texel
+        // pointer result type (e.g. Ptr<uint> in the Image address space), not
+        // a resource type, so it fails the isResourceType/isPointerToResourceType
+        // checks. Decorate its chain explicitly so the texel pointer, the
+        // legalized global-param address, and the access-chain index all carry
+        // NonUniform as required for image atomics (VUID-RuntimeSpirv-None-10148).
+        if (isResourceType(type) || isPointerToResourceType(type) ||
+            operand->getOp() == kIROp_ImageTexelPointer)
         {
             IRBuilder builder(operand);
             auto decorate = [&](IRInst* value)
@@ -328,25 +342,6 @@ void processNonUniformResourceIndex(
             decorateNonUniformChain(operand, decorate);
         }
         inst->replaceUsesWith(operand);
-
-        // After replacing uses, any ImageSubscript that consumed the
-        // NonUniformResourceIndex wrapper now uses the operand directly.
-        // Propagate NonUniform forward so the texel pointer emitted for
-        // the ImageSubscript carries the decoration for atomic operations
-        // (VUID-RuntimeSpirv-None-10148).
-        if (isResourceType(type) || isPointerToResourceType(type))
-        {
-            IRBuilder builder(operand);
-            for (auto use = operand->firstUse; use; use = use->nextUse)
-            {
-                auto user = use->getUser();
-                if (user->getOp() == kIROp_ImageSubscript &&
-                    !user->findDecoration<IRSPIRVNonUniformResourceDecoration>())
-                {
-                    builder.addSPIRVNonUniformResourceDecoration(user);
-                }
-            }
-        }
         inst->removeAndDeallocate();
     }
 }
