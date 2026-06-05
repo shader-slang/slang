@@ -1531,7 +1531,6 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
     case Stage::Mesh:
     case Stage::Amplification:
         emitLocalSizeLayout();
-        break;
     default:
         break;
     }

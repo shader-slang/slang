@@ -1148,6 +1148,16 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         emitOperand(inst->getOperand(0), inOuterPrec);
         return true;
 
+    case kIROp_NodeOutputRecordGetElementPtr:
+        {
+            auto base = inst->getOperand(0);
+            emitOperand(base, inOuterPrec);
+            m_writer->emit(".Get(");
+            emitOperand(inst->getOperand(1), EmitOpInfo());
+            m_writer->emit(")");
+            return true;
+        }
+
     case kIROp_SubpassLoad:
         {
             auto subpassLoad = as<IRSubpassLoad>(inst);
@@ -1808,6 +1818,15 @@ void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
     case kIROp_NoInlineDecoration:
         m_writer->emit("[noinline]\n");
         break;
+
+    case kIROp_MaxRecordsDecoration:
+        {
+            auto maxRecordsDecor = cast<IRMaxRecordsDecoration>(decoration);
+            m_writer->emit("[MaxRecords(");
+            m_writer->emit(getIntVal(maxRecordsDecor->getCount()));
+            m_writer->emit(")]\n");
+            break;
+        }
 
     default:
         break;

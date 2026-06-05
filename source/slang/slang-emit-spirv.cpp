@@ -11812,18 +11812,6 @@ SlangResult emitSPIRVFromIR(
 
     auto sink = codeGenContext->getSink();
 
-    for (auto irEntryPoint : irEntryPoints)
-    {
-        auto entryPointDecor = irEntryPoint->findDecoration<IREntryPointDecoration>();
-        if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Node)
-        {
-            sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-                .operation = "SPIR-V node shader stage",
-                .location = irEntryPoint->sourceLoc});
-            return SLANG_FAIL;
-        }
-    }
-
 #if 0
     {
         DiagnosticSinkWriter writer(codeGenContext->getSink());
