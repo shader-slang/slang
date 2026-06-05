@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8 -experimental-feature
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature
 import experimental.workgraph;
 
 // Test that NodeID, NodeIsProgramEntry, NodeArraySize, AllowSparseNodes compile to dxil.
@@ -26,3 +27,6 @@ void main(
 //CHK_DXIL: !"MyNode", i32 0
 //CHK_DXIL: !"TargetNode", i32 0
 //CHK_DXIL: !"MaxNode", i32 {{-1|4294967295}}
+//CHK_HLSL: [NodeID("MyNode", 0)]
+//CHK_HLSL: [NodeIsProgramEntry]
+//CHK_HLSL: [MaxRecords(4)] [NodeArraySize(8)] [AllowSparseNodes] NodeOutputArray
