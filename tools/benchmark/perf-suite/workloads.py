@@ -24,6 +24,80 @@ def _buf():
 
 
 # --------------------------------------------------------------------------- #
+# Per-compile floor
+# --------------------------------------------------------------------------- #
+
+def gen_minimal(n):
+    """Near-empty shader: isolates the fixed per-compile floor — core-module
+    deserialization (readSerializedModuleIR/AST, loadBuiltinModule) plus linkIR
+    of the user module against the core module — with negligible user-code work.
+
+    This is the cleanest detector for "the standard library got heavier"
+    regressions: when the core module grows, every compile pays here regardless
+    of which language features it uses (the class of regression introduced by the
+    auto-diff overhaul in PR #9808, where an empty shader's linkIR rose ~27x)."""
+    s = [_HEADER, _buf()]
+    s.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID) { outBuf[tid.x] = float(tid.x); }\n")
+    return {"minimal.slang": "".join(s)}
+
+
+def gen_ir_builder(n):
+    """One enormous straight-line function: `n` trivial integer SSA ops, almost
+    no semantic work. Stresses IR instruction construction / dedup / hash-cons
+    and the SSA simplifier (the shared IRBuilder layer PR #9808 touched)."""
+    s = [_HEADER, _buf()]
+    s.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    s.append("    int acc = int(tid.x);\n")
+    for i in range(n):
+        op = "*" if i % 3 == 0 else ("+" if i % 3 == 1 else "^")
+        s.append(f"    acc = acc {op} {i % 13 + 1};\n")
+    s.append("    outBuf[0] = float(acc);\n}\n")
+    return {"ir_builder.slang": "".join(s)}
+
+
+def gen_serialize(n):
+    """A large module of `n` public functions, compiled to a .slang-module.
+    Stresses IR/AST serialization (writeSerializedModule*) — the write side of
+    the cost whose read side (readSerializedModule*) the `minimal` floor test
+    and module loading exercise."""
+    s = [_HEADER]
+    for i in range(n):
+        s.append(
+            f"public float sfn_{i}(float x, float y) {{ return x * {i % 7 + 1}.0 + y * {i % 5 + 1}.0 + sin(x + {i}.0); }}\n"
+        )
+    return {"serialize.slang": "".join(s)}
+
+
+def gen_conformance(n):
+    """`n` structs each conforming to a shared interface. Stresses interface
+    conformance checking / witness synthesis in the front end (compiled to a
+    .slang-module so the signal is sema, not codegen)."""
+    s = [_HEADER]
+    s.append("interface IFace { float f(float x); int g(); }\n\n")
+    for i in range(n):
+        s.append(
+            f"struct C{i} : IFace {{ float f(float x) {{ return x * {i % 9 + 1}.0 + {i}.0; }} "
+            f"int g() {{ return {i}; }} }}\n"
+        )
+    return {"conformance.slang": "".join(s)}
+
+
+def gen_loop_unroll(n):
+    """A force-unrolled loop of `n` iterations. Stresses loop unrolling
+    (unrollLoopsInModule) and the downstream SSA simplify on the unrolled body."""
+    s = [_HEADER, _buf()]
+    s.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    s.append("    float acc = outBuf[tid.x];\n")
+    s.append(f"    [ForceUnroll] for (int i = 0; i < {n}; ++i)\n")
+    s.append("        acc = acc * 1.0009 + sin(acc + float(i)) * 0.5 - cos(acc * 0.5);\n")
+    s.append("    outBuf[0] = acc;\n}\n")
+    return {"loop_unroll.slang": "".join(s)}
+
+
+# --------------------------------------------------------------------------- #
 # Suspected-regression features
 # --------------------------------------------------------------------------- #
 

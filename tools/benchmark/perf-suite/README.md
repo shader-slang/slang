@@ -35,6 +35,13 @@ regression points at a specific release.
 
 - **Robustness:** each data point is `1 warmup + 5 timed` runs; the **min** is
   used for cross-version comparison (least perturbed by scheduling noise).
+- **Memory:** when GNU `/usr/bin/time` is present, peak RSS per compile is also
+  captured (`rss_kb`) — a heavier core module inflates memory, not just time.
+- **Floor + slope:** `analyze.py --slope-label <label>` fits `time = floor + k·N`
+  from a `--sweep` (multi-size) run, separating a fixed-cost regression (heavier
+  stdlib) from a per-element one (a pass got slower) from a scaling one
+  (super-linear `k`). `analyze.py` also classifies each workload **STEP** vs
+  **DRIFT** (gradual creep) vs **FASTER**.
 
 > **Reading the numbers:** the synthetic workloads are *stress tests built to
 > amplify* one pass each. A "3.8×" is a sensitivity figure for that pass, **not**
@@ -67,6 +74,24 @@ regression points at a specific release.
 | **inlining** | `N` `[ForceInline]` functions (bounded-depth groups) | **inliner + SSA simplify** | `simplifyIR` |
 | **codegen_spirv** | one shader, `N` lines of backend math | **target code emission** | `generateOutput` |
 | **module_link** | `N` modules precompiled to `.slang-module`, then linked | **module read + IR link** | `linkIR` |
+
+### Shared-infrastructure & scaling tests
+
+Added after a real investigation (PR #9808) showed that a *fixed per-compile*
+regression — the standard module growing, inflating `linkIR`/deserialization for
+**every** compile — was nearly invisible to feature-targeted tests. These
+isolate the shared machinery and scaling behavior directly.
+
+| Test | What it generates | Targets | Primary timer |
+|---|---|---|---|
+| **minimal** | a near-empty shader | the **per-compile floor**: core-module load + link | `linkIR`, `readSerializedModuleIR`, `loadBuiltinModule` |
+| **ir_builder** | one giant straight-line function (`N` trivial int ops) | **IR construction / dedup / SSA simplify** | `generateIR`, `simplifyIR` |
+| **serialize** | a large module of `N` public functions → `.slang-module` | **IR/AST serialization (write)** | `writeSerializedModuleAST/IR` |
+| **conformance** | `N` structs conforming to a shared interface | **conformance checking / witness synthesis** | `SemanticChecking` |
+| **loop_unroll** | a `[ForceUnroll]` loop of `N` iterations | **loop unrolling + simplify** | `unrollLoopsInModule` |
+
+`minimal` is the **regression canary**: cheap enough to run on every PR, and the
+single best early warning for "the stdlib got heavier"-class regressions.
 
 ### Real-shader test
 

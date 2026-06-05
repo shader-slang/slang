@@ -35,7 +35,11 @@ def load(index_path, results_dir, timer):
         if "slangc" not in rec or not os.path.exists(p):
             continue
         recs.append(rec)
-    recs.sort(key=lambda r: vkey(r["tag"]))
+    # Preserve index.json order (authored chronologically). This lets non-release
+    # labels (e.g. pr9808-before/after) slot in at the right position; they don't
+    # match the version regex used as the fallback sort key.
+    if all(vkey(r["tag"]) != (0, 0, 0) for r in recs):
+        recs.sort(key=lambda r: vkey(r["tag"]))
     order = [r["tag"] for r in recs]
     for i, rec in enumerate(recs):
         runs = {r["workload"]: r for r in json.load(open(os.path.join(results_dir, rec["tag"], "results.json")))}

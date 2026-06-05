@@ -79,6 +79,79 @@ def load_series(index, results_dir, metric):
     return series, lookup, order
 
 
+def classify(values, step_thr=1.4, drift_thr=1.25):
+    """Classify a release-ordered [(tag,date,val)] series as 'step', 'drift',
+    'faster', or 'flat', separating a single dominant jump from gradual creep.
+
+    Returns dict with total ratio, the largest single-release step (+where), and
+    the fraction of release-to-release moves that were increases (a high value on
+    a 'drift' series = steady upward creep rather than noise)."""
+    vals = [v for _, _, v in values]
+    if len(vals) < 2 or vals[0] <= 0:
+        return None
+    steps = [(values[i - 1][0], values[i][0], vals[i] / vals[i - 1])
+             for i in range(1, len(vals)) if vals[i - 1] > 0]
+    total = vals[-1] / vals[0]
+    max_step = max(steps, key=lambda s: s[2]) if steps else (None, None, 1.0)
+    ups = sum(1 for *_, r in steps if r > 1.01)
+    up_frac = ups / len(steps) if steps else 0.0
+    if max_step[2] >= step_thr:
+        kind = "step"
+    elif total >= drift_thr:
+        kind = "drift"
+    elif total <= 0.9:
+        kind = "faster"
+    else:
+        kind = "flat"
+    return {"kind": kind, "total": total, "max_step": max_step[2],
+            "max_step_at": f"{max_step[0]}->{max_step[1]}" if max_step[0] else "",
+            "up_frac": up_frac, "n_steps": len(steps)}
+
+
+def _linfit(xs, ys):
+    """Ordinary least squares y = a + b*x. Returns (a, b, r2)."""
+    n = len(xs)
+    sx, sy = sum(xs), sum(ys)
+    sxx = sum(x * x for x in xs)
+    sxy = sum(x * y for x, y in zip(xs, ys))
+    denom = n * sxx - sx * sx
+    if denom == 0:
+        return ys[0], 0.0, 0.0
+    b = (n * sxy - sx * sy) / denom
+    a = (sy - b * sx) / n
+    ybar = sy / n
+    ss_tot = sum((y - ybar) ** 2 for y in ys) or 1.0
+    ss_res = sum((y - (a + b * x)) ** 2 for x, y in zip(xs, ys))
+    return a, b, 1 - ss_res / ss_tot
+
+
+def slope_report(results_dir, label, metric):
+    """Decompose compile time into fixed floor + per-element slope from a
+    --sweep run (multiple sizes per workload). A regression in `floor` (heavier
+    stdlib, e.g. PR #9808) is a different bug from a regression in `slope`
+    (a pass got per-element slower) or in scaling (slope rising super-linearly)."""
+    path = os.path.join(results_dir, label, "results.json")
+    if not os.path.exists(path):
+        raise SystemExit(f"no results at {path} (run bench.py --sweep --label {label})")
+    by_wl = {}
+    for r in json.load(open(path)):
+        st = r["timers"].get("compileInner")
+        if st and r["size"] > 0:
+            by_wl.setdefault(r["workload"], []).append((r["size"], st[metric]))
+    print(f"Floor + slope fit (compileInner, {metric}) for label '{label}'")
+    print(f"{'workload':18s}{'floor(ms)':>11}{'slope(ms/unit)':>16}{'R^2':>7}   sizes")
+    print("-" * 72)
+    for wl, pts in sorted(by_wl.items()):
+        pts = sorted(set(pts))
+        if len(pts) < 2:
+            continue
+        xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+        a, b, r2 = _linfit(xs, ys)
+        print(f"{wl:18s}{a:11.1f}{b:16.4f}{r2:7.3f}   {[x for x in xs]}")
+    print("\nfloor = fixed per-compile cost (core-module load/link); "
+          "slope = marginal cost per generated unit.")
+
+
 def flag_steps(values, rel_thr, abs_floor):
     """values: [(tag,date,val)]. Yield (prev_tag,tag,prev,cur,rel,abs)."""
     flags = []
@@ -103,7 +176,14 @@ def main():
     ap.add_argument("--abs", type=float, default=2.0, help="min absolute ms jump to flag")
     ap.add_argument("--primary-only", action="store_true",
                     help="only consider each workload's primary timers")
+    ap.add_argument("--slope-label", default=None,
+                    help="fit floor+slope (time = a + b*N) from a --sweep run's "
+                         "multi-size results under results/<label>/ and exit")
     args = ap.parse_args()
+
+    if args.slope_label:
+        slope_report(args.results, args.slope_label, args.metric)
+        return
 
     with open(args.index) as fh:
         index = json.load(fh)
@@ -187,13 +267,27 @@ def main():
     print(f"Metric: {args.metric}; flag if ratio>={args.rel} and jump>={args.abs}ms\n")
 
     print("== End-to-end drift (compileInner, first -> last) ==")
+    classes = {}
     for (wl, timer), vals in sorted(series.items()):
         if timer != "compileInner" or len(vals) < 2:
             continue
         f, l = vals[0][2], vals[-1][2]
         ratio = l / f if f else 0
-        mark = "  <== REGRESSED" if ratio >= args.rel else ""
-        print(f"  {wl:18s} {f:9.1f} -> {l:9.1f} ms  ({ratio:4.2f}x){mark}")
+        c = classify(vals)
+        classes[wl] = c
+        kind = c["kind"].upper() if c else "?"
+        print(f"  {wl:18s} {f:9.1f} -> {l:9.1f} ms  ({ratio:4.2f}x)  [{kind}]")
+
+    # Gradual drift: meaningful total rise with NO single dominant step — the
+    # creep that step-change detection structurally misses (e.g. parse, sema).
+    drifters = [(wl, c) for wl, c in classes.items() if c and c["kind"] == "drift"]
+    drifters.sort(key=lambda x: -x[1]["total"])
+    print("\n== Gradual drift (no single step >= 1.4x; ranked by total rise) ==")
+    if not drifters:
+        print("  none")
+    for wl, c in drifters:
+        print(f"  {wl:18s} total {c['total']:.2f}x over {c['n_steps']} steps  "
+              f"(biggest single {c['max_step']:.2f}x; {c['up_frac']*100:.0f}% of steps rose)")
 
     print("\n== Flagged step-changes (ranked by absolute jump) ==")
     if not all_flags:

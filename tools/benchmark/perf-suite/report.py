@@ -92,21 +92,27 @@ def main():
     H.append(f'<div class="chart">{inline[svg_norm]}</div>')
     H.append(f'<div class="chart">{inline[svg_abs]}</div>')
 
-    # end-to-end drift
+    # end-to-end drift, with step-vs-drift classification
     H.append("<h2>End-to-end drift (compileInner, first → last)</h2>")
+    H.append('<p class="small"><b>STEP</b> = a single dominant release jump · '
+             '<b>DRIFT</b> = gradual creep with no single step ≥1.4× · '
+             '<b>FASTER</b> = improved.</p>')
     H.append("<table><tr><th>Workload</th><th class=num>first (ms)</th><th class=num>last (ms)</th>"
-             "<th class=num>ratio</th><th>verdict</th></tr>")
+             "<th class=num>ratio</th><th>trend</th><th>biggest step</th></tr>")
     rows = []
     for (wl, timer), vals in series.items():
         if timer != "compileInner" or len(vals) < 2:
             continue
         f, l = vals[0][2], vals[-1][2]
-        rows.append((wl, f, l, l / f if f else 0))
-    for wl, f, l, r in sorted(rows, key=lambda x: -x[3]):
-        verdict = ("<span class='pill r'>regressed</span>" if r >= args.rel
-                   else "<span class='pill g'>faster</span>" if r <= 0.9 else "—")
+        rows.append((wl, f, l, l / f if f else 0, analyze.classify(vals)))
+    badge = {"step": "pill r", "drift": "pill r", "faster": "pill g", "flat": ""}
+    for wl, f, l, r, c in sorted(rows, key=lambda x: -x[3]):
+        kind = c["kind"] if c else "flat"
+        b = f"<span class='{badge.get(kind,'')}'>{kind}</span>" if kind != "flat" else "—"
+        step = (f"{c['max_step']:.2f}× <span class=small>{html.escape(c['max_step_at'])}</span>"
+                if c and kind in ("step", "drift") else "—")
         H.append(f"<tr><td>{html.escape(wl)}</td><td class=num>{f:.0f}</td><td class=num>{l:.0f}</td>"
-                 f"<td class='num {cls(r)}'>{r:.2f}×</td><td>{verdict}</td></tr>")
+                 f"<td class='num {cls(r)}'>{r:.2f}×</td><td>{b}</td><td>{step}</td></tr>")
     H.append("</table>")
 
     # ranked compileInner step-changes with leaf attribution

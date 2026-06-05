@@ -22,6 +22,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -109,12 +110,46 @@ def build_commands(slangc, spec, gen_dir, files):
     }
 
 
+# GNU /usr/bin/time -v gives per-process peak RSS; detect once.
+def _detect_gnu_time():
+    try:
+        r = subprocess.run(["/usr/bin/time", "-v", "true"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        return b"Maximum resident set size" in r.stderr
+    except Exception:  # noqa: BLE001
+        return False
+
+
+_GNU_TIME = _detect_gnu_time()
+
+
 def run_once(cmd):
+    """Run one compile; return (rc, wall_ms, combined_text, rss_kb_or_None).
+
+    When GNU time is available the command is wrapped so its peak RSS is written
+    to a side file (keeping the compiler's own stdout/stderr clean for parsing)."""
+    memfile = None
+    runcmd = cmd
+    if _GNU_TIME:
+        memfd, memfile = tempfile.mkstemp(prefix="bench_mem_")
+        os.close(memfd)
+        runcmd = ["/usr/bin/time", "-v", "-o", memfile] + cmd
     t0 = time.perf_counter()
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    proc = subprocess.run(runcmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     wall = (time.perf_counter() - t0) * 1000.0
     text = proc.stdout.decode("utf-8", "replace")
-    return proc.returncode, wall, text
+    rss = None
+    if memfile:
+        try:
+            with open(memfile) as fh:
+                for line in fh:
+                    if "Maximum resident set size" in line:
+                        rss = float(line.rsplit(":", 1)[1].strip())  # kbytes
+                        break
+        except Exception:  # noqa: BLE001
+            pass
+        os.unlink(memfile)
+    return proc.returncode, wall, text, rss
 
 
 # Benign messages to ignore: a missing downstream tool (spirv-opt/glslang) on
@@ -154,12 +189,15 @@ def run_spec(slangc, spec, size, samples, warmup, root):
 
     per_timer = {}
     walls = []
+    rsses = []
     last_text = ""
     rc = 0
     for _ in range(samples):
-        rc, wall, text = run_once(timed)
+        rc, wall, text, rss = run_once(timed)
         last_text = text
         walls.append(wall)
+        if rss is not None:
+            rsses.append(rss)
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
 
@@ -181,6 +219,7 @@ def run_spec(slangc, spec, size, samples, warmup, root):
         "samples": samples,
         "warmup": warmup,
         "wall_ms": stats(walls),
+        "rss_kb": stats(rsses) if rsses else None,
         "timers": {k: stats(v) for k, v in sorted(per_timer.items())},
         "primary_timers": spec.primary_timers,
         "cmd": " ".join(timed),

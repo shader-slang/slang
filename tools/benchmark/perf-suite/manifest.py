@@ -46,6 +46,58 @@ class WorkloadSpec:
 SPIRV = ["-target", "spirv", "-emit-spirv-directly"]
 
 WORKLOADS = [
+    # ---- per-compile floor (core-module load + link) ---------------------
+    WorkloadSpec(
+        name="minimal",
+        bucket="core_link",
+        gen=workloads.gen_minimal,
+        default_size=0,  # fixed; near-empty shader
+        mode="target",
+        extra_flags=SPIRV,
+        # loadBuiltinModule is per-process (excluded from compileInner) but still
+        # reported; readSerializedModuleIR + linkIR are the core-module-size signal.
+        primary_timers=["compileInner", "linkIR", "readSerializedModuleIR",
+                        "loadBuiltinModule"],
+    ),
+    # ---- shared-infrastructure / scaling stressors -----------------------
+    WorkloadSpec(
+        name="ir_builder",
+        bucket="ir_infra",
+        gen=workloads.gen_ir_builder,
+        default_size=4000,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["generateIR", "simplifyIR", "compileInner"],
+        sweep_sizes=[1000, 2000, 4000, 8000],
+    ),
+    WorkloadSpec(
+        name="serialize",
+        bucket="ir_infra",
+        gen=workloads.gen_serialize,
+        default_size=1500,
+        mode="module",
+        primary_timers=["writeSerializedModuleAST", "writeSerializedModuleIR", "compileInner"],
+        sweep_sizes=[500, 1000, 1500, 3000],
+    ),
+    WorkloadSpec(
+        name="conformance",
+        bucket="sema",
+        gen=workloads.gen_conformance,
+        default_size=600,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[150, 300, 600, 1200],
+    ),
+    WorkloadSpec(
+        name="loop_unroll",
+        bucket="loop_unroll",
+        gen=workloads.gen_loop_unroll,
+        default_size=300,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["unrollLoopsInModule", "simplifyIR", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
+    ),
     # ---- suspected-regression features -----------------------------------
     WorkloadSpec(
         name="autodiff",
