@@ -10,7 +10,6 @@ struct RecordData
 
 [shader("node")]
 [NodeLaunch("thread")]
-[numthreads(1, 1, 1)]
 void main(ThreadNodeInputRecord<RecordData> input, RWBuffer<int> output)
 {
     output[0] = input.Get().value;

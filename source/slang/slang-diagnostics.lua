@@ -2595,6 +2595,13 @@ err(
     span { loc = "attr:Modifier", message = "'[AllowSparseNodes]' is only valid on NodeOutputArray parameters" }
 )
 
+err(
+    "num-threads-disallowed-on-thread-launch-node",
+    31119,
+    "invalid 'numthreads' on thread-launch node",
+    span { loc = "attr:Modifier", message = "thread-launch node shaders must not specify '[numthreads]'; they use an implicit '[numthreads(1, 1, 1)]'" }
+)
+
 warning(
     "explicit-uniform-location",
     31104,

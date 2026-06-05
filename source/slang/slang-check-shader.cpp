@@ -1822,6 +1822,15 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         return launchAttr && launchAttr->mode == kNodeLaunchModeThread;
     };
 
+    if (isThreadLaunchNode())
+    {
+        if (auto numThreadsAttr = entryPointFuncDecl->findModifier<NumThreadsAttribute>())
+        {
+            sink->diagnose(Diagnostics::NumThreadsDisallowedOnThreadLaunchNode{
+                .attr = numThreadsAttr});
+        }
+    }
+
     bool needsNumThreads = stage == Stage::Compute || stage == Stage::Mesh ||
                            stage == Stage::Amplification || stage == Stage::Node;
     if (needsNumThreads && !isThreadLaunchNode() &&
