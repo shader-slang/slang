@@ -1564,6 +1564,28 @@ program->getEntryPointMetadata(
         &entryPointMetadata);
 ```
 
+Target-wide post-emit metadata is queried through `IComponentType::getTargetMetadata()`. For
+`DescriptorHandle<T>`, `ProgramLayout::getBindlessSpaceIndex()` reports the frontend-reserved
+bindless space, which can be non-negative even when the emitted target does not use a descriptor
+heap path. Hosts should cast target metadata to `IBindlessResourceMetadata` and use
+`usesBindlessResourceHeap()` when deciding whether the compiled target actually needs the bindless
+resource heap binding:
+
+```c++
+slang::IComponentType* program = ...;
+slang::IMetadata* targetMetadata;
+program->getTargetMetadata(
+        0, // target index
+        &targetMetadata);
+
+auto bindlessMetadata = static_cast<slang::IBindlessResourceMetadata*>(
+    targetMetadata->castAs(slang::IBindlessResourceMetadata::getTypeGuid()));
+if(bindlessMetadata && bindlessMetadata->usesBindlessResourceHeap())
+{
+    // Bind the descriptor heap for this compiled target.
+}
+```
+
 When traversal of reflection data reaches a leaf parameter, the application can use `IMetadata::isParameterLocationUsed()` with the absolute location of that parameter for a given layout unit:
 
 ```c++
