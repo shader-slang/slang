@@ -50,7 +50,7 @@ attribute_syntax [AllowSparseNodes] : AllowSparseNodesAttribute;
 
 /// Read-only input to a broadcasting-launch node shader.
 __generic<T>
-[require(hlsl_spirv)]
+[require(hlsl)]
 __intrinsic_type(DispatchNodeInputRecord)
 public struct DispatchNodeInputRecord
 {
@@ -61,17 +61,6 @@ public struct DispatchNodeInputRecord
         {
         case hlsl:
             __intrinsic_asm ".Get";
-        case spirv:
-            int index = 0;
-            return spirv_asm
-            {
-                %in_payload_t = OpTypeNodePayloadArrayAMDX $$T;
-                %in_payload_arr_ptr_t = OpTypePointer NodePayloadAMDX %in_payload_t;
-                %in_payload_elem_ptr_t = OpTypePointer NodePayloadAMDX $$T;
-                %var = OpVariable %in_payload_arr_ptr_t NodePayloadAMDX;
-                %ptr : %in_payload_elem_ptr_t = OpAccessChain %var $index;
-                result : $$T = OpLoad %ptr;
-            };
         }
     }
 };

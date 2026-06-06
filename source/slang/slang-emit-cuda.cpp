@@ -428,8 +428,6 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(
 {
     SLANG_UNUSED(irFunc);
     SLANG_UNUSED(entryPointDecor);
-    // CUDA entry points are emitted through emitFunctionPreambleImpl. Suppress the C++ emitter's
-    // numthreads comment and SLANG_PRELUDE_EXPORT marker.
 }
 
 void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)

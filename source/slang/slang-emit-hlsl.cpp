@@ -24,6 +24,8 @@ bool HLSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     {
     case kIROp_InOutImplicitCast:
     case kIROp_OutImplicitCast:
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+    case kIROp_GetEnumBarrierSemanticFlags:
         return true;
     default:
         return Super::shouldFoldInstIntoUseSites(inst);

@@ -9632,30 +9632,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             check(check, inst.operands[operandIndex]);
         }
 
-        auto shouldDiagnoseLayoutSensitiveTypeInAsm = [&]()
-        {
-            if (opcode == SpvOpTypeArray || opcode == SpvOpTypeRuntimeArray)
-                return true;
-
-            if (opcode != SpvOpTypePointer)
-                return false;
-
-            // Work-graph node payload pointers have to be spelled as
-            // OpTypePointer NodePayloadAMDX in SPIR-V asm because the base
-            // variable points at OpTypeNodePayloadArrayAMDX, while access-chain
-            // results point at the payload element type.
-            if (inst.operands.getCount() >= 2)
-            {
-                const auto& storageClassOperand = inst.operands[1];
-                if (storageClassOperand.flavor == SPIRVAsmOperand::NamedValue &&
-                    storageClassOperand.knownValue == SpvStorageClassNodePayloadAMDX)
-                    return false;
-            }
-
-            return true;
-        };
-
-        if (shouldDiagnoseLayoutSensitiveTypeInAsm())
+        if (opcode == SpvOpTypeArray || opcode == SpvOpTypeRuntimeArray ||
+            opcode == SpvOpTypePointer)
         {
             getSink()->diagnose(Diagnostics::SpirvLayoutSensitiveTypeInAsm{
                 .opcode = inst.opcode.token.getContent(),

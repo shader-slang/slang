@@ -2181,45 +2181,24 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     for (auto& use : signatureStructUses)
         entryPointInferredCaps.nonDestructiveJoin(use.structDecl->inferredCapabilityRequirements);
 
-    auto getStageNameForDiagnostic = [](CapabilityAtom stage) -> UnownedStringSlice
-    {
-        // `node` is represented internally by `_node` so the public alias can include the
-        // required shader-model capability. Diagnostics should still use the public stage name.
-        if (stage == CapabilityAtom::_node)
-            return capabilityNameToString(CapabilityName::node);
-        return capabilityNameToString((CapabilityName)stage);
-    };
-
     for (auto target : linkage->targets)
     {
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
-        auto compileTarget = target->getTargetCaps().getCompileTarget();
-        auto stageTarget = stageCapabilitySet.getTargetStage();
         targetCaps.join(stageCapabilitySet);
-        if (targetCaps.isInvalid())
-        {
-            maybeDiagnose(
-                sink,
-                linkage->m_optionSet,
-                DiagnosticCategory::Capability,
-                Diagnostics::EntryPointUsesUnavailableCapability{
-                    .stage = getStageNameForDiagnostic(stageTarget),
-                    .target = capabilityNameToString((CapabilityName)compileTarget),
-                    .decl = entryPointFuncDecl});
-            continue;
-        }
         if (targetCaps.isIncompatibleWith(entryPointInferredCaps))
         {
             // Incompatable means we don't support a set of abstract atoms.
             // Diagnose that we lack support for 'stage' and 'target' atoms with our provided
             // entry-point
+            auto compileTarget = target->getTargetCaps().getCompileTarget();
+            auto stageTarget = stageCapabilitySet.getTargetStage();
             maybeDiagnose(
                 sink,
                 linkage->m_optionSet,
                 DiagnosticCategory::Capability,
                 Diagnostics::EntryPointUsesUnavailableCapability{
-                    .stage = getStageNameForDiagnostic(stageTarget),
+                    .stage = capabilityNameToString((CapabilityName)stageTarget),
                     .target = capabilityNameToString((CapabilityName)compileTarget),
                     .decl = entryPointFuncDecl});
 

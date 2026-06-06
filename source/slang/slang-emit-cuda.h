@@ -82,14 +82,15 @@ protected:
         EmitLayoutSemanticOption layoutSemanticOption) SLANG_OVERRIDE;
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
         SLANG_OVERRIDE;
+    virtual void emitEntryPointAttributesImpl(
+        IRFunc* irFunc,
+        IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
+
     virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace)
         SLANG_OVERRIDE;
     virtual void emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout) SLANG_OVERRIDE;
     virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamsImpl(IRFunc* func) SLANG_OVERRIDE;
-    virtual void emitEntryPointAttributesImpl(
-        IRFunc* irFunc,
-        IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
     virtual void emitInterpolationModifiersImpl(
         IRInst* varInst,
         IRType* valueType,
