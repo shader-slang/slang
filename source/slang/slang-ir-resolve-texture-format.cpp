@@ -51,7 +51,7 @@ static void resolveTextureFormatForParameter(IRInst* textureInst, IRTextureTypeB
     {
         IRBuilder builder(textureInst->getModule());
         builder.setInsertBefore(textureInst);
-        auto formatArg = builder.getIntValue(builder.getUIntType(), IRIntegerValue(format));
+        auto formatArg = builder.getIntValue(builder.getIntType(), IRIntegerValue(format));
 
         auto newType = builder.getTextureType(
             textureType->getElementType(),
