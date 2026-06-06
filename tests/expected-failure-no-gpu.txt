@@ -29,7 +29,6 @@ gfx-unit-test-tool/linkTimeTypeMultiUseVulkan.internal
 gfx-unit-test-tool/linkTimeTypeVulkan.internal
 gfx-unit-test-tool/mutableShaderObjectVulkan.internal
 gfx-unit-test-tool/nestedParameterBlockTestVulkan.internal
-gfx-unit-test-tool/neuralSlangNetworkConverterVulkan.internal
 gfx-unit-test-tool/pointerInBufferDoublePtrRoundtripVulkan.internal
 gfx-unit-test-tool/pointerInBufferRoundtripVulkan.internal
 gfx-unit-test-tool/pointerInParamBlockRoundtripVulkan.internal
