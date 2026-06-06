@@ -4178,18 +4178,21 @@ void legalizeEntryPointParameterForGLSL(
     }
     if (auto meshOutputType = as<IRMeshOutputType>(valueType))
     {
-        legalizeMeshOutputParam(context, codeGenContext, func, pp, paramLayout, meshOutputType);
-        return;
+        return legalizeMeshOutputParam(
+            context,
+            codeGenContext,
+            func,
+            pp,
+            paramLayout,
+            meshOutputType);
     }
     if (auto patchType = as<IRHLSLPatchType>(valueType))
     {
-        legalizePatchParam(context, codeGenContext, func, pp, paramLayout, patchType);
-        return;
+        return legalizePatchParam(context, codeGenContext, func, pp, paramLayout, patchType);
     }
     if (pp->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
-        legalizeMeshPayloadInputParam(context, codeGenContext, pp);
-        return;
+        return legalizeMeshPayloadInputParam(context, codeGenContext, pp);
     }
 
     // When we have an HLSL ray tracing shader entry point,
