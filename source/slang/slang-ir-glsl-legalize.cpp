@@ -4820,6 +4820,8 @@ IRFunc* legalizeEntryPointForGLSL(
     SLANG_ASSERT(entryPointDecor);
 
     auto stage = entryPointDecor->getProfile().getStage();
+    const bool shouldEmitSPIRVDirectly =
+        codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly();
 
     auto layoutDecoration = func->findDecoration<IRLayoutDecoration>();
     SLANG_ASSERT(layoutDecoration);
@@ -4909,8 +4911,7 @@ IRFunc* legalizeEntryPointForGLSL(
         invokePathConstantFuncInHullShader(&context, codeGenContext, scalarizedGlobalOutput);
     }
 
-    if (isRayTracingHitStage(stage) &&
-        !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
+    if (isRayTracingHitStage(stage) && !shouldEmitSPIRVDirectly)
     {
         if (auto firstBlock = func->getFirstBlock())
         {
