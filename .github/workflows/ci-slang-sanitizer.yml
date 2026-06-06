@@ -222,6 +222,7 @@ jobs:
           printf '+ %q' "$bin_dir/slang-test"
           printf ' %q' "${slang_test_args[@]}"
           printf '\n'
+
           # Non-zero exits are expected (sanitizer errors, test failures); this
           # job gates only on sanitizer log output in the Summary step.
           "$bin_dir/slang-test" "${slang_test_args[@]}" && slang_test_exit=0 || slang_test_exit=$?

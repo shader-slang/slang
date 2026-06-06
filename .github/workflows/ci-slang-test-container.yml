@@ -169,6 +169,7 @@ jobs:
           printf '+ %q' "$bin_dir/slang-test"
           printf ' %q' "${test_roots[@]}" "${slang_test_args[@]}"
           printf '\n'
+
           "$bin_dir/slang-test" "${test_roots[@]}" "${slang_test_args[@]}"
 
       - name: Run slangc tests
