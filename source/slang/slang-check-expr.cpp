@@ -4473,6 +4473,14 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     if (!m_shouldShortCircuitLogicExpr)
         return nullptr;
 
+    // In GLSL-compatibility mode several builtin operators have different semantics than in
+    // Slang/HLSL — e.g. `vec == vec` yields a scalar `bool` (all-components-equal) rather
+    // than a `vector<bool,N>`, and `mat * mat` is a matrix product rather than a
+    // component-wise multiply. Those differences live in the GLSL module's operator
+    // overloads, so let normal resolution pick them rather than hard-coding HLSL semantics.
+    if (getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
+        return nullptr;
+
     // Unary prefix operators on a builtin scalar/vector/matrix operand: `-x` (negate),
     // `!x` (logical not, bool operand), `~x` (bitwise not, integer operand). Same idea as
     // the binary case below; handled separately because there is a single operand.
@@ -4495,8 +4503,8 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         Type* uElementType = uOperandType;
         if (auto v = as<VectorExpressionType>(uOperandType))
             uElementType = v->getElementType();
-        else if (auto m = as<MatrixExpressionType>(uOperandType))
-            uElementType = m->getElementType();
+        else if (as<MatrixExpressionType>(uOperandType))
+            return nullptr; // matrices are left to the normal path (see binary case)
         auto uBasic = as<BasicExpressionType>(uElementType);
         if (!uBasic)
             return nullptr;
@@ -4546,10 +4554,10 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     if (!leftArg->type.type || !rightArg->type.type)
         return nullptr;
 
-    // Both operands must be the *same* builtin arithmetic (integer or floating-point)
-    // scalar, vector, or matrix type. Same type => no promotion to perform, and no
-    // user-defined operator can apply, so the result is exactly the corresponding
-    // builtin IR op. Constant-folding contexts are handled by the runtime gate below.
+    // Both operands must be the *same* builtin scalar or vector type. Same type => no
+    // promotion to perform, and no user-defined operator can apply, so the result is
+    // exactly the corresponding builtin IR op. Constant-folding contexts are handled by
+    // the runtime gate below.
     if (!leftArg->type.type->equals(rightArg->type.type))
         return nullptr;
 
@@ -4589,10 +4597,12 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         eligible = isIntegerBase || isFloatBase;
     if (!eligible)
         return nullptr;
-    // Matrix comparison would need a `matrix<bool,...>` result; leave it to the normal
-    // path (it is rare). Scalar/vector comparison, and scalar/vector/matrix arithmetic and
-    // bitwise ops, are handled here.
-    if (isComparison && isMatrix)
+    // Matrices are left to the normal path. The builtin matrix operators inline to a
+    // per-element form whose emitted variable naming/structure differs from a single IR
+    // matrix op, so fast-pathing them is not byte-identical (and matrix-`*` is a matrix
+    // product, not component-wise, in GLSL mode). Matrix operators are also rare, so the
+    // fast path targets scalar and vector operands only.
+    if (isMatrix)
         return nullptr;
 
     // If both operands are compile-time constants, leave the operator to normal
