@@ -18,6 +18,8 @@ void main(
     uint count = input.Count();
     if (outputA.IsValid())
         outputA.ThreadIncrementOutputCount(1);
+    if (count == 0)
+        outputA.GroupIncrementOutputCount(1);
     EmptyNodeOutput elem = outputArr[0];
     if (elem.IsValid())
         elem.ThreadIncrementOutputCount(1);
@@ -31,3 +33,4 @@ void main(
 //CHK_HLSL: EmptyNodeOutputArray outputArr_0
 //CHK_HLSL: input_0.Count()
 //CHK_HLSL: outputA_0.ThreadIncrementOutputCount(1U);
+//CHK_HLSL: outputA_0.GroupIncrementOutputCount(1U);

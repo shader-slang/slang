@@ -1899,6 +1899,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             if (numThreads)
                 addModifier(entryPointFuncDecl, numThreads);
         }
+        if (stage == Stage::Node && !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
+        {
+            sink->diagnose(
+                Diagnostics::NodeNumThreadsAttributeRequired{.decl = entryPointFuncDecl});
+        }
     }
 
     bool canHaveVaryingInput = false;
