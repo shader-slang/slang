@@ -42,13 +42,27 @@ static void resolveTextureFormatForParameter(IRInst* textureInst, IRTextureTypeB
     // The `format` operand of `IRTextureType` is optional (see
     // `IRResourceType::hasFormat()`); read it via the same guarded pattern used
     // at the SPIR-V/WGSL emit readers so a texture type without operand 8 here
-    // does not assert (debug) or read out-of-bounds (release). The
-    // `!hasFormat()` branch is defensive: today this function is itself the
-    // pass that *attaches* the format operand to global texture insts, and is
-    // only invoked from the global-walk in `resolveTextureFormat` below.
-    // No present-day caller is known to land an unformatted `IRTextureTypeBase`
-    // here, so the branch hardens the site against a future caller that
-    // bypasses or precedes the global format-resolve pass.
+    // does not assert (debug) or read out-of-bounds (release).
+    //
+    // **Data-flow change vs. pre-PR shape.** Before this change the initial
+    // `format` read here was a dead store — overwritten by
+    // `format = decor->getFormat()` further down before any read — and the
+    // early-return called `textureType->getFormat()` a second time
+    // independently. This refactor makes the initial read live by reusing it
+    // in the `decor->getFormat() == format` early-return guard. For
+    // `hasFormat() == true` it is a behavior-preserving "two reads into one
+    // variable" simplification. For `hasFormat() == false` (the new defensive
+    // branch — see reachability note below) `format` is `unknown`, so a
+    // texture lacking the format operand whose `IRFormatDecoration` is also
+    // `unknown` early-returns (nothing to attach), while a decoration with
+    // any other format proceeds to attach it.
+    //
+    // **Reachability.** This function is itself the pass that *attaches* the
+    // format operand to global texture insts, invoked only from the global
+    // walk in `resolveTextureFormat` below; no present-day caller is known to
+    // land an unformatted `IRTextureTypeBase` here. The `!hasFormat()` branch
+    // hardens the site against a future caller that bypasses or precedes the
+    // global format-resolve pass.
     ImageFormat format =
         textureType->hasFormat() ? (ImageFormat)textureType->getFormat() : ImageFormat::unknown;
     auto decor = textureInst->findDecoration<IRFormatDecoration>();

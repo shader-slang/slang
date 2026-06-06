@@ -3146,20 +3146,32 @@ IRType* getTextureTypeFromCombinedTextureSampler(IRType* type)
     IRBuilder builder(type);
     builder.setInsertBefore(type);
     auto textureType = as<IRTextureTypeBase>(type);
-    // The `format` operand of `IRTextureType` is optional
-    // (`IRResourceType::hasFormat()` returns false when `getOperandCount() < 9`);
-    // fall back to `Unknown` so we never index past-end. `Unknown` matches the
-    // canonical encoding `resolveTextureFormatForParameter` uses for the
-    // synthesized format constant (see `slang-ir-resolve-texture-format.cpp`).
-    // The `!hasFormat()` branch is defensive: combined-texture-sampler lowering
-    // currently runs after `resolveTextureFormat` populates globals, so no
-    // present-day caller is known to reach it. The branch hardens this site
-    // against a future caller / pass that produces an unformatted texture
+    // `format` is the optional operand 8 of `IRTextureType`
+    // (`IRResourceType::hasFormat()` gates `getOperand(8)`); fall back to a
+    // synthesized `Unknown` constant when absent so we never index past-end.
+    //
+    // The constant's encoding is `int`-typed because the core-module declares
+    // the format generic parameter as signed `int` (`hlsl.meta.slang:832`,
+    // `let format:int`), and the adjacent `isCombined` operand built two lines
+    // below in this same `getTextureType(...)` call uses `builder.getIntType()`
+    // as well. `IRBuilder::getIntValue` keys constants on the `(value, type)`
+    // pair (`slang-ir.cpp:2367`), and `IRTextureType` is hoistable / uniqued by
+    // operand identity (`slang-ir-insts.lua:417`) — so a `uint`-typed `0` would
+    // be a distinct `IRConstant` from the canonical `int 0` and would silently
+    // fragment the texture-type cache the moment a real producer of
+    // unformatted textures landed.
+    //
+    // **Reachability.** Combined-texture-sampler lowering runs after
+    // `resolveTextureFormat` populates globals, so no present-day caller is
+    // known to land an unformatted `IRTextureTypeBase` here. The branch hardens
+    // this site against a future caller that produces an unformatted texture
     // (i.e. an `IRTextureType` whose optional format operand was never set).
+    // No test exercises the branch — encoding stability is pinned by the
+    // schema citation above.
     auto formatInst =
         textureType->hasFormat()
             ? textureType->getFormatInst()
-            : builder.getIntValue(builder.getUIntType(), (IRIntegerValue)ImageFormat::unknown);
+            : builder.getIntValue(builder.getIntType(), (IRIntegerValue)ImageFormat::unknown);
     return builder.getTextureType(
         textureType->getElementType(),
         textureType->getShapeInst(),

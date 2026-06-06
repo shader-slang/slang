@@ -64,16 +64,19 @@ float4 main(uniform PushConstants pc)
 }
 
 // `DIAGNOSTIC_TEST:SIMPLE` matches each CHECK against one emitted diagnostic
-// (`tools/slang-test/diagnostic-annotation-util.cpp` matches the substring
+// (`tools/slang-test/diagnostic-annotation-util.cpp:475` matches the substring
 // against `diag.message`, `diag.severity`, or `diag.errorCode` and consumes
-// the diagnostic). `SLANG_UNEXPECTED` produces a single line, so we have
-// exactly one CHECK to spend; per the repo convention used by other
-// diagnostic tests (e.g. `tests/diagnostics/execution-model/
-// sv-output-direction-mismatch.slang`), pinning the diagnostic *code* is the
-// strongest single assertion. The code is fixed by the runtime path
-// (`SLANG_UNEXPECTED` → `InternalError` → `error[E99997]`), so a
-// regression that no longer routes through `SLANG_UNEXPECTED` (e.g.
-// silent SIGSEGV again, or a different diagnostic code) fails this CHECK.
-// Note: the *message body* is not pinned here, so a regression to a
-// different `SLANG_UNEXPECTED` text at the same site would still pass.
-//CHECK: E99997
+// the diagnostic). `SLANG_UNEXPECTED` produces a single diagnostic line, so we
+// have exactly one CHECK to spend.
+//
+// We pin a distinctive substring of the runtime message body (the literal
+// string `slang-emit-spirv.cpp` passes to `SLANG_UNEXPECTED`) rather than the
+// diagnostic code `E99997`, because `E99997` is the generic
+// `compilation-aborted-due-to-exception` catch-all
+// (`source/slang/slang-diagnostics.lua` E99997 entry) emitted for *every*
+// uncaught exception in the compiler — not specific to this site. A
+// `//CHECK: E99997` would false-pass on any unrelated exception fired by this
+// input. Pinning the message body asserts *this* guard ran. The trade-off:
+// a same-site message-body refactor would need this CHECK updated alongside
+// the message string.
+//CHECK: SPIRVAsmOperandImageType / SampledImageType operand value has no resolvable texture type

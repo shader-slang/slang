@@ -10917,24 +10917,69 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         // `InternalError` → `slang-end-to-end-request.cpp`); on
                         // no-exceptions configurations it `exit(-1)`s — still
                         // strictly better than a silent SIGSEGV.
+                        //
+                        // **Asymmetry contract.** This arm responds to two
+                        // distinct unexpected inputs with different policies:
+                        // a non-resolvable texture type → hard-abort here,
+                        // and an unfortunately-formatless `IRTextureType` →
+                        // silent `Unknown` substitution below. The split is
+                        // deliberate. `IRTextureType` declares `format` as
+                        // **optional** by contract (`IRResourceType::hasFormat()`
+                        // gates `getOperand(8)`), so a missing format operand is
+                        // a valid IR shape that the rest of the emitter — and
+                        // the SPIR-V spec — handles via `OpTypeImage … Unknown`.
+                        // A null/non-texture data-type, by contrast, is a
+                        // malformed-IR shape (no `IRTextureType` declares
+                        // "missing data type" as a valid mode); allowing emit
+                        // to proceed would produce nonsense SPIR-V. Hence the
+                        // crash-stop on one and the harden-and-continue on the
+                        // other.
                         if (!textureInst)
                         {
                             SLANG_UNEXPECTED(
                                 "SPIRVAsmOperandImageType / SampledImageType operand value "
                                 "has no resolvable texture type");
                         }
-                        // The `format` operand of `IRTextureType` is optional
-                        // (`IRResourceType::hasFormat()` returns false when
-                        // `getOperandCount() < 9`); fall back to `Unknown` so
-                        // we never index past-end. Mirrors `getSpvImageFormat`'s
-                        // safe pattern. The `!hasFormat()` branch is defensive
-                        // for inputs the global-only `resolveTextureFormat` pass
-                        // does not visit; #11496's input does not reach here
-                        // because the null-guard above fires first.
+                        // `format` is the optional operand 8 of `IRTextureType`
+                        // (`hasFormat()` returns `getOperandCount() >= 9`); fall
+                        // back to a synthesized `Unknown` constant so we never
+                        // index past-end. The ternary's *guard shape* mirrors
+                        // `getSpvImageFormat` (`slang-emit-spirv.cpp:2899`).
+                        //
+                        // The constant's *encoding* is `int`-typed because the
+                        // core-module declares the format generic parameter as
+                        // signed `int` (`hlsl.meta.slang:832`,
+                        // `let format:int`), and the adjacent `isCombined`
+                        // operand built two lines below in this same
+                        // `getTextureType(...)` call also uses
+                        // `builder.getIntType()`. `IRBuilder::getIntValue` keys
+                        // constants on the `(value, type)` pair (see
+                        // `slang-ir.cpp:2367`'s `keyInst.typeUse.usedValue`),
+                        // and `IRTextureType` is hoistable / uniqued by operand
+                        // identity (`slang-ir-insts.lua:417`) — so a `uint`-typed
+                        // `0` would be a distinct `IRConstant` from the canonical
+                        // `int 0`, which would silently fragment the texture-type
+                        // cache the moment a real producer of unformatted
+                        // textures landed.
+                        //
+                        // **Hardening now (vs. when a producer lands).** No
+                        // present-day pass produces a `getOperandCount() == 8`
+                        // `IRTextureType` reaching this arm (#11496's input
+                        // hits the null-guard above first; combined-texture-
+                        // sampler lowering runs after `resolveTextureFormat`).
+                        // The branch is added now because Reviewer A's audit
+                        // found three readers of the optional format operand
+                        // sharing the same OOB-read precondition; folding all
+                        // three guards into the same commit costs ~1 line per
+                        // site and prevents the next refactor from
+                        // re-introducing the OOB. There is no test exercising
+                        // this branch — encoding stability is therefore pinned
+                        // by the comment above and by the `let format:int`
+                        // declaration it cites.
                         auto formatInst = textureInst->hasFormat()
                                               ? textureInst->getFormatInst()
                                               : builder.getIntValue(
-                                                    builder.getUIntType(),
+                                                    builder.getIntType(),
                                                     (IRIntegerValue)ImageFormat::unknown);
                         auto imageType = builder.getTextureType(
                             textureInst->getElementType(),
