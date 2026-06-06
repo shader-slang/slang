@@ -4541,18 +4541,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto elementCountInst = as<IRIntLit>(vectorType->getElementCount());
         if (!elementCountInst)
         {
-            m_sink->diagnose(
-                Diagnostics::SpirvFp16VectorAtomicUnsupportedWidth{
-                    .location = atomicInst->sourceLoc});
+            m_sink->diagnose(Diagnostics::SpirvFp16VectorAtomicUnsupportedWidth{
+                .location = atomicInst->sourceLoc});
             return false;
         }
 
         auto elementCount = elementCountInst->getValue();
         if (elementCount != 2 && elementCount != 4)
         {
-            m_sink->diagnose(
-                Diagnostics::SpirvFp16VectorAtomicUnsupportedWidth{
-                    .location = atomicInst->sourceLoc});
+            m_sink->diagnose(Diagnostics::SpirvFp16VectorAtomicUnsupportedWidth{
+                .location = atomicInst->sourceLoc});
             return false;
         }
 
