@@ -18,6 +18,7 @@
 // SPIRV_VARPTR: OpCapability VariablePointers
 // SPIRV_VARPTR: OpExtension "SPV_KHR_variable_pointers"
 // SPIRV_VARPTR: OpMemoryModel
+// SPIRV_VARPTR: OpTypeFunction %void %_ptr_Workgroup
 
 struct Data
 {
