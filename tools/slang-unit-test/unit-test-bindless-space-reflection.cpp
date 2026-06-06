@@ -370,6 +370,20 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutReservedSpace)
         true);
 }
 
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithDescriptorHandleBeforeExplicitLayout)
+{
+    _checkBindlessSpaceReflection(
+        _getTextureHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        true,
+        nullptr,
+        0,
+        SLANG_SPIRV,
+        "spirv_1_5",
+        nullptr,
+        true);
+}
+
 SLANG_UNIT_TEST(bindlessSpaceMetadataWithStrippedNameHints)
 {
     const char* userSource = R"(
