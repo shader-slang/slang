@@ -4963,12 +4963,7 @@ IRFunc* legalizeEntryPointForGLSL(
             auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
             SLANG_ASSERT(paramLayout);
 
-            legalizeEntryPointParameterForGLSL(
-                &context,
-                codeGenContext,
-                func,
-                pp,
-                paramLayout);
+            legalizeEntryPointParameterForGLSL(&context, codeGenContext, func, pp, paramLayout);
         }
 
         // At this point we should have eliminated all uses of the
