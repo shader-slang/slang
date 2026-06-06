@@ -11,6 +11,10 @@
 //TEST:SIMPLE(filecheck=AHIT_DXIL):-target dxil-assembly -entry main_ahit -stage anyhit -profile sm_6_5
 //TEST:SIMPLE(filecheck=CHIT_DXIL):-target dxil-assembly -entry main_chit -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=MULTI_DXIL):-target dxil-assembly -entry main_isect -stage intersection -entry main_chit -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=FORWARD_SPIRV):-target spirv-assembly -entry main_chit_forward -stage closesthit
+//TEST:SIMPLE(filecheck=FORWARD_GLSL):-target glsl -entry main_chit_forward -stage closesthit
+//TEST:SIMPLE(filecheck=FORWARD_HLSL):-target hlsl -entry main_chit_forward -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=FORWARD_DXIL):-target dxil-assembly -entry main_chit_forward -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=ISECT_CUDA):-target cuda -entry main_isect_cuda -stage intersection
 //TEST:SIMPLE(filecheck=AHIT_CUDA):-target cuda -entry main_ahit -stage anyhit
 //TEST:SIMPLE(filecheck=CHIT_CUDA):-target cuda -entry main_chit -stage closesthit
@@ -24,6 +28,11 @@ struct Attribs
 {
     float v;
 };
+
+float getPrimitiveIDAsFloat(in int value)
+{
+    return float(value);
+}
 
 [shader("intersection")]
 void main_isect(int pid : SV_PrimitiveID)
@@ -110,3 +119,31 @@ void main_chit(
 // CHIT_CUDA: __global__ void __closesthit__main_chit
 // CHIT_CUDA-NOT: pid
 // CHIT_CUDA: optixGetPrimitiveIndex()
+
+[shader("closesthit")]
+void main_chit_forward(
+    inout Payload payload,
+    in BuiltInTriangleIntersectionAttributes attribs,
+    int pid : SV_PrimitiveID)
+{
+    payload.val =
+        getPrimitiveIDAsFloat(pid) + attribs.barycentrics.x + attribs.barycentrics.y;
+}
+
+// FORWARD_SPIRV: OpEntryPoint ClosestHitKHR
+// FORWARD_SPIRV: BuiltIn PrimitiveId
+// FORWARD_SPIRV: %{{.*}} = OpVariable %_ptr_Input_int Input
+
+// FORWARD_GLSL: #version 460
+// FORWARD_GLSL-NOT: pid_
+// FORWARD_GLSL: gl_PrimitiveID
+// FORWARD_GLSL-NOT: pid_
+// FORWARD_GLSL: payload_0.val_0
+
+// FORWARD_HLSL: [shader("closesthit")]void main_chit_forward
+// FORWARD_HLSL-NOT: SV_PrimitiveID
+// FORWARD_HLSL: uint [[PRIMITIVE_ID:[A-Za-z_][A-Za-z_0-9]*]] = PrimitiveIndex()
+// FORWARD_HLSL: getPrimitiveIDAsFloat_0(int([[PRIMITIVE_ID]]))
+
+// FORWARD_DXIL: call i32 @dx.op.primitiveIndex.i32
+// FORWARD_DXIL: sitofp i32
