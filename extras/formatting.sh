@@ -2,9 +2,11 @@
 
 set -e
 
-# Check Bash version
-if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
-  echo "Error: Bash 4 or newer is required. Current version: $BASH_VERSION" >&2
+# Check Bash version. 3.2 is supported (the default /bin/bash on macOS); older
+# releases lack the process substitution and array support this script relies on.
+if [ "${BASH_VERSINFO[0]}" -lt 3 ] ||
+  { [ "${BASH_VERSINFO[0]}" -eq 3 ] && [ "${BASH_VERSINFO[1]}" -lt 2 ]; }; then
+  echo "Error: Bash 3.2 or newer is required. Current version: $BASH_VERSION" >&2
   if [[ "$(uname)" == "Darwin" ]]; then
     echo "Please install a newer version of Bash using Homebrew:" >&2
     echo "  brew install bash" >&2
@@ -262,10 +264,23 @@ function list_files() {
   fi
 }
 
+# Bash 3.2 (still the default /bin/bash on macOS) has no `readarray`/`mapfile`.
+# Emulate `readarray -t <name>`: read newline-delimited stdin into the named
+# array, stripping the trailing newline from each element. The `|| [ -n ... ]`
+# keeps a final line that has no trailing newline, matching readarray.
+read_lines() {
+  local __name=$1
+  local __line
+  eval "$__name=()"
+  while IFS= read -r __line || [ -n "$__line" ]; do
+    eval "$__name+=(\"\$__line\")"
+  done
+}
+
 cmake_formatting() {
   echo "Formatting CMake files..." >&2
 
-  readarray -t files < <(list_files '*.cmake' 'CMakeLists.txt' '**/CMakeLists.txt')
+  read_lines files < <(list_files '*.cmake' 'CMakeLists.txt' '**/CMakeLists.txt')
   [ ${#files[@]} -gt 0 ] || return 0
 
   common_args=(
@@ -303,7 +318,7 @@ track_progress() {
 cpp_formatting() {
   echo "Formatting cpp files..." >&2
 
-  readarray -t files < <(list_files '*.cpp' '*.hpp' '*.c' '*.h' ':!external/**')
+  read_lines files < <(list_files '*.cpp' '*.hpp' '*.c' '*.h' ':!external/**')
   [ ${#files[@]} -gt 0 ] || return 0
 
   # The progress reporting is a bit sneaky, we use `--verbose` with xargs which
@@ -318,7 +333,7 @@ cpp_formatting() {
       mkdir -p \"\$(dirname \"$tmpdir/{}\")\"
       $DIFF_BIN -u --color=always --label \"{}\" --label \"{}\" \"{}\" <(clang-format \"{}\") > \"$tmpdir/{}\"
       :
-    " |& track_progress ${#files[@]}
+    " 2>&1 | track_progress ${#files[@]}
 
     for file in "${files[@]}"; do
       # Fail if any of the diffs have contents
@@ -328,7 +343,7 @@ cpp_formatting() {
       fi
     done
   else
-    printf '%s\n' "${files[@]}" | $XARGS_BIN --verbose -n1 -P "$(get_nproc)" clang-format -i |&
+    printf '%s\n' "${files[@]}" | $XARGS_BIN --verbose -n1 -P "$(get_nproc)" clang-format -i 2>&1 |
       track_progress ${#files[@]}
   fi
 }
@@ -354,7 +369,7 @@ prettier_formatting() {
 yaml_json_formatting() {
   echo "Formatting yaml and json files..." >&2
 
-  readarray -t files < <(list_files "*.yaml" "*.yml" "*.json" ':!external/**')
+  read_lines files < <(list_files "*.yaml" "*.yml" "*.json" ':!external/**')
   [ ${#files[@]} -gt 0 ] || return 0
 
   prettier_formatting
@@ -363,7 +378,7 @@ yaml_json_formatting() {
 markdown_formatting() {
   echo "Formatting markdown files..." >&2
 
-  readarray -t files < <(list_files "*.md" ':!external/**')
+  read_lines files < <(list_files "*.md" ':!external/**')
   [ ${#files[@]} -gt 0 ] || return 0
 
   prettier_formatting
@@ -372,7 +387,7 @@ markdown_formatting() {
 sh_formatting() {
   echo "Formatting sh files..." >&2
 
-  readarray -t files < <(list_files "*.sh")
+  read_lines files < <(list_files "*.sh")
   [ ${#files[@]} -gt 0 ] || return 0
 
   common_args=(
