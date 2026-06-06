@@ -3998,13 +3998,12 @@ IRFunc* legalizeEntryPointParameterForGLSL(
     auto builder = context->getBuilder();
     auto stage = context->getStage();
 
-    if (isRayTracingHitStage(stage) &&
-        tryLegalizeRayTracingPrimitiveIDParam(
-            builder->getModule(),
-            *builder,
-            pp,
-            primitiveIndexFunc,
-            /* removeParam */ false))
+    if (isRayTracingHitStage(stage) && tryLegalizeRayTracingPrimitiveIDParam(
+                                           builder->getModule(),
+                                           *builder,
+                                           pp,
+                                           primitiveIndexFunc,
+                                           /* removeParam */ false))
     {
         return primitiveIndexFunc;
     }
