@@ -3998,16 +3998,6 @@ IRFunc* legalizeEntryPointParameterForGLSL(
     auto builder = context->getBuilder();
     auto stage = context->getStage();
 
-    if (isRayTracingHitStage(stage) && tryLegalizeRayTracingPrimitiveIDParam(
-                                           builder->getModule(),
-                                           *builder,
-                                           pp,
-                                           primitiveIndexFunc,
-                                           /* removeParam */ false))
-    {
-        return primitiveIndexFunc;
-    }
-
     // (JS): In the legalization process parameters are moved from the entry point.
     // So when we get to emit we have a problem in that we can't use parameters to find important
     // decorations And in the future we will not have front end 'Layout' available. To work around
@@ -4927,15 +4917,17 @@ IRFunc* legalizeEntryPointForGLSL(
     {
         if (auto firstBlock = func->getFirstBlock())
         {
-            for (auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam())
+            for (auto pp = firstBlock->getFirstParam(); pp;)
             {
+                auto next = pp->getNextParam();
                 builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
                 tryLegalizeRayTracingPrimitiveIDParam(
                     module,
                     builder,
                     pp,
                     primitiveIndexFunc,
-                    /* removeParam */ false);
+                    /* removeParam */ true);
+                pp = next;
             }
         }
     }

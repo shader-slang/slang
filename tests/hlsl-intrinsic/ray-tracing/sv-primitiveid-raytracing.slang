@@ -4,6 +4,9 @@
 //TEST:SIMPLE(filecheck=ISECT_SPIRV):-target spirv-assembly -entry main_isect -stage intersection
 //TEST:SIMPLE(filecheck=AHIT_SPIRV):-target spirv-assembly -entry main_ahit -stage anyhit
 //TEST:SIMPLE(filecheck=CHIT_SPIRV):-target spirv-assembly -entry main_chit -stage closesthit
+//TEST:SIMPLE(filecheck=ISECT_GLSL):-target glsl -entry main_isect -stage intersection
+//TEST:SIMPLE(filecheck=AHIT_GLSL):-target glsl -entry main_ahit -stage anyhit
+//TEST:SIMPLE(filecheck=CHIT_GLSL):-target glsl -entry main_chit -stage closesthit
 //TEST:SIMPLE(filecheck=ISECT_DXIL):-target dxil-assembly -entry main_isect -stage intersection -profile sm_6_5
 //TEST:SIMPLE(filecheck=AHIT_DXIL):-target dxil-assembly -entry main_ahit -stage anyhit -profile sm_6_5
 //TEST:SIMPLE(filecheck=CHIT_DXIL):-target dxil-assembly -entry main_chit -stage closesthit -profile sm_6_5
@@ -33,6 +36,12 @@ void main_isect(int pid : SV_PrimitiveID)
 // ISECT_SPIRV: BuiltIn PrimitiveId
 // ISECT_SPIRV: %{{.*}} = OpVariable %_ptr_Input_int Input
 
+// ISECT_GLSL: #version 460
+// ISECT_GLSL-NOT: pid_
+// ISECT_GLSL: gl_PrimitiveID
+// ISECT_GLSL-NOT: pid_
+// ISECT_GLSL: reportIntersectionEXT
+
 // ISECT_DXIL: call i32 @dx.op.primitiveIndex.i32
 // ISECT_DXIL: sitofp i32
 // ISECT_DXIL: call i1 @dx.op.reportHit.struct.Attribs_0
@@ -61,6 +70,12 @@ void main_ahit(
 // AHIT_SPIRV-DAG: OpTypePointer HitAttribute{{NV|KHR}}
 // AHIT_SPIRV: %{{.*}} = OpVariable %_ptr_Input_int Input
 
+// AHIT_GLSL: #version 460
+// AHIT_GLSL-NOT: pid_
+// AHIT_GLSL: gl_PrimitiveID
+// AHIT_GLSL-NOT: pid_
+// AHIT_GLSL: payload_0.val_0
+
 // AHIT_DXIL: call i32 @dx.op.primitiveIndex.i32
 // AHIT_DXIL: sitofp i32
 
@@ -81,6 +96,12 @@ void main_chit(
 // CHIT_SPIRV: BuiltIn PrimitiveId
 // CHIT_SPIRV-DAG: OpTypePointer HitAttribute{{NV|KHR}}
 // CHIT_SPIRV: %{{.*}} = OpVariable %_ptr_Input_int Input
+
+// CHIT_GLSL: #version 460
+// CHIT_GLSL-NOT: pid_
+// CHIT_GLSL: gl_PrimitiveID
+// CHIT_GLSL-NOT: pid_
+// CHIT_GLSL: payload_0.val_0
 
 // CHIT_DXIL: call i32 @dx.op.primitiveIndex.i32
 // CHIT_DXIL: sitofp i32
