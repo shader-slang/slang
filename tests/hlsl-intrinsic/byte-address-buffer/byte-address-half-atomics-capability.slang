@@ -174,7 +174,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         half2(1.0h, 2.0h),
         half2(3.0h, 4.0h));
 // UNSUPPORTED_VECTOR_COMPARE_EXCHANGE: error[E50014]: invalid SPIR-V fp16 vector atomic operation
-// UNSUPPORTED_VECTOR_COMPARE_EXCHANGE: SPIR-V fp16 vector atomics only support add, min, max, and exchange operations.
+// UNSUPPORTED_VECTOR_COMPARE_EXCHANGE: SPIR-V fp16 vector atomics only support add, sub, min, max, and exchange operations.
     outputBuffer[0] = float(originalValue.x + originalValue.y);
 #elif defined(TEST_BUFFER_EMULATED_NO_VECTOR)
     half originalValue;
