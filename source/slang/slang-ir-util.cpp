@@ -1665,6 +1665,21 @@ bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions opti
     return false;
 }
 
+// Enumerate any associated functions of 'func'
+// that might be used by a pass (e.g. auto-diff)
+//
+template<typename TFunc>
+void forEachAssociatedCallee(IRInst* callee, TFunc callback)
+{
+    traverseUsers<IRAnnotation>(
+        callee,
+        [&](IRAnnotation* annotation)
+        {
+            if (annotation->getTarget() == callee)
+                callback(annotation->getInst());
+        });
+}
+
 bool doesCalleeHaveSideEffect(IRInst* callee)
 {
     bool sideEffect = !isNoSideEffectCallee(callee);
@@ -1681,26 +1696,13 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
     //
     if (!sideEffect)
     {
-        if (auto module = callee->getModule())
-        {
-            IRBuilder builder(module);
-            const AnnotationKind associatedCalleeAnnotationKinds[] = {
-                AnnotationKind::ForwardDerivative,
-                AnnotationKind::BackwardDerivativeApply,
-                AnnotationKind::BackwardDerivativeContextRemat,
-                AnnotationKind::BackwardDerivativePropagate,
-            };
-
-            for (auto kind : associatedCalleeAnnotationKinds)
+        forEachAssociatedCallee(
+            callee,
+            [&](IRInst* associatedCallee)
             {
-                if (auto associatedCallee = builder.tryLookupAnnotation(callee, kind))
-                {
-                    sideEffect |= !isNoSideEffectCallee(associatedCallee);
-                    if (sideEffect)
-                        break;
-                }
-            }
-        }
+                sideEffect |= !isNoSideEffectCallee(associatedCallee);
+                return;
+            });
     }
 
     return sideEffect;
