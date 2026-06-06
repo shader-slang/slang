@@ -270,8 +270,11 @@ void collectMetadata(
     ArtifactPostEmitMetadata& outMetadata)
 {
     int bindlessSpaceIndex = -1;
-    if (auto programLayout = targetProgram->getLayoutIfAvailable())
-        bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
+    if (targetProgram)
+    {
+        if (auto programLayout = targetProgram->getLayoutIfAvailable())
+            bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
+    }
 
     // Scan the instructions looking for global resource declarations
     // and exported functions.

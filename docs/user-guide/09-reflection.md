@@ -1568,8 +1568,8 @@ Target-wide post-emit metadata is queried through `IComponentType::getTargetMeta
 `DescriptorHandle<T>`, `ProgramLayout::getBindlessSpaceIndex()` reports the frontend-reserved
 bindless space, which can be non-negative even when the emitted target does not use a descriptor
 heap path. Hosts should cast target metadata to `IBindlessResourceMetadata` and use
-`usesBindlessResourceHeap()` when deciding whether the compiled target actually needs the bindless
-resource heap binding:
+`usesBindlessResourceHeap()` as a post-lowering signal, then combine it with the target binding
+model when deciding whether an explicit bindless resource heap binding is required:
 
 ```c++
 slang::IComponentType* program = ...;
