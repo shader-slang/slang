@@ -294,13 +294,13 @@ public enum BarrierSemanticFlags : uint
 /// (e.g. "(UAV_MEMORY)" or "(UAV_MEMORY | NODE_INPUT_MEMORY)"). Handled by the
 /// HLSL emitter via kIROp_GetEnumBarrierMemoryTypeFlags; must only be called for HLSL.
 __intrinsic_op(getEnumBarrierMemoryTypeFlags)
-int GetEnumBarrierMemoryTypeFlags(BarrierMemoryTypeFlags f);
+int GetEnumBarrierMemoryTypeFlags(constexpr BarrierMemoryTypeFlags f);
 
 /// Maps a compile-time BarrierSemanticFlags value to its target named-constant expression
 /// (e.g. "(GROUP_SYNC)" or "(DEVICE_SCOPE | GROUP_SCOPE)"). Handled by the
 /// HLSL emitter via kIROp_GetEnumBarrierSemanticFlags; must only be called for HLSL.
 __intrinsic_op(getEnumBarrierSemanticFlags)
-int GetEnumBarrierSemanticFlags(BarrierSemanticFlags f);
+int GetEnumBarrierSemanticFlags(constexpr BarrierSemanticFlags f);
 
 [require(hlsl, sm_6_8)]
 void __Barrier_hlsl(int memoryTypeFlags, int semanticFlags)
@@ -315,7 +315,9 @@ void __Barrier_hlsl(int memoryTypeFlags, int semanticFlags)
 /// Work-graph Barrier intrinsic (SM 6.8).
 [ForceInline]
 [require(hlsl, sm_6_8)]
-public void Barrier(BarrierMemoryTypeFlags memoryTypeFlags, BarrierSemanticFlags semanticFlags)
+public void Barrier(
+    constexpr BarrierMemoryTypeFlags memoryTypeFlags,
+    constexpr BarrierSemanticFlags semanticFlags)
 {
     __target_switch
     {
