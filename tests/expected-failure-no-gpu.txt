@@ -37,3 +37,15 @@ gfx-unit-test-tool/uint16BufferTestVulkan.internal
 
 # CPU gfx smoke imports the gfx module, which is not available on no-GPU hosted runners
 tests/cpu-program/gfx-smoke.slang (cpu)
+
+# Vulkan COMPARE_COMPUTE tests: lavapipe (Mesa software Vulkan) on aarch64 crashes the
+# test server when the render-test module dispatches these compute shaders, most likely
+# due to a Mesa bug in the SPIRV-to-NIR translation path on that platform.
+tests/bugs/frexp-double.slang.3 (vk)
+tests/bugs/frexp-double.slang.4 (vk)
+tests/bugs/frexp.slang.3 (vk)
+tests/bugs/frexp.slang.4 (vk)
+tests/compute/simple.slang.3 (vk)
+tests/legalization/vec1.slang (vk)
+tests/legalization/vec1.slang.1 (vk)
+tests/metal/vector-get-element-ptr.slang.2 (vk)
