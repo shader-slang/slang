@@ -3382,6 +3382,7 @@ struct TypeFlowSpecializationContext
         {
             IRBuilder builder(module);
             HashSet<IRInst*>& results = *module->getContainerPool().getHashSet<IRInst>();
+            bool sawResidualMiss = false;
             forEachInSet(
                 module,
                 cast<IRWitnessTableSet>(elementOfSetType->getSet()),
@@ -3429,14 +3430,25 @@ struct TypeFlowSpecializationContext
                     }
 
                     // Walk nested base-interface witness tables for inherited
-                    // requirements (#11487). Skip on a residual miss so a stray
-                    // null does not land in the result set. An empty result set
-                    // emits poison downstream (specializeLookupWitnessMethod's
-                    // isEmpty branch); a non-empty set is specialized normally.
+                    // requirements (#11487). A partial miss (some tables hit,
+                    // some miss) cannot be silently dropped: the downstream
+                    // singleton-shortcut would specialize the lookup to the
+                    // surviving entry for every runtime tag, mis-dispatching
+                    // the callers whose tables actually missed. Track residual
+                    // misses and bail to none() so the caller leaves the
+                    // lookup dynamic instead.
                     if (auto satisfyingVal =
                             findWitnessTableEntryInInheritanceClosure(witnessTab, key))
                         results.add(satisfyingVal);
+                    else
+                        sawResidualMiss = true;
                 });
+
+            if (sawResidualMiss)
+            {
+                module->getContainerPool().free(&results);
+                return none();
+            }
 
             auto setOp = getSetOpFromType(inst->getDataType());
             auto resultSetType = makeElementOfSetType(builder.getSet(setOp, results));
@@ -5786,12 +5798,15 @@ struct TypeFlowSpecializationContext
         // Handle trivial case where inst's operand is a concrete table.
         if (auto witnessTable = as<IRWitnessTable>(inst->getWitnessTable()))
         {
-            // Walk inherited witness tables (#11487); leave unspecialized on a
-            // miss so we don't call replaceUsesWith(null).
+            // Walk inherited witness tables (#11487). Once the operand is
+            // already a concrete IRWitnessTable, no later typeflow step can
+            // make the lookup start succeeding, and the post-pass diagnostic
+            // walker skips concrete-table operands - so a residual miss must
+            // be surfaced here as a release assert rather than silently
+            // leaving an unresolved lookup that escapes diagnostics.
             auto satisfyingVal =
                 findWitnessTableEntryInInheritanceClosure(witnessTable, inst->getRequirementKey());
-            if (!satisfyingVal)
-                return false;
+            SLANG_RELEASE_ASSERT(satisfyingVal);
             inst->replaceUsesWith(satisfyingVal);
             inst->removeAndDeallocate();
             return true;
