@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG):
 
 // Test the `[nodiscard]` attribute: calling a function marked `[nodiscard]`
 // and discarding its result produces a warning.
@@ -26,26 +26,26 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     t.val = 0;
 
     t.load(); // warn
-/*diag:
+/*DIAG:
           ^ result of '[nodiscard]' function is discarded
           ^ the result of calling 'load' is discarded; this function is marked '[nodiscard]'.
 */
 
     t.compute(); // warn
-/*diag:
+/*DIAG:
              ^ result of '[nodiscard]' function is discarded
              ^ the result of calling 'compute' is discarded; this function is marked '[nodiscard]'.
 */
 
     freeFunc(); // warn
-/*diag:
+/*DIAG:
             ^ result of '[nodiscard]' function is discarded
             ^ the result of calling 'freeFunc' is discarded; this function is marked '[nodiscard]'.
 */
 
     // The result is discarded in a `for` loop's side-effect expression too.
     for (int i = 0; i < 1; t.load())
-/*diag:
+/*DIAG:
                                  ^ result of '[nodiscard]' function is discarded
                                  ^ the result of calling 'load' is discarded; this function is marked '[nodiscard]'.
 */
@@ -55,7 +55,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // The result is also discarded in a comma operand of a `for` loop side effect.
     for (int j = 0; j < 1; t.load(), j++)
-/*diag:
+/*DIAG:
                                  ^ result of '[nodiscard]' function is discarded
                                  ^ the result of calling 'load' is discarded; this function is marked '[nodiscard]'.
 */

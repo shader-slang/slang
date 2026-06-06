@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG):
 
 // `[nodiscard]` on a function that returns `void` has no result to discard,
 // so it is rejected at the declaration with an error.
@@ -9,7 +9,7 @@ struct MyType
 
     [nodiscard]
     void touch() {}
-/*diag:
+/*DIAG:
          ^^^^^ '[nodiscard]' applied to a function returning 'void'
          ^^^^^ '[nodiscard]' has no effect on a function that returns 'void'.
 */
@@ -17,7 +17,7 @@ struct MyType
 
 [nodiscard]
 void freeVoid() {}
-/*diag:
+/*DIAG:
      ^^^^^^^^ '[nodiscard]' applied to a function returning 'void'
      ^^^^^^^^ '[nodiscard]' has no effect on a function that returns 'void'.
 */
