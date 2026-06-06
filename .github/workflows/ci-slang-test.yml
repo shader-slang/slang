@@ -104,38 +104,33 @@ jobs:
             "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
           )
 
-          # slang-test accepts only a single -api option, so build one API
-          # expression from all applicable restrictions and append it once.
-          # A later -api would silently override an earlier one.
-          api_expr=""
-
-          # Restrict to CPU / LLVM backends; tests requiring any GPU API get
-          # ignored by the test filter rather than run-and-failed.
+          # slang-test accepts only a single -api option (a later one silently
+          # overrides an earlier one), so select exactly one expression. macOS
+          # has no native Vulkan, so its expressions exclude the vk backend;
+          # "-api all" is equivalent to the default (all APIs enabled).
           if [[ "${{ inputs.cpu-only }}" == "true" ]]; then
+            # Restrict to CPU / LLVM backends; tests requiring any GPU API get
+            # ignored by the test filter rather than run-and-failed.
             api_expr="cpu+llvm"
-          # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped. Intentionally
-          # NOT using -api-only: no-API tests still need to run because
-          # COMPILE directives in multi-step compile→dispatch tests have
-          # requiredFlags==0 and would be skipped, breaking the dispatch.
           elif [[ "${{ inputs.gpu-api-only }}" == "true" ]]; then
-            api_expr="vk+cuda+dx11+dx12+mtl+wgpu"
-          fi
-
-          # macOS has no native Vulkan; exclude the vk backend so Vulkan-only
-          # test variants are filtered out rather than run-and-failed. Fold this
-          # into the single expression instead of adding a second -api: "all-vk"
-          # on its own, or "-vk" subtracted from an existing restriction.
-          if [[ "${{ inputs.os }}" == "macos" ]]; then
-            if [[ -z "$api_expr" ]]; then
+            # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped.
+            # Intentionally NOT using -api-only: no-API tests still need to run
+            # because COMPILE directives in multi-step compile→dispatch tests
+            # have requiredFlags==0 and would be skipped, breaking the dispatch.
+            if [[ "${{ inputs.os }}" == "macos" ]]; then
+              api_expr="cuda+dx11+dx12+mtl+wgpu"
+            else
+              api_expr="vk+cuda+dx11+dx12+mtl+wgpu"
+            fi
+          else
+            if [[ "${{ inputs.os }}" == "macos" ]]; then
               api_expr="all-vk"
             else
-              api_expr="$api_expr-vk"
+              api_expr="all"
             fi
           fi
 
-          if [[ -n "$api_expr" ]]; then
-            slang_test_args+=("-api" "$api_expr")
-          fi
+          slang_test_args+=("-api" "$api_expr")
 
           # Add test server arguments only if server count > 1
           if [ "${{ inputs.server-count }}" -gt 1 ]; then
