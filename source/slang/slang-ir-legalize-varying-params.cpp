@@ -2892,6 +2892,10 @@ private:
         for (auto param : func->getParams())
         {
             auto paramType = as<IRStructType>(param->getDataType());
+            // Workgraph record parameters are intrinsic HLSL node-record wrappers, not ordinary
+            // varying structs. Their payload fields may carry semantics such as SV_DispatchGrid,
+            // but the wrapper must stay intact so node-record methods and native HLSL types emit
+            // correctly.
             if (paramType && !isWorkGraphRecordType(paramType))
             {
                 paramsToProcess.add(param);

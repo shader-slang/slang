@@ -34,6 +34,11 @@ bool HLSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     {
     case kIROp_InOutImplicitCast:
     case kIROp_OutImplicitCast:
+        return true;
+
+    // Barrier flag conversion ops do not have a standalone HLSL temporary form. The
+    // use-site emitter expands their folded integer operand to DXC barrier flag tokens and
+    // diagnoses non-constant or unknown values there.
     case kIROp_GetEnumBarrierMemoryTypeFlags:
     case kIROp_GetEnumBarrierSemanticFlags:
         return true;
