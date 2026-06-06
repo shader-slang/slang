@@ -25,6 +25,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=BUFFER_EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability cuda_hlsl_spirv+sm_5_0+spvAtomicFloat16AddEXT -DTEST_BUFFER_EMULATED_NO_VECTOR
 //DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_EMULATED
 //DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_F16X2_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_F16X2
+//TEST:SIMPLE(filecheck=POINTER_EMULATED): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -skip-spirv-validation -capability spvAtomicFloat16VectorNV -DTEST_POINTER_EMULATED
+//TEST:SIMPLE(filecheck=POINTER_F16X2): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_POINTER_F16X2
 
 // Positive codegen checks for ignored capabilities, scalar/vector SPIR-V, and CUDA.
 //TEST:SIMPLE(filecheck=IGNORE_CAPS): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -ignore-capabilities -capability spirv_1_5
@@ -302,6 +304,26 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // EMULATED: [[HIGH_ATOMIC:%[0-9]+]] = OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[HIGH]]
 // EMULATED: OpCompositeExtract %half [[HIGH_ATOMIC]] 1
 // EMULATED-NOT: OpAtomicFAddEXT
+
+// POINTER_EMULATED: OpCapability VariablePointersStorageBuffer
+// POINTER_EMULATED: OpExtension "SPV_KHR_variable_pointers"
+// POINTER_EMULATED: OpCapability AtomicFloat16VectorNV
+// POINTER_EMULATED: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// POINTER_EMULATED-DAG: [[LOW:%[0-9]+]] = OpConstantComposite %v2half %half_0x1p_0 %half_0x0p_0
+// POINTER_EMULATED-DAG: [[HIGH:%[0-9]+]] = OpConstantComposite %v2half %half_0x0p_0 %half_0x1p_0
+// POINTER_EMULATED: [[LOW_ATOMIC:%[0-9]+]] = OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[LOW]]
+// POINTER_EMULATED: OpCompositeExtract %half [[LOW_ATOMIC]] 0
+// POINTER_EMULATED: [[HIGH_ATOMIC:%[0-9]+]] = OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[HIGH]]
+// POINTER_EMULATED: OpCompositeExtract %half [[HIGH_ATOMIC]] 1
+// POINTER_EMULATED-NOT: OpAtomicFAddEXT
+
+// POINTER_F16X2: OpCapability VariablePointersStorageBuffer
+// POINTER_F16X2: OpExtension "SPV_KHR_variable_pointers"
+// POINTER_F16X2: OpCapability AtomicFloat16VectorNV
+// POINTER_F16X2: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// POINTER_F16X2-DAG: [[VALUE:%[0-9]+]] = OpConstantComposite %v2half %half_0x1p_0 %half_0x1p_1
+// POINTER_F16X2: OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[VALUE]]
+// POINTER_F16X2-NOT: OpAtomicFAddEXT
 
 // CUDA-NOT: atomicAdd((half2 *
 // CUDA-NOT: atomicAdd((__half2 *
