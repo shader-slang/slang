@@ -1,9 +1,9 @@
-// Scalar fp16 add checks. `NO_FP16_ATOMIC` has no fp16 atomic capability; `VECTOR_ONLY`
-// has the vector capability but intentionally lacks the scalar spvAtomicFloat16AddEXT.
+// Scalar/vector fp16 add checks. `NO_FP16_ATOMIC` has no fp16 atomic capability;
+// `VECTOR_F16` has the vector capability, which implies scalar spvAtomicFloat16AddEXT.
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_SCALAR):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16AddEXT -render-feature atomic-half -output-using-type -xslang -DTEST_RUNTIME_SCALAR
 //TEST:SIMPLE(filecheck=SCALAR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT
 //DIAGNOSTIC_TEST:SIMPLE(diag=NO_FP16_ATOMIC,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spirv_1_5
-//DIAGNOSTIC_TEST:SIMPLE(diag=VECTOR_ONLY,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16VectorNV
+//TEST:SIMPLE(filecheck=VECTOR_F16): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV
 
 // Direct half-vector `__atomic_*` checks. `DIRECT` selects direct structured-buffer
 // atomics; `NO_VECTOR` means only the scalar fp16 atomic capability is enabled.
@@ -205,8 +205,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     tmpBuffer.InterlockedAddF16(0, 1.0h, originalValue);
 // NO_FP16_ATOMIC: entry point uses capabilities not in specified profile
 // NO_FP16_ATOMIC: Missing capabilities are: 'spvAtomicFloat16AddEXT'
-// VECTOR_ONLY: entry point uses capabilities not in specified profile
-// VECTOR_ONLY: Missing capabilities are: 'spvAtomicFloat16AddEXT'
 // IGNORE_CAPS-NOT: entry point uses capabilities not in specified profile
     outputBuffer[0] = float(originalValue);
     tmpBuffer.InterlockedAddF16(2, 1.0h, originalValue);
@@ -232,16 +230,22 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // SCALAR-NOT: OpCapability AtomicFloat16VectorNV
 // SCALAR-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 
-// BOTH-NOT: OpCapability AtomicFloat16VectorNV
-// BOTH-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
-// BOTH: OpCapability AtomicFloat16AddEXT
-// BOTH: OpExtension "SPV_EXT_shader_atomic_float16_add"
-// BOTH-NOT: OpAtomicFAddEXT %v2half
-// BOTH-COUNT-5: OpAtomicFAddEXT %half
-// BOTH-NOT: OpAtomicFAddEXT %v2half
+// VECTOR_F16-NOT: OpCapability AtomicFloat16AddEXT
+// VECTOR_F16-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
+// VECTOR_F16: OpCapability AtomicFloat16VectorNV
+// VECTOR_F16: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// VECTOR_F16-NOT: OpAtomicFAddEXT %half
+// VECTOR_F16-COUNT-6: OpAtomicFAddEXT %v2half
+// VECTOR_F16-NOT: OpAtomicFAddEXT %half
+
+// BOTH-NOT: OpCapability AtomicFloat16AddEXT
+// BOTH-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
+// BOTH: OpCapability AtomicFloat16VectorNV
+// BOTH: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// BOTH-NOT: OpAtomicFAddEXT %half
+// BOTH-COUNT-6: OpAtomicFAddEXT %v2half
+// BOTH-NOT: OpAtomicFAddEXT %half
 // BOTH-NOT: OpAtomicCompareExchange
-// BOTH-NOT: OpCapability AtomicFloat16VectorNV
-// BOTH-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 
 // VECTOR-NOT: OpCapability AtomicFloat16AddEXT
 // VECTOR-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"

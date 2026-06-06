@@ -728,6 +728,7 @@ Extensions
 
 `spvAtomicFloat16VectorNV`
 > Represents the SPIR-V capability for vector atomic float 16 add/min/max/exchange operations.
+> Implies scalar atomic float 16 add support.
 
 `spvAtomicFloat32AddEXT`
 > Represents the SPIR-V capability for atomic float 32 add operations.
