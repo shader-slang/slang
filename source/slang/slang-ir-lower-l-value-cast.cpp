@@ -57,9 +57,7 @@ struct LValueCastLoweringContext
         auto ptrA = as<IRPtrTypeBase>(a);
         auto ptrB = as<IRPtrTypeBase>(b);
 
-        // HLSL work-graph Barrier flag diagnostics can leave enum/integer value casts wrapped in
-        // the l-value cast ops. Those are not pointer l-value casts, so this pass leaves them for
-        // target-specific expression emission instead of asserting here.
+        SLANG_ASSERT(ptrA && ptrB);
         if (!ptrA || !ptrB)
             return false;
 
@@ -124,11 +122,41 @@ struct LValueCastLoweringContext
         return _canReinterpretCast(a, b);
     }
 
+    bool _isHLSLBarrierFlagValueCast(IRInst* castInst, IRType* fromType, IRType* toType)
+    {
+        if (m_intermediateSourceLanguage != SourceLanguage::HLSL)
+            return false;
+
+        if (as<IRPtrTypeBase>(fromType) || as<IRPtrTypeBase>(toType))
+            return false;
+
+        // HLSL work-graph Barrier flag diagnostics can leave enum/integer value casts wrapped in
+        // the l-value cast ops. Those are not pointer l-value casts, so this pass leaves only this
+        // known pattern for HLSL expression emission, where the wrappers are stripped.
+        bool hasUse = false;
+        for (auto use = castInst->firstUse; use; use = use->nextUse)
+        {
+            hasUse = true;
+            switch (use->getUser()->getOp())
+            {
+            case kIROp_GetEnumBarrierMemoryTypeFlags:
+            case kIROp_GetEnumBarrierSemanticFlags:
+                break;
+            default:
+                return false;
+            }
+        }
+        return hasUse;
+    }
+
     void _processLValueCast(IRInst* castInst)
     {
         auto castOperand = castInst->getOperand(0);
         auto fromType = castOperand->getDataType();
         auto toType = castInst->getDataType();
+
+        if (_isHLSLBarrierFlagValueCast(castInst, fromType, toType))
+            return;
 
         switch (m_intermediateSourceLanguage)
         {
@@ -181,11 +209,9 @@ struct LValueCastLoweringContext
         auto toPtrType = as<IRPtrTypeBase>(toType);
         auto fromPtrType = as<IRPtrTypeBase>(fromType);
 
+        SLANG_ASSERT(toPtrType && fromPtrType);
         if (!toPtrType || !fromPtrType)
         {
-            // If either type is not a pointer type, this is a value-cast wrapper rather than a
-            // pointer l-value cast. For example, HLSL work-graph Barrier flag diagnostics strip
-            // these wrappers at emission time.
             return;
         }
 
