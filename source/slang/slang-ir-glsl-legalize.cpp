@@ -4922,6 +4922,24 @@ IRFunc* legalizeEntryPointForGLSL(
         invokePathConstantFuncInHullShader(&context, codeGenContext, scalarizedGlobalOutput);
     }
 
+    if (isRayTracingHitStage(stage) &&
+        !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
+    {
+        if (auto firstBlock = func->getFirstBlock())
+        {
+            for (auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam())
+            {
+                builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+                tryLegalizeRayTracingPrimitiveIDParam(
+                    module,
+                    builder,
+                    pp,
+                    primitiveIndexFunc,
+                    /* removeParam */ false);
+            }
+        }
+    }
+
     // Special handling for ray tracing shaders
     switch (stage)
     {
