@@ -739,16 +739,47 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     auto binaryExpr = as<InfixExpr>(stmt->predicateExpression);
     if (!binaryExpr)
         return;
-    auto compareFuncExpr = as<DeclRefExpr>(binaryExpr->functionExpr);
-    if (!compareFuncExpr)
-        return;
-    if (!compareFuncExpr->declRef.getDecl())
-        return;
     IROp compareOp = kIROp_Nop;
-    if (auto intrinsicOpModifier =
-            compareFuncExpr->declRef.getDecl()->findModifier<IntrinsicOpModifier>())
+    // Note: `VarExpr` is a subclass of `DeclRefExpr`, so the fast-path case (where the
+    // callee is left as an unresolved operator-name `VarExpr`) must be handled *before*
+    // the resolved-DeclRefExpr case below.
+    if (binaryExpr->isLoweredAsBuiltinArithmetic)
     {
-        compareOp = (IROp)intrinsicOpModifier->op;
+        // A builtin comparison handled by the operator fast path: the callee is the
+        // unresolved operator name (no resolved intrinsic DeclRef), so map the name to
+        // the corresponding IR comparison op directly.
+        if (auto varExpr = as<VarExpr>(binaryExpr->functionExpr))
+        {
+            auto opText = getText(varExpr->name);
+            if (opText == "<")
+                compareOp = kIROp_Less;
+            else if (opText == "<=")
+                compareOp = kIROp_Leq;
+            else if (opText == ">")
+                compareOp = kIROp_Greater;
+            else if (opText == ">=")
+                compareOp = kIROp_Geq;
+            else if (opText == "==")
+                compareOp = kIROp_Eql;
+            else if (opText == "!=")
+                compareOp = kIROp_Neq;
+        }
+        if (compareOp == kIROp_Nop)
+            return;
+    }
+    else if (auto compareFuncExpr = as<DeclRefExpr>(binaryExpr->functionExpr))
+    {
+        if (!compareFuncExpr->declRef.getDecl())
+            return;
+        if (auto intrinsicOpModifier =
+                compareFuncExpr->declRef.getDecl()->findModifier<IntrinsicOpModifier>())
+        {
+            compareOp = (IROp)intrinsicOpModifier->op;
+        }
+        else
+        {
+            return;
+        }
     }
     else
     {

@@ -2390,19 +2390,41 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     if (!funcDeclRefExpr)
         return nullptr;
 
-    auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
-    if (!funcDeclRef)
-        return nullptr;
-    auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
-    auto implicitCast = funcDeclRef.getDecl()->findModifier<ImplicitConversionModifier>();
-    if (!intrinsicMod && !implicitCast)
+    // A builtin operator recognized by the fast path (see `convertToBuiltinArithmeticOp`)
+    // keeps its callee as an unresolved operator-name `VarExpr` instead of a resolved
+    // intrinsic-operator DeclRef. We can still fold it directly by operator name, as long
+    // as its operands reduce to concrete integer constants below. (A *symbolic* constant
+    // operand would need the resolved operator decl, which a fast-path node lacks; such
+    // operators are kept off the fast path by `convertToBuiltinArithmeticOp` so they reach
+    // the resolved path here instead.)
+    Name* builtinFastPathOpName = nullptr;
+    if (auto opExpr = as<OperatorExpr>(invokeExpr.getExpr()))
     {
-        // We can't constant fold anything that doesn't map to a builtin
-        // operation right now.
-        //
-        // TODO: we should really allow constant-folding for anything
-        // that can be lowered to our bytecode...
-        return nullptr;
+        if (opExpr->isLoweredAsBuiltinArithmetic)
+        {
+            if (auto opVarExpr = as<VarExpr>(opExpr->functionExpr))
+                builtinFastPathOpName = opVarExpr->name;
+        }
+    }
+
+    DeclRef<Decl> funcDeclRef;
+    ImplicitConversionModifier* implicitCast = nullptr;
+    if (!builtinFastPathOpName)
+    {
+        funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
+        if (!funcDeclRef)
+            return nullptr;
+        auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
+        implicitCast = funcDeclRef.getDecl()->findModifier<ImplicitConversionModifier>();
+        if (!intrinsicMod && !implicitCast)
+        {
+            // We can't constant fold anything that doesn't map to a builtin
+            // operation right now.
+            //
+            // TODO: we should really allow constant-folding for anything
+            // that can be lowered to our bytecode...
+            return nullptr;
+        }
     }
 
     // Let's not constant-fold operations with more than a certain number of arguments, for
@@ -2454,7 +2476,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             return nullptr;
         }
 
-        auto opName = funcDeclRef.getName();
+        auto opName = builtinFastPathOpName ? builtinFastPathOpName : funcDeclRef.getName();
 
         // handle binary operators
         if (opName == getName("-"))
@@ -2494,6 +2516,12 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             opName == getName("^") || opName == getName("~") || opName == getName("%") ||
             opName == getName("?:") || opName == getName("<<") || opName == getName(">>"))
         {
+            // These build a deferred `FuncCallIntVal` that records the resolved operator
+            // decl for later re-evaluation. A fast-path node has no resolved decl, but it
+            // also never reaches here with a symbolic operand (such operands are kept off
+            // the fast path), so fall back to "not a constant" defensively.
+            if (builtinFastPathOpName)
+                return nullptr;
             auto result = m_astBuilder->getOrCreate<FuncCallIntVal>(
                 invokeExpr.getExpr()->type.type,
                 funcDeclRef,
@@ -2524,7 +2552,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     }
     else
     {
-        auto opName = funcDeclRef.getName();
+        auto opName = builtinFastPathOpName ? builtinFastPathOpName : funcDeclRef.getName();
 
         // handle binary operators
         if (opName == getName("-"))
@@ -4374,6 +4402,247 @@ Expr* SemanticsExprVisitor::visitSelectExpr(SelectExpr* expr)
     return result;
 }
 
+// Conservatively returns true if `expr` is (or may be) a compile-time constant value made
+// only of literals, `sizeof`-likes, `const` variables, generic value parameters, enum
+// cases, and arithmetic/paren/cast over such. Used to keep constant arithmetic on the
+// folding path (the builtin-op fast path only fires when at least one operand is genuinely
+// runtime). Over-approximation is safe: it only ever defers to normal resolution + folding.
+static bool _isCompileTimeConstantArith(Expr* expr)
+{
+    if (!expr)
+        return false;
+    if (as<IntegerLiteralExpr>(expr) || as<FloatingPointLiteralExpr>(expr) ||
+        as<BoolLiteralExpr>(expr))
+        return true;
+    // `sizeof`/`alignof`/`countof` always fold to compile-time constants.
+    if (as<SizeOfLikeExpr>(expr))
+        return true;
+    if (auto parenExpr = as<ParenExpr>(expr))
+        return _isCompileTimeConstantArith(parenExpr->base);
+    if (auto castExpr = as<BuiltinCastExpr>(expr))
+        return _isCompileTimeConstantArith(castExpr->base);
+    // A numeric conversion (e.g. the implicit `int`->`uint` cast inserted when resolving a
+    // mixed-type operator) is constant exactly when its operand is. `TypeCastExpr` is an
+    // `InvokeExpr` whose argument[0] is the value being converted.
+    if (auto typeCastExpr = as<TypeCastExpr>(expr))
+        return typeCastExpr->arguments.getCount() == 1 &&
+               _isCompileTimeConstantArith(typeCastExpr->arguments[0]);
+    if (auto declRefExpr = as<DeclRefExpr>(expr))
+    {
+        auto decl = declRefExpr->declRef.getDecl();
+        // Generic value parameters (`let N : int`) and enum cases are compile-time
+        // constants. Check these before VarDeclBase: GenericValueParamDecl is itself a
+        // VarDeclBase, so the VarDeclBase branch would otherwise reject `N` (it is not
+        // `static const`) and let `N + 1` fast-path, breaking `vector<T, N+1>`.
+        if (as<GenericValueParamDecl>(decl) != nullptr || as<EnumCaseDecl>(decl) != nullptr)
+            return true;
+        // Any `const` variable (local, global, or `static const`) may carry a
+        // compile-time-constant value and be used as one (e.g. a generic value argument).
+        // Treat it as constant so we leave it to normal resolution + folding. This is
+        // conservative-safe: a `const` initialized from a runtime value simply falls back
+        // to the normal (correct) operator path.
+        if (auto varDecl = as<VarDeclBase>(decl))
+            return varDecl->hasModifier<ConstModifier>();
+        return false;
+    }
+    // Arithmetic over constants (including a previously fast-pathed builtin op) is constant.
+    if (auto opExpr = as<OperatorExpr>(expr))
+    {
+        if (opExpr->arguments.getCount() == 2)
+            return _isCompileTimeConstantArith(opExpr->arguments[0]) &&
+                   _isCompileTimeConstantArith(opExpr->arguments[1]);
+    }
+    return false;
+}
+
+Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
+{
+    // Don't fast-path inside a compile-time-constant context (array extents, generic value
+    // arguments, `static const` initializers). There the operator must remain a resolved
+    // intrinsic-operator call: the constant folder represents a *symbolic* result (e.g.
+    // `N / 2` with a generic value parameter `N`) as a `FuncCallIntVal` that stores the
+    // resolved operator DeclRef and re-evaluates it on substitution. A fast-path node has
+    // no such DeclRef, and encoding the operator differently would create a *second*
+    // `FuncCallIntVal` representation of the same value — and since `Val::equals` is
+    // pointer-identity-after-resolution, that representation would compare unequal to the
+    // resolved one, breaking type unification during generic specialization. Skipping
+    // constant contexts costs nothing at runtime (these operators are evaluated once at
+    // compile time). The compiler already marks exactly these contexts by disabling
+    // short-circuit evaluation of `&&`/`||`, which has the same "must stay foldable"
+    // constraint, so we reuse that signal.
+    if (!m_shouldShortCircuitLogicExpr)
+        return nullptr;
+
+    // Unary prefix operators on a builtin scalar/vector/matrix operand: `-x` (negate),
+    // `!x` (logical not, bool operand), `~x` (bitwise not, integer operand). Same idea as
+    // the binary case below; handled separately because there is a single operand.
+    if (as<PrefixExpr>(expr) && expr->arguments.getCount() == 1)
+    {
+        auto uVarExpr = as<VarExpr>(expr->functionExpr);
+        if (!uVarExpr || !uVarExpr->name)
+            return nullptr;
+        auto uOpText = getText(uVarExpr->name);
+        bool isNeg = (uOpText == "-");
+        bool isLogicalNot = (uOpText == "!");
+        bool isBitNot = (uOpText == "~");
+        if (!isNeg && !isLogicalNot && !isBitNot)
+            return nullptr;
+
+        auto arg = expr->arguments[0];
+        if (!arg->type.type)
+            return nullptr;
+        Type* uOperandType = arg->type.type;
+        Type* uElementType = uOperandType;
+        if (auto v = as<VectorExpressionType>(uOperandType))
+            uElementType = v->getElementType();
+        else if (auto m = as<MatrixExpressionType>(uOperandType))
+            uElementType = m->getElementType();
+        auto uBasic = as<BasicExpressionType>(uElementType);
+        if (!uBasic)
+            return nullptr;
+        auto uBaseType = uBasic->getBaseType();
+        auto uFlags = BaseTypeInfo::getInfo(uBaseType).flags;
+        bool uInt = (uFlags & BaseTypeInfo::Flag::Integer) != 0;
+        bool uFloat = (uFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+        bool uBool = (uBaseType == BaseType::Bool);
+        // `-` => signed/float negate; `~` => integer bitwise-not; `!` => bool logical-not.
+        bool uEligible = isNeg ? (uInt || uFloat) : (isBitNot ? uInt : /*isLogicalNot*/ uBool);
+        if (!uEligible)
+            return nullptr;
+        // Keep a compile-time-constant operand on the normal resolution + folding path.
+        if (_isCompileTimeConstantArith(arg))
+            return nullptr;
+
+        expr->type = QualType(uOperandType);
+        as<OperatorExpr>(expr)->isLoweredAsBuiltinArithmetic = true;
+        if (m_parentDifferentiableAttr && isNeg)
+        {
+            maybeRegisterDifferentiableType(m_astBuilder, arg->type.type, arg->loc);
+            maybeRegisterDifferentiableType(m_astBuilder, uOperandType, expr->loc);
+        }
+        return expr;
+    }
+
+    // Only an infix binary operator `a OP b`.
+    if (!as<InfixExpr>(expr) || expr->arguments.getCount() != 2)
+        return nullptr;
+    auto varExpr = as<VarExpr>(expr->functionExpr);
+    if (!varExpr || !varExpr->name)
+        return nullptr;
+    auto opText = getText(varExpr->name);
+
+    bool isArithmetic =
+        (opText == "+" || opText == "-" || opText == "*" || opText == "/" || opText == "%");
+    bool isComparison =
+        (opText == "==" || opText == "!=" || opText == "<" || opText == ">" || opText == "<=" ||
+         opText == ">=");
+    bool isBitwise =
+        (opText == "&" || opText == "|" || opText == "^" || opText == "<<" || opText == ">>");
+    if (!isArithmetic && !isComparison && !isBitwise)
+        return nullptr;
+
+    auto leftArg = expr->arguments[0];
+    auto rightArg = expr->arguments[1];
+    if (!leftArg->type.type || !rightArg->type.type)
+        return nullptr;
+
+    // Both operands must be the *same* builtin arithmetic (integer or floating-point)
+    // scalar, vector, or matrix type. Same type => no promotion to perform, and no
+    // user-defined operator can apply, so the result is exactly the corresponding
+    // builtin IR op. Constant-folding contexts are handled by the runtime gate below.
+    if (!leftArg->type.type->equals(rightArg->type.type))
+        return nullptr;
+
+    Type* operandType = leftArg->type.type;
+    Type* elementType = operandType;
+    bool isVector = false;
+    bool isMatrix = false;
+    if (auto vecType = as<VectorExpressionType>(operandType))
+    {
+        elementType = vecType->getElementType();
+        isVector = true;
+    }
+    else if (auto matType = as<MatrixExpressionType>(operandType))
+    {
+        elementType = matType->getElementType();
+        isMatrix = true;
+    }
+    auto basicElementType = as<BasicExpressionType>(elementType);
+    if (!basicElementType)
+        return nullptr;
+    auto baseType = basicElementType->getBaseType();
+    auto baseFlags = BaseTypeInfo::getInfo(baseType).flags;
+    bool isIntegerBase = (baseFlags & BaseTypeInfo::Flag::Integer) != 0;
+    bool isFloatBase = (baseFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+    bool isBoolBase = (baseType == BaseType::Bool);
+    bool isEquality = (opText == "==" || opText == "!=");
+    // Element-type eligibility per operator family:
+    //  - bitwise/shift: integer only;
+    //  - equality (`==`/`!=`): integer, floating-point, or bool;
+    //  - arithmetic and ordering comparison: integer or floating-point.
+    bool eligible;
+    if (isBitwise)
+        eligible = isIntegerBase;
+    else if (isEquality)
+        eligible = isIntegerBase || isFloatBase || isBoolBase;
+    else
+        eligible = isIntegerBase || isFloatBase;
+    if (!eligible)
+        return nullptr;
+    // Matrix comparison would need a `matrix<bool,...>` result; leave it to the normal
+    // path (it is rare). Scalar/vector comparison, and scalar/vector/matrix arithmetic and
+    // bitwise ops, are handled here.
+    if (isComparison && isMatrix)
+        return nullptr;
+
+    // If both operands are compile-time constants, leave the operator to normal
+    // resolution + folding rather than fast-pathing it. The constant folder *can* fold a
+    // fast-path node directly by operator name when its operands reduce to concrete
+    // integers (see tryConstantFoldExpr), but a *symbolic* constant operand (e.g. a
+    // generic value parameter `N` in `vector<T, N / 2>`) folds to a deferred
+    // `FuncCallIntVal` that needs the resolved operator decl, which a fast-path node does
+    // not carry. Keeping both-constant operators off the fast path guarantees those
+    // symbolic forms stay on the resolved path. (Genuinely runtime operands fall through
+    // and are fast-pathed.)
+    if (_isCompileTimeConstantArith(leftArg) && _isCompileTimeConstantArith(rightArg))
+        return nullptr;
+
+    // Result type: arithmetic preserves the operand type; comparison yields a boolean
+    // of matching shape (scalar -> bool, vector<T,N> -> vector<bool,N>).
+    QualType resultType;
+    if (isComparison)
+    {
+        Type* boolType = m_astBuilder->getBoolType();
+        if (isVector)
+            resultType = QualType(createVectorType(
+                boolType,
+                as<VectorExpressionType>(operandType)->getElementCount()));
+        else
+            resultType = QualType(boolType);
+    }
+    else
+    {
+        resultType = QualType(operandType);
+    }
+
+    // Keep the node as an OperatorExpr (InfixExpr) so form-sensitive analyses still see
+    // an operator. We leave `functionExpr` as the unresolved operator name; lower-to-ir
+    // reads it (and the operand type) to pick the IR op. No generic operator candidate
+    // is enumerated.
+    expr->type = resultType;
+    as<OperatorExpr>(expr)->isLoweredAsBuiltinArithmetic = true;
+
+    // Match visitInvokeExpr's differentiable-type registration for arithmetic (the IR
+    // op it lowers to is differentiable). Comparison results are boolean (non-diff).
+    if (m_parentDifferentiableAttr && isArithmetic)
+    {
+        maybeRegisterDifferentiableType(m_astBuilder, leftArg->type.type, leftArg->loc);
+        maybeRegisterDifferentiableType(m_astBuilder, rightArg->type.type, rightArg->loc);
+        maybeRegisterDifferentiableType(m_astBuilder, resultType.type, expr->loc);
+    }
+    return expr;
+}
+
 Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
 {
     LogicOperatorShortCircuitExpr* newExpr = nullptr;
@@ -4449,6 +4718,12 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     // to use short-circuit evaluation.
     if (auto newExpr = convertToLogicOperatorExpr(expr))
         return newExpr;
+
+    // Fast path: builtin same-type arithmetic/comparison on scalar/vector/matrix operands
+    // (`a + b`, `a < b`, etc.) is marked for direct IR lowering and skips generic operator
+    // overload resolution.
+    if (auto builtinOp = convertToBuiltinArithmeticOp(expr))
+        return builtinOp;
 
     // Check for comma operator usage and emit warning if not in for-loop side effect context
     // Skip warning in Slang 2026+ mode where parentheses create tuples

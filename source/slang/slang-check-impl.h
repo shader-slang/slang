@@ -3698,6 +3698,15 @@ public:
 private:
     // Convert the logic operator expression to not use 'InvokeExpr' type
     Expr* convertToLogicOperatorExpr(InvokeExpr* expr);
+
+    // If `expr` is an arithmetic (`+ - * / %`) or comparison (`== != < > <= >=`) operator
+    // on two operands of the *same* builtin integer/floating-point scalar, vector, or
+    // matrix type (comparison: scalar/vector only), with at least one runtime operand and
+    // outside a constant-evaluation context, mark it for direct builtin IR lowering and
+    // return it (typed), skipping generic operator overload resolution. Returns null to
+    // fall back to normal resolution (mixed/promoted types, constant-only operands inside
+    // constant contexts, matrix comparison, user-defined types).
+    Expr* convertToBuiltinArithmeticOp(InvokeExpr* expr);
 };
 
 struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmtVisitor>

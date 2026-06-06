@@ -5205,6 +5205,79 @@ struct ExprLoweringContext
     /// Lower an invoke expr, and attempt to fuse a store of the expr's result into destination.
     /// If the store is fused, returns LoweredValInfo::None. Otherwise, returns the IR val
     /// representing the RValue.
+    // Emit a builtin floating-point scalar/vector arithmetic operator directly as the
+    // corresponding IR arithmetic instruction, bypassing callable resolution/lowering.
+    // The operands and result type are already checked; differentiability is handled by
+    // autodiff's rules for the emitted IR ops.
+    LoweredValInfo lowerBuiltinArithmeticOp(OperatorExpr* expr)
+    {
+        auto irType = lowerType(context, expr->type);
+        const Index argCount = expr->arguments.getCount();
+        SLANG_ASSERT(argCount == 1 || argCount == 2);
+        IRInst* args[2];
+        for (Index i = 0; i < argCount; ++i)
+            args[i] = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[i]));
+
+        // Determine whether the operand element type is floating-point (selects FRem vs
+        // IRem for `%`).
+        bool isFloatingPoint = false;
+        {
+            Type* elementType = expr->arguments[0]->type.type;
+            if (auto vecType = as<VectorExpressionType>(elementType))
+                elementType = vecType->getElementType();
+            else if (auto matType = as<MatrixExpressionType>(elementType))
+                elementType = matType->getElementType();
+            if (auto basicType = as<BasicExpressionType>(elementType))
+                isFloatingPoint = (BaseTypeInfo::getInfo(basicType->getBaseType()).flags &
+                                   BaseTypeInfo::Flag::FloatingPoint) != 0;
+        }
+
+        auto opText = getText(as<VarExpr>(expr->functionExpr)->name);
+        if (argCount == 1)
+        {
+            // Unary prefix operators.
+            IROp uop = kIROp_Neg;
+            if (opText == "!")
+                uop = kIROp_Not;
+            else if (opText == "~")
+                uop = kIROp_BitNot;
+            // else "-" => kIROp_Neg
+            return LoweredValInfo::simple(getBuilder()->emitIntrinsicInst(irType, uop, 1, args));
+        }
+        IROp op = kIROp_Add;
+        if (opText == "-")
+            op = kIROp_Sub;
+        else if (opText == "*")
+            op = kIROp_Mul;
+        else if (opText == "/")
+            op = kIROp_Div;
+        else if (opText == "%")
+            op = isFloatingPoint ? kIROp_FRem : kIROp_IRem;
+        else if (opText == "==")
+            op = kIROp_Eql;
+        else if (opText == "!=")
+            op = kIROp_Neq;
+        else if (opText == "<")
+            op = kIROp_Less;
+        else if (opText == ">")
+            op = kIROp_Greater;
+        else if (opText == "<=")
+            op = kIROp_Leq;
+        else if (opText == ">=")
+            op = kIROp_Geq;
+        else if (opText == "&")
+            op = kIROp_BitAnd;
+        else if (opText == "|")
+            op = kIROp_BitOr;
+        else if (opText == "^")
+            op = kIROp_BitXor;
+        else if (opText == "<<")
+            op = kIROp_Lsh;
+        else if (opText == ">>")
+            op = kIROp_Rsh;
+        return LoweredValInfo::simple(getBuilder()->emitIntrinsicInst(irType, op, 2, args));
+    }
+
     LoweredValInfo visitInvokeExprImpl(
         InvokeExpr* expr,
         LoweredValInfo destination,
@@ -5227,6 +5300,15 @@ struct ExprLoweringContext
         }
         context->invokeLoweringRecursionDepth++;
         SLANG_DEFER(context->invokeLoweringRecursionDepth--);
+
+        // Builtin same-type arithmetic/comparison on scalar/vector/matrix operands,
+        // recognized during checking (see `convertToBuiltinArithmeticOp`): emit the IR
+        // op directly, skipping the resolved-callable lowering path.
+        if (auto opExpr = as<OperatorExpr>(expr))
+        {
+            if (opExpr->isLoweredAsBuiltinArithmetic)
+                return lowerBuiltinArithmeticOp(opExpr);
+        }
 
         auto type = lowerType(context, expr->type);
 

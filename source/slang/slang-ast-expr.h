@@ -276,6 +276,16 @@ FIDDLE()
 class OperatorExpr : public InvokeExpr
 {
     FIDDLE(...)
+
+    // When set, this builtin same-type arithmetic/comparison operator on scalar/vector/
+    // matrix operands was recognized during checking and given its result type directly,
+    // without resolving to a generic `operator OP` candidate. lower-to-ir emits the
+    // corresponding IR op directly (see `lowerBuiltinArithmeticOp`). The node is kept as
+    // an OperatorExpr so form-sensitive analyses (constant folding, autodiff, for-loop
+    // trip-count inference) still see an operator rather than a function call. Only set
+    // when at least one operand is a runtime value (constant contexts use normal
+    // resolution + folding).
+    FIDDLE() bool isLoweredAsBuiltinArithmetic = false;
 };
 
 FIDDLE()
