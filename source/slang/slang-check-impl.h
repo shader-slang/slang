@@ -3699,14 +3699,19 @@ private:
     // Convert the logic operator expression to not use 'InvokeExpr' type
     Expr* convertToLogicOperatorExpr(InvokeExpr* expr);
 
-    // If `expr` is an arithmetic (`+ - * / %`) or comparison (`== != < > <= >=`) operator
-    // on two operands of the *same* builtin integer/floating-point scalar, vector, or
-    // matrix type (comparison: scalar/vector only), with at least one runtime operand and
-    // outside a constant-evaluation context, mark it for direct builtin IR lowering and
-    // return it (typed), skipping generic operator overload resolution. Returns null to
-    // fall back to normal resolution (mixed/promoted types, constant-only operands inside
-    // constant contexts, matrix comparison, user-defined types).
+    // If `expr` is an arithmetic (`+ - * / %`), comparison (`== != < > <= >=`), bitwise/
+    // shift (`& | ^ << >>`), or unary (`- ! ~`) operator on operands of the *same* builtin
+    // integer/floating-point/bool scalar, vector, or matrix type, with at least one runtime
+    // operand and outside a constant-evaluation context, mark it for direct builtin IR
+    // lowering and return it (typed), skipping generic operator overload resolution.
+    // Returns null to fall back to normal resolution (mixed/promoted types, constant-only
+    // operands inside constant contexts, GLSL operator scope, user-defined types).
     Expr* convertToBuiltinArithmeticOp(InvokeExpr* expr);
+
+    // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either
+    // `-allow-glsl` is set, or the `glsl` module is in scope (its `operator*` overloads
+    // make `mat * mat` a matrix product). The builtin-operator fast path is disabled then.
+    bool isGLSLOperatorScope();
 };
 
 struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmtVisitor>

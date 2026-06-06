@@ -4455,6 +4455,18 @@ static bool _isCompileTimeConstantArith(Expr* expr)
     return false;
 }
 
+bool SemanticsExprVisitor::isGLSLOperatorScope()
+{
+    if (getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
+        return true;
+    for (auto moduleDecl : getShared()->importedModulesList)
+    {
+        if (moduleDecl->getName() && getText(moduleDecl->getName()) == "glsl")
+            return true;
+    }
+    return false;
+}
+
 Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
 {
     // Don't fast-path inside a compile-time-constant context (array extents, generic value
@@ -4475,10 +4487,12 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
 
     // In GLSL-compatibility mode several builtin operators have different semantics than in
     // Slang/HLSL — e.g. `vec == vec` yields a scalar `bool` (all-components-equal) rather
-    // than a `vector<bool,N>`, and `mat * mat` is a matrix product rather than a
-    // component-wise multiply. Those differences live in the GLSL module's operator
-    // overloads, so let normal resolution pick them rather than hard-coding HLSL semantics.
-    if (getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
+    // than a `vector<bool,N>` (enabled by `-allow-glsl`), and `mat * mat` is a matrix
+    // product rather than a component-wise multiply (the `operator*` overloads in the
+    // `glsl` module, which a user can pull in with just `import glsl;` without
+    // `-allow-glsl`). In either situation, hard-coding HLSL semantics would be wrong, so
+    // fall back to normal resolution.
+    if (isGLSLOperatorScope())
         return nullptr;
 
     // Unary prefix operators on a builtin scalar/vector/matrix operand: `-x` (negate),
@@ -4503,8 +4517,8 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         Type* uElementType = uOperandType;
         if (auto v = as<VectorExpressionType>(uOperandType))
             uElementType = v->getElementType();
-        else if (as<MatrixExpressionType>(uOperandType))
-            return nullptr; // matrices are left to the normal path (see binary case)
+        else if (auto m = as<MatrixExpressionType>(uOperandType))
+            uElementType = m->getElementType();
         auto uBasic = as<BasicExpressionType>(uElementType);
         if (!uBasic)
             return nullptr;
@@ -4554,27 +4568,21 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     if (!leftArg->type.type || !rightArg->type.type)
         return nullptr;
 
-    // Both operands must be the *same* builtin scalar or vector type. Same type => no
-    // promotion to perform, and no user-defined operator can apply, so the result is
-    // exactly the corresponding builtin IR op. Constant-folding contexts are handled by
-    // the runtime gate below.
+    // Both operands must be the *same* builtin scalar, vector, or matrix type. Same type
+    // => no promotion to perform, and no user-defined operator can apply, so the result is
+    // exactly the corresponding builtin IR op. Constant-folding contexts are handled by the
+    // runtime gate below.
     if (!leftArg->type.type->equals(rightArg->type.type))
         return nullptr;
 
     Type* operandType = leftArg->type.type;
     Type* elementType = operandType;
-    bool isVector = false;
-    bool isMatrix = false;
-    if (auto vecType = as<VectorExpressionType>(operandType))
-    {
+    VectorExpressionType* vecType = nullptr;
+    MatrixExpressionType* matType = nullptr;
+    if ((vecType = as<VectorExpressionType>(operandType)))
         elementType = vecType->getElementType();
-        isVector = true;
-    }
-    else if (auto matType = as<MatrixExpressionType>(operandType))
-    {
+    else if ((matType = as<MatrixExpressionType>(operandType)))
         elementType = matType->getElementType();
-        isMatrix = true;
-    }
     auto basicElementType = as<BasicExpressionType>(elementType);
     if (!basicElementType)
         return nullptr;
@@ -4597,13 +4605,6 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         eligible = isIntegerBase || isFloatBase;
     if (!eligible)
         return nullptr;
-    // Matrices are left to the normal path. The builtin matrix operators inline to a
-    // per-element form whose emitted variable naming/structure differs from a single IR
-    // matrix op, so fast-pathing them is not byte-identical (and matrix-`*` is a matrix
-    // product, not component-wise, in GLSL mode). Matrix operators are also rare, so the
-    // fast path targets scalar and vector operands only.
-    if (isMatrix)
-        return nullptr;
 
     // If both operands are compile-time constants, leave the operator to normal
     // resolution + folding rather than fast-pathing it. The constant folder *can* fold a
@@ -4617,16 +4618,21 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     if (_isCompileTimeConstantArith(leftArg) && _isCompileTimeConstantArith(rightArg))
         return nullptr;
 
-    // Result type: arithmetic preserves the operand type; comparison yields a boolean
-    // of matching shape (scalar -> bool, vector<T,N> -> vector<bool,N>).
+    // Result type: arithmetic/bitwise preserve the operand type; comparison yields a
+    // boolean of matching shape (scalar -> bool, vector<T,N> -> vector<bool,N>,
+    // matrix<T,R,C> -> matrix<bool,R,C>).
     QualType resultType;
     if (isComparison)
     {
         Type* boolType = m_astBuilder->getBoolType();
-        if (isVector)
-            resultType = QualType(createVectorType(
+        if (vecType)
+            resultType = QualType(createVectorType(boolType, vecType->getElementCount()));
+        else if (matType)
+            resultType = QualType(m_astBuilder->getMatrixType(
                 boolType,
-                as<VectorExpressionType>(operandType)->getElementCount()));
+                matType->getRowCount(),
+                matType->getColumnCount(),
+                matType->getLayout()));
         else
             resultType = QualType(boolType);
     }
