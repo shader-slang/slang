@@ -10905,6 +10905,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         IRBuilder builder(m_irModule);
                         auto textureInst =
                             as<IRTextureTypeBase>(operand->getValue()->getDataType());
+                        // Defensive: the asm-operand value should be texture-typed;
+                        // when an upstream IR pass leaves a stranded `IRParam` here
+                        // (observed for shader-slang/slang#11496 — orphan param with
+                        // null `getFullType()` reaches this arm), bail with a clean
+                        // internal-error diagnostic rather than null-dereferencing on
+                        // the cast result. The upstream producer is tracked
+                        // separately; this guard only converts the SIGSEGV into a
+                        // surfaceable error.
+                        if (!textureInst)
+                        {
+                            SLANG_UNEXPECTED("SPIRVAsmOperandImageType / SampledImageType value "
+                                             "has no resolvable texture type "
+                                             "(see shader-slang/slang#11496)");
+                        }
+                        // The `format` operand of `IRTextureType` is optional
+                        // (see `IRResourceType::hasFormat()`); fall back to
+                        // `Unknown` to mirror `getSpvImageFormat`'s safe pattern.
+                        auto formatInst = textureInst->hasFormat()
+                                              ? textureInst->getFormatInst()
+                                              : builder.getIntValue(
+                                                    builder.getIntType(),
+                                                    (IRIntegerValue)ImageFormat::unknown);
                         auto imageType = builder.getTextureType(
                             textureInst->getElementType(),
                             textureInst->getShapeInst(),
@@ -10917,7 +10939,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 builder.getIntType(),
                                 (operand->getOp() == kIROp_SPIRVAsmOperandSampledImageType ? 1
                                                                                            : 0)),
-                            textureInst->getFormatInst());
+                            formatInst);
                         emitOperand(ensureInst(imageType));
                         break;
                     }

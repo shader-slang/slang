@@ -3146,6 +3146,13 @@ IRType* getTextureTypeFromCombinedTextureSampler(IRType* type)
     IRBuilder builder(type);
     builder.setInsertBefore(type);
     auto textureType = as<IRTextureTypeBase>(type);
+    // The `format` operand of `IRTextureType` is optional
+    // (see `IRResourceType::hasFormat()`); fall back to `Unknown` so we don't
+    // null-deref on parameter-typed textures that bypass `resolveTextureFormat`.
+    auto formatInst =
+        textureType->hasFormat()
+            ? textureType->getFormatInst()
+            : builder.getIntValue(builder.getIntType(), (IRIntegerValue)ImageFormat::unknown);
     return builder.getTextureType(
         textureType->getElementType(),
         textureType->getShapeInst(),
@@ -3155,7 +3162,7 @@ IRType* getTextureTypeFromCombinedTextureSampler(IRType* type)
         textureType->getAccessInst(),
         textureType->getIsShadowInst(),
         builder.getIntValue(builder.getIntType(), 0),
-        textureType->getFormatInst());
+        formatInst);
 }
 
 IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type)
