@@ -15,9 +15,9 @@ namespace Slang
 /// ensuring consistency with reflection data.
 bool tryGetBindlessSpaceIndex(TargetProgram* targetProgram, UInt& outBindlessSpaceIndex)
 {
-    SLANG_ASSERT(targetProgram);
+    SLANG_RELEASE_ASSERT(targetProgram);
     auto programLayout = targetProgram->getExistingLayout();
-    SLANG_ASSERT(programLayout);
+    SLANG_RELEASE_ASSERT(programLayout);
 
     // Do not fall back to the requested option here; only layout knows the
     // bindless space that was actually reserved after conflict resolution.

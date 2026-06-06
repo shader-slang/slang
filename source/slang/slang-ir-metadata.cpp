@@ -172,6 +172,11 @@ static bool _instUsesBindlessResourceHeap(IRInst* inst, SlangInt bindlessSpaceIn
         // is collected; SPIR-V descriptor-heap extension tests cover these cases.
         return true;
     case kIROp_CastDescriptorHandleToResource:
+    case kIROp_CastResourceToDescriptorHandle:
+    case kIROp_CastUInt2ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt2:
+    case kIROp_CastUInt64ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt64:
         return true;
     default:
         return false;
