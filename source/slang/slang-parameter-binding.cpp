@@ -3,6 +3,7 @@
 
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "slang-compiler.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
 #include "slang-lookup.h"
@@ -2143,11 +2144,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             auto sn = state.optSemanticName->toLower();
             if (sn == "sv_primitiveid")
             {
-                switch (state.stage)
+                if (isRayTracingHitStage(state.stage))
                 {
-                case Stage::Intersection:
-                case Stage::AnyHit:
-                case Stage::ClosestHit:
                     isRaytracingPrimitiveIDSystemValueInput = true;
                     if (isD3DTarget(context->getTargetRequest()) ||
                         isKhronosTarget(context->getTargetRequest()) ||
@@ -2163,9 +2161,6 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                                 "for this target",
                             .location = state.loc});
                     }
-                    break;
-                default:
-                    break;
                 }
             }
         }

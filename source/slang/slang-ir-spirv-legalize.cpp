@@ -14,6 +14,7 @@
 #include "slang-ir-legalize-composite-select.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-mesh-outputs.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-lower-copy-logical.h"
@@ -695,15 +696,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             else if (semanticName == "sv_primitiveid" && result == AddressSpace::Generic)
             {
-                switch (getReferencingEntryPointStage(varInst))
+                if (isRayTracingHitStage(getReferencingEntryPointStage(varInst)))
                 {
-                case Stage::Intersection:
-                case Stage::AnyHit:
-                case Stage::ClosestHit:
                     result = AddressSpace::BuiltinInput;
-                    break;
-                default:
-                    break;
                 }
             }
         }

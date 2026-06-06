@@ -3987,19 +3987,18 @@ void tryReplaceUsesOfStageInput(
     }
 }
 
-void legalizeEntryPointParameterForGLSL(
+IRFunc* legalizeEntryPointParameterForGLSL(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
     IRFunc* func,
     IRParam* pp,
     IRVarLayout* paramLayout,
-    IRFunc*& primitiveIndexFunc)
+    IRFunc* primitiveIndexFunc)
 {
     auto builder = context->getBuilder();
     auto stage = context->getStage();
 
     if (isRayTracingHitStage(stage) &&
-        !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly() &&
         tryLegalizeRayTracingPrimitiveIDParam(
             builder->getModule(),
             *builder,
@@ -4007,7 +4006,7 @@ void legalizeEntryPointParameterForGLSL(
             primitiveIndexFunc,
             /* removeParam */ false))
     {
-        return;
+        return primitiveIndexFunc;
     }
 
     // (JS): In the legalization process parameters are moved from the entry point.
@@ -4187,25 +4186,22 @@ void legalizeEntryPointParameterForGLSL(
         auto undefinedVal = builder->emitPoison(pp->getFullType());
         pp->replaceUsesWith(undefinedVal);
 
-        return;
+        return primitiveIndexFunc;
     }
     if (auto meshOutputType = as<IRMeshOutputType>(valueType))
     {
-        return legalizeMeshOutputParam(
-            context,
-            codeGenContext,
-            func,
-            pp,
-            paramLayout,
-            meshOutputType);
+        legalizeMeshOutputParam(context, codeGenContext, func, pp, paramLayout, meshOutputType);
+        return primitiveIndexFunc;
     }
     if (auto patchType = as<IRHLSLPatchType>(valueType))
     {
-        return legalizePatchParam(context, codeGenContext, func, pp, paramLayout, patchType);
+        legalizePatchParam(context, codeGenContext, func, pp, paramLayout, patchType);
+        return primitiveIndexFunc;
     }
     if (pp->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
-        return legalizeMeshPayloadInputParam(context, codeGenContext, pp);
+        legalizeMeshPayloadInputParam(context, codeGenContext, pp);
+        return primitiveIndexFunc;
     }
 
     // When we have an HLSL ray tracing shader entry point,
@@ -4234,7 +4230,7 @@ void legalizeEntryPointParameterForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        return;
+        return primitiveIndexFunc;
     }
 
     // Is the parameter type a special pointer type
@@ -4503,6 +4499,8 @@ void legalizeEntryPointParameterForGLSL(
             }
         }
     }
+
+    return primitiveIndexFunc;
 }
 
 bool shouldUseOriginalEntryPointName(CodeGenContext* codeGenContext)
@@ -4824,13 +4822,13 @@ void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
     }
 }
 
-void legalizeEntryPointForGLSL(
+IRFunc* legalizeEntryPointForGLSL(
     Session* session,
     IRModule* module,
     IRFunc* func,
     CodeGenContext* codeGenContext,
     ShaderExtensionTracker* glslExtensionTracker,
-    IRFunc*& primitiveIndexFunc)
+    IRFunc* primitiveIndexFunc)
 {
     auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
     SLANG_ASSERT(entryPointDecor);
@@ -4959,7 +4957,7 @@ void legalizeEntryPointForGLSL(
             auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
             SLANG_ASSERT(paramLayout);
 
-            legalizeEntryPointParameterForGLSL(
+            primitiveIndexFunc = legalizeEntryPointParameterForGLSL(
                 &context,
                 codeGenContext,
                 func,
@@ -5038,6 +5036,7 @@ void legalizeEntryPointForGLSL(
     // for example, SV_InstanceID should map to gl_InstanceIndex - gl_BaseInstance,
     // we will replace these builtins with additional compute logic here.
     legalizeTargetBuiltinVar(context);
+    return primitiveIndexFunc;
 }
 
 void decorateModuleWithSPIRVVersion(IRModule* module, SemanticVersion spirvVersion)
@@ -5090,7 +5089,7 @@ void legalizeEntryPointsForGLSL(
     IRFunc* primitiveIndexFunc = nullptr;
     for (auto func : funcs)
     {
-        legalizeEntryPointForGLSL(
+        primitiveIndexFunc = legalizeEntryPointForGLSL(
             session,
             module,
             func,
