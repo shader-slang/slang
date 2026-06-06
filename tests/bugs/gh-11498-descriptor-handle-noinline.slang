@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -profile spirv_1_6 -capability spvDescriptorHeapEXT -stage fragment -entry main
+//TEST:SIMPLE(filecheck=SAMP):-target spirv-asm -profile spirv_1_6 -capability spvDescriptorHeapEXT -stage fragment -entry sampMain
 
 // Regression test for shader-slang/slang#11498.
 //
@@ -55,3 +56,40 @@ float4 main(uniform PushConstants pc) : SV_Target
 // CHECK: %bad_function = OpFunction
 // CHECK: OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap
 // CHECK: OpImageSampleImplicitLod
+
+// ----------------------------------------------------------------------------
+// End-to-end smoke for the sampler-heap variant. `DescriptorHandle<SamplerState>`
+// also lowers to `__spirvLoadDescriptorFromHeap` but with `__spirvSamplerHeap()`
+// as the heap operand (`hlsl.meta.slang:27249`). For a non-array `SamplerState`
+// param, `isIllegalSPIRVParameterType` returns false, so the sampler doesn't go
+// through Sites 1-3 directly; the sampler-heap load is emitted in the caller
+// and the materialized sampler is passed by value. This SAMP variant locks in
+// that the combined texture+sampler heap-EXT path emits without regressing —
+// resource heap reached via the specialized callee, sampler heap reached via
+// the caller, and an actual sample op present.
+// ----------------------------------------------------------------------------
+
+[noinline]
+float4 sampleWith(Texture2D tex, SamplerState s)
+{
+    return tex.Sample(s, float2(0.0));
+}
+
+struct PCSamp
+{
+    DescriptorHandle<Texture2D> tex;
+    DescriptorHandle<SamplerState> samp;
+};
+
+[shader("fragment")]
+float4 sampMain(uniform PCSamp pc) : SV_Target
+{
+    return sampleWith(pc.tex, pc.samp);
+}
+
+// SAMP-DAG: OpCapability DescriptorHeapEXT
+// SAMP-DAG: OpExtension "SPV_EXT_descriptor_heap"
+// SAMP-DAG: OpUntypedAccessChainKHR {{.*}} %slang_samplerHeap
+// SAMP-DAG: OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap
+// SAMP-DAG: %sampleWith = OpFunction
+// SAMP-DAG: OpImageSampleImplicitLod

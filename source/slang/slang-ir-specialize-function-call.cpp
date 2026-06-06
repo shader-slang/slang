@@ -661,22 +661,17 @@ struct FunctionParameterSpecializationContext
         }
         else if (auto loadFromHeap = as<IRSPIRVLoadDescriptorFromHeap>(oldArg))
         {
-            // The heap-EXT analogue of CastDescriptorHandleToResource. One
-            // important asymmetry vs the cast branch: the `heap` operand is a
-            // hoistable module-global (`SPIRVResourceHeap` / `SPIRVSamplerHeap`,
-            // see `slang-ir-spirv-legalize.cpp:1726-1733`) whose IR type is
-            // `uint` but which the SPIR-V emitter materializes as a pointer in
-            // `UniformConstant` storage and uses directly as the base of
-            // `OpUntypedAccessChainKHR`. Parameterizing it would replace the
-            // pointer base with a `uint` `OpFunctionParameter` — invalid SPIR-V.
-            // We therefore reuse the heap global directly inside the cloned
-            // callee (keyed for cache-uniqueness so different heap globals
-            // don't collide) and only parameterize the index.
-            //
-            // We key on `oldArg->getFullType()` (the *result* type T) — the cast
-            // branch keys on its operand type because the handle type encodes T,
-            // but here `(heap, index)` are uniform across all heap loads, so
-            // only the result type distinguishes per-resource specializations.
+            // Heap-EXT analogue of CastDescriptorHandleToResource. The `heap`
+            // operand is a hoistable uint-typed global
+            // (kIROp_SPIRVResourceHeap / kIROp_SPIRVSamplerHeap, both
+            // `hoistable = true` in slang-ir-insts.lua) emitted as an
+            // UniformConstant pointer by emitDescriptorHeapBuiltinVar and used
+            // directly as the OpUntypedAccessChainKHR base — parameterizing it
+            // would yield a `uint` OpFunctionParameter base, invalid SPIR-V. So
+            // reuse the heap global and key on it; only the index is
+            // parameterized. Key on the result type T (not the operand type
+            // like the cast branch does) since (heap, index) are uniform
+            // across heap loads.
             ioInfo.key.vals.add(oldArg->getFullType());
             ioInfo.key.vals.add(loadFromHeap->getHeap());
             ioInfo.newArgs.add(loadFromHeap->getIndex());
@@ -981,14 +976,12 @@ struct FunctionParameterSpecializationContext
         }
         else if (auto loadFromHeap = as<IRSPIRVLoadDescriptorFromHeap>(oldArg))
         {
-            // Heap-EXT analogue of the cast case: rebuild the load inside the
-            // cloned callee from a fresh `index` param while reusing the heap
-            // operand directly. The heap is a hoistable module-global pointer
-            // builtin (see Site 2 comment); parameterizing it would emit an
-            // invalid `OpUntypedAccessChainKHR` whose base is a `uint`
-            // `OpFunctionParameter`. Materializing the load in-block from the
-            // global also keeps the texture out of the orphan-IRParam path
-            // that broke SPIR-V emit in shader-slang/slang#11498.
+            // Rebuild the load inside the cloned callee from a fresh `index`
+            // param, reusing the heap global directly — see the matching
+            // branch in `getCallInfoForArg` for why the heap must not be
+            // parameterized. Materializing the load in-block also keeps the
+            // texture out of the orphan-IRParam path that broke SPIR-V emit in
+            // shader-slang/slang#11498.
             auto builder = getBuilder();
             auto newIndex = builder->createParam(loadFromHeap->getIndex()->getFullType());
             ioInfo.newParams.add(newIndex);
