@@ -18,10 +18,6 @@ on:
       runs-on:
         required: true
         type: string
-      test-category:
-        required: false
-        type: string
-        default: smoke
       full-gpu-tests:
         required: false
         type: boolean
@@ -102,7 +98,6 @@ jobs:
           fi
           # Build common slang-test arguments
           slang_test_args=(
-            "-category" "${{ inputs.test-category }}"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
@@ -179,7 +174,6 @@ jobs:
           via_glsl_args=(
             -use-test-server
             -server-count ${{ inputs.server-count }}
-            -category ${{ inputs.test-category }}
             -emit-spirv-via-glsl
             -api vk
             -expected-failure-list tests/expected-failure-via-glsl.txt

@@ -11,10 +11,9 @@ jobs:
     uses: ./.github/workflows/ci-slang-sanitizer.yml
     with:
       runs-on: '["ubuntu-22.04"]'
-      # Full test category on a GitHub-hosted CPU runner. GPU-requiring
-      # tests are skipped (no GPU available); this maximizes coverage of
-      # CPU, SPIRV-emit, and diagnostic tests under sanitizer.
-      test-category: full
+      # GitHub-hosted CPU runner. GPU-requiring tests are skipped (no GPU
+      # available); this maximizes coverage of CPU, SPIRV-emit, and
+      # diagnostic tests under sanitizer.
       server-count: 1
       timeout-minutes: 90
     secrets: inherit

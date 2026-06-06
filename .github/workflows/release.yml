@@ -14,7 +14,6 @@ jobs:
         os: [linux, macos, windows]
         config: [release]
         platform: [x86_64, aarch64, wasm]
-        test-category: [smoke]
         exclude:
           - { os: windows, platform: wasm }
           - { os: macos, platform: wasm }

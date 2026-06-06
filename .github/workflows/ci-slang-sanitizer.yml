@@ -10,10 +10,6 @@ on:
         required: false
         type: number
         default: 2
-      test-category:
-        required: false
-        type: string
-        default: smoke
       timeout-minutes:
         required: false
         type: number
@@ -190,7 +186,6 @@ jobs:
       - name: Run Tests with Sanitizers
         if: steps.build.outcome == 'success'
         env:
-          TEST_CATEGORY: ${{ inputs.test-category }}
           SERVER_COUNT: ${{ inputs.server-count }}
         run: |
           # halt_on_error=0: continue after each error to find more issues
@@ -209,7 +204,6 @@ jobs:
           ldd "$bin_dir/slang-test" 2>&1 | head -30 || true
 
           slang_test_args=(
-            "-category" "$TEST_CATEGORY"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
             "-expected-failure-list" "tests/expected-failure-linux.txt"

@@ -184,7 +184,7 @@ jobs:
       server-count: 4
 
   # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
-  # Runs the -category full suite filtered to CPU and LLVM backends via
+  # Runs the test suite filtered to CPU and LLVM backends via
   # -api cpu+llvm, so GPU-targeted test variants are ignored rather than run.
   # Catches frontend / IR / diagnostic regressions on cheap hardware and
   # complements the GPU-runner jobs.
@@ -198,7 +198,6 @@ jobs:
       platform: x86_64
       config: release
       runs-on: '["ubuntu-24.04"]'
-      test-category: full
       full-gpu-tests: false
       cpu-only: true
       # Keep the CPU-only tier off the persistent test-server while we
@@ -216,7 +215,6 @@ jobs:
       platform: aarch64
       config: debug
       runs-on: '["macos-latest"]'
-      test-category: smoke
       full-gpu-tests: true
       server-count: 3
 
@@ -230,7 +228,6 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["macos-latest"]'
-      test-category: full
       full-gpu-tests: true
       server-count: 3
 
@@ -245,7 +242,6 @@ jobs:
       platform: aarch64
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
-      test-category: smoke
       full-gpu-tests: false
 
   test-linux-release-gcc-aarch64:
@@ -258,7 +254,6 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["ubuntu-24.04-arm"]'
-      test-category: smoke
       full-gpu-tests: false
 
   # Windows GPU tests (self-hosted)
@@ -272,7 +267,6 @@ jobs:
       platform: x86_64
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      test-category: full
       full-gpu-tests: true
       gpu-tier: t4
 
@@ -286,7 +280,6 @@ jobs:
       platform: x86_64
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      test-category: full
       full-gpu-tests: true
       gpu-tier: t4
 
