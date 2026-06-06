@@ -105,29 +105,25 @@ jobs:
           )
 
           # slang-test accepts only a single -api option (a later one silently
-          # overrides an earlier one), so select exactly one expression. macOS
-          # has no native Vulkan, so its expressions exclude the vk backend;
+          # overrides an earlier one), so select exactly one expression.
           # "-api all" is equivalent to the default (all APIs enabled).
           if [[ "${{ inputs.cpu-only }}" == "true" ]]; then
             # Restrict to CPU / LLVM backends; tests requiring any GPU API get
             # ignored by the test filter rather than run-and-failed.
             api_expr="cpu+llvm"
+          elif [[ "${{ inputs.os }}" == "macos" ]]; then
+            # Metal is the only GPU API on macOS; restrict to it. (cpu)/(llvm)
+            # tests are skipped here and covered by the CPU-only tier, while
+            # no-API tests still run because their requiredFlags==0.
+            api_expr="mtl"
           elif [[ "${{ inputs.gpu-api-only }}" == "true" ]]; then
             # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped.
             # Intentionally NOT using -api-only: no-API tests still need to run
             # because COMPILE directives in multi-step compile→dispatch tests
             # have requiredFlags==0 and would be skipped, breaking the dispatch.
-            if [[ "${{ inputs.os }}" == "macos" ]]; then
-              api_expr="cuda+dx11+dx12+mtl+wgpu"
-            else
-              api_expr="vk+cuda+dx11+dx12+mtl+wgpu"
-            fi
+            api_expr="vk+cuda+dx11+dx12+mtl+wgpu"
           else
-            if [[ "${{ inputs.os }}" == "macos" ]]; then
-              api_expr="all-vk"
-            else
-              api_expr="all"
-            fi
+            api_expr="all"
           fi
 
           slang_test_args+=("-api" "$api_expr")
