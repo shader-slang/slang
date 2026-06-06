@@ -608,7 +608,7 @@ Specify the space index for the system defined global bindless resource array.
 
 **-spirv-resource-heap-stride &lt;stride&gt;**
 
-Specify the byte stride for the resource descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType), except RaytracingAccelerationStructure entries use an 8-byte uint64 address stride. 
+Specify the byte stride for the resource descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType), except RaytracingAccelerationStructure entries emit a literal 8-byte ArrayStride for the uint64 device address elements. 
 
 
 <a id="spirv-sampler-heap-stride"></a>
