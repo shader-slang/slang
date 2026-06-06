@@ -820,9 +820,7 @@ bool isBuiltinParameterType(Type* type)
 // which have no dedicated AST type class but carry an `IntrinsicTypeModifier`.
 static bool isIntrinsicTypeWithOp(Type* type, IROp op)
 {
-    if (!type)
-        return false;
-
+    SLANG_ASSERT(type);
     type = as<Type>(type->resolve());
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
@@ -1814,15 +1812,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // so we merge all GLSLLayoutLocalSizeAttribute values into a single
     // NumThreadsAttribute.
     // Node shaders in thread-launch mode do not require [numthreads].
-    auto isThreadLaunchNode = [&]() -> bool
+    bool isThreadLaunchNode = false;
+    if (stage == Stage::Node)
     {
-        if (stage != Stage::Node)
-            return false;
         auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
-        return launchAttr && launchAttr->mode == kNodeLaunchModeThread;
-    };
+        isThreadLaunchNode = launchAttr && launchAttr->mode == kNodeLaunchModeThread;
+    }
 
-    if (isThreadLaunchNode())
+    if (isThreadLaunchNode)
     {
         if (auto numThreadsAttr = entryPointFuncDecl->findModifier<NumThreadsAttribute>())
         {
@@ -1833,7 +1830,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     bool needsNumThreads = stage == Stage::Compute || stage == Stage::Mesh ||
                            stage == Stage::Amplification || stage == Stage::Node;
-    if (needsNumThreads && !isThreadLaunchNode() &&
+    if (needsNumThreads && !isThreadLaunchNode &&
         !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
     {
         auto parentDecl = entryPointFuncDecl->parentDecl;

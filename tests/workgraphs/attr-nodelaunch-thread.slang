@@ -5,7 +5,7 @@ import experimental.workgraph;
 // Test that a thread-launch node shader compiles to dxil.
 
 [shader("node")]
-[NodeLaunch("thread")]
+[NodeLaunch("Thread")]
 void main(RWBuffer<int> output)
 {
     output[0] = 0;

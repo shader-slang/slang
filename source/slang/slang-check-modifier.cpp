@@ -46,53 +46,6 @@ ConstantIntVal* SemanticsVisitor::checkConstantIntVal(Expr* expr)
     return constIntVal;
 }
 
-ConstantIntVal* SemanticsVisitor::checkConstantUInt32Val(Expr* expr)
-{
-    static const IntegerLiteralValue kMaxUInt32Value = 0xffffffffLL;
-
-    expr = CheckExpr(expr);
-
-    auto rawIntVal = CheckIntegerConstantExpression(
-        expr,
-        IntegerConstantExpressionCoercionType::AnyInteger,
-        nullptr,
-        ConstantFoldingKind::CompileTime);
-
-    if (!rawIntVal)
-        return nullptr;
-
-    auto rawConstIntVal = as<ConstantIntVal>(rawIntVal);
-    if (!rawConstIntVal)
-    {
-        getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});
-        return nullptr;
-    }
-
-    auto rawValue = rawConstIntVal->getValue();
-    if (rawValue < 0 || rawValue > kMaxUInt32Value)
-    {
-        getSink()->diagnose(Diagnostics::TypeMismatch{
-            .expectedType = m_astBuilder->getUIntType(),
-            .actualType = expr->type,
-            .expr = expr});
-        return nullptr;
-    }
-
-    auto coercedIntVal = CheckIntegerConstantExpression(
-        expr,
-        IntegerConstantExpressionCoercionType::SpecificType,
-        m_astBuilder->getUIntType(),
-        ConstantFoldingKind::CompileTime);
-
-    auto coercedConstIntVal = as<ConstantIntVal>(coercedIntVal);
-    if (!coercedConstIntVal)
-    {
-        getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});
-        return nullptr;
-    }
-    return coercedConstIntVal;
-}
-
 ConstantIntVal* SemanticsVisitor::checkConstantEnumVal(Expr* expr)
 {
     // First type-check the expression as normal
@@ -541,35 +494,47 @@ Modifier* SemanticsVisitor::validateAttribute(
         String mode;
         if (!checkLiteralStringVal(attr->args[0], &mode))
             return nullptr;
-        if (mode != "broadcasting" && mode != "thread" && mode != "coalescing")
+        auto modeSlice = mode.getUnownedSlice();
+        if (modeSlice.caseInsensitiveEquals(toSlice("broadcasting")))
+        {
+            nodeLaunchAttr->mode = "broadcasting";
+        }
+        else if (modeSlice.caseInsensitiveEquals(toSlice("thread")))
+        {
+            nodeLaunchAttr->mode = "thread";
+        }
+        else if (modeSlice.caseInsensitiveEquals(toSlice("coalescing")))
+        {
+            nodeLaunchAttr->mode = "coalescing";
+        }
+        else
         {
             getSink()->diagnose(Diagnostics::InvalidNodeLaunchMode{.mode = mode, .attr = attr});
             return nullptr;
         }
-        nodeLaunchAttr->mode = mode;
     }
     else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
-        gridAttr->x = checkConstantUInt32Val(attr->args[0]);
-        gridAttr->y = checkConstantUInt32Val(attr->args[1]);
-        gridAttr->z = checkConstantUInt32Val(attr->args[2]);
+        gridAttr->x = checkConstantIntVal(attr->args[0]);
+        gridAttr->y = checkConstantIntVal(attr->args[1]);
+        gridAttr->z = checkConstantIntVal(attr->args[2]);
         if (!gridAttr->x || !gridAttr->y || !gridAttr->z)
             return nullptr;
     }
     else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
-        fixedGridAttr->x = checkConstantUInt32Val(attr->args[0]);
-        fixedGridAttr->y = checkConstantUInt32Val(attr->args[1]);
-        fixedGridAttr->z = checkConstantUInt32Val(attr->args[2]);
+        fixedGridAttr->x = checkConstantIntVal(attr->args[0]);
+        fixedGridAttr->y = checkConstantIntVal(attr->args[1]);
+        fixedGridAttr->z = checkConstantIntVal(attr->args[2]);
         if (!fixedGridAttr->x || !fixedGridAttr->y || !fixedGridAttr->z)
             return nullptr;
     }
     else if (auto maxRecAttr = as<MaxRecordsAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
-        auto value = checkConstantUInt32Val(attr->args[0]);
+        auto value = checkConstantIntVal(attr->args[0]);
         if (!value)
             return nullptr;
         maxRecAttr->value = value;
@@ -587,7 +552,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         nodeIDAttr->name = name;
         if (argCount == 2)
         {
-            auto arrayIndex = checkConstantUInt32Val(attr->args[1]);
+            auto arrayIndex = checkConstantIntVal(attr->args[1]);
             if (!arrayIndex)
                 return nullptr;
             nodeIDAttr->arrayIndex = arrayIndex;
@@ -600,7 +565,7 @@ Modifier* SemanticsVisitor::validateAttribute(
     else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
-        auto count = checkConstantUInt32Val(attr->args[0]);
+        auto count = checkConstantIntVal(attr->args[0]);
         if (!count)
             return nullptr;
         nodeArraySizeAttr->count = count;

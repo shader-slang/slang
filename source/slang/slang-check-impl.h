@@ -2244,8 +2244,6 @@ public:
 
     ConstantIntVal* checkConstantIntVal(Expr* expr);
 
-    ConstantIntVal* checkConstantUInt32Val(Expr* expr);
-
     ConstantIntVal* checkConstantEnumVal(Expr* expr);
 
     // Check an expression, coerce it to the `String` type, and then
