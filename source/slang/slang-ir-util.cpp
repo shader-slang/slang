@@ -321,6 +321,10 @@ bool isValueType(IRInst* dataType)
     case kIROp_RaytracingAccelerationStructureType:
     case kIROp_GLSLAtomicUintType:
     case kIROp_EnumType:
+    case kIROp_DispatchNodeInputRecordType:
+    case kIROp_ThreadNodeInputRecordType:
+    case kIROp_GroupNodeInputRecordsType:
+    case kIROp_EmptyNodeInputType:
         return true;
     default:
         // Read-only resource handles are considered as Value type.
@@ -1239,6 +1243,12 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
     case kIROp_GLSLShaderStorageBufferType:
+    case kIROp_ThreadNodeOutputRecordsType:
+    case kIROp_GroupNodeOutputRecordsType:
+    case kIROp_NodeOutputType:
+    case kIROp_NodeOutputArrayType:
+    case kIROp_EmptyNodeOutputType:
+    case kIROp_EmptyNodeOutputArrayType:
         return true;
     }
     return false;
