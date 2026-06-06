@@ -77,14 +77,18 @@ To change the standard module paths:
 5. Standard modules are compiled using `slangc` at build time
 6. Standard modules are placed under subdirectories next to libslang.so/slang.dll that match
    their import paths:
-   - **Build - Windows**: `build/Debug/bin/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
-   - **Build - Windows**: `build/Debug/bin/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
-   - **Build - Linux/Mac**: `build/Debug/lib/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
-   - **Build - Linux/Mac**: `build/Debug/lib/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
-   - **Install - Windows**: `<prefix>/bin/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
-   - **Install - Windows**: `<prefix>/bin/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
-   - **Install - Linux/Mac**: `<prefix>/lib/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
-   - **Install - Linux/Mac**: `<prefix>/lib/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
+   - **Build - Windows**:
+     - `build/Debug/bin/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
+     - `build/Debug/bin/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
+   - **Build - Linux/Mac**:
+     - `build/Debug/lib/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
+     - `build/Debug/lib/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
+   - **Install - Windows**:
+     - `<prefix>/bin/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
+     - `<prefix>/bin/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
+   - **Install - Linux/Mac**:
+     - `<prefix>/lib/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
+     - `<prefix>/lib/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
 
 For example, `import slang.neural;` resolves to `slang/neural.slang-module`, and
 `import experimental.workgraph;` resolves to `experimental/workgraph.slang-module`.
