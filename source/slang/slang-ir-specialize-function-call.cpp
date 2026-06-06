@@ -46,6 +46,14 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         if (as<IRCastDescriptorHandleToResource>(arg))
             return true;
 
+        // The bindless heap-EXT path: under `spvDescriptorHeapEXT`,
+        // `DescriptorHandle<T>.Handle` lowers via `__spirvLoadDescriptorFromHeap`
+        // (kIROp_SPIRVLoadDescriptorFromHeap), which is the heap-variant analogue
+        // of `IRCastDescriptorHandleToResource` and must also be a valid leaf for
+        // call-site specialization. See shader-slang/slang#11498.
+        if (as<IRSPIRVLoadDescriptorFromHeap>(arg))
+            return true;
+
         // As we will see later, we can also
         // specialize a call when the argument
         // is the result of indexing into an
@@ -651,6 +659,19 @@ struct FunctionParameterSpecializationContext
             ioInfo.key.vals.add(oldBase->getFullType());
             ioInfo.newArgs.add(oldBase);
         }
+        else if (oldArg->getOp() == kIROp_SPIRVLoadDescriptorFromHeap)
+        {
+            // The heap-EXT analogue of CastDescriptorHandleToResource: pass the
+            // (heap, index) pair through as new arguments and re-emit the load
+            // inside the cloned callee. The result type carries `T` and is what
+            // distinguishes specializations (operand types are uniform across
+            // heap loads).
+            auto oldHeap = oldArg->getOperand(0);
+            auto oldIndex = oldArg->getOperand(1);
+            ioInfo.key.vals.add(oldArg->getFullType());
+            ioInfo.newArgs.add(oldHeap);
+            ioInfo.newArgs.add(oldIndex);
+        }
         else
         {
             // If we fail to match any of the cases above
@@ -946,6 +967,30 @@ struct FunctionParameterSpecializationContext
                 oldArg->getFullType(),
                 kIROp_CastDescriptorHandleToResource,
                 1,
+                newOperands);
+            return newVal;
+        }
+        else if (auto loadFromHeap = as<IRSPIRVLoadDescriptorFromHeap>(oldArg))
+        {
+            // Heap-EXT analogue of the cast case: rebuild the load inside the
+            // cloned callee from fresh (heap, index) params. This materializes
+            // the resource as an in-block instruction in the specialized function
+            // rather than a passed-in IRParam, which avoids the orphan-IRParam
+            // path that broke SPIR-V emit in shader-slang/slang#11498.
+            auto builder = getBuilder();
+            auto oldHeap = loadFromHeap->getOperand(0);
+            auto oldIndex = loadFromHeap->getOperand(1);
+            auto newHeap = builder->createParam(oldHeap->getFullType());
+            auto newIndex = builder->createParam(oldIndex->getFullType());
+            ioInfo.newParams.add(newHeap);
+            ioInfo.newParams.add(newIndex);
+
+            builder->setInsertInto(ioInfo.newBodyInsts);
+            IRInst* newOperands[] = {newHeap, newIndex};
+            auto newVal = builder->emitIntrinsicInst(
+                oldArg->getFullType(),
+                kIROp_SPIRVLoadDescriptorFromHeap,
+                2,
                 newOperands);
             return newVal;
         }

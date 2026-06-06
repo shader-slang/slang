@@ -117,7 +117,9 @@ struct FuncBufferLoadSpecializationCondition : FunctionCallSpecializeCondition
         {
             return true;
         }
-        else if (isUserPointerType(a->getDataType()) || as<IRCastDescriptorHandleToResource>(a))
+        else if (
+            isUserPointerType(a->getDataType()) || as<IRCastDescriptorHandleToResource>(a) ||
+            as<IRSPIRVLoadDescriptorFromHeap>(a))
         {
             return true;
         }
