@@ -326,6 +326,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // POINTER_EMULATED-DAG: OpCapability AtomicFloat16VectorNV
 // POINTER_EMULATED-DAG: OpExtension "SPV_KHR_variable_pointers"
 // POINTER_EMULATED-DAG: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// POINTER_EMULATED-NOT: OpCapability AtomicFloat16AddEXT
+// POINTER_EMULATED-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
 // POINTER_EMULATED-DAG: [[LOW:%[0-9]+]] = OpConstantComposite %v2half %half_0x1p_0 %half_0x0p_0
 // POINTER_EMULATED-DAG: [[HIGH:%[0-9]+]] = OpConstantComposite %v2half %half_0x0p_0 %half_0x1p_0
 // POINTER_EMULATED: [[LOW_ATOMIC:%[0-9]+]] = OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[LOW]]
@@ -338,6 +340,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // POINTER_F16X2-DAG: OpCapability AtomicFloat16VectorNV
 // POINTER_F16X2-DAG: OpExtension "SPV_KHR_variable_pointers"
 // POINTER_F16X2-DAG: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// POINTER_F16X2-NOT: OpCapability AtomicFloat16AddEXT
+// POINTER_F16X2-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
 // POINTER_F16X2-DAG: [[VALUE:%[0-9]+]] = OpConstantComposite %v2half %half_0x1p_0 %half_0x1p_1
 // POINTER_F16X2: OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[VALUE]]
 // POINTER_F16X2-NOT: OpAtomicFAddEXT
