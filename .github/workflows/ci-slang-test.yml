@@ -75,7 +75,7 @@ jobs:
         if: inputs.os == 'linux' && inputs.cpu-only != true
         shell: bash
         run: |
-          sudo apt-get install -y mesa-vulkan-drivers
+          sudo apt-get update -y && sudo apt-get install -y mesa-vulkan-drivers
           # Force lavapipe's LLVM JIT to use generic scalar code rather than
           # NEON-vectorized code. On aarch64 GitHub-hosted runners the JIT
           # otherwise emits NEON instructions that SIGILL at dispatch time.
