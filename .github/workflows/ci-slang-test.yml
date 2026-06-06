@@ -76,6 +76,9 @@ jobs:
         shell: bash
         run: |
           sudo apt-get install -y mesa-vulkan-drivers
+          # Disable lavapipe worker threads: the default multi-threaded JIT
+          # crashes on aarch64 (SIGILL in LLVM-generated NEON code).
+          echo "LP_NUM_THREADS=0" >> "$GITHUB_ENV"
 
       - name: Test Slang
         run: |
