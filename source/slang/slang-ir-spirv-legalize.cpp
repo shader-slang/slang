@@ -1,6 +1,7 @@
 // slang-ir-spirv-legalize.cpp
 #include "slang-ir-spirv-legalize.h"
 
+#include "slang-compiler.h"
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-clone.h"
@@ -27,7 +28,6 @@
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-compiler.h"
 
 namespace Slang
 {
