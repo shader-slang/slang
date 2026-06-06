@@ -242,6 +242,41 @@ SLANG_UNIT_TEST(bindlessSpaceReflection)
     _checkBindlessSpaceReflection(userSource, _expectReservedBindlessSpaceAt(2), true);
 }
 
+SLANG_UNIT_TEST(bindlessSpaceMetadataAtSpaceZero)
+{
+    const char* userSource = R"(
+        [[vk::binding(0, 1)]]
+        RWStructuredBuffer<float> gOutput;
+
+        struct P
+        {
+            Texture2D.Handle t;
+        };
+
+        [[vk::binding(0, 2)]]
+        ParameterBlock<P> p1;
+
+        [Shader("compute")]
+        [NumThreads(1, 1, 1)]
+        void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            gOutput[0] = p1.t.Load(int3(0, 0, 0)).x;
+        }
+    )";
+
+    slang::CompilerOptionEntry bindlessSpaceOption = {};
+    bindlessSpaceOption.name = slang::CompilerOptionName::BindlessSpaceIndex;
+    bindlessSpaceOption.value.kind = slang::CompilerOptionValueKind::Int;
+    bindlessSpaceOption.value.intValue0 = 0;
+
+    _checkBindlessSpaceReflection(
+        userSource,
+        _expectReservedBindlessSpaceAt(0),
+        true,
+        &bindlessSpaceOption,
+        1);
+}
+
 SLANG_UNIT_TEST(bindlessSpaceMetadataWithUnboundedResourceArray)
 {
     const char* userSource = R"(
