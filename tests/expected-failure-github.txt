@@ -21,3 +21,7 @@ tests/compute/groupshared.slang.4 syn (wgpu)
 tests/metal/groupshared-threadlocal-same-parameter.slang.4 syn (wgpu)
 # Fails on macOS (-target hlsl variant only); tracked as a separate issue.
 tests/neural/network-parameter-layout-converter-unsupported-target.slang
+# Flaky on macOS: the two existential-typed constant buffers' outputs come
+# back swapped under the test server (passes locally and on macOS debug).
+# Root cause tracked as a separate issue (dynamic-dispatch ordering, #10393).
+tests/language-feature/dynamic-dispatch/constantbuffer-struct-interface-field.slang (cpu)
