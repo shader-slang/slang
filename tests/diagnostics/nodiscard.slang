@@ -13,11 +13,6 @@ struct MyType
     [nodiscard]
     int compute() { return val * 2; }
 
-    // `[nodiscard]` on a `void` function has no result to discard, so discarding
-    // a call to it never warns.
-    [nodiscard]
-    void touch() {}
-
     int regular() { return val; }
 }
 
@@ -66,9 +61,6 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 */
     {
     }
-
-    // `[nodiscard]` on a `void` function does not warn even when discarded.
-    t.touch();
 
     // Storing the result is fine, no warning.
     let loaded = t.load();

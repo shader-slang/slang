@@ -1301,6 +1301,13 @@ warning(
 )
 
 err(
+    "nodiscard-on-void-function",
+    30069,
+    "'[nodiscard]' applied to a function returning 'void'",
+    span { loc = "decl:Decl", message = "'[nodiscard]' has no effect on a function that returns 'void'." }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",
