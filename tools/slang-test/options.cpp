@@ -136,6 +136,11 @@ static bool _isSubCommand(const char* arg)
 
     List<const char*> positionalArgs;
 
+    // Track whether an -api option has been seen so a later name-leading -api
+    // (which resets the API set and silently discards earlier -api options) can
+    // be rejected. Operator-leading (+/-) expressions still accumulate.
+    bool apiOptionSeen = false;
+
     int argCount = argc;
     char const* const* argCursor = argv;
     char const* const* argEnd = argCursor + argCount;
@@ -435,6 +440,23 @@ static bool _isSubCommand(const char* arg)
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
+
+            // Each -api expression is parsed relative to the previous result,
+            // but that previous value is only kept when the expression begins
+            // with an operator ('+' or '-'). An expression that begins with an
+            // API name resets from scratch and silently discards any earlier
+            // -api. Reject that case so a later -api cannot quietly override an
+            // earlier one; combine them into one expression or lead with +/-.
+            if (apiOptionSeen && apiList[0] != '+' && apiList[0] != '-')
+            {
+                stdError.print(
+                    "error: -api expression '%s' would discard the previous -api; "
+                    "begin it with '+' or '-' to combine, or merge them into a single "
+                    "expression (eg 'vk+dx12' or 'all-vk')\n",
+                    apiList);
+                return SLANG_FAIL;
+            }
+            apiOptionSeen = true;
 
             SlangResult res = RenderApiUtil::parseApiFlags(
                 UnownedStringSlice(apiList),
