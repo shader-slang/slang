@@ -526,19 +526,6 @@ static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
     return false;
 }
 
-static IRType* getAtomicOperationValueType(IRInst* inst)
-{
-    auto valueType = inst->getDataType();
-    if (valueType && valueType->getOp() != kIROp_VoidType)
-        return valueType;
-
-    IRBuilder builder(inst);
-    auto ptrValueType = tryGetPointedToType(&builder, inst->getOperand(0)->getDataType());
-    if (auto atomicType = as<IRAtomicType>(ptrValueType))
-        return atomicType->getElementType();
-    return ptrValueType;
-}
-
 static IRVectorType* getFp16VectorAtomicType(IRInst* inst)
 {
     auto valueType = getAtomicOperationValueType(inst);

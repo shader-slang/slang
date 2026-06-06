@@ -2960,19 +2960,6 @@ static bool hasExplicitInterlockInst(IRFunc* func)
     return false;
 }
 
-static IRType* getAtomicOperationValueType(IRInst* inst)
-{
-    auto valueType = inst->getDataType();
-    if (valueType && valueType->getOp() != kIROp_VoidType)
-        return valueType;
-
-    IRBuilder builder(inst);
-    auto ptrValueType = tryGetPointedToType(&builder, inst->getOperand(0)->getDataType());
-    if (auto atomicType = as<IRAtomicType>(ptrValueType))
-        return atomicType->getElementType();
-    return ptrValueType;
-}
-
 static bool isSupportedSPIRVFp16VectorAtomic(IRInst* inst)
 {
     switch (inst->getOp())

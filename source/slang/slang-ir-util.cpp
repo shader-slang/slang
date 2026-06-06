@@ -68,6 +68,19 @@ IRType* getMatrixElementType(IRType* type)
     return type;
 }
 
+IRType* getAtomicOperationValueType(IRInst* inst)
+{
+    auto valueType = inst->getDataType();
+    if (valueType && valueType->getOp() != kIROp_VoidType)
+        return valueType;
+
+    IRBuilder builder(inst);
+    auto ptrValueType = tryGetPointedToType(&builder, inst->getOperand(0)->getDataType());
+    if (auto atomicType = as<IRAtomicType>(ptrValueType))
+        return atomicType->getElementType();
+    return ptrValueType;
+}
+
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType)
 {
     Dictionary<IRInst*, IRInst*> result;

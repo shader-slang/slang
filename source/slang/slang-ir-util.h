@@ -137,6 +137,9 @@ IRType* getVectorOrCoopMatrixElementType(IRType* type);
 // If `type` is a matrix, returns its element type. Otherwise, return `type`.
 IRType* getMatrixElementType(IRType* type);
 
+// Returns the value type operated on by an atomic instruction.
+IRType* getAtomicOperationValueType(IRInst* inst);
+
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
