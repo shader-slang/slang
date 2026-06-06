@@ -264,23 +264,24 @@ function list_files() {
   fi
 }
 
-# Bash 3.2 (still the default /bin/bash on macOS) has no `readarray`/`mapfile`.
-# Emulate `readarray -t <name>`: read newline-delimited stdin into the named
-# array, stripping the trailing newline from each element. The `|| [ -n ... ]`
-# keeps a final line that has no trailing newline, matching readarray.
+# Bash 3.2 (still the default /bin/bash on macOS) has no `readarray`/`mapfile`,
+# and no namerefs (`local -n`, added in 4.3) for an output-array parameter.
+# Emulate `readarray -t files`: read newline-delimited stdin into the global
+# `files` array, stripping the trailing newline from each element. The
+# `|| [ -n ... ]` keeps a final line that has no trailing newline, matching
+# readarray. Every caller consumes the result through the `files` array.
 read_lines() {
-  local __name=$1
+  files=()
   local __line
-  eval "$__name=()"
   while IFS= read -r __line || [ -n "$__line" ]; do
-    eval "$__name+=(\"\$__line\")"
+    files+=("$__line")
   done
 }
 
 cmake_formatting() {
   echo "Formatting CMake files..." >&2
 
-  read_lines files < <(list_files '*.cmake' 'CMakeLists.txt' '**/CMakeLists.txt')
+  read_lines < <(list_files '*.cmake' 'CMakeLists.txt' '**/CMakeLists.txt')
   [ ${#files[@]} -gt 0 ] || return 0
 
   common_args=(
@@ -318,7 +319,7 @@ track_progress() {
 cpp_formatting() {
   echo "Formatting cpp files..." >&2
 
-  read_lines files < <(list_files '*.cpp' '*.hpp' '*.c' '*.h' ':!external/**')
+  read_lines < <(list_files '*.cpp' '*.hpp' '*.c' '*.h' ':!external/**')
   [ ${#files[@]} -gt 0 ] || return 0
 
   # The progress reporting is a bit sneaky, we use `--verbose` with xargs which
@@ -369,7 +370,7 @@ prettier_formatting() {
 yaml_json_formatting() {
   echo "Formatting yaml and json files..." >&2
 
-  read_lines files < <(list_files "*.yaml" "*.yml" "*.json" ':!external/**')
+  read_lines < <(list_files "*.yaml" "*.yml" "*.json" ':!external/**')
   [ ${#files[@]} -gt 0 ] || return 0
 
   prettier_formatting
@@ -378,7 +379,7 @@ yaml_json_formatting() {
 markdown_formatting() {
   echo "Formatting markdown files..." >&2
 
-  read_lines files < <(list_files "*.md" ':!external/**')
+  read_lines < <(list_files "*.md" ':!external/**')
   [ ${#files[@]} -gt 0 ] || return 0
 
   prettier_formatting
@@ -387,7 +388,7 @@ markdown_formatting() {
 sh_formatting() {
   echo "Formatting sh files..." >&2
 
-  read_lines files < <(list_files "*.sh")
+  read_lines < <(list_files "*.sh")
   [ ${#files[@]} -gt 0 ] || return 0
 
   common_args=(
