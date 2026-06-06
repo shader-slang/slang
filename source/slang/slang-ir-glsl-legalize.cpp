@@ -3987,13 +3987,12 @@ void tryReplaceUsesOfStageInput(
     }
 }
 
-IRFunc* legalizeEntryPointParameterForGLSL(
+void legalizeEntryPointParameterForGLSL(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
     IRFunc* func,
     IRParam* pp,
-    IRVarLayout* paramLayout,
-    IRFunc* primitiveIndexFunc)
+    IRVarLayout* paramLayout)
 {
     auto builder = context->getBuilder();
     auto stage = context->getStage();
@@ -4175,22 +4174,22 @@ IRFunc* legalizeEntryPointParameterForGLSL(
         auto undefinedVal = builder->emitPoison(pp->getFullType());
         pp->replaceUsesWith(undefinedVal);
 
-        return primitiveIndexFunc;
+        return;
     }
     if (auto meshOutputType = as<IRMeshOutputType>(valueType))
     {
         legalizeMeshOutputParam(context, codeGenContext, func, pp, paramLayout, meshOutputType);
-        return primitiveIndexFunc;
+        return;
     }
     if (auto patchType = as<IRHLSLPatchType>(valueType))
     {
         legalizePatchParam(context, codeGenContext, func, pp, paramLayout, patchType);
-        return primitiveIndexFunc;
+        return;
     }
     if (pp->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
         legalizeMeshPayloadInputParam(context, codeGenContext, pp);
-        return primitiveIndexFunc;
+        return;
     }
 
     // When we have an HLSL ray tracing shader entry point,
@@ -4219,7 +4218,7 @@ IRFunc* legalizeEntryPointParameterForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        return primitiveIndexFunc;
+        return;
     }
 
     // Is the parameter type a special pointer type
@@ -4488,8 +4487,6 @@ IRFunc* legalizeEntryPointParameterForGLSL(
             }
         }
     }
-
-    return primitiveIndexFunc;
 }
 
 bool shouldUseOriginalEntryPointName(CodeGenContext* codeGenContext)
@@ -4966,13 +4963,12 @@ IRFunc* legalizeEntryPointForGLSL(
             auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
             SLANG_ASSERT(paramLayout);
 
-            primitiveIndexFunc = legalizeEntryPointParameterForGLSL(
+            legalizeEntryPointParameterForGLSL(
                 &context,
                 codeGenContext,
                 func,
                 pp,
-                paramLayout,
-                primitiveIndexFunc);
+                paramLayout);
         }
 
         // At this point we should have eliminated all uses of the
