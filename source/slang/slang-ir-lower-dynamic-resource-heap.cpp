@@ -15,9 +15,9 @@ namespace Slang
 /// ensuring consistency with reflection data.
 bool tryGetBindlessSpaceIndex(TargetProgram* targetProgram, UInt& outBindlessSpaceIndex)
 {
-    auto programLayout = targetProgram->getLayoutIfAvailable();
-    if (!programLayout)
-        return false;
+    SLANG_ASSERT(targetProgram);
+    auto programLayout = targetProgram->getExistingLayout();
+    SLANG_ASSERT(programLayout);
 
     // Do not fall back to the requested option here; only layout knows the
     // bindless space that was actually reserved after conflict resolution.
@@ -74,7 +74,8 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
     }
 
     UInt bindlessSpaceIndex = 0;
-    SLANG_RELEASE_ASSERT(tryGetBindlessSpaceIndex(targetProgram, bindlessSpaceIndex));
+    bool foundBindlessSpaceIndex = tryGetBindlessSpaceIndex(targetProgram, bindlessSpaceIndex);
+    SLANG_RELEASE_ASSERT(foundBindlessSpaceIndex);
 
     for (auto inst : workList)
     {

@@ -121,8 +121,7 @@ static void _insertBinding(
 
 static bool _isBindlessResourceHeapGlobalParam(IRInst* inst, int bindlessSpaceIndex)
 {
-    if (bindlessSpaceIndex < 0)
-        return false;
+    SLANG_ASSERT(bindlessSpaceIndex >= 0);
 
     auto globalParam = as<IRGlobalParam>(inst);
     if (!globalParam)
@@ -157,7 +156,7 @@ static bool _isBindlessResourceHeapGlobalParam(IRInst* inst, int bindlessSpaceIn
 
 static bool _instUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
 {
-    if (_isBindlessResourceHeapGlobalParam(inst, bindlessSpaceIndex))
+    if (bindlessSpaceIndex >= 0 && _isBindlessResourceHeapGlobalParam(inst, bindlessSpaceIndex))
         return true;
 
     switch (inst->getOp())
@@ -269,12 +268,10 @@ void collectMetadata(
     TargetProgram* targetProgram,
     ArtifactPostEmitMetadata& outMetadata)
 {
-    int bindlessSpaceIndex = -1;
-    if (targetProgram)
-    {
-        if (auto programLayout = targetProgram->getLayoutIfAvailable())
-            bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
-    }
+    SLANG_ASSERT(targetProgram);
+    auto programLayout = targetProgram->getExistingLayout();
+    SLANG_ASSERT(programLayout);
+    int bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
 
     // Scan the instructions looking for global resource declarations
     // and exported functions.
