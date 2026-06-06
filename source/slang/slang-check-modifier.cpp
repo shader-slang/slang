@@ -490,7 +490,16 @@ Modifier* SemanticsVisitor::validateAttribute(
     }
     else if (auto nodeLaunchAttr = as<NodeLaunchAttribute>(attr))
     {
-        SLANG_ASSERT(attr->args.getCount() == 1);
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
         String mode;
         if (!checkLiteralStringVal(attr->args[0], &mode))
             return nullptr;
@@ -515,7 +524,16 @@ Modifier* SemanticsVisitor::validateAttribute(
     }
     else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(attr))
     {
-        SLANG_ASSERT(attr->args.getCount() == 3);
+        auto argCount = attr->args.getCount();
+        if (argCount != 3)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "3",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
         gridAttr->x = checkConstantIntVal(attr->args[0]);
         gridAttr->y = checkConstantIntVal(attr->args[1]);
         gridAttr->z = checkConstantIntVal(attr->args[2]);
@@ -524,7 +542,16 @@ Modifier* SemanticsVisitor::validateAttribute(
     }
     else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(attr))
     {
-        SLANG_ASSERT(attr->args.getCount() == 3);
+        auto argCount = attr->args.getCount();
+        if (argCount != 3)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "3",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
         fixedGridAttr->x = checkConstantIntVal(attr->args[0]);
         fixedGridAttr->y = checkConstantIntVal(attr->args[1]);
         fixedGridAttr->z = checkConstantIntVal(attr->args[2]);
@@ -533,7 +560,16 @@ Modifier* SemanticsVisitor::validateAttribute(
     }
     else if (auto maxRecAttr = as<MaxRecordsAttribute>(attr))
     {
-        SLANG_ASSERT(attr->args.getCount() == 1);
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
         auto value = checkConstantIntVal(attr->args[0]);
         if (!value)
             return nullptr;
@@ -542,9 +578,15 @@ Modifier* SemanticsVisitor::validateAttribute(
     else if (auto nodeIDAttr = as<NodeIDAttribute>(attr))
     {
         auto argCount = attr->args.getCount();
-        SLANG_ASSERT(argCount >= 1 && argCount <= 2);
         if (argCount < 1 || argCount > 2)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1...2",
+                .provided = (int64_t)argCount,
+                .attr = attr});
             return nullptr;
+        }
 
         String name;
         if (!checkLiteralStringVal(attr->args[0], &name))
@@ -564,7 +606,16 @@ Modifier* SemanticsVisitor::validateAttribute(
     }
     else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(attr))
     {
-        SLANG_ASSERT(attr->args.getCount() == 1);
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
         auto count = checkConstantIntVal(attr->args[0]);
         if (!count)
             return nullptr;
