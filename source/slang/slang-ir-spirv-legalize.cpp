@@ -27,6 +27,7 @@
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-compiler.h"
 
 namespace Slang
 {
@@ -2959,6 +2960,146 @@ static bool hasExplicitInterlockInst(IRFunc* func)
     return false;
 }
 
+static IRType* getAtomicOperationValueType(IRInst* inst)
+{
+    if (inst->getDataType()->getOp() != kIROp_VoidType)
+        return inst->getDataType();
+
+    IRBuilder builder(inst);
+    auto ptrValueType = tryGetPointedToType(&builder, inst->getOperand(0)->getDataType());
+    if (auto atomicType = as<IRAtomicType>(ptrValueType))
+        return atomicType->getElementType();
+    return ptrValueType;
+}
+
+static bool isSupportedSPIRVFp16VectorAtomic(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicAdd:
+    case kIROp_AtomicSub:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+        break;
+    default:
+        return false;
+    }
+
+    auto valueType = getAtomicOperationValueType(inst);
+    auto vectorType = as<IRVectorType>(valueType);
+    if (!vectorType || vectorType->getElementType()->getOp() != kIROp_HalfType)
+        return false;
+
+    auto elementCountInst = as<IRIntLit>(vectorType->getElementCount());
+    if (!elementCountInst)
+        return false;
+
+    auto elementCount = elementCountInst->getValue();
+    return elementCount == 2 || elementCount == 4;
+}
+
+static bool shouldDiagnoseImplicitCapabilityUse(CompilerOptionSet& optionSet)
+{
+    if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+        return false;
+
+    return optionSet.getBoolOption(CompilerOptionName::RestrictiveCapabilityCheck) ||
+           isSpecificProfileOrCapabilityRequested(optionSet);
+}
+
+static void diagnoseCapabilityUseForEntryPoint(
+    SPIRVEmitSharedContext* context,
+    IRFunc* entryPoint,
+    CapabilityName capabilityName,
+    Dictionary<IRFunc*, HashSet<String>>& diagnosedCapabilityUses)
+{
+    auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>();
+    if (!entryPointDecor)
+        return;
+
+    CapabilitySet stageTargetCaps = context->m_targetProgram->getTargetReq()->getTargetCaps();
+    CapabilitySet stageCapabilitySet = entryPointDecor->getProfile().getCapabilityName();
+    CapabilitySet required(capabilityName);
+    stageTargetCaps.join(stageCapabilitySet);
+    required.join(stageCapabilitySet);
+
+    if (stageTargetCaps.atLeastOneSetImpliedInOther(required) ==
+        CapabilitySet::ImpliesReturnFlags::Implied)
+        return;
+
+    CapabilityAtomSet addedAtoms{};
+    if (auto stageCapSet = stageTargetCaps.getAtomSets())
+    {
+        if (auto requiredSet = required.getAtomSets())
+            CapabilityAtomSet::calcSubtract(addedAtoms, (*requiredSet), (*stageCapSet));
+    }
+
+    StringBuilder capsSb;
+    printDiagnosticArg(capsSb, addedAtoms);
+    String missingCapsStr = capsSb.toString();
+    if (!diagnosedCapabilityUses[entryPoint].add(missingCapsStr))
+        return;
+
+    StringBuilder entryPointSb;
+    printDiagnosticArg(entryPointSb, entryPoint);
+
+    auto& optionSet = context->m_targetProgram->getOptionSet();
+    maybeDiagnoseWarningOrError(
+        context->m_sink,
+        optionSet,
+        DiagnosticCategory::Capability,
+        Diagnostics::ProfileImplicitlyUpgraded{
+            .entryPoint = entryPointSb.toString(),
+            .profile = optionSet.getProfile().getName(),
+            .capabilities = missingCapsStr,
+            .location = entryPoint->sourceLoc,
+        },
+        Diagnostics::ProfileImplicitlyUpgradedRestrictive{
+            .entryPoint = entryPointSb.toString(),
+            .profile = optionSet.getProfile().getName(),
+            .capabilities = missingCapsStr,
+            .location = entryPoint->sourceLoc,
+        });
+}
+
+static void diagnoseSPIRVAtomicCapabilityUses(SPIRVEmitSharedContext* context, IRModule* module)
+{
+    auto& optionSet = context->m_targetProgram->getOptionSet();
+    if (!shouldDiagnoseImplicitCapabilityUse(optionSet))
+        return;
+
+    Dictionary<IRFunc*, HashSet<String>> diagnosedCapabilityUses;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+
+        auto entryPoints = context->m_referencingEntryPoints.tryGetValue(func);
+        if (!entryPoints)
+            continue;
+
+        for (auto block : func->getBlocks())
+        {
+            for (auto childInst : block->getChildren())
+            {
+                if (!isSupportedSPIRVFp16VectorAtomic(childInst))
+                    continue;
+
+                for (auto entryPoint : *entryPoints)
+                {
+                    diagnoseCapabilityUseForEntryPoint(
+                        context,
+                        entryPoint,
+                        CapabilityName::spvAtomicFloat16VectorNV,
+                        diagnosedCapabilityUses);
+                }
+            }
+        }
+    }
+}
+
 void insertFragmentShaderInterlock(SPIRVEmitSharedContext* context, IRModule* module)
 {
     HashSet<IRFunc*> fragmentShaders;
@@ -3121,6 +3262,7 @@ void legalizeIRForSPIRV(
     eliminateDeadCode(module);
 
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
+    diagnoseSPIRVAtomicCapabilityUses(context, module);
     insertFragmentShaderInterlock(context, module);
 }
 

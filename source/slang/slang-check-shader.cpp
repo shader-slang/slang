@@ -1956,28 +1956,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         else
         {
             auto& targetOptionSet = target->getOptionSet();
-            bool specificProfileRequested =
-                targetOptionSet.hasOption(CompilerOptionName::Profile) &&
-                (targetOptionSet.getIntOption(CompilerOptionName::Profile) !=
-                 SLANG_PROFILE_UNKNOWN);
-            bool specificCapabilityRequested = false;
-            for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
-            {
-                switch (atomVal.kind)
-                {
-                case CompilerOptionValueKind::Int:
-                    if (atomVal.intValue != SLANG_CAPABILITY_UNKNOWN)
-                        specificCapabilityRequested = true;
-                    break;
-                case CompilerOptionValueKind::String:
-                    // User made a specific capability request
-                    specificCapabilityRequested = true;
-                    break;
-                }
-                if (specificCapabilityRequested)
-                    break;
-            }
-
             if (auto declaredCapsMod =
                     entryPointFuncDecl->findModifier<ExplicitlyDeclaredCapabilityModifier>())
             {
@@ -1988,7 +1966,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             }
 
             // Only attempt to error if a specific profile or capability is requested
-            if ((specificCapabilityRequested || specificProfileRequested) &&
+            if (isSpecificProfileOrCapabilityRequested(targetOptionSet) &&
                 targetCaps.atLeastOneSetImpliedInOther(
                     CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}) ==
                     CapabilitySet::ImpliesReturnFlags::NotImplied)
