@@ -2962,8 +2962,9 @@ static bool hasExplicitInterlockInst(IRFunc* func)
 
 static IRType* getAtomicOperationValueType(IRInst* inst)
 {
-    if (inst->getDataType()->getOp() != kIROp_VoidType)
-        return inst->getDataType();
+    auto valueType = inst->getDataType();
+    if (valueType && valueType->getOp() != kIROp_VoidType)
+        return valueType;
 
     IRBuilder builder(inst);
     auto ptrValueType = tryGetPointedToType(&builder, inst->getOperand(0)->getDataType());

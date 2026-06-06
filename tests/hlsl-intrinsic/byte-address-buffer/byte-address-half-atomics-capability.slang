@@ -26,6 +26,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=BUFFER_EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability cuda_hlsl_spirv+sm_5_0+spvAtomicFloat16AddEXT -DTEST_BUFFER_EMULATED_NO_VECTOR
 //DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_EMULATED
 //DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_F16X2_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_F16X2
+//DIAGNOSTIC_TEST:SIMPLE(diag=MULTI_ENTRY_NO_VECTOR,non-exhaustive): -target spirv -entry computeMainA -entry computeMainB -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_MULTI_ENTRY_HELPER_NO_VECTOR
 //TEST:SIMPLE(filecheck=POINTER_EMULATED): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -skip-spirv-validation -capability spvAtomicFloat16VectorNV -DTEST_POINTER_EMULATED
 //TEST:SIMPLE(filecheck=POINTER_F16X2): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_POINTER_F16X2
 
@@ -58,6 +59,37 @@ RWStructuredBuffer<half3> unsupportedVectorBuffer;
 //TEST_INPUT:ubuffer(stride=4, count=1):name=uintBuffer
 RWStructuredBuffer<uint> uintBuffer;
 
+#ifdef TEST_MULTI_ENTRY_HELPER_NO_VECTOR
+void sharedVectorAtomic()
+{
+    __atomic_add(vectorBuffer[0], half2(1.0h, 2.0h));
+}
+
+void callSharedVectorAtomic()
+{
+    sharedVectorAtomic();
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMainA(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    sharedVectorAtomic();
+    callSharedVectorAtomic();
+// MULTI_ENTRY_NO_VECTOR: entry point 'computeMainA' uses capabilities
+// MULTI_ENTRY_NO_VECTOR-SAME: Missing capabilities are: 'spvAtomicFloat16VectorNV'
+// MULTI_ENTRY_NO_VECTOR: entry point 'computeMainB' uses capabilities
+// MULTI_ENTRY_NO_VECTOR-SAME: Missing capabilities are: 'spvAtomicFloat16VectorNV'
+// MULTI_ENTRY_NO_VECTOR-NOT: entry point '
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMainB(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    callSharedVectorAtomic();
+}
+#else
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -230,6 +262,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[4] = float(originalValue);
 #endif
 }
+#endif
 
 // SCALAR-NOT: OpCapability AtomicFloat16VectorNV
 // SCALAR-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
@@ -246,7 +279,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // VECTOR_F16: OpCapability AtomicFloat16VectorNV
 // VECTOR_F16: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 // VECTOR_F16-NOT: OpAtomicFAddEXT %half
-// VECTOR_F16-COUNT-6: OpAtomicFAddEXT %v2half
+// VECTOR_F16-DAG: [[LOW:%[0-9]+]] = OpConstantComposite %v2half %half_0x1p_0 %half_0x0p_0
+// VECTOR_F16-DAG: [[HIGH:%[0-9]+]] = OpConstantComposite %v2half %half_0x0p_0 %half_0x1p_0
+// VECTOR_F16: [[LOW_ATOMIC:%[0-9]+]] = OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[LOW]]
+// VECTOR_F16: OpCompositeExtract %half [[LOW_ATOMIC]] 0
+// VECTOR_F16: [[HIGH_ATOMIC:%[0-9]+]] = OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[HIGH]]
+// VECTOR_F16: OpCompositeExtract %half [[HIGH_ATOMIC]] 1
+// VECTOR_F16-COUNT-4: OpAtomicFAddEXT %v2half
 // VECTOR_F16-NOT: OpAtomicFAddEXT %half
 
 // BOTH-NOT: OpCapability AtomicFloat16AddEXT
@@ -268,7 +307,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // VECTOR_SUB-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
 // VECTOR_SUB: OpCapability AtomicFloat16VectorNV
 // VECTOR_SUB: OpExtension "SPV_NV_shader_atomic_fp16_vector"
-// VECTOR_SUB-DAG: [[VALUE:%[0-9]+]] = OpConstantComposite %v2half {{%[0-9]+}} {{%[0-9]+}}
+// VECTOR_SUB-DAG: [[VALUE:%[0-9]+]] = OpConstantComposite %v2half {{%[A-Za-z0-9_]+}} {{%[A-Za-z0-9_]+}}
 // VECTOR_SUB: [[NEG_VALUE:%[0-9]+]] = OpFNegate %v2half [[VALUE]]
 // VECTOR_SUB: OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[NEG_VALUE]]
 
