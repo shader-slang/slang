@@ -506,10 +506,22 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithHelperFunctionHandleUse)
     _checkBindlessSpaceReflection(userSource, _expectReservedBindlessSpaceAt(2), true);
 }
 
-SLANG_UNIT_TEST(bindlessSpaceMetadataHLSLResourceAndSamplerHandles)
+SLANG_UNIT_TEST(bindlessSpaceMetadataHLSLResourceHandle)
 {
     _checkBindlessSpaceReflection(
-        _getTextureSamplerHandleSource(),
+        _getTextureHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        true,
+        nullptr,
+        0,
+        SLANG_HLSL,
+        "sm_6_6");
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataHLSLSamplerHandle)
+{
+    _checkBindlessSpaceReflection(
+        _getSamplerHandleSource(),
         _expectAnyReservedBindlessSpace(),
         true,
         nullptr,
