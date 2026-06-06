@@ -2602,6 +2602,13 @@ err(
     span { loc = "attr:Modifier", message = "thread-launch node shaders must not specify '[numthreads]'; they use an implicit '[numthreads(1, 1, 1)]'" }
 )
 
+err(
+    "node-launch-attribute-required",
+    31127,
+    "missing 'NodeLaunch' attribute",
+    span { loc = "decl:Decl", message = "node shader entry point '~decl:Decl' must specify a '[NodeLaunch]' attribute" }
+)
+
 warning(
     "explicit-uniform-location",
     31104,

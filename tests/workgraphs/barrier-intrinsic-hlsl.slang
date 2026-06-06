@@ -10,6 +10,7 @@ import experimental.workgraph;
 void main()
 {
     Barrier(BarrierMemoryTypeFlags.ALL_MEMORY, BarrierSemanticFlags.REORDER);
+    Barrier(BarrierMemoryTypeFlags.UAV_MEMORY, (BarrierSemanticFlags)0);
     Barrier(BarrierMemoryTypeFlags.UAV_MEMORY, BarrierSemanticFlags.GROUP_SYNC);
     Barrier(BarrierMemoryTypeFlags.GROUP_SHARED_MEMORY, BarrierSemanticFlags.GROUP_SYNC);
     Barrier(
@@ -25,6 +26,7 @@ void main()
 }
 
 //CHK: Barrier((ALL_MEMORY), (REORDER));
+//CHK: Barrier((UAV_MEMORY), (REORDER));
 //CHK: Barrier((UAV_MEMORY), (GROUP_SYNC));
 //CHK: Barrier((GROUP_SHARED_MEMORY), (GROUP_SYNC));
 //CHK: Barrier((UAV_MEMORY | NODE_INPUT_MEMORY | NODE_OUTPUT_MEMORY), (GROUP_SCOPE | DEVICE_SCOPE));

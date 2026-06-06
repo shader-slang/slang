@@ -271,6 +271,7 @@ public struct EmptyNodeOutputArray
 
 /// Memory type flags for the work-graph Barrier() intrinsic (SM 6.8, first argument).
 /// Keep these numeric values in sync with source/slang/slang-type-system-shared.h.
+/// That C++ header pins the mirrored values with static_assert checks.
 public enum BarrierMemoryTypeFlags : uint
 {
     UAV_MEMORY          = 0x01,
@@ -282,6 +283,7 @@ public enum BarrierMemoryTypeFlags : uint
 
 /// Semantic flags for the work-graph Barrier() intrinsic (SM 6.8, second argument).
 /// Keep these numeric values in sync with source/slang/slang-type-system-shared.h.
+/// That C++ header pins the mirrored values with static_assert checks.
 public enum BarrierSemanticFlags : uint
 {
     REORDER      = 0x00,

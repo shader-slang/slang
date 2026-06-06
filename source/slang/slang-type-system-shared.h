@@ -17,6 +17,15 @@ enum BarrierMemoryTypeFlags : uint32_t
     NodeOutputMemory = 0x08u,
     AllMemory = 0x0fu,
 };
+static_assert(UavMemory == 0x01u, "UavMemory must match experimental/workgraph.slang");
+static_assert(
+    GroupSharedMemory == 0x02u,
+    "GroupSharedMemory must match experimental/workgraph.slang");
+static_assert(NodeInputMemory == 0x04u, "NodeInputMemory must match experimental/workgraph.slang");
+static_assert(
+    NodeOutputMemory == 0x08u,
+    "NodeOutputMemory must match experimental/workgraph.slang");
+static_assert(AllMemory == 0x0fu, "AllMemory must match experimental/workgraph.slang");
 
 // Semantic flags for the work-graph Barrier() intrinsic (SM 6.8, second argument).
 // Keep these values in sync with experimental/workgraph.slang; the HLSL emitter also
@@ -28,6 +37,10 @@ enum BarrierSemanticFlags : uint32_t
     GroupScope = 0x02u,
     DeviceScope = 0x04u,
 };
+static_assert(Reorder == 0x00u, "Reorder must match experimental/workgraph.slang");
+static_assert(GroupSync == 0x01u, "GroupSync must match experimental/workgraph.slang");
+static_assert(GroupScope == 0x02u, "GroupScope must match experimental/workgraph.slang");
+static_assert(DeviceScope == 0x04u, "DeviceScope must match experimental/workgraph.slang");
 #define FOREACH_BASE_TYPE(X) \
     X(Void)                  \
     X(Bool)                  \

@@ -1614,6 +1614,9 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::HLSLGroupSharedModifier:
         return modifierType;
 
+    case ASTNodeType::NodeLaunchAttribute:
+        return modifierType;
+
     case ASTNodeType::NodeDispatchGridAttribute:
     case ASTNodeType::NodeMaxDispatchGridAttribute:
         return ASTNodeType::NodeDispatchGridAttribute;

@@ -1816,6 +1816,24 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     if (stage == Stage::Node)
     {
         auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
+        bool hasUncheckedNodeLaunchAttr = false;
+        for (auto modifier = entryPointFuncDecl->modifiers.first; modifier;
+             modifier = modifier->next)
+        {
+            auto uncheckedAttr = as<UncheckedAttribute>(modifier);
+            if (!uncheckedAttr || !uncheckedAttr->keywordName)
+                continue;
+
+            if (uncheckedAttr->keywordName->text.getUnownedSlice() == toSlice("NodeLaunch"))
+            {
+                hasUncheckedNodeLaunchAttr = true;
+                break;
+            }
+        }
+        if (!launchAttr && !hasUncheckedNodeLaunchAttr)
+        {
+            sink->diagnose(Diagnostics::NodeLaunchAttributeRequired{.decl = entryPointFuncDecl});
+        }
         isThreadLaunchNode = launchAttr && launchAttr->mode == kNodeLaunchModeThread;
     }
 
