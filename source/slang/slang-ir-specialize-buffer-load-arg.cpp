@@ -121,12 +121,18 @@ struct FuncBufferLoadSpecializationCondition : FunctionCallSpecializeCondition
             isUserPointerType(a->getDataType()) || as<IRCastDescriptorHandleToResource>(a) ||
             as<IRSPIRVLoadDescriptorFromHeap>(a))
         {
-            // The IRSPIRVLoadDescriptorFromHeap arm is defensive parallelism
-            // with the IRCastDescriptorHandleToResource arm above: not exercised
-            // by the #11498 repro (the isTypePreferrableToDeferLoad early-return
-            // rejects opaque Texture2D before reaching this matcher) but kept so
-            // a future deferable struct/array param whose access chain roots at
-            // a heap load lands on the same Sites 2/3 reconstruction path.
+            // The IRSPIRVLoadDescriptorFromHeap arm is the heap-EXT analogue of
+            // the IRCastDescriptorHandleToResource arm above. Not exercised by
+            // the #11498 texture repro (its `Texture2D` param is rejected at
+            // the `isTypePreferrableToDeferLoad` early-return before reaching
+            // this matcher), but a deferable struct/array param whose access
+            // chain roots at a heap load — e.g. a `[noinline]` callee taking
+            // a `BigStruct` from `DescriptorHandle<StructuredBuffer<BigStruct>>` —
+            // routes through this arm into `getCallInfoForArg` /
+            // `getSpecializedValueForArg` (in slang-ir-specialize-function-call.cpp),
+            // which reconstruct the heap load inside the cloned callee. See the
+            // BUF directive in tests/bugs/gh-11498-descriptor-handle-noinline.slang
+            // for the regression that exercises this path.
             return true;
         }
         return false;

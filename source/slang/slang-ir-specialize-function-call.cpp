@@ -670,8 +670,9 @@ struct FunctionParameterSpecializationContext
             // would yield a `uint` OpFunctionParameter base, invalid SPIR-V. So
             // reuse the heap global and key on it; only the index is
             // parameterized. Key on the result type T (not the operand type
-            // like the cast branch does) since (heap, index) are uniform
-            // across heap loads.
+            // like the cast branch does) because the (heap, index) operand
+            // types are uniform across heap loads — keying on operand type
+            // would not distinguish per-T specializations.
             ioInfo.key.vals.add(oldArg->getFullType());
             ioInfo.key.vals.add(loadFromHeap->getHeap());
             ioInfo.newArgs.add(loadFromHeap->getIndex());
