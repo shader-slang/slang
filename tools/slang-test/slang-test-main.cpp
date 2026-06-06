@@ -6043,6 +6043,7 @@ SlangResult innerMain(int argc, char** argv)
                 {
                     TestOptions testOptions;
                     testOptions.categories.add(unitTestCategory);
+                    testOptions.categories.add(smokeTestCategory);
                     runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
                 }
             }
