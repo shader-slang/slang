@@ -63,6 +63,15 @@ static void resolveTextureFormatForParameter(IRInst* textureInst, IRTextureTypeB
     // land an unformatted `IRTextureTypeBase` here. The `!hasFormat()` branch
     // hardens the site against a future caller that bypasses or precedes the
     // global format-resolve pass.
+    //
+    // Note: line 54 below synthesizes the (non-`unknown`) format constant with
+    // `builder.getUIntType()` — a pre-existing schema-drift vs. the schema
+    // citations above, latent today because the surrounding
+    // `if (format != ImageFormat::unknown)` guard means it never emits the
+    // `0`-valued constant that would collide with this branch's `int 0` in
+    // the hoistable cache. Tracked at shader-slang/slang#11503; same flag
+    // applies to the sibling fallbacks at `slang-emit-spirv.cpp` and
+    // `slang-ir-util.cpp`.
     ImageFormat format =
         textureType->hasFormat() ? (ImageFormat)textureType->getFormat() : ImageFormat::unknown;
     auto decor = textureInst->findDecoration<IRFormatDecoration>();
