@@ -231,7 +231,7 @@ jobs:
       full-gpu-tests: true
       server-count: 3
 
-  # Linux ARM64 tests (GitHub-hosted, CPU only)
+  # Linux ARM64 tests (GitHub-hosted, CPU only — no GPU/Vulkan available)
   test-linux-debug-gcc-aarch64:
     needs: [filter, build-linux-debug-gcc-aarch64]
     if: needs.filter.outputs.should-run == 'true'
@@ -243,6 +243,7 @@ jobs:
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
+      cpu-only: true
 
   test-linux-release-gcc-aarch64:
     needs: [filter, build-linux-release-gcc-aarch64]
@@ -255,6 +256,7 @@ jobs:
       config: release
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
+      cpu-only: true
 
   # Windows GPU tests (self-hosted)
   test-windows-debug-cl-x86_64-gpu:
