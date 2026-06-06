@@ -10,7 +10,7 @@ The standard modules configuration is centralized to avoid hardcoding paths in m
 
 The following CMake variables control the standard modules configuration:
 
-- `SLANG_STANDARD_MODULE_DIR_NAME` (default: "slang-standard-module-${SLANG_VERSION_FULL}")
+- `SLANG_STANDARD_MODULE_DIR_NAME` (default: "slang-standard-module-${SLANG_VERSION_NUMERIC}")
   - The directory name for all standard modules relative to libslang location
   - Includes the Slang version number for version-specific module isolation
 
@@ -21,8 +21,8 @@ The following CMake variables control the standard modules configuration:
   - The file name for the compiled experimental workgraph module
 
 - `SLANG_STANDARD_MODULE_INSTALL_DIR`
-  - **Windows**: `bin/slang-standard-module-${SLANG_VERSION_FULL}` (installed next to slang.dll)
-  - **Linux/Mac**: `lib/slang-standard-module-${SLANG_VERSION_FULL}` (installed next to libslang.so/libslang.dylib)
+  - **Windows**: `bin/slang-standard-module-${SLANG_VERSION_NUMERIC}` (installed next to slang.dll)
+  - **Linux/Mac**: `lib/slang-standard-module-${SLANG_VERSION_NUMERIC}` (installed next to libslang.so/libslang.dylib)
   - The installation directory for all standard modules in release packages
 
 ## Directory Structure
@@ -78,17 +78,17 @@ To change the standard module paths:
 6. Standard modules are placed under subdirectories next to libslang.so/slang.dll that match
    their import paths:
    - **Build - Windows**:
-     - `build/Debug/bin/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
-     - `build/Debug/bin/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
+     - `build/Debug/bin/slang-standard-module-${SLANG_VERSION_NUMERIC}/slang/`
+     - `build/Debug/bin/slang-standard-module-${SLANG_VERSION_NUMERIC}/experimental/`
    - **Build - Linux/Mac**:
-     - `build/Debug/lib/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
-     - `build/Debug/lib/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
+     - `build/Debug/lib/slang-standard-module-${SLANG_VERSION_NUMERIC}/slang/`
+     - `build/Debug/lib/slang-standard-module-${SLANG_VERSION_NUMERIC}/experimental/`
    - **Install - Windows**:
-     - `<prefix>/bin/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
-     - `<prefix>/bin/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
+     - `<prefix>/bin/slang-standard-module-${SLANG_VERSION_NUMERIC}/slang/`
+     - `<prefix>/bin/slang-standard-module-${SLANG_VERSION_NUMERIC}/experimental/`
    - **Install - Linux/Mac**:
-     - `<prefix>/lib/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
-     - `<prefix>/lib/slang-standard-module-${SLANG_VERSION_FULL}/experimental/`
+     - `<prefix>/lib/slang-standard-module-${SLANG_VERSION_NUMERIC}/slang/`
+     - `<prefix>/lib/slang-standard-module-${SLANG_VERSION_NUMERIC}/experimental/`
 
 For example, `import slang.neural;` resolves to `slang/neural.slang-module`, and
 `import experimental.workgraph;` resolves to `experimental/workgraph.slang-module`.
