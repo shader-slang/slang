@@ -54,6 +54,29 @@ static const char* _getTextureHandleSource()
     )";
 }
 
+static const char* _getUnusedTextureHandleSource()
+{
+    return R"(
+        RWStructuredBuffer<float> gInput;
+        RWStructuredBuffer<float> gOutput;
+
+        struct P
+        {
+            Texture2D.Handle t;
+        };
+
+        ParameterBlock<P> p1;
+
+        [Shader("compute")]
+        [NumThreads(4, 1, 1)]
+        void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            uint tid = dispatchThreadID.x;
+            gOutput[tid] = gInput[tid] + 1.0f;
+        }
+    )";
+}
+
 static const char* _getTextureSamplerHandleSource()
 {
     return R"(
@@ -354,6 +377,16 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandleBeforeExplicitLayout
         "spirv_1_5",
         nullptr,
         true);
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithDeadDescriptorHandle)
+{
+    // The source declares a DescriptorHandle in a parameter block, so layout reserves bindless
+    // space, but the entry point never uses it and metadata should report no heap use.
+    _checkBindlessSpaceReflection(
+        _getUnusedTextureHandleSource(),
+        _expectAnyReservedBindlessSpace(),
+        false);
 }
 
 SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutReservedSpace)

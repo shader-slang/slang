@@ -119,7 +119,7 @@ static void _insertBinding(
     ranges.add(newRange);
 }
 
-static bool _isBindlessResourceHeapGlobalParam(IRInst* inst, int bindlessSpaceIndex)
+static bool _isBindlessResourceHeapGlobalParam(IRInst* inst, SlangInt bindlessSpaceIndex)
 {
     SLANG_ASSERT(bindlessSpaceIndex >= 0);
 
@@ -154,13 +154,14 @@ static bool _isBindlessResourceHeapGlobalParam(IRInst* inst, int bindlessSpaceIn
     return descriptorTableSlotSize && descriptorTableSlotSize->getSize().isInfinite();
 }
 
-static bool _instUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
+static bool _instUsesBindlessResourceHeap(IRInst* inst, SlangInt bindlessSpaceIndex)
 {
     if (bindlessSpaceIndex >= 0 && _isBindlessResourceHeapGlobalParam(inst, bindlessSpaceIndex))
         return true;
 
     switch (inst->getOp())
     {
+    case kIROp_GetDynamicResourceHeap:
     case kIROp_LoadResourceDescriptorFromHeap:
     case kIROp_LoadSamplerDescriptorFromHeap:
     case kIROp_SPIRVLoadDescriptorFromHeap:
@@ -177,15 +178,19 @@ static bool _instUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
     }
 }
 
-static bool _subtreeUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
+static bool _subtreeUsesBindlessResourceHeap(IRInst* root, SlangInt bindlessSpaceIndex)
 {
-    if (_instUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
-        return true;
+    List<IRInst*> workList;
+    workList.add(root);
 
-    for (auto child : inst->getChildren())
+    for (Index i = 0; i < workList.getCount(); ++i)
     {
-        if (_subtreeUsesBindlessResourceHeap(child, bindlessSpaceIndex))
+        auto inst = workList[i];
+        if (_instUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
             return true;
+
+        for (auto child : inst->getChildren())
+            workList.add(child);
     }
 
     return false;
@@ -270,12 +275,12 @@ void collectMetadata(
 {
     SLANG_ASSERT(targetProgram);
 
-    int bindlessSpaceIndex = -1;
+    SlangInt bindlessSpaceIndex = -1;
     if (targetProgram->hasExistingLayout())
     {
         auto programLayout = targetProgram->getExistingLayout();
         SLANG_ASSERT(programLayout);
-        bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
+        bindlessSpaceIndex = programLayout->bindlessSpaceIndex;
     }
 
     // Scan the instructions looking for global resource declarations
