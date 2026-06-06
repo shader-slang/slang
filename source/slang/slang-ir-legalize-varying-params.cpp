@@ -458,10 +458,13 @@ bool legalizeRayTracingPrimitiveIDParamsForEntryPoint(
     IRFunc*& primitiveIndexFunc)
 {
     auto entryPointDecor = entryPointFunc->findDecoration<IREntryPointDecoration>();
-    if (!entryPointDecor || !isRayTracingHitStage(entryPointDecor->getProfile().getStage()))
+    SLANG_ASSERT(entryPointDecor);
+    if (!entryPointDecor)
         return false;
+    SLANG_ASSERT(isRayTracingHitStage(entryPointDecor->getProfile().getStage()));
 
     auto firstBlock = entryPointFunc->getFirstBlock();
+    SLANG_ASSERT(firstBlock);
     if (!firstBlock)
         return false;
 

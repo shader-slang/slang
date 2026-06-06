@@ -3094,9 +3094,8 @@ void consolidateRayTracingParameters(
     List<IRParam*> params;
 
     auto stage = context->getStage();
-    const bool isRayTracingHitStage =
-        stage == Stage::Intersection || stage == Stage::AnyHit || stage == Stage::ClosestHit;
-    if (isRayTracingHitStage && !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
+    const bool isHitStage = isRayTracingHitStage(stage);
+    if (isHitStage && !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
     {
         legalizeRayTracingPrimitiveIDParamsForEntryPoint(
             builder->getModule(),
