@@ -7,6 +7,7 @@ namespace Slang
 class ArtifactPostEmitMetadata;
 class DiagnosticSink;
 struct IRModule;
+class TargetProgram;
 
 // Walks `irModule` and records metadata for the target-visible cooperative
 // matrix/vector types and combinations. For each cooperative operation, the
@@ -19,8 +20,7 @@ void collectCooperativeMetadata(
 
 void collectMetadata(
     const IRModule* irModule,
-    int bindlessSpaceIndex,
-    bool shouldTreatDescriptorHandleResourceCastsAsHeapUse,
+    TargetProgram* targetProgram,
     ArtifactPostEmitMetadata& outMetadata);
 
 } // namespace Slang

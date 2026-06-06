@@ -5,6 +5,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target-program.h"
 
 #include <utility>
 
@@ -154,10 +155,7 @@ static bool _isBindlessResourceHeapGlobalParam(IRInst* inst, int bindlessSpaceIn
     return descriptorTableSlotSize && descriptorTableSlotSize->getSize().isInfinite();
 }
 
-static bool _instUsesBindlessResourceHeap(
-    IRInst* inst,
-    int bindlessSpaceIndex,
-    bool shouldTreatDescriptorHandleResourceCastsAsHeapUse)
+static bool _instUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
 {
     if (_isBindlessResourceHeapGlobalParam(inst, bindlessSpaceIndex))
         return true;
@@ -174,32 +172,20 @@ static bool _instUsesBindlessResourceHeap(
         // is collected; SPIR-V descriptor-heap extension tests cover these cases.
         return true;
     case kIROp_CastDescriptorHandleToResource:
-        // This cast is the SPIR-V NV bindless-texture path and the native-handle path for
-        // non-SPIR-V targets. Generic SPIR-V dynamic heaps are detected through heap globals or
-        // heap-load ops instead.
-        return shouldTreatDescriptorHandleResourceCastsAsHeapUse;
+        return true;
     default:
         return false;
     }
 }
 
-static bool _subtreeUsesBindlessResourceHeap(
-    IRInst* inst,
-    int bindlessSpaceIndex,
-    bool shouldTreatDescriptorHandleResourceCastsAsHeapUse)
+static bool _subtreeUsesBindlessResourceHeap(IRInst* inst, int bindlessSpaceIndex)
 {
-    if (_instUsesBindlessResourceHeap(
-            inst,
-            bindlessSpaceIndex,
-            shouldTreatDescriptorHandleResourceCastsAsHeapUse))
+    if (_instUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
         return true;
 
     for (auto child : inst->getChildren())
     {
-        if (_subtreeUsesBindlessResourceHeap(
-                child,
-                bindlessSpaceIndex,
-                shouldTreatDescriptorHandleResourceCastsAsHeapUse))
+        if (_subtreeUsesBindlessResourceHeap(child, bindlessSpaceIndex))
             return true;
     }
 
@@ -280,19 +266,19 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
 // Collects the metadata from the provided IR module, saves it in outMetadata.
 void collectMetadata(
     const IRModule* irModule,
-    int bindlessSpaceIndex,
-    bool shouldTreatDescriptorHandleResourceCastsAsHeapUse,
+    TargetProgram* targetProgram,
     ArtifactPostEmitMetadata& outMetadata)
 {
+    int bindlessSpaceIndex = -1;
+    if (auto programLayout = targetProgram->getLayoutIfAvailable())
+        bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
+
     // Scan the instructions looking for global resource declarations
     // and exported functions.
     bool usesBindlessResourceHeap = false;
     for (const auto& inst : irModule->getGlobalInsts())
     {
-        if (!usesBindlessResourceHeap && _subtreeUsesBindlessResourceHeap(
-                                             inst,
-                                             bindlessSpaceIndex,
-                                             shouldTreatDescriptorHandleResourceCastsAsHeapUse))
+        if (!usesBindlessResourceHeap && _subtreeUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
             usesBindlessResourceHeap = true;
 
         if (auto func = as<IRFunc>(inst))
