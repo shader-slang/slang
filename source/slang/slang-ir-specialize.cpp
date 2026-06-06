@@ -1126,6 +1126,15 @@ struct SpecializationContext
                     {
                         if (auto table = as<IRWitnessTable>(instElement))
                         {
+                            // Static specialization path: deliberately a flat
+                            // lookup. An inherited base-interface key would
+                            // miss here (its entry lives on a nested
+                            // base-interface table; see #11487 + the
+                            // dynamic-dispatch sites that route through
+                            // findWitnessTableEntryInInheritanceClosure).
+                            // The fall-through skip below leaves the lookup
+                            // unspecialized, which the typeflow specializer
+                            // then resolves correctly.
                             if (auto satisfyingVal = findWitnessTableEntry(table, requirementKey))
                             {
                                 satisfyingValSet.add(satisfyingVal);
@@ -1192,6 +1201,12 @@ struct SpecializationContext
 
         if (witnessTable)
         {
+            // Static specialization path: deliberately a flat lookup. An
+            // inherited base-interface key would miss here (its entry lives
+            // on a nested base-interface table; see #11487). The pre-existing
+            // null-guard below leaves the lookup unspecialized, and the
+            // typeflow specializer's inheritance-closure walk resolves it
+            // correctly later.
             satisfyingVal = findWitnessTableEntry(witnessTable, requirementKey);
         }
         else

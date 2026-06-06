@@ -499,10 +499,13 @@ struct TagOpsLoweringContext : public InstPassBase
         Dictionary<UInt, UInt> mapping;
         for (UInt i = 0; i < srcSet->getCount(); i++)
         {
-            // Find in destSet
+            // Find in destSet. Use the inheritance-closure walk so this
+            // matches the lookup the typeflow specializer used when it built
+            // destSet from inherited requirement keys (#11487).
             bool found = false;
-            auto srcMappedElement =
-                findWitnessTableEntry(cast<IRWitnessTable>(srcSet->getElement(i)), key);
+            auto srcMappedElement = findWitnessTableEntryInInheritanceClosure(
+                cast<IRWitnessTable>(srcSet->getElement(i)),
+                key);
             for (UInt j = 0; j < destSet->getCount(); j++)
             {
                 auto destElement = destSet->getElement(j);

@@ -3428,7 +3428,14 @@ struct TypeFlowSpecializationContext
                         return;
                     }
 
-                    results.add(findWitnessTableEntry(witnessTab, key));
+                    // Walk nested base-interface witness tables for inherited
+                    // requirements (#11487). Skip on a residual miss so a stray
+                    // null does not land in the result set. An empty result set
+                    // emits poison downstream (specializeLookupWitnessMethod's
+                    // isEmpty branch); a non-empty set is specialized normally.
+                    if (auto satisfyingVal =
+                            findWitnessTableEntryInInheritanceClosure(witnessTab, key))
+                        results.add(satisfyingVal);
                 });
 
             auto setOp = getSetOpFromType(inst->getDataType());
@@ -5779,7 +5786,13 @@ struct TypeFlowSpecializationContext
         // Handle trivial case where inst's operand is a concrete table.
         if (auto witnessTable = as<IRWitnessTable>(inst->getWitnessTable()))
         {
-            inst->replaceUsesWith(findWitnessTableEntry(witnessTable, inst->getRequirementKey()));
+            // Walk inherited witness tables (#11487); leave unspecialized on a
+            // miss so we don't call replaceUsesWith(null).
+            auto satisfyingVal =
+                findWitnessTableEntryInInheritanceClosure(witnessTable, inst->getRequirementKey());
+            if (!satisfyingVal)
+                return false;
+            inst->replaceUsesWith(satisfyingVal);
             inst->removeAndDeallocate();
             return true;
         }
@@ -6517,7 +6530,21 @@ struct TypeFlowSpecializationContext
                     switch (action.kind)
                     {
                     case DispatchAction::Kind::Lookup:
-                        val = findWitnessTableEntry(cast<IRWitnessTable>(val), action.lookupKey);
+                        // Walk nested base-interface witness tables for keys
+                        // declared on an inherited interface (#11487). The
+                        // front-end conformance check requires every
+                        // registered conformance to satisfy all of its
+                        // interface's requirements (direct and inherited), so
+                        // for valid IR the closure walk always finds an entry
+                        // here. A residual miss therefore indicates internal
+                        // inconsistency in the IR rather than a user-reachable
+                        // state; the release assert surfaces it with a clear
+                        // message instead of letting the next iteration's
+                        // cast<IRGeneric>(val) deref a null.
+                        val = findWitnessTableEntryInInheritanceClosure(
+                            cast<IRWitnessTable>(val),
+                            action.lookupKey);
+                        SLANG_RELEASE_ASSERT(val);
                         break;
 
                     case DispatchAction::Kind::Specialize:

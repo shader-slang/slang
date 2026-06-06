@@ -339,10 +339,19 @@ static IRInst* specializeWitnessLookup(IRLookupWitnessMethod* lookupInst)
 
     // Because we have a concrete witness table, we can
     // use it to look up the IR value that satisfies
-    // the given interface requirement.
+    // the given interface requirement. The inheritance-closure
+    // walk handles the case where the operand is a derived-
+    // interface witness table but the key was declared on an
+    // inherited base interface (see #11487).
     //
     auto requirementKey = lookupInst->getRequirementKey();
-    auto satisfyingVal = findWitnessTableEntry(witnessTable, requirementKey);
+    auto satisfyingVal = findWitnessTableEntryInInheritanceClosure(witnessTable, requirementKey);
+
+    // Defensive: if the entry is genuinely missing, leave the lookup in
+    // place rather than calling replaceUsesWith(null), which would trip
+    // SLANG_ASSERT(other) in _replaceInstUsesWith.
+    if (!satisfyingVal)
+        return lookupInst;
 
     lookupInst->replaceUsesWith(satisfyingVal);
     lookupInst->removeAndDeallocate();

@@ -321,6 +321,37 @@ IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 
 IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
 
+// Find a witness-table entry by key. If the key is not a direct entry of
+// `table`, descends depth-first into nested witness-table entries that
+// share the outermost table's concrete (implementing) type, cycle-guarded
+// by a visited set, returning the first match. Used at dynamic-dispatch
+// specialization sites where the lookup operand is a derived-interface
+// witness table but the key was declared on an inherited base interface,
+// and the inherited entry lives on the nested base-interface witness
+// table the AST conformance check stored as a
+// `RequirementWitness::Flavor::witnessTable` on the parent (see #11487).
+//
+// Traversal is restricted to nested tables whose `getConcreteType()`
+// matches the outermost table's concrete type. Inheritance chains preserve
+// the concrete type at every step (`Foo : IDerived` → `Foo : IBase`), so
+// the walk reaches every inherited entry. Associated-conformance entries
+// (e.g. an entry on `Foo : IDerived` whose nested table is `Bar : IBase`
+// because `IDerived` requires an associated type `A : IBase`) carry a
+// different concrete type and are *not* traversed — without this filter
+// the walk could otherwise return an associated-type's IBase
+// implementation in place of `Self : IBase`, since IR requirement keys
+// are globally-unique IRStructKeys and can collide across the two nested
+// tables.
+//
+// Post-walk miss contract: for IR produced by the front end, every
+// requirement key declared on a base interface is reachable from a
+// conforming derived-interface table along the inheritance chain (the
+// conformance check enforces this). A null return therefore indicates
+// the lookup operand does not satisfy the requirement at all - the caller
+// is expected to either leave the inst unspecialized for a later pass, or
+// treat the miss as an internal-consistency error.
+IRInst* findWitnessTableEntryInInheritanceClosure(IRWitnessTable* table, IRInst* key);
+
 IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar);
 
 IRInst* getInstInBlock(IRInst* inst);

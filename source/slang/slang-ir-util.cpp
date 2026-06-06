@@ -1720,6 +1720,63 @@ IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key)
     return nullptr;
 }
 
+// Recursive helper for findWitnessTableEntryInInheritanceClosure. The visited
+// set is required for termination: the IR can carry self-referential
+// witness-table entries (e.g. the differential-pair tables synthesized by
+// buildDifferentiablePairWitness in slang-ir-autodiff.cpp store the parent
+// table itself as the satisfying value for the differential-assoc-type
+// witness key, intentionally creating a self-edge), so this walk is not a
+// tree walk. The autodiff regression suite (tests/autodiff/) exercises
+// this walk against those self-referential tables, so a future refactor
+// that drops the visited set will surface there as a stack overflow.
+//
+// `anchorConcreteType` is the concrete (implementing) type of the original
+// outermost call's table; the walk only descends into nested tables that
+// share that concrete type. Inheritance chains (e.g. `Lambert : IBSDF` →
+// `Lambert : IShadingFunction`) preserve the concrete type at every step,
+// so the walk reaches every inherited entry. Associated-conformance entries
+// (e.g. an entry on `Foo : IDerived` whose nested table is `Bar : IBase`
+// because `IDerived` requires an associated type `A : IBase`) carry a
+// *different* concrete type and are skipped — without this filter the walk
+// could otherwise return an associated-type's IBase implementation in place
+// of `Self : IBase`, since IR requirement keys are globally-unique
+// IRStructKeys and can collide across the two nested tables.
+static IRInst* findWitnessTableEntryInInheritanceClosureImpl(
+    IRWitnessTable* table,
+    IRInst* key,
+    IRType* anchorConcreteType,
+    HashSet<IRWitnessTable*>& visited)
+{
+    if (auto direct = findWitnessTableEntry(table, key))
+        return direct;
+
+    if (!visited.add(table))
+        return nullptr;
+
+    for (auto entry : table->getEntries())
+    {
+        auto nested = as<IRWitnessTable>(entry->getSatisfyingVal());
+        if (!nested)
+            continue;
+        if (nested->getConcreteType() != anchorConcreteType)
+            continue;
+        if (auto found =
+                findWitnessTableEntryInInheritanceClosureImpl(nested, key, anchorConcreteType, visited))
+            return found;
+    }
+    return nullptr;
+}
+
+IRInst* findWitnessTableEntryInInheritanceClosure(IRWitnessTable* table, IRInst* key)
+{
+    HashSet<IRWitnessTable*> visited;
+    return findWitnessTableEntryInInheritanceClosureImpl(
+        table,
+        key,
+        table->getConcreteType(),
+        visited);
+}
+
 IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar)
 {
     IRInst* location = nullptr;
