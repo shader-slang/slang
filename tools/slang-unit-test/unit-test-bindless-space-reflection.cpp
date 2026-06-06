@@ -28,6 +28,11 @@ static BindlessSpaceExpectation _expectAnyReservedBindlessSpace()
     return {true, false, 0};
 }
 
+static BindlessSpaceExpectation _expectNoReservedBindlessSpace()
+{
+    return {false, false, -1};
+}
+
 static const char* _getTextureHandleSource()
 {
     return R"(
@@ -347,6 +352,20 @@ SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutDescriptorHandleBeforeExplicitLayout
         0,
         SLANG_SPIRV,
         "spirv_1_5",
+        nullptr,
+        true);
+}
+
+SLANG_UNIT_TEST(bindlessSpaceMetadataWithoutReservedSpace)
+{
+    _checkBindlessSpaceReflection(
+        _getNoDescriptorHandleSource(),
+        _expectNoReservedBindlessSpace(),
+        false,
+        nullptr,
+        0,
+        SLANG_HLSL,
+        "sm_5_1",
         nullptr,
         true);
 }

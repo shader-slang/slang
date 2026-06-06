@@ -1573,14 +1573,20 @@ model when deciding whether an explicit bindless resource heap binding is requir
 
 ```c++
 slang::IComponentType* program = ...;
-slang::IMetadata* targetMetadata;
-program->getTargetMetadata(
+Slang::ComPtr<slang::IMetadata> targetMetadata;
+Slang::ComPtr<slang::IBlob> diagnostics;
+if (SLANG_FAILED(program->getTargetMetadata(
         0, // target index
-        &targetMetadata);
+        targetMetadata.writeRef(),
+        diagnostics.writeRef())))
+{
+    // Handle error.
+    return;
+}
 
 auto bindlessMetadata = static_cast<slang::IBindlessResourceMetadata*>(
     targetMetadata->castAs(slang::IBindlessResourceMetadata::getTypeGuid()));
-if(bindlessMetadata && bindlessMetadata->usesBindlessResourceHeap())
+if (bindlessMetadata && bindlessMetadata->usesBindlessResourceHeap())
 {
     // Bind the descriptor heap for this compiled target.
 }

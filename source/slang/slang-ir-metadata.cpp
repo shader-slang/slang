@@ -269,9 +269,14 @@ void collectMetadata(
     ArtifactPostEmitMetadata& outMetadata)
 {
     SLANG_ASSERT(targetProgram);
-    auto programLayout = targetProgram->getExistingLayout();
-    SLANG_ASSERT(programLayout);
-    int bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
+
+    int bindlessSpaceIndex = -1;
+    if (targetProgram->hasExistingLayout())
+    {
+        auto programLayout = targetProgram->getExistingLayout();
+        SLANG_ASSERT(programLayout);
+        bindlessSpaceIndex = (int)programLayout->bindlessSpaceIndex;
+    }
 
     // Scan the instructions looking for global resource declarations
     // and exported functions.

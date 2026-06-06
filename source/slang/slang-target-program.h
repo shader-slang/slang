@@ -60,6 +60,7 @@ public:
         SLANG_ASSERT(m_layout);
         return m_layout;
     }
+    bool hasExistingLayout() const { return m_layout != nullptr; }
 
     /// Get the compiled code for an entry point on the target.
     ///
