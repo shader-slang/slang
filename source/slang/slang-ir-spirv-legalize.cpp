@@ -3045,19 +3045,20 @@ static void diagnoseCapabilityUseForEntryPoint(
     printDiagnosticArg(entryPointSb, entryPoint);
 
     auto& optionSet = context->m_targetProgram->getOptionSet();
+    auto entryPointProfileName = entryPointDecor->getProfile().getName();
     maybeDiagnoseWarningOrError(
         context->m_sink,
         optionSet,
         DiagnosticCategory::Capability,
         Diagnostics::ProfileImplicitlyUpgraded{
             .entryPoint = entryPointSb.toString(),
-            .profile = optionSet.getProfile().getName(),
+            .profile = entryPointProfileName,
             .capabilities = missingCapsStr,
             .location = entryPoint->sourceLoc,
         },
         Diagnostics::ProfileImplicitlyUpgradedRestrictive{
             .entryPoint = entryPointSb.toString(),
-            .profile = optionSet.getProfile().getName(),
+            .profile = entryPointProfileName,
             .capabilities = missingCapsStr,
             .location = entryPoint->sourceLoc,
         });

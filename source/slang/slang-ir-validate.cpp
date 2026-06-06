@@ -588,6 +588,8 @@ static void validateSPIRVFp16VectorAtomicOperation(DiagnosticSink* sink, IRInst*
         return;
 
     default:
+        sink->diagnose(
+            Diagnostics::SpirvFp16VectorAtomicUnsupportedOperation{.location = inst->sourceLoc});
         return;
     }
 }
