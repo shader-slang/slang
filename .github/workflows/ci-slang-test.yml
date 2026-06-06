@@ -118,6 +118,12 @@ jobs:
             slang_test_args+=("-api" "vk+cuda+dx11+dx12+mtl+wgpu")
           fi
 
+          # macOS has no native Vulkan; exclude the vk backend so Vulkan-only
+          # test variants are filtered out rather than run-and-failed.
+          if [[ "${{ inputs.os }}" == "macos" ]]; then
+            slang_test_args+=("-api" "all-vk")
+          fi
+
           # Add test server arguments only if server count > 1
           if [ "${{ inputs.server-count }}" -gt 1 ]; then
             slang_test_args+=("-use-test-server")
