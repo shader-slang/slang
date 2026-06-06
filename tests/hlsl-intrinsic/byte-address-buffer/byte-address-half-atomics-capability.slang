@@ -12,6 +12,7 @@
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT4):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT_VECTOR4
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_ATOMIC
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_SUB_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_SUB
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_VECTOR4_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR4_ATOMIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_MIN_MAX
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_EXCHANGE_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_EXCHANGE
@@ -32,6 +33,7 @@
 //TEST:SIMPLE(filecheck=IGNORE_CAPS): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -ignore-capabilities -capability spirv_1_5
 //TEST:SIMPLE(filecheck=BOTH): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT -capability spvAtomicFloat16VectorNV
 //TEST:SIMPLE(filecheck=VECTOR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_ATOMIC
+//TEST:SIMPLE(filecheck=VECTOR_SUB): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_SUB
 //TEST:SIMPLE(filecheck=VECTOR4): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR4_ATOMIC
 //TEST:SIMPLE(filecheck=VECTOR_MIN_MAX): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_MIN_MAX
 //TEST:SIMPLE(filecheck=VECTOR_EXCHANGE): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_EXCHANGE
@@ -146,6 +148,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     __atomic_add(vectorBuffer[0], half2(1.0h, 2.0h));
 // DIRECT_NO_VECTOR: entry point uses capabilities not in specified profile
 // DIRECT_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
+#elif defined(TEST_DIRECT_VECTOR_SUB)
+    __atomic_sub(vectorBuffer[0], half2(1.0h, 2.0h));
+// DIRECT_SUB_NO_VECTOR: entry point uses capabilities not in specified profile
+// DIRECT_SUB_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
 #elif defined(TEST_DIRECT_VECTOR4_ATOMIC)
     __atomic_add(vector4Buffer[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
 // DIRECT_VECTOR4_NO_VECTOR: entry point uses capabilities not in specified profile
@@ -178,6 +184,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // UNSUPPORTED_VECTOR_COMPARE_EXCHANGE: error[E50014]: invalid SPIR-V fp16 vector atomic operation
 // UNSUPPORTED_VECTOR_COMPARE_EXCHANGE: SPIR-V fp16 vector atomics only support add, sub, min, max, and exchange operations.
     outputBuffer[0] = float(originalValue.x + originalValue.y);
+// Half-vector atomic load/store are not source-expressible today: Atomic<T> requires
+// scalar IAtomicable types, while half2/half4 do not conform to that interface. The
+// validator rejects those IR ops defensively if a later lowering path creates them.
 #elif defined(TEST_BUFFER_EMULATED_NO_VECTOR)
     half originalValue;
     tmpBuffer.InterlockedAddF16Emulated(0, 1.0h, originalValue);
@@ -254,6 +263,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // VECTOR: OpCapability AtomicFloat16VectorNV
 // VECTOR: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 // VECTOR: OpAtomicFAddEXT %v2half
+
+// VECTOR_SUB-NOT: OpCapability AtomicFloat16AddEXT
+// VECTOR_SUB-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
+// VECTOR_SUB: OpCapability AtomicFloat16VectorNV
+// VECTOR_SUB: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// VECTOR_SUB-DAG: [[VALUE:%[0-9]+]] = OpConstantComposite %v2half {{%[0-9]+}} {{%[0-9]+}}
+// VECTOR_SUB: [[NEG_VALUE:%[0-9]+]] = OpFNegate %v2half [[VALUE]]
+// VECTOR_SUB: OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[NEG_VALUE]]
 
 // VECTOR4-NOT: OpCapability AtomicFloat16AddEXT
 // VECTOR4-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"

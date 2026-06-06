@@ -5575,6 +5575,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     builder.setInsertBefore(inst);
                     auto negatedOperand = builder.emitNeg(inst->getDataType(), operand);
+                    emitLocalInst(parent, negatedOperand);
                     operand = negatedOperand;
                 }
                 result = emitOpAtomicOp(
