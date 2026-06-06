@@ -12,7 +12,7 @@ class Session;
 struct IRFunc;
 struct IRModule;
 
-void legalizeRayTracingParametersForHLSL(IRModule* module);
+void legalizeParametersForHLSL(IRModule* module);
 
 void legalizeEmptyRayPayloadsForHLSL(IRModule* module);
 

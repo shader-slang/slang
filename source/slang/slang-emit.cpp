@@ -1638,12 +1638,12 @@ Result linkAndOptimizeIR(
             SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
         }
 
-        // For DXIL/HLSL ray tracing: rewrite parameters that need backend
-        // intrinsics or temporary structs before existential layout removes
-        // empty struct parameters.
+        // For DXIL/HLSL: rewrite parameters that need backend intrinsics or
+        // temporary structs before existential layout removes empty struct
+        // parameters.
         if (isD3DTarget(targetRequest))
         {
-            SLANG_PASS(legalizeRayTracingParametersForHLSL);
+            SLANG_PASS(legalizeParametersForHLSL);
         }
 
         if (requiredLoweringPassSet.existentialTypeLayout)

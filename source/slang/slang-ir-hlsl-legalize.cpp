@@ -159,7 +159,7 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
     }
 }
 
-void legalizeRayTracingParametersForHLSL(IRModule* module)
+void legalizeParametersForHLSL(IRModule* module)
 {
     List<IRFunc*> funcs;
     List<IRFunc*> primitiveIDEntryPoints;
