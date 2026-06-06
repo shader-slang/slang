@@ -8,7 +8,11 @@
 // specialization allowlists did not accept, leaving the texture parameter
 // unspecialized and its asm-operand back-reference desynced by later passes.
 
-// CHECK: OpImageSampleImplicitLod
+// Assert we stayed on the descriptor-heap-EXT path and produced a sample op
+// from the specialized callee.
+// CHECK-DAG: OpCapability DescriptorHeapEXT
+// CHECK-DAG: OpExtension "SPV_EXT_descriptor_heap"
+// CHECK-DAG: OpImageSampleImplicitLod
 
 SamplerState sampler;
 static const uint N = 2;
