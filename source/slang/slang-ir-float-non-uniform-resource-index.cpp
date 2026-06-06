@@ -9,7 +9,54 @@
 // Vulkan (VUID-RuntimeSpirv-None-10148) requires the NonUniform decoration
 // on the resource operand consumed by the sampling/memory instruction.
 //
-// Two passes cooperate to achieve this:
+// Target applicability
+// --------------------
+// This pass runs for every target (see the two callers below), but the two
+// floatModes do very different amounts of work, and the heavy propagation in
+// this file matters for exactly one target: the direct SPIR-V backend.
+//
+//   * SPIRV mode (called from slang-ir-spirv-legalize.cpp): the direct SPIR-V
+//     emitter is the only backend with no downstream shader compiler, so Slang
+//     itself must attach OpDecorate NonUniform to every consumed resource
+//     operand to satisfy VUID-RuntimeSpirv-None-10148. That is why this mode
+//     bubbles the wrapper all the way to the leaf and then runs the decoration
+//     phase (decorateNonUniformChain + the legalize forward scan).
+//
+//   * Textual mode (called from slang-emit.cpp for all !isSPIRV targets): no
+//     decoration is emitted (the function returns before the decoration phase).
+//     The pass only repositions the NonUniformResourceIndex wrapper so it ends
+//     up wrapping the index expression; the rest is the source emitter's job.
+//     Per each target's own spec, the non-uniform concept lives on the *index*
+//     (and the downstream compiler propagates it) or does not exist at all:
+//       - HLSL: re-emitted as the textual `NonUniformResourceIndex(index)`
+//         hint. The D3D spec defines it as a hint applied to the indexing
+//         expression (indices are wave-uniform by default); DXC/FXC then
+//         propagates correctness to the consumed resource. So Slang only needs
+//         the wrapper on the index. (DirectX-Specs: Resource Binding, "Shader
+//         Derivatives and Divergent Indexing"; SM 6.6 Dynamic Resources.)
+//       - GLSL: re-emitted as `nonuniformEXT(index)`. GLSL *does* support
+//         non-uniform indexing -- the GL_EXT_nonuniform_qualifier spec defines
+//         `nonuniformEXT` as a qualifier/constructor applied to the index or
+//         expression -- and glslang propagates it downstream. (Khronos
+//         GL_EXT_nonuniform_qualifier.)
+//       - Metal / WGSL / CUDA / CPU: the wrapper is dropped at emit time (the
+//         CLikeSourceEmitter base just emits operand 0), because none of these
+//         have a non-uniform-resource-indexing annotation to carry:
+//           . Metal allows dynamic/non-uniform indexing of argument-buffer
+//             resource arrays with no shader-side qualifier (Metal Shading
+//             Language Spec 2.13 Argument Buffers; Tier 2 bindless).
+//           . WGSL/WebGPU has no non-uniform annotation: binding arrays are
+//             still proposal-stage and, per that proposal, "do not require
+//             explicit non-uniform annotations" (gpuweb sized-binding-arrays).
+//           . CUDA/CPU have no descriptor-array / bindless concept at all.
+//         There is nothing to propagate, so doing more here would have no
+//         target syntax to emit it into.
+//
+// So the decoration machinery below is intentionally SPIR-V-only: every other
+// target either delegates propagation to its downstream compiler (HLSL, GLSL)
+// or has no way to express the concept (Metal, WGSL, CUDA, CPU).
+//
+// Two passes cooperate to achieve this for SPIR-V:
 //
 // 1. Float pass (this file, called during SPIR-V legalization):
 //    Bubbles the NonUniformResourceIndex wrapper outward through the
