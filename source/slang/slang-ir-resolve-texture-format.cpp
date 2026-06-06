@@ -51,6 +51,11 @@ static void resolveTextureFormatForParameter(IRInst* textureInst, IRTextureTypeB
     {
         IRBuilder builder(textureInst->getModule());
         builder.setInsertBefore(textureInst);
+        // The IR type token here is load-bearing: `IRTextureType`'s `format`
+        // operand is declared `int` in `hlsl.meta.slang`, and the hoistable
+        // texture-type cache keys on each operand's full type. A `uint`
+        // constant would key distinctly from an `int` constant of the same
+        // value and prevent dedup against the schema-built texture type.
         auto formatArg = builder.getIntValue(builder.getIntType(), IRIntegerValue(format));
 
         auto newType = builder.getTextureType(

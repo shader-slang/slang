@@ -21,5 +21,5 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 }
 
 // IR: ### AFTER resolveTextureFormat
-// IR: TextureType({{.*}}, {{[0-9]+}} : Int){{.*}}global_param
-// IR-NOT: TextureType({{.*}}UInt{{.*}}global_param
+// IR: TextureType({{.*}}, {{[0-9]+}} : Int){{.*}}= global_param
+// IR-NOT: TextureType({{.*}}, {{[0-9]+}} : UInt){{.*}}= global_param
