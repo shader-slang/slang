@@ -1760,8 +1760,11 @@ static IRInst* findWitnessTableEntryInInheritanceClosureImpl(
             continue;
         if (nested->getConcreteType() != anchorConcreteType)
             continue;
-        if (auto found =
-                findWitnessTableEntryInInheritanceClosureImpl(nested, key, anchorConcreteType, visited))
+        if (auto found = findWitnessTableEntryInInheritanceClosureImpl(
+                nested,
+                key,
+                anchorConcreteType,
+                visited))
             return found;
     }
     return nullptr;
