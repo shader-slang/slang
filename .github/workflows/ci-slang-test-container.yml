@@ -165,6 +165,11 @@ jobs:
             slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
           fi
 
+          # Print the fully-resolved command so the CI log shows exactly which
+          # arguments were used (the conditional logic only shows the source).
+          printf '+ %q' "$bin_dir/slang-test"
+          printf ' %q' "${test_roots[@]}" "${slang_test_args[@]}"
+          printf '\n'
           "$bin_dir/slang-test" "${test_roots[@]}" "${slang_test_args[@]}"
 
       - name: Run slangc tests

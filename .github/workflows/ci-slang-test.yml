@@ -150,7 +150,12 @@ jobs:
             slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
           fi
 
-          # Execute slang-test with all arguments
+          # Execute slang-test with all arguments. Print the fully-resolved
+          # command first so the CI log shows exactly which arguments were used
+          # (the conditional logic above only shows the source, not the result).
+          printf '+ %q' "$bin_dir/slang-test"
+          printf ' %q' "${slang_test_args[@]}"
+          printf '\n'
           "$bin_dir/slang-test" "${slang_test_args[@]}"
       - name: Run Slang examples
         # Run examples on release for pull requests, and not on merge_group, to reduce CI load.
@@ -183,6 +188,9 @@ jobs:
           if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
             via_glsl_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
           fi
+          printf '+ %q' "$bin_dir/slang-test"
+          printf ' %q' "${via_glsl_args[@]}"
+          printf '\n'
           "$bin_dir/slang-test" "${via_glsl_args[@]}"
 
   # Run slang-rhi tests when:
