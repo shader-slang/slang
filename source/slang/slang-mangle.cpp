@@ -386,6 +386,14 @@ void emitVal(ManglingContext* context, Val* val)
         for (Index i = 0; i < funcCallIntVal->getArgs().getCount(); i++)
             emitVal(context, funcCallIntVal->getArgs()[i]);
     }
+    else if (auto builtinOpIntVal = dynamicCast<BuiltinOperationIntVal>(val))
+    {
+        emitRaw(context, "KB");
+        emit(context, builtinOpIntVal->getArgs().getCount());
+        emitNameImpl(context, getBuiltinOperationOpText(builtinOpIntVal->getOp()));
+        for (Index i = 0; i < builtinOpIntVal->getArgs().getCount(); i++)
+            emitVal(context, builtinOpIntVal->getArgs()[i]);
+    }
     else if (auto lookupIntVal = dynamicCast<WitnessLookupIntVal>(val))
     {
         emitRaw(context, "KL");

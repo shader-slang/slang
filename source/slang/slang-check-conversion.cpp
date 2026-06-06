@@ -1009,7 +1009,8 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         {
             auto isLinkTimeVal =
                 as<TypeCastIntVal>(toElementCount) || as<DeclRefIntVal>(toElementCount) ||
-                as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementCount);
+                as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementCount) ||
+                as<BuiltinOperationIntVal>(toElementCount);
             if (isLinkTimeVal)
             {
                 auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
@@ -1203,7 +1204,8 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         {
             auto isLinkTimeVal =
                 as<TypeCastIntVal>(rowCountIntVal) || as<DeclRefIntVal>(rowCountIntVal) ||
-                as<PolynomialIntVal>(rowCountIntVal) || as<FuncCallIntVal>(rowCountIntVal);
+                as<PolynomialIntVal>(rowCountIntVal) || as<FuncCallIntVal>(rowCountIntVal) ||
+                as<BuiltinOperationIntVal>(rowCountIntVal);
             if (isLinkTimeVal)
             {
                 auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();

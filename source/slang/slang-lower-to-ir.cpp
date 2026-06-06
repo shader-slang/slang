@@ -1917,6 +1917,66 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return resVal;
     }
 
+    LoweredValInfo visitBuiltinOperationIntVal(BuiltinOperationIntVal* val)
+    {
+        List<IRInst*> args;
+        IRType* specConstRateType = nullptr;
+        for (auto arg : val->getArgs())
+        {
+            auto loweredArg = lowerVal(context, arg);
+            args.add(loweredArg.val);
+            if (!specConstRateType && isSpecConstRateType(loweredArg.val->getFullType()))
+                specConstRateType = loweredArg.val->getFullType();
+        }
+        auto builder = getBuilder();
+        auto resType =
+            maybeAddRateType(builder, specConstRateType, lowerType(context, val->getType()));
+        // Emit the corresponding hoistable constexpr IR op (mirrors visitFuncCallIntVal's
+        // builtin-operator dispatch, but keyed on the operator enum since there is no decl).
+        switch (val->getOp())
+        {
+        case BuiltinOperationKind::Add:
+            return LoweredValInfo::simple(builder->emitConstexprAdd(resType, args[0], args[1]));
+        case BuiltinOperationKind::Sub:
+            return LoweredValInfo::simple(builder->emitConstexprSub(resType, args[0], args[1]));
+        case BuiltinOperationKind::Mul:
+            return LoweredValInfo::simple(builder->emitConstexprMul(resType, args[0], args[1]));
+        case BuiltinOperationKind::Div:
+            return LoweredValInfo::simple(builder->emitConstexprDiv(resType, args[0], args[1]));
+        case BuiltinOperationKind::Mod:
+            return LoweredValInfo::simple(builder->emitConstexprIRem(resType, args[0], args[1]));
+        case BuiltinOperationKind::Neg:
+            return LoweredValInfo::simple(builder->emitConstexprNeg(resType, args[0]));
+        case BuiltinOperationKind::Eql:
+            return LoweredValInfo::simple(builder->emitConstexprEql(resType, args[0], args[1]));
+        case BuiltinOperationKind::Neq:
+            return LoweredValInfo::simple(builder->emitConstexprNeq(resType, args[0], args[1]));
+        case BuiltinOperationKind::Less:
+            return LoweredValInfo::simple(builder->emitConstexprLess(resType, args[0], args[1]));
+        case BuiltinOperationKind::Greater:
+            return LoweredValInfo::simple(builder->emitConstexprGreater(resType, args[0], args[1]));
+        case BuiltinOperationKind::Leq:
+            return LoweredValInfo::simple(builder->emitConstexprLeq(resType, args[0], args[1]));
+        case BuiltinOperationKind::Geq:
+            return LoweredValInfo::simple(builder->emitConstexprGeq(resType, args[0], args[1]));
+        case BuiltinOperationKind::BitAnd:
+            return LoweredValInfo::simple(builder->emitConstexprBitAnd(resType, args[0], args[1]));
+        case BuiltinOperationKind::BitOr:
+            return LoweredValInfo::simple(builder->emitConstexprBitOr(resType, args[0], args[1]));
+        case BuiltinOperationKind::BitXor:
+            return LoweredValInfo::simple(builder->emitConstexprBitXor(resType, args[0], args[1]));
+        case BuiltinOperationKind::BitNot:
+            return LoweredValInfo::simple(builder->emitConstexprBitNot(resType, args[0]));
+        case BuiltinOperationKind::Lsh:
+            return LoweredValInfo::simple(builder->emitConstexprShl(resType, args[0], args[1]));
+        case BuiltinOperationKind::Rsh:
+            return LoweredValInfo::simple(builder->emitConstexprShr(resType, args[0], args[1]));
+        case BuiltinOperationKind::Not:
+            return LoweredValInfo::simple(builder->emitConstexprNot(resType, args[0]));
+        }
+        SLANG_UNIMPLEMENTED_X("BuiltinOperationIntVal lowering");
+    }
+
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
     {
         auto baseVal = lowerVal(context, val->getBase());

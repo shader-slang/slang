@@ -2280,6 +2280,284 @@ Val* FuncCallIntVal::_substituteImplOverride(
     return this;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinOperationIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op)
+{
+    switch (op)
+    {
+    case BuiltinOperationKind::Add:
+        return toSlice("+");
+    case BuiltinOperationKind::Sub:
+        return toSlice("-");
+    case BuiltinOperationKind::Mul:
+        return toSlice("*");
+    case BuiltinOperationKind::Div:
+        return toSlice("/");
+    case BuiltinOperationKind::Mod:
+        return toSlice("%");
+    case BuiltinOperationKind::Neg:
+        return toSlice("-");
+    case BuiltinOperationKind::Eql:
+        return toSlice("==");
+    case BuiltinOperationKind::Neq:
+        return toSlice("!=");
+    case BuiltinOperationKind::Less:
+        return toSlice("<");
+    case BuiltinOperationKind::Greater:
+        return toSlice(">");
+    case BuiltinOperationKind::Leq:
+        return toSlice("<=");
+    case BuiltinOperationKind::Geq:
+        return toSlice(">=");
+    case BuiltinOperationKind::BitAnd:
+        return toSlice("&");
+    case BuiltinOperationKind::BitOr:
+        return toSlice("|");
+    case BuiltinOperationKind::BitXor:
+        return toSlice("^");
+    case BuiltinOperationKind::BitNot:
+        return toSlice("~");
+    case BuiltinOperationKind::Lsh:
+        return toSlice("<<");
+    case BuiltinOperationKind::Rsh:
+        return toSlice(">>");
+    case BuiltinOperationKind::Not:
+        return toSlice("!");
+    default:
+        return toSlice("?");
+    }
+}
+
+bool findBuiltinOperationKind(UnownedStringSlice opText, bool isUnary, BuiltinOperationKind& out)
+{
+    if (opText == toSlice("+"))
+        out = BuiltinOperationKind::Add;
+    else if (opText == toSlice("-"))
+        out = isUnary ? BuiltinOperationKind::Neg : BuiltinOperationKind::Sub;
+    else if (opText == toSlice("*"))
+        out = BuiltinOperationKind::Mul;
+    else if (opText == toSlice("/"))
+        out = BuiltinOperationKind::Div;
+    else if (opText == toSlice("%"))
+        out = BuiltinOperationKind::Mod;
+    else if (opText == toSlice("~"))
+        out = BuiltinOperationKind::BitNot;
+    else if (opText == toSlice("!"))
+        out = BuiltinOperationKind::Not;
+    else if (opText == toSlice("=="))
+        out = BuiltinOperationKind::Eql;
+    else if (opText == toSlice("!="))
+        out = BuiltinOperationKind::Neq;
+    else if (opText == toSlice("<"))
+        out = BuiltinOperationKind::Less;
+    else if (opText == toSlice(">"))
+        out = BuiltinOperationKind::Greater;
+    else if (opText == toSlice("<="))
+        out = BuiltinOperationKind::Leq;
+    else if (opText == toSlice(">="))
+        out = BuiltinOperationKind::Geq;
+    else if (opText == toSlice("&"))
+        out = BuiltinOperationKind::BitAnd;
+    else if (opText == toSlice("|"))
+        out = BuiltinOperationKind::BitOr;
+    else if (opText == toSlice("^"))
+        out = BuiltinOperationKind::BitXor;
+    else if (opText == toSlice("<<"))
+        out = BuiltinOperationKind::Lsh;
+    else if (opText == toSlice(">>"))
+        out = BuiltinOperationKind::Rsh;
+    else
+        return false;
+    return true;
+}
+
+void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
+{
+    auto args = getArgs();
+    auto opText = getBuiltinOperationOpText(getOp());
+    auto argToText = [&](Index index)
+    {
+        if (as<PolynomialIntVal>(args[index]) || as<FuncCallIntVal>(args[index]) ||
+            as<BuiltinOperationIntVal>(args[index]))
+        {
+            out << "(";
+            args[index]->toText(out);
+            out << ")";
+        }
+        else
+        {
+            args[index]->toText(out);
+        }
+    };
+    if (args.getCount() == 2)
+    {
+        argToText(0);
+        out << opText;
+        argToText(1);
+    }
+    else if (args.getCount() == 1)
+    {
+        out << opText;
+        argToText(0);
+    }
+}
+
+Val* BuiltinOperationIntVal::tryFoldImpl(
+    ASTBuilder* astBuilder,
+    Type* resultType,
+    BuiltinOperationKind op,
+    List<IntVal*>& newArgs,
+    DiagnosticSink* sink)
+{
+    List<ConstantIntVal*> constArgs;
+    for (auto arg : newArgs)
+    {
+        auto c = as<ConstantIntVal>(arg);
+        if (!c)
+            return nullptr; // still symbolic
+        constArgs.add(c);
+    }
+
+    const IntegerLiteralValue a0 = constArgs[0]->getValue();
+    const IntegerLiteralValue a1 = (constArgs.getCount() > 1) ? constArgs[1]->getValue() : 0;
+    IntegerLiteralValue r = 0;
+    switch (op)
+    {
+    case BuiltinOperationKind::Neg:
+        r = -a0;
+        break;
+    case BuiltinOperationKind::BitNot:
+        r = ~a0;
+        break;
+    case BuiltinOperationKind::Not:
+        r = (a0 == 0);
+        break;
+    case BuiltinOperationKind::Eql:
+        r = (a0 == a1);
+        break;
+    case BuiltinOperationKind::Neq:
+        r = (a0 != a1);
+        break;
+    case BuiltinOperationKind::Less:
+        r = (a0 < a1);
+        break;
+    case BuiltinOperationKind::Greater:
+        r = (a0 > a1);
+        break;
+    case BuiltinOperationKind::Leq:
+        r = (a0 <= a1);
+        break;
+    case BuiltinOperationKind::Geq:
+        r = (a0 >= a1);
+        break;
+    case BuiltinOperationKind::BitAnd:
+        r = a0 & a1;
+        break;
+    case BuiltinOperationKind::BitOr:
+        r = a0 | a1;
+        break;
+    case BuiltinOperationKind::BitXor:
+        r = a0 ^ a1;
+        break;
+    case BuiltinOperationKind::Add:
+        r = a0 + a1;
+        break;
+    case BuiltinOperationKind::Sub:
+        r = a0 - a1;
+        break;
+    case BuiltinOperationKind::Mul:
+        r = a0 * a1;
+        break;
+    case BuiltinOperationKind::Div:
+    case BuiltinOperationKind::Mod:
+        if (a1 == 0)
+        {
+            if (sink)
+                sink->diagnose(Diagnostics::DivideByZero{});
+            return nullptr;
+        }
+        r = (op == BuiltinOperationKind::Div) ? (a0 / a1) : (a0 % a1);
+        break;
+    case BuiltinOperationKind::Lsh:
+    case BuiltinOperationKind::Rsh:
+        if (a1 < 0)
+            return nullptr;
+        {
+            const auto shiftCount =
+                static_cast<std::make_unsigned_t<IRIntegerValue>>(a1) %
+                std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
+            r = (op == BuiltinOperationKind::Lsh)
+                    ? static_cast<IntegerLiteralValue>(
+                          static_cast<std::make_unsigned_t<IntegerLiteralValue>>(a0) << shiftCount)
+                    : (a0 >> shiftCount);
+        }
+        break;
+    default:
+        return nullptr;
+    }
+    return astBuilder->getIntVal(resultType, r);
+}
+
+Val* BuiltinOperationIntVal::_resolveImplOverride()
+{
+    auto astBuilder = getCurrentASTBuilder();
+    bool diff = false;
+    List<IntVal*> newArgs;
+    for (auto arg : getArgs())
+    {
+        auto newArg = as<IntVal>(arg->resolve());
+        if (!newArg)
+            return this;
+        newArgs.add(newArg);
+        if (newArg != arg)
+            diff = true;
+    }
+    if (auto resolved = tryFoldImpl(astBuilder, getType(), getOp(), newArgs, nullptr))
+        return resolved;
+    if (diff)
+        return astBuilder->getOrCreate<BuiltinOperationIntVal>(
+            getType(),
+            getOp(),
+            newArgs.getArrayView());
+    return this;
+}
+
+Val* BuiltinOperationIntVal::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    List<IntVal*> newArgs;
+    for (auto& arg : getArgs())
+    {
+        auto substArg = arg->substituteImpl(astBuilder, subst, &diff);
+        if (substArg != arg)
+            diff++;
+        newArgs.add(as<IntVal>(substArg));
+    }
+    *ioDiff += diff;
+    if (diff)
+    {
+        if (auto newVal = tryFoldImpl(astBuilder, getType(), getOp(), newArgs, nullptr))
+            return newVal;
+        return astBuilder->getOrCreate<BuiltinOperationIntVal>(
+            getType(),
+            getOp(),
+            newArgs.getArrayView());
+    }
+    return this;
+}
+
+Val* BuiltinOperationIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
+{
+    List<IntVal*> newArgs;
+    for (auto arg : getArgs())
+        newArgs.add(as<IntVal>(arg->linkTimeResolve(map)));
+    return tryFoldImpl(getCurrentASTBuilder(), getType(), getOp(), newArgs, nullptr);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SizeOfIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void SizeOfIntVal::_toTextOverride(StringBuilder& out)

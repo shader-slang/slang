@@ -3075,6 +3075,10 @@ static LayoutSize GetElementCount(IntVal* val)
     {
         return LayoutSize::invalid();
     }
+    else if (as<BuiltinOperationIntVal>(val))
+    {
+        return LayoutSize::invalid();
+    }
     else if (const auto typeCastIntVal = as<TypeCastIntVal>(val))
     {
         // Recursively check the base IntVal

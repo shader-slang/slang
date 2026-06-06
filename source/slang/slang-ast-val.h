@@ -257,6 +257,86 @@ class FuncCallIntVal : public IntVal
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
+// Identifies a builtin operator for `BuiltinOperationIntVal`. These mirror the builtin
+// IR ops (see `convertToBuiltinArithmeticOp` / `lowerBuiltinArithmeticOp`); their integer
+// values are part of the serialized/mangled form, so only append, never reorder.
+enum class BuiltinOperationKind
+{
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Neg,
+    Eql,
+    Neq,
+    Less,
+    Greater,
+    Leq,
+    Geq,
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+    Lsh,
+    Rsh,
+    Not,
+};
+
+// A compile-time integer that is the result of a builtin operator applied to operands that
+// are not all concrete yet (e.g. `N / 2` for a generic value parameter `N`). Unlike
+// `FuncCallIntVal`, it identifies the operator by a `BuiltinOperationKind` enum rather than
+// a resolved operator `DeclRef`, so it can represent operators recognized by the builtin
+// fast path (which never resolve to an operator declaration). It re-evaluates on
+// substitution and folds once its operands become concrete.
+FIDDLE()
+class BuiltinOperationIntVal : public IntVal
+{
+    FIDDLE(...)
+    BuiltinOperationKind getOp() { return (BuiltinOperationKind)getIntConstOperand(1); }
+    OperandView<IntVal> getArgs() { return OperandView<IntVal>(this, 2, getOperandCount() - 2); }
+    Index getArgCount() { return getOperandCount() - 2; }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+
+    BuiltinOperationIntVal(Type* inType, BuiltinOperationKind inOp, ArrayView<IntVal*> inArgs)
+    {
+        setOperands(inType, (IntegerLiteralValue)inOp);
+        for (auto arg : inArgs)
+            m_operands.add(ValNodeOperand(arg));
+    }
+
+    static Val* tryFoldImpl(
+        ASTBuilder* astBuilder,
+        Type* resultType,
+        BuiltinOperationKind op,
+        List<IntVal*>& newArgs,
+        DiagnosticSink* sink);
+
+    bool _isLinkTimeValOverride()
+    {
+        for (auto arg : getArgs())
+        {
+            if (arg->isLinkTimeVal())
+                return true;
+        }
+        return false;
+    }
+
+    Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
+};
+
+// Operator-name text for a `BuiltinOperationKind` (e.g. `Add` -> "+"); used for `toText`
+// and mangling so a `BuiltinOperationIntVal` is identified consistently.
+UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op);
+
+// Map an operator-name + arity to a `BuiltinOperationKind`. Returns false for operators
+// that don't have a `BuiltinOperationIntVal` form (e.g. `&&`/`||`). `isUnary` disambiguates
+// the prefix `-` (Neg) from the binary `-` (Sub).
+bool findBuiltinOperationKind(UnownedStringSlice opText, bool isUnary, BuiltinOperationKind& out);
+
 FIDDLE(abstract)
 class SizeOfLikeIntVal : public IntVal
 {
