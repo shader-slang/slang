@@ -1632,6 +1632,51 @@ struct LoweredElementTypeContext
         auto clonedFunc = as<IRFunc>(cloneInst(&cloneEnv, &builder, call->getCallee()));
         List<IRUse*> uses;
 
+        // If our cloned function has uses already, that means it may be calling
+        // itself (is recursive). There are also other potential causes, such as
+        // decorations, but this condition is basically only here to skip
+        // unnecessary extra work on the vast majority of non-recursive cases.
+        // Running the code inside is harmless but useless when the function is
+        // not calling itself.
+        //
+        // In this context, it is actually more correct for the recursive calls
+        // in a cloned function to call the original function instead of the new
+        // clone. First, the cloned function has a different type signature, but
+        // the `cloneInst` retains the old arguments for recursive calls, which
+        // already can cause type mismatches in the IR.
+        //
+        // Second, the CastStorageToLogical insts in the arguments of the
+        // cloned call get recorded in outNewCasts, causing the function call to
+        // the clone to get handled as if it had not been specialized in
+        // `deferStorageToLogicalCasts`. As the cloned function won't be
+        // recorded in `specializedFuncs` yet, it leads to
+        // `createSpecializedFuncThatUseStorageType` being called again for the
+        // clone. This sets up an infinite loop of cloning and specializing.
+        //
+        // By swapping the callees from the cloned function to the original
+        // function, we can fix both issues: we won't get type signature issues
+        // and the function is found in `specializedFuncs` during the next
+        // iteration in `deferStorageToLogicalCasts`.
+        if (clonedFunc->hasUses())
+        {
+            // Replace all self-calls with the original function.
+            cloneEnv.mapOldValToNew.remove(clonedFunc);
+            cloneEnv.mapOldValToNew.add(clonedFunc, call->getCallee());
+            traverseUsers<IRCall>(
+                clonedFunc,
+                [&](IRCall* user)
+                {
+                    // Ensure that the use is specifically as the callee.
+                    if (user->getCallee() == clonedFunc)
+                    {
+                        builder.setInsertBefore(user);
+                        auto newCall = cloneInst(&cloneEnv, &builder, user);
+                        user->replaceUsesWith(newCall);
+                        user->removeAndDeallocate();
+                    }
+                });
+        }
+
         // If a parameter is being translated to storage type,
         // insert a cast to convert it to logical type.
         List<IRParam*> params;
