@@ -530,6 +530,8 @@ public:
         //
         beginModuleImpl();
 
+        List<EntryPointInfo> entryPoints;
+
         // We now search for entry-point definitions in the IR module.
         // All entry points should appear at the global scope.
         //
@@ -549,10 +551,11 @@ public:
             if (!shouldProcessEntryPoint(entryPointDecor))
                 continue;
 
-            // Once we find an entry point we process it immediately.
-            //
-            processEntryPoint(func, entryPointDecor);
+            entryPoints.add({func, entryPointDecor});
         }
+
+        for (auto& entryPoint : entryPoints)
+            processEntryPoint(entryPoint.entryPointFunc, entryPoint.entryPointDecor);
     }
 
 protected:
