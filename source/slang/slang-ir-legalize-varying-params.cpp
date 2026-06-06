@@ -452,78 +452,52 @@ static void replacePrimitiveIDParamUses(
         });
 }
 
-bool legalizeRayTracingPrimitiveIDParamsForEntryPoint(
+bool tryLegalizeRayTracingPrimitiveIDParam(
     IRModule* module,
-    IRFunc* entryPointFunc,
-    IRFunc*& primitiveIndexFunc)
+    IRBuilder& builder,
+    IRParam* param,
+    IRFunc*& primitiveIndexFunc,
+    bool removeParam)
 {
-    auto entryPointDecor = entryPointFunc->findDecoration<IREntryPointDecoration>();
-    SLANG_ASSERT(entryPointDecor);
-    if (!entryPointDecor)
-        return false;
-    SLANG_ASSERT(isRayTracingHitStage(entryPointDecor->getProfile().getStage()));
-
-    auto firstBlock = entryPointFunc->getFirstBlock();
-    SLANG_ASSERT(firstBlock);
-    if (!firstBlock)
+    if (!isPrimitiveIDSystemValueParam(param))
         return false;
 
-    IRBuilder builder(module);
-    builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
-
-    bool modifiedFuncType = false;
-    for (auto param = firstBlock->getFirstParam(); param;)
+    auto paramType = param->getFullType();
+    IRType* valueType = paramType;
+    bool needsAddressReplacement = false;
+    if (auto borrowInParamType = as<IRBorrowInParamType>(valueType))
     {
-        auto nextParam = param->getNextParam();
-
-        if (!isPrimitiveIDSystemValueParam(param))
-        {
-            param = nextParam;
-            continue;
-        }
-
-        auto paramType = param->getFullType();
-        IRType* valueType = paramType;
-        bool needsAddressReplacement = false;
-        if (auto borrowInParamType = as<IRBorrowInParamType>(valueType))
-        {
-            valueType = borrowInParamType->getValueType();
-            needsAddressReplacement = true;
-        }
-        else if (auto ptrType = as<IRPtrTypeBase>(valueType))
-        {
-            valueType = ptrType->getValueType();
-            needsAddressReplacement = true;
-        }
-
-        if (param->hasUses())
-        {
-            auto valueReplacement =
-                emitRayTracingPrimitiveIndexValue(module, builder, primitiveIndexFunc, paramType);
-            if (!valueReplacement)
-            {
-                // Source-level semantic type validation should reject this. Leave malformed IR
-                // untouched rather than replacing uses with a null value.
-                param = nextParam;
-                continue;
-            }
-            replacePrimitiveIDParamUses(
-                builder,
-                param,
-                valueReplacement,
-                valueType,
-                needsAddressReplacement);
-        }
-
-        param->removeAndDeallocate();
-        modifiedFuncType = true;
-        param = nextParam;
+        valueType = borrowInParamType->getValueType();
+        needsAddressReplacement = true;
+    }
+    else if (auto ptrType = as<IRPtrTypeBase>(valueType))
+    {
+        valueType = ptrType->getValueType();
+        needsAddressReplacement = true;
     }
 
-    if (modifiedFuncType)
-        fixUpFuncType(entryPointFunc);
+    if (param->hasUses())
+    {
+        auto valueReplacement =
+            emitRayTracingPrimitiveIndexValue(module, builder, primitiveIndexFunc, paramType);
+        if (!valueReplacement)
+        {
+            // Source-level semantic type validation should reject this. Leave malformed IR
+            // untouched rather than replacing uses with a null value.
+            return false;
+        }
+        replacePrimitiveIDParamUses(
+            builder,
+            param,
+            valueReplacement,
+            valueType,
+            needsAddressReplacement);
+    }
 
-    return modifiedFuncType;
+    if (removeParam)
+        param->removeAndDeallocate();
+
+    return true;
 }
 
 
@@ -572,6 +546,8 @@ public:
             auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
             if (!entryPointDecor)
                 continue;
+            if (!shouldProcessEntryPoint(entryPointDecor))
+                continue;
 
             // Once we find an entry point we process it immediately.
             //
@@ -585,6 +561,7 @@ protected:
     // only happen once per module that is processed.
     //
     virtual void beginModuleImpl() {}
+    virtual bool shouldProcessEntryPoint(IREntryPointDecoration*) { return true; }
 
     // We have both per-module and per-entry-point state that
     // needs to be managed. The former is set up in `processModule()`,
@@ -738,7 +715,7 @@ protected:
     IRParam* m_param = nullptr;
     IRVarLayout* m_paramLayout = nullptr;
 
-    void processParam(IRParam* param)
+    virtual void processParam(IRParam* param)
     {
         m_param = param;
 
@@ -1282,6 +1259,46 @@ protected:
 // With the target-independent core of the pass out of the way, we can
 // turn our attention to the target-specific subtypes that handle
 // translation of "leaf" varying parameters.
+
+struct HLSLRayTracingPrimitiveIDParamLegalizeContext : EntryPointVaryingParamLegalizeContext
+{
+    IRFunc* primitiveIndexFunc = nullptr;
+    bool modifiedFuncType = false;
+
+    bool shouldProcessEntryPoint(IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE
+    {
+        return isRayTracingHitStage(entryPointDecor->getProfile().getStage());
+    }
+
+    void beginEntryPointImpl() SLANG_OVERRIDE { modifiedFuncType = false; }
+
+    void processParam(IRParam* param) SLANG_OVERRIDE
+    {
+        IRBuilder builder(m_module);
+        builder.setInsertBefore(m_firstOrdinaryInst);
+        if (tryLegalizeRayTracingPrimitiveIDParam(
+                m_module,
+                builder,
+                param,
+                primitiveIndexFunc,
+                /* removeParam */ true))
+        {
+            modifiedFuncType = true;
+        }
+    }
+
+    void endEntryPointImpl() SLANG_OVERRIDE
+    {
+        if (modifiedFuncType)
+            fixUpFuncType(m_entryPointFunc);
+    }
+};
+
+void legalizeRayTracingPrimitiveIDParamsForHLSL(IRModule* module)
+{
+    HLSLRayTracingPrimitiveIDParamLegalizeContext context;
+    context.processModule(module, nullptr);
+}
 
 struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalizeContext
 {

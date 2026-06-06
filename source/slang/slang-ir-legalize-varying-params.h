@@ -10,6 +10,7 @@ class DiagnosticSink;
 struct IRModule;
 struct IRInst;
 struct IRFunc;
+struct IRParam;
 struct IRVectorType;
 struct IRBuilder;
 struct IREntryPointDecoration;
@@ -98,9 +99,13 @@ SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticN
 
 bool isRayTracingHitStage(Stage stage);
 
-bool legalizeRayTracingPrimitiveIDParamsForEntryPoint(
+bool tryLegalizeRayTracingPrimitiveIDParam(
     IRModule* module,
-    IRFunc* entryPointFunc,
-    IRFunc*& primitiveIndexFunc);
+    IRBuilder& builder,
+    IRParam* param,
+    IRFunc*& primitiveIndexFunc,
+    bool removeParam);
+
+void legalizeRayTracingPrimitiveIDParamsForHLSL(IRModule* module);
 
 } // namespace Slang

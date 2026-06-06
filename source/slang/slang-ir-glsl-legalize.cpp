@@ -3080,9 +3080,7 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 // Consolidate ray tracing parameters for an entry point function
 void consolidateRayTracingParameters(
     GLSLLegalizationContext* context,
-    CodeGenContext* codeGenContext,
-    IRFunc* func,
-    IRFunc*& primitiveIndexFunc)
+    IRFunc* func)
 {
     auto builder = context->getBuilder();
     auto firstBlock = func->getFirstBlock();
@@ -3092,16 +3090,6 @@ void consolidateRayTracingParameters(
     // Collect all out/inout parameters that need to be consolidated
     List<IRParam*> outParams;
     List<IRParam*> params;
-
-    auto stage = context->getStage();
-    const bool isHitStage = isRayTracingHitStage(stage);
-    if (isHitStage && !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly())
-    {
-        legalizeRayTracingPrimitiveIDParamsForEntryPoint(
-            builder->getModule(),
-            func,
-            primitiveIndexFunc);
-    }
 
     for (auto param = firstBlock->getFirstParam(); param; param = param->getNextParam())
     {
@@ -4006,10 +3994,23 @@ void legalizeEntryPointParameterForGLSL(
     CodeGenContext* codeGenContext,
     IRFunc* func,
     IRParam* pp,
-    IRVarLayout* paramLayout)
+    IRVarLayout* paramLayout,
+    IRFunc*& primitiveIndexFunc)
 {
     auto builder = context->getBuilder();
     auto stage = context->getStage();
+
+    if (isRayTracingHitStage(stage) &&
+        !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly() &&
+        tryLegalizeRayTracingPrimitiveIDParam(
+            builder->getModule(),
+            *builder,
+            pp,
+            primitiveIndexFunc,
+            /* removeParam */ false))
+    {
+        return;
+    }
 
     // (JS): In the legalization process parameters are moved from the entry point.
     // So when we get to emit we have a problem in that we can't use parameters to find important
@@ -4935,7 +4936,7 @@ void legalizeEntryPointForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        consolidateRayTracingParameters(&context, codeGenContext, func, primitiveIndexFunc);
+        consolidateRayTracingParameters(&context, func);
         break;
     default:
         break;
@@ -4960,7 +4961,13 @@ void legalizeEntryPointForGLSL(
             auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
             SLANG_ASSERT(paramLayout);
 
-            legalizeEntryPointParameterForGLSL(&context, codeGenContext, func, pp, paramLayout);
+            legalizeEntryPointParameterForGLSL(
+                &context,
+                codeGenContext,
+                func,
+                pp,
+                paramLayout,
+                primitiveIndexFunc);
         }
 
         // At this point we should have eliminated all uses of the
