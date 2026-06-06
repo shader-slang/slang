@@ -4522,45 +4522,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return true;
     }
 
-    bool checkSupportedFp16VectorAtomicOperation(IRInst* atomicInst, IRType* valueType)
+    void maybeRequireFp16VectorAtomicCapability(IRInst* atomicInst, IRType* valueType)
     {
         if (!isFp16VectorAtomicType(valueType))
-            return true;
-
-        m_sink->diagnose(Diagnostics::SpirvFp16VectorAtomicUnsupportedOperation{
-            .location = atomicInst->sourceLoc});
-        return false;
-    }
-
-    bool maybeRequireFp16VectorAtomicCapability(IRInst* atomicInst, IRType* valueType)
-    {
-        if (!isFp16VectorAtomicType(valueType))
-            return true;
+            return;
 
         auto vectorType = as<IRVectorType>(valueType);
         auto elementCountInst = as<IRIntLit>(vectorType->getElementCount());
+        SLANG_ASSERT(elementCountInst);
         if (!elementCountInst)
-        {
-            m_sink->diagnose(Diagnostics::SpirvFp16VectorAtomicUnsupportedWidth{
-                .location = atomicInst->sourceLoc});
-            return false;
-        }
+            return;
 
         auto elementCount = elementCountInst->getValue();
+        SLANG_ASSERT(elementCount == 2 || elementCount == 4);
         if (elementCount != 2 && elementCount != 4)
-        {
-            m_sink->diagnose(Diagnostics::SpirvFp16VectorAtomicUnsupportedWidth{
-                .location = atomicInst->sourceLoc});
-            return false;
-        }
+            return;
 
         maybeDiagnoseCapabilityUse(atomicInst, CapabilityName::spvAtomicFloat16VectorNV);
         ensureExtensionDeclaration(toSlice("SPV_NV_shader_atomic_fp16_vector"));
         requireSPIRVCapability(SpvCapabilityAtomicFloat16VectorNV);
-        return true;
     }
 
-    bool ensureAtomicCapability(IRInst* atomicInst, SpvOp op)
+    void ensureAtomicCapability(IRInst* atomicInst, SpvOp op)
     {
         IRType* atomicValueType = atomicInst->getDataType();
         auto typeOp = atomicValueType->getOp();
@@ -4583,12 +4566,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case SpvOpAtomicStore:
         case SpvOpAtomicCompareExchange:
         case SpvOpAtomicCompareExchangeWeak:
-            if (!checkSupportedFp16VectorAtomicOperation(atomicInst, atomicValueType))
-                return false;
+            SLANG_ASSERT(!isFp16VectorAtomicType(atomicValueType));
             break;
         case SpvOpAtomicExchange:
-            if (!maybeRequireFp16VectorAtomicCapability(atomicInst, atomicValueType))
-                return false;
+            maybeRequireFp16VectorAtomicCapability(atomicInst, atomicValueType);
             break;
         case SpvOpAtomicFAddEXT:
             {
@@ -4607,8 +4588,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityAtomicFloat16AddEXT);
                     break;
                 case kIROp_VectorType:
-                    if (!maybeRequireFp16VectorAtomicCapability(atomicInst, atomicValueType))
-                        return false;
+                    maybeRequireFp16VectorAtomicCapability(atomicInst, atomicValueType);
                     break;
                 }
             }
@@ -4631,8 +4611,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityAtomicFloat16MinMaxEXT);
                     break;
                 case kIROp_VectorType:
-                    if (!maybeRequireFp16VectorAtomicCapability(atomicInst, atomicValueType))
-                        return false;
+                    maybeRequireFp16VectorAtomicCapability(atomicInst, atomicValueType);
                     break;
                 }
             }
@@ -4645,18 +4624,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             requireSPIRVCapability(SpvCapabilityInt64Atomics);
             break;
         }
-        return true;
-    }
-
-    static SpvInst* emitUndefResultForDiagnosedInst(
-        SPIRVEmitContext* context,
-        SpvInstParent* parent,
-        IRInst* inst)
-    {
-        auto dataType = inst->getDataType();
-        if (!dataType || dataType->getOp() == kIROp_VoidType)
-            return nullptr;
-        return context->emitOpUndef(parent, inst, dataType);
     }
 
     SpvInst* emitDebugVarDeclaration(SpvInstParent* parent, IRDebugVar* debugVar)
@@ -5579,11 +5546,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     const auto memoryScope =
                         emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
                     const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1), ptr);
-                    if (!ensureAtomicCapability(inst, SpvOpAtomicLoad))
-                    {
-                        result = emitUndefResultForDiagnosedInst(this, parent, inst);
-                        break;
-                    }
+                    ensureAtomicCapability(inst, SpvOpAtomicLoad);
                     result = emitOpAtomicLoad(
                         parent,
                         inst,
@@ -5612,11 +5575,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     const auto memoryScope =
                         emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
                     const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2), ptr);
-                    if (!ensureAtomicCapability(inst, SpvOpAtomicStore))
-                    {
-                        result = emitUndefResultForDiagnosedInst(this, parent, inst);
-                        break;
-                    }
+                    ensureAtomicCapability(inst, SpvOpAtomicStore);
                     result =
                         emitOpAtomicStore(parent, inst, ptr, memoryScope, memorySemantics, val);
                 }
@@ -5640,11 +5599,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     const auto memoryScope =
                         emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
                     const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2), ptr);
-                    if (!ensureAtomicCapability(inst, SpvOpAtomicExchange))
-                    {
-                        result = emitUndefResultForDiagnosedInst(this, parent, inst);
-                        break;
-                    }
+                    ensureAtomicCapability(inst, SpvOpAtomicExchange);
                     result = emitOpAtomicExchange(
                         parent,
                         inst,
@@ -5672,11 +5627,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     emitMemorySemanticMask(inst->getOperand(3), inst->getOperand(0));
                 const auto memorySemanticsUnequal =
                     emitMemorySemanticMask(inst->getOperand(4), inst->getOperand(0));
-                if (!ensureAtomicCapability(inst, SpvOpAtomicCompareExchange))
-                {
-                    result = emitUndefResultForDiagnosedInst(this, parent, inst);
-                    break;
-                }
+                ensureAtomicCapability(inst, SpvOpAtomicCompareExchange);
                 result = emitOpAtomicCompareExchange(
                     parent,
                     inst,
@@ -5707,11 +5658,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     emitMemorySemanticMask(inst->getOperand(2), inst->getOperand(0));
                 bool negateOperand = false;
                 auto spvOp = getSpvAtomicOp(inst, negateOperand);
-                if (!ensureAtomicCapability(inst, spvOp))
-                {
-                    result = emitUndefResultForDiagnosedInst(this, parent, inst);
-                    break;
-                }
+                ensureAtomicCapability(inst, spvOp);
                 auto operand = inst->getOperand(1);
                 if (negateOperand)
                 {
@@ -11794,6 +11741,8 @@ SlangResult emitSPIRVFromIR(
 
     SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
 #if 0
     {
