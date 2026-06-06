@@ -3078,9 +3078,7 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 }
 
 // Consolidate ray tracing parameters for an entry point function
-void consolidateRayTracingParameters(
-    GLSLLegalizationContext* context,
-    IRFunc* func)
+void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* func)
 {
     auto builder = context->getBuilder();
     auto firstBlock = func->getFirstBlock();
