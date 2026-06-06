@@ -39,11 +39,22 @@ static IRType* replaceImageElementType(IRInst* originalType, IRInst* newElementT
 
 static void resolveTextureFormatForParameter(IRInst* textureInst, IRTextureTypeBase* textureType)
 {
-    ImageFormat format = (ImageFormat)(textureType->getFormat());
+    // The `format` operand of `IRTextureType` is optional (see
+    // `IRResourceType::hasFormat()`); read it via the same guarded pattern used
+    // at the SPIR-V/WGSL emit readers so a texture type without operand 8 here
+    // does not assert (debug) or read out-of-bounds (release). The
+    // `!hasFormat()` branch is defensive: today this function is itself the
+    // pass that *attaches* the format operand to global texture insts, and is
+    // only invoked from the global-walk in `resolveTextureFormat` below.
+    // No present-day caller is known to land an unformatted `IRTextureTypeBase`
+    // here, so the branch hardens the site against a future caller that
+    // bypasses or precedes the global format-resolve pass.
+    ImageFormat format =
+        textureType->hasFormat() ? (ImageFormat)textureType->getFormat() : ImageFormat::unknown;
     auto decor = textureInst->findDecoration<IRFormatDecoration>();
     if (!decor)
         return;
-    if (decor->getFormat() == (ImageFormat)textureType->getFormat())
+    if (decor->getFormat() == format)
         return;
 
     format = decor->getFormat();

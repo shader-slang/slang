@@ -10905,27 +10905,36 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         IRBuilder builder(m_irModule);
                         auto textureInst =
                             as<IRTextureTypeBase>(operand->getValue()->getDataType());
-                        // Defensive: the asm-operand value should be texture-typed;
-                        // when an upstream IR pass leaves a stranded `IRParam` here
-                        // (observed for shader-slang/slang#11496 — orphan param with
-                        // null `getFullType()` reaches this arm), bail with a clean
-                        // internal-error diagnostic rather than null-dereferencing on
-                        // the cast result. The upstream producer is tracked
-                        // separately; this guard only converts the SIGSEGV into a
-                        // surfaceable error.
+                        // The `as<IRTextureTypeBase>` above can return null in two
+                        // distinct ways: `getDataType()` is itself null (observed
+                        // for shader-slang/slang#11496 — an orphan `IRParam` with
+                        // null `getFullType()` reaches this arm), or it returns a
+                        // non-null type that simply isn't a texture type. The
+                        // single `!textureInst` test deliberately covers both;
+                        // without it the next `textureInst->...` member access
+                        // SIGSEGVs. Surfaced as `error[E99997]` on
+                        // exception-enabled builds (`SLANG_UNEXPECTED` →
+                        // `InternalError` → `slang-end-to-end-request.cpp`); on
+                        // no-exceptions configurations it `exit(-1)`s — still
+                        // strictly better than a silent SIGSEGV.
                         if (!textureInst)
                         {
-                            SLANG_UNEXPECTED("SPIRVAsmOperandImageType / SampledImageType value "
-                                             "has no resolvable texture type "
-                                             "(see shader-slang/slang#11496)");
+                            SLANG_UNEXPECTED(
+                                "SPIRVAsmOperandImageType / SampledImageType operand value "
+                                "has no resolvable texture type");
                         }
                         // The `format` operand of `IRTextureType` is optional
-                        // (see `IRResourceType::hasFormat()`); fall back to
-                        // `Unknown` to mirror `getSpvImageFormat`'s safe pattern.
+                        // (`IRResourceType::hasFormat()` returns false when
+                        // `getOperandCount() < 9`); fall back to `Unknown` so
+                        // we never index past-end. Mirrors `getSpvImageFormat`'s
+                        // safe pattern. The `!hasFormat()` branch is defensive
+                        // for inputs the global-only `resolveTextureFormat` pass
+                        // does not visit; #11496's input does not reach here
+                        // because the null-guard above fires first.
                         auto formatInst = textureInst->hasFormat()
                                               ? textureInst->getFormatInst()
                                               : builder.getIntValue(
-                                                    builder.getIntType(),
+                                                    builder.getUIntType(),
                                                     (IRIntegerValue)ImageFormat::unknown);
                         auto imageType = builder.getTextureType(
                             textureInst->getElementType(),

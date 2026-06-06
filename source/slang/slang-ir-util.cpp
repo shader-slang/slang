@@ -3147,12 +3147,19 @@ IRType* getTextureTypeFromCombinedTextureSampler(IRType* type)
     builder.setInsertBefore(type);
     auto textureType = as<IRTextureTypeBase>(type);
     // The `format` operand of `IRTextureType` is optional
-    // (see `IRResourceType::hasFormat()`); fall back to `Unknown` so we don't
-    // null-deref on parameter-typed textures that bypass `resolveTextureFormat`.
+    // (`IRResourceType::hasFormat()` returns false when `getOperandCount() < 9`);
+    // fall back to `Unknown` so we never index past-end. `Unknown` matches the
+    // canonical encoding `resolveTextureFormatForParameter` uses for the
+    // synthesized format constant (see `slang-ir-resolve-texture-format.cpp`).
+    // The `!hasFormat()` branch is defensive: combined-texture-sampler lowering
+    // currently runs after `resolveTextureFormat` populates globals, so no
+    // present-day caller is known to reach it. The branch hardens this site
+    // against a future caller / pass that produces an unformatted texture
+    // (i.e. an `IRTextureType` whose optional format operand was never set).
     auto formatInst =
         textureType->hasFormat()
             ? textureType->getFormatInst()
-            : builder.getIntValue(builder.getIntType(), (IRIntegerValue)ImageFormat::unknown);
+            : builder.getIntValue(builder.getUIntType(), (IRIntegerValue)ImageFormat::unknown);
     return builder.getTextureType(
         textureType->getElementType(),
         textureType->getShapeInst(),
