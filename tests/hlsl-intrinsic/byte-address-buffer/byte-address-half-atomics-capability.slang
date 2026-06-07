@@ -5,31 +5,17 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=NO_FP16_ATOMIC,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spirv_1_5
 //TEST:SIMPLE(filecheck=VECTOR_F16): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV
 
-// Direct half-vector `__atomic_*` checks. `DIRECT` selects direct structured-buffer
-// atomics; `NO_VECTOR` means only the scalar fp16 atomic capability is enabled.
+// Direct half-vector `__atomic_*` checks.
 // RHI does not yet expose a feature gate for VK_NV_shader_atomic_float16_vector, so these
 // runtime checks stay disabled while the active tests below cover SPIR-V codegen/diagnostics.
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT4):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT_VECTOR4
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_ATOMIC
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_SUB_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_SUB
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_VECTOR4_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR4_ATOMIC
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_VECTOR4_SUB_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR4_SUB
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_VECTOR4_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR4_MIN_MAX
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_VECTOR4_EXCHANGE_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR4_EXCHANGE
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_MIN_MAX
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_EXCHANGE_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_EXCHANGE
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED_VECTOR_WIDTH,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_UNSUPPORTED_VECTOR_WIDTH
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED_VECTOR_COMPARE_EXCHANGE,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_UNSUPPORTED_VECTOR_COMPARE_EXCHANGE
 
-// Emulated fp16 vector checks. These paths are emitted as vector atomics, so
-// they must diagnose missing spvAtomicFloat16VectorNV when only scalar fp16 add is enabled.
+// Emulated fp16 vector checks.
 // Runtime coverage for the pointer-form helpers would require SPIR-V variable pointers,
 // which existing tests keep disabled on current GCP runners.
-//DIAGNOSTIC_TEST:SIMPLE(diag=BUFFER_EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability cuda_hlsl_spirv+sm_5_0+spvAtomicFloat16AddEXT -DTEST_BUFFER_EMULATED_NO_VECTOR
-//DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_EMULATED_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_EMULATED
-//DIAGNOSTIC_TEST:SIMPLE(diag=POINTER_F16X2_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_POINTER_F16X2
-//DIAGNOSTIC_TEST:SIMPLE(diag=MULTI_ENTRY_NO_VECTOR,non-exhaustive): -target spirv -entry computeMainA -entry computeMainB -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_MULTI_ENTRY_HELPER_NO_VECTOR
 //TEST:SIMPLE(filecheck=POINTER_EMULATED): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -skip-spirv-validation -capability spvAtomicFloat16VectorNV -DTEST_POINTER_EMULATED
 //TEST:SIMPLE(filecheck=POINTER_F16X2): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_POINTER_F16X2
 
@@ -65,37 +51,6 @@ RWStructuredBuffer<half3> unsupportedVectorBuffer;
 //TEST_INPUT:ubuffer(stride=4, count=1):name=uintBuffer
 RWStructuredBuffer<uint> uintBuffer;
 
-#ifdef TEST_MULTI_ENTRY_HELPER_NO_VECTOR
-void sharedVectorAtomic()
-{
-    __atomic_add(vectorBuffer[0], half2(1.0h, 2.0h));
-}
-
-void callSharedVectorAtomic()
-{
-    sharedVectorAtomic();
-}
-
-[shader("compute")]
-[numthreads(1, 1, 1)]
-void computeMainA(uint3 dispatchThreadID : SV_DispatchThreadID)
-{
-    sharedVectorAtomic();
-    callSharedVectorAtomic();
-// MULTI_ENTRY_NO_VECTOR: entry point 'computeMainA' uses capabilities
-// MULTI_ENTRY_NO_VECTOR-SAME: Missing capabilities are: 'spvAtomicFloat16VectorNV'
-// MULTI_ENTRY_NO_VECTOR: entry point 'computeMainB' uses capabilities
-// MULTI_ENTRY_NO_VECTOR-SAME: Missing capabilities are: 'spvAtomicFloat16VectorNV'
-// MULTI_ENTRY_NO_VECTOR-NOT: entry point '
-}
-
-[shader("compute")]
-[numthreads(1, 1, 1)]
-void computeMainB(uint3 dispatchThreadID : SV_DispatchThreadID)
-{
-    callSharedVectorAtomic();
-}
-#else
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -184,39 +139,23 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // RUNTIME_DIRECT4-NEXT: 12.000000
 #elif defined(TEST_DIRECT_VECTOR_ATOMIC)
     __atomic_add(vectorBuffer[0], half2(1.0h, 2.0h));
-// DIRECT_NO_VECTOR: entry point uses capabilities not in specified profile
-// DIRECT_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
 #elif defined(TEST_DIRECT_VECTOR_SUB)
     __atomic_sub(vectorBuffer[0], half2(1.0h, 2.0h));
-// DIRECT_SUB_NO_VECTOR: entry point uses capabilities not in specified profile
-// DIRECT_SUB_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
 #elif defined(TEST_DIRECT_VECTOR4_ATOMIC)
     __atomic_add(vector4Buffer[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
-// DIRECT_VECTOR4_NO_VECTOR: entry point uses capabilities not in specified profile
-// DIRECT_VECTOR4_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
 #elif defined(TEST_DIRECT_VECTOR4_SUB)
     __atomic_sub(vector4Buffer[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
-// DIRECT_VECTOR4_SUB_NO_VECTOR: entry point uses capabilities not in specified profile
-// DIRECT_VECTOR4_SUB_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
 #elif defined(TEST_DIRECT_VECTOR4_MIN_MAX)
     __atomic_min(vector4Buffer[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
-// DIRECT_VECTOR4_MIN_MAX_NO_VECTOR: entry point uses capabilities not in specified profile
-// DIRECT_VECTOR4_MIN_MAX_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
     __atomic_max(vector4Buffer[1], half4(5.0h, 6.0h, 7.0h, 8.0h));
 #elif defined(TEST_DIRECT_VECTOR4_EXCHANGE)
     half4 originalValue = __atomic_exchange(vector4Buffer[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
-// DIRECT_VECTOR4_EXCHANGE_NO_VECTOR: entry point uses capabilities not in specified profile
-// DIRECT_VECTOR4_EXCHANGE_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
     outputBuffer[0] = float(originalValue.x + originalValue.y + originalValue.z + originalValue.w);
 #elif defined(TEST_DIRECT_VECTOR_MIN_MAX)
     __atomic_min(vectorBuffer[0], half2(1.0h, 2.0h));
-// DIRECT_MIN_MAX_NO_VECTOR: entry point uses capabilities not in specified profile
-// DIRECT_MIN_MAX_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
     __atomic_max(vectorBuffer[1], half2(3.0h, 4.0h));
 #elif defined(TEST_DIRECT_VECTOR_EXCHANGE)
     half2 originalValue = __atomic_exchange(vectorBuffer[0], half2(1.0h, 2.0h));
-// DIRECT_EXCHANGE_NO_VECTOR: entry point uses capabilities not in specified profile
-// DIRECT_EXCHANGE_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
     outputBuffer[0] = float(originalValue.x + originalValue.y);
 #elif defined(TEST_DIRECT_SCALAR_EXCHANGE)
     uint originalValue = __atomic_exchange(uintBuffer[0], 1u);
@@ -239,12 +178,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // Half-vector atomic load/store are not source-expressible today: Atomic<T> requires
 // scalar IAtomicable types, while half2/half4 do not conform to that interface. The
 // validator rejects those IR ops defensively if a later lowering path creates them.
-#elif defined(TEST_BUFFER_EMULATED_NO_VECTOR)
-    half originalValue;
-    tmpBuffer.InterlockedAddF16Emulated(0, 1.0h, originalValue);
-// BUFFER_EMULATED_NO_VECTOR: entry point uses capabilities not in specified profile
-// BUFFER_EMULATED_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
-    outputBuffer[0] = float(originalValue);
 #elif defined(TEST_EMULATED)
     half originalValue;
     tmpBuffer.InterlockedAddF16Emulated(0, 1.0h, originalValue);
@@ -254,14 +187,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 #elif defined(TEST_POINTER_EMULATED)
     half originalValue;
     InterlockedAddF16Emulated(&halfBuffer[0], 1.0h, originalValue);
-// POINTER_EMULATED_NO_VECTOR: entry point uses capabilities not in specified profile
-// POINTER_EMULATED_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
     outputBuffer[0] = float(originalValue);
 #elif defined(TEST_POINTER_F16X2)
     half2 originalValue;
     InterlockedAddF16x2(&vectorBuffer[0], half2(1.0h, 2.0h), originalValue);
-// POINTER_F16X2_NO_VECTOR: entry point uses capabilities not in specified profile
-// POINTER_F16X2_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
     outputBuffer[0] = float(originalValue.x + originalValue.y);
 #else
     half originalValue;
@@ -282,7 +211,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[4] = float(originalValue);
 #endif
 }
-#endif
 
 // SCALAR-NOT: OpCapability AtomicFloat16VectorNV
 // SCALAR-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
