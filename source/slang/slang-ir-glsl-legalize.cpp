@@ -4811,13 +4811,12 @@ void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
     }
 }
 
-IRFunc* legalizeEntryPointForGLSL(
+void legalizeEntryPointForGLSL(
     Session* session,
     IRModule* module,
     IRFunc* func,
     CodeGenContext* codeGenContext,
-    ShaderExtensionTracker* glslExtensionTracker,
-    IRFunc* primitiveIndexFunc)
+    ShaderExtensionTracker* glslExtensionTracker)
 {
     auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
     SLANG_ASSERT(entryPointDecor);
@@ -4916,6 +4915,7 @@ IRFunc* legalizeEntryPointForGLSL(
 
     if (isRayTracingHitStage(stage) && !shouldEmitSPIRVDirectly)
     {
+        IRFunc* primitiveIndexFunc = nullptr;
         if (auto firstBlock = func->getFirstBlock())
         {
             for (auto pp = firstBlock->getFirstParam(); pp;)
@@ -5040,7 +5040,6 @@ IRFunc* legalizeEntryPointForGLSL(
     // for example, SV_InstanceID should map to gl_InstanceIndex - gl_BaseInstance,
     // we will replace these builtins with additional compute logic here.
     legalizeTargetBuiltinVar(context);
-    return primitiveIndexFunc;
 }
 
 void decorateModuleWithSPIRVVersion(IRModule* module, SemanticVersion spirvVersion)
@@ -5090,16 +5089,9 @@ void legalizeEntryPointsForGLSL(
     CodeGenContext* context,
     ShaderExtensionTracker* glslExtensionTracker)
 {
-    IRFunc* primitiveIndexFunc = nullptr;
     for (auto func : funcs)
     {
-        primitiveIndexFunc = legalizeEntryPointForGLSL(
-            session,
-            module,
-            func,
-            context,
-            glslExtensionTracker,
-            primitiveIndexFunc);
+        legalizeEntryPointForGLSL(session, module, func, context, glslExtensionTracker);
     }
 
     assignRayPayloadHitObjectAttributeLocations(module);
