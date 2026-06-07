@@ -19,6 +19,11 @@ struct MyType
 [nodiscard]
 int freeFunc() { return 1; }
 
+void consume(int x) {}
+
+// Returning the result is using it, not discarding it, so no warning.
+int useResult() { return freeFunc(); }
+
 [numthreads(1, 1, 1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -68,6 +73,13 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // A function not marked `[nodiscard]` does not warn even when discarded.
     t.regular();
+
+    // Using the result in a sub-expression is not discarding it, so none of these warn:
+    // as a call argument, ...
+    consume(t.compute());
+    // ... and as an operand of a larger, non-`[nodiscard]` expression whose own result is
+    // then discarded (the `[nodiscard]` call's result is consumed by `+`, not discarded).
+    t.compute() + c;
 
     // Silence unused-variable concerns.
     t.val = loaded.val + c;
