@@ -94,16 +94,21 @@ namespace Slang
 // access-chain index that is the source of non-uniformity.
 // Terminates because the IR operand graph is acyclic (SSA dominance order).
 //
-// Two op kinds get deliberately asymmetric treatment:
+// Op kinds get deliberately different treatment:
 //  - Access-chain ops (GetElementPtr/GetElement, and the address inside a
 //    Load): decorate only the *index* operand -- the index is the source of
 //    non-uniformity, and the access chain / load itself is decorated later by
 //    the forward scan in propagateNonUniformDecorations.
-//  - Resource-creating ops (MakeCombinedTextureSampler,
-//    CombinedTextureSamplerGetTexture/GetSampler, ImageTexelPointer,
-//    GetLegalizedSPIRVGlobalParamAddr): decorate the produced resource value
-//    itself and recurse into its operand to reach the underlying index, since
-//    the forward scan does not handle these ops.
+//  - Single-operand resource-creating ops (CombinedTextureSamplerGetTexture/
+//    GetSampler, ImageTexelPointer, GetLegalizedSPIRVGlobalParamAddr): decorate
+//    the produced resource value itself and recurse into its sole resource
+//    operand to reach the underlying index, since the forward scan does not
+//    handle these ops.
+//  - MakeCombinedTextureSampler: decorate only the produced (combined) value,
+//    and do NOT recurse into the texture/sampler operands -- one of them may be
+//    uniform. The non-uniform operand is decorated separately at the point it
+//    is unwrapped in processNonUniformResourceIndex, which is the only place
+//    that knows which of the two operands the non-uniformity flowed through.
 static void decorateNonUniformChain(IRInst* operand, const std::function<void(IRInst*)>& decorate)
 {
     if (auto gep = as<IRGetElementPtr>(operand))
@@ -127,11 +132,17 @@ static void decorateNonUniformChain(IRInst* operand, const std::function<void(IR
             decorate(addr);
         }
     }
-    else if (auto makeCombined = as<IRMakeCombinedTextureSampler>(operand))
+    else if (as<IRMakeCombinedTextureSampler>(operand))
     {
+        // Decorate only the combined (OpSampledImage) result. We intentionally
+        // do NOT recurse into the texture/sampler operands here: a combined
+        // sampler can be built from one non-uniform and one uniform resource
+        // (e.g. tex[NonUniformResourceIndex(i)].Sample(uniformSampler, ...)),
+        // and recursing into both would decorate the uniform sibling. Instead,
+        // the operand that the non-uniformity actually flowed through is
+        // decorated at the point it is unwrapped in processNonUniformResourceIndex
+        // (which is the only place that knows which operand it was).
         decorate(operand);
-        decorateNonUniformChain(makeCombined->getOperand(0), decorate);
-        decorateNonUniformChain(makeCombined->getOperand(1), decorate);
     }
     else if (
         as<IRCombinedTextureSamplerGetTexture>(operand) ||
@@ -146,6 +157,19 @@ static void decorateNonUniformChain(IRInst* operand, const std::function<void(IR
     {
         decorate(operand);
     }
+}
+
+// Walk back from `operand` and attach IRSPIRVNonUniformResourceDecoration along
+// the chain. Idempotent: a value that is already decorated is left untouched.
+static void decorateNonUniformResourceChain(IRInst* operand)
+{
+    IRBuilder builder(operand);
+    auto decorate = [&](IRInst* value)
+    {
+        if (!value->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+            builder.addSPIRVNonUniformResourceDecoration(value);
+    };
+    decorateNonUniformChain(operand, decorate);
 }
 
 void processNonUniformResourceIndex(
@@ -296,15 +320,28 @@ void processNonUniformResourceIndex(
                     {
                         auto tex = user->getOperand(0);
                         auto samp = user->getOperand(1);
+                        // Track the operand the non-uniformity flowed through so
+                        // we can decorate only that side below; the other
+                        // operand (texture or sampler) may be uniform.
+                        IRInst* nonUniformOperand = nullptr;
                         if (tex == inst)
-                            tex = inst->getOperand(0);
+                            nonUniformOperand = tex = inst->getOperand(0);
                         else if (samp == inst)
-                            samp = inst->getOperand(0);
+                            nonUniformOperand = samp = inst->getOperand(0);
                         else
                             SLANG_UNREACHABLE("NonUniformResourceIndex must be an operand of "
                                               "MakeCombinedTextureSampler");
                         newUser =
                             builder.emitMakeCombinedTextureSampler(user->getFullType(), tex, samp);
+
+                        // Decorate the non-uniform operand's chain now, while we
+                        // still know which operand it was. decorateNonUniformChain
+                        // deliberately does not recurse into combined-sampler
+                        // operands (that would over-decorate a uniform sibling),
+                        // so this is the only place the operand chain gets
+                        // decorated. Decoration is SPIR-V only.
+                        if (floatMode == NonUniformResourceIndexFloatMode::SPIRV)
+                            decorateNonUniformResourceChain(nonUniformOperand);
                     }
                     break;
                 case kIROp_CombinedTextureSamplerGetTexture:
@@ -390,13 +427,7 @@ void processNonUniformResourceIndex(
         if (isResourceType(type) || isPointerToResourceType(type) ||
             operand->getOp() == kIROp_ImageTexelPointer)
         {
-            IRBuilder builder(operand);
-            auto decorate = [&](IRInst* value)
-            {
-                if (!value->findDecoration<IRSPIRVNonUniformResourceDecoration>())
-                    builder.addSPIRVNonUniformResourceDecoration(value);
-            };
-            decorateNonUniformChain(operand, decorate);
+            decorateNonUniformResourceChain(operand);
         }
         inst->replaceUsesWith(operand);
         inst->removeAndDeallocate();
