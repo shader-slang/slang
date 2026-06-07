@@ -231,7 +231,7 @@ jobs:
       full-gpu-tests: true
       server-count: 3
 
-  # Linux ARM64 tests (GitHub-hosted; software Vulkan via Mesa lavapipe)
+  # Linux ARM64 tests (GitHub-hosted, no physical GPU; Vulkan tests are auto-skipped)
   test-linux-debug-gcc-aarch64:
     needs: [filter, build-linux-debug-gcc-aarch64]
     if: needs.filter.outputs.should-run == 'true'

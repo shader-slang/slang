@@ -71,16 +71,6 @@ jobs:
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
 
-      - name: Install software Vulkan (Linux)
-        if: inputs.os == 'linux' && inputs.cpu-only != true
-        shell: bash
-        run: |
-          sudo apt-get update -y && sudo apt-get install -y mesa-vulkan-drivers
-          # Force lavapipe's LLVM JIT to use generic scalar code rather than
-          # NEON-vectorized code. On aarch64 GitHub-hosted runners the JIT
-          # otherwise emits NEON instructions that SIGILL at dispatch time.
-          echo "GALLIUM_OVERRIDE_CPU_CAPS=noneon" >> "$GITHUB_ENV"
-
       - name: Test Slang
         run: |
           # Fail fast on mutually exclusive inputs — both would accumulate
