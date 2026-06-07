@@ -628,9 +628,13 @@ void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink
     validateAtomicOperationsImpl(skipFuncParamValidation, sink, inst, false);
 }
 
-void validateSPIRVAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst)
+void validateAtomicOperations(
+    bool skipFuncParamValidation,
+    DiagnosticSink* sink,
+    IRInst* inst,
+    bool validateSPIRVAtomics)
 {
-    validateAtomicOperationsImpl(skipFuncParamValidation, sink, inst, true);
+    validateAtomicOperationsImpl(skipFuncParamValidation, sink, inst, validateSPIRVAtomics);
 }
 
 static void validateVectorOrMatrixElementType(
