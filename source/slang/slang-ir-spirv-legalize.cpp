@@ -2299,15 +2299,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             // resource operand consumed by the access (the final
                             // OpAccessChain result) must be NonUniform. So when a
                             // base, index, or inst on this chain is decorated, we
-                            // decorate the whole derived chain -- both the index
-                            // and this inst -- to guarantee the consumed result
-                            // carries NonUniform. Decorating the index when only
-                            // the base is non-uniform is spec-compliance for the
-                            // derived access chain, not a claim that the index is
-                            // itself non-uniform (it may be a fixed field offset).
-                            // The base check propagates into inner access chains
-                            // (e.g. structured-buffer element pointers) derived
-                            // from a decorated outer access chain.
+                            // decorate this inst to guarantee the consumed result
+                            // carries NonUniform, and decorate the index so a
+                            // non-uniform index operand is marked too. The base
+                            // check propagates into inner access chains (e.g.
+                            // structured-buffer element pointers) derived from a
+                            // decorated outer access chain.
+                            //
+                            // A constant index (e.g. a fixed [0] offset) is
+                            // dynamically uniform and is skipped automatically by
+                            // addSPIRVNonUniformResourceDecoration -- so only the
+                            // result is decorated for the constant-index case.
                             auto baseOperand = inst->getOperand(0);
                             auto indexOperand = inst->getOperand(1);
                             auto baseDecorated =
