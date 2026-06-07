@@ -462,6 +462,11 @@ static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
         return true;
     if (as<IRImageSubscript>(dst))
         return true;
+    // Descriptor-heap lowering (spvDescriptorHeapEXT) rewrites an image-subscript
+    // atomic destination into this heap texel pointer, which is still a valid
+    // image atomic destination — just like the IRImageSubscript case above.
+    if (as<IRSPIRVLoadTexelPointerFromHeap>(dst))
+        return true;
 
     if (auto ptrType = as<IRPtrType>(dst->getDataType()))
     {
