@@ -1,9 +1,9 @@
 // unit-test-vtable-stability.cpp
 //
-// Verifies that the vtable slot layout of every COM interface declared in
-// include/slang.h has not changed.  Each test creates a concrete probe object
-// that records which override was called, then dispatches through a specific
-// raw vtable slot and asserts the expected method fired.
+// Verifies that the vtable slot layout of public COM interfaces has not changed.
+// Each test creates a concrete probe object that records which override was called,
+// then dispatches through a specific raw vtable slot and asserts the expected method
+// fired.
 //
 // If a virtual method is inserted in the middle of an interface the slot
 // indices of all subsequent methods shift by one, causing a different probe
@@ -21,6 +21,7 @@
 // entire test is guarded by SLANG_PTR_IS_64.
 
 #include "slang.h"
+#include "slang-gfx.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace slang;
@@ -68,6 +69,81 @@ SLANG_UNIT_TEST(vtableISlangUnknown)
     SLANG_CHECK(p.lastSlot == 1); // addRef
     callSlot(&p, 2);
     SLANG_CHECK(p.lastSlot == 2); // release
+}
+
+// ---------------------------------------------------------------------------
+// gfx::IShaderProgramD3D12 : ISlangUnknown  (own slot 3)
+// ---------------------------------------------------------------------------
+struct IShaderProgramD3D12Probe : gfx::IShaderProgramD3D12
+{
+    int lastSlot = -1;
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const&, void**) SLANG_OVERRIDE
+    {
+        lastSlot = 0;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        lastSlot = 1;
+        return 1;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        lastSlot = 2;
+        return 1;
+    }
+    SLANG_NO_THROW gfx::Result SLANG_MCALL getRootSignature(void**) SLANG_OVERRIDE
+    {
+        lastSlot = 3;
+        return SLANG_OK;
+    }
+};
+
+SLANG_UNIT_TEST(vtableIShaderProgramD3D12)
+{
+    IShaderProgramD3D12Probe p;
+    callSlot(&p, 0);
+    SLANG_CHECK(p.lastSlot == 0); // queryInterface
+    callSlot(&p, 3);
+    SLANG_CHECK(p.lastSlot == 3); // getRootSignature
+}
+
+// ---------------------------------------------------------------------------
+// gfx::IComputeCommandEncoderD3D12 : ISlangUnknown  (own slot 3)
+// ---------------------------------------------------------------------------
+struct IComputeCommandEncoderD3D12Probe : gfx::IComputeCommandEncoderD3D12
+{
+    int lastSlot = -1;
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const&, void**) SLANG_OVERRIDE
+    {
+        lastSlot = 0;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        lastSlot = 1;
+        return 1;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        lastSlot = 2;
+        return 1;
+    }
+    SLANG_NO_THROW gfx::Result SLANG_MCALL
+    bindRootObjectAsCompute(gfx::IShaderProgram*, gfx::IShaderObject*) SLANG_OVERRIDE
+    {
+        lastSlot = 3;
+        return SLANG_OK;
+    }
+};
+
+SLANG_UNIT_TEST(vtableIComputeCommandEncoderD3D12)
+{
+    IComputeCommandEncoderD3D12Probe p;
+    callSlot(&p, 0);
+    SLANG_CHECK(p.lastSlot == 0); // queryInterface
+    callSlot(&p, 3);
+    SLANG_CHECK(p.lastSlot == 3); // bindRootObjectAsCompute
 }
 
 // ---------------------------------------------------------------------------

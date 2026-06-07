@@ -441,24 +441,6 @@ struct SpecializationContext
 
         if (auto existingVal = entry->getValue())
         {
-            // For work-graph record types (e.g. DispatchNodeInputRecord<T>), the
-            // element type T may not have been recorded yet if the specialization was
-            // completed during module loading (before this compilation unit ran). Add
-            // the decoration here so the HLSL emitter can reconstruct the native
-            // template name.
-            if (auto structType = as<IRStructType>(existingVal))
-            {
-                if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>() &&
-                    !structType->findDecoration<IRWorkGraphRecordElementTypeDecoration>() &&
-                    specializeInst->getArgCount() == 1)
-                {
-                    if (auto elemType = as<IRType>(specializeInst->getArg(0)))
-                        builder.addDecoration(
-                            structType,
-                            kIROp_WorkGraphRecordElementTypeDecoration,
-                            elemType);
-                }
-            }
             return existingVal;
         }
 
@@ -3986,25 +3968,6 @@ IRInst* specializeGenericImpl(
                 cloneInstDecorationsAndChildren(&env, module, specializeInst, specializedVal);
                 if (context)
                     context->removeSpecializationDepthDecorations(specializedVal);
-
-                // If the specialized type is a work-graph record type and was given exactly
-                // one type argument (the element type T), record T so the HLSL emitter can
-                // reconstruct the native template name (e.g. DispatchNodeInputRecord<RecordData>).
-                if (auto structType = as<IRStructType>(specializedVal))
-                {
-                    if (structType->findDecoration<IRWorkGraphRecordTypeDecoration>() &&
-                        !structType->findDecoration<IRWorkGraphRecordElementTypeDecoration>() &&
-                        specializeInst->getArgCount() == 1)
-                    {
-                        if (auto elemType = as<IRType>(specializeInst->getArg(0)))
-                        {
-                            builder->addDecoration(
-                                structType,
-                                kIROp_WorkGraphRecordElementTypeDecoration,
-                                elemType);
-                        }
-                    }
-                }
 
                 // Perform IR simplifications to fold constants in this specialized value if it
                 // is a function, so further specializations from the specialized function will
