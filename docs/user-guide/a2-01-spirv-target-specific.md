@@ -171,7 +171,7 @@ GLSL 4.6 with [GLSL_EXT_shader_atomic_float2](https://github.com/KhronosGroup/GL
 
 SPIR-V 1.5 with [SPV_EXT_shader_atomic_float_add](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/EXT/SPV_EXT_shader_atomic_float_add.asciidoc) and [SPV_EXT_shader_atomic_float_min_max](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/EXT/SPV_EXT_shader_atomic_float_min_max.asciidoc) can use atomic operations for 32-bit float type and 64-bit float type.
 SPIR-V 1.5 with [SPV_EXT_shader_atomic_float16_add](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/EXT/SPV_EXT_shader_atomic_float16_add.asciidoc) can use atomic operations for 16-bit float type.
-SPIR-V 1.5 with [SPV_NV_shader_atomic_fp16_vector](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/NV/SPV_NV_shader_atomic_fp16_vector.asciidoc) can use vector atomic add/sub/min/max/exchange operations for 16-bit float vector types with 2 or 4 components.
+SPIR-V 1.5 with [SPV_NV_shader_atomic_fp16_vector](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/NV/SPV_NV_shader_atomic_fp16_vector.asciidoc) can use vector atomic add/min/max/exchange operations for 16-bit float vector types with 2 or 4 components. Vector atomic sub is emitted as a negated vector atomic add.
 
 |        | 32-bit integer | 64-bit integer  | 32-bit float          | 64-bit float     | 16-bit float     | 16-bit float vector     |
 | ------ | -------------- | --------------- | --------------------- | ---------------- | ---------------- | ----------------------- |

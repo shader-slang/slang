@@ -14,6 +14,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_ATOMIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_SUB_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_SUB
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_VECTOR4_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR4_ATOMIC
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_VECTOR4_SUB_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR4_SUB
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_VECTOR4_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR4_MIN_MAX
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_VECTOR4_EXCHANGE_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR4_EXCHANGE
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_MIN_MAX_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_MIN_MAX
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT_EXCHANGE_NO_VECTOR,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spvAtomicFloat16AddEXT -DTEST_DIRECT_VECTOR_EXCHANGE
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED_VECTOR_WIDTH,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_UNSUPPORTED_VECTOR_WIDTH
@@ -36,6 +39,9 @@
 //TEST:SIMPLE(filecheck=VECTOR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_ATOMIC
 //TEST:SIMPLE(filecheck=VECTOR_SUB): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_SUB
 //TEST:SIMPLE(filecheck=VECTOR4): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR4_ATOMIC
+//TEST:SIMPLE(filecheck=VECTOR4_SUB): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR4_SUB
+//TEST:SIMPLE(filecheck=VECTOR4_MIN_MAX): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR4_MIN_MAX
+//TEST:SIMPLE(filecheck=VECTOR4_EXCHANGE): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR4_EXCHANGE
 //TEST:SIMPLE(filecheck=VECTOR_MIN_MAX): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_MIN_MAX
 //TEST:SIMPLE(filecheck=VECTOR_EXCHANGE): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_EXCHANGE
 //TEST:SIMPLE(filecheck=SCALAR_EXCHANGE): -target spirv -entry computeMain -stage compute -emit-spirv-directly -DTEST_DIRECT_SCALAR_EXCHANGE
@@ -188,6 +194,20 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     __atomic_add(vector4Buffer[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
 // DIRECT_VECTOR4_NO_VECTOR: entry point uses capabilities not in specified profile
 // DIRECT_VECTOR4_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
+#elif defined(TEST_DIRECT_VECTOR4_SUB)
+    __atomic_sub(vector4Buffer[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
+// DIRECT_VECTOR4_SUB_NO_VECTOR: entry point uses capabilities not in specified profile
+// DIRECT_VECTOR4_SUB_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
+#elif defined(TEST_DIRECT_VECTOR4_MIN_MAX)
+    __atomic_min(vector4Buffer[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
+// DIRECT_VECTOR4_MIN_MAX_NO_VECTOR: entry point uses capabilities not in specified profile
+// DIRECT_VECTOR4_MIN_MAX_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
+    __atomic_max(vector4Buffer[1], half4(5.0h, 6.0h, 7.0h, 8.0h));
+#elif defined(TEST_DIRECT_VECTOR4_EXCHANGE)
+    half4 originalValue = __atomic_exchange(vector4Buffer[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
+// DIRECT_VECTOR4_EXCHANGE_NO_VECTOR: entry point uses capabilities not in specified profile
+// DIRECT_VECTOR4_EXCHANGE_NO_VECTOR: Missing capabilities are: 'spvAtomicFloat16VectorNV'
+    outputBuffer[0] = float(originalValue.x + originalValue.y + originalValue.z + originalValue.w);
 #elif defined(TEST_DIRECT_VECTOR_MIN_MAX)
     __atomic_min(vectorBuffer[0], half2(1.0h, 2.0h));
 // DIRECT_MIN_MAX_NO_VECTOR: entry point uses capabilities not in specified profile
@@ -274,6 +294,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // SCALAR-NOT: OpCapability AtomicFloat16VectorNV
 // SCALAR-NOT: OpExtension "SPV_NV_shader_atomic_fp16_vector"
 
+// IGNORE_CAPS-NOT: entry point uses capabilities not in specified profile
+// IGNORE_CAPS: OpCapability AtomicFloat16AddEXT
+// IGNORE_CAPS: OpExtension "SPV_EXT_shader_atomic_float16_add"
+// IGNORE_CAPS-COUNT-5: OpAtomicFAddEXT %half
+// IGNORE_CAPS-NOT: OpAtomicFAddEXT %v2half
+
 // VECTOR_F16-NOT: OpCapability AtomicFloat16AddEXT
 // VECTOR_F16-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
 // VECTOR_F16: OpCapability AtomicFloat16VectorNV
@@ -318,6 +344,27 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // VECTOR4: OpAtomicFAddEXT %v4half
 // VECTOR4-NOT: OpCapability AtomicFloat16AddEXT
 // VECTOR4-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
+
+// VECTOR4_SUB-NOT: OpCapability AtomicFloat16AddEXT
+// VECTOR4_SUB-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
+// VECTOR4_SUB: OpCapability AtomicFloat16VectorNV
+// VECTOR4_SUB: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// VECTOR4_SUB-DAG: [[VALUE:%[0-9]+]] = OpConstantComposite %v4half {{%[A-Za-z0-9_]+}} {{%[A-Za-z0-9_]+}} {{%[A-Za-z0-9_]+}} {{%[A-Za-z0-9_]+}}
+// VECTOR4_SUB: [[NEG_VALUE:%[0-9]+]] = OpFNegate %v4half [[VALUE]]
+// VECTOR4_SUB: OpAtomicFAddEXT %v4half {{%[0-9]+}} %uint_1 %uint_0 [[NEG_VALUE]]
+
+// VECTOR4_MIN_MAX-NOT: OpCapability AtomicFloat16AddEXT
+// VECTOR4_MIN_MAX-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
+// VECTOR4_MIN_MAX: OpCapability AtomicFloat16VectorNV
+// VECTOR4_MIN_MAX: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// VECTOR4_MIN_MAX: OpAtomicFMinEXT %v4half
+// VECTOR4_MIN_MAX: OpAtomicFMaxEXT %v4half
+
+// VECTOR4_EXCHANGE-NOT: OpCapability AtomicFloat16AddEXT
+// VECTOR4_EXCHANGE-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
+// VECTOR4_EXCHANGE: OpCapability AtomicFloat16VectorNV
+// VECTOR4_EXCHANGE: OpExtension "SPV_NV_shader_atomic_fp16_vector"
+// VECTOR4_EXCHANGE: OpAtomicExchange %v4half
 
 // VECTOR_MIN_MAX-NOT: OpCapability AtomicFloat16AddEXT
 // VECTOR_MIN_MAX-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"

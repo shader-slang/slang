@@ -4456,20 +4456,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     void ensureAtomicCapability(IRInst* atomicInst, SpvOp op)
     {
-        IRType* atomicValueType = atomicInst->getDataType();
+        IRType* atomicValueType = getAtomicOperationValueType(atomicInst);
+        if (!atomicValueType)
+            return;
+
         auto typeOp = atomicValueType->getOp();
-        if (typeOp == kIROp_VoidType)
-        {
-            auto ptrType = atomicInst->getOperand(0)->getDataType();
-            IRBuilder builder(atomicInst);
-            if (auto valType = tryGetPointedToType(&builder, ptrType))
-            {
-                if (auto atomicType = as<IRAtomicType>(valType))
-                    valType = atomicType->getElementType();
-                atomicValueType = valType;
-                typeOp = valType->getOp();
-            }
-        }
 
         switch (op)
         {
