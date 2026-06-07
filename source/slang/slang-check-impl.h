@@ -3700,12 +3700,14 @@ private:
     Expr* convertToLogicOperatorExpr(InvokeExpr* expr);
 
     // If `expr` is an arithmetic (`+ - * / %`), comparison (`== != < > <= >=`), bitwise/
-    // shift (`& | ^ << >>`), or unary (`- ! ~`) operator on operands of the *same* builtin
-    // integer/floating-point/bool scalar, vector, or matrix type, with at least one runtime
-    // operand and outside a constant-evaluation context, mark it for direct builtin IR
-    // lowering and return it (typed), skipping generic operator overload resolution.
-    // Returns null to fall back to normal resolution (mixed/promoted types, constant-only
-    // operands inside constant contexts, GLSL operator scope, user-defined types).
+    // shift (`& | ^ << >>`), or unary (`- ! ~`) operator on builtin integer/floating-point/
+    // bool scalar, vector, or matrix operands, mark it for direct builtin IR lowering and
+    // return it (typed), skipping generic operator overload resolution. Operands of the same
+    // builtin type are handled as-is; operands of different builtin types are promoted via
+    // `getBuiltinArithmeticCommonType` (the usual arithmetic conversions). Returns null to
+    // fall back to normal resolution: GLSL operator scope (where some operators differ), the
+    // short-circuiting `&&`/`||`, mixed shapes that are not broadcast-compatible, and
+    // user-defined operand types.
     Expr* convertToBuiltinArithmeticOp(InvokeExpr* expr);
 
     // For a builtin binary operator `a OP b` whose operands have *different* builtin

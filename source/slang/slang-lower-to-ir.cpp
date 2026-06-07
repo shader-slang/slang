@@ -5265,12 +5265,20 @@ struct ExprLoweringContext
     /// Lower an invoke expr, and attempt to fuse a store of the expr's result into destination.
     /// If the store is fused, returns LoweredValInfo::None. Otherwise, returns the IR val
     /// representing the RValue.
-    // Emit a builtin floating-point scalar/vector arithmetic operator directly as the
-    // corresponding IR arithmetic instruction, bypassing callable resolution/lowering.
-    // The operands and result type are already checked; differentiability is handled by
-    // autodiff's rules for the emitted IR ops.
+    // Emit a builtin operator recognized by the fast path (see `convertToBuiltinArithmeticOp`)
+    // directly as the corresponding IR instruction, bypassing callable resolution/lowering.
+    // Covers arithmetic (`+ - * / %`), comparison (`< > <= >=`), equality (`== !=`), bitwise
+    // and shift (`& | ^ << >>`), and the unary `- ! ~`, on builtin integer / floating-point /
+    // bool scalar, vector, or matrix operands (possibly of mixed type/shape). The operands and
+    // result type are already checked; differentiability is handled by autodiff's rules for
+    // the emitted IR ops.
     LoweredValInfo lowerBuiltinArithmeticOp(OperatorExpr* expr)
     {
+        // The fast path always leaves the callee as the unresolved operator-name `VarExpr`
+        // (see `convertToBuiltinArithmeticOp`); the op text below relies on that invariant.
+        auto opVarExpr = as<VarExpr>(expr->functionExpr);
+        SLANG_ASSERT(opVarExpr && opVarExpr->name);
+
         auto irType = lowerType(context, expr->type);
         const Index argCount = expr->arguments.getCount();
         SLANG_ASSERT(argCount == 1 || argCount == 2);
@@ -5292,7 +5300,7 @@ struct ExprLoweringContext
                                    BaseTypeInfo::Flag::FloatingPoint) != 0;
         }
 
-        auto opText = getText(as<VarExpr>(expr->functionExpr)->name);
+        auto opText = getText(opVarExpr->name);
         if (argCount == 1)
         {
             // Unary prefix operators.
@@ -5361,9 +5369,10 @@ struct ExprLoweringContext
         context->invokeLoweringRecursionDepth++;
         SLANG_DEFER(context->invokeLoweringRecursionDepth--);
 
-        // Builtin same-type arithmetic/comparison on scalar/vector/matrix operands,
-        // recognized during checking (see `convertToBuiltinArithmeticOp`): emit the IR
-        // op directly, skipping the resolved-callable lowering path.
+        // A builtin arithmetic/comparison/bitwise/shift/unary operator on scalar/vector/
+        // matrix operands (same or mixed type), recognized during checking (see
+        // `convertToBuiltinArithmeticOp`): emit the IR op directly, skipping the
+        // resolved-callable lowering path.
         if (auto opExpr = as<OperatorExpr>(expr))
         {
             if (opExpr->isLoweredAsBuiltinArithmetic)

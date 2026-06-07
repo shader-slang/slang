@@ -4854,9 +4854,10 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     if (auto newExpr = convertToLogicOperatorExpr(expr))
         return newExpr;
 
-    // Fast path: builtin same-type arithmetic/comparison on scalar/vector/matrix operands
-    // (`a + b`, `a < b`, etc.) is marked for direct IR lowering and skips generic operator
-    // overload resolution.
+    // Fast path: a builtin arithmetic/comparison/bitwise/shift/unary operator on
+    // scalar/vector/matrix operands (`a + b`, `a < b`, `v * s`, `-x`, etc.; same or mixed
+    // builtin type) is marked for direct IR lowering and skips generic operator overload
+    // resolution.
     if (auto builtinOp = convertToBuiltinArithmeticOp(expr))
         return builtinOp;
 

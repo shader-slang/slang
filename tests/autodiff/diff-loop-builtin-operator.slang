@@ -10,6 +10,7 @@
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;
+// (slots: [0] primal, [1] reverse-mode derivative, [2] forward-mode derivative)
 
 [Differentiable]
 float poly(float x)
@@ -30,11 +31,17 @@ void computeMain()
     // f(x) = 8 * x^2 = 72 at x=3
     outputBuffer[0] = poly(x);
 
-    // f'(x) = 16 * x = 48 at x=3
+    // f'(x) = 16 * x = 48 at x=3 (reverse mode)
     var dp = diffPair(x, 0.0);
     bwd_diff(poly)(dp, 1.0);
     outputBuffer[1] = dp.d;
 
+    // f'(x) = 48 at x=3 (forward mode) -- also relies on [MaxIters(8)] inference over the
+    // fast-pathed `i < 8` predicate.
+    var fp = fwd_diff(poly)(diffPair(x, 1.0));
+    outputBuffer[2] = fp.d;
+
     // CHECK: 72.0
+    // CHECK: 48.0
     // CHECK: 48.0
 }

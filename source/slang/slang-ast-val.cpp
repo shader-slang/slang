@@ -2125,6 +2125,29 @@ Val* FuncCallIntVal::_resolveImplOverride()
     return resolvedVal;
 }
 
+// Fold a constant integer shift consistently for every `Val` path that can represent a
+// shift (`FuncCallIntVal` from resolved operator overloads, `BuiltinOperationIntVal` from the
+// builtin-operator fast path). Negative counts leave the value symbolic (returns false);
+// out-of-range counts are masked to the operand width, matching common hardware behavior and
+// avoiding C++ undefined behavior. Folding `x << y` therefore produces the same constant
+// regardless of which path reaches it, so the two representations stay `Val::equals`-equal.
+static bool _tryFoldConstantShift(
+    IntegerLiteralValue base,
+    IntegerLiteralValue count,
+    bool isLeftShift,
+    IntegerLiteralValue& out)
+{
+    if (count < 0)
+        return false;
+    const auto width = std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
+    const auto shiftCount = static_cast<std::make_unsigned_t<IRIntegerValue>>(count) % width;
+    out = isLeftShift
+              ? static_cast<IntegerLiteralValue>(
+                    static_cast<std::make_unsigned_t<IntegerLiteralValue>>(base) << shiftCount)
+              : (base >> shiftCount);
+    return true;
+}
+
 Val* FuncCallIntVal::tryFoldImpl(
     ASTBuilder* astBuilder,
     Type* resultType,
@@ -2206,8 +2229,18 @@ Val* FuncCallIntVal::tryFoldImpl(
         BINARY_OPERATOR_CASE(<)
         BINARY_OPERATOR_CASE(!=)
         BINARY_OPERATOR_CASE(==)
-        BINARY_OPERATOR_CASE(<<)
-        BINARY_OPERATOR_CASE(>>)
+        SPECIAL_OPERATOR_CASE("<<",
+                              if (!_tryFoldConstantShift(
+                                      constArgs[0]->getValue(),
+                                      constArgs[1]->getValue(),
+                                      /*isLeftShift*/ true,
+                                      resultValue)) return nullptr;)
+        SPECIAL_OPERATOR_CASE(">>",
+                              if (!_tryFoldConstantShift(
+                                      constArgs[0]->getValue(),
+                                      constArgs[1]->getValue(),
+                                      /*isLeftShift*/ false,
+                                      resultValue)) return nullptr;)
         BINARY_OPERATOR_CASE(&)
         BINARY_OPERATOR_CASE(|)
         BINARY_OPERATOR_CASE(^)
@@ -2419,6 +2452,16 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         constArgs.add(c);
     }
 
+    // Reject a malformed node whose argument count does not match the operation's arity, so a
+    // unary op never reads a missing second operand and a binary op never folds with a
+    // defaulted one.
+    const bool isUnary =
+        (op == BuiltinOperationKind::Neg || op == BuiltinOperationKind::BitNot ||
+         op == BuiltinOperationKind::Not);
+    const Index expectedArgs = isUnary ? 1 : 2;
+    if (constArgs.getCount() != expectedArgs)
+        return nullptr;
+
     const IntegerLiteralValue a0 = constArgs[0]->getValue();
     const IntegerLiteralValue a1 = (constArgs.getCount() > 1) ? constArgs[1]->getValue() : 0;
     IntegerLiteralValue r = 0;
@@ -2481,17 +2524,8 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         break;
     case BuiltinOperationKind::Lsh:
     case BuiltinOperationKind::Rsh:
-        if (a1 < 0)
+        if (!_tryFoldConstantShift(a0, a1, /*isLeftShift*/ op == BuiltinOperationKind::Lsh, r))
             return nullptr;
-        {
-            const auto shiftCount =
-                static_cast<std::make_unsigned_t<IRIntegerValue>>(a1) %
-                std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
-            r = (op == BuiltinOperationKind::Lsh)
-                    ? static_cast<IntegerLiteralValue>(
-                          static_cast<std::make_unsigned_t<IntegerLiteralValue>>(a0) << shiftCount)
-                    : (a0 >> shiftCount);
-        }
         break;
     default:
         return nullptr;

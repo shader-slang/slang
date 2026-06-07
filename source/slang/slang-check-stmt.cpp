@@ -747,7 +747,9 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     {
         // A builtin comparison handled by the operator fast path: the callee is the
         // unresolved operator name (no resolved intrinsic DeclRef), so map the name to
-        // the corresponding IR comparison op directly.
+        // the corresponding IR comparison op directly. `==`/`!=` are mapped here too so this
+        // branch produces the same `compareOp` set as the resolved-DeclRef branch below; the
+        // shared trip-count logic that follows only acts on the ordering comparisons.
         if (auto varExpr = as<VarExpr>(binaryExpr->functionExpr))
         {
             auto opText = getText(varExpr->name);
