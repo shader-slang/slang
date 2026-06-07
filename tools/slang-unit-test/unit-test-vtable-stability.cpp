@@ -20,8 +20,8 @@
 // parameters, corrupting the stack when called with fewer arguments, so the
 // entire test is guarded by SLANG_PTR_IS_64.
 
-#include "slang.h"
 #include "slang-gfx.h"
+#include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace slang;
