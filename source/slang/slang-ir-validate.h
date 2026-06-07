@@ -80,6 +80,8 @@ private:
 // lead back to in/inout parameters that we can't validate.
 void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst);
 
+// If 'validateSPIRVAtomics' is true, also reject fp16 vector atomic operations
+// and widths that cannot be represented by the SPIR-V NV vector atomic extension.
 void validateAtomicOperations(
     bool skipFuncParamValidation,
     DiagnosticSink* sink,

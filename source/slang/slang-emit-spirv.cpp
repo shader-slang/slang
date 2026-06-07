@@ -4446,7 +4446,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return;
 
         auto elementCount = elementCountInst->getValue();
-        SLANG_ASSERT(elementCount == 2 || elementCount == 4);
         if (elementCount != 2 && elementCount != 4)
             return;
 
