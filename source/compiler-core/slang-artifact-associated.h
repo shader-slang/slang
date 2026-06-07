@@ -126,14 +126,26 @@ struct ShaderBindingRange;
 
 struct UniformParamUsage
 {
-    // Parent CB or parameter block binding identity. Together
-    // (parentSpace, parentBindingIndex) uniquely identifies which
-    // uniform bearing parameter the byte ranges below belong to, so
-    // multiple CBs in the same register space stay disambiguated.
+    // Parent CB or parameter block binding identity. Two spaces are
+    // recorded because the byte query and the reflection emitter key off
+    // different ones, and they diverge for a CB bound to a non zero
+    // descriptor set (see ByteGranularityParameterUsageInfo for the full
+    // rationale):
+    //   parentSpace        - the space the Uniform category reports
+    //                        (RegisterSpace offset only); what
+    //                        isParameterLocationUsed(Uniform, space) is
+    //                        queried with. Each usedRanges entry carries
+    //                        this as its spaceIndex.
+    //   parentBindingSpace - the parent binding's own space (includes the
+    //                        descriptor set); what the emitter matches via
+    //                        getBindingSpace. Together with
+    //                        parentBindingIndex it disambiguates multiple
+    //                        CBs in a shared register space.
     // Each entry in usedRanges has category=Uniform,
     // spaceIndex=parentSpace, registerIndex=byte offset within the
     // parent, and registerCount=byte size.
     UInt parentSpace;
+    UInt parentBindingSpace;
     UInt parentBindingIndex;
     List<ShaderBindingRange> usedRanges;
     // True when the IR pass deliberately did not analyze this param

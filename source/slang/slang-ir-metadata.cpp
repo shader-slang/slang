@@ -222,6 +222,7 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
     {
         UniformParamUsage entry;
         entry.parentSpace = info.parentSpace;
+        entry.parentBindingSpace = info.parentBindingSpace;
         entry.parentBindingIndex = info.parentBindingIndex;
         entry.isUntracked = info.isUntracked;
         for (auto& r : info.ranges)

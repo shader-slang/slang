@@ -1154,7 +1154,10 @@ static void emitEntryPointParamJSON(
             {
                 for (const auto& entry : postEmit->getUniformParamUsage())
                 {
-                    if (entry.parentSpace != spaceIndex ||
+                    // Match the parent binding's own space (which includes
+                    // the descriptor set), since spaceIndex here came from
+                    // getBindingSpace on the parent CB or parameter block.
+                    if (entry.parentBindingSpace != spaceIndex ||
                         entry.parentBindingIndex != parentBindingIndex)
                         continue;
                     if (entry.isUntracked)

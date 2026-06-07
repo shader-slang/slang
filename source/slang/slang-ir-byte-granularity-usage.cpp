@@ -364,32 +364,41 @@ collectApproximateByteGranularityUsageInformationForParameterGroups(const IRModu
         info.parentSpace = 0;
         if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
             info.parentSpace = spaceAttr->getOffset();
-        // Capture the parent CB or parameter block binding index. For most
+        // Capture the parent CB or parameter block binding. For most
         // targets a parameter group has a ConstantBuffer offset (D3D b
         // register) or a DescriptorTableSlot offset (Vulkan/SPIR-V
         // descriptor binding). Some target configurations (cooperative
         // type metadata shaders, certain Metal/WGSL paths) yield a group
         // with neither attr. In that case we have no parent identity to
-        // scope per byte ranges against, so emit an untracked entry in
-        // the param's space. Queries in that space then return
-        // SLANG_E_NOT_AVAILABLE, which is safe over reporting rather
-        // than a silent collision with binding zero.
+        // scope per byte ranges against, so emit an untracked entry.
+        // Queries then return SLANG_E_NOT_AVAILABLE, which is safe over
+        // reporting rather than a silent collision with binding zero.
         auto cbAttr = varLayout->findOffsetAttr(LayoutResourceKind::ConstantBuffer);
         auto dtAttr = varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot);
+        // parentBindingSpace must match what the reflection emitter sees
+        // via getBindingSpace: the category attr's own space plus the
+        // RegisterSpace offset. A descriptor set can live in either source
+        // depending on binding style (vk::binding(N, set) puts it in the
+        // descriptor attr's space; -fvk-bind-globals puts it in
+        // RegisterSpace), so both are summed. parentSpace stays the
+        // RegisterSpace offset alone, matching the space a Uniform query
+        // carries.
         UniformParentBinding parent = selectUniformParentBinding(
             cbAttr != nullptr,
-            info.parentSpace,
+            info.parentSpace + (cbAttr ? cbAttr->getSpace() : 0),
             cbAttr ? cbAttr->getOffset() : 0,
             dtAttr != nullptr,
-            info.parentSpace,
+            info.parentSpace + (dtAttr ? dtAttr->getSpace() : 0),
             dtAttr ? dtAttr->getOffset() : 0);
         if (!parent.found)
         {
+            info.parentBindingSpace = info.parentSpace;
             info.parentBindingIndex = 0;
             info.isUntracked = true;
             result.add(_Move(info));
             continue;
         }
+        info.parentBindingSpace = parent.space;
         info.parentBindingIndex = parent.bindingIndex;
         info.isUntracked = false;
 
