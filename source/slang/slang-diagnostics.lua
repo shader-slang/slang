@@ -1297,7 +1297,7 @@ err(
     "expected-a-type",
     30060,
     "expected a type",
-    span { loc = "expr:Expr", message = "expected a type, got a '~whatWeGot'" }
+    span { loc = "expr:Expr", message = "expected a type, got ~whatWeGot" }
 )
 
 err(
