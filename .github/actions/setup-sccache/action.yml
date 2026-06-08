@@ -64,7 +64,37 @@ runs:
       if: inputs.platform == 'macos'
       shell: bash
       run: |
-        brew install sccache
+        # Pin sccache to a known version with checksum verification rather
+        # than the rolling `brew install sccache`, matching the Linux and
+        # Windows install paths above.
+        ARCH=$(uname -m)
+        if [[ "$ARCH" == "x86_64" ]]; then
+          SCCACHE_ARCH="x86_64-apple-darwin"
+          SCCACHE_SHA256="5ef04e4a2dfec6467e611ac5e3dd94342342fb7fe6ca15c933e4fa48f78cac64"
+        elif [[ "$ARCH" == "arm64" ]]; then
+          SCCACHE_ARCH="aarch64-apple-darwin"
+          SCCACHE_SHA256="c98acf172a7be239f8831523477c256c50aeab2cbcc1828dc5e4daafe5c8dbc4"
+        else
+          echo "Unsupported architecture: $ARCH"
+          exit 1
+        fi
+
+        echo "Installing sccache for $ARCH ($SCCACHE_ARCH)"
+        sccache_archive="$RUNNER_TEMP/sccache.tar.gz"
+        curl -fL --retry 3 --retry-delay 5 -o "$sccache_archive" \
+          https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-${SCCACHE_ARCH}.tar.gz
+        printf '%s  %s\n' "$SCCACHE_SHA256" "$sccache_archive" | shasum -a 256 -c -
+        tar xz -C "$RUNNER_TEMP" -f "$sccache_archive"
+        rm "$sccache_archive"
+
+        install_dir="$RUNNER_TEMP/sccache-bin"
+        mkdir -p "$install_dir"
+        mv "$RUNNER_TEMP/sccache-v0.7.4-${SCCACHE_ARCH}/sccache" "$install_dir/"
+        chmod +x "$install_dir/sccache"
+        rm -rf "$RUNNER_TEMP/sccache-v0.7.4-${SCCACHE_ARCH}"
+        echo "$install_dir" >> "$GITHUB_PATH"
+        export PATH="$install_dir:$PATH"
+
         sccache --version
 
     - name: Install sccache (Windows)
