@@ -174,6 +174,8 @@ python3 sweep_report.py --label dev         # -> results/dev/_sweep/sweep_report
 | `fetch_corpus.py` | downloads the MDL real-shader corpus (GitHub contents API) |
 | `fetch_releases.py` | downloads + caches prebuilt `slangc` per release tag |
 | `sweep.py` | **release sweep** — runs `bench.py` against every cached release |
+| `track.py` | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint |
+| `trend.py` | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression |
 | `analyze.py` | per-`(workload,timer)` series, leaf-attributed step-change detection, diagnostics path-cost |
 | `plot.py` | self-contained SVG charts (normalized + absolute log) |
 | `report.py` | single self-contained **HTML report**, cross-release (charts inline + tables) |

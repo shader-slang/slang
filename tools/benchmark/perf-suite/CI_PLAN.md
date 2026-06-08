@@ -102,8 +102,8 @@ figures, not user-facing slowdowns; `mdl_dxr` is the realistic one.
 # Implemented: nightly ToT + release-history resync + tracking series
 
 The time-series tier is wired up as two GitHub Actions workflows on the dedicated
-benchmark runner, plus `track.py` for the data model. The per-PR gate and trend
-alerting (`compare.py` / `trend.py`) remain TODO (see above).
+benchmark runner, plus `track.py` (data model) and `trend.py` (drift alert). The
+per-PR gate (`compare.py`) remains TODO (see above).
 
 ## Data model
 
@@ -137,14 +137,26 @@ like-with-like.
 
 - **`.github/workflows/compile-perf-nightly.yml`** — `schedule` (06:00 UTC) +
   `workflow_dispatch`. Builds ToT, sweeps into `daily/<date>-<sha>/`, runs
-  `track.py register`, pushes the results repo. Inputs: `samples`, `sweep`,
-  `only`.
+  `track.py register`, pushes the results repo, then runs `trend.py`. Inputs:
+  `samples`, `sweep`, `only`.
 - **`.github/workflows/compile-perf-release-sweep.yml`** — `workflow_dispatch`
   only. Downloads prebuilt release `slangc` for this runner's platform
   (`fetch_releases.py`, now platform-aware: Linux `.tar.gz` / Windows `.zip`),
   sweeps each into `<tag>/`, copies `index.json`, `stamp-runner`, `rebuild`,
   pushes. **Run with `force=true` to resync the whole history onto a new
   runner.** Inputs: `since`, `until`, `samples`, `force`.
+
+## Drift alert (`trend.py`)
+
+After each nightly rebuild, `trend.py` compares the latest point's primary timers
+(per workload, always incl. `compileInner`) against the trailing-N-point median
+(default 7), restricted to the **same runner fingerprint**. A metric past both a
+relative (`--rel`, default 1.25×) and absolute (`--abs`, default 2 ms) threshold
+is flagged: printed, emitted as a GitHub `::error::` annotation + step-summary
+row, and the job exits non-zero (after the push, so data is still stored). If the
+latest point's runner differs from the history's, it warns and compares only
+same-runner points (prompting a release-sweep resync). This catches the gradual
+drift a per-PR step gate misses.
 
 ## Runner-change ("recreate the history") procedure
 

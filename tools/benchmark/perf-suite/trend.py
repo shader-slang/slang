@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Drift alert for the nightly compile-perf tracking series.
+
+Reads the tracking series (track.py's _tracking/tracking.json) and compares the
+latest point — tonight's tip-of-tree (ToT) sweep — against the trailing median of
+the previous N points, per (workload, primary-timer). A metric that rises beyond
+both a relative and an absolute threshold is flagged: printed, emitted as a
+GitHub Actions ::error:: annotation + step-summary row, and (unless --no-fail)
+the process exits non-zero so the nightly job goes red. This catches the gradual
+drift a per-PR step gate structurally misses.
+
+Absolute compile times are runner-specific, so comparisons are restricted to
+points sharing the current point's runner fingerprint. If the latest point ran on
+a different runner than the release history was built on, the history is stale for
+this machine — re-run compile-perf-release-sweep (force=true); trend.py warns and
+compares only against same-runner points.
+
+    python3 trend.py --results <perf-results>        # after track.py rebuild
+    python3 trend.py --results <dir> --window 7 --rel 1.25 --abs 2.0
+"""
+import argparse
+import json
+import os
+import statistics
+
+import manifest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def timers_for(workload):
+    """The timers worth alerting on for a workload: its manifest primary timers,
+    always including compileInner (the holistic signal)."""
+    spec = manifest.BY_NAME.get(workload)
+    timers = set(spec.primary_timers) if spec else set()
+    timers.add("compileInner")
+    return timers
+
+
+def gh(line):
+    """Emit a GitHub Actions workflow command if running under Actions."""
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print(line)
+
+
+def summary(md):
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if path:
+        with open(path, "a") as fh:
+            fh.write(md + "\n")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--results", default=os.path.join(HERE, "results"))
+    ap.add_argument("--window", type=int, default=7, help="trailing points for the median")
+    ap.add_argument("--rel", type=float, default=1.25, help="relative regression threshold")
+    ap.add_argument("--abs", type=float, default=2.0, help="min absolute ms delta to flag")
+    ap.add_argument("--min-baseline", type=int, default=3,
+                    help="min trailing points required to judge a metric")
+    ap.add_argument("--no-fail", action="store_true", help="report only; always exit 0")
+    args = ap.parse_args()
+
+    tpath = os.path.join(args.results, "_tracking", "tracking.json")
+    if not os.path.exists(tpath):
+        raise SystemExit(f"no tracking series at {tpath}; run track.py rebuild first")
+    series = json.load(open(tpath))
+    pts = series.get("points", [])
+    if len(pts) < 2:
+        print("not enough points to trend (need >= 2)")
+        return
+
+    hist_runner = series.get("runner", "")
+    current = pts[-1]
+    cur_runner = current.get("runner") or hist_runner
+
+    print(f"trend: current={current['label']} ({current['date']}, {current['kind']})  "
+          f"runner={cur_runner or 'unset'}")
+
+    # Restrict the baseline to points on the same runner (release points carry no
+    # per-point runner — they were built on hist_runner by the resync job).
+    prior = [p for p in pts[:-1] if (p.get("runner") or hist_runner) == cur_runner]
+    window = prior[-args.window:]
+
+    if hist_runner and cur_runner and cur_runner != hist_runner:
+        msg = (f"latest point ran on runner '{cur_runner}' but the release history "
+               f"was built on '{hist_runner}'. Comparing against same-runner points "
+               f"only; re-run compile-perf-release-sweep (force=true) to resync the "
+               f"history to this machine.")
+        print(f"WARNING: {msg}")
+        gh(f"::warning title=Perf runner mismatch::{msg}")
+
+    if len(window) < args.min_baseline:
+        msg = (f"only {len(window)} comparable trailing point(s) "
+               f"(need {args.min_baseline}); skipping trend judgement.")
+        print(msg)
+        gh(f"::warning title=Perf trend::{msg}")
+        return
+
+    base_labels = f"{window[0]['label']}..{window[-1]['label']}"
+    regressions = []
+    for key, cur in sorted(current.get("metrics", {}).items()):
+        wl, _, timer = key.partition("|")
+        if timer not in timers_for(wl):
+            continue
+        baseline = [p["metrics"][key] for p in window if key in p.get("metrics", {})]
+        if len(baseline) < args.min_baseline:
+            continue
+        med = statistics.median(baseline)
+        if med <= 0:
+            continue
+        ratio = cur / med
+        delta = cur - med
+        if ratio >= args.rel and delta >= args.abs:
+            regressions.append((wl, timer, med, cur, ratio, delta))
+
+    regressions.sort(key=lambda r: -r[4])
+
+    print(f"baseline: trailing {len(window)} point(s) [{base_labels}], "
+          f"median per metric; flag at ratio >= {args.rel} and >= {args.abs} ms\n")
+    if not regressions:
+        print(f"OK — no compile-perf regression in {current['label']} vs trailing median.")
+        summary(f"### Compile-perf trend — {current['label']}\n\n"
+                f"OK — no regression vs trailing {len(window)}-point median "
+                f"(`{base_labels}`).")
+        return
+
+    print(f"{'workload':20s}{'timer':26s}{'median':>10}{'current':>10}{'ratio':>8}{'Δms':>9}")
+    rows = ["### ⚠️ Compile-perf regressions — " + current["label"],
+            f"\nvs trailing {len(window)}-point median (`{base_labels}`), "
+            f"runner `{cur_runner}`.\n",
+            "| workload | timer | median (ms) | current (ms) | ratio | Δ ms |",
+            "|---|---|--:|--:|--:|--:|"]
+    for wl, timer, med, cur, ratio, delta in regressions:
+        print(f"{wl:20s}{timer:26s}{med:10.1f}{cur:10.1f}{ratio:7.2f}x{delta:+9.1f}")
+        gh(f"::error title=Perf regression {wl}/{timer}::"
+           f"{ratio:.2f}x ({med:.1f} -> {cur:.1f} ms, +{delta:.1f}) vs trailing median")
+        rows.append(f"| {wl} | {timer} | {med:.1f} | {cur:.1f} | "
+                    f"{ratio:.2f}× | +{delta:.1f} |")
+    summary("\n".join(rows))
+
+    print(f"\n{len(regressions)} regression(s) flagged.")
+    if not args.no_fail:
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()

@@ -106,3 +106,13 @@ jobs:
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git commit -m "nightly ToT $(date -u +%Y-%m-%d) ($(cd "$GITHUB_WORKSPACE" && git rev-parse --short HEAD))"
           git push
+
+      # Runs AFTER the push so the data is stored even when this step fails the
+      # job. trend.py exits non-zero (job red + ::error:: annotations) when a
+      # primary timer drifts past threshold vs the trailing median.
+      - name: Check trend (fail on regression)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/tools/benchmark/perf-suite"
+          python trend.py --results "$GITHUB_WORKSPACE/perf-results"
