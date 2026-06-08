@@ -46,7 +46,7 @@ uploads, and dispatches 512×512 = 262144 rays from a synthetic camera.
 
 Each coverage run writes:
 
-- `<mode>.coverage-mapping.json`
+- `<mode>.coverage-manifest.json`
 - `<mode>.lcov`
 - `<mode>.counters.bin` — feed to
   `tools/shader-coverage/slang-coverage-to-lcov.py` for the rich LCOV

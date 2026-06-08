@@ -1176,10 +1176,16 @@ typedef uint32_t SlangSizeT;
                  //   a repeatable hint consumed only when any coverage mode is enabled.
         TraceFunctionCoverage = 148, // bool: insert per-function-entry coverage counters
         TraceBranchCoverage = 149,   // bool: insert per-branch-arm coverage counters
-        // 150 is reserved for CoverageManifestOutput from PR #11336
-        // (feature/shader-coverage-slangc-cli). When that PR lands first this
-        // 64-bit counter PR rebases cleanly; if this PR lands first, #11336
-        // takes the next free ID.
+        CoverageManifestOutput =
+            150, // stringValue0: explicit path for the slangc coverage manifest sidecar.
+                 //   When unset, slangc writes <output>.coverage-manifest.json next to
+                 //   file outputs that carry coverage metadata. This option is output
+                 //   policy only and is excluded from compiler cache keys. It requires
+                 //   at least one coverage tracing mode, is rejected for container
+                 //   outputs, and errors if the selected outputs produce no coverage
+                 //   metadata. Explicit paths are valid only when exactly one compiled
+                 //   artifact carries coverage metadata and must not overlap any emitted
+                 //   artifact path. Query/set with the string option APIs.
         TraceCoverageCounterWidth =
             151, // intValue0: per-slot byte width for the synthesized __slang_coverage
                  //   buffer. Accepts 4 (uint32) or 8 (uint64). Defaults to 8 when any
@@ -5562,7 +5568,7 @@ struct SlangGlobalSessionDesc
 SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size);
 
 /* Serialize coverage metadata into the canonical
- * `.coverage-mapping.json` shape. Same bytes that `slangc` writes
+ * `.coverage-manifest.json` shape. Same bytes that `slangc` writes
  * alongside compiled output when `-trace-coverage` is on, available
  * in-process for hosts compiling via the C++ API.
  *

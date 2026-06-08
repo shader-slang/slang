@@ -4796,9 +4796,36 @@ warning(
     "`-trace-coverage-reserved-space` does not apply to this target; ignoring reserved spaces"
 )
 
--- 45108..45112 are reserved for the slangc coverage CLI PR
--- (#11336, feature/shader-coverage-slangc-cli). Picking 45113 here so the
--- two PRs rebase cleanly regardless of merge order.
+err(
+    "coverage-manifest-output-without-coverage",
+    45108,
+    "`-coverage-manifest-output` requires a coverage tracing option; use `-trace-coverage`, `-trace-function-coverage`, or `-trace-branch-coverage`"
+)
+
+err(
+    "coverage-manifest-output-multiple-artifacts",
+    45109,
+    "`-coverage-manifest-output` path '~path' is not supported for multiple coverage-instrumented artifacts; use per-artifact `<output>.coverage-manifest.json` sidecars or compile each target separately"
+)
+
+err(
+    "coverage-manifest-output-collides-with-artifact",
+    45110,
+    "`-coverage-manifest-output` path '~path' must differ from any artifact output path emitted by this compile"
+)
+
+err(
+    "coverage-manifest-output-with-container",
+    45111,
+    "`-coverage-manifest-output` is not supported when writing a container output"
+)
+
+err(
+    "coverage-manifest-output-without-coverage-data",
+    45112,
+    "`-coverage-manifest-output` path '~path' was requested, but the selected target did not produce coverage metadata"
+)
+
 err(
     "coverage-counter-width-invalid",
     45113,
@@ -4905,6 +4932,13 @@ err(
     50060,
     "invalid mesh output topology",
     span { loc = "location", message = "Invalid mesh stage output topology '~topology' for target '~target', must be one of: ~validTopologies" }
+)
+
+err(
+    "invalid-stage-output-topology",
+    50061,
+    "invalid output topology",
+    span { loc = "location", message = "Invalid output topology '~topology' for stage '~stage', must be one of: ~validTopologies" }
 )
 
 err(

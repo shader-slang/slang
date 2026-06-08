@@ -42,7 +42,7 @@ The coverage delta between the two runs is the demo's headline.
 
 Each coverage run writes alongside the executable:
 
-- `<mode>.coverage-mapping.json` — counter ↔ source attribution
+- `<mode>.coverage-manifest.json` — counter ↔ source attribution
 - `<mode>.lcov` — line-only LCOV (quick view)
 - `<mode>.counters.bin` — raw counter buffer; feed to
   `tools/shader-coverage/slang-coverage-to-lcov.py` for a rich LCOV
@@ -56,7 +56,7 @@ measure the coverage instrumentation overhead by comparing
 
 ```bash
 python3 path/to/slang/tools/shader-coverage/slang-coverage-to-lcov.py \
-    --manifest exhaustive.coverage-mapping.json \
+    --manifest exhaustive.coverage-manifest.json \
     --counters exhaustive.counters.bin \
     --output exhaustive.full.lcov
 

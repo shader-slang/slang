@@ -574,14 +574,14 @@ int main(int argc, char** argv)
     printSummary(mode.c_str(), summary);
 
     const auto outDir = getDemoDirectory();
-    writeManifest(shader.coverageMetadata, outDir / (mode + ".coverage-mapping.json"));
+    writeManifest(shader.coverageMetadata, outDir / (mode + ".coverage-manifest.json"));
     writeLcov(
         shader.coverageMetadata,
         hits,
         outDir / (mode + ".lcov"),
         ("image-pipeline-" + mode).c_str());
     writeCountersBinary(rawBytes, outDir / (mode + ".counters.bin"));
-    std::cout << "wrote " << (outDir / (mode + ".coverage-mapping.json")) << "\n";
+    std::cout << "wrote " << (outDir / (mode + ".coverage-manifest.json")) << "\n";
     std::cout << "wrote " << (outDir / (mode + ".lcov")) << "\n";
     std::cout << "wrote " << (outDir / (mode + ".counters.bin")) << "\n";
 
