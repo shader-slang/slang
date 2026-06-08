@@ -1299,7 +1299,7 @@ URI URI::fromLocalFilePath(UnownedStringSlice path)
         else
         {
             char buffer[32];
-            int length = intToAscii(buffer, (unsigned char)ch, 16, 2);
+            int length = intToAscii(buffer, int((unsigned char)ch), 16, 2);
             sb << "%" << UnownedStringSlice(buffer, length);
         }
     }
