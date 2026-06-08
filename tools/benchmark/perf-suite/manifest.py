@@ -257,7 +257,7 @@ WORKLOADS = [
         extra_flags=SPIRV,
         primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR",
                         "simplifyIR"],
-        sweep_sizes=[20, 40, 80, 160, 320, 640],
+        sweep_sizes=[20, 40, 80, 160, 320, 640, 1280],
     ),
     # ---- coverage-gap stressors (passes / paths no other workload hits) ---
     WorkloadSpec(
