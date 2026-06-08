@@ -82,13 +82,16 @@ def render_panels(sweeps, metric, out, cols=3):
     cols = min(cols, n) or 1
     rows = (n + cols - 1) // cols
     pw, ph = 300, 188
-    ml, mt, mr, mb = 56, 40, 150, 50  # right margin holds the per-panel legend
+    # right margin holds the per-panel legend AND the (long) fit annotation, so it
+    # must fit e.g. "fit: -4051ms + 62.13·N  (R²=0.966)" (~200px) without spilling
+    # into the next column or off the canvas.
+    ml, mt, mr, mb = 56, 40, 218, 58
     cw, chh = ml + pw + mr, mt + ph + mb
-    W = cols * cw + 16
-    H = rows * chh + 52
+    W = cols * cw + 24       # +pad so the rightmost legend/fit text isn't clipped
+    H = rows * chh + 60      # +pad below the last row
 
     s = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
-         f'font-family="sans-serif" font-size="11">',
+         f'viewBox="0 0 {W} {H}" font-family="sans-serif" font-size="11">',
          f'<rect width="{W}" height="{H}" fill="white"/>',
          f'<text x="12" y="30" font-size="17" font-weight="bold">'
          f'Complexity sweep — compile time vs workload size N ({metric} ms, linear)</text>']
