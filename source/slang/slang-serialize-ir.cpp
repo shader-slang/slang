@@ -548,6 +548,9 @@ static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRe
 
 static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serializer, IRModule* module)
 {
+    // Bound recursive child traversal so malformed flat tables cannot exhaust the host stack.
+    static const Int64 kMaxIRDeserializeDepth = 4096;
+
     IRSerialReadContext& readContext = *serializer.getContext();
 #if DIRECT_FROM_FOSSIL
     const auto flatPtr = as<Fossilized<FlatInstTable>>(serializer.getImpl()->readValPtr());
@@ -572,6 +575,8 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 
     const auto operandIndicesCount = flat.operandIndices.getCount();
 
+    // These relationships are serialized IR invariants; stop before rebuilding pointers from
+    // inconsistent flat tables.
     SLANG_RELEASE_ASSERT(flat.childCounts.getCount() == numInsts);
     SLANG_RELEASE_ASSERT(sourceLocs.getCount() == numInsts);
 
@@ -642,8 +647,9 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         SLANG_RELEASE_ASSERT(index >= -1 && index < numInsts);
         return insts[index];
     };
-    const auto go = [&](auto& go, IRInst* parent) -> IRInst*
+    const auto go = [&](auto& go, IRInst* parent, Int64 depth) -> IRInst*
     {
+        SLANG_RELEASE_ASSERT(depth < kMaxIRDeserializeDepth);
         SLANG_RELEASE_ASSERT(instIndex < numInsts);
 
         const auto thisInstIndex = instIndex++;
@@ -715,7 +721,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         SLANG_RELEASE_ASSERT(childCount >= 0);
         for (Int64 i = 0; i < childCount; ++i)
         {
-            auto c = go(go, inst);
+            auto c = go(go, inst, depth + 1);
             if (i == 0)
                 first = c;
             last = c;
@@ -731,8 +737,12 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 
         return inst;
     };
-    const auto moduleInst = go(go, nullptr);
+    const auto moduleInst = go(go, nullptr, 0);
     SLANG_RELEASE_ASSERT(instIndex == numInsts);
+    SLANG_RELEASE_ASSERT(litIndex == flat.literals.getCount());
+    SLANG_RELEASE_ASSERT(operandIndex == operandIndicesCount);
+    SLANG_RELEASE_ASSERT(stringLengthIndex == flat.stringLengths.getCount());
+    SLANG_RELEASE_ASSERT(stringDataIndex == flat.stringChars.getCount());
     SLANG_RELEASE_ASSERT(as<IRModuleInst>(moduleInst));
     return cast<IRModuleInst>(moduleInst);
 }
