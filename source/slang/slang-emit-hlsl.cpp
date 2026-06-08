@@ -1601,6 +1601,28 @@ static bool _canEmitExport(const Profile& profile)
     Super::emitFuncDecorationsImpl(func);
 }
 
+
+void HLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name) {
+    // Mesh shaders outputs have their "out" already added in emitMeshShaderModifiers, so we do not
+    // need that here. This is tracked through a cache variable. (This is safe because
+    // emitParamTypeImpl will be called immediately after emitMeshShaderModifiers.)
+    if (m_lastParamMeshOutput)
+    {
+        m_lastParamMeshOutput = false; // consume
+        if (auto outType = as<IROutParamType>(type))
+        {
+            type = outType->getValueType();
+        }
+        else if (auto constRefType = as<IRBorrowInParamType>(type))
+        {
+            type = constRefType->getValueType();
+        }
+    }
+
+    // Use the default case in general.
+    Super::emitParamTypeImpl(type, name);
+}
+
 void HLSLSourceEmitter::emitIfDecorationsImpl(IRIfElse* ifInst)
 {
     if (ifInst->findDecorationImpl(kIROp_BranchDecoration))
@@ -2302,11 +2324,13 @@ void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
                                                                : nullptr;
         SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
         m_writer->emit(s);
+        m_lastParamMeshOutput = true;
     }
     if (varInst->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
         // DXC requires that mesh payload parameters have "in" specified
         m_writer->emit("in payload ");
+        m_lastParamMeshOutput = true;
     }
 }
 

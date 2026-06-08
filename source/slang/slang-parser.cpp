@@ -9,6 +9,7 @@
 #include "slang-rich-diagnostics.h"
 #include "slang-visitor.h"
 
+#include <limits.h>
 #include <assert.h>
 #include <float.h>
 #include <optional>

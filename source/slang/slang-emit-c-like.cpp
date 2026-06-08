@@ -3814,10 +3814,10 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
         {
             emitInterpolationModifiers(param, paramType, layout);
-            emitMeshShaderModifiers(param);
         }
     }
 
+    emitMeshShaderModifiers(param);
     emitParamType(paramType, paramName);
     emitSemantics(param);
     emitPostDeclarationAttributesForType(paramType);
@@ -4652,7 +4652,6 @@ void CLikeSourceEmitter::emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, 
         layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
     {
         emitInterpolationModifiers(varDecl, varType, layout);
-        emitMeshShaderModifiers(varDecl);
     }
 
     // Output target specific qualifiers
