@@ -348,7 +348,7 @@ Write shader coverage manifest metadata to an explicit JSON sidecar path. Use th
 
 **-trace-coverage-counter-width &lt;bits&gt;**
 
-Per-slot bit width of the synthesized `__slang_coverage` buffer. Accepts `64` (default) or `32`. uint64 counters effectively cannot wrap within any practical run; uint32 counters wrap silently at 2^32 hits per slot. Use `32` when targeting a runtime driver that does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon, which exposes `shaderBufferInt64Atomics = false`). Ignored when no coverage mode is enabled. The chosen width is reported through the coverage manifest's `buffer.element_type` / `buffer.element_stride` and the `CoverageBufferInfo::elementByteWidth` host API, so host readback and the LCOV converter honor it automatically. 
+Per-slot bit width of the synthesized `__slang_coverage` buffer. Accepts `64` (default) or `32`. uint64 counters effectively cannot wrap within any practical run; uint32 counters wrap silently at 2^32 hits per slot. Use `32` when targeting a runtime driver that does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon, which exposes `shaderBufferInt64Atomics = false`). Implies `-trace-coverage` is meaningful; ignored when no coverage mode is enabled. 
 
 
 <a id="report-dynamic-dispatch-sites"></a>
