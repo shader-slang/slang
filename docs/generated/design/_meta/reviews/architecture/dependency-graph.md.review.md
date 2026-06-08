@@ -1,37 +1,39 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-05T14:11:45+00:00
 target_doc: architecture/dependency-graph.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 30983b1eac237a20bb36b39636936cb7cb3bc5b003a6f2f819545a3ac80fb871
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: d562c492ff7426404fd8fcd584e73aade50ea9e87ab0386d9d3448c420d06cb9
+source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
 finding_count: 2
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 1
+  major: 0
+  minor: 2
   nit: 0
 ---
 
 # Review report for architecture/dependency-graph.md
 
 ## Summary
-The page is structurally lint-clean, but review found 2 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The page satisfies the required dependency-graph structure and all relative links resolve. I found two minor factual issues: the external-dependency notes omit dependencies visible in the recorded CMake files, and one approximate line citation is stale.
 
 ## Items checked
-- Checked CMake link clauses for key source subprojects, external dependency notes, mermaid syntax, and public-header invariant.
+- Ran `regenerate.py show architecture/dependency-graph.md` and reviewed the manifest prompt, watched files, and `depends_on` peer `architecture/module-map.md`.
+- Verified front matter, required sections, mermaid node style, all 32 markdown links, and all body line-number citations.
+- Spot-checked 16 CMake-backed claims across `source/core`, `source/compiler-core`, `source/slang`, `source/slang-core-module`, `source/slang-glsl-module`, `source/slangc`, `source/slang-wasm`, `source/slang-rt`, `source/slang-glslang`, and `source/standard-modules` at commit `52339028a2aa703271533454c6b9528a534bac31`.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | Mermaid graph | The graph is not one node per logical unit group from `module-map.md`; it omits groups such as `source/standard-modules/`, `source/slang-llvm/`, and `source/slang-record-replay/`. | `docs/generated/design/architecture/module-map.md` has sections for these groups; `docs/generated/design/_meta/prompts/architecture-dependency-graph.md` requires one node per logical unit group. | Add omitted groups, marking groups without observed CMake link edges as isolated or no observed link edge. |
-| F-002 | minor | `## Edges` | The prompt asks every edge to be justified by CMake citations, but the graph has no per-edge citations and notes cite only selected build files. | `docs/generated/design/_meta/prompts/architecture-dependency-graph.md` requires every edge be justified. | Add a compact edge table or per-node notes mapping graph edges to `CMakeLists.txt` evidence. |
+| F-001 | minor | `## Edges (intra-project only)`, lines 26-30 and `External dependencies`, lines 131-147 | The page says omitted external dependencies “are listed in the notes per node,” but the notes omit at least `libcmark-gfm` for `slang` and `Threads::Threads` / `${SLANG_GLSL_MODULE_DEPENDENCY}` for `slangc`. | `source/slang/CMakeLists.txt:265-276` includes `SPIRV-Headers::SPIRV-Headers` and `libcmark-gfm` in `slang_link_args`; `source/slangc/CMakeLists.txt:13-17` links `core`, `slang`, `Threads::Threads`, and `${SLANG_GLSL_MODULE_DEPENDENCY}`. | Add the missing external dependencies to the notes, or narrow the claim so it no longer promises that every omitted external dependency is listed per node. |
+| F-002 | minor | `## Edges (intra-project only)`, lines 100-103 | The note says `SLANG_SLANG_LLVM_FLAVOR` is in root `CMakeLists.txt` “around line 355,” but at the reviewed commit the option begins at line 365 and the symbol itself is on line 366. | `CMakeLists.txt:365-369` contains `enum_option(` followed by `SLANG_SLANG_LLVM_FLAVOR`. | Update the citation to “around line 366” or remove the approximate line number. |

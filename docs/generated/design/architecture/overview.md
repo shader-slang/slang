@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-28T08:19:15+00:00
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-watched_paths_digest: 523d4a2878184499b9f5e8fce9e6f73b1da8dbb5fe081b2ecc44b29ae8e980e3
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: e5d3ec001daa5764cbb9fd0fabb552621df4ce64926121102bf19a375fa9d517
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -160,10 +160,12 @@ and the per-area Lua tables under
 ## Compilation request lifecycle
 
 A Slang compilation flows through a small set of central objects whose
-declarations are clustered in
-[include/slang.h](../../../../include/slang.h) and the
-`slang-*-request.h` / `slang-module.h` headers under
-[source/slang/](../../../../source/slang).
+declarations are spread across
+[include/slang.h](../../../../include/slang.h) and several headers under
+[source/slang/](../../../../source/slang) — including
+`slang-translation-unit.h`, `slang-session.h`, `slang-target.h`,
+`slang-compile-request.h`, `slang-end-to-end-request.h`, and
+`slang-module.h`.
 
 - `Session` — process-wide compiler state. Owns built-in modules, the
   AST builder, and the global type-checking environment. The COM-style
@@ -191,8 +193,11 @@ declarations are clustered in
 - `FrontEndCompileRequest` — drives the front-end (parse, check, lower
   to IR) for a set of translation units. Declared in
   [slang-compile-request.h](../../../../source/slang/slang-compile-request.h).
-- `BackEndCompileRequest` — drives the back-end (IR passes, emit) for a
-  set of entry points and targets.
+- `CodeGenContext` — drives the back-end (IR passes, emit) for a set of
+  entry points and targets. Declared in
+  [slang-code-gen.h](../../../../source/slang/slang-code-gen.h); it
+  replaces the historical `BackEndCompileRequest` object that earlier
+  revisions named here.
 - `EndToEndCompileRequest` — the umbrella object behind a single
   `slangc` invocation, declared separately in
   `slang-end-to-end-request.h`.

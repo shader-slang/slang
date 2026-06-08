@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
+model: claude-opus-4.8
+generated_at: 2026-06-05T10:25:25+00:00
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -38,7 +38,11 @@ than living in a single contiguous group:
   `getValueFromBoundInterface`, `extractExistentialValue`,
   `extractExistentialType`, `extractExistentialWitnessTable`,
   `isNullExistential`, `extractTaggedUnionTag`,
-  `extractTaggedUnionPayload` appear around lines 2460-2485.
+  `extractTaggedUnionPayload` appear around lines ~2491-2516.
+- The type-flow specialization opcodes (`TypeSet` / `FuncSet` /
+  `WitnessTableSet` / `GenericSet` and their elements,
+  `GetDispatcher`, the tagged-union and tag operations, and the
+  specialization keys) appear around lines ~2916-3162.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The
@@ -125,20 +129,20 @@ processing.
 
 ### Witness tables and witness facts
 
-The structural opcodes that back interface dispatch are documented
-in [structure.md](structure.md); only the ones the dispatch path
-consumes directly are summarized here.
+These opcodes back interface dispatch. Their structural (container)
+role is documented in [structure.md](structure.md); the rows below
+give the shapes the dispatch path (`lookupWitness`, specialization)
+consumes.
 
-- `witness_table`, `witness_table_entry`, and `interface_req_entry`
-  store the requirement-to-implementation mapping that
-  `lookupWitness` walks. See
-  [structure.md — witness tables and witness facts](structure.md).
-- `thisTypeWitness` and `TypeEqualityWitness` are placeholder
-  witnesses used by the type system to certify self-conformance and
-  type equality.
-- `key` (`StructKey`) and `indexedFieldKey` identify the
-  requirement slots that witness tables key on; documented in
-  [structure.md — struct internals](structure.md).
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `witness_table` | — | (children: `witness_table_entry`) | H | `InheritanceDecl` lowering in `slang-lower-to-ir.cpp` | Maps each interface requirement key to its concrete implementation; `lookupWitness` walks it. |
+| `witness_table_entry` | — | `requirementKey, satisfyingVal` | | (synthesized) | One row of a `witness_table`. |
+| `interface_req_entry` | `InterfaceRequirementEntry` | `requirementKey, requirementVal` | G | (synthesized in `InterfaceDecl` lowering) | One requirement slot on the interface side. |
+| `thisTypeWitness` | — | `type` | | (synthesized inside `InterfaceDecl` lowering) | Placeholder witness that `ThisType` conforms to the enclosing interface. |
+| `TypeEqualityWitness` | — | `subType, superType` | H | (synthesized) | Placeholder witness certifying two types are equal. |
+| `key` | `StructKey` | — | G | Member-name lowering in `slang-lower-to-ir.cpp` | Identity for a requirement slot that witness tables key on. |
+| `indexedFieldKey` | — | `baseType, index` | H | (synthesized) | Synthetic key for an unnamed (tuple-like) requirement slot. |
 
 ### Runtime type information
 
