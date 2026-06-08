@@ -193,6 +193,83 @@ def gen_diagnostics_clean(n):
     return {"diagnostics_clean.slang": "".join(s)}
 
 
+def gen_existential_aggregate(n):
+    """An interface-typed *field* inside a struct (`Scene { IMat m; ... }`), with
+    n implementations selected at runtime through a switch. Unlike
+    `dynamic_dispatch` (a bare local existential), boxing the existential in an
+    aggregate forces `legalizeExistentialTypeLayout` to float the existential
+    field out and recompute the parent layout, and feeds specializeModule a
+    witness-table-per-case blowup. Stresses specializeModule +
+    legalizeExistentialTypeLayout + the downstream simplifyIR. Scales by breadth
+    (number of implementations / switch cases)."""
+    s = [_HEADER, _buf()]
+    s.append("[anyValueSize(16)]\ninterface IMat { float shade(float x); }\n\n")
+    for i in range(n):
+        s.append(
+            f"struct M{i} : IMat {{ float shade(float x) {{ return x * {i + 1}.0 + {i}.0 + sin(x * {i % 7 + 1}.0); }} }}\n"
+        )
+    s.append("\nstruct Scene { IMat m; float w; }\n\n")
+    s.append("float shadeScene(Scene sc, float x) { return sc.m.shade(x) * sc.w; }\n\n")
+    s.append('[shader("compute")]\n[numthreads(64,1,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    s.append("    float acc = 0.0;\n    int base = int(tid.x);\n")
+    s.append(f"    for (int i = 0; i < {n}; ++i)\n    {{\n        Scene sc;\n")
+    s.append(f"        switch ((base + i) % {n})\n        {{\n")
+    for i in range(n):
+        s.append(f"        case {i}: sc.m = M{i}(); break;\n")
+    s.append("        default: sc.m = M0(); break;\n        }\n")
+    s.append("        sc.w = float(i);\n        acc += shadeScene(sc, outBuf[0] + float(i));\n    }\n")
+    s.append("    outBuf[0] = acc;\n}\n")
+    return {"existential_aggregate.slang": "".join(s)}
+
+
+# --------------------------------------------------------------------------- #
+# Complexity ladder: realistic mixed-feature shader scaled simple -> complex.
+# --------------------------------------------------------------------------- #
+
+def gen_complexity_ladder(n):
+    """A single shader that ramps *several* realistic dimensions together as n
+    grows, modelling how a real shader's compile cost behaves going from simple
+    to highly complex — as opposed to the single-axis stressors, which isolate
+    one pass. Each step adds: a branchy helper (control flow / SSA + phi), a
+    generic call (sema + specialization), a small bounded inner loop, resource
+    reads, and a dynamic-dispatch site. Helpers are chained in bounded-depth
+    groups (call graph depth) so doubling n roughly doubles total work across
+    all of front-end, IR opt, and codegen at once. Sweep this to get the
+    holistic complexity->compile-time curve and a floor+slope fit."""
+    s = [_HEADER]
+    s.append("RWStructuredBuffer<float> outBuf;\nStructuredBuffer<float> inBuf;\n\n")
+    s.append("interface IOp { float apply(float x); }\n")
+    s.append("struct OpAdd : IOp { float apply(float x) { return x + 1.0; } }\n")
+    s.append("struct OpMul : IOp { float apply(float x) { return x * 1.5 + 0.25; } }\n")
+    s.append("struct OpSq  : IOp { float apply(float x) { return x * x - 0.5; } }\n\n")
+    s.append("T gpoly<T : IArithmetic>(T a, T b) { return a * a + b * a + a; }\n\n")
+    s.append("float dispatch(int id, float x)\n{\n    IOp o;\n    switch (id % 3)\n    {\n")
+    s.append("    case 0: o = OpAdd(); break;\n    case 1: o = OpMul(); break;\n")
+    s.append("    default: o = OpSq(); break;\n    }\n    return o.apply(x);\n}\n\n")
+    # n branchy helpers in bounded-depth call chains.
+    group_tops = []
+    for i in range(n):
+        prev = f"h_{i - 1}(x)" if (i % _GROUP_DEPTH != 0) else "x"
+        s.append(f"float h_{i}(float x)\n{{\n    float t = {prev};\n")
+        s.append(f"    if (t > {i % 11}.0) t = t * 1.01 + sin(t + {i % 7}.0);\n")
+        s.append("    else t = t - cos(t * 0.5) * 0.25;\n")
+        s.append(f"    [MaxIters(4)] for (int k = 0; k < (int(t) & 3) + 1; ++k)\n")
+        s.append(f"        t = t * 0.999 + gpoly<float>(t, {i % 5}.0);\n")
+        s.append("    return t;\n}\n")
+        if (i % _GROUP_DEPTH == _GROUP_DEPTH - 1) or i == n - 1:
+            group_tops.append(i)
+    s.append('\n[shader("compute")]\n[numthreads(64,1,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    s.append("    int idx = int(tid.x);\n    float acc = inBuf[idx];\n")
+    for j, top in enumerate(group_tops):
+        s.append(f"    acc += h_{top}(acc + float({j}));\n")
+        s.append(f"    acc += dispatch(idx + {j}, acc);\n")
+    s.append("    acc += float(gpoly<int>(idx, idx + 1));\n")
+    s.append("    outBuf[idx] = acc;\n}\n")
+    return {"complexity_ladder.slang": "".join(s)}
+
+
 # --------------------------------------------------------------------------- #
 # Core compiler-stage buckets
 # --------------------------------------------------------------------------- #

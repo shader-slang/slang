@@ -123,6 +123,20 @@ WORKLOADS = [
         sweep_sizes=[50, 100, 200, 400],
     ),
     WorkloadSpec(
+        name="existential_aggregate",
+        bucket="dynamic_dispatch",
+        gen=workloads.gen_existential_aggregate,
+        default_size=100,
+        mode="target",
+        extra_flags=SPIRV,
+        # existential field in a struct -> legalizeExistentialTypeLayout, plus a
+        # witness-table-per-case specialization blowup. Neither is the primary
+        # signal of the bare-local dynamic_dispatch workload.
+        primary_timers=["compileInner", "specializeModule",
+                        "legalizeExistentialTypeLayout", "simplifyIR"],
+        sweep_sizes=[40, 80, 160, 320],
+    ),
+    WorkloadSpec(
         name="diagnostics_errors",
         bucket="diagnostics",
         gen=workloads.gen_diagnostics_errors,
@@ -201,6 +215,46 @@ WORKLOADS = [
         extra_flags=SPIRV,
         primary_timers=["linkIR", "compileInner"],
         sweep_sizes=[25, 50, 100, 200],
+    ),
+    # ---- source-target emission (the text backends spirv-directly skips) --
+    # Same shader as codegen_spirv, but emitted to a textual GPU language so the
+    # whole emitEntryPointsSourceFromIR path + target legalization (legalizeIRForMetal /
+    # legalizeIRForWGSL) is exercised — entirely bypassed by -emit-spirv-directly,
+    # so no other workload covers it. Metal/WGSL emit text with no external toolchain.
+    WorkloadSpec(
+        name="emit_metal",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "metal"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
+    ),
+    WorkloadSpec(
+        name="emit_wgsl",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "wgsl"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
+    ),
+    # ---- complexity ladder: realistic mixed shader, simple -> complex ------
+    # Sweep this to see the holistic compile-time curve as a representative
+    # shader grows in complexity (control flow + generics + dispatch + resources
+    # + call depth all scale together), vs the single-axis stressors above.
+    WorkloadSpec(
+        name="complexity_ladder",
+        bucket="realistic_scaling",
+        gen=workloads.gen_complexity_ladder,
+        default_size=160,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR",
+                        "simplifyIR"],
+        sweep_sizes=[20, 40, 80, 160, 320, 640],
     ),
     # ---- real-shader corpus ----------------------------------------------
     WorkloadSpec(

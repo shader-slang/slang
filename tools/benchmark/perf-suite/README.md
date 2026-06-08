@@ -52,7 +52,7 @@ regression points at a specific release.
 
 ## The tests and what they target
 
-11 workloads run per release. Synthetic ones are generated deterministically by
+Workloads run per release. Synthetic ones are generated deterministically by
 `workloads.py`, scaled by a size knob `N`; `mdl_dxr` is a real shader corpus.
 
 ### Suspected-regression features (deepest workloads)
@@ -61,6 +61,7 @@ regression points at a specific release.
 |---|---|---|---|
 | **autodiff** | `N` `[Differentiable]` functions in bounded-depth groups, differentiated forward + reverse, plus a differentiable generic | the **autodiff IR transform** | `linkAndOptimizeIR` |
 | **dynamic_dispatch** | one interface with `N` implementations, dispatched through a runtime-typed existential (defeats static specialization → real witness-table dispatch) | **dynamic-dispatch lowering / specialization** | `specializeModule` |
+| **existential_aggregate** | an interface-typed **field** inside a struct (`Scene { IMat m; }`) + `N` impls selected via a switch | boxing the existential in an aggregate forces **existential-layout legalization** + a witness-per-case specialization blowup (uncovered by the bare-local `dynamic_dispatch`) | `legalizeExistentialTypeLayout`, `specializeModule` |
 | **diagnostics_errors** | `N` functions each with undefined symbols → ~2N diagnostics (compile fails on purpose) | the **diagnostic-emission path** | `SemanticChecking` |
 | **diagnostics_clean** | same shape, but compiles | **size-matched control** — `errors − clean` isolates diagnostic cost | `SemanticChecking` |
 
@@ -72,7 +73,8 @@ regression points at a specific release.
 | **sema_generics** | `N` generic functions × 3 type instantiations | **semantic checking / generic instantiation** | `SemanticChecking` |
 | **specialization** | a generic `Box<T:IVal>` over `N` distinct types | **generic specialization** | `specializeModule` |
 | **inlining** | `N` `[ForceInline]` functions (bounded-depth groups) | **inliner + SSA simplify** | `simplifyIR` |
-| **codegen_spirv** | one shader, `N` lines of backend math | **target code emission** | `generateOutput` |
+| **codegen_spirv** | one shader, `N` lines of backend math | **target code emission** (SPIR-V, direct) | `generateOutput` |
+| **emit_metal** / **emit_wgsl** | the same shader as `codegen_spirv`, emitted to **textual** Metal / WGSL | the **source-emission backend** (`emitEntryPointsSourceFromIR` + target legalization) that `-emit-spirv-directly` skips entirely — no other workload exercises it | `emitEntryPointsSourceFromIR` |
 | **module_link** | `N` modules precompiled to `.slang-module`, then linked | **module read + IR link** | `linkIR` |
 
 ### Shared-infrastructure & scaling tests
@@ -92,6 +94,21 @@ isolate the shared machinery and scaling behavior directly.
 
 `minimal` is the **regression canary**: cheap enough to run on every PR, and the
 single best early warning for "the stdlib got heavier"-class regressions.
+
+### Complexity-scaling test
+
+The single-axis stressors above each isolate **one** pass. `complexity_ladder`
+instead ramps *several* realistic dimensions together — branchy control flow,
+generic calls, bounded inner loops, resource reads, dynamic dispatch, and
+call-graph depth — so the size knob `N` models a real shader growing from
+**simple to highly complex**. Sweep it (`bench.py --only complexity_ladder
+--sweep`) and fit with `analyze.py --slope-label` to get the holistic
+complexity → compile-time curve, separating the fixed **floor** from the
+per-unit **slope** and surfacing super-linear bends at high complexity.
+
+| Test | What it generates | Targets | Primary timer |
+|---|---|---|---|
+| **complexity_ladder** | a mixed-feature shader (control flow + generics + loops + dispatch + resources, scaled together by `N`) | the **whole pipeline at once**, as a realistic-shader scaling curve | `compileInner` (+ `frontEndExecute`, `linkAndOptimizeIR`) |
 
 ### Real-shader test
 
