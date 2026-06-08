@@ -613,19 +613,19 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // About 5% of instructions in the core module are strings!
         case kIROp_StringLit:
         case kIROp_BlobLit:
-        {
-            SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
-            const auto len = flat.stringLengths[stringLengthIndex++];
-            SLANG_RELEASE_ASSERT(len >= 0);
-            SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
+            {
+                SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
+                const auto len = flat.stringLengths[stringLengthIndex++];
+                SLANG_RELEASE_ASSERT(len >= 0);
+                SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
 
-            const size_t headerSize =
-                offsetof(IRConstant, value) + offsetof(IRConstant::StringValue, chars);
-            SLANG_RELEASE_ASSERT(size_t(len) <= size_t(-1) - headerSize);
+                const size_t headerSize =
+                    offsetof(IRConstant, value) + offsetof(IRConstant::StringValue, chars);
+                SLANG_RELEASE_ASSERT(size_t(len) <= size_t(-1) - headerSize);
 
-            minSizeInBytes = headerSize + size_t(len);
-            break;
-        }
+                minSizeInBytes = headerSize + size_t(len);
+                break;
+            }
         }
         insts[instIndex] = module->_allocateInst(op, a.operandCount, minSizeInBytes);
     }
@@ -663,47 +663,47 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             break;
         case kIROp_BoolLit:
         case kIROp_IntLit:
-        {
-            SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
-            const auto bits = flat.literals[litIndex++];
-            cast<IRConstant>(inst)->value.intVal = bitCast<IRIntegerValue>(bits);
-            break;
-        }
+            {
+                SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
+                const auto bits = flat.literals[litIndex++];
+                cast<IRConstant>(inst)->value.intVal = bitCast<IRIntegerValue>(bits);
+                break;
+            }
         case kIROp_FloatLit:
-        {
-            SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
-            const auto bits = flat.literals[litIndex++];
-            cast<IRConstant>(inst)->value.floatVal = bitCast<double>(bits);
-            break;
-        }
+            {
+                SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
+                const auto bits = flat.literals[litIndex++];
+                cast<IRConstant>(inst)->value.floatVal = bitCast<double>(bits);
+                break;
+            }
         case kIROp_PtrLit:
-        {
-            SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
-            const auto bits = flat.literals[litIndex++];
-            // Keep the compiler happy on 32 bit builds
-            cast<IRConstant>(inst)->value.ptrVal = (void*)(uintptr_t(bits));
-            break;
-        }
+            {
+                SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
+                const auto bits = flat.literals[litIndex++];
+                // Keep the compiler happy on 32 bit builds
+                cast<IRConstant>(inst)->value.ptrVal = (void*)(uintptr_t(bits));
+                break;
+            }
         case kIROp_StringLit:
         case kIROp_BlobLit:
-        {
-            const auto c = cast<IRConstant>(inst);
-            SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
-            const auto len = flat.stringLengths[stringLengthIndex++];
-            SLANG_RELEASE_ASSERT(len >= 0);
-            SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
+            {
+                const auto c = cast<IRConstant>(inst);
+                SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
+                const auto len = flat.stringLengths[stringLengthIndex++];
+                SLANG_RELEASE_ASSERT(len >= 0);
+                SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
 
-            const auto stringCharsCount = flat.stringChars.getCount();
-            SLANG_RELEASE_ASSERT(stringDataIndex <= stringCharsCount);
-            SLANG_RELEASE_ASSERT(len <= stringCharsCount - stringDataIndex);
+                const auto stringCharsCount = flat.stringChars.getCount();
+                SLANG_RELEASE_ASSERT(stringDataIndex <= stringCharsCount);
+                SLANG_RELEASE_ASSERT(len <= stringCharsCount - stringDataIndex);
 
-            char* const dstChars = c->value.stringVal.chars;
-            c->value.stringVal.numChars = uint32_t(len);
-            if (len != 0)
-                memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, size_t(len));
-            stringDataIndex += len;
-            break;
-        }
+                char* const dstChars = c->value.stringVal.chars;
+                c->value.stringVal.numChars = uint32_t(len);
+                if (len != 0)
+                    memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, size_t(len));
+                stringDataIndex += len;
+                break;
+            }
         }
 
         // Read in children, and fix up pointers
