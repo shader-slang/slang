@@ -454,7 +454,9 @@ int main(int argc, char** argv)
     }
 
     vkdemo::Context ctx;
-    ctx.init();
+    // 64-bit counters need a device with shaderBufferInt64Atomics; request it so
+    // selection skips integrated GPUs that only support a 32-bit counter buffer.
+    ctx.init(enableCoverage && counterByteWidth == 8);
 
     // Application bindings at set=0; coverage at set=kCoverageSet binding=kCoverageBinding.
     std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings;
