@@ -21,7 +21,9 @@ float poly(float x)
     {
         acc = acc + x * x;
     }
-    return acc;
+    // `-(-acc)` exercises the fast-pathed unary negate (kIROp_Neg) inside a differentiable
+    // function; it is the identity, so the result/derivative are unchanged.
+    return -(-acc);
 }
 
 [numthreads(1, 1, 1)]

@@ -9,12 +9,20 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-d3d12 -output-using-type
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain()
 {
+    // Mixed-sign, same-size promotion: `int OP uint` promotes to `uint` (size-tie -> unsigned
+    // wins, per getBuiltinArithmeticCommonType). The signed `-1` is therefore compared as
+    // 0xFFFFFFFF, so `neg > zero` is true (it would be false under signed semantics).
+    int neg = int(outputBuffer[8]) - 1; // -1
+    uint zero = outputBuffer[9];         // 0
+    outputBuffer[8] = (neg > zero) ? 111u : 0u; // unsigned compare -> 111
+    outputBuffer[9] = uint(neg) + zero + 1u;     // 0xFFFFFFFF + 1 wraps -> 0
+
     uint big = outputBuffer[0] + 0xFFFFFFFFu; // 0xFFFFFFFF (4294967295)
     uint three = outputBuffer[1] + 3u;        // 3
 
@@ -42,4 +50,6 @@ void computeMain()
     // CHECK: 268435455
     // CHECK: 0
     // CHECK: 4
+    // CHECK: 111
+    // CHECK: 0
 }

@@ -2466,11 +2466,17 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
 
     const IntegerLiteralValue a0 = constArgs[0]->getValue();
     const IntegerLiteralValue a1 = (constArgs.getCount() > 1) ? constArgs[1]->getValue() : 0;
+    // Do the wrapping arithmetic (negate/add/sub/mul) through the unsigned type: signed
+    // overflow is UB (and `-INT64_MIN` / `INT64_MIN / -1` even trap on real hardware), while
+    // unsigned wraps two's-complement, matching what the target IR ops compute at runtime.
+    using UInt = std::make_unsigned_t<IntegerLiteralValue>;
+    const UInt u0 = (UInt)a0;
+    const UInt u1 = (UInt)a1;
     IntegerLiteralValue r = 0;
     switch (op)
     {
     case BuiltinOperationKind::Neg:
-        r = -a0;
+        r = (IntegerLiteralValue)(UInt(0) - u0);
         break;
     case BuiltinOperationKind::BitNot:
         r = ~a0;
@@ -2506,13 +2512,13 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         r = a0 ^ a1;
         break;
     case BuiltinOperationKind::Add:
-        r = a0 + a1;
+        r = (IntegerLiteralValue)(u0 + u1);
         break;
     case BuiltinOperationKind::Sub:
-        r = a0 - a1;
+        r = (IntegerLiteralValue)(u0 - u1);
         break;
     case BuiltinOperationKind::Mul:
-        r = a0 * a1;
+        r = (IntegerLiteralValue)(u0 * u1);
         break;
     case BuiltinOperationKind::Div:
     case BuiltinOperationKind::Mod:
@@ -2522,7 +2528,12 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
                 sink->diagnose(Diagnostics::DivideByZero{});
             return nullptr;
         }
-        r = (op == BuiltinOperationKind::Div) ? (a0 / a1) : (a0 % a1);
+        // `INT64_MIN / -1` overflows and traps (SIGFPE) on real hardware, so handle the
+        // `/ -1` case without dividing: `x / -1 == -x` (wrapping) and `x % -1 == 0`.
+        if (a1 == -1)
+            r = (op == BuiltinOperationKind::Div) ? (IntegerLiteralValue)(UInt(0) - u0) : 0;
+        else
+            r = (op == BuiltinOperationKind::Div) ? (a0 / a1) : (a0 % a1);
         break;
     case BuiltinOperationKind::Lsh:
     case BuiltinOperationKind::Rsh:
