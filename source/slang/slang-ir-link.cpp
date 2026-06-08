@@ -2255,12 +2255,16 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // coverage pass uses) — otherwise they would be dead code, and on a target
     // that can't lower them (e.g. WGSL) a kept-but-unused wave func breaks
     // codegen.
-    const bool coverageEnabled =
-        linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage) ||
-        linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage) ||
-        linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
-    const bool keepCoverageWaveFuncs =
-        coverageEnabled && isCoverageWaveAggregationSupported(targetReq);
+    //
+    // `shouldTraceAnyCoverage()` is the same "any coverage mode on" predicate
+    // the coverage pass keys off (it reads the merged TargetProgram option set),
+    // so reusing it keeps the force-keep in lockstep with whether the pass runs
+    // rather than re-spelling the three-flag disjunction here. The profile gate
+    // likewise reads the merged set so it matches the pass's own decision.
+    const bool keepCoverageWaveFuncs = codeGenContext->shouldTraceAnyCoverage() &&
+                                       isCoverageWaveAggregationSupported(
+                                           targetReq,
+                                           targetProgram->getOptionSet().getProfileVersion());
 
     auto shouldCopy = [&](IRInst* inst) -> bool
     {

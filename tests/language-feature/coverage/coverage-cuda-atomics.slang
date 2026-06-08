@@ -33,16 +33,23 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK: struct GlobalParams
 //CHECK: RWStructuredBuffer{{.*}}_slang_coverage
 
-// Counter increments are wave-aggregated (issue #11509): each marker counts
-// the active lanes (WaveActiveCountBits) and a single lane (WaveIsFirstLane)
-// applies the whole increment, instead of every lane issuing atomicAdd(slot, 1).
-//CHECK-DAG: WaveActiveCountBits
-//CHECK-DAG: WaveIsFirstLane
-// One distinct counter slot per marker (no slot dedup by file/line).
-//CHECK-DAG: _slang_coverage{{.*}}int(0)
-//CHECK-DAG: _slang_coverage{{.*}}int(1)
-//CHECK-DAG: _slang_coverage{{.*}}int(2)
-// Each marker still performs a real (now guarded) CUDA atomicAdd on the buffer.
-//CHECK-DAG: atomicAdd
-//CHECK-DAG: atomicAdd
-//CHECK-DAG: atomicAdd
+// Counter increments are wave-aggregated (issue #11509): each marker counts the
+// active lanes and a single elected lane applies the whole increment, instead of
+// every lane issuing atomicAdd(slot, 1). On CUDA `WaveActiveCountBits` lowers to
+// `__popc(__ballot_sync(...))`, so assert that real idiom (not just the kept
+// function name), then bind each guarded `atomicAdd` to BOTH its coverage-slot
+// pointer and the active-lane-count result so the test proves the atomic targets
+// the slot and adds the lane count, not a literal 1.
+//CHECK: __popc(__ballot_sync
+// slot 0: capture the slot pointer and the lane count, then bind the atomic.
+//CHECK: [[SLOT0:_S[0-9]+]] = {{.*}}_slang_coverage{{.*}}int(0)
+//CHECK: [[CNT0:_S[0-9]+]] = WaveActiveCountBits
+//CHECK: atomicAdd([[SLOT0]], [[CNT0]])
+// slot 1
+//CHECK: [[SLOT1:_S[0-9]+]] = {{.*}}_slang_coverage{{.*}}int(1)
+//CHECK: [[CNT1:_S[0-9]+]] = WaveActiveCountBits
+//CHECK: atomicAdd([[SLOT1]], [[CNT1]])
+// slot 2
+//CHECK: [[SLOT2:_S[0-9]+]] = {{.*}}_slang_coverage{{.*}}int(2)
+//CHECK: [[CNT2:_S[0-9]+]] = WaveActiveCountBits
+//CHECK: atomicAdd([[SLOT2]], [[CNT2]])

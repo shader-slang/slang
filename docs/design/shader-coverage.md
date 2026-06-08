@@ -190,8 +190,18 @@ counters are inserted, with examples, see
      on the same source line get distinct slots and are aggregated by
      the LCOV exporter. Function and branch markers produce their own
      `CoverageEntryInfo::kind` values and use the same counter buffer.
-   - **Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
-     Relaxed)`**.
+   - **Rewrites each op into a counter increment, choosing one of two
+     lowerings via `isCoverageWaveAggregationSupported`:**
+     - Non-wave targets (CPU/cpp-source, WGSL, GLSL, sub-SM6.0 HLSL):
+       per-lane `AtomicAdd(__slang_coverage[slot], 1, Relaxed)`.
+     - Wave-capable targets (SPIR-V, CUDA, Metal, HLSL SM6.0+): the
+       wave-aggregated form (issue #11509), where the active lanes are
+       counted once and a single elected lane applies the whole
+       increment —
+       `uint lc = WaveActiveCountBits(true); if (WaveIsFirstLane())
+       AtomicAdd(__slang_coverage[slot], lc, Relaxed);` — so the hot
+       counter slot takes one atomic per wave instead of one per lane,
+       with the aggregated total equal to the per-lane total.
    - **Records source entries on the artifact's
      `ICoverageTracingMetadata` and the synthesized buffer binding on
      `ISyntheticResourceMetadata`.** A source entry is unattributable when its

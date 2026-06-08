@@ -19,6 +19,11 @@
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
 
+// The body is two straight-line statements, so under line `-trace-coverage`
+// it produces exactly two line markers → coverage slots %int_0 and %int_1, and
+// no %int_2. The slot-0 / slot-1 CHECKs and the final %int_2 CHECK-NOT below
+// depend on that mapping; editing the body (adding/removing a statement)
+// changes the slot count and would need the checks updated to match.
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {

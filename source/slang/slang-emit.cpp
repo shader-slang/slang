@@ -1077,6 +1077,13 @@ Result linkAndOptimizeIR(
                 reservedSpaces.add((int)value.intValue);
             }
         }
+        // Read the wave-aggregation profile gate from the MERGED TargetProgram
+        // option set, not the per-target request — an API-supplied SM6.0 profile
+        // lands on the merged set, and reading the per-target set alone would
+        // leave it Unknown and silently disable aggregation for those callers.
+        const bool coverageWaveAggregationSupported = isCoverageWaveAggregationSupported(
+            targetRequest,
+            targetProgram->getOptionSet().getProfileVersion());
         SLANG_PASS(
             instrumentCoverage,
             sink,
@@ -1086,6 +1093,7 @@ Result linkAndOptimizeIR(
             reservedSpaces.getBuffer(),
             (int)reservedSpaces.getCount(),
             targetRequest,
+            coverageWaveAggregationSupported,
             outLinkedIR.globalScopeVarLayout,
             *metadata);
         validateIRModuleIfEnabled(codeGenContext, irModule);

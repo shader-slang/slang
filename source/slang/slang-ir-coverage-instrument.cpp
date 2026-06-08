@@ -516,6 +516,12 @@ static bool isCoverageInstrumentationTargetSupported(TargetRequest* targetReques
 // link (slang-ir-link.cpp) when coverage is enabled, so the definitions are
 // present here; the coverage pass runs before inlining/target-switch, so the
 // calls resolve through the normal pipeline afterwards.
+//
+// Precondition: link leaves at most one IR func per `[KnownBuiltin]` name. The
+// asserts below pin that — if two clones of `WaveActiveCountBits` ever survived
+// link, picking one arbitrarily would be a silent miscompile, so we fail loudly
+// instead. Either out-param is left null when its intrinsic is absent (the
+// caller falls back to the per-lane path), so absence is not an error here.
 static void findCoverageWaveFuncs(IRModule* module, IRFunc*& outCountBits, IRFunc*& outFirstLane)
 {
     outCountBits = nullptr;
@@ -531,9 +537,11 @@ static void findCoverageWaveFuncs(IRModule* module, IRFunc*& outCountBits, IRFun
         switch (knownBuiltin->getName())
         {
         case KnownBuiltinDeclName::WaveActiveCountBits:
+            SLANG_ASSERT(!outCountBits); // expect a unique definition post-link
             outCountBits = func;
             break;
         case KnownBuiltinDeclName::WaveIsFirstLane:
+            SLANG_ASSERT(!outFirstLane); // expect a unique definition post-link
             outFirstLane = func;
             break;
         default:
@@ -941,12 +949,17 @@ struct CoverageInstrumenter
     IRModule* module;
     IRGlobalParam* coverageBuffer;
     SourceManager* sourceManager;
-    TargetRequest* targetRequest;
     ArtifactPostEmitMetadata& outMetadata;
     IRType* uintType;
     IRType* uintPtrType;
     IRType* intType;
     IRType* boolType;
+    // Invariant (established in the ctor, read in `lowerMarkerOp`): the three
+    // wave members move together. `waveAggregate` is true iff this target
+    // aggregates AND the linker force-kept both `[KnownBuiltin]` intrinsics, in
+    // which case `waveCountBitsFunc`/`waveIsFirstLaneFunc` are the resolved
+    // callees `lowerMarkerOp` invokes; when false, both funcs stay null and the
+    // per-lane path is taken.
     bool waveAggregate = false;
     IRFunc* waveCountBitsFunc = nullptr;
     IRFunc* waveIsFirstLaneFunc = nullptr;
@@ -957,9 +970,9 @@ struct CoverageInstrumenter
         IRModule* m,
         IRGlobalParam* buf,
         SourceManager* sm,
-        TargetRequest* tr,
+        bool waveAggregationSupported,
         ArtifactPostEmitMetadata& md)
-        : module(m), coverageBuffer(buf), sourceManager(sm), targetRequest(tr), outMetadata(md)
+        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md)
     {
         IRBuilder tmpBuilder(module);
         uintType = tmpBuilder.getUIntType();
@@ -967,7 +980,7 @@ struct CoverageInstrumenter
         intType = tmpBuilder.getIntType();
         boolType = tmpBuilder.getBoolType();
 
-        waveAggregate = isCoverageWaveAggregationSupported(targetRequest);
+        waveAggregate = waveAggregationSupported;
         if (waveAggregate)
         {
             findCoverageWaveFuncs(module, waveCountBitsFunc, waveIsFirstLaneFunc);
@@ -982,6 +995,14 @@ struct CoverageInstrumenter
     // Move `inst` and every following inst in its block into a fresh block,
     // leaving the original block open (no terminator) so the caller can
     // append control flow.
+    //
+    // Preconditions (true at the sole call site — a marker op sits mid-block):
+    // `inst` is an ordinary body instruction, not an `IRParam` (block params are
+    // intentionally left on the original block, never moved), and `inst`'s block
+    // has a terminator. The loop carries that terminator into the new block, so
+    // the new block is well-formed while the original is deliberately left open
+    // for the caller to terminate. Not a general-purpose utility — used only by
+    // `lowerMarkerOp`.
     IRBlock* splitBlockAtInst(IRInst* inst)
     {
         IRBuilder builder(module);
@@ -1071,8 +1092,7 @@ struct CoverageInstrumenter
             2,
             getElemArgs);
 
-        IRInst* memoryOrder =
-            builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed);
+        IRInst* memoryOrder = builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed);
 
         if (waveAggregate)
         {
@@ -1085,6 +1105,14 @@ struct CoverageInstrumenter
             //   if (WaveIsFirstLane()) atomicAdd(slot, lc);
             // `WaveActiveCountBits(true)` counts lanes active at this marker, so
             // the aggregated total matches the per-lane total exactly.
+            //
+            // Placement is load-bearing: `WaveActiveCountBits`/`WaveIsFirstLane`
+            // are wave-collective, so every lane that participates in the count
+            // must reach them. They are emitted into `headBlock` — before the
+            // `WaveIsFirstLane()` guard — and must stay in this convergent
+            // control flow. Sinking either call into `thenBlock` (the elected-
+            // lane branch) would let only one lane vote and break the count, so
+            // a refactor must not move the collective calls past the guard.
             IRInst* trueVal = builder.getBoolValue(true);
             IRInst* laneCount = builder.emitCallInst(uintType, waveCountBitsFunc, 1, &trueVal);
             IRInst* isFirstLane = builder.emitCallInst(boolType, waveIsFirstLaneFunc, 0, nullptr);
@@ -1302,7 +1330,12 @@ static bool tryGetCoverageUniformBindingInfo(
 // also include GLSL, but enabling it needs separate validation that a bare
 // `glsl_450` profile auto-declares the subgroup extension rather than
 // erroring, so we gate on SPIR-V only via `isSPIRV`.
-bool isCoverageWaveAggregationSupported(TargetRequest* targetRequest)
+//
+// `profileVersion` must be the MERGED `TargetProgram` profile (see the header):
+// the HLSL branch compares against `DX_6_0`, and reading the per-target
+// `targetRequest->getOptionSet()` instead would miss an API-supplied profile
+// and silently fall back to per-lane on SM6.0+ callers.
+bool isCoverageWaveAggregationSupported(TargetRequest* targetRequest, ProfileVersion profileVersion)
 {
     if (!isCoverageInstrumentationTargetSupported(targetRequest)) // excludes WGSL + CPU-via-LLVM
         return false;
@@ -1315,7 +1348,7 @@ bool isCoverageWaveAggregationSupported(TargetRequest* targetRequest)
     if (isSPIRV(targetRequest->getTarget())) // SPIR-V / Vulkan
         return true;
     if (isD3DTarget(targetRequest)) // HLSL: wave intrinsics require shader model 6.0+
-        return targetRequest->getOptionSet().getProfileVersion() >= ProfileVersion::DX_6_0;
+        return profileVersion >= ProfileVersion::DX_6_0;
     return false;
 }
 
@@ -1328,6 +1361,7 @@ void instrumentCoverage(
     const int* reservedSpaces,
     int reservedSpaceCount,
     TargetRequest* targetRequest,
+    bool waveAggregationSupported,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
 {
@@ -1481,7 +1515,7 @@ void instrumentCoverage(
         module,
         buffer,
         sink ? sink->getSourceManager() : nullptr,
-        targetRequest,
+        waveAggregationSupported,
         outMetadata);
     instrumenter.run(markerOps);
 }
