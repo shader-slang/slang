@@ -176,7 +176,9 @@ for (uint32_t i = 0; i < entryCount; ++i) {
 }
 ```
 
-The host allocates a `uint32_t[counterCount]` counter buffer, binds it
+The host allocates a `counterCount`-element counter buffer at the width
+reported by `CoverageBufferInfo::elementByteWidth` (`uint64` by default,
+`uint32` under `-trace-coverage-counter-width 32`), binds it
 using the hidden binding information reported through
 `ISyntheticResourceMetadata`, dispatches the shader, reads the
 counters back, and consumes the source entries however it likes —
@@ -296,9 +298,13 @@ contract.
 
 ## Counter buffer format
 
-`uint32_t counters[N]` — flat little-endian array, no header. Indexed
-by `CoverageEntryInfo::counterIndex` / manifest `counter`. Saturates
-at ~4 × 10⁹ hits per slot (see [Current limitations](#current-limitations)).
+Flat little-endian array of `N` counters, no header. Element width is
+`uint64` by default (`uint32` under `-trace-coverage-counter-width 32`),
+reported by `manifest.buffer.element_stride` /
+`CoverageBufferInfo::elementByteWidth`. Indexed by
+`CoverageEntryInfo::counterIndex` / manifest `counter`. uint64 slots
+effectively never wrap; uint32 slots saturate at ~4 × 10⁹ hits per slot
+(see [Current limitations](#current-limitations)).
 
 ---
 
@@ -309,7 +315,9 @@ at ~4 × 10⁹ hits per slot (see [Current limitations](#current-limitations)).
                                  Produced by slangc alongside the
                                  compiled artifact, or hand-built from
                                  ICoverageTracingMetadata.
---counters <file.bin>            Binary uint32 little-endian
+--counters <file.bin>            Binary little-endian; element width
+                                 (uint32 or uint64) auto-detected from
+                                 the manifest's buffer.element_stride
   OR
 --counters-text <file-or-'->     Whitespace-separated decimal ints
                                  ('-' reads stdin)
@@ -359,9 +367,10 @@ declares the slot in its own pipeline layout / root signature.
   source `switch` case/default dispatch arms, including the implicit
   no-match default path when no `default` label exists.
 - **Column position is dropped.** Only `(file, line)` reaches LCOV.
-- **Counter type is `uint32`.** Saturates at ~4 × 10⁹ hits per
-  slot. Multiple ops on the same source line accumulate
-  independently before LCOV-emit-time aggregation.
+- **Counter width is selectable.** `uint64` by default (effectively
+  never wraps); `-trace-coverage-counter-width 32` opts down to `uint32`,
+  which saturates at ~4 × 10⁹ hits per slot. Multiple ops on the same
+  source line accumulate independently before LCOV-emit-time aggregation.
 
 ## Current limitations
 
