@@ -1603,7 +1603,7 @@ static bool _canEmitExport(const Profile& profile)
 
 
 void HLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name) {
-    // Mesh shaders outputs have their "in"/"out" qualifiers already added in
+    // Mesh shader parameters have their "in"/"out" qualifiers already added in
     // emitMeshShaderModifiers, so we do not need that here. This is tracked
     // through a cache variable. (This is safe because emitParamTypeImpl will
     // be called immediately after emitMeshShaderModifiers.)
