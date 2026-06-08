@@ -4651,6 +4651,7 @@ void CLikeSourceEmitter::emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, 
     if (layout->usesResourceKind(LayoutResourceKind::VaryingInput) ||
         layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
     {
+        emitMeshShaderModifiers(varDecl);
         emitInterpolationModifiers(varDecl, varType, layout);
     }
 
