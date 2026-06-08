@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T17:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-05T15:45:00Z
 target_doc: ir-reference/control-flow.md
 review_report: ../../reviews/ir-reference/control-flow.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
 actions:
-  fixed: 1
+  fixed: 0
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,11 +18,11 @@ actions:
 
 ## Summary
 
-One major finding addressed by adding the four missing
-`Require*`-style rows to the "Other control-flow opcodes" table.
+The review reported zero findings (finding_count: 0). No actions were
+taken and the target document is unchanged. The Actions table below
+contains only its header row.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-ir-insts.lua:1381-1389` defines `RequirePrelude`, `RequireTargetExtension`, `RequireComputeDerivative`, `StaticAssert`, `Printf`, `RequireMaximallyReconverges`, and `RequireQuadDerivatives` as a single contiguous group; the existing rows already covered three of the seven. | Added rows for `RequireTargetExtension`, `RequireComputeDerivative`, `RequireMaximallyReconverges`, and `RequireQuadDerivatives` in the "Other control-flow opcodes" table. |

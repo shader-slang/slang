@@ -1,38 +1,49 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-05T14:54:00+00:00
 target_doc: pipeline/overview.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: c42e276adc6581c33bb4effaa5201418aa07fde812042c885eb713bf657774c6
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: 2b1f264a09ca0945624e60f437a309169a899a6be06ea582244f6b6933989b9c
+source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: partial
-  style_consistency: pass
-  source_alignment: partial
+  completeness: pass
+  style_consistency: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 3
+finding_count: 1
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 2
-  nit: 0
+  major: 0
+  minor: 0
+  nit: 1
 ---
 
 # Review report for pipeline/overview.md
 
 ## Summary
-The page is structurally lint-clean, but review found 3 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+
+Overall the overview is accurate and source-aligned. The only issue I found is a prompt-style mismatch in the Mermaid diagram: the node IDs are PascalCase, but the prompt's quality checklist asks for camelCase IDs.
 
 ## Items checked
-- Verified front matter, stage links, driver/source path claims, `linkAndOptimizeIR`, `emitEntryPointsSourceFromIR`, and representative compile-request orchestration claims.
+
+- Ran `python3 docs/generated/design/_meta/regenerate.py show pipeline/overview.md` and reviewed the resolved watched-file scope plus dependency `architecture/overview.md`.
+- Verified required front matter keys and confirmed `target_doc_source_commit` and `target_doc_watched_paths_digest` match the target document.
+- Resolved all 41 relative Markdown links at `52339028a2aa703271533454c6b9528a534bac31` with no missing targets.
+- Verified line-number citations against source: `checkTranslationUnit` around line 513 in `source/slang/slang-compile-request.cpp`, `linkAndOptimizeIR` around line 895 in `source/slang/slang-emit.cpp`, and `emitEntryPointsSourceFromIR` at line 2487 in `source/slang/slang-emit.cpp`.
+- Spot-checked 17 factual/source-alignment claims covering lexer/preprocessor files, two-stage parsing, semantic-check file family, AST-to-IR lowering through `IRBuilder`, approximate `slang-ir-*.cpp` count, emit backend selection, compile-request entry points, `EndToEndCompileRequest`, `Module`, `IComponentType`, and cross-cutting concern links.
+- Checked required sections, stage subsections, per-stage detail links, no-emoji style, workspace-relative links, and document size relative to the 24 KB cap.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | lines 109-115 | The page claims `source/slang/` contains roughly 300 `slang-ir-*.cpp` files, but the watched glob resolves to about 161 implementation files. | `source/slang/slang-ir-*.cpp` at review HEAD resolves to 161 files. | Change the count to roughly 160, or avoid a precise count. |
-| F-002 | minor | lines 145-149 | The page says `slang-end-to-end-request.cpp` declares `EndToEndCompileRequest`; the class is declared in the header. | `source/slang/slang-end-to-end-request.h:61` declares `class EndToEndCompileRequest`. | Change the reference to `slang-end-to-end-request.h` for the declaration. |
-| F-003 | major | `## Driver entry points` | The prompt requires `slang-compile-request.cpp` orchestration coverage, but this section links only `slang-compile-request.h`. | `source/slang/slang-compile-request.cpp:513` contains orchestration through `checkAllTranslationUnits` / `checkTranslationUnit`. | Add a `slang-compile-request.cpp` link and describe its orchestration role. |
+| F-001 | nit | `## End-to-end flow`, lines 22-30 | The Mermaid diagram uses node IDs such as `Source`, `Lex`, `Parse`, and `Artefact`; these are PascalCase rather than the camelCase IDs required by the prompt checklist. | `docs/generated/design/_meta/prompts/pipeline-overview.md` lines 41-47 includes the quality-check item: Mermaid diagram nodes use camelCase IDs and no explicit colors. | Rename the diagram IDs to camelCase forms such as `source`, `lexPreprocess`, `parse`, `semanticCheck`, `lower`, `irPasses`, `emit`, and `targetArtifact` while preserving the visible labels. |
+
+## No-issues notes
+
+- The page keeps the expected roadmap scope and does not duplicate detailed per-stage content.
+- Every stage subsection contains at least one source-file link, and the per-stage detail links resolve.
+- The generated front matter contains all required keys, and the digest is a valid 64-character hex value.
