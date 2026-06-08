@@ -34,8 +34,16 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //GLSL-DAG: atomicAdd{{.*_slang_coverage.*uint\(2\)}}
 //GLSL-NOT: atomicAdd{{.*_slang_coverage.*uint\(3\)}}
 
+// Metal is wave-capable (SIMD-group functions), so coverage increments are
+// wave-aggregated (issue #11509): count active lanes, then simd_is_first()
+// guards a single atomic per marker.
 //METAL: _slang_coverage
-//METAL-DAG: atomic_fetch_add_explicit{{.*_slang_coverage.*int\(0\)}}
-//METAL-DAG: atomic_fetch_add_explicit{{.*_slang_coverage.*int\(1\)}}
-//METAL-DAG: atomic_fetch_add_explicit{{.*_slang_coverage.*int\(2\)}}
-//METAL-NOT: atomic_fetch_add_explicit{{.*_slang_coverage.*int\(3\)}}
+//METAL-DAG: WaveActiveCountBits
+//METAL-DAG: simd_is_first
+//METAL-DAG: _slang_coverage{{.*}}int(0)
+//METAL-DAG: _slang_coverage{{.*}}int(1)
+//METAL-DAG: _slang_coverage{{.*}}int(2)
+//METAL-DAG: atomic_fetch_add_explicit
+//METAL-DAG: atomic_fetch_add_explicit
+//METAL-DAG: atomic_fetch_add_explicit
+//METAL-NOT: _slang_coverage{{.*}}int(3)

@@ -5,6 +5,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "slang-capability.h"
 #include "slang-ir-autodiff.h"
+#include "slang-ir-coverage-instrument.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-specialize-target-switch.h"
@@ -2246,6 +2247,21 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     bool shouldCopyGlobalParams =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::PreserveParameters);
 
+    // Coverage instrumentation (issue #11509) synthesizes calls to the wave
+    // intrinsics `WaveActiveCountBits`/`WaveIsFirstLane` for wave-aggregated
+    // counters, so those `[KnownBuiltin]` funcs must survive link even when the
+    // user shader references no wave ops. Force-keep them only when coverage is
+    // enabled AND the target actually aggregates (the same predicate the
+    // coverage pass uses) — otherwise they would be dead code, and on a target
+    // that can't lower them (e.g. WGSL) a kept-but-unused wave func breaks
+    // codegen.
+    const bool coverageEnabled =
+        linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage) ||
+        linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage) ||
+        linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
+    const bool keepCoverageWaveFuncs =
+        coverageEnabled && isCoverageWaveAggregationSupported(targetReq);
+
     auto shouldCopy = [&](IRInst* inst) -> bool
     {
         // We need to copy over exported symbols,
@@ -2267,6 +2283,12 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             {
             case KnownBuiltinDeclName::NullDifferential:
                 return true;
+            case KnownBuiltinDeclName::WaveActiveCountBits:
+            case KnownBuiltinDeclName::WaveIsFirstLane:
+                // Force-kept only when coverage will aggregate on this target.
+                if (keepCoverageWaveFuncs)
+                    return true;
+                break;
             default:
                 break;
             }

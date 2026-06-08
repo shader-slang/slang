@@ -511,6 +511,37 @@ static bool isCoverageInstrumentationTargetSupported(TargetRequest* targetReques
     return !isWGPUTarget(targetRequest) && !isCPUTargetViaLLVM(targetRequest);
 }
 
+// Locate the wave intrinsics that wave-aggregation synthesizes calls to.
+// They are marked `[KnownBuiltin]` in the core module and force-kept across
+// link (slang-ir-link.cpp) when coverage is enabled, so the definitions are
+// present here; the coverage pass runs before inlining/target-switch, so the
+// calls resolve through the normal pipeline afterwards.
+static void findCoverageWaveFuncs(IRModule* module, IRFunc*& outCountBits, IRFunc*& outFirstLane)
+{
+    outCountBits = nullptr;
+    outFirstLane = nullptr;
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func)
+            continue;
+        auto knownBuiltin = func->findDecoration<IRKnownBuiltinDecoration>();
+        if (!knownBuiltin)
+            continue;
+        switch (knownBuiltin->getName())
+        {
+        case KnownBuiltinDeclName::WaveActiveCountBits:
+            outCountBits = func;
+            break;
+        case KnownBuiltinDeclName::WaveIsFirstLane:
+            outFirstLane = func;
+            break;
+        default:
+            break;
+        }
+    }
+}
+
 static void addReservedCoverageSpaces(
     List<UsedBindingRange>& ranges,
     const int* reservedSpaces,
@@ -910,10 +941,15 @@ struct CoverageInstrumenter
     IRModule* module;
     IRGlobalParam* coverageBuffer;
     SourceManager* sourceManager;
+    TargetRequest* targetRequest;
     ArtifactPostEmitMetadata& outMetadata;
     IRType* uintType;
     IRType* uintPtrType;
     IRType* intType;
+    IRType* boolType;
+    bool waveAggregate = false;
+    IRFunc* waveCountBitsFunc = nullptr;
+    IRFunc* waveIsFirstLaneFunc = nullptr;
     List<BranchSiteRemap> branchSiteRemaps;
     uint32_t nextBranchSiteID = 1;
 
@@ -921,13 +957,43 @@ struct CoverageInstrumenter
         IRModule* m,
         IRGlobalParam* buf,
         SourceManager* sm,
+        TargetRequest* tr,
         ArtifactPostEmitMetadata& md)
-        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md)
+        : module(m), coverageBuffer(buf), sourceManager(sm), targetRequest(tr), outMetadata(md)
     {
         IRBuilder tmpBuilder(module);
         uintType = tmpBuilder.getUIntType();
         uintPtrType = tmpBuilder.getPtrType(uintType);
         intType = tmpBuilder.getIntType();
+        boolType = tmpBuilder.getBoolType();
+
+        waveAggregate = isCoverageWaveAggregationSupported(targetRequest);
+        if (waveAggregate)
+        {
+            findCoverageWaveFuncs(module, waveCountBitsFunc, waveIsFirstLaneFunc);
+            // If the force-keep did not preserve the intrinsics (e.g. a future
+            // change to the link root set), fall back to the per-lane path
+            // rather than emitting a call to a missing callee.
+            if (!waveCountBitsFunc || !waveIsFirstLaneFunc)
+                waveAggregate = false;
+        }
+    }
+
+    // Move `inst` and every following inst in its block into a fresh block,
+    // leaving the original block open (no terminator) so the caller can
+    // append control flow.
+    IRBlock* splitBlockAtInst(IRInst* inst)
+    {
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+        IRBlock* newBlock = builder.emitBlock();
+        for (IRInst* i = inst; i;)
+        {
+            IRInst* next = i->getNextInst();
+            i->insertAtEnd(newBlock);
+            i = next;
+        }
+        return newBlock;
     }
 
     uint32_t getRemappedBranchSiteID(IRInst* markerOp, uint32_t originalSiteID)
@@ -1005,16 +1071,51 @@ struct CoverageInstrumenter
             2,
             getElemArgs);
 
-        // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
-        // backend emitter to its native atomic-increment idiom
-        // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
-        // SPIR-V, etc.). Correct under GPU concurrency.
-        IRInst* atomicArgs[] = {
-            slotPtr,
-            builder.getIntValue(uintType, 1),
-            builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
-        };
-        builder.emitIntrinsicInst(uintType, kIROp_AtomicAdd, 3, atomicArgs);
+        IRInst* memoryOrder =
+            builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed);
+
+        if (waveAggregate)
+        {
+            // Wave-aggregated counter increment (issue #11509). Instead of
+            // every active lane issuing `atomicAdd(slot, 1)` — which serializes
+            // on the few hot counter slots and can trip GPU TDR on large
+            // dispatches — count the active lanes once and let a single lane
+            // apply the whole increment:
+            //   uint lc = WaveActiveCountBits(true);
+            //   if (WaveIsFirstLane()) atomicAdd(slot, lc);
+            // `WaveActiveCountBits(true)` counts lanes active at this marker, so
+            // the aggregated total matches the per-lane total exactly.
+            IRInst* trueVal = builder.getBoolValue(true);
+            IRInst* laneCount = builder.emitCallInst(uintType, waveCountBitsFunc, 1, &trueVal);
+            IRInst* isFirstLane = builder.emitCallInst(boolType, waveIsFirstLaneFunc, 0, nullptr);
+
+            IRBlock* headBlock = as<IRBlock>(markerOp->getParent());
+            IRBlock* afterBlock = splitBlockAtInst(markerOp);
+
+            IRBlock* thenBlock = builder.createBlock();
+            thenBlock->insertAfter(headBlock);
+
+            builder.setInsertInto(headBlock);
+            builder.emitIfElse(isFirstLane, thenBlock, afterBlock, afterBlock);
+
+            builder.setInsertInto(thenBlock);
+            IRInst* atomicArgs[] = {slotPtr, laneCount, memoryOrder};
+            builder.emitIntrinsicInst(uintType, kIROp_AtomicAdd, 3, atomicArgs);
+            builder.emitBranch(afterBlock);
+        }
+        else
+        {
+            // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
+            // backend emitter to its native atomic-increment idiom
+            // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
+            // SPIR-V, etc.). Correct under GPU concurrency.
+            IRInst* atomicArgs[] = {
+                slotPtr,
+                builder.getIntValue(uintType, 1),
+                memoryOrder,
+            };
+            builder.emitIntrinsicInst(uintType, kIROp_AtomicAdd, 3, atomicArgs);
+        }
 
         // The marker op has void return type and, by construction, no uses.
         // Catch a future IR transform that takes a use of it before we reach
@@ -1184,6 +1285,40 @@ static bool tryGetCoverageUniformBindingInfo(
 
 } // anonymous namespace
 
+// Wave-aggregation (issue #11509) reduces atomic contention by issuing one
+// atomic per wave instead of one per active lane. The coverage pass
+// synthesizes calls to the stdlib `WaveActiveCountBits(true)` /
+// `WaveIsFirstLane()`, so it is only valid where those intrinsics lower.
+//
+// A capability query (`getTargetCaps().implies(subgroup_basic_ballot)`) is the
+// WRONG test at this early post-link stage: SPIR-V/Metal/CUDA subgroup atoms
+// are added on demand at emit (not present yet), and `implies` against a
+// multi-target compound alias requires the cap set to cover every target
+// family at once — so it returns false even for SPIR-V/CUDA/Metal here. Gate
+// on target family instead (the idiomatic approach in slang-emit.cpp), with
+// the HLSL shader-model 6.0 boundary checked via the profile version.
+//
+// GLSL is intentionally left on the per-lane path: `isKhronosTarget` would
+// also include GLSL, but enabling it needs separate validation that a bare
+// `glsl_450` profile auto-declares the subgroup extension rather than
+// erroring, so we gate on SPIR-V only via `isSPIRV`.
+bool isCoverageWaveAggregationSupported(TargetRequest* targetRequest)
+{
+    if (!isCoverageInstrumentationTargetSupported(targetRequest)) // excludes WGSL + CPU-via-LLVM
+        return false;
+    if (isCPUTarget(targetRequest)) // cpp-source CPU has no wave/SIMD-group concept
+        return false;
+    if (isCUDATarget(targetRequest))
+        return true;
+    if (isMetalTarget(targetRequest))
+        return true;
+    if (isSPIRV(targetRequest->getTarget())) // SPIR-V / Vulkan
+        return true;
+    if (isD3DTarget(targetRequest)) // HLSL: wave intrinsics require shader model 6.0+
+        return targetRequest->getOptionSet().getProfileVersion() >= ProfileVersion::DX_6_0;
+    return false;
+}
+
 void instrumentCoverage(
     IRModule* module,
     DiagnosticSink* sink,
@@ -1346,6 +1481,7 @@ void instrumentCoverage(
         module,
         buffer,
         sink ? sink->getSourceManager() : nullptr,
+        targetRequest,
         outMetadata);
     instrumenter.run(markerOps);
 }

@@ -238,6 +238,8 @@ FIDDLE() namespace Slang
         IBwdCallable,
         NullDifferential,
         OperatorAddressOf,
+        WaveActiveCountBits,
+        WaveIsFirstLane,
         COUNT
     };
 

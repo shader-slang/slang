@@ -22,9 +22,17 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK: struct GlobalParams
 //CHECK: RWStructuredBuffer{{.*}}_slang_coverage
 
-// One function-entry marker and two branch-arm markers lower to native
-// CUDA atomicAdd operations.
-//CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(0\)}}
-//CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(1\)}}
-//CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(2\)}}
-//CHECK-NOT: atomicAdd{{.*_slang_coverage.*int\(3\)}}
+// One function-entry marker and two branch-arm markers, each wave-aggregated
+// (issue #11509): count active lanes, then a single lane applies the increment.
+//CHECK-DAG: WaveActiveCountBits
+//CHECK-DAG: WaveIsFirstLane
+// Exactly three distinct counter slots (one per marker); the guarded atomicAdd
+// adds the active-lane count rather than a literal 1.
+//CHECK-DAG: _slang_coverage{{.*}}int(0)
+//CHECK-DAG: _slang_coverage{{.*}}int(1)
+//CHECK-DAG: _slang_coverage{{.*}}int(2)
+//CHECK-DAG: atomicAdd
+//CHECK-DAG: atomicAdd
+//CHECK-DAG: atomicAdd
+// No fourth marker slot is synthesized.
+//CHECK-NOT: _slang_coverage{{.*}}int(3)

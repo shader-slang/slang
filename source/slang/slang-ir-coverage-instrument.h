@@ -68,6 +68,14 @@ void finalizeCoverageInstrumentationMetadata(
     TargetRequest* targetRequest,
     ArtifactPostEmitMetadata& outMetadata);
 
+// True when `targetRequest` can lower the wave intrinsics that coverage
+// instrumentation uses to aggregate counter increments per wave (issue
+// #11509): SPIR-V, CUDA, Metal, and HLSL shader-model 6.0+. CPU/cpp-source,
+// WGSL, sub-SM6.0 HLSL, and GLSL stay on the per-lane path. Shared by the
+// coverage pass (to pick the lowering) and the linker (to force-keep the wave
+// intrinsics only where they will actually be used) so the two stay aligned.
+bool isCoverageWaveAggregationSupported(TargetRequest* targetRequest);
+
 } // namespace Slang
 
 #endif // SLANG_IR_COVERAGE_INSTRUMENT_H

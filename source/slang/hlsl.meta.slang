@@ -17083,6 +17083,7 @@ uint4 WaveActiveBallot(bool condition)
 }
 
 /// @category wave
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveActiveCountBits))]
 [require(cuda_glsl_hlsl_metal_spirv, subgroup_basic_ballot)]
 uint WaveActiveCountBits(bool value)
 {
@@ -17448,6 +17449,7 @@ __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [NonUniformReturn]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveIsFirstLane))]
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
 bool WaveIsFirstLane()
 {

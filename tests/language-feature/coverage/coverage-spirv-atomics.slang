@@ -22,6 +22,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[0] = accum;
 }
 
+// On SPIR-V the increments are wave-aggregated (issue #11509), so the module
+// must declare the subgroup ballot capability used by WaveActiveCountBits.
+//CHECK: OpCapability GroupNonUniformBallot
+
 // The synthesized coverage buffer should show up in the module's
 // debug name table so that a host can discover it via reflection.
 //CHECK: __slang_coverage
@@ -35,6 +39,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_0
 //CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_1
 //CHECK-DAG: OpAccessChain {{.*}} %__slang_coverage {{.*}} %int_2
+
+// Each marker aggregates over active lanes: WaveActiveCountBits lowers to
+// OpGroupNonUniformBallotBitCount and the WaveIsFirstLane guard to
+// OpGroupNonUniformElect.
+//CHECK-DAG: OpGroupNonUniformBallotBitCount
+//CHECK-DAG: OpGroupNonUniformElect
 
 // And each access chain feeds a real OpAtomicIAdd — native SPIR-V
 // lowering of kIROp_AtomicAdd, not a load-add-store fallback.

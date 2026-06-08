@@ -33,9 +33,16 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK: struct GlobalParams
 //CHECK: RWStructuredBuffer{{.*}}_slang_coverage
 
-// Counter increments must use CUDA's native `atomicAdd` on the
-// coverage buffer field — confirms the full instrumentation path
-// survives to CUDA codegen.
-//CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(0\)}}
-//CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(1\)}}
-//CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(2\)}}
+// Counter increments are wave-aggregated (issue #11509): each marker counts
+// the active lanes (WaveActiveCountBits) and a single lane (WaveIsFirstLane)
+// applies the whole increment, instead of every lane issuing atomicAdd(slot, 1).
+//CHECK-DAG: WaveActiveCountBits
+//CHECK-DAG: WaveIsFirstLane
+// One distinct counter slot per marker (no slot dedup by file/line).
+//CHECK-DAG: _slang_coverage{{.*}}int(0)
+//CHECK-DAG: _slang_coverage{{.*}}int(1)
+//CHECK-DAG: _slang_coverage{{.*}}int(2)
+// Each marker still performs a real (now guarded) CUDA atomicAdd on the buffer.
+//CHECK-DAG: atomicAdd
+//CHECK-DAG: atomicAdd
+//CHECK-DAG: atomicAdd
