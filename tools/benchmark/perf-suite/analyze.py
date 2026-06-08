@@ -50,6 +50,23 @@ def leaf_deltas(lookup, ptag, tag, wl):
     return out
 
 
+def canonical_runs(runs):
+    """One row per workload for per-release/trend views. A `--sweep` enriches a
+    results.json with several sizes for a workload (e.g. complexity_ladder); the
+    trend charts compare like-with-like across releases, so collapse to each
+    workload's default_size (falling back to the first row seen). Scaling
+    analysis reads the full multi-size data separately (ladder_scaling.py)."""
+    import manifest
+    best = {}
+    for r in runs:
+        wl = r["workload"]
+        spec = manifest.BY_NAME.get(wl)
+        default = spec.default_size if spec else None
+        if wl not in best or (r["size"] == default and best[wl]["size"] != default):
+            best[wl] = r
+    return list(best.values())
+
+
 def load_series(index, results_dir, metric):
     """{(workload,timer): [(tag,date,value), ...]} in release order, plus a
     {(tag,workload): {timer: value}} lookup for attribution."""
@@ -65,7 +82,7 @@ def load_series(index, results_dir, metric):
             continue
         order.append((tag, date))
         with open(path) as fh:
-            runs = json.load(fh)
+            runs = canonical_runs(json.load(fh))
         for run in runs:
             wl = run["workload"]
             for timer, st in run["timers"].items():

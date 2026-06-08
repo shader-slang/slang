@@ -41,8 +41,10 @@ def load(index_path, results_dir, timer):
     if all(vkey(r["tag"]) != (0, 0, 0) for r in recs):
         recs.sort(key=lambda r: vkey(r["tag"]))
     order = [r["tag"] for r in recs]
+    import analyze
     for i, rec in enumerate(recs):
-        runs = {r["workload"]: r for r in json.load(open(os.path.join(results_dir, rec["tag"], "results.json")))}
+        raw = json.load(open(os.path.join(results_dir, rec["tag"], "results.json")))
+        runs = {r["workload"]: r for r in analyze.canonical_runs(raw)}
         for wl, r in runs.items():
             st = r["timers"].get(timer)
             series.setdefault(wl, [None] * len(recs))
@@ -150,6 +152,79 @@ def render(order, series, title, ylabel, logy, normalize, highlight, out):
     return out
 
 
+def render_small_multiples(order, series, title, out, cols=4):
+    """One linear, zero-based panel per workload (small multiples). Unlike the
+    two overview charts — normalized (hides absolute magnitude) and log-absolute
+    (distorts curve shape) — this shows each benchmark's true absolute curve on
+    its own linear y-axis, so the per-benchmark shape and scale are both honest."""
+    names = sorted(series, key=lambda w: -(next((v for v in reversed(series[w]) if v), 0)))
+    n = len(names)
+    rows = (n + cols - 1) // cols
+    pw, ph = 252, 150          # panel plot area
+    ml, mt = 46, 26            # per-panel left/top margin (axis labels / title)
+    mr, mb = 12, 34            # per-panel right/bottom margin (x labels)
+    cw, chh = ml + pw + mr, mt + ph + mb
+    W = cols * cw + 16
+    H = rows * chh + 56
+    nrel = len(order)
+
+    s = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
+         f'font-family="sans-serif" font-size="11">',
+         f'<rect width="{W}" height="{H}" fill="white"/>',
+         f'<text x="12" y="26" font-size="17" font-weight="bold">{esc(title)}</text>']
+
+    # sparse x ticks: first, middle, last release
+    tick_idx = sorted(set([0, nrel // 2, nrel - 1]))
+
+    for k, wl in enumerate(names):
+        r, c = divmod(k, cols)
+        ox = 8 + c * cw
+        oy = 44 + r * chh
+        vals = series[wl]
+        present = [(i, v) for i, v in enumerate(vals) if v is not None]
+        vmax = max((v for _, v in present), default=1.0) or 1.0
+        hi = vmax * 1.08
+        xmap = lambda i: ox + ml + (i * pw / (nrel - 1) if nrel > 1 else pw / 2)
+        ymap = lambda v: oy + mt + ph - (v / hi) * ph
+
+        last = next((v for v in reversed(vals) if v), None)
+        first = next((v for v in vals if v), None)
+        ratio = (last / first) if (first and last) else None
+        rtxt = f"  {ratio:.2f}×" if ratio else ""
+        s.append(f'<text x="{ox+ml}" y="{oy+14}" font-size="12" font-weight="600">'
+                 f'{esc(wl)}<tspan fill="#888" font-weight="400">{esc(rtxt)}</tspan></text>')
+
+        # panel frame + y gridlines (0, mid, max) with absolute-ms labels
+        for frac in (0.0, 0.5, 1.0):
+            yv = hi * frac
+            y = ymap(yv)
+            s.append(f'<line x1="{ox+ml:.1f}" y1="{y:.1f}" x2="{ox+ml+pw:.1f}" y2="{y:.1f}" stroke="#eee"/>')
+            lbl = f"{yv:.0f}" if yv >= 10 else f"{yv:.1f}"
+            s.append(f'<text x="{ox+ml-4:.1f}" y="{y+3:.1f}" text-anchor="end" fill="#999">{lbl}</text>')
+        s.append(f'<line x1="{ox+ml:.1f}" y1="{oy+mt:.1f}" x2="{ox+ml:.1f}" y2="{oy+mt+ph:.1f}" stroke="#333"/>')
+        s.append(f'<line x1="{ox+ml:.1f}" y1="{oy+mt+ph:.1f}" x2="{ox+ml+pw:.1f}" y2="{oy+mt+ph:.1f}" stroke="#333"/>')
+
+        # x ticks (sparse, release tags)
+        for i in tick_idx:
+            x = xmap(i)
+            t = order[i].replace("v20", "")
+            s.append(f'<line x1="{x:.1f}" y1="{oy+mt+ph:.1f}" x2="{x:.1f}" y2="{oy+mt+ph+3:.1f}" stroke="#999"/>')
+            s.append(f'<text x="{x:.1f}" y="{oy+mt+ph+15:.1f}" text-anchor="middle" fill="#666">{esc(t)}</text>')
+
+        # the curve
+        pts = [(xmap(i), ymap(v)) for i, v in present]
+        if len(pts) >= 2:
+            path = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+            s.append(f'<polyline points="{path}" fill="none" stroke="#3060d0" stroke-width="1.8"/>')
+        for x, y in pts:
+            s.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.0" fill="#3060d0"/>')
+
+    s.append("</svg>")
+    with open(out, "w") as fh:
+        fh.write("\n".join(s))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--index", default=os.path.join(HERE, "releases", "index.json"))
@@ -170,7 +245,11 @@ def main():
                 f"Slang compile time per release — {args.timer} (absolute, log scale)",
                 "ms (log)", logy=True, normalize=False, highlight=args.highlight,
                 out=os.path.join(outdir, "perf_compileinner.svg"))
-    print(f"wrote {p1}\nwrote {p2}")
+    p3 = render_small_multiples(
+        order, series,
+        f"Per-benchmark {args.timer} — absolute, linear (own y-axis each)",
+        out=os.path.join(outdir, "perf_per_benchmark.svg"))
+    print(f"wrote {p1}\nwrote {p2}\nwrote {p3}")
     print(f"({len(order)} releases, {len(series)} workloads)")
 
 
