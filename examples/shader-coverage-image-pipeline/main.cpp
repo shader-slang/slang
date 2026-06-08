@@ -49,6 +49,9 @@ struct PipelineParams
     float bilateralSigmaS;
     float bilateralSigmaR;
     float exposure;
+    // Row offset of the current dispatch's tile (see the dispatch loop
+    // in main). Must match `PipelineParams` in pipeline.slang.
+    uint32_t tileOriginY;
 };
 
 [[noreturn]] void fail(const std::string& message)
@@ -511,8 +514,42 @@ int main(int argc, char** argv)
     }
 
     auto configs = (mode == "smoke") ? buildSmokeConfigs() : buildExhaustiveConfigs();
-    std::cout << "running " << configs.size() << " dispatch(es) in mode=" << mode
-              << " (coverage=" << (enableCoverage ? "on" : "off") << ")\n";
+
+    // Allocate the descriptor sets once and reuse them for every
+    // dispatch. The bound buffers never change; only the contents of
+    // `paramsBuf` do (re-uploaded per tile below, which is safe because
+    // each dispatch waits for idle). Allocating a fresh set per dispatch
+    // would exhaust the descriptor pool once tiling multiplies the
+    // dispatch count.
+    VkDescriptorSet set0 = ctx.allocateDescriptorSet(pipe.setLayouts[0]);
+    ctx.writeStorageBuffer(set0, 0, inputBuf);
+    ctx.writeStorageBuffer(set0, 1, outputBuf);
+    ctx.writeStorageBuffer(set0, 2, paramsBuf);
+    std::vector<VkDescriptorSet> sets = {set0};
+    if (enableCoverage)
+    {
+        VkDescriptorSet set1 = ctx.allocateDescriptorSet(pipe.setLayouts[1]);
+        ctx.writeStorageBuffer(set1, kCoverageBinding, coverageBuf);
+        sets.push_back(set1);
+    }
+
+    // Dispatch each config as a sequence of horizontal tiles rather than
+    // one whole-image dispatch. Coverage instrumentation makes every
+    // pixel perform many counter atomic-adds that contend on a handful
+    // of buffer slots (the per-line counters inside the bilateral
+    // filter's inner loop), so a single whole-image dispatch runs long
+    // enough to risk a GPU watchdog reset (TDR / VK_ERROR_DEVICE_LOST)
+    // under that load. Tiling caps the per-submission GPU time. It does
+    // not change the coverage results: the tiles partition the image,
+    // every pixel is still processed exactly once, and the counter
+    // buffer accumulates across all tiles and configs.
+    const uint32_t kTileRows = 128;
+    const uint32_t groupsX = (kImageWidth + 7) / 8;
+    uint32_t dispatchCount = 0;
+
+    std::cout << "running " << configs.size() << " config(s) in mode=" << mode
+              << " (coverage=" << (enableCoverage ? "on" : "off") << ", tiled in " << kTileRows
+              << "-row bands)\n";
 
     const auto renderStart = std::chrono::steady_clock::now();
     for (const auto& cfg : configs)
@@ -526,30 +563,23 @@ int main(int argc, char** argv)
         p.bilateralSigmaS = cfg.sigmaS;
         p.bilateralSigmaR = cfg.sigmaR;
         p.exposure = cfg.exposure;
-        ctx.upload(paramsBuf, &p, sizeof(p));
-
-        VkDescriptorSet set0 = ctx.allocateDescriptorSet(pipe.setLayouts[0]);
-        ctx.writeStorageBuffer(set0, 0, inputBuf);
-        ctx.writeStorageBuffer(set0, 1, outputBuf);
-        ctx.writeStorageBuffer(set0, 2, paramsBuf);
-
-        std::vector<VkDescriptorSet> sets = {set0};
-        if (enableCoverage)
+        for (uint32_t y0 = 0; y0 < kImageHeight; y0 += kTileRows)
         {
-            VkDescriptorSet set1 = ctx.allocateDescriptorSet(pipe.setLayouts[1]);
-            ctx.writeStorageBuffer(set1, kCoverageBinding, coverageBuf);
-            sets.push_back(set1);
+            p.tileOriginY = y0;
+            ctx.upload(paramsBuf, &p, sizeof(p));
+            const uint32_t bandRows =
+                (kImageHeight - y0 < kTileRows) ? (kImageHeight - y0) : kTileRows;
+            const uint32_t groupsY = (bandRows + 7) / 8;
+            ctx.dispatch(pipe, sets, groupsX, groupsY, 1);
+            ++dispatchCount;
         }
-
-        const uint32_t groupsX = (kImageWidth + 7) / 8;
-        const uint32_t groupsY = (kImageHeight + 7) / 8;
-        ctx.dispatch(pipe, sets, groupsX, groupsY, 1);
     }
     const auto renderEnd = std::chrono::steady_clock::now();
     const double renderMs =
         std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
-    std::cout << "render wall time: " << renderMs << " ms (" << configs.size() << " dispatches, "
-              << (renderMs / configs.size()) << " ms/dispatch)\n";
+    std::cout << "render wall time: " << renderMs << " ms (" << configs.size() << " config(s), "
+              << dispatchCount << " tiled dispatches, " << (renderMs / configs.size())
+              << " ms/config)\n";
 
     if (!enableCoverage)
     {

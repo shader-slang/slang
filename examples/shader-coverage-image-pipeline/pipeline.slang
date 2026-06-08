@@ -21,6 +21,12 @@ struct PipelineParams
     float bilateralSigmaS;
     float bilateralSigmaR;
     float exposure;
+    // Row offset of the current dispatch's tile. The host splits the
+    // image into horizontal bands and dispatches each band separately
+    // (see main.cpp), so the real pixel row is `tid.y + tileOriginY`.
+    // Tiling keeps each GPU submission short enough that the heavy
+    // coverage-atomic traffic cannot trip the driver's watchdog/TDR.
+    uint tileOriginY;
 }
 
 [[vk::binding(2, 0)]] StructuredBuffer<PipelineParams> paramsBuffer;
@@ -31,7 +37,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     PipelineParams params = paramsBuffer[0];
     uint x = tid.x;
-    uint y = tid.y;
+    // The dispatch covers one horizontal band; recover the global pixel
+    // row by adding the band's origin. Threads past the image bound
+    // (last partial band) drop out here.
+    uint y = tid.y + params.tileOriginY;
     if (x >= params.imageWidth || y >= params.imageHeight)
         return;
 
