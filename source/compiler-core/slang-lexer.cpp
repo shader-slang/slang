@@ -7,6 +7,7 @@
 
 #include "core/slang-char-encode.h"
 #include "core/slang-string-escape-util.h"
+#include "fast_float/fast_float.h"
 #include "slang-core-diagnostics.h"
 #include "slang-name.h"
 #include "slang-source-loc.h"
@@ -778,108 +779,42 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
     UnownedStringSlice* outSuffix)
 {
-    FloatingPointLiteralValue value = 0;
+    FloatingPointLiteralValue value{};
 
     const UnownedStringSlice content = token.getContent();
 
     char const* cursor = content.begin();
     char const* end = content.end();
 
-    int radix = _readOptionalBase(&cursor);
-
-    bool seenDot = false;
-    FloatingPointLiteralValue divisor = 1;
-    for (;;)
+    auto result = fast_float::from_chars(cursor, end, value);
+    switch (result.ec)
     {
-        if (*cursor == '.')
-        {
-            cursor++;
-            seenDot = true;
-            continue;
-        }
+    case std::errc():
+        break;
 
-        int digit = _maybeReadDigit(&cursor, radix);
-        if (digit < 0)
-            break;
+    default:
+        // this should never happen, since we've prevalidated the input, but...
+        SLANG_ASSERT(!"Floating-point literal parsing failure\n");
 
-        value = value * radix + digit;
-
-        if (seenDot)
-        {
-            divisor *= radix;
-        }
+        // fallthrough
+    case std::errc::result_out_of_range:
+        value = INFINITY;
+        break;
     }
 
-    if (*cursor == '#')
+    cursor = result.ptr;
+
+    // check for special exponent for infinity
+    if ((cursor != end) && (*cursor == '#'))
     {
-        // It must be INF
         const auto inf = toSlice("#INF");
 
         if (UnownedStringSlice(cursor, end).startsWith(inf))
         {
-            if (outSuffix)
-            {
-                *outSuffix = UnownedStringSlice(cursor + inf.getLength(), end);
-            }
-
             value = INFINITY;
-
-            return value;
+            cursor += inf.getLength();
         }
     }
-
-    // Now read optional exponent
-    if (_isNumberExponent(*cursor, radix))
-    {
-        cursor++;
-
-        bool exponentIsNegative = false;
-        switch (*cursor)
-        {
-        default:
-            break;
-
-        case '-':
-            exponentIsNegative = true;
-            cursor++;
-            break;
-
-        case '+':
-            cursor++;
-            break;
-        }
-
-        int exponentRadix = 10;
-        int exponent = 0;
-
-        for (;;)
-        {
-            int digit = _maybeReadDigit(&cursor, exponentRadix);
-            if (digit < 0)
-                break;
-
-            exponent = exponent * exponentRadix + digit;
-        }
-
-        FloatingPointLiteralValue exponentBase = 10;
-        if (radix == 16)
-        {
-            exponentBase = 2;
-        }
-
-        FloatingPointLiteralValue exponentValue = pow(exponentBase, exponent);
-
-        if (exponentIsNegative)
-        {
-            divisor *= exponentValue;
-        }
-        else
-        {
-            value *= exponentValue;
-        }
-    }
-
-    value /= divisor;
 
     if (outSuffix)
     {
