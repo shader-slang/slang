@@ -66,15 +66,29 @@ def load_sweeps(results_dir, label, metric):
     return out
 
 
-def fit(pts):
-    """floor, slope, R^2, and top-doubling ratio (>2 = super-linear) for a curve."""
+def fit(pts, floor=0.0):
+    """Power-law fit of the *feature work* (compile time minus the fixed
+    per-compile floor): (t − floor) = a·N^k. Returns {a, k, pow_r2, top}.
+
+    The floor must be subtracted first or k is meaningless: at small N the curve
+    is floor-dominated, which flattens the raw log-log slope and understates k.
+    The honest floor is the measured `minimal` workload (passed in), not a fitted
+    intercept. `k` is the global exponent (k≈1 linear, >1 super-linear); `top` is
+    the high-end local doubling ratio — when they disagree, the exponent is
+    changing across the range (e.g. linear at small N, bending up at large N)."""
     xs, ys = [x for x, _ in pts], [y for _, y in pts]
-    a, b, r2 = analyze._linfit(xs, ys)
+    work = [y - floor for y in ys]
+    a, k, pow_r2 = analyze._powfit(xs, work)
     top = (ys[-1] / ys[-2]) if (len(ys) >= 2 and ys[-2]) else None
-    return a, b, r2, top
+    return {"a": a, "k": k, "pow_r2": pow_r2, "top": top}
 
 
-def render_panels(sweeps, metric, out, cols=3):
+def superlinear(k):
+    """A power-law exponent meaningfully above 1."""
+    return k is not None and k > 1.15
+
+
+def render_panels(sweeps, metric, out, floor=0.0, cols=3):
     """One panel per workload: each primary timer (+ compileInner) as a line vs N,
     linear zero-based y, with the compileInner fit annotated."""
     names = sorted(sweeps)
@@ -150,16 +164,21 @@ def render_panels(sweeps, metric, out, cols=3):
                      f'stroke="{color}" stroke-width="{3 if bold else 2}"/>')
             s.append(f'<text x="{ox+ml+pw+32}" y="{ly+4}" fill="#222"{weight}>{plot.esc(tname)}</text>')
 
-        # fit annotation (compileInner)
+        # fit annotation (compileInner): floor-subtracted power-law exponent
         if "compileInner" in timers:
-            a, b, r2, top = fit(timers["compileInner"])
-            note = f"fit: {a:.0f}ms + {b:.2f}·N  (R²={r2:.3f})"
-            sl = f"top-2×: {top:.2f}×" if top else ""
-            ly = oy + mt + 4 + len(lines) * 16 + 8
-            s.append(f'<text x="{ox+ml+pw+10}" y="{ly}" fill="#555">{plot.esc(note)}</text>')
-            if sl:
-                cl = "#c0392b" if (top and top > 2.15) else "#555"
-                s.append(f'<text x="{ox+ml+pw+10}" y="{ly+15}" fill="{cl}">{plot.esc(sl)}</text>')
+            ft = fit(timers["compileInner"], floor)
+            k, top = ft["k"], ft["top"]
+            ly = oy + mt + 4 + len(lines) * 16 + 10
+            kcl = "#c0392b" if superlinear(k) else "#555"
+            s.append(f'<text x="{ox+ml+pw+10}" y="{ly}" fill="{kcl}" font-weight="600">'
+                     f'{plot.esc(f"(t−floor) ∝ N^{k:.2f}")}'
+                     f'<tspan fill="#888" font-weight="400"> (R²={ft["pow_r2"]:.3f})</tspan></text>')
+            s.append(f'<text x="{ox+ml+pw+10}" y="{ly+15}" fill="#777">'
+                     f'{plot.esc(f"floor {floor:.0f}ms (minimal)")}</text>')
+            if top:
+                tcl = "#c0392b" if top > 2.15 else "#777"
+                s.append(f'<text x="{ox+ml+pw+10}" y="{ly+30}" fill="{tcl}">'
+                         f'{plot.esc(f"top-2×: {top:.2f}×")}</text>')
 
     s.append("</svg>")
     with open(out, "w") as fh:
@@ -179,9 +198,19 @@ def main():
         raise SystemExit(f"no multi-size (swept) workloads in results/{args.label}; "
                          "re-run bench.py with --sweep")
 
+    # Fixed per-compile floor = the `minimal` workload's compileInner on this
+    # build (the suite's floor canary). Subtracted before the power-law fit so the
+    # exponent reflects feature work, not the floor. 0 if minimal wasn't run.
+    floor = 0.0
+    raw = json.load(open(os.path.join(args.results, args.label, "results.json")))
+    for r in raw:
+        if r["workload"] == "minimal" and r["timers"].get("compileInner"):
+            floor = r["timers"]["compileInner"][args.metric]
+            break
+
     outdir = os.path.join(args.results, args.label, "_sweep")
     os.makedirs(outdir, exist_ok=True)
-    svg = render_panels(sweeps, args.metric, os.path.join(outdir, "sweep_curves.svg"))
+    svg = render_panels(sweeps, args.metric, os.path.join(outdir, "sweep_curves.svg"), floor)
     inline = open(svg).read()
 
     names = sorted(sweeps)
@@ -195,33 +224,46 @@ def main():
          "<h2>Scaling curves</h2>",
          '<p class="small">Each panel: the workload\'s primary phase timers and '
          '<b>compileInner</b> (bold) on a zero-based linear axis vs <code>N</code>. '
-         'Annotated with the floor+slope·N least-squares fit and the top-doubling '
-         "ratio (>2× ⇒ super-linear at the high end, shown red).</p>",
+         'Headlined with the floor-subtracted power-law exponent <b>(t−floor) ∝ N<sup>k</sup></b> '
+         '(red when k&gt;1.15 ⇒ super-linear), the measured floor, and the top-doubling ratio.</p>',
          f'<div class="chart">{inline}</div>',
          "<h2>Scaling fit (compileInner)</h2>",
-         '<p class="small"><b>floor</b> = fixed per-compile cost · <b>slope</b> = ms per '
-         'unit of N · <b>top-2×</b> = t(N<sub>max</sub>)/t(N<sub>max</sub>/2): 2.00 ≈ linear, '
-         '&gt;2 super-linear.</p>',
+         f'<p class="small"><b>floor</b> = fixed per-compile cost, measured as the '
+         f'<code>minimal</code> workload on this build (<b>{floor:.0f} ms</b>) — subtracted '
+         'before the fit so the exponent reflects feature work, not the floor. '
+         '<b>k</b> = power-law exponent of <code>(t − floor) = a·N<sup>k</sup></code> '
+         '(log-log fit): <b>k≈1</b> linear, <b>k&gt;1</b> super-linear — always positive, '
+         'unlike a back-extrapolated linear intercept. <b>top-2×</b> = '
+         't(N<sub>max</sub>)/t(N<sub>max</sub>/2), the <i>local</i> high-end slope. '
+         'When <b>k</b> and <b>top-2×</b> disagree the exponent varies across the range '
+         '(near-linear at small N, bending up at large N).</p>',
          "<table><tr><th>Workload</th><th class=num>N range</th><th class=num>floor (ms)</th>"
-         "<th class=num>slope (ms/N)</th><th class=num>R²</th><th class=num>t(N<sub>min</sub>)</th>"
-         "<th class=num>t(N<sub>max</sub>)</th><th class=num>top-2×</th></tr>"]
+         "<th class=num>k (work)</th><th class=num>fit R²</th>"
+         "<th class=num>t(N<sub>min</sub>)</th><th class=num>t(N<sub>max</sub>)</th>"
+         "<th class=num>top-2×</th></tr>"]
     for wl in names:
         pts = sweeps[wl]["timers"].get("compileInner")
         if not pts:
             continue
-        a, b, r2, top = fit(pts)
+        ft = fit(pts, floor)
+        k, top = ft["k"], ft["top"]
         n0, y0, n1, y1 = pts[0][0], pts[0][1], pts[-1][0], pts[-1][1]
+        kcls = "reg" if superlinear(k) else "flat"
         topcls = "reg" if (top and top > 2.15) else "flat"
         tops = f"{top:.2f}×" if top else "—"
         H.append(f"<tr><td>{html.escape(wl)}</td><td class=num>{n0}–{n1}</td>"
-                 f"<td class=num>{a:.0f}</td><td class=num>{b:.2f}</td><td class=num>{r2:.3f}</td>"
+                 f"<td class=num>{floor:.0f}</td>"
+                 f"<td class='num {kcls}'>{k:.2f}</td><td class=num>{ft['pow_r2']:.3f}</td>"
                  f"<td class=num>{y0:.0f}</td><td class=num>{y1:.0f}</td>"
                  f"<td class='num {topcls}'>{tops}</td></tr>")
     H.append("</table>")
     H.append('<div class="note"><b>Reading these:</b> these synthetic workloads amplify one '
-             'compiler pass each — the curve <i>shape</i> (floor vs slope vs super-linearity), not '
-             'the absolute ms, is the signal. A clean straight line ⇒ the cost is linear in code '
-             'size; an upward bend ⇒ a pass whose cost grows faster than the input.</div>')
+             'compiler pass each — the curve <i>shape</i> (the exponent <b>k</b>), not the '
+             'absolute ms, is the signal. <b>k≈1</b> ⇒ cost is linear in code size; '
+             '<b>k&gt;1</b> ⇒ a pass whose cost grows faster than its input, where regressions '
+             'on large real shaders hide. The fixed floor is the <code>minimal</code> workload '
+             '(subtracted here, not refitted per workload), which is also the suite\'s '
+             'standalone regression canary for "the stdlib got heavier".</div>')
     H.append('<p class="small">Generated by perf-suite/sweep_report.py from '
              f'results/{html.escape(args.label)}/results.json. Companion to report.py '
              '(cross-release) and ladder_scaling.py (cross-release fit table).</p>')

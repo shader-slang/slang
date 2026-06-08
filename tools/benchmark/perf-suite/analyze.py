@@ -16,6 +16,7 @@ Outputs a ranked console report plus results/_analysis/{series.csv,flags.csv}.
 import argparse
 import csv
 import json
+import math
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -140,6 +141,21 @@ def _linfit(xs, ys):
     ss_tot = sum((y - ybar) ** 2 for y in ys) or 1.0
     ss_res = sum((y - (a + b * x)) ** 2 for x, y in zip(xs, ys))
     return a, b, 1 - ss_res / ss_tot
+
+
+def _powfit(xs, ys):
+    """Power-law fit t = a * N^k via OLS on (log N, log t). Returns (a, k, r2),
+    with r2 measured in log space. k is the honest super-linearity exponent —
+    k≈1 linear, k>1 super-linear, k<1 sub-linear — and unlike the linear floor it
+    never goes negative on a convex curve. Needs positive xs/ys; falls back to
+    (0, 0, 0) otherwise."""
+    pts = [(x, y) for x, y in zip(xs, ys) if x > 0 and y > 0]
+    if len(pts) < 2:
+        return 0.0, 0.0, 0.0
+    lx = [math.log(x) for x, _ in pts]
+    ly = [math.log(y) for _, y in pts]
+    loga, k, r2 = _linfit(lx, ly)
+    return math.exp(loga), k, r2
 
 
 def slope_report(results_dir, label, metric):
