@@ -276,15 +276,20 @@ FIDDLE()
 class OperatorExpr : public InvokeExpr
 {
     FIDDLE(...)
+};
 
-    // When set, this builtin arithmetic / comparison / bitwise / shift / unary operator on
-    // scalar/vector/matrix operands (of the same or mixed builtin type) was recognized
-    // during checking and given its result type directly, without resolving to a generic
-    // `operator OP` candidate. lower-to-ir emits the corresponding IR op directly (see
-    // `lowerBuiltinArithmeticOp`). The node is kept as an OperatorExpr so form-sensitive
-    // analyses (constant folding, autodiff, for-loop trip-count inference) still see an
-    // operator rather than a function call.
-    FIDDLE() bool isLoweredAsBuiltinArithmetic = false;
+// A builtin arithmetic / comparison / bitwise / shift / unary operator on builtin
+// integer/floating-point/bool scalar, vector, or matrix operands, recognized by the fast
+// path during checking (see `convertToBuiltinArithmeticOp`). Unlike a generic `operator OP`
+// call, it carries the resolved `BuiltinOperationKind` directly, so the operator-name ->
+// kind mapping happens exactly once (at creation) and every consumer (constant folding via
+// `BuiltinOperationIntVal`, IR lowering, for-loop trip-count inference) reads the kind rather
+// than re-parsing an operator name. `arguments` holds 1 (unary) or 2 operands.
+FIDDLE()
+class BuiltinOperatorExpr : public ExprWithArgsBase
+{
+    FIDDLE(...)
+    FIDDLE() BuiltinOperationKind op;
 };
 
 FIDDLE()

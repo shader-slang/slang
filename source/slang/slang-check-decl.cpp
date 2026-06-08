@@ -3282,21 +3282,17 @@ static bool _initExprIsRuntimeValue(Expr* expr)
         }
         return false;
     }
+    if (auto builtinOpExpr = as<BuiltinOperatorExpr>(expr))
+    {
+        // A builtin-operator fast-path node is a pure builtin operation: it is a runtime
+        // value only when one of its operands is.
+        for (auto arg : builtinOpExpr->arguments)
+            if (_initExprIsRuntimeValue(arg))
+                return true;
+        return false;
+    }
     if (auto invokeExpr = as<InvokeExpr>(expr))
     {
-        // A builtin operator recognized by the fast path (convertToBuiltinArithmeticOp)
-        // has an unresolved operator-name callee (no DeclRef), but it is a pure builtin
-        // operation: it is a runtime value only when one of its operands is.
-        if (auto opExpr = as<OperatorExpr>(invokeExpr))
-        {
-            if (opExpr->isLoweredAsBuiltinArithmetic)
-            {
-                for (auto arg : invokeExpr->arguments)
-                    if (_initExprIsRuntimeValue(arg))
-                        return true;
-                return false;
-            }
-        }
 
         // Determine whether the callee is a "pure" callable whose result depends only
         // on its arguments and cannot read or write arbitrary runtime state. For pure

@@ -2576,6 +2576,14 @@ public:
         ConstantFoldingKind kind,
         ConstantFoldingCircularityInfo* circularityInfo);
 
+    /// Constant-fold a builtin-operator fast-path node (`a + b`, `N / 2`, etc.), producing a
+    /// concrete `ConstantIntVal`, a `PolynomialIntVal` (for `+`/`-`/`*`), or a decl-free
+    /// `BuiltinOperationIntVal` when operands are still symbolic.
+    IntVal* tryConstantFoldBuiltinOperatorExpr(
+        SubstExpr<BuiltinOperatorExpr> expr,
+        ConstantFoldingKind kind,
+        ConstantFoldingCircularityInfo* circularityInfo);
+
     /// Try to apply front-end constant folding to determine the value of `expr`.
     IntVal* tryConstantFoldExpr(
         SubstExpr<Expr> expr,
@@ -3604,6 +3612,11 @@ public:
 
     Expr* visitInvokeExpr(InvokeExpr* expr);
 
+    // A `BuiltinOperatorExpr` is produced already-checked by `convertToBuiltinArithmeticOp`
+    // (during `visitInvokeExpr`), so checking it is a no-op; this exists for visitor
+    // completeness / idempotent re-checks.
+    Expr* visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr);
+
     Expr* visitSelectExpr(SelectExpr* expr);
 
     Expr* visitVarExpr(VarExpr* expr);
@@ -3701,13 +3714,14 @@ private:
 
     // If `expr` is an arithmetic (`+ - * / %`), comparison (`== != < > <= >=`), bitwise/
     // shift (`& | ^ << >>`), or unary (`- ! ~`) operator on builtin integer/floating-point/
-    // bool scalar, vector, or matrix operands, mark it for direct builtin IR lowering and
-    // return it (typed), skipping generic operator overload resolution. Operands of the same
-    // builtin type are handled as-is; operands of different builtin types are promoted via
-    // `getBuiltinArithmeticCommonType` (the usual arithmetic conversions). Returns null to
-    // fall back to normal resolution: GLSL operator scope (where some operators differ), the
-    // short-circuiting `&&`/`||`, mixed shapes that are not broadcast-compatible, and
-    // user-defined operand types.
+    // bool scalar, vector, or matrix operands, return a `BuiltinOperatorExpr` (carrying the
+    // resolved `BuiltinOperationKind`) for direct builtin IR lowering, skipping generic
+    // operator overload resolution. Operands of the same builtin type are handled as-is;
+    // operands of different builtin types are promoted via `getBuiltinArithmeticCommonType`
+    // (the usual arithmetic conversions). Returns null to fall back to normal resolution: the
+    // short-circuiting `&&`/`||`, mixed shapes that are not broadcast-compatible, user-defined
+    // operand types, and -- in GLSL operator scope only -- matrix operands and vector
+    // equality (`==`/`!=`), whose semantics the `glsl` module's overloads own.
     Expr* convertToBuiltinArithmeticOp(InvokeExpr* expr);
 
     // For a builtin binary operator `a OP b` whose operands have *different* builtin

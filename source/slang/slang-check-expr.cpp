@@ -2390,37 +2390,23 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     if (!funcDeclRefExpr)
         return nullptr;
 
-    // A builtin operator recognized by the fast path (see `convertToBuiltinArithmeticOp`)
-    // keeps its callee as an *unresolved* operator-name `VarExpr` instead of a resolved
-    // intrinsic-operator DeclRef. Detect that by structure (an operator-name callee with no
-    // resolved decl) rather than the `isLoweredAsBuiltinArithmetic` marker, since this is
-    // also reached when re-folding a *deserialized* initializer expression (cross-module),
-    // where the marker is not preserved but the unresolved callee is. Fold it directly by
-    // operator name; a `BuiltinOperationIntVal` represents the still-symbolic case.
+    // The builtin-operator fast path produces a `BuiltinOperatorExpr` (folded separately by
+    // `tryConstantFoldBuiltinOperatorExpr`), so anything reaching here is an ordinary call:
+    // it must resolve to a decl carrying an intrinsic-op or implicit-conversion modifier.
     auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
-    Name* builtinFastPathOpName = nullptr;
-    if (!funcDeclRef.getDecl())
+    if (!funcDeclRef)
+        return nullptr;
+    auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
+    ImplicitConversionModifier* implicitCast =
+        funcDeclRef.getDecl()->findModifier<ImplicitConversionModifier>();
+    if (!intrinsicMod && !implicitCast)
     {
-        if (auto opVarExpr = as<VarExpr>(funcDeclRefExpr.getExpr()))
-            builtinFastPathOpName = opVarExpr->name;
-    }
-
-    ImplicitConversionModifier* implicitCast = nullptr;
-    if (!builtinFastPathOpName)
-    {
-        if (!funcDeclRef)
-            return nullptr;
-        auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
-        implicitCast = funcDeclRef.getDecl()->findModifier<ImplicitConversionModifier>();
-        if (!intrinsicMod && !implicitCast)
-        {
-            // We can't constant fold anything that doesn't map to a builtin
-            // operation right now.
-            //
-            // TODO: we should really allow constant-folding for anything
-            // that can be lowered to our bytecode...
-            return nullptr;
-        }
+        // We can't constant fold anything that doesn't map to a builtin
+        // operation right now.
+        //
+        // TODO: we should really allow constant-folding for anything
+        // that can be lowered to our bytecode...
+        return nullptr;
     }
 
     // Let's not constant-fold operations with more than a certain number of arguments, for
@@ -2472,7 +2458,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             return nullptr;
         }
 
-        auto opName = builtinFastPathOpName ? builtinFastPathOpName : funcDeclRef.getName();
+        auto opName = funcDeclRef.getName();
 
         // handle binary operators
         if (opName == getName("-"))
@@ -2512,26 +2498,10 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             opName == getName("^") || opName == getName("~") || opName == getName("%") ||
             opName == getName("?:") || opName == getName("<<") || opName == getName(">>"))
         {
-            // A symbolic builtin operator. A resolved operator call records the resolved
-            // decl in a deferred `FuncCallIntVal`; a fast-path node has no decl, so it uses
-            // the decl-free `BuiltinOperationIntVal` instead (identified by an operator
-            // enum). Both re-evaluate once their operands become concrete.
-            if (builtinFastPathOpName)
-            {
-                BuiltinOperationKind builtinOp;
-                if (!findBuiltinOperationKind(
-                        builtinFastPathOpName->text.getUnownedSlice(),
-                        argCount == 1,
-                        builtinOp))
-                    return nullptr;
-                List<IntVal*> opArgs;
-                for (Index a = 0; a < argCount; ++a)
-                    opArgs.add(argVals[a]);
-                return m_astBuilder->getOrCreate<BuiltinOperationIntVal>(
-                    invokeExpr.getExpr()->type.type,
-                    builtinOp,
-                    opArgs.getArrayView());
-            }
+            // A symbolic builtin operator from a *resolved* operator call records the
+            // resolved decl in a deferred `FuncCallIntVal` that re-evaluates once its operands
+            // become concrete. (The fast path's `BuiltinOperatorExpr` form is folded
+            // separately by `tryConstantFoldBuiltinOperatorExpr`.)
             auto result = m_astBuilder->getOrCreate<FuncCallIntVal>(
                 invokeExpr.getExpr()->type.type,
                 funcDeclRef,
@@ -2562,7 +2532,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     }
     else
     {
-        auto opName = builtinFastPathOpName ? builtinFastPathOpName : funcDeclRef.getName();
+        auto opName = funcDeclRef.getName();
 
         // handle binary operators
         if (opName == getName("-"))
@@ -2820,6 +2790,53 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
             tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), kind, &newCircularityInfo))
         return folded;
     return foldFromStoredVal();
+}
+
+IntVal* SemanticsVisitor::tryConstantFoldBuiltinOperatorExpr(
+    SubstExpr<BuiltinOperatorExpr> expr,
+    ConstantFoldingKind kind,
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
+    auto e = expr.getExpr();
+    const Index argCount = e->arguments.getCount();
+    List<IntVal*> argVals;
+    for (Index a = 0; a < argCount; ++a)
+    {
+        auto argVal = tryFoldIntegerConstantExpression(
+            SubstExpr<Expr>(e->arguments[a], expr.getSubsts()),
+            kind,
+            circularityInfo);
+        if (!argVal)
+            return nullptr;
+        argVals.add(argVal);
+    }
+    auto resultType = as<Type>(e->type.type->substitute(m_astBuilder, expr.getSubsts()));
+    auto op = e->op;
+
+    // If all operands are concrete, fold to a constant directly.
+    if (auto folded = as<IntVal>(
+            BuiltinOperationIntVal::tryFoldImpl(m_astBuilder, resultType, op, argVals, getSink())))
+        return folded;
+
+    // Otherwise the result is symbolic. `+`/`-`/`*`/unary-`-` use `PolynomialIntVal` so value
+    // unification can canonicalize (e.g. `N+1` == `1+N`); the rest use the decl-free
+    // `BuiltinOperationIntVal`, which re-folds once its operands become concrete.
+    switch (op)
+    {
+    case BuiltinOperationKind::Add:
+        return PolynomialIntVal::add(m_astBuilder, argVals[0], argVals[1]);
+    case BuiltinOperationKind::Sub:
+        return PolynomialIntVal::sub(m_astBuilder, argVals[0], argVals[1]);
+    case BuiltinOperationKind::Mul:
+        return PolynomialIntVal::mul(m_astBuilder, argVals[0], argVals[1]);
+    case BuiltinOperationKind::Neg:
+        return PolynomialIntVal::neg(m_astBuilder, argVals[0]);
+    default:
+        return m_astBuilder->getOrCreate<BuiltinOperationIntVal>(
+            resultType,
+            op,
+            argVals.getArrayView());
+    }
 }
 
 IntVal* SemanticsVisitor::tryConstantFoldExpr(
@@ -3179,6 +3196,10 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             auto result = m_astBuilder->getTypeCastIntVal(substType, val);
             return result;
         }
+    }
+    else if (auto builtinOpExpr = expr.as<BuiltinOperatorExpr>())
+    {
+        return tryConstantFoldBuiltinOperatorExpr(builtinOpExpr, kind, circularityInfo);
     }
     else if (auto invokeExpr = expr.as<InvokeExpr>())
     {
@@ -4501,15 +4522,14 @@ static BaseType _getBuiltinCommonBaseType(BaseType a, BaseType b)
 
 Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
 {
-    // In GLSL-compatibility mode several builtin operators have different semantics than in
-    // Slang/HLSL — e.g. `vec == vec` yields a scalar `bool` (all-components-equal) rather
-    // than a `vector<bool,N>` (enabled by `-allow-glsl`), and `mat * mat` is a matrix
-    // product rather than a component-wise multiply (the `operator*` overloads in the
-    // `glsl` module, which a user can pull in with just `import glsl;` without
-    // `-allow-glsl`). In either situation, hard-coding HLSL semantics would be wrong, so
-    // fall back to normal resolution.
-    if (isGLSLOperatorScope())
-        return nullptr;
+    // GLSL-compatibility scope (`-allow-glsl` or an `import glsl;`) only changes the
+    // semantics of a *subset* of builtin operators, which are owned by the `glsl` module's
+    // overloads: `mat * mat` (and matrix/vector products) is an algebraic product rather than
+    // a component-wise op, and `vec == vec` / `vec != vec` yields a scalar `bool`
+    // (all-components-equal) rather than a `vector<bool,N>`. The fast path therefore bails in
+    // GLSL scope only for those cases (matrix operands, and vector equality); scalar and
+    // vector arithmetic/comparison are identical to HLSL and stay fast-pathed -- which also
+    // keeps scalar constant folding going through `BuiltinOperationIntVal` in every scope.
 
     // Unary prefix operators on a builtin scalar/vector/matrix operand: `-x` (negate),
     // `!x` (logical not, bool operand), `~x` (bitwise not, integer operand). Same idea as
@@ -4530,6 +4550,9 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         if (!arg->type.type)
             return nullptr;
         Type* uOperandType = arg->type.type;
+        // Bail on matrix operands in GLSL scope (see above).
+        if (isGLSLOperatorScope() && as<MatrixExpressionType>(uOperandType))
+            return nullptr;
         Type* uElementType = uOperandType;
         if (auto v = as<VectorExpressionType>(uOperandType))
             uElementType = v->getElementType();
@@ -4548,14 +4571,20 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         if (!uEligible)
             return nullptr;
 
-        expr->type = QualType(uOperandType);
-        as<OperatorExpr>(expr)->isLoweredAsBuiltinArithmetic = true;
+        BuiltinOperationKind uKind;
+        if (!findBuiltinOperationKind(uOpText.getUnownedSlice(), /*isUnary*/ true, uKind))
+            return nullptr;
+        auto node = m_astBuilder->create<BuiltinOperatorExpr>();
+        node->op = uKind;
+        node->arguments.add(arg);
+        node->type = QualType(uOperandType);
+        node->loc = expr->loc;
         if (m_parentDifferentiableAttr && isNeg)
         {
             maybeRegisterDifferentiableType(m_astBuilder, arg->type.type, arg->loc);
             maybeRegisterDifferentiableType(m_astBuilder, uOperandType, expr->loc);
         }
-        return expr;
+        return node;
     }
 
     // Only an infix binary operator `a OP b`.
@@ -4580,6 +4609,24 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     auto rightArg = expr->arguments[1];
     if (!leftArg->type.type || !rightArg->type.type)
         return nullptr;
+
+    bool isEquality = (opText == "==" || opText == "!=");
+
+    // GLSL operator scope only overrides matrix operators (algebraic products) and vector
+    // equality (`vec == vec` / `!=` -> scalar `bool`); bail to normal resolution for those so
+    // the glsl module's overloads apply. Everything else is identical to HLSL and stays
+    // fast-pathed.
+    if (isGLSLOperatorScope())
+    {
+        bool leftMat = as<MatrixExpressionType>(leftArg->type.type) != nullptr;
+        bool rightMat = as<MatrixExpressionType>(rightArg->type.type) != nullptr;
+        bool anyVec = as<VectorExpressionType>(leftArg->type.type) != nullptr ||
+                      as<VectorExpressionType>(rightArg->type.type) != nullptr;
+        if (leftMat || rightMat)
+            return nullptr;
+        if (isEquality && anyVec)
+            return nullptr;
+    }
 
     bool isShift = (opText == "<<" || opText == ">>");
     Type* operandType = leftArg->type.type;
@@ -4655,7 +4702,6 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     bool isIntegerBase = (baseFlags & BaseTypeInfo::Flag::Integer) != 0;
     bool isFloatBase = (baseFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
     bool isBoolBase = (baseType == BaseType::Bool);
-    bool isEquality = (opText == "==" || opText == "!=");
     // Element-type eligibility per operator family:
     //  - bitwise/shift: integer only;
     //  - equality (`==`/`!=`): integer, floating-point, or bool;
@@ -4693,12 +4739,20 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         resultType = QualType(operandType);
     }
 
-    // Keep the node as an OperatorExpr (InfixExpr) so form-sensitive analyses still see
-    // an operator. We leave `functionExpr` as the unresolved operator name; lower-to-ir
-    // reads it (and the operand type) to pick the IR op. No generic operator candidate
-    // is enumerated.
-    expr->type = resultType;
-    as<OperatorExpr>(expr)->isLoweredAsBuiltinArithmetic = true;
+    // Resolve the operator-name to a `BuiltinOperationKind` exactly once, here, and produce a
+    // dedicated `BuiltinOperatorExpr`. Every downstream consumer (IR lowering, constant
+    // folding via `BuiltinOperationIntVal`, for-loop trip-count inference) reads the kind from
+    // the node rather than re-parsing the operator name. The original `InvokeExpr`'s
+    // (already-checked, possibly element-coerced) operands are carried over verbatim.
+    BuiltinOperationKind kind;
+    if (!findBuiltinOperationKind(opText.getUnownedSlice(), /*isUnary*/ false, kind))
+        return nullptr;
+    auto node = m_astBuilder->create<BuiltinOperatorExpr>();
+    node->op = kind;
+    node->arguments.add(leftArg);
+    node->arguments.add(rightArg);
+    node->type = resultType;
+    node->loc = expr->loc;
 
     // Match visitInvokeExpr's differentiable-type registration for arithmetic (the IR
     // op it lowers to is differentiable). Comparison results are boolean (non-diff).
@@ -4708,7 +4762,7 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         maybeRegisterDifferentiableType(m_astBuilder, rightArg->type.type, rightArg->loc);
         maybeRegisterDifferentiableType(m_astBuilder, resultType.type, expr->loc);
     }
-    return expr;
+    return node;
 }
 
 // Decompose a builtin numeric type into (base element type, shape). `outRows`/`outCols`
@@ -4836,6 +4890,13 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
     return newExpr;
 }
 
+Expr* SemanticsExprVisitor::visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+{
+    // Already produced fully-checked (operator kind, operands, and result type resolved) by
+    // `convertToBuiltinArithmeticOp`; there is nothing further to check.
+    return expr;
+}
+
 Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
 {
     // check the base expression first
@@ -4856,8 +4917,8 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
 
     // Fast path: a builtin arithmetic/comparison/bitwise/shift/unary operator on
     // scalar/vector/matrix operands (`a + b`, `a < b`, `v * s`, `-x`, etc.; same or mixed
-    // builtin type) is marked for direct IR lowering and skips generic operator overload
-    // resolution.
+    // builtin type) is rewritten to a `BuiltinOperatorExpr` and skips generic operator
+    // overload resolution.
     if (auto builtinOp = convertToBuiltinArithmeticOp(expr))
         return builtinOp;
 

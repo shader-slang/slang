@@ -2357,9 +2357,11 @@ UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op)
         return toSlice(">>");
     case BuiltinOperationKind::Not:
         return toSlice("!");
-    default:
-        return toSlice("?");
     }
+    // Every `BuiltinOperationKind` must have op text (it feeds `toText` and mangling); a
+    // missing case is a bug, not a silently-"?" operator.
+    SLANG_UNEXPECTED("unhandled BuiltinOperationKind in getBuiltinOperationOpText");
+    UNREACHABLE_RETURN(toSlice("?"));
 }
 
 bool findBuiltinOperationKind(UnownedStringSlice opText, bool isUnary, BuiltinOperationKind& out)

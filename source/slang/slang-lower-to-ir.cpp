@@ -5265,21 +5265,15 @@ struct ExprLoweringContext
     /// Lower an invoke expr, and attempt to fuse a store of the expr's result into destination.
     /// If the store is fused, returns LoweredValInfo::None. Otherwise, returns the IR val
     /// representing the RValue.
-    // Emit a builtin operator recognized by the fast path (see `convertToBuiltinArithmeticOp`)
-    // directly as the corresponding IR instruction, bypassing callable resolution/lowering.
-    // Covers arithmetic (`+ - * / %`), comparison (`< > <= >=`), equality (`== !=`), bitwise
-    // and shift (`& | ^ << >>`), and the unary `- ! ~`, on builtin integer / floating-point /
-    // bool scalar, vector, or matrix operands (possibly of mixed type/shape). The operands and
-    // result type are already checked; differentiability is handled by autodiff's rules for
-    // the emitted IR ops.
-    LoweredValInfo lowerBuiltinArithmeticOp(OperatorExpr* expr)
+    // Emit a `BuiltinOperatorExpr` (produced by the fast path; see
+    // `convertToBuiltinArithmeticOp`) directly as the corresponding IR instruction, bypassing
+    // callable resolution/lowering. Covers arithmetic (`+ - * / %`), comparison (`< > <= >=`),
+    // equality (`== !=`), bitwise and shift (`& | ^ << >>`), and the unary `- ! ~`, on builtin
+    // integer / floating-point / bool scalar, vector, or matrix operands (possibly of mixed
+    // type/shape). The operator kind, operands, and result type are already resolved during
+    // checking; differentiability is handled by autodiff's rules for the emitted IR ops.
+    LoweredValInfo lowerBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
     {
-        // The fast path leaves the callee as the operator-name `VarExpr` (see
-        // `convertToBuiltinArithmeticOp`); read the op text through it. Tolerate a missing
-        // name defensively (a cloned/specialized node may not carry one) rather than
-        // dereferencing unconditionally -- the op-name dispatch below simply finds no match.
-        auto opVarExpr = as<VarExpr>(expr->functionExpr);
-
         auto irType = lowerType(context, expr->type);
         const Index argCount = expr->arguments.getCount();
         SLANG_ASSERT(argCount == 1 || argCount == 2);
@@ -5301,50 +5295,69 @@ struct ExprLoweringContext
                                    BaseTypeInfo::Flag::FloatingPoint) != 0;
         }
 
-        String opText = (opVarExpr && opVarExpr->name) ? getText(opVarExpr->name) : String();
-        if (argCount == 1)
-        {
-            // Unary prefix operators.
-            IROp uop = kIROp_Neg;
-            if (opText == "!")
-                uop = kIROp_Not;
-            else if (opText == "~")
-                uop = kIROp_BitNot;
-            // else "-" => kIROp_Neg
-            return LoweredValInfo::simple(getBuilder()->emitIntrinsicInst(irType, uop, 1, args));
-        }
         IROp op = kIROp_Add;
-        if (opText == "-")
+        switch (expr->op)
+        {
+        case BuiltinOperationKind::Add:
+            op = kIROp_Add;
+            break;
+        case BuiltinOperationKind::Sub:
             op = kIROp_Sub;
-        else if (opText == "*")
+            break;
+        case BuiltinOperationKind::Mul:
             op = kIROp_Mul;
-        else if (opText == "/")
+            break;
+        case BuiltinOperationKind::Div:
             op = kIROp_Div;
-        else if (opText == "%")
+            break;
+        case BuiltinOperationKind::Mod:
             op = isFloatingPoint ? kIROp_FRem : kIROp_IRem;
-        else if (opText == "==")
+            break;
+        case BuiltinOperationKind::Neg:
+            op = kIROp_Neg;
+            break;
+        case BuiltinOperationKind::Not:
+            op = kIROp_Not;
+            break;
+        case BuiltinOperationKind::BitNot:
+            op = kIROp_BitNot;
+            break;
+        case BuiltinOperationKind::Eql:
             op = kIROp_Eql;
-        else if (opText == "!=")
+            break;
+        case BuiltinOperationKind::Neq:
             op = kIROp_Neq;
-        else if (opText == "<")
+            break;
+        case BuiltinOperationKind::Less:
             op = kIROp_Less;
-        else if (opText == ">")
+            break;
+        case BuiltinOperationKind::Greater:
             op = kIROp_Greater;
-        else if (opText == "<=")
+            break;
+        case BuiltinOperationKind::Leq:
             op = kIROp_Leq;
-        else if (opText == ">=")
+            break;
+        case BuiltinOperationKind::Geq:
             op = kIROp_Geq;
-        else if (opText == "&")
+            break;
+        case BuiltinOperationKind::BitAnd:
             op = kIROp_BitAnd;
-        else if (opText == "|")
+            break;
+        case BuiltinOperationKind::BitOr:
             op = kIROp_BitOr;
-        else if (opText == "^")
+            break;
+        case BuiltinOperationKind::BitXor:
             op = kIROp_BitXor;
-        else if (opText == "<<")
+            break;
+        case BuiltinOperationKind::Lsh:
             op = kIROp_Lsh;
-        else if (opText == ">>")
+            break;
+        case BuiltinOperationKind::Rsh:
             op = kIROp_Rsh;
-        return LoweredValInfo::simple(getBuilder()->emitIntrinsicInst(irType, op, 2, args));
+            break;
+        }
+        return LoweredValInfo::simple(
+            getBuilder()->emitIntrinsicInst(irType, op, (UInt)argCount, args));
     }
 
     LoweredValInfo visitInvokeExprImpl(
@@ -5369,16 +5382,6 @@ struct ExprLoweringContext
         }
         context->invokeLoweringRecursionDepth++;
         SLANG_DEFER(context->invokeLoweringRecursionDepth--);
-
-        // A builtin arithmetic/comparison/bitwise/shift/unary operator on scalar/vector/
-        // matrix operands (same or mixed type), recognized during checking (see
-        // `convertToBuiltinArithmeticOp`): emit the IR op directly, skipping the
-        // resolved-callable lowering path.
-        if (auto opExpr = as<OperatorExpr>(expr))
-        {
-            if (opExpr->isLoweredAsBuiltinArithmetic)
-                return lowerBuiltinArithmeticOp(opExpr);
-        }
 
         auto type = lowerType(context, expr->type);
 
@@ -6987,6 +6990,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             expr,
             LoweredValInfo(),
             TryClauseEnvironment());
+    }
+
+    LoweredValInfo visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+    {
+        return sharedLoweringContext.lowerBuiltinOperatorExpr(expr);
     }
 
     LoweredValInfo visitBuiltinCastExpr(BuiltinCastExpr* expr)

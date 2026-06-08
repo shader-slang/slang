@@ -736,42 +736,46 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         tryFoldIntegerConstantExpression(initialVal, ConstantFoldingKind::CompileTime, nullptr));
 
     ConstantIntVal* finalVal = nullptr;
-    auto binaryExpr = as<InfixExpr>(stmt->predicateExpression);
-    if (!binaryExpr)
-        return;
     IROp compareOp = kIROp_Nop;
-    // Note: `VarExpr` is a subclass of `DeclRefExpr`, so the fast-path case (where the
-    // callee is left as an unresolved operator-name `VarExpr`) must be handled *before*
-    // the resolved-DeclRefExpr case below.
-    if (binaryExpr->isLoweredAsBuiltinArithmetic)
+    // The loop predicate `i < N` is either a fast-path `BuiltinOperatorExpr` (read its op
+    // kind) or a resolved comparison `InfixExpr` (read the intrinsic-op modifier). Both carry
+    // their operands in `arguments` (`ExprWithArgsBase`).
+    ExprWithArgsBase* cmpExpr = nullptr;
+    if (auto builtinOp = as<BuiltinOperatorExpr>(stmt->predicateExpression))
     {
-        // A builtin comparison handled by the operator fast path: the callee is the
-        // unresolved operator name (no resolved intrinsic DeclRef), so map the name to
-        // the corresponding IR comparison op directly. `==`/`!=` are mapped here too so this
-        // branch produces the same `compareOp` set as the resolved-DeclRef branch below; the
-        // shared trip-count logic that follows only acts on the ordering comparisons.
-        if (auto varExpr = as<VarExpr>(binaryExpr->functionExpr))
+        cmpExpr = builtinOp;
+        switch (builtinOp->op)
         {
-            auto opText = getText(varExpr->name);
-            if (opText == "<")
-                compareOp = kIROp_Less;
-            else if (opText == "<=")
-                compareOp = kIROp_Leq;
-            else if (opText == ">")
-                compareOp = kIROp_Greater;
-            else if (opText == ">=")
-                compareOp = kIROp_Geq;
-            else if (opText == "==")
-                compareOp = kIROp_Eql;
-            else if (opText == "!=")
-                compareOp = kIROp_Neq;
+        case BuiltinOperationKind::Less:
+            compareOp = kIROp_Less;
+            break;
+        case BuiltinOperationKind::Leq:
+            compareOp = kIROp_Leq;
+            break;
+        case BuiltinOperationKind::Greater:
+            compareOp = kIROp_Greater;
+            break;
+        case BuiltinOperationKind::Geq:
+            compareOp = kIROp_Geq;
+            break;
+        case BuiltinOperationKind::Eql:
+            compareOp = kIROp_Eql;
+            break;
+        case BuiltinOperationKind::Neq:
+            compareOp = kIROp_Neq;
+            break;
+        default:
+            break;
         }
+        // `==`/`!=` are recognized for parity with the resolved branch; the trip-count logic
+        // below only acts on the ordering comparisons.
         if (compareOp == kIROp_Nop)
             return;
     }
-    else if (auto compareFuncExpr = as<DeclRefExpr>(binaryExpr->functionExpr))
+    else if (auto binaryExpr = as<InfixExpr>(stmt->predicateExpression))
     {
-        if (!compareFuncExpr->declRef.getDecl())
+        auto compareFuncExpr = as<DeclRefExpr>(binaryExpr->functionExpr);
+        if (!compareFuncExpr || !compareFuncExpr->declRef.getDecl())
             return;
         if (auto intrinsicOpModifier =
                 compareFuncExpr->declRef.getDecl()->findModifier<IntrinsicOpModifier>())
@@ -782,21 +786,22 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         {
             return;
         }
+        cmpExpr = binaryExpr;
     }
     else
     {
         return;
     }
-    if (binaryExpr->arguments.getCount() != 2)
+    if (cmpExpr->arguments.getCount() != 2)
         return;
-    auto leftCompareOperand = binaryExpr->arguments[0];
-    auto rightCompareOperand = binaryExpr->arguments[1];
+    auto leftCompareOperand = cmpExpr->arguments[0];
+    auto rightCompareOperand = cmpExpr->arguments[1];
     if (!leftCompareOperand)
         return;
     if (!rightCompareOperand)
         return;
     if (auto rightVal = tryFoldIntegerConstantExpression(
-            binaryExpr->arguments[1],
+            cmpExpr->arguments[1],
             ConstantFoldingKind::CompileTime,
             nullptr))
     {
@@ -808,7 +813,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     }
     else if (
         auto leftVal = tryFoldIntegerConstantExpression(
-            binaryExpr->arguments[0],
+            cmpExpr->arguments[0],
             ConstantFoldingKind::CompileTime,
             nullptr))
     {

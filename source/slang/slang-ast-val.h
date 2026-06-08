@@ -257,31 +257,9 @@ class FuncCallIntVal : public IntVal
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
-// Identifies a builtin operator for `BuiltinOperationIntVal`. These mirror the builtin
-// IR ops (see `convertToBuiltinArithmeticOp` / `lowerBuiltinArithmeticOp`); their integer
-// values are part of the serialized/mangled form, so only append, never reorder.
-enum class BuiltinOperationKind
-{
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    Neg,
-    Eql,
-    Neq,
-    Less,
-    Greater,
-    Leq,
-    Geq,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitNot,
-    Lsh,
-    Rsh,
-    Not,
-};
+// `BuiltinOperationKind` and its helpers (`getBuiltinOperationOpText` / `findBuiltinOperationKind`)
+// are declared in slang-ast-support-types.h, since they are shared with the AST-level
+// `BuiltinOperatorExpr` node.
 
 // A compile-time integer that is the result of a builtin operator applied to operands that
 // are not all concrete yet (e.g. `N / 2` for a generic value parameter `N`). Unlike
@@ -327,15 +305,6 @@ class BuiltinOperationIntVal : public IntVal
 
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
-
-// Operator-name text for a `BuiltinOperationKind` (e.g. `Add` -> "+"); used for `toText`
-// and mangling so a `BuiltinOperationIntVal` is identified consistently.
-UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op);
-
-// Map an operator-name + arity to a `BuiltinOperationKind`. Returns false for operators
-// that don't have a `BuiltinOperationIntVal` form (e.g. `&&`/`||`). `isUnary` disambiguates
-// the prefix `-` (Neg) from the binary `-` (Sub).
-bool findBuiltinOperationKind(UnownedStringSlice opText, bool isUnary, BuiltinOperationKind& out);
 
 FIDDLE(abstract)
 class SizeOfLikeIntVal : public IntVal

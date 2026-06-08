@@ -1871,4 +1871,44 @@ FIDDLE() namespace Slang
         Default = Internal,
     };
 
+    // Identifies a builtin operator recognized by the fast path. Used by `BuiltinOperatorExpr`
+    // (the checked-AST node the fast path produces) and `BuiltinOperationIntVal` (its
+    // compile-time-constant form). These mirror the builtin IR ops (see
+    // `convertToBuiltinArithmeticOp` / `lowerBuiltinOperatorExpr`); their integer values are
+    // part of the serialized/mangled form, so only append, never reorder.
+    enum class BuiltinOperationKind
+    {
+        Add,
+        Sub,
+        Mul,
+        Div,
+        Mod,
+        Neg,
+        Eql,
+        Neq,
+        Less,
+        Greater,
+        Leq,
+        Geq,
+        BitAnd,
+        BitOr,
+        BitXor,
+        BitNot,
+        Lsh,
+        Rsh,
+        Not,
+    };
+
+    // Operator-name text for a `BuiltinOperationKind` (e.g. `Add` -> "+"); used for `toText`
+    // and mangling so a `BuiltinOperationIntVal` is identified consistently.
+    UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op);
+
+    // Map an operator-name + arity to a `BuiltinOperationKind`. Returns false for operators
+    // that don't have a builtin fast-path form (e.g. `&&`/`||`). `isUnary` disambiguates the
+    // prefix `-` (Neg) from the binary `-` (Sub).
+    bool findBuiltinOperationKind(
+        UnownedStringSlice opText,
+        bool isUnary,
+        BuiltinOperationKind& out);
+
 } // namespace Slang
