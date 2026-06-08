@@ -2770,10 +2770,9 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
 
     // Fall back to the decl's stored, serializable folded value (substituted for this
     // declRef) when there is no initializer expression to fold, or when re-folding it
-    // fails. The latter occurs cross-module: an imported initializer that contains a
-    // builtin fast-path operator loses its operator-name callee through AST serialization,
-    // so it can no longer be re-folded, but the stored `val` (e.g. a
-    // `BuiltinOperationIntVal`) round-trips and folds correctly under substitution.
+    // fails. The stored `val` (e.g. a `BuiltinOperationIntVal`) round-trips through
+    // serialization and folds correctly under substitution, so this is a robust safety net
+    // for imported (cross-module) initializers whose expression form does not re-fold.
     auto foldFromStoredVal = [&]() -> IntVal*
     {
         if (auto storedVal = decl->val)
