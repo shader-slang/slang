@@ -25,6 +25,115 @@ bundle's `source_doc` (or a secondary doc the per-section prompt
 explicitly allows). The test's `purpose` field paraphrases the claim
 being verified.
 
+### Source-of-truth hierarchy
+
+When a behaviour is described in more than one place, **the language
+reference outranks the generated design docs**.
+
+1. **`docs/language-reference/*.md`** — the human-written language
+   reference manual. Describes what Slang behaviour _should be_. This
+   is the **authoritative spec**. Anchor to the language reference
+   whenever it covers the claim you are testing.
+2. **`docs/generated/design/*.md`** — the LLM-generated architectural
+   docs. Reverse-engineered from the compiler source and therefore
+   liable to codify bugs as if they were intentional behaviour.
+   Anchor here **only when the language reference is silent** on the
+   specific behaviour (the language reference is a work-in-progress
+   and incomplete; the design-doc fallback path stays load-bearing).
+3. **Compiler source** — never the test's primary citation. See
+   `## Reporting suspected compiler bugs` for how to handle
+   spec-vs-compiler disagreements you observe.
+
+If you find a behaviour described in **both** the language reference
+and a generated-design doc, and the two disagree, anchor the test to
+the **language reference** and let the test fail. The failure is the
+signal: the compiler matches one of them and not the other, and the
+human triage step decides whether the spec or the compiler is wrong.
+Write a `drift-from-source` doc-gap row in the bundle README naming
+both citations so the next regeneration of either doc consumes it.
+
+### Anchor format
+
+The `//META: doc_ref=` value is a single `path#anchor` pointing at the
+authoritative doc for that one claim. Examples:
+
+```
+//META: doc_ref=docs/language-reference/expressions-literal.md#integer-literal-expressions
+//META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#name-binding
+```
+
+The path must exist; the lint pass validates this. If the anchor
+fragment does not match a heading in the file, the test still passes
+lint but the citation is fragile and reviewers will catch it.
+
+### Where the test lives — role-based trees (`conformance/` + `design/`)
+
+The framework uses **two parallel test trees** with distinct roles.
+Each bundle's `_prompt.md` is co-located in the bundle directory.
+
+| Tree                                                                                                                                                                          | Bundles' `source_doc` points at                         | Role                                                                                             |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `docs/generated/tests/conformance/`                                                                                                                                           | `docs/language-reference/*.md` (the human-written spec) | **Spec conformance.** A failing test is a spec-vs-compiler signal.                               |
+| `docs/generated/tests/design/<area>/` (areas: `pipeline/`, `ast-reference/`, `ir-reference/`, `syntax-reference/`, `name-resolution/`, `cross-cutting/`, `target-pipelines/`) | `docs/generated/design/*.md` (LLM-derived design docs)  | **Regression coverage.** A failing test is a behavioural regression in known-codified behaviour. |
+
+The two trees are intentionally allowed to overlap on the same
+compiler surface — they verify _different_ properties (spec
+conformance vs. behavioural regression). When a `conformance/` test
+fails and its `design/` counterpart passes, that IS the
+spec-vs-compiler drift signal the suite is designed to surface; file a
+finding.
+
+**Where to write a new test:**
+
+1. If the language reference describes the claim → put the test in
+   `docs/generated/tests/conformance/<doc-name>/` (creating the bundle
+   if absent). `<doc-name>` mirrors the lang-ref filename without the
+   `.md` suffix.
+2. Otherwise → put the test in the appropriate existing `design/`
+   bundle.
+3. If you find the same surface described in both, write a test in
+   **both** trees. They are doing different jobs.
+
+This keeps coverage of the language reference trivially measurable
+per-bundle, lets the bundle path tell a reviewer the failure
+semantics at a glance, and removes the per-test ambiguity an "anchor
+tag" approach would introduce.
+
+### Campaign mode (autonomous batch generation)
+
+When an operator runs an autonomous-generation campaign across many
+lang-ref docs at once, the **bug-finding flow is local-only**:
+
+- Write the structured finding YAML under
+  `docs/generated/tests/_meta/findings/<id>.yaml` exactly as the
+  schema requires.
+- Run `regenerate.py lint` to validate the YAML.
+- Add the affected test path to
+  `docs/generated/tests/_meta/expected-failures.txt` with a `#`
+  comment naming the _local_ finding ID (not yet a tracking-issue
+  URL — that comes later).
+- **Do NOT** run `regenerate.py findings file <id>` during campaign
+  mode. The YAML stays in `_meta/findings/` (not `_meta/findings/filed/`).
+  A later human-led triage pass reviews the pending findings, edits
+  them if needed, files the ones worth filing, and de-dupes any that
+  share root cause.
+
+The expected-failures-lint enforces a tracking-issue-style link
+above every entry block; during campaign mode you can satisfy this
+with the pending finding's filename:
+
+```
+# Pending: docs/generated/tests/_meta/findings/slangi-foo-bar.yaml
+# (will become a tracking issue at human-triage time)
+docs/generated/tests/conformance/.../some-test.slang
+```
+
+For the full claim-driven generation methodology a campaign session
+follows, see [`_claims.md`](_claims.md) and [`../CAMPAIGN.md`](../CAMPAIGN.md).
+
+This preserves the bug signal without generating a flood of GitHub
+issues during a single-session burst.
+
 You will be asked at times to "increase coverage" or to "expand" a
 bundle. **You must never** in that case:
 
@@ -85,25 +194,25 @@ strategy (e.g. "one positive + one negative per claim in sections
 
 ## Functional coverage
 
-| Claim                                                                          | Intent     | Anchor                                                                        | Tests                                                                    |
-| ------------------------------------------------------------------------------ | ---------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Claim                                                                          | Intent     | Anchor                                                               | Tests                                                                    |
+| ------------------------------------------------------------------------------ | ---------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | The more specialized generic wins when both candidates are equally accessible. | functional | [#overload-resolution](../../../design/<doc>.md#overload-resolution) | [`overload-prefer-specialized.slang`](overload-prefer-specialized.slang) |
-| ...                                                                            | ...        | ...                                                                           | ...                                                                      |
+| ...                                                                            | ...        | ...                                                                  | ...                                                                      |
 
 ## Untested claims
 
-| Claim                                                                                                                                     | Reason          | Anchor                                                                    | Why untested                                                                                                                                     |
-| ----------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Claim                                                                                                                                     | Reason          | Anchor                                                           | Why untested                                                                                                                                     |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | The doc describes the `serialize(serializer, value)` template pattern that compiler internals use to thread values through serialization. | needs-unit-test | [#serialize-pattern](../../../design/<doc>.md#serialize-pattern) | A C++ idiom invoked from compiler-internal code; no slangc CLI surface reaches it. A C++ unit test against the serializer types could verify it. |
 | The `closesthit` entry point lowers to a DXR `[shader("closesthit")]` HLSL function.                                                      | gpu-dxr         | [#dxr-ray-tracing](../../../design/<doc>.md#dxr-ray-tracing)     | Agent runtime has no GPU; CI nightly has D3D12 + DXR support.                                                                                    |
-| ...                                                                                                                                       | ...             | ...                                                                       | ...                                                                                                                                              |
+| ...                                                                                                                                       | ...             | ...                                                              | ...                                                                                                                                              |
 
 ## Doc gaps observed
 
-| Anchor                                                                      | Kind            | Gap                                                                                                             | Suggested addition                                                              |
-| --------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Anchor                                                             | Kind            | Gap                                                                                                             | Suggested addition                                                              |
+| ------------------------------------------------------------------ | --------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | [#basic-scalar-types](../../../design/<doc>.md#basic-scalar-types) | missing-surface | The doc lists `IntPtr` and `UIntPtr` as opcodes but does not name a Slang surface construct that produces them. | A "user-level surface" column per row, or a note that these are host-side only. |
-| ...                                                                         | ...             | ...                                                                                                             | ...                                                                             |
+| ...                                                                | ...             | ...                                                                                                             | ...                                                                             |
 ```
 
 **Functional-coverage table rules:**
@@ -112,7 +221,7 @@ strategy (e.g. "one positive + one negative per claim in sections
   test verifies in one plain-English sentence; it must match the test's
   `//META: purpose=...` line verbatim.
 - **Intent** uses the controlled vocabulary `functional | boundary |
-  negative | expansion | regression` and matches the test's
+negative | expansion | regression` and matches the test's
   `//META: intent=...` field. When multiple tests with different
   intents share one claim row, list them comma-separated
   (`functional, boundary`).
@@ -120,7 +229,7 @@ strategy (e.g. "one positive + one negative per claim in sections
   `[#anchor-name](<relative-path-to-doc>#anchor-name)`. Use the same
   anchor that appears in the tests' `//META: doc_ref=...` fields.
 - **Tests** is a comma-separated list of clickable filenames in the
-  bundle directory, formatted `` [`filename.slang`](filename.slang) ``.
+  bundle directory, formatted ``[`filename.slang`](filename.slang)``.
   Never repeat a claim across rows — if multiple tests verify the same
   claim (identical purpose), group them in the Tests cell of a single
   row.
@@ -145,14 +254,14 @@ to add.
   multiple sections, pick the most specific anchor and mention the
   others in the Gap cell.
 - **Kind** is one value from the controlled vocabulary:
-  | Kind                     | When to use                                                                                                       |
+  | Kind | When to use |
   | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-  | `missing-example`        | Doc names a claim but does not include a minimal example shader that exercises it.                                |
-  | `missing-surface`        | Doc names an IR / AST / internal construct but does not name the user-level syntax or builtin that produces it.   |
-  | `undocumented-behavior`  | Observed compiler behavior is real and reachable but the doc is silent about it (no claim, no caveat, no warning).|
-  | `cascading-only-mention` | Doc describes a diagnostic or behavior that is always shadowed in practice by an earlier diagnostic or pass.      |
-  | `ambiguous-claim`        | Doc claim has more than one reasonable interpretation; tests cannot anchor to it without making a guess.          |
-  | `drift-from-source`      | Observed compiler behavior contradicts what the doc says (e.g., doc says "lowers to `select`" but actually emits `ifElse`). |
+  | `missing-example` | Doc names a claim but does not include a minimal example shader that exercises it. |
+  | `missing-surface` | Doc names an IR / AST / internal construct but does not name the user-level syntax or builtin that produces it. |
+  | `undocumented-behavior` | Observed compiler behavior is real and reachable but the doc is silent about it (no claim, no caveat, no warning).|
+  | `cascading-only-mention` | Doc describes a diagnostic or behavior that is always shadowed in practice by an earlier diagnostic or pass. |
+  | `ambiguous-claim` | Doc claim has more than one reasonable interpretation; tests cannot anchor to it without making a guess. |
+  | `drift-from-source` | Observed compiler behavior contradicts what the doc says (e.g., doc says "lowers to `select`" but actually emits `ifElse`). |
 - **Gap** is one to three sentences naming what the doc lacks, in the
   voice of a reader of the doc. Quote the doc literally when the gap
   is about its exact wording. Do **not** describe internal compiler
@@ -172,9 +281,9 @@ co-reports are fine — they are useful evidence.
 
 The `## Untested claims` section is the **bucket of doc claims that
 do not yet have a test in this bundle**. Each row names a claim and
-why no test exists — either the kind of test harness that *would*
+why no test exists — either the kind of test harness that _would_
 verify it (C++ unit test, multi-file test, CLI test), the runner /
-capability that *would* unblock it (GPU runtime, DXC, etc.), or, for
+capability that _would_ unblock it (GPU runtime, DXC, etc.), or, for
 truly terminal cases, why no upgrade unblocks it. The doc-regen
 workflow does **not** consume this table; it exists to make the
 suite's coverage boundary visible to readers, and to surface
@@ -185,7 +294,7 @@ primary content; Anchor is a supporting pointer.
 
 - **Claim**: one to three sentences naming what the doc states.
   Lead with the claim because that's the substance — readers and
-  downstream tooling want to know *what* before *why*.
+  downstream tooling want to know _what_ before _why_.
 - **Reason**: controlled vocabulary naming what is needed (when
   testable elsewhere) or why the claim is unreachable. Three families:
 
@@ -201,22 +310,22 @@ primary content; Anchor is a supporting pointer.
   toolchain. CI nightly typically lifts these; the agent runtime
   cannot validate them locally.
 
-  | Reason                 | Meaning                                                                                                                |
-  | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-  | `gpu-dxr`              | D3D12 + DXR ray-tracing entry points (`closesthit` / `anyhit` / `miss` / `raygen` / `intersection` / `callable`).      |
-  | `gpu-mesh-shader`      | Mesh / amplification entry points.                                                                                     |
-  | `gpu-dxc-dxil`         | DXC binary; `-target dxil` / DXBytecode output.                                                                        |
-  | `gpu-fxc-dxbc`         | fxc binary; DXBytecode legacy output.                                                                                  |
-  | `gpu-cuda`             | nvrtc / PTX / OptiX runtime.                                                                                           |
-  | `gpu-metal-toolchain`  | Apple `metal` compiler / `.metallib` toolchain.                                                                        |
-  | `gpu-wgsl-tint`        | Tint downstream invocation (`-target wgsl-spirv`).                                                                     |
-  | `gpu-spirv-tools`      | spirv-link / spirv-val / spirv-opt downstream chain.                                                                   |
-  | `gpu-non-compute`      | Vertex / fragment / hull / domain / geometry / tessellation stages.                                                    |
-  | `gpu-bindless`         | Bindless / `NonUniformResourceIndex` capability.                                                                       |
-  | `gpu-cooperative`      | Cooperative matrix / cooperative vector capability.                                                                    |
-  | `gpu-vulkan-extension` | A Vulkan extension or capability set not enabled in the bundle.                                                        |
-  | `gpu-cross-api-flag`   | Vulkan-cross-API option flags (`VulkanInvertY`, `VulkanUseDxPositionW`, etc.).                                         |
-  | `gpu-other`            | General GPU-runtime requirement without a specific tag above.                                                          |
+  | Reason                 | Meaning                                                                                                           |
+  | ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+  | `gpu-dxr`              | D3D12 + DXR ray-tracing entry points (`closesthit` / `anyhit` / `miss` / `raygen` / `intersection` / `callable`). |
+  | `gpu-mesh-shader`      | Mesh / amplification entry points.                                                                                |
+  | `gpu-dxc-dxil`         | DXC binary; `-target dxil` / DXBytecode output.                                                                   |
+  | `gpu-fxc-dxbc`         | fxc binary; DXBytecode legacy output.                                                                             |
+  | `gpu-cuda`             | nvrtc / PTX / OptiX runtime.                                                                                      |
+  | `gpu-metal-toolchain`  | Apple `metal` compiler / `.metallib` toolchain.                                                                   |
+  | `gpu-wgsl-tint`        | Tint downstream invocation (`-target wgsl-spirv`).                                                                |
+  | `gpu-spirv-tools`      | spirv-link / spirv-val / spirv-opt downstream chain.                                                              |
+  | `gpu-non-compute`      | Vertex / fragment / hull / domain / geometry / tessellation stages.                                               |
+  | `gpu-bindless`         | Bindless / `NonUniformResourceIndex` capability.                                                                  |
+  | `gpu-cooperative`      | Cooperative matrix / cooperative vector capability.                                                               |
+  | `gpu-vulkan-extension` | A Vulkan extension or capability set not enabled in the bundle.                                                   |
+  | `gpu-cross-api-flag`   | Vulkan-cross-API option flags (`VulkanInvertY`, `VulkanUseDxPositionW`, etc.).                                    |
+  | `gpu-other`            | General GPU-runtime requirement without a specific tag above.                                                     |
 
   Terminal — no harness or runner upgrade unblocks:
 
@@ -230,6 +339,7 @@ primary content; Anchor is a supporting pointer.
   | `compile-time-toggle`    | The claim is about a preprocessor define or build-time flag baked into the binary. Not observable at run-time.                     |
   | `requires-external-tool` | The claim could be verified but requires a non-Slang tool (`unzip`, hex dumper, etc.) the runner does not include.                 |
   | `implementation-detail`  | The claim is about internal compiler choice (pass ordering count, hoistability decisions) with no test-directive that reveals it.  |
+
 - **Anchor**: markdown link to the doc section that makes the claim.
 - **Why untested**: one to two sentences elaborating the Reason —
   what specifically blocks the test, and (for `needs-*` / `gpu-*`
@@ -261,8 +371,45 @@ Optional keys:
 //META: requires-tool=<comma-separated list>
 ```
 
-After the `//META` block, add 1–3 short comment lines in plain English
-describing the test in human terms. Then the test directive(s).
+After the `//META` block, add a short comment (1–4 lines) that says
+**what claim the test verifies and how it verifies it** — in your own
+words. Then the test directive(s).
+
+**Do not quote or paraphrase-as-quote the doc.** Comments like
+`// The doc says: "..."` / `// The doc states: ...` / `// The spec
+says ...` are an anti-pattern: the doc anchor already lives in
+`//META: doc_ref` and the claim is already paraphrased in
+`//META: purpose`. The body comment must add what those don't — the
+test's reasoning: the claim under test, plus the mechanism (what the
+test computes/emits and what the `CHECK` asserts, and why that
+observation proves the claim).
+
+Shape (adapt the wording; don't follow it mechanically):
+
+```slang
+// Verifies <the claim, in plain words>.
+// <How: what the test does and what CHECK asserts; why that proves it.>
+```
+
+Before (anti-pattern — verbatim doc quote):
+
+```slang
+// The doc states: if T has a conformance constraint T : U, type T is
+// considered to conform to U, meaning T implements all requirements of U.
+```
+
+After (claim + mechanism):
+
+```slang
+// Verifies a `T : IStringable` constraint lets the generic body call the
+// interface's methods on T. Two distinct conformers are passed through
+// getCode<T>(); CHECK asserts each returns its own code(), which is only
+// reachable if the constraint admits the interface method.
+```
+
+Inline comments next to a specific `// CHECK` line (explaining one
+assertion) are fine and should be kept — this rule is about the
+descriptive block, not about banning all commentary.
 
 `doc_section_digest` is the SHA-256 of the text of the cited doc
 section, computed as the body lines from the heading whose id is the
@@ -287,14 +434,14 @@ Declare the prerequisite explicitly:
 
 Allowed values (comma-separated when more than one is needed):
 
-| Value | What it gates |
-| --- | --- |
-| `dxc` | DXC binary for `-target dxil` / DXIL-assembly. |
-| `fxc` | Legacy fxc.exe for `-target dxbc`. |
-| `nvrtc` | NVRTC / CUDA toolchain for `-target cuda` runtime, `-target ptx`, OptiX runtime. |
-| `metal-toolchain` | Apple `metal` compiler / `metallib` (Mac-only). |
-| `spirv-tools` | spirv-link / spirv-val / spirv-opt downstream chain. |
-| `tint` | Tint downstream (`-target wgsl-spirv`). |
+| Value             | What it gates                                                                    |
+| ----------------- | -------------------------------------------------------------------------------- |
+| `dxc`             | DXC binary for `-target dxil` / DXIL-assembly.                                   |
+| `fxc`             | Legacy fxc.exe for `-target dxbc`.                                               |
+| `nvrtc`           | NVRTC / CUDA toolchain for `-target cuda` runtime, `-target ptx`, OptiX runtime. |
+| `metal-toolchain` | Apple `metal` compiler / `metallib` (Mac-only).                                  |
+| `spirv-tools`     | spirv-link / spirv-val / spirv-opt downstream chain.                             |
+| `tint`            | Tint downstream (`-target wgsl-spirv`).                                          |
 
 `regenerate.py verify` honors `requires-tool`: when a required
 binary is not on `$PATH`, the test is reported as `ignored`
@@ -321,23 +468,23 @@ buries genuine compiler bugs in the failure noise.
 
 Allowed directives (any of these — pick what fits the claim):
 
-| Directive                                                                | When to use                                                          |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| `//TEST:SIMPLE(filecheck=CHECK):-target hlsl`                            | Compile to HLSL text and FileCheck the emitted code.                 |
-| `//TEST:SIMPLE(filecheck=CHECK):-target glsl`                            | Compile to GLSL text and FileCheck the emitted code.                 |
-| `//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm`                       | Compile to SPIR-V assembly text and FileCheck the emitted code.      |
-| `//TEST:SIMPLE(filecheck=CHECK):-target metal`                           | Compile to Metal text and FileCheck the emitted code.                |
-| `//TEST:SIMPLE(filecheck=CHECK):-target wgsl`                            | Compile to WGSL text and FileCheck the emitted code.                 |
-| `//TEST:SIMPLE(filecheck=CHECK):-target cuda`                            | Compile to CUDA C++ text and FileCheck the emitted code.             |
-| `//TEST:SIMPLE(filecheck=CHECK):-target cpp`                             | Compile to CPU C++ text and FileCheck the emitted code.              |
-| `//TEST:SIMPLE(filecheck=CHECK):-target dxil`                            | Compile to DXIL bytecode and FileCheck the emitted code (CI-only).   |
-| `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):`                                  | Verify a diagnostic is emitted with the expected text/severity/code. |
-| `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type` | CPU compute kernel; verify the buffer values.                        |
-| `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type`  | Vulkan compute kernel; verify the buffer values (CI-only).           |
+| Directive                                                                 | When to use                                                          |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `//TEST:SIMPLE(filecheck=CHECK):-target hlsl`                             | Compile to HLSL text and FileCheck the emitted code.                 |
+| `//TEST:SIMPLE(filecheck=CHECK):-target glsl`                             | Compile to GLSL text and FileCheck the emitted code.                 |
+| `//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm`                        | Compile to SPIR-V assembly text and FileCheck the emitted code.      |
+| `//TEST:SIMPLE(filecheck=CHECK):-target metal`                            | Compile to Metal text and FileCheck the emitted code.                |
+| `//TEST:SIMPLE(filecheck=CHECK):-target wgsl`                             | Compile to WGSL text and FileCheck the emitted code.                 |
+| `//TEST:SIMPLE(filecheck=CHECK):-target cuda`                             | Compile to CUDA C++ text and FileCheck the emitted code.             |
+| `//TEST:SIMPLE(filecheck=CHECK):-target cpp`                              | Compile to CPU C++ text and FileCheck the emitted code.              |
+| `//TEST:SIMPLE(filecheck=CHECK):-target dxil`                             | Compile to DXIL bytecode and FileCheck the emitted code (CI-only).   |
+| `//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):`                                   | Verify a diagnostic is emitted with the expected text/severity/code. |
+| `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type`  | CPU compute kernel; verify the buffer values.                        |
+| `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type`   | Vulkan compute kernel; verify the buffer values (CI-only).           |
 | `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -output-using-type` | D3D12 compute kernel; verify the buffer values (CI-only).            |
 | `//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type` | CUDA compute kernel; verify the buffer values (CI-only).             |
-| `//TEST:INTERPRET(filecheck=CHECK):`                                     | Run under `slangi` (byte-code interpreter).                          |
-| `//TEST:SIMPLE...-dump-ir...`                                            | Inspect IR via FileCheck patterns.                                   |
+| `//TEST:INTERPRET(filecheck=CHECK):`                                      | Run under `slangi` (byte-code interpreter).                          |
+| `//TEST:SIMPLE...-dump-ir...`                                             | Inspect IR via FileCheck patterns.                                   |
 
 **Required for every directive:** at least one `// CHECK:` (or
 `/*CHECK:` block) somewhere in the file that the directive's
@@ -355,28 +502,89 @@ CI validates it. The `gpu-*` Reason tags in `## Untested claims` are
 used only when no test has been written for the claim yet; once a
 test exists, the claim moves to `## Functional coverage`.
 
-### Exercise as many backends as the claim allows
+### Exercise every feasible back-end for target-dependent claims
 
-A single test file may carry **multiple `//TEST` directives**, one per
-line at the top of the file. `slang-test` runs each directive
-independently and any failure fails the file. **The default is to test
-the claim against every feasible backend, not just one:**
+A single test file may carry **multiple `//TEST` directives** (one per
+line at the top). `slang-test` runs each independently; any failure
+fails the file. Use a **distinct FileCheck prefix per target** so each
+directive matches its own emitted text:
 
-- For a claim that is **target-independent** (lexer / parser /
-  early-semantic-check), one or two directives is enough — adding more
-  is repetition of identical pre-backend behavior. Use `INTERPRET` as
-  the primary.
-- For a claim that is **target-dependent** (IR passes, legalization,
-  emit behaviors, capability gates), add a `//TEST` directive for
-  _every_ feasible text-emit target where the claim is observable:
-  HLSL, GLSL, SPIR-V (asm), Metal, WGSL, CUDA, CPP. If different
-  targets produce different emitted text, use distinct `CHECK`
-  patterns per directive (see existing tests under `tests/` for
-  examples; slang-test selects the pattern block matching the
-  directive).
+```slang
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+// ...
+//HLSL: ...
+//SPV: ...
+//METAL: ...
+```
 
-This is how the suite gains backend coverage. A single-target test
-masks per-target regressions; a multi-target test catches them.
+**Classify the claim first — the classification decides the back-end count:**
+
+- **Target-independent** — resolved _before_ back-end codegen: lexing,
+  preprocessing, parsing, name lookup, overload resolution, generic
+  specialization _semantics_, constant-folded _values_, most
+  diagnostics, AST shape. **One or two directives** (INTERPRET primary,
+  or `COMPARE_COMPUTE -cpu`). Adding more back-ends here just repeats
+  identical pre-backend behavior — don't.
+
+- **Target-dependent** — observable in emitted/generated code or in
+  target-specific legalization / capability handling: codegen shape,
+  intrinsic lowering, type / struct / matrix layout, resource binding,
+  swizzles, capability gates, the emitted form of a construct.
+  **Mandatory: add a `//TEST:SIMPLE(filecheck=<PREFIX>):-target <T>`
+  directive for _every_ feasible text-emit target the claim is
+  observable on** — `hlsl`, `glsl`, `spirv-asm`, `metal`, `wgsl`,
+  `cuda`, `cpp`. This is where the suite earns its per-target
+  regression coverage; a single-target test silently masks
+  Metal / WGSL / CUDA / GLSL codegen bugs. Do **not** stop at HLSL +
+  SPIR-V.
+
+Pair with the functional check as usual (see § functional+emission): the
+runtime _value_ stays on INTERPRET / `COMPARE_COMPUTE -cpu`; the
+emission fan-out is the per-target `SIMPLE` directives.
+
+**When a target can't express the claim** (feature unsupported, needs a
+capability the target lacks, or only diagnoses): do **not** force a
+passing directive or weaken the `CHECK` to make it green. Either add a
+negative / `requires-capability` directive that pins the diagnostic, or
+record that target in `## Untested claims` with a reason
+(`unsupported-on-target` / `gpu-*`).
+
+Targets whose _downstream_ tool is absent locally (DXIL→dxc, CUDA
+PTX→nvrtc, Metal→metallib, WGSL→tint) still emit **source** text that
+FileCheck matches, so a `-target metal/wgsl/cuda/glsl/spirv-asm/hlsl`
+emission directive runs locally without that tool; only genuinely
+tool-gated steps are reported `ignored` (CI validates them).
+
+#### Make functional tests back-end-portable (buffer output, not `printf`)
+
+`printf` exists only on slangi (`INTERPRET`) and the CPU target; it is
+**not** in the Metal or WGSL compute capability set, so a `printf`-based
+shader fails to emit there (E36107) and contributes **zero**
+Metal/WGSL coverage. When a target-dependent claim should also be
+emitted on every back-end, write the result to an `RWStructuredBuffer`
+and observe it with `COMPARE_COMPUTE`, not `printf`:
+
+```slang
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+// ... one SIMPLE directive per feasible target ...
+RWStructuredBuffer<int> outputBuffer;
+[numthreads(1, 1, 1)]
+void computeMain() { outputBuffer[0] = /* result */; }
+// CHECK: /* expected value */
+```
+
+This single buffer-output shader is functional on CPU **and** emits on
+all text targets. Keep a separate `INTERPRET` + `printf` companion only
+when you specifically want slangi-VM value coverage (it has surfaced
+real VM bugs). For a target-independent value claim, `printf`/INTERPRET
+alone is still fine — don't rework it; the buffer form is for claims you
+want exercised across back-ends.
 
 ### Pressure the compiler — boundary coverage is mandatory
 
@@ -533,7 +741,7 @@ These are not lint-enforced, but skip them only with a
 - **Default to `CHECK-DAG` for any test with more than one CHECK
   line.** FileCheck's plain `CHECK:` cursor advances monotonically:
   a `CHECK: error` followed by `CHECK: E30011` cannot match
-  `error[E30011]: msg` (the second pattern's text is *behind* the
+  `error[E30011]: msg` (the second pattern's text is _behind_ the
   cursor after the first match). Use `CHECK-DAG:` for unordered
   matches, `CHECK:` only when source-text order is the property you
   are verifying. This single rule prevents the most common
@@ -723,7 +931,7 @@ for the dump-printer spelling.
   `//DIAGNOSTIC_TEST(non-exhaustive):SIMPLE(diag=CHECK):`.
 - **Default to omitting `non-exhaustive`.** The runner errors with
   `Unnecessary 'non-exhaustive': All N diagnostic(s) were matched
-  by annotations` when the flag is set but every emitted diagnostic
+by annotations` when the flag is set but every emitted diagnostic
   was matched — and this is the single most common cause of FAILED
   results during `verify`. Write your CHECK annotations, run
   `verify`, and add `non-exhaustive` **only** if the verify output
@@ -772,7 +980,7 @@ the bundle and reports three buckets:
   not a failure.
 - **FAILED** — the directive ran and the CHECK patterns did not match,
   OR the diagnostic-test runner objected (e.g. `Unnecessary
-  'non-exhaustive'`, line-count mismatch, message-text mismatch).
+'non-exhaustive'`, line-count mismatch, message-text mismatch).
   **Every FAILED test must be fixed before commit.**
 
 The two most common causes of a FAILED result on first verify are:
@@ -816,8 +1024,8 @@ the nightly job stays green while the fix is in flight. Format:
 # Remove the entry when the underlying bug is fixed.
 
 # https://github.com/shader-slang/slang/issues/11375 — slangi VM constants OOB
-docs/generated/tests/ast-reference/expressions/logic-and-short-circuit.slang
-docs/generated/tests/ast-reference/expressions/logic-or-short-circuit.slang
+docs/generated/tests/design/ast-reference/expressions/logic-and-short-circuit.slang
+docs/generated/tests/design/ast-reference/expressions/logic-or-short-circuit.slang
 ```
 
 `regenerate.py verify` honors this file: matching tests are reported

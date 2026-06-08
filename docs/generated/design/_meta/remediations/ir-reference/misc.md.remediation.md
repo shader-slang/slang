@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T17:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-05T15:45:00Z
 target_doc: ir-reference/misc.md
 review_report: ../../reviews/ir-reference/misc.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
 actions:
-  fixed: 3
+  fixed: 1
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,16 +18,12 @@ actions:
 
 ## Summary
 
-Three major findings addressed: added "System opcodes" and "Tensor
-and runtime helpers" sub-tables for the unclaimed concrete opcodes
-the catch-all had been missing; removed the `CastStorageToLogicalBase`
-and `LiveRangeMarker` grouping-parent rows; removed `DiffTypeInfo`
-(now owned by `differentiation.md`).
+The single finding was fixed; none were rejected, deferred, or
+escalated. The two concrete children of `ForceVarIntoStructTemporarilyBase`
+were missing from the catch-all tables and have been added.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-ir-insts.lua:14-18` defines `nop` and `Unrecognized` (system-level placeholders); `:1528-1576` defines runtime/tensor helpers (`makeArrayList`, `makeTensorView`, `allocTorchTensor`, `TorchGetCudaStream`, `TorchTensorGetView`, `allocateOpaqueHandle`); the cooperative-matrix/vector ops from that same range belong on `resources-and-atomics.md` (added there in this cycle); the constexpr arithmetic/cast cluster at `:3142-3174` is value-like and was added to `values.md` in this cycle. | Added `### System opcodes` and `### Tensor and runtime helpers` to the top of `## Opcodes`. |
-| F-002 | fixed | `source/slang/slang-ir-insts.lua:2517-2522` and `:2701` show `CastStorageToLogicalBase` and `LiveRangeMarker` as grouping parents with no IR opcode of their own. | Removed both rows; folded a short note above each affected table identifying the parent and its concrete children; renamed the "CastStorageToLogicalBase" notable-opcode block to "Storage / logical casts" so the existing prose still applies. |
-| F-003 | fixed | `source/slang/slang-ir-insts.lua:1006-1010` annotates `DiffTypeInfo` as differential-type-info; the paired `differentiation.md` remediation adds the canonical row there. | Removed the `DiffTypeInfo` row from the "Pack and expansion" table. |
+| F-001 | fixed | `ir-reference-misc.md:16` names `ForceVarIntoStructTemporarilyBase` as a typical misc inhabitant; its children at `source/slang/slang-ir-insts.lua:1541-1548` were absent and no sibling page lists them. Behavior verified at `source/slang/slang-ir-hlsl-legalize.cpp:62-130`. | Added a `### Variable struct-wrapping legalization` sub-table with rows for `ForceVarIntoStructTemporarily` and `ForceVarIntoRayPayloadStructTemporarily`. |
