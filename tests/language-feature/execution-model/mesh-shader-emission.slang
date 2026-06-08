@@ -45,8 +45,12 @@ void meshMain(
 // HLSL: keeps the explicit attributes and output declarations.
 // CHECK_HLSL-DAG: outputtopology("triangle")
 // CHECK_HLSL-DAG: numthreads(3, 1, 1)
-// CHECK_HLSL-DAG: out indices
-// CHECK_HLSL-DAG: out vertices
+// CHECK_HLSL-DAG: out vertices   {{[A-Za-z_0-9]+}} verts
+// CHECK_HLSL-DAG: out indices    {{[A-Za-z_0-9]+}} triangles
+// CHECK_HLSL-DAG: out primitives {{[A-Za-z_0-9]+}} prims
+// CHECK_HLSL-NOT: out indices    {{.*}} out
+// CHECK_HLSL-NOT: out vertices   {{.*}} out
+// CHECK_HLSL-NOT: out primitives {{.*}} out
 // CHECK_HLSL-DAG: SetMeshOutputCounts
 
 // SPIRV: emits MeshEXT execution mode + the per-vertex / per-primitive
