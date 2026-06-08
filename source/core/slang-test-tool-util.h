@@ -88,6 +88,30 @@ struct TestToolUtil
     static bool hasDeferredCoreModule(Index numArgs, const char* const* args);
 
     static SlangResult getDllDirectoryPath(const char* exePath, String& outDllDirectoryPath);
+
+    /// If `prefix` is `filePath` followed by `.<all-digits>`, returns that subtest index;
+    /// otherwise returns -1. The all-digits requirement means `foo.slang.6` parses but
+    /// `foo.slang.6 syn (llvm)` does not (the space ends parsing) and `.6` never matches
+    /// `.60`.
+    static int getSubtestIndex(const String& prefix, const String& filePath);
+
+    /// Inserts `.<index>` into `testName` right after the file-path token (before any
+    /// trailing " syn"/" (<api>)" suffix), producing the form `-dry-run` prints for a
+    /// subtest, e.g. insertSubtestIndex("foo.slang (vk)", 0) == "foo.slang.0 (vk)".
+    static String insertSubtestIndex(const String& testName, int index);
+
+    /// Returns true if `entry` (an `-exclude-prefix` / `-skip-list` value) targets the
+    /// expanded subtest identified by (`filePath`, `outputStem`, `testName`) at
+    /// `subTestIndex` within a file of `subtestCount` subtests. Matches the full expanded
+    /// display name (including the `.0` form `-dry-run` prints for the first subtest of a
+    /// multi-subtest file) or the subtest stem `<path>.<idx>` (all variants of that index).
+    static bool doesSubtestMatchExcludeEntry(
+        const String& entry,
+        const String& filePath,
+        const String& outputStem,
+        const String& testName,
+        Index subTestIndex,
+        Index subtestCount);
 };
 
 } // namespace Slang
