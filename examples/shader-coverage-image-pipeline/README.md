@@ -38,6 +38,13 @@ The coverage delta between the two runs is the demo's headline.
 # `--counter-width=64` to exercise the wider counters (cannot wrap
 # within any practical run; default in production use):
 ./shader-coverage-image-pipeline --mode=exhaustive --counter-width=64
+
+# `--counter-width=64` needs a device with `shaderBufferInt64Atomics`
+# (and a Vulkan 1.2 instance, since the path emits SPIR-V 1.5). The demo
+# automatically selects a discrete GPU that advertises the feature and
+# enables `shaderInt64` + `shaderBufferInt64Atomics`; if no eligible
+# device is present (e.g. an integrated-only laptop) it errors and asks
+# you to use `--counter-width=32`.
 ```
 
 Each coverage run writes alongside the executable:

@@ -666,7 +666,9 @@ int main(int argc, char** argv)
     globalsData.nodeCount = (uint32_t)nodes.size();
 
     vkdemo::Context ctx;
-    ctx.init();
+    // 64-bit counters need a device with shaderBufferInt64Atomics; request it so
+    // selection skips integrated GPUs that only support a 32-bit counter buffer.
+    ctx.init(enableCoverage && counterByteWidth == 8);
 
     std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings;
     setBindings.resize(2);

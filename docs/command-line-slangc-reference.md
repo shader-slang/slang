@@ -343,6 +343,14 @@ Reserve a descriptor set when auto-allocating the synthesized `__slang_coverage`
 Write shader coverage manifest metadata to an explicit JSON sidecar path. Use this when compiled output is written to stdout or when the build needs a stable manifest path instead of the default `&lt;output&gt;.coverage-manifest.json` sidecar. Requires at least one coverage tracing mode, is not supported for container outputs, and is valid only when exactly one compiled artifact carries coverage metadata. The path must not overlap any emitted artifact path. 
 
 
+<a id="trace-coverage-counter-width"></a>
+### -trace-coverage-counter-width
+
+**-trace-coverage-counter-width &lt;bits&gt;**
+
+Per-slot bit width of the synthesized `__slang_coverage` buffer. Accepts `64` (default) or `32`. uint64 counters effectively cannot wrap within any practical run; uint32 counters wrap silently at 2^32 hits per slot. Use `32` when targeting a runtime driver that does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon, which exposes `shaderBufferInt64Atomics = false`). Ignored when no coverage mode is enabled. The chosen width is reported through the coverage manifest's `buffer.element_type` / `buffer.element_stride` and the `CoverageBufferInfo::elementByteWidth` host API, so host readback and the LCOV converter honor it automatically. 
+
+
 <a id="report-dynamic-dispatch-sites"></a>
 ### -report-dynamic-dispatch-sites
 Reports information about dynamic dispatch sites for interface calls. 

@@ -215,6 +215,44 @@ D3D12 / HLSL hosts are expected to use the same `space` / `binding`
 metadata shape in a follow-up, but this PR does not define D3D register-space
 auto-allocation or reservation policy.
 
+## Counter element width and device requirements
+
+The synthesized `__slang_coverage` buffer defaults to `uint64` counters
+(8-byte slots) and can be narrowed to `uint32` (4-byte) with
+`-trace-coverage-counter-width 32`. The host must read the width from
+`CoverageBufferInfo::elementByteWidth` (mirrored in the manifest as
+`buffer.element_type` / `buffer.element_stride`) and allocate and read
+back the buffer at the matching stride — do not assume 4 bytes.
+
+The default 64-bit width requires runtime support for 64-bit integer
+atomics, because the instrumented shader increments counters with a
+64-bit atomic add. The host must enable the corresponding device
+features before the coverage shader is created, or shader-module
+creation is rejected and no counters are written:
+
+- **Vulkan / SPIR-V** — enable `shaderInt64` (the SPIR-V `Int64`
+  capability) and `shaderBufferInt64Atomics` (`VK_KHR_shader_atomic_int64`,
+  core in Vulkan 1.2). The 64-bit path emits SPIR-V 1.5, so the instance
+  must target Vulkan 1.2 (a 1.1 instance, max SPIR-V 1.3, rejects it).
+  Note that some drivers (e.g. NVIDIA) report `shaderBufferInt64Atomics`
+  only through the standalone `VkPhysicalDeviceShaderAtomicInt64Features`
+  struct and return 0 for the same bit in the aggregated
+  `VkPhysicalDeviceVulkan12Features`; query the standalone struct.
+  Integrated GPUs frequently expose a compute queue but not
+  `shaderBufferInt64Atomics`, so a host that enumerates devices should
+  select one that advertises the feature (or fall back to
+  `-trace-coverage-counter-width 32`).
+- **HLSL / D3D12** — the `uint64` `InterlockedAdd` overload requires
+  Shader Model 6.6; SM 5.x / 6.0–6.5 must use
+  `-trace-coverage-counter-width 32`.
+- **CUDA / CPU** — no device opt-in; the backend selects the 64-bit
+  atomic-add form directly.
+
+`-trace-coverage-counter-width 32` removes these requirements and runs
+anywhere 32-bit shader atomics work (notably MoltenVK on Apple Silicon,
+which reports `shaderBufferInt64Atomics = false`), at the cost of silent
+wraparound past 2^32 hits per counter slot.
+
 ## `slang-rhi` consumption model
 
 The companion `slang-rhi` implementation is tracked in

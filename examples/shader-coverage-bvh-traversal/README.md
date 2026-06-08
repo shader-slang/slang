@@ -42,6 +42,13 @@ uploads, and dispatches 512×512 = 262144 rays from a synthetic camera.
 # `--counter-width=64` to use the wider counters that effectively
 # cannot wrap.
 ./shader-coverage-bvh-traversal --mode=stress --counter-width=64
+
+# `--counter-width=64` needs a device with `shaderBufferInt64Atomics`
+# (and a Vulkan 1.2 instance, since the path emits SPIR-V 1.5). The demo
+# automatically selects a discrete GPU that advertises the feature and
+# enables `shaderInt64` + `shaderBufferInt64Atomics`; if no eligible
+# device is present (e.g. an integrated-only laptop) it errors and asks
+# you to use `--counter-width=32`.
 ```
 
 Each coverage run writes:
