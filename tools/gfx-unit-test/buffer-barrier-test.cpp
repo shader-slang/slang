@@ -117,6 +117,10 @@ void barrierTestImpl(IDevice* device, UnitTestContext* context)
 
 void barrierTestAPI(UnitTestContext* context, DeviceType deviceType)
 {
+    if (!deviceTypeInEnabledApis(deviceType, context->enabledApis))
+    {
+        SLANG_IGNORE_TEST
+    }
     Slang::List<const char*> searchPaths = {"", "../../tools/gfx-unit-test", "tools/gfx-unit-test"};
     auto device = createTestingDevice(context, deviceType, searchPaths);
 
