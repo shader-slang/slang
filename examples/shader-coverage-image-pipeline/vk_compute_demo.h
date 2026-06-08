@@ -35,13 +35,12 @@
 
 #pragma once
 
-#include <vulkan/vulkan.h>
-
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <vulkan/vulkan.h>
 
 namespace vkdemo
 {
@@ -258,9 +257,8 @@ inline void Context::init(bool requireInt64Atomics)
     featuresSupported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
     featuresSupported.pNext = &atomic64Supported;
     vkGetPhysicalDeviceFeatures2(physical, &featuresSupported);
-    const bool haveBufferInt64Atomics =
-        featuresSupported.features.shaderInt64 == VK_TRUE &&
-        atomic64Supported.shaderBufferInt64Atomics == VK_TRUE;
+    const bool haveBufferInt64Atomics = featuresSupported.features.shaderInt64 == VK_TRUE &&
+                                        atomic64Supported.shaderBufferInt64Atomics == VK_TRUE;
 
     // Enable structs kept in scope until vkCreateDevice (chained via pNext).
     VkPhysicalDeviceShaderAtomicInt64Features atomic64Enable = {};
@@ -398,7 +396,9 @@ inline ComputePipeline Context::createComputePipeline(
         dslci.bindingCount = (uint32_t)bindings.size();
         dslci.pBindings = bindings.data();
         VkDescriptorSetLayout dsl = VK_NULL_HANDLE;
-        check(vkCreateDescriptorSetLayout(device, &dslci, nullptr, &dsl), "vkCreateDescriptorSetLayout");
+        check(
+            vkCreateDescriptorSetLayout(device, &dslci, nullptr, &dsl),
+            "vkCreateDescriptorSetLayout");
         p.setLayouts.push_back(dsl);
     }
 
