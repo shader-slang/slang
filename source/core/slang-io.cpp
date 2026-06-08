@@ -1244,7 +1244,8 @@ String URI::getPath() const
     for (Index i = startIndex; i < endIndex;)
     {
         auto ch = uri[i];
-        if (ch == '%' && i + 2 < endIndex)
+        if (ch == '%' && i + 2 < endIndex && CharUtil::isHexDigit(uri[i + 1]) &&
+            CharUtil::isHexDigit(uri[i + 2]))
         {
             Int charVal = CharUtil::getHexDigitValue(uri[i + 1]) * 16 +
                           CharUtil::getHexDigitValue(uri[i + 2]);
