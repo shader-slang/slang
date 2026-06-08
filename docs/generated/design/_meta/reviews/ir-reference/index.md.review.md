@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-05T15:05:51+00:00
 target_doc: ir-reference/index.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 44cc076396b4503f18997a6be579c3163209ab7a24f87f3aae489b26a3963cbd
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: 9221d4167460d8aa57ead3a905a1ce4b763de1371a68088ad1f20133ed887720
+source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
 checklist:
-  factual_accuracy: fail
+  factual_accuracy: partial
   cross_references: pass
-  completeness: fail
+  completeness: partial
   style_consistency: pass
-  source_alignment: fail
+  source_alignment: partial
   front_matter_validity: pass
-finding_count: 1
+finding_count: 2
 severity_breakdown:
-  critical: 1
-  major: 0
+  critical: 0
+  major: 2
   minor: 0
   nit: 0
 ---
@@ -24,13 +24,18 @@ severity_breakdown:
 # Review report for ir-reference/index.md
 
 ## Summary
-The page is structurally lint-clean, but review found 1 finding; the most significant severity is critical. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The page has valid front matter and all relative links resolve at the target document source commit. I found two coverage and prompt-contract issues: the index claims exhaustive opcode coverage that the dependency pages do not currently provide, and `## Cross-cutting topics` omits the required target-backends cross-reference.
 
 ## Items checked
-- Checked front matter, all relative links, family-page table, opcode-row union across family docs, and sampled source ranges in `slang-ir-insts.lua`.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/index.md`.
+- Read `_common.md`, `ir-reference-index.md`, the target document, all listed dependency family pages, and `source/slang/slang-ir-insts.lua` at `52339028a2aa703271533454c6b9528a534bac31`.
+- Resolved all 31 relative Markdown links at the target source commit.
+- Checked front matter keys and target digest fields for obvious validity.
+- Spot-checked the family taxonomy, the `## Pages` table, approximate opcode counts, and more than 10 source-backed claims about Lua roots, abstract entries, AST-origin conventions, and cross-reference targets.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | intro | The intro claims every opcode appears in exactly one family page, but the set is neither complete nor unique. | `source/slang/slang-ir-insts.lua:1112-1121` and `source/slang/slang-ir-insts.lua:2893-3174` define missing opcodes; duplicate rows include `global_var`, `param`, `witness_table`, and `DebugFunction`. | Fix family pages first, then update the index wording and counts to match exact coverage. |
+| F-001 | major | lines 12-21 and 87-93 | The page says every concrete opcode appears in a family page, but the dependency pages do not currently include all concrete opcodes from the recorded Lua source. | `source/slang/slang-ir-insts.lua:1534` declares `GetPerVertexInputArray` and `source/slang/slang-ir-insts.lua:1539` declares `ResolveVaryingInputRef`; the dependency family pages contain no opcode rows for either name. | Add the missing opcodes to their owning family page, then update this index's exhaustive wording and approximate counts to match the fixed family coverage. |
+| F-002 | major | `## Cross-cutting topics` | The required target-backends cross-reference is missing from the cross-cutting topic list. | `docs/generated/design/_meta/prompts/ir-reference-index.md:51-56` requires bullets for target backends; this section links AST-to-IR, IR passes, emit, IR instructions, serialization, diagnostics, and glossary, but not `../cross-cutting/targets.md`. | Add a bullet for `../cross-cutting/targets.md` or otherwise include the target-backends cross-reference required by the prompt. |

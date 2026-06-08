@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-28T09:03:07+00:00
+reviewed_at: 2026-06-05T14:54:00+00:00
 target_doc: pipeline/06-emit.md
-target_doc_source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-target_doc_watched_paths_digest: a36bfc191a0ab4adb9168e61c6ea332b786bc78e7f29a88ec21d3e53fc1f4f9b
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: 6dc28f908084269f31c6e55e648ebd8307ae6b527db79dfc00f74b5e82c5c6ed
+source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
 checklist:
   factual_accuracy: pass
   cross_references: pass
@@ -24,17 +24,24 @@ severity_breakdown:
 # Review report for pipeline/06-emit.md
 
 ## Summary
-No findings were identified in this follow-up review. The prior front-matter / freshness-ledger findings have been remediated, and the sampled source claims checked in this pass are supported by the source tree.
+
+The page passes this review. Its required sections are present, backend coverage matches the watched `slang-emit-*` files, links resolve at the target source commit, and the sampled source claims align with the recorded source snapshot.
 
 ## Items checked
-- Checked front matter against `_meta/freshness.json` and current digest after remediation of the stale/fresh ledger mismatch.
-- Verified the target document front matter against `docs/generated/design/_meta/freshness.json` and the current `regenerate.py digest` result.
-- Ran the generated-doc linter before and after updating the review records.
+
+- Ran `python3 docs/generated/design/_meta/regenerate.py show pipeline/06-emit.md` and reviewed the resolved watched-file scope plus dependency `pipeline/05-ir-passes.md`.
+- Verified required front matter keys and confirmed `target_doc_source_commit` and `target_doc_watched_paths_digest` match the target document.
+- Resolved all 75 relative Markdown links at `52339028a2aa703271533454c6b9528a534bac31` with no missing targets.
+- Verified both line-number citations in the body against `source/slang/slang-emit.cpp`: `linkAndOptimizeIR` near line 893 and `emitEntryPointsSourceFromIR` at line 2487.
+- Spot-checked 19 factual/source-alignment claims covering `IArtifact` output, dispatcher includes, backend files for HLSL, GLSL, SPIR-V, Metal, WGSL, C++, CUDA, Torch, LLVM, VM, Slang round-trip, `CLikeSourceEmitter`, `SourceWriter`, precedence helpers, prelude files, dependency-file output, and capability-test touch points.
+- Checked the required backend subsections, source-writer section, precedence section, preludes section, adding-backend checklist, no-emoji style, workspace-relative links, and document size relative to the 32 KB cap.
 
 ## Findings
 
 (no findings)
 
 ## No-issues notes
-- The document front matter now matches the freshness ledger entry.
-- The current digest computed by `regenerate.py digest` matches the document front matter.
+
+- The backend list includes each concrete emit backend in the watched `slang-emit-*.cpp` set.
+- The shared-base and support files are covered without treating helper files as target backends.
+- The generated front matter contains all required keys, and the digest is a valid 64-character hex value.

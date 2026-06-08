@@ -1,17 +1,17 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-05T15:05:51+00:00
 target_doc: ir-reference/metadata.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 4efe93afbd22f4572d6d334ca82947cebf8058c7572291261103fd18aa04f6bd
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: 156c66694255ff678fb0eaa18abd2bb50bfa9979d070210c7bb229025fcd0b6b
+source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
 checklist:
-  factual_accuracy: fail
+  factual_accuracy: pass
   cross_references: pass
   completeness: partial
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
 finding_count: 2
 severity_breakdown:
@@ -24,14 +24,18 @@ severity_breakdown:
 # Review report for ir-reference/metadata.md
 
 ## Summary
-The page is structurally lint-clean, but review found 2 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The page is broadly source-aligned: front matter is valid, links resolve, and the opcode rows I checked match the recorded Lua declarations. I found two completeness issues against the metadata prompt: the debug table rows do not cite an introducing pass, and the required notable coverage for `Layout` and `DebugScope` is incomplete.
 
 ## Items checked
-- Checked Layout, Attr, Debug, SPIRVAsm tables, special asm opcode names, abstract-parent handling, front matter, and links.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/metadata.md`.
+- Read `_common.md`, `ir-reference-metadata.md`, the target document, dependency docs, and watched source files at `52339028a2aa703271533454c6b9528a534bac31`.
+- Resolved all 12 relative Markdown links at the target source commit.
+- Verified front matter keys and checked the target source commit and watched-path digest values against the document front matter.
+- Spot-checked more than 10 factual claims across the `Layout`, `Attr`, debug-info, and `SPIRVAsmOperand` rows, including source line ranges, operands, flags, and wrapper names.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | lines 171-175 | Several SPIR-V asm Opcode cells use C++ wrapper names instead of Lua opcode names. | `source/slang/slang-ir-insts.lua:2823-2858` defines Lua entries such as `__truncate`, `__entryPoint`, `__sampledType`, `__imageType`, and `__sampledImageType`. | Use Lua names in the Opcode column and move wrapper names to the C++ wrapper column. |
-| F-002 | major | lines 111-116 and 158 | Abstract/grouping parents are listed as opcode rows: `SemanticAttr`, `LayoutResourceInfoAttr`, and `SPIRVAsmOperand`. | `source/slang/slang-ir-insts.lua:2685-2694` and `:2756-2862` show these as grouping entries with children. | Remove those rows from Opcodes and show them only in hierarchy. |
+| F-001 | major | `### Debug info family` | The prompt requires at least one debug-info row to cite the IR pass that introduces it, but every debug-info row uses only `(synthesized)` in the `AST origin` column. | `docs/generated/design/_meta/prompts/ir-reference-metadata.md:59-65` requires a debug-info row citation; `source/slang/slang-ir-insts.lua:2747-2784` defines the debug opcodes listed in this table. | Update at least one debug-info row, such as `DebugValue` or `DebugLine`, so its `AST origin` cell names the introducing pass file requested by the prompt. |
+| F-002 | major | `## Notable opcodes` | The required notable coverage is incomplete: there is no `DebugScope` callout, and the `Layout` parent is not covered as its own prompt-required topic relating it to `LayoutDecoration`. | `docs/generated/design/_meta/prompts/ir-reference-metadata.md:38-48` requires notable coverage for `Layout`, `VarLayout`, `DebugLine`, `DebugScope`, and `SPIRVAsmOperand`; `source/slang/slang-ir-insts.lua:2652` declares `Layout` and `source/slang/slang-ir-insts.lua:2767` declares `DebugScope`. | Add focused notable callouts for `Layout` and `DebugScope`, or expand existing callouts so those required topics are explicitly covered. |

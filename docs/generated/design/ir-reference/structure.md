@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
+model: claude-opus-4.8
+generated_at: 2026-06-05T10:25:25+00:00
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -40,11 +40,12 @@ infrastructure (`IRInst`, `IRBuilder::createFunc`,
 
 Lowering from the AST is in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp):
-`lowerProgram` (module), `lowerFuncDecl` and `lowerCallableDecl`
-(functions), `lowerGenericDecl` (generics), `lowerStructDecl`
-(struct types), `lowerInterfaceDecl` (interface types),
-`lowerInheritanceDecl` (witness tables), `lowerGlobalVarDecl`
-(global variables).
+`lowerFuncDecl` (functions), `visitGenericDecl` (generics),
+`visitAggTypeDecl` (struct / class types, via `createStructType`),
+`visitInterfaceDecl` (interface types), `visitInheritanceDecl`
+(witness tables), and `lowerGlobalVarDecl` (global variables). The
+module itself is created in `generateIRForTranslationUnit`, whose
+member declarations are lowered through `ensureAllDeclsRec`.
 
 ## Family hierarchy
 
@@ -133,7 +134,7 @@ rows below describe their structural role.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `witness_table` | — | (children: `witness_table_entry`) | H | `InheritanceDecl` lowering in `slang-lower-to-ir.cpp` | Maps each requirement key of an interface to the concrete implementation; hoistable so identical conformances dedupe. |
+| `witness_table` | — | `concreteType` (+ children: `witness_table_entry`) | H | `InheritanceDecl` lowering in `slang-lower-to-ir.cpp` | Conformance of `concreteType` (operand 0) to the interface carried in its result type; owns one `witness_table_entry` per requirement. Hoistable so identical conformances dedupe. |
 | `witness_table_entry` | — | `requirementKey, satisfyingVal` | | (synthesized) | One row of a `witness_table`. |
 | `thisTypeWitness` | — | `type` | | (synthesized inside `InterfaceDecl` lowering) | Placeholder witness that `ThisType` implements the enclosing interface; only valid inside an interface definition. |
 | `TypeEqualityWitness` | — | `subType, superType` | H | (synthesized) | Witness certifying two types are equal. |
@@ -191,6 +192,19 @@ Field access opcodes (`FieldAddress`, `FieldExtract`, see
 [values.md](values.md)) use the key as their selector, which
 makes structural reorganization (e.g. struct splitting) a
 key-rewriting task rather than a string-rewriting task.
+
+### `witness_table`
+
+`witness_table` records that one concrete type conforms to one
+interface. Operand 0 is the `concreteType` (read back via
+`getConcreteType()`); the interface it satisfies is *not* an operand
+but is carried in the instruction's result type — a
+`WitnessTableType` whose conformance interface is read back via
+`getConformanceType()`. Its children are the `witness_table_entry`
+instructions, one per interface requirement, that map each
+`requirementKey` to the satisfying function or value. The opcode is
+hoistable, so the same type-and-interface pair shares a single
+witness table across all uses.
 
 ### `witness_table_entry` vs `interface_req_entry`
 
