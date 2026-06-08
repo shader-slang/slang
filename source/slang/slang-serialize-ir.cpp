@@ -619,8 +619,11 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             SLANG_RELEASE_ASSERT(len >= 0);
             SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
 
-            minSizeInBytes = offsetof(IRConstant, value) +
-                             offsetof(IRConstant::StringValue, chars) + size_t(len);
+            const size_t headerSize =
+                offsetof(IRConstant, value) + offsetof(IRConstant::StringValue, chars);
+            SLANG_RELEASE_ASSERT(size_t(len) <= size_t(-1) - headerSize);
+
+            minSizeInBytes = headerSize + size_t(len);
             break;
         }
         }
