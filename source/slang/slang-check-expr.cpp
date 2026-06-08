@@ -4765,9 +4765,10 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     return node;
 }
 
-// Decompose a builtin numeric type into (base element type, shape). `outRows`/`outCols`
-// describe the shape: both null => scalar, rows set & cols null => vector<rows>, both set =>
-// matrix<rows,cols>. Returns false if `type` is not a builtin scalar/vector/matrix.
+// See the declaration in slang-check-impl.h: computes the common operand type that overload
+// resolution would converge on for `left OP right` (the usual arithmetic conversions, with
+// scalar/vector/matrix broadcast), or null when the operands are not both builtin numeric
+// scalar/vector/matrix types or are not broadcast-compatible.
 Type* SemanticsExprVisitor::getBuiltinArithmeticCommonType(Type* left, Type* right)
 {
     BaseType leftBase, rightBase;

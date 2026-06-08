@@ -675,16 +675,21 @@ void SemanticsStmtVisitor::visitCatchStmt(CatchStmt* stmt)
 void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
 {
     stmt->expression = CheckExpr(stmt->expression);
+    // Warn on a dangling `==` whose result is discarded (likely a mistyped `=`). The
+    // comparison may be either a resolved `operator==` call or a builtin fast-path
+    // `BuiltinOperatorExpr` (the common scalar case).
+    bool isDanglingEquality = false;
     if (auto operatorExpr = as<OperatorExpr>(stmt->expression))
     {
         if (auto func = as<VarExpr>(operatorExpr->functionExpr))
-        {
-            if (func->name && func->name->text == "==")
-            {
-                getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = operatorExpr});
-            }
-        }
+            isDanglingEquality = func->name && func->name->text == "==";
     }
+    else if (auto builtinOp = as<BuiltinOperatorExpr>(stmt->expression))
+    {
+        isDanglingEquality = (builtinOp->op == BuiltinOperationKind::Eql);
+    }
+    if (isDanglingEquality)
+        getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = stmt->expression});
 }
 
 void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)
