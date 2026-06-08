@@ -622,13 +622,26 @@ if(_dxc_build_from_source)
         -DLLVM_INCLUDE_TESTS=OFF
         -DCLANG_INCLUDE_TESTS=OFF
         -DLLVM_ENABLE_WARNINGS=OFF
-        # Apple Clang 21+ (Xcode 26+) marks std::is_nothrow_constructible with
-        # [[_Clang::__no_specializations__]], turning DXC's LLVM StringRef
-        # specializations into hard errors.
-        "-DCMAKE_CXX_FLAGS=-Wno-invalid-specialization"
         ${_dxc_forwarded_config_args}
         -Wno-dev
     )
+
+    # Apple Clang 21+ (Xcode 26+) ships a libc++ that marks
+    # std::is_nothrow_constructible with [[_Clang::__no_specializations__]],
+    # turning DXC's LLVM StringRef trait specializations into
+    # -Winvalid-specialization hard errors. Only this toolchain needs the
+    # suppression, so scope it to AppleClang >= 21; other compilers (and older
+    # AppleClang) must not receive a flag they do not need.
+    if(
+        CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang"
+        AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "21.0.0"
+    )
+        list(
+            APPEND
+            _dxc_configure_args
+            "-DCMAKE_CXX_FLAGS=-Wno-invalid-specialization"
+        )
+    endif()
 
     # A SHA256 hash keeps the stamp content short regardless of argument length.
     # The leading "stamp-v1;" token is a manual schema version: bump it to force
