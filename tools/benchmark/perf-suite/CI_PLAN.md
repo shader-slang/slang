@@ -33,6 +33,10 @@ the real constraints are **timing noise** and **runner contention**, not runtime
 
 ## Tier 1 — per-PR fast gate (soft-fail / warning)
 
+> **Status:** the diff script `compare.py` is built and used **locally** by devs
+> (bench base + head on one machine, then `compare.py base head`). The automated
+> `pull_request` workflow below is **not deployed yet** — design only.
+
 **Trigger:** `pull_request` to `master`, `paths-ignore` docs, skip drafts.
 **Runner:** `[self-hosted, benchmark]` (same dedicated machine).
 **Behavior on regression:** the perf job **fails (visible red X)** but is **NOT a
@@ -102,8 +106,9 @@ figures, not user-facing slowdowns; `mdl_dxr` is the realistic one.
 # Implemented: nightly ToT + release-history resync + tracking series
 
 The time-series tier is wired up as two GitHub Actions workflows on the dedicated
-benchmark runner, plus `track.py` (data model) and `trend.py` (drift alert). The
-per-PR gate (`compare.py`) remains TODO (see above).
+benchmark runner, plus `track.py` (data model) and `trend.py` (drift alert).
+`compare.py` (base-vs-head diff) is implemented as a **local dev tool**; the
+automated per-PR *workflow* (Tier 1 above) is intentionally not deployed yet.
 
 ## Data model
 

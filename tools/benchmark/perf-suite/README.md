@@ -158,6 +158,11 @@ python3 report.py                           # single self-contained HTML report 
 python3 bench.py --slangc /path/to/slangc --label dev --sweep \
     --only resource_aggregate,reflection_layout,control_flow_ssa
 python3 sweep_report.py --label dev         # -> results/dev/_sweep/sweep_report.html
+
+# 6. "did my change slow compilation?" — A/B two builds on the SAME machine
+python3 bench.py --slangc /path/to/base-slangc --label base   # baseline (e.g. merge-base)
+python3 bench.py --slangc /path/to/head-slangc --label head   # your branch
+python3 compare.py base head                # primary-timer Δ%, flags regressions
 ```
 
 ---
@@ -174,6 +179,7 @@ python3 sweep_report.py --label dev         # -> results/dev/_sweep/sweep_report
 | `fetch_corpus.py` | downloads the MDL real-shader corpus (GitHub contents API) |
 | `fetch_releases.py` | downloads + caches prebuilt `slangc` per release tag |
 | `sweep.py` | **release sweep** — runs `bench.py` against every cached release |
+| `compare.py` | **local base-vs-head diff** — "did my change slow compilation?" (bench two slangc on one machine, then diff primary timers) |
 | `track.py` | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint |
 | `trend.py` | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression |
 | `analyze.py` | per-`(workload,timer)` series, leaf-attributed step-change detection, diagnostics path-cost |
