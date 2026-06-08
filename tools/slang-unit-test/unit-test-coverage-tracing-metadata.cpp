@@ -2389,3 +2389,114 @@ SLANG_UNIT_TEST(coverageTracingDoWhileBranchArmKinds)
     SLANG_CHECK(seenTrueArm);
     SLANG_CHECK(seenFalseArm);
 }
+
+// The `-trace-coverage-counter-width` CLI flag validates its bit value
+// (32/64) up front and stores a byte width (4/8). The matching public
+// API option `CompilerOptionName::TraceCoverageCounterWidth` is a byte
+// width and is NOT routed through that CLI validation, so an API caller
+// that supplies a value other than 4 or 8 — most realistically by
+// forwarding the bit width (32/64) without dividing by 8 — must still
+// fail loudly rather than silently producing uint32 counters. This test
+// pins that contract: invalid byte widths fail codegen with E45114, and
+// the two legal widths (4 and 8) compile.
+SLANG_UNIT_TEST(coverageTracingInvalidCounterWidthFailsCodegen)
+{
+    const char* shaderSource = R"(
+        RWStructuredBuffer<uint> outputBuffer;
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void computeMain(uint3 tid : SV_DispatchThreadID)
+        {
+            outputBuffer[0] = tid.x;
+        }
+    )";
+
+    // Compile the shader with `-trace-coverage` and the given API byte
+    // width, forcing codegen so the coverage pass (and its width
+    // validation) runs. Returns the codegen result and any diagnostics.
+    auto compileWithCounterByteWidth = [&](int counterByteWidth,
+                                           ComPtr<slang::IBlob>& outDiagnostics) -> SlangResult
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_CPP_SOURCE;
+        targetDesc.profile = globalSession->findProfile("sm_5_0");
+
+        slang::CompilerOptionEntry coverageOptions[2] = {};
+        coverageOptions[0].name = slang::CompilerOptionName::TraceCoverage;
+        coverageOptions[0].value.kind = slang::CompilerOptionValueKind::Int;
+        coverageOptions[0].value.intValue0 = 1;
+        coverageOptions[1].name = slang::CompilerOptionName::TraceCoverageCounterWidth;
+        coverageOptions[1].value.kind = slang::CompilerOptionValueKind::Int;
+        coverageOptions[1].value.intValue0 = counterByteWidth;
+
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.compilerOptionEntryCount = 2;
+        sessionDesc.compilerOptionEntries = coverageOptions;
+
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> diagnostics;
+        auto module = session->loadModuleFromSourceString(
+            "coverageInvalidCounterWidth",
+            "coverageInvalidCounterWidth.slang",
+            shaderSource,
+            diagnostics.writeRef());
+        SLANG_CHECK(module != nullptr);
+
+        ComPtr<slang::IEntryPoint> entryPoint;
+        module->findEntryPointByName("computeMain", entryPoint.writeRef());
+        SLANG_CHECK(entryPoint != nullptr);
+
+        slang::IComponentType* components[] = {module, entryPoint.get()};
+        ComPtr<slang::IComponentType> program;
+        SLANG_CHECK(
+            session->createCompositeComponentType(
+                components,
+                SLANG_COUNT_OF(components),
+                program.writeRef(),
+                nullptr) == SLANG_OK);
+
+        ComPtr<slang::IComponentType> linked;
+        SLANG_CHECK(program->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> codeBlob;
+        outDiagnostics.setNull();
+        SlangResult codeResult =
+            linked->getEntryPointCode(0, 0, codeBlob.writeRef(), outDiagnostics.writeRef());
+        return codeResult;
+    };
+
+    // Invalid byte widths must fail codegen with E45114. `32`/`64` are
+    // the bit values a caller is most likely to forward by mistake; `2`
+    // and `16` cover other out-of-range integers.
+    const int invalidByteWidths[] = {2, 16, 32, 64};
+    for (int badWidth : invalidByteWidths)
+    {
+        ComPtr<slang::IBlob> diagnostics;
+        SlangResult codeResult = compileWithCounterByteWidth(badWidth, diagnostics);
+        SLANG_CHECK(SLANG_FAILED(codeResult));
+        SLANG_CHECK(diagnostics != nullptr);
+        String diagnosticText(UnownedStringSlice(
+            (const char*)diagnostics->getBufferPointer(),
+            diagnostics->getBufferSize()));
+        SLANG_CHECK(diagnosticText.indexOf(toSlice("E45114")) != -1);
+    }
+
+    // The two legal byte widths must compile (positive control, so a
+    // future regression that rejects 4 or 8 is also caught).
+    const int validByteWidths[] = {4, 8};
+    for (int goodWidth : validByteWidths)
+    {
+        ComPtr<slang::IBlob> diagnostics;
+        SlangResult codeResult = compileWithCounterByteWidth(goodWidth, diagnostics);
+        SLANG_CHECK(SLANG_SUCCEEDED(codeResult));
+    }
+}

@@ -224,6 +224,15 @@ The synthesized `__slang_coverage` buffer defaults to `uint64` counters
 `buffer.element_type` / `buffer.element_stride`) and allocate and read
 back the buffer at the matching stride — do not assume 4 bytes.
 
+A host driving compilation through the API selects the width with the
+`CompilerOptionName::TraceCoverageCounterWidth` option. Note the unit
+difference from the CLI flag: the API option is a *byte* width and
+accepts only `4` or `8`, whereas the `-trace-coverage-counter-width`
+command-line flag is a *bit* width (`32`/`64`). A value other than 4 or
+8 — most easily produced by forwarding the bit width without dividing by
+8 — fails codegen with `E45114 coverage-counter-width-byte-width-invalid`
+rather than silently selecting uint32.
+
 The default 64-bit width requires runtime support for 64-bit integer
 atomics, because the instrumented shader increments counters with a
 64-bit atomic add. The host must enable the corresponding device

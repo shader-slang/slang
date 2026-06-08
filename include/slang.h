@@ -1187,13 +1187,18 @@ typedef uint32_t SlangSizeT;
                  //   artifact carries coverage metadata and must not overlap any emitted
                  //   artifact path. Query/set with the string option APIs.
         TraceCoverageCounterWidth =
-            151, // intValue0: per-slot byte width for the synthesized __slang_coverage
-                 //   buffer. Accepts 4 (uint32) or 8 (uint64). Defaults to 8 when any
-                 //   coverage mode is enabled. Use 4 to opt down to uint32 when the
-                 //   runtime driver lacks 64-bit shader atomic support (notably MoltenVK
-                 //   on Apple Silicon, where Vulkan exposes shaderBufferInt64Atomics =
-                 //   false). uint32 counters wrap silently at 2^32 hits per slot;
-                 //   uint64 counters effectively do not wrap within any practical run.
+            151, // intValue0: per-slot *byte* width for the synthesized __slang_coverage
+                 //   buffer. This API value is in BYTES: exactly 4 (uint32) or 8 (uint64).
+                 //   Note the unit difference from the `-trace-coverage-counter-width <bits>`
+                 //   command-line flag, which is in BITS (32/64); the CLI parser divides by 8
+                 //   and stores the byte width here, so a host setting this option directly
+                 //   must pass 4/8, not 32/64. Omitting the option yields 8 when any coverage
+                 //   mode is enabled (the default is applied where the option is read, in
+                 //   slang-emit.cpp). Use 4 to opt down to uint32 when the runtime driver
+                 //   lacks 64-bit shader atomic support (notably MoltenVK on Apple Silicon,
+                 //   where Vulkan exposes shaderBufferInt64Atomics = false). uint32 counters
+                 //   wrap silently at 2^32 hits per slot; uint64 counters effectively do not
+                 //   wrap within any practical run.
 
         CountOf,
     };
@@ -4735,15 +4740,26 @@ struct CoverageBufferInfo
     /// this target.
     int32_t binding = -1;
 
-    /// Byte width of one counter slot in the synthesized buffer.
+    /// Byte width of one counter slot in the synthesized buffer:
     /// `4` when the IR coverage pass synthesizes a
     /// `RWStructuredBuffer<uint>`, `8` when it synthesizes a
     /// `RWStructuredBuffer<uint64_t>`. The host must read back
     /// `getCounterCount() * elementByteWidth` bytes and interpret
-    /// each slot as a little-endian unsigned integer of this
-    /// width. `0` is reserved for "not assigned" and should be
-    /// treated as `4` for compatibility with older outputs that
-    /// did not populate this field.
+    /// each slot as a little-endian unsigned integer of this width.
+    ///
+    /// The width forms a closed pair with the manifest's
+    /// `buffer.element_type` / `buffer.element_stride`: today only
+    /// `{4: "uint32", 8: "uint64"}` are produced, kept in lockstep.
+    ///
+    /// Two "unassigned" conventions exist for compatibility and a
+    /// caller should treat both as the historical uint32 layout:
+    ///   - the in-class default `4`, observed when a current
+    ///     implementation populates the field but no coverage pass ran;
+    ///   - the sentinel `0`, which only arises when the field is read
+    ///     from an output produced by a compiler too old to populate it
+    ///     (the `structSize`-gated writer leaves it untouched). A
+    ///     current in-process implementation always writes a real `4`
+    ///     or `8`, so `0` cannot occur on the in-process path.
     uint32_t elementByteWidth = 4;
 };
 

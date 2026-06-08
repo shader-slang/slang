@@ -1358,6 +1358,12 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             // through the CPU prelude helpers. Matches HLSL/GLSL
             // semantics: returns the prior value as the inst result.
             //
+            // This is the general integer-AtomicAdd lowering for the CPU
+            // target, not coverage-specific: any user `InterlockedAdd`
+            // reaches it. Coverage is one client and only ever emits the
+            // unsigned variants (its synthesized buffer is uint/uint64),
+            // but the signed cases are exercised by ordinary user code.
+            //
             // 32-bit and 64-bit integer widths are supported via the
             // matching prelude helper pair
             // (`_slang_atomic_add_{u,i}{32,64}`). Other widths /

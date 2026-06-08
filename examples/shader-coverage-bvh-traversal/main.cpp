@@ -507,11 +507,13 @@ void writeManifest(slang::ICoverageTracingMetadata* coverage, const std::filesys
 
 void writeCountersBinary(const std::vector<uint8_t>& rawBytes, const std::filesystem::path& path)
 {
-    // The host file mirrors the on-GPU memory layout exactly: N
-    // little-endian unsigned integers, each of byte width
-    // `manifest.buffer.element_stride`. Downstream tools (the LCOV
-    // converter, the HTML renderer) read both the manifest and this
-    // file as a pair.
+    // Writes the raw readback bytes verbatim; this function does not see
+    // the slot width. The caller guarantees the layout by sizing
+    // `rawBytes` as `counterCount * counterByteWidth`, so the resulting
+    // file is N little-endian unsigned integers each of `counterByteWidth`
+    // bytes (mirrored in `manifest.buffer.element_stride`). Downstream
+    // tools (the LCOV converter, the HTML renderer) read the manifest and
+    // this file as a pair.
     std::ofstream out(path, std::ios::binary);
     out.write(reinterpret_cast<const char*>(rawBytes.data()), (std::streamsize)rawBytes.size());
 }
@@ -666,9 +668,11 @@ int main(int argc, char** argv)
     globalsData.nodeCount = (uint32_t)nodes.size();
 
     vkdemo::Context ctx;
-    // 64-bit counters need a device with shaderBufferInt64Atomics; request it so
-    // selection skips integrated GPUs that only support a 32-bit counter buffer.
-    ctx.init(enableCoverage && counterByteWidth == 8);
+    // 64-bit counters (8-byte slots) need a device with
+    // shaderBufferInt64Atomics; request that feature so device selection
+    // skips integrated GPUs that only support a 32-bit counter buffer.
+    const bool needsInt64Atomics = enableCoverage && counterByteWidth == 8;
+    ctx.init(needsInt64Atomics);
 
     std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings;
     setBindings.resize(2);

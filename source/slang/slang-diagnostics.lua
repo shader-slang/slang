@@ -4833,6 +4833,12 @@ err(
     span { loc = "location", message = "option `-trace-coverage-counter-width` accepts only `32` or `64`, but got `~parsedValue:Int`. uint64 (the default) effectively cannot wrap; uint32 wraps silently at 2^32 hits per slot but is needed when the runtime driver does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon)." }
 )
 
+err(
+    "coverage-counter-width-byte-width-invalid",
+    45114,
+    "coverage counter width API option value is invalid: the `CompilerOptionName::TraceCoverageCounterWidth` API option is a per-slot *byte* width and accepts only `4` (uint32) or `8` (uint64), but got `~byteWidth:Int`. Note the `-trace-coverage-counter-width` command-line flag is in *bits* (32/64); a host setting the API option directly must pass the byte width (divide bits by 8), not the bit width."
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(

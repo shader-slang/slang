@@ -326,6 +326,13 @@ public:                                                                         
 // the semantics of HLSL `InterlockedAdd`, SPIR-V `OpAtomicIAdd`, etc.
 // Uses compiler builtins so no <atomic> header is required.
 //
+// Contract for every `_slang_atomic_add_*` helper below (u32/i32/u64/
+// i64): atomically add `val` to `*ptr` and return the PRIOR value (the
+// value before the add), matching HLSL `InterlockedAdd` and GLSL
+// `atomicAdd`. The 64-bit MSVC variants reinterpret the pointer as
+// `volatile long long*` for `_InterlockedExchangeAdd64`, which is sound
+// because `sizeof(long long) == 8` (asserted below).
+//
 // Compiler coverage:
 //   - MSVC:            `_InterlockedExchangeAdd`
 //   - GCC / Clang:     `__atomic_fetch_add`

@@ -3086,15 +3086,23 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 SLANG_RETURN_ON_FAIL(_expectUInt(arg, widthBits));
                 if (widthBits != 32 && widthBits != 64)
                 {
+                    // `parsedValue` is intentionally the user's bit value
+                    // (`widthBits`), not the byte width stored below: the
+                    // diagnostic echoes what the user typed (32/64) so its
+                    // "accepts only 32 or 64" message reads correctly. Do
+                    // not "fix" this to the stored stride.
                     m_sink->diagnose(Diagnostics::CoverageCounterWidthInvalid{
                         .parsedValue = widthBits,
                         .location = arg.loc,
                     });
                     return SLANG_FAIL;
                 }
-                // Store the byte width (4 or 8) so the IR pass and metadata
-                // writer can treat the value as a stride directly without
-                // re-translating bits → bytes.
+                // Convert the user-facing bit width to the byte width (4 or
+                // 8) stored on the option. This is the one place the unit
+                // changes from bits (CLI) to bytes (option / IR pass /
+                // metadata / `CoverageBufferInfo::elementByteWidth`); every
+                // internal consumer reads bytes. The IR pass and metadata
+                // writer can then treat the value as a stride directly.
                 linkage->m_optionSet.set(
                     OptionKind::TraceCoverageCounterWidth,
                     (int)(widthBits / 8));

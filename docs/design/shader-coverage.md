@@ -230,8 +230,7 @@ counters are inserted, with examples, see
      prelude helpers (GCC/Clang `__atomic_fetch_add`, MSVC
      `_InterlockedExchangeAdd64` / `_InterlockedExchangeAdd`)
 
-Counter element width
----------------------
+### Counter element width
 
 The synthesized `__slang_coverage` buffer's element width is
 controlled by `-trace-coverage-counter-width <bits>`:
@@ -266,8 +265,16 @@ of that width. The bundled LCOV converter
 (`tools/shader-coverage/slang-coverage-to-lcov.py`) and the
 shader-coverage demos both follow this contract.
 
-Invalid values (`16`, `128`, etc.) produce a clear
-`E45113 coverage-counter-width-invalid` front-end diagnostic.
+Invalid values are rejected on both entry paths. On the CLI,
+`-trace-coverage-counter-width` accepts only the bit values `32` or
+`64`; anything else (`16`, `128`, etc.) produces a clear
+`E45113 coverage-counter-width-invalid` front-end diagnostic. The
+public API option `CompilerOptionName::TraceCoverageCounterWidth` is a
+*byte* width and accepts only `4` or `8`; a host that sets some other
+value — most realistically by forwarding the bit width `32`/`64`
+without dividing by 8 — fails codegen with
+`E45114 coverage-counter-width-byte-width-invalid` rather than silently
+falling back to uint32.
 
 Coverage marker ops are side-effectful by default in DCE analysis, so
 they survive optimizations untouched until the coverage pass rewrites
