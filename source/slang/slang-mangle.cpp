@@ -797,7 +797,7 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             {
                 auto paramType = getType(context->astBuilder, paramDeclRef);
                 parameterTypes.add(paramType);
-                paramPassingModes.add(getParamPassingMode(paramDeclRef.getDecl()));
+                paramPassingModes.add(getParamPassingMode(paramDeclRef, context->astBuilder));
             }
             resultType = getResultType(context->astBuilder, callableDeclRef);
 
