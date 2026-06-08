@@ -130,8 +130,12 @@ jobs:
             tsc --version
             git clone https://github.com/emscripten-core/emsdk.git
             pushd emsdk
-              ./emsdk install latest
-              ./emsdk activate latest
+              # Pin emsdk to a known-good version. An unpinned `latest`
+              # silently broke the wasm link step when emscripten 6.0.0
+              # shipped on 2026-06-04 (see #11481). Pinning protects the
+              # release build from a same-day breaking emscripten release.
+              ./emsdk install 6.0.0
+              ./emsdk activate 6.0.0
               source ./emsdk_env.sh
             popd
             emcmake cmake -DSLANG_GENERATORS_PATH=build-platform-generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
