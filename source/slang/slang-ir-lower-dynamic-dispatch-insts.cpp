@@ -1441,7 +1441,7 @@ struct TaggedUnionLoweringContext : public InstPassBase
         // We'll replace it with a poison value so that any accidental uses will result in
         // an error later on.
         //
-        inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+        inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
         return true;
     }
 

@@ -1198,7 +1198,7 @@ struct ForwardDiffTranslationContext
 
         auto isPointerPairMethod = checkIsPtrPairMethod(calleeType, origCall->sourceLoc);
 
-        auto placeholderCallee = builder->emitPoison(builder->getTypeKind());
+        auto placeholderCallee = builder->getPoison(builder->getTypeKind());
         auto placeholderCall = builder->emitCallInst(nullptr, placeholderCallee, 0, nullptr);
         builder->setInsertBefore(placeholderCall);
         IRBuilder argBuilder = *builder;
@@ -3656,7 +3656,7 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             newWitnessTable,
             as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(5))
                 ->getRequirementKey(),
-            builder.emitPoison(builder.getVoidType()));
+            builder.getPoison(builder.getVoidType()));
     }
 
     return newWitnessTable;

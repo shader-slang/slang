@@ -2527,7 +2527,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             //
             // Use a sub-builder so that the insert point isn't affected.
             IRBuilder subBuilder(context->irBuilder->getModule());
-            auto poisonWitness = getUnitPoisonVal(&subBuilder, context->irBuilder->getModule());
+            auto poisonWitness = getUnitPoisonVal(&subBuilder);
             return getBuilder()->getDifferentialPairType(primalType, poisonWitness);
         }
         if (as<IRAssociatedType>(primalType) || as<IRThisType>(primalType))
@@ -2542,7 +2542,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                         operands.add(argVal);
                     });
 
-            auto undefined = getBuilder()->emitPoison(operands[1]->getFullType());
+            auto undefined = getBuilder()->getPoison(operands[1]->getFullType());
             return getBuilder()->getDifferentialPairType(primalType, undefined);
         }
 
@@ -5146,7 +5146,7 @@ struct ExprLoweringContext
                 context->getSink()->diagnose(loweringDiag);
             }
             auto irType = lowerType(context, expr->type);
-            return LoweredValInfo::simple(getBuilder()->emitPoison(irType));
+            return LoweredValInfo::simple(getBuilder()->getPoison(irType));
         }
         context->invokeLoweringRecursionDepth++;
         SLANG_DEFER(context->invokeLoweringRecursionDepth--);
@@ -6322,7 +6322,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // In practice, we should never get here. If the value remains unassigned after all of
             // the subsequent IR steps and is used, it should be detected by
             // detectUninitializedResources.
-            return LoweredValInfo::simple(getBuilder()->emitPoison(irType));
+            return LoweredValInfo::simple(getBuilder()->getPoison(irType));
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {

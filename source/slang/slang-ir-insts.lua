@@ -890,7 +890,7 @@ local insts = {
 		--
 		-- Corresponds to the LLVM `poison` instruction.
 		--
-		{ Poison = {} },
+		{ Poison = { hoistable = true } },
 	}},
 
 	-- A `defaultConstruct` operation creates an initialized

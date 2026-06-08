@@ -5807,7 +5807,7 @@ struct TypeFlowSpecializationContext
         }
         else if (elementOfSetType->getSet()->isEmpty())
         {
-            auto poison = builder.emitPoison(inst->getDataType());
+            auto poison = builder.getPoison(inst->getDataType());
             inst->replaceUsesWith(poison);
             inst->removeAndDeallocate();
             return true;
@@ -5892,7 +5892,7 @@ struct TypeFlowSpecializationContext
             }
             else if (elementOfSetType->getSet()->isEmpty())
             {
-                inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+                inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
                 inst->removeAndDeallocate();
                 return true;
             }
@@ -5937,7 +5937,7 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(inst);
             builder.setInsertAfter(inst);
 
-            inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+            inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
             inst->removeAndDeallocate();
             return true;
         }
@@ -5970,7 +5970,7 @@ struct TypeFlowSpecializationContext
             {
                 IRBuilder builder(inst);
                 builder.setInsertBefore(inst);
-                inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+                inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
                 inst->removeAndDeallocate();
                 return true;
             }
@@ -7165,7 +7165,7 @@ struct TypeFlowSpecializationContext
 
         inst->replaceUsesWith(builder.emitMakeTaggedUnion(
             taggedUnionType,
-            builder.emitPoison(makeTagType(typeSet)),
+            builder.getPoison(makeTagType(typeSet)),
             witnessTableTag,
             packedValue));
         inst->removeAndDeallocate();
@@ -7281,7 +7281,7 @@ struct TypeFlowSpecializationContext
 
         auto newInst = builder.emitMakeTaggedUnion(
             (IRType*)taggedUnionType,
-            builder.emitPoison(makeTagType(taggedUnionType->getTypeSet())),
+            builder.getPoison(makeTagType(taggedUnionType->getTypeSet())),
             translatedTag,
             packedValue);
 
@@ -8008,7 +8008,7 @@ struct TypeFlowSpecializationContext
 
                 auto newTaggedUnion = builder.emitMakeTaggedUnion(
                     getLoweredType(destTaggedUnionType),
-                    builder.emitPoison(makeTagType(destTaggedUnionType->getTypeSet())),
+                    builder.getPoison(makeTagType(destTaggedUnionType->getTypeSet())),
                     downcastedTag,
                     unpackedValue);
 

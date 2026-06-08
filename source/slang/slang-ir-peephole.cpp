@@ -1870,7 +1870,7 @@ struct PeepholeContext : InstPassBase
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
 
                     builder.setInsertBefore(inst);
-                    auto undef = builder.emitPoison(inst->getDataType());
+                    auto undef = builder.getPoison(inst->getDataType());
                     inst->replaceUsesWith(undef);
                     maybeRemoveOldInst(inst);
                     changed = true;

@@ -1340,43 +1340,10 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
     return false;
 }
 
-IRInst* getUnitPoisonVal(IRBuilder* builder, IRModule* module)
+IRInst* getUnitPoisonVal(IRBuilder* builder)
 {
-    auto moduleInst = module->getModuleInst();
-
-    // DCE can ask for this placeholder many times, so keep the canonical
-    // module-scope void poison value on the module instead of scanning globals.
-    if (auto cachedInst = module->getCachedUnitPoisonVal())
-    {
-        // If a pass detached or replaced the cached instruction, fall back to
-        // the old scan/create path and refresh the cache.
-        if (cachedInst->getParent() == moduleInst && cachedInst->getOp() == kIROp_Poison &&
-            cachedInst->getDataType() && cachedInst->getDataType()->getOp() == kIROp_VoidType)
-        {
-            return cachedInst;
-        }
-        module->setCachedUnitPoisonVal(nullptr);
-    }
-
-    IRInst* undefInst = nullptr;
-
-    for (auto inst : moduleInst->getChildren())
-    {
-        if (inst->getOp() == kIROp_Poison && inst->getDataType() &&
-            inst->getDataType()->getOp() == kIROp_VoidType)
-        {
-            undefInst = inst;
-            break;
-        }
-    }
-    if (!undefInst)
-    {
-        auto voidType = builder->getVoidType();
-        builder->setInsertAfter(voidType);
-        undefInst = builder->emitPoison(voidType);
-    }
-    module->setCachedUnitPoisonVal(undefInst);
-    return undefInst;
+    builder->setInsertInto(builder->getModule()->getModuleInst());
+    return builder->getPoison(builder->getVoidType());
 }
 
 IROp getSwapSideComparisonOp(IROp op)
