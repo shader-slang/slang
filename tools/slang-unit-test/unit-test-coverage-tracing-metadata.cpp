@@ -433,8 +433,8 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         JSONValue buffer = findJsonField(container, parsed.root, "buffer");
         SLANG_CHECK(buffer.isValid());
         checkJsonStringField(container, buffer, "name", "__slang_coverage");
-        checkJsonStringField(container, buffer, "element_type", "uint32");
-        checkJsonIntField(container, buffer, "element_stride", 4);
+        checkJsonStringField(container, buffer, "element_type", "uint64");
+        checkJsonIntField(container, buffer, "element_stride", 8);
         SLANG_CHECK(findJsonField(container, buffer, "space").isValid());
         SLANG_CHECK(findJsonField(container, buffer, "binding").isValid());
         SLANG_CHECK(!findJsonField(container, buffer, "uniform_offset").isValid());
@@ -538,8 +538,8 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         JSONValue buffer = findJsonField(container, parsed.root, "buffer");
         SLANG_CHECK(buffer.isValid());
         checkJsonStringField(container, buffer, "name", "__slang_coverage");
-        checkJsonStringField(container, buffer, "element_type", "uint32");
-        checkJsonIntField(container, buffer, "element_stride", 4);
+        checkJsonStringField(container, buffer, "element_type", "uint64");
+        checkJsonIntField(container, buffer, "element_stride", 8);
         SLANG_CHECK(findJsonField(container, buffer, "uniform_offset").isValid());
         SLANG_CHECK(findJsonField(container, buffer, "uniform_stride").isValid());
 
