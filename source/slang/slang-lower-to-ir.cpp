@@ -5274,10 +5274,11 @@ struct ExprLoweringContext
     // the emitted IR ops.
     LoweredValInfo lowerBuiltinArithmeticOp(OperatorExpr* expr)
     {
-        // The fast path always leaves the callee as the unresolved operator-name `VarExpr`
-        // (see `convertToBuiltinArithmeticOp`); the op text below relies on that invariant.
+        // The fast path leaves the callee as the operator-name `VarExpr` (see
+        // `convertToBuiltinArithmeticOp`); read the op text through it. Tolerate a missing
+        // name defensively (a cloned/specialized node may not carry one) rather than
+        // dereferencing unconditionally -- the op-name dispatch below simply finds no match.
         auto opVarExpr = as<VarExpr>(expr->functionExpr);
-        SLANG_ASSERT(opVarExpr && opVarExpr->name);
 
         auto irType = lowerType(context, expr->type);
         const Index argCount = expr->arguments.getCount();
@@ -5300,7 +5301,7 @@ struct ExprLoweringContext
                                    BaseTypeInfo::Flag::FloatingPoint) != 0;
         }
 
-        auto opText = getText(opVarExpr->name);
+        String opText = (opVarExpr && opVarExpr->name) ? getText(opVarExpr->name) : String();
         if (argCount == 1)
         {
             // Unary prefix operators.
