@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Download + cache prebuilt linux-x86_64 slangc for a range of Slang releases.
+"""Download + cache prebuilt slangc for a range of Slang releases.
 
-The corporate proxy blocks the github.com /releases/download/ path, but the
-GitHub *API* asset endpoint (Accept: application/octet-stream) redirects to the
-reachable release-assets CDN, so that is what we use.
+Auto-detects the host platform (Linux / Windows / macOS) and fetches the matching
+release asset, so the per-release history can be re-swept on whatever CI runner is
+current — overridable with --platform. The corporate proxy blocks the github.com
+/releases/download/ path, but the GitHub *API* asset endpoint (Accept:
+application/octet-stream) redirects to the reachable release-assets CDN, so that
+is what we use.
 
 The default tag set is the minor releases (vYYYY.N, no patch suffix) in a date
 window, read from the local Slang git checkout's tags. Patch releases can be
@@ -15,18 +18,29 @@ tag -> {slangc, version, date}.
 import argparse
 import json
 import os
+import platform
 import subprocess
 import sys
 import tarfile
 import urllib.request
+import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))  # slang checkout
 API = "https://api.github.com/repos/shader-slang/slang"
-# Preferred asset suffixes, best first. Host glibc (2.39) runs all of them; the
-# plain build targets the newest glibc, the -glibc-N builds are for older hosts.
-ASSET_SUFFIXES = ["-linux-x86_64.tar.gz", "-linux-x86_64-glibc-2.28.tar.gz",
-                  "-linux-x86_64-glibc-2.27.tar.gz"]
+# Preferred asset suffixes per platform, best first. On Linux the plain build
+# targets the newest glibc and the -glibc-N builds are for older hosts.
+ASSET_SUFFIXES = {
+    "linux": ["-linux-x86_64.tar.gz", "-linux-x86_64-glibc-2.28.tar.gz",
+              "-linux-x86_64-glibc-2.27.tar.gz"],
+    "windows": ["-windows-x86_64.zip"],
+    "macos": ["-macos-aarch64.zip", "-macos-x86_64.zip"],
+}
+
+
+def host_platform():
+    s = platform.system().lower()
+    return "windows" if s.startswith("win") else "macos" if s == "darwin" else "linux"
 
 
 def gh_get(url):
@@ -59,10 +73,10 @@ def window_tags(repo, since, until, include_patches):
     return tags
 
 
-def pick_asset(release):
+def pick_asset(release, suffixes):
     by_name = {a["name"]: a for a in release.get("assets", [])}
     ver = release["tag_name"].lstrip("v")
-    for suf in ASSET_SUFFIXES:
+    for suf in suffixes:
         name = f"slang-{ver}{suf}"
         if name in by_name:
             return by_name[name]
@@ -86,34 +100,41 @@ def download_asset(asset, dest):
 
 def find_slangc(root):
     for dirpath, _, files in os.walk(root):
-        if "slangc" in files and os.path.basename(dirpath) == "bin":
-            return os.path.join(dirpath, "slangc")
+        if os.path.basename(dirpath) == "bin":
+            for name in ("slangc", "slangc.exe"):
+                if name in files:
+                    return os.path.join(dirpath, name)
     return None
 
 
-def fetch_one(tag, date, outdir, force):
+def fetch_one(tag, date, outdir, suffixes, force):
     tagdir = os.path.join(outdir, tag)
     existing = find_slangc(tagdir) if os.path.isdir(tagdir) else None
     if existing and not force:
         return {"tag": tag, "date": date, "slangc": existing, "cached": True}
 
     release = gh_get(f"{API}/releases/tags/{tag}")
-    asset = pick_asset(release)
+    asset = pick_asset(release, suffixes)
     if not asset:
-        return {"tag": tag, "date": date, "error": "no linux-x86_64 asset"}
+        return {"tag": tag, "date": date, "error": f"no asset matching {suffixes}"}
 
     os.makedirs(tagdir, exist_ok=True)
-    tarpath = os.path.join(tagdir, asset["name"])
+    arpath = os.path.join(tagdir, asset["name"])
     print(f"  downloading {asset['name']} ({asset['size'] // (1<<20)} MB) ...",
           flush=True)
-    download_asset(asset, tarpath)
-    with tarfile.open(tarpath, "r:gz") as t:
-        t.extractall(tagdir)
-    os.remove(tarpath)
+    download_asset(asset, arpath)
+    if asset["name"].endswith(".zip"):
+        with zipfile.ZipFile(arpath) as z:
+            z.extractall(tagdir)
+    else:
+        with tarfile.open(arpath, "r:gz") as t:
+            t.extractall(tagdir)
+    os.remove(arpath)
     slangc = find_slangc(tagdir)
     if not slangc:
         return {"tag": tag, "date": date, "error": "slangc not found in archive"}
-    os.chmod(slangc, 0o755)
+    if not slangc.endswith(".exe"):
+        os.chmod(slangc, 0o755)
     return {"tag": tag, "date": date, "slangc": slangc, "cached": False}
 
 
@@ -133,8 +154,11 @@ def main():
     ap.add_argument("--include-patches", action="store_true")
     ap.add_argument("--tags", default=None, help="comma-separated explicit tags (overrides window)")
     ap.add_argument("--out", default=os.path.join(HERE, "releases"))
+    ap.add_argument("--platform", default=host_platform(),
+                    choices=sorted(ASSET_SUFFIXES), help="release asset platform (default: host)")
     ap.add_argument("--force", action="store_true", help="re-download even if cached")
     args = ap.parse_args()
+    suffixes = ASSET_SUFFIXES[args.platform]
 
     if args.tags:
         # keep chronological order from git where possible
@@ -147,12 +171,12 @@ def main():
     if not tags:
         sys.exit("no tags matched")
     os.makedirs(args.out, exist_ok=True)
-    print(f"{len(tags)} releases to fetch -> {args.out}")
+    print(f"{len(tags)} releases to fetch ({args.platform}) -> {args.out}")
 
     index = []
     for date, tag in tags:
         print(f"[{tag}] {date}")
-        rec = fetch_one(tag, date, args.out, args.force)
+        rec = fetch_one(tag, date, args.out, suffixes, args.force)
         if "slangc" in rec:
             rec["version"] = verify(rec["slangc"])
             state = "cached" if rec.get("cached") else "downloaded"

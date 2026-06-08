@@ -1,7 +1,8 @@
 # Perf-suite CI plan (per-PR + nightly)
 
-Design only — not yet wired up. Two tiers, per the decision: a **fast per-PR
-gate** (soft-fail / warning, non-blocking) and a **full nightly** trend job.
+Two tiers: a **fast per-PR gate** (soft-fail / warning, non-blocking — design
+only, below) and a **full nightly + release-history** time-series, which is now
+**implemented** (see "Implemented" section at the end).
 
 ## Measured cost (basis for the design)
 
@@ -95,3 +96,68 @@ figures, not user-facing slowdowns; `mdl_dxr` is the realistic one.
   `trend.py` (series vs trailing median → alert).
 - Decide the results-store repo for nightly (reuse the MDL one or a new
   `slang-compile-perf` repo).
+
+---
+
+# Implemented: nightly ToT + release-history resync + tracking series
+
+The time-series tier is wired up as two GitHub Actions workflows on the dedicated
+benchmark runner, plus `track.py` for the data model. The per-PR gate and trend
+alerting (`compare.py` / `trend.py`) remain TODO (see above).
+
+## Data model
+
+Absolute compile times are **runner-specific**, so every point in a comparison
+must come from the *same* machine. The **tracking series** is:
+
+    tracking = [per-release history, all on the current runner]
+               ++ [daily tip-of-tree (ToT) points dated after the last release]
+
+- **Per-release history** — one swept point per release tag, the stable baseline.
+- **Daily ToT** — one sweep of master HEAD per night, appended after the last
+  release. When a new release ships, a release-sweep run adds its point and the
+  daily tail simply continues after it.
+
+`track.py` (stdlib) owns this: `register` (stamp a daily run + rebuild),
+`rebuild` (recompute `_tracking/tracking.json`), `stamp-runner` (record the
+runner fingerprint the history was built on), `runner-id`, `summary`. Points are
+reduced to per-(workload, timer) `min` via `analyze.canonical_runs`, so swept
+(multi-size) runs collapse to `default_size` and history vs daily compare
+like-with-like.
+
+## Storage layout (the `slang-compile-perf` results repo)
+
+    index.json                   release manifest {tag,date,version} (fetch_releases.py)
+    <tag>/results.json           per-release sweep — the history baseline
+    daily/<date>-<sha>/results.json + meta.json   one ToT sweep per night
+    runner.json                  {fingerprint,label} the history was built on
+    _tracking/tracking.json      derived series consumed by plots / trend.py
+
+## Workflows
+
+- **`.github/workflows/compile-perf-nightly.yml`** — `schedule` (06:00 UTC) +
+  `workflow_dispatch`. Builds ToT, sweeps into `daily/<date>-<sha>/`, runs
+  `track.py register`, pushes the results repo. Inputs: `samples`, `sweep`,
+  `only`.
+- **`.github/workflows/compile-perf-release-sweep.yml`** — `workflow_dispatch`
+  only. Downloads prebuilt release `slangc` for this runner's platform
+  (`fetch_releases.py`, now platform-aware: Linux `.tar.gz` / Windows `.zip`),
+  sweeps each into `<tag>/`, copies `index.json`, `stamp-runner`, `rebuild`,
+  pushes. **Run with `force=true` to resync the whole history onto a new
+  runner.** Inputs: `since`, `until`, `samples`, `force`.
+
+## Runner-change ("recreate the history") procedure
+
+When the benchmark runner is replaced/updated, `track.py runner-id` changes;
+the stored `runner.json` no longer matches. Re-run **compile-perf-release-sweep**
+with `force=true` to re-measure every release on the new machine and re-stamp
+`runner.json`. Until then, daily-vs-history comparisons mix runners and are
+invalid (a future `trend.py` should refuse to compare across fingerprints).
+
+## Prerequisites before enabling
+
+- Create the `shader-slang/slang-compile-perf` results repo and a
+  `SLANG_COMPILE_PERF_PAT` secret with push access (mirrors the MDL
+  `slang-material-modules-benchmark` + `SLANG_MDL_BENCHMARK_RESULTS_PAT`
+  pattern). Both workflows read `PERF_RESULTS_REPO` env if you point elsewhere.
+- Seed the history once via a manual **compile-perf-release-sweep** run.

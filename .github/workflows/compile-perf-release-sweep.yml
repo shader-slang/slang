@@ -1,0 +1,97 @@
+name: Compile Perf — Release Sweep (history resync)
+
+# Manually-triggered re-sweep of the per-release history on the CURRENT benchmark
+# runner. Absolute compile times are runner-specific, so when the benchmark
+# machine changes the whole release history must be re-measured on it for the
+# daily ToT points to stay comparable — run this with force=true to do that.
+# Downloads prebuilt slangc for each release (matching the runner's platform),
+# sweeps them into the perf-results repo, stamps the runner fingerprint, and
+# rebuilds the tracking series. See tools/benchmark/perf-suite/CI_PLAN.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "earliest release date (YYYY-MM-DD)"
+        default: "2025-08-01"
+      until:
+        description: "latest release date (YYYY-MM-DD)"
+        default: "2026-12-31"
+      samples:
+        description: "timed samples per run"
+        default: "5"
+      force:
+        description: "re-sweep releases already present (set true to resync a new runner)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: compile-perf-release-sweep
+  cancel-in-progress: false
+
+env:
+  PERF_RESULTS_REPO: shader-slang/slang-compile-perf
+
+jobs:
+  release-sweep:
+    runs-on: [Windows, self-hosted, benchmark]
+    steps:
+      # No Slang build here — we sweep prebuilt RELEASE binaries. fetch-depth 0
+      # is needed so fetch_releases.py can read release tags + dates from git.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: "0"
+
+      - name: Checkout MDL-SDK corpus
+        uses: actions/checkout@v4
+        with:
+          repository: "shader-slang/MDL-SDK"
+          path: "external/MDL-SDK"
+          sparse-checkout: |
+            ./examples/mdl_sdk/dxr/content/slangified
+
+      - name: Checkout perf results repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PERF_RESULTS_REPO }}
+          path: "perf-results"
+          token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+
+      - name: Fetch release binaries + sweep on this runner
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # API rate limit for asset downloads
+        run: |
+          set -euo pipefail
+          SUITE="$GITHUB_WORKSPACE/tools/benchmark/perf-suite"
+          RESULTS="$GITHUB_WORKSPACE/perf-results"
+
+          mkdir -p "$SUITE/corpus/mdl"
+          cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang "$SUITE/corpus/mdl/"
+
+          cd "$SUITE"
+          FORCE=""; [ "${{ github.event.inputs.force || 'false' }}" = "true" ] && FORCE="--force"
+          # Prebuilt slangc for each release, matching THIS runner's platform.
+          python fetch_releases.py --repo "$GITHUB_WORKSPACE" \
+            --since "${{ github.event.inputs.since || '2025-08-01' }}" \
+            --until "${{ github.event.inputs.until || '2026-12-31' }}" $FORCE
+          # Sweep every release into the results repo (history baseline).
+          python sweep.py --index releases/index.json --results "$RESULTS" \
+            --samples "${{ github.event.inputs.samples || '5' }}" --sweep $FORCE
+          # Store the release manifest, stamp the runner the history was built on,
+          # and rebuild the tracking series.
+          cp releases/index.json "$RESULTS/index.json"
+          python track.py stamp-runner --results "$RESULTS" --label "release-sweep-$(date -u +%Y-%m-%d)"
+          python track.py rebuild --results "$RESULTS" --index "$RESULTS/index.json"
+
+      - name: Push results
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/perf-results"
+          git config user.name "slang-perf-bot"
+          git config user.email "slang-perf-bot@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "release history resync $(date -u +%Y-%m-%d) (runner $(python "$GITHUB_WORKSPACE/tools/benchmark/perf-suite/track.py" runner-id))"
+          git push

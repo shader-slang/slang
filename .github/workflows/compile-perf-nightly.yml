@@ -1,0 +1,108 @@
+name: Compile Perf — Nightly ToT
+
+# Daily tip-of-tree compile-time sweep. Builds master HEAD on the dedicated
+# benchmark runner, runs the perf suite, stores the day's results in the
+# perf-results repo under daily/<date>-<sha>/, and rebuilds the tracking series
+# (per-release history ++ post-release daily points). See
+# tools/benchmark/perf-suite/CI_PLAN.md.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: "timed samples per run"
+        default: "5"
+      sweep:
+        description: "run the scaling sweep (sweep_sizes), not just default sizes"
+        type: boolean
+        default: true
+      only:
+        description: "comma-separated workload subset (blank = full suite)"
+        default: ""
+
+concurrency:
+  group: compile-perf-nightly
+  cancel-in-progress: false # never cancel a running benchmark — timing must be clean
+
+env:
+  # Dedicated results repo (mirrors the MDL slang-material-modules-benchmark
+  # pattern). Requires a PAT secret SLANG_COMPILE_PERF_PAT with push access.
+  PERF_RESULTS_REPO: shader-slang/slang-compile-perf
+
+jobs:
+  nightly:
+    # The quiesced benchmark machine — the SAME runner the release history is
+    # swept on, so absolute timings stay comparable.
+    runs-on: [Windows, self-hosted, benchmark]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "0"
+
+      - name: Common setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: windows
+          compiler: cl
+          platform: x86_64
+          config: release
+          build-llvm: true
+
+      - name: Build Slang (tip of tree)
+        run: |
+          cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --workflow --preset release
+
+      - name: Checkout MDL-SDK corpus
+        uses: actions/checkout@v4
+        with:
+          repository: "shader-slang/MDL-SDK"
+          path: "external/MDL-SDK"
+          sparse-checkout: |
+            ./examples/mdl_sdk/dxr/content/slangified
+
+      - name: Checkout perf results repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PERF_RESULTS_REPO }}
+          path: "perf-results"
+          token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+
+      - name: Run nightly sweep + update tracking
+        shell: bash
+        run: |
+          set -euo pipefail
+          SUITE="$GITHUB_WORKSPACE/tools/benchmark/perf-suite"
+          RESULTS="$GITHUB_WORKSPACE/perf-results"
+          SLANGC="$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
+          LABEL="$(date -u +%Y-%m-%d)-$(git rev-parse --short HEAD)"
+          COMMIT="$(git rev-parse HEAD)"
+
+          # MDL corpus for the mdl_dxr workload.
+          mkdir -p "$SUITE/corpus/mdl"
+          cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang "$SUITE/corpus/mdl/"
+
+          cd "$SUITE"
+          SWEEP=""; [ "${{ github.event.inputs.sweep || 'true' }}" = "true" ] && SWEEP="--sweep"
+          ONLY=""; [ -n "${{ github.event.inputs.only }}" ] && ONLY="--only ${{ github.event.inputs.only }}"
+          # Daily ToT sweep -> perf-results/daily/<label>/results.json
+          python bench.py --slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" \
+            --samples "${{ github.event.inputs.samples || '5' }}" --warmup 1 $SWEEP $ONLY
+          # Stamp meta + rebuild perf-results/_tracking/tracking.json
+          python track.py register --results "$RESULTS" --index "$RESULTS/index.json" \
+            --label "$LABEL" --commit "$COMMIT"
+
+      - name: Push results
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/perf-results"
+          git config user.name "slang-perf-bot"
+          git config user.email "slang-perf-bot@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "nightly ToT $(date -u +%Y-%m-%d) ($(cd "$GITHUB_WORKSPACE" && git rev-parse --short HEAD))"
+          git push
