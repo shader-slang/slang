@@ -271,6 +271,97 @@ def gen_complexity_ladder(n):
 
 
 # --------------------------------------------------------------------------- #
+# Coverage-gap stressors: passes / paths no other workload exercises.
+# --------------------------------------------------------------------------- #
+
+def gen_resource_aggregate(n):
+    """n resource-bundle structs (each holding two textures, a sampler and a
+    StructuredBuffer) declared at global scope and all read in the entry point.
+    Nesting resource handles inside an aggregate forces `legalizeResourceTypes`
+    to flatten each struct's resource fields into individually-bound resources
+    before a target can consume them — a pass no other workload triggers (every
+    other workload's only resource is a bare RWStructuredBuffer). Resources are
+    kept live (sampled / indexed into the output) so dead-code elimination can't
+    drop them before legalization runs. Scales by breadth = number of bundles,
+    i.e. the count of resource fields the pass must legalize; legalizeResourceTypes
+    grows super-linearly in n."""
+    s = [_HEADER]
+    s.append("struct ResBundle { Texture2D<float4> albedo; Texture2D<float4> normal; "
+             "SamplerState samp; StructuredBuffer<float> coeffs; }\n\n")
+    for i in range(n):
+        s.append(f"ResBundle bundle_{i};\n")
+    s.append("\nRWStructuredBuffer<float> outBuf;\n\n")
+    s.append('[shader("compute")]\n[numthreads(8,8,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    s.append("    float acc = 0.0;\n    float2 uv = float2(tid.xy) * 0.01;\n")
+    for i in range(n):
+        s.append(f"    acc += bundle_{i}.albedo.SampleLevel(bundle_{i}.samp, uv, 0).x\n")
+        s.append(f"          + bundle_{i}.normal.SampleLevel(bundle_{i}.samp, uv, 0).y\n")
+        s.append(f"          + bundle_{i}.coeffs[tid.x % 16];\n")
+    s.append("    outBuf[tid.x] = acc;\n}\n")
+    return {"resource_aggregate.slang": "".join(s)}
+
+
+def gen_reflection_layout(n):
+    """n constant buffers, each with a structurally rich payload — vectors,
+    matrices, an array of a nested `Light` struct, a nested `Material` struct and
+    a scalar array. This is the only workload with a large, deeply-typed shader
+    *parameter interface* (every other workload's interface is a single
+    RWStructuredBuffer), so it is the one stressor for the parameter binding /
+    layout-assignment engine and — with `-reflection-json` (see the spec's
+    reflection_json flag) — the reflection serializer, the layout/reflection path
+    PLAN.md deferred and nothing else covers. Scales by breadth = number of
+    parameter blocks the layout engine must place and reflect. Note: layout is
+    computed during compileInner regardless of the flag (so compileInner is the
+    holistic signal); -reflection-json additionally runs the serializer, which is
+    cheap today but tracked here for regression coverage."""
+    s = [_HEADER]
+    s.append("struct Light { float3 pos; float3 color; float intensity; float4x4 shadow; }\n")
+    s.append("struct Material { float4 base; float metal; float rough; float2 uvScale; float3x3 tangent; }\n\n")
+    for i in range(n):
+        s.append(f"cbuffer Params{i} : register(b{i})\n{{\n"
+                 f"    float4 tint{i};\n    float4x4 xform{i};\n"
+                 f"    Light lights{i}[4];\n    Material mat{i};\n    float weights{i}[8];\n}}\n")
+    s.append("\nRWStructuredBuffer<float> outBuf;\n\n")
+    s.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
+    s.append("void computeMain()\n{\n    float acc = 0.0;\n")
+    for i in range(n):
+        s.append(f"    acc += tint{i}.x + xform{i}[0][0] + lights{i}[0].intensity "
+                 f"+ mat{i}.metal + weights{i}[0];\n")
+    s.append("    outBuf[0] = acc;\n}\n")
+    return {"reflection_layout.slang": "".join(s)}
+
+
+def gen_control_flow_ssa(n):
+    """A single entry point with n stacked control-flow blocks — nested if/else,
+    a bounded inner loop with break/continue, and a switch — all mutating a small
+    set of carried locals (a, b, c, d). Re-assigning the same locals across many
+    branches and loop back-edges is what forces SSA construction to insert phi
+    nodes and what the CFG simplifier (constructSSA, inside simplifyIR) must chew
+    through. Isolates the SSA/CFG axis that complexity_ladder only touches as one
+    of several mixed dimensions; nothing else stresses it alone. Scales by breadth
+    = number of control-flow blocks, so basic-block and phi counts grow with n."""
+    s = [_HEADER]
+    s.append("RWStructuredBuffer<float> outBuf;\nStructuredBuffer<float> inBuf;\n\n")
+    s.append('[shader("compute")]\n[numthreads(64,1,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    s.append("    int idx = int(tid.x);\n")
+    s.append("    float a = inBuf[idx], b = inBuf[idx + 1], c = 0.0, d = 1.0;\n")
+    for i in range(n):
+        s.append(f"    if ((idx + {i}) % {i % 5 + 2} == 0)\n    {{\n")
+        s.append("        a = a * 1.1 + b;\n")
+        s.append(f"        [MaxIters(4)] for (int k = 0; k < {i % 4 + 1}; ++k)\n        {{\n")
+        s.append("            c += a - b * 0.5;\n")
+        s.append(f"            if (c > {i % 9}.0) {{ b = c; break; }}\n")
+        s.append("            else { d = d * 0.99 + a; continue; }\n        }\n    }\n")
+        s.append(f"    else\n    {{\n        switch ((idx + {i}) % 4)\n        {{\n")
+        s.append("        case 0: a -= d; break;\n        case 1: b += c; break;\n")
+        s.append("        case 2: c *= 1.01; break;\n        default: d -= a * 0.1;\n        }\n    }\n")
+    s.append("    outBuf[idx] = a + b + c + d;\n}\n")
+    return {"control_flow_ssa.slang": "".join(s)}
+
+
+# --------------------------------------------------------------------------- #
 # Core compiler-stage buckets
 # --------------------------------------------------------------------------- #
 

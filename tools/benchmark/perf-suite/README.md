@@ -95,6 +95,18 @@ isolate the shared machinery and scaling behavior directly.
 `minimal` is the **regression canary**: cheap enough to run on every PR, and the
 single best early warning for "the stdlib got heavier"-class regressions.
 
+### Coverage-gap tests
+
+Each exercises a pass or output path that **no other workload reaches** — found
+by probing the dev `slangc` with `-report-perf-benchmark` and noting timers that
+never appeared in the suite. All scale by breadth (number of constructs).
+
+| Test | What it generates | Targets (compiler stage) | Primary timer |
+|---|---|---|---|
+| **resource_aggregate** | `N` structs bundling textures + a sampler + a `StructuredBuffer`, all read live | **resource-type legalization**: nesting resources in an aggregate forces `legalizeResourceTypes` to flatten them into bindings (every other workload's only resource is a bare `RWStructuredBuffer`); the timer grows super-linearly in `N` | `legalizeResourceTypes` |
+| **reflection_layout** | `N` constant buffers with rich payloads (vectors, matrices, nested `Light[]`/`Material` structs, scalar arrays), compiled with `-reflection-json` | the **parameter binding / layout engine** + reflection serializer — the only large, deeply-typed shader **parameter interface** in the suite (layout/reflection was deferred in PLAN.md) | `compileInner` (+ `frontEndExecute`, `generateOutput`) |
+| **control_flow_ssa** | one entry point with `N` stacked control-flow blocks (nested if/else + bounded loop with break/continue + switch) mutating carried locals | **SSA construction / CFG simplify**: reassigning locals across branches and back-edges forces phi insertion (`constructSSA` inside `simplifyIR`) — the axis `complexity_ladder` only touches as one of several | `simplifyIR`, `frontEndExecute` |
+
 ### Complexity-scaling test
 
 The single-axis stressors above each isolate **one** pass. `complexity_ladder`
@@ -140,7 +152,12 @@ python3 sweep.py --samples 5                                # -> results/<tag>/
 # 4. analyze + visualize
 python3 analyze.py                          # ranked regressions + series.csv/flags.csv
 python3 plot.py                             # SVG charts
-python3 report.py                           # single self-contained HTML report
+python3 report.py                           # single self-contained HTML report (cross-release)
+
+# 5. complexity sweep of one build (compile time vs size N), with HTML report
+python3 bench.py --slangc /path/to/slangc --label dev --sweep \
+    --only resource_aggregate,reflection_layout,control_flow_ssa
+python3 sweep_report.py --label dev         # -> results/dev/_sweep/sweep_report.html
 ```
 
 ---
@@ -159,7 +176,9 @@ python3 report.py                           # single self-contained HTML report
 | `sweep.py` | **release sweep** — runs `bench.py` against every cached release |
 | `analyze.py` | per-`(workload,timer)` series, leaf-attributed step-change detection, diagnostics path-cost |
 | `plot.py` | self-contained SVG charts (normalized + absolute log) |
-| `report.py` | single self-contained **HTML report** (charts inline + tables) |
+| `report.py` | single self-contained **HTML report**, cross-release (charts inline + tables) |
+| `ladder_scaling.py` | cross-release `floor + slope·N` fit table for any swept workload |
+| `sweep_report.py` | **complexity-sweep HTML report** for one build — compile time vs size `N`, per-workload scaling curves + fit |
 
 ### Documents
 

@@ -35,6 +35,9 @@ class WorkloadSpec:
     expect_fail: bool = False
     # additional sizes worth sweeping for scaling curves (optional)
     sweep_sizes: list = field(default_factory=list)
+    # emit reflection JSON (bench.py supplies a writable per-run path). Exercises
+    # the reflection serializer in addition to the layout engine.
+    reflection_json: bool = False
     # for multi-file/corpus workloads: the file to compile (imports resolve via
     # -I <gendir>). If None, bench picks the file containing "main", else first.
     main_file: str = None
@@ -255,6 +258,38 @@ WORKLOADS = [
         primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR",
                         "simplifyIR"],
         sweep_sizes=[20, 40, 80, 160, 320, 640],
+    ),
+    # ---- coverage-gap stressors (passes / paths no other workload hits) ---
+    WorkloadSpec(
+        name="resource_aggregate",
+        bucket="resource_legalize",
+        gen=workloads.gen_resource_aggregate,
+        default_size=80,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner"],
+        sweep_sizes=[20, 40, 80, 160],
+    ),
+    WorkloadSpec(
+        name="reflection_layout",
+        bucket="reflection_layout",
+        gen=workloads.gen_reflection_layout,
+        default_size=120,
+        mode="target",
+        extra_flags=SPIRV,
+        reflection_json=True,
+        primary_timers=["compileInner", "frontEndExecute", "generateOutput"],
+        sweep_sizes=[30, 60, 120, 240],
+    ),
+    WorkloadSpec(
+        name="control_flow_ssa",
+        bucket="control_flow",
+        gen=workloads.gen_control_flow_ssa,
+        default_size=120,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["simplifyIR", "frontEndExecute", "compileInner"],
+        sweep_sizes=[30, 60, 120, 240],
     ),
     # ---- real-shader corpus ----------------------------------------------
     WorkloadSpec(

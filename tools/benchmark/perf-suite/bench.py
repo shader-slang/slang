@@ -102,11 +102,15 @@ def build_commands(slangc, spec, gen_dir, files):
     # target mode
     f = spec.main_file or main or list(files)[0]
     out = os.path.join(gen_dir, "out.spv")
+    extra = list(spec.extra_flags)
+    # reflection JSON needs a writable path; gen_dir is per-run and writable.
+    if getattr(spec, "reflection_json", False):
+        extra += ["-reflection-json", os.path.join(gen_dir, "reflect.json")]
     # -I gen_dir lets multi-file corpora resolve imports; harmless for single files
     return {
         "setup": [],
         "timed": [slangc, PERF_FLAG, "-I", gen_dir, os.path.join(gen_dir, f),
-                  *spec.extra_flags, "-o", out],
+                  *extra, "-o", out],
     }
 
 
