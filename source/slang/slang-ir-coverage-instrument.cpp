@@ -1011,6 +1011,34 @@ struct CoverageInstrumenter
         }
     }
 
+    // Emit the increment of one coverage counter slot, given a pointer
+    // to it. `slotPtr` points at `counterElementType` (uint or uint64).
+    //
+    // Emits `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each backend
+    // emitter to its native atomic-increment idiom (InterlockedAdd on
+    // HLSL, atomicAdd on GLSL, OpAtomicIAdd on SPIR-V, etc.). The
+    // immediate and the result type are typed against `counterElementType`,
+    // so the same lowering path produces a 64-bit `OpAtomicIAdd` /
+    // `atomicAdd(ulonglong*)` when the buffer is wide.
+    //
+    // This is the single point where a counter is incremented, so it is
+    // also the extension point for wave/subgroup-aggregated increments:
+    // when the target has wave ops, the per-lane atomic here should be
+    // replaced by one atomic per wave (`AtomicAdd(slotPtr, activeLaneCount)`
+    // from the elected lane) to cut atomic contention on hot counters.
+    // See `docs/design/shader-coverage-wave-aggregation.md` and
+    // https://github.com/shader-slang/slang/issues/11509. The aggregation
+    // is not wired up yet; today every lane increments by 1.
+    void emitCoverageCounterIncrement(IRBuilder& builder, IRInst* slotPtr)
+    {
+        IRInst* atomicArgs[] = {
+            slotPtr,
+            builder.getIntValue(counterElementType, 1),
+            builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
+        };
+        builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
+    }
+
     // Lower a single coverage marker op to an atomic add on
     // `coverageBuffer[slot]`. Appends the source-entry metadata that
     // currently points at this direct counter slot, then removes the
@@ -1034,19 +1062,7 @@ struct CoverageInstrumenter
             2,
             getElemArgs);
 
-        // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
-        // backend emitter to its native atomic-increment idiom
-        // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
-        // SPIR-V, etc.). The immediate and the result type are typed
-        // against `counterElementType` (uint or uint64), so the same
-        // lowering path produces a 64-bit `OpAtomicIAdd` /
-        // `atomicAdd(ulonglong*)` when the buffer is wide.
-        IRInst* atomicArgs[] = {
-            slotPtr,
-            builder.getIntValue(counterElementType, 1),
-            builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
-        };
-        builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
+        emitCoverageCounterIncrement(builder, slotPtr);
 
         // The marker op has void return type and, by construction, no uses.
         // Catch a future IR transform that takes a use of it before we reach

@@ -1,0 +1,147 @@
+# Shader coverage: wave-aggregated counter increments (design notes)
+
+Tracking issue: [#11509](https://github.com/shader-slang/slang/issues/11509).
+Status: **design / in progress.** This document captures the investigation
+and the chosen approach; the implementation is not yet wired up.
+
+## Problem
+
+The coverage instrumentation pass (`source/slang/slang-ir-coverage-instrument.cpp`)
+emits one atomic increment per covered line/branch **per thread**:
+
+```text
+slotPtr = RWStructuredBufferGetElementPtr(__slang_coverage, slot)
+AtomicAdd(slotPtr, 1, relaxed)
+```
+
+When many threads execute the same marker — e.g. a counter inside a hot
+loop — every thread issues an atomic-add to the same buffer slot, and the
+adds serialize. On the `shader-coverage-image-pipeline` demo (2.07M threads,
+per-line counters inside the bilateral filter's inner loop) the hottest
+counter slots receive 18-37 million atomics each, and the instrumented
+shader runs ~20-30x slower than the uninstrumented one on an NVIDIA RTX
+A3000. The same demo is only ~3x slower on Apple Silicon, because Apple GPUs
+coalesce atomics within a SIMD-group before they reach memory. The goal is to
+do that coalescing explicitly so all targets benefit.
+
+## Desired transform
+
+Replace the per-lane increment with a wave/subgroup-aggregated one — one
+atomic per wave instead of one per active lane:
+
+```text
+laneCount = <number of lanes active at this marker>
+if (<this lane is the elected lane>)
+    AtomicAdd(slotPtr, laneCount, relaxed)
+```
+
+`laneCount` is the count of lanes active *at the marker*, so divergent
+control flow (a marker only some lanes reach) stays correct: the sum of
+active lanes equals the number of executions, exactly matching the per-lane
+baseline. Only the increment *amount* changes (`1` -> `laneCount`); the
+per-line/branch counter slots, the manifest, the LCOV output, and host
+readback are all unaffected.
+
+This reduces atomic traffic by up to the wave width (≈32 on NVIDIA/AMD,
+≈32/64 on others), which should close most of the gap with Apple.
+
+## The stage problem (why this is non-trivial)
+
+`instrumentCoverage` runs inside `linkAndOptimizeIR`, **after** `linkIR` and
+after stdlib specialization. At that point the high-level wave intrinsics are
+not available as primitives:
+
+- `WaveActiveSum`, `WaveIsFirstLane`, `WaveMaskSum`, etc. are **stdlib
+  functions** in `hlsl.meta.slang` implemented with per-target
+  `__target_switch` / `__intrinsic_asm` bodies — not single IR opcodes.
+- The only wave-related IR opcodes that exist are `kIROp_WaveGetActiveMask`,
+  `kIROp_WaveMaskBallot`, and `kIROp_WaveMaskMatch`. There is no IR opcode for
+  a wave reduction, lane index, lane count, or bit-count, so the aggregate
+  cannot simply be emitted as a few intrinsic insts the way the plain
+  `AtomicAdd` is.
+
+So the pass cannot just inline `WaveActiveSum(1)` / `WaveIsFirstLane()`.
+
+## Candidate approaches
+
+1. **Emit a call to a Slang-defined coverage-increment helper (recommended).**
+   Define a small generic helper, e.g.
+   `void __coverageCounterIncrement<T>(RWStructuredBuffer<T> buf, uint slot)`,
+   in a coverage runtime module written in Slang. Its body uses the
+   high-level wave intrinsics with a capability-gated fallback:
+
+   ```slang
+   // pseudo-code
+   void __coverageCounterIncrement<T>(RWStructuredBuffer<T> buf, uint slot)
+   {
+       // Wave-capable targets: one atomic per wave.
+       let count = T(WaveActiveSum(1u));
+       if (WaveIsFirstLane())
+           InterlockedAdd(buf[slot], count);
+       // Targets without wave ops fall back (via capability/__target_switch)
+       // to a plain per-lane InterlockedAdd(buf[slot], T(1)).
+   }
+   ```
+
+   The coverage pass emits a *call* to this helper instead of an inline
+   `AtomicAdd`. The normal capability system and target lowering expand the
+   wave intrinsics per target and select the fallback where wave ops are
+   unsupported (CPU, pre-SM6.0 HLSL).
+
+   **Open question / next step:** the helper must be present in the linked IR
+   when the post-link coverage pass runs. Need to confirm the mechanism for
+   guaranteeing a runtime helper is linked and findable by mangled name at
+   that stage (how do other late passes reference runtime functions?), or
+   move the helper-call emission to just before/within linking.
+
+2. **Emit the aggregate from low-level IR ops.** Use `WaveGetActiveMask` +
+   `WaveMaskBallot` + a popcount + an elected-lane test built from the
+   ballot's lowest set bit vs the lane index. Rejected for now: lane-index /
+   bit-count are not IR opcodes either, and the `WaveMask` is `uint4` for >32
+   lanes, so this re-implements a chunk of stdlib lowering by hand and is
+   error-prone across wave widths.
+
+3. **Instrument before stdlib lowering.** Move coverage instrumentation
+   earlier so high-level wave intrinsics are callable. Rejected: coverage is
+   deliberately late (post-specialization) so it counts the final, specialized
+   code; moving it changes coverage semantics.
+
+**Recommendation: approach 1.** It reuses the capability system and per-target
+lowering, keeps the coverage pass target-agnostic, and gives the fallback for
+free. The one thing to resolve is the helper-linking mechanism.
+
+## Target gating
+
+Wave aggregation only applies where the target has wave/subgroup ops; the
+fallback is the current per-lane atomic.
+
+- **HLSL/DXIL** — wave intrinsics require SM6.0+; older profiles use the
+  fallback.
+- **SPIR-V** — `GroupNonUniform*` subgroup ops (already used by the stdlib
+  intrinsics); the capability is auto-declared.
+- **CUDA** — warp intrinsics.
+- **Metal** — `simd_*`; note Apple already coalesces, so the win is smaller.
+- **CPU (LLVM / C++ source)** — no wave concept; always the per-lane
+  `_slang_atomic_add_*` path.
+
+With approach 1 this gating is mostly handled by the helper's `__target_switch`
+and `[require(...)]` capability annotations rather than by branching in the
+C++ pass.
+
+## Correctness / testing
+
+- Aggregated counts must equal the per-lane baseline. Add tests that compile
+  the same shader with and without aggregation and compare counter values
+  (CPU path is unaffected, so it is the reference).
+- Cover divergent control flow: a marker inside a branch only some lanes take
+  must add only the active-lane count.
+- Confirm the existing 61 coverage tests and the metadata unit tests still
+  pass (the metadata/manifest/LCOV contracts do not change).
+- Re-measure the image-pipeline demo before/after to quantify the speedup.
+
+## Where it plugs in
+
+The single emission site is `CoverageInstrumenter::lowerMarkerOp` in
+`source/slang/slang-ir-coverage-instrument.cpp`. The atomic emission has been
+factored into `emitCoverageCounterIncrement()` so the aggregated path is a
+localized change behind a target-capability check.
