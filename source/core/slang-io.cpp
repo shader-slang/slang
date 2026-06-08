@@ -1244,19 +1244,20 @@ String URI::getPath() const
     for (Index i = startIndex; i < endIndex;)
     {
         auto ch = uri[i];
-        if (ch == '%' && i + 2 < endIndex && CharUtil::isHexDigit(uri[i + 1]) &&
-            CharUtil::isHexDigit(uri[i + 2]))
+        if (ch == '%' && i + 2 < endIndex)
         {
-            Int charVal = CharUtil::getHexDigitValue(uri[i + 1]) * 16 +
-                          CharUtil::getHexDigitValue(uri[i + 2]);
-            sb.appendChar((char)charVal);
-            i += 3;
+            Int highDigit = CharUtil::getHexDigitValue(uri[i + 1]);
+            Int lowDigit = CharUtil::getHexDigitValue(uri[i + 2]);
+            if (highDigit >= 0 && lowDigit >= 0)
+            {
+                sb.appendChar((char)(highDigit * 16 + lowDigit));
+                i += 3;
+                continue;
+            }
         }
-        else
-        {
-            sb.appendChar(uri[i]);
-            i++;
-        }
+
+        sb.appendChar(uri[i]);
+        i++;
     }
     return sb.produceString();
 }
@@ -1298,7 +1299,7 @@ URI URI::fromLocalFilePath(UnownedStringSlice path)
         else
         {
             char buffer[32];
-            int length = intToAscii(buffer, (int)ch, 16);
+            int length = intToAscii(buffer, (unsigned char)ch, 16, 2);
             sb << "%" << UnownedStringSlice(buffer, length);
         }
     }

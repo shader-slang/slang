@@ -172,4 +172,6 @@ SLANG_UNIT_TEST(uriGetPathPercentDecode)
     SLANG_CHECK(URI::fromString(toSlice("file://path%")).getPath() == "path%");
     SLANG_CHECK(URI::fromString(toSlice("file://path%2")).getPath() == "path%2");
     SLANG_CHECK(URI::fromString(toSlice("file://path%2g")).getPath() == "path%2g");
+    SLANG_CHECK(URI::fromString(toSlice("file://path%2?x=1")).getPath() == "path%2");
+    SLANG_CHECK(URI::fromLocalFilePath(toSlice("path\tname")).getPath() == "path\tname");
 }
