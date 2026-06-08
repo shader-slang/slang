@@ -13,6 +13,13 @@
 // CHECK-DAG: %[[AC:[A-Za-z0-9_]+]] = OpAccessChain %{{[A-Za-z0-9_]+}} %cbs %{{[A-Za-z0-9_]+}}
 // CHECK-DAG: OpDecorate %[[AC]] NonUniform
 
+// The inner field-access pointer and the load that reads the field must also be
+// NonUniform per VUID-RuntimeSpirv-None-10148, not just the outer array chain.
+// CHECK-DAG: %[[FIELD:[A-Za-z0-9_]+]] = OpAccessChain %{{[A-Za-z0-9_]+}} %[[AC]] %{{[A-Za-z0-9_]+}}
+// CHECK-DAG: OpDecorate %[[FIELD]] NonUniform
+// CHECK-DAG: %[[LOAD:[A-Za-z0-9_]+]] = OpLoad %{{[A-Za-z0-9_]+}} %[[FIELD]]
+// CHECK-DAG: OpDecorate %[[LOAD]] NonUniform
+
 struct Foo { uint x; };
 ConstantBuffer<Foo> cbs[];
 RWStructuredBuffer<uint> outputBuffer;
