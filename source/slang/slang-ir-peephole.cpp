@@ -1258,6 +1258,18 @@ struct PeepholeContext : InstPassBase
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
+                else if (!as<IRConditionalType>(inst->getOperand(0)->getDataType()))
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+
+                    if (inst->getOperand(0)->getDataType() == inst->getDataType())
+                        inst->replaceUsesWith(inst->getOperand(0));
+                    else
+                        inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
             }
             break;
         case kIROp_OptionalHasValue:

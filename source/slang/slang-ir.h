@@ -2239,7 +2239,6 @@ private:
 
     // (inst, association-kind) -> associated-inst
     Dictionary<AnnotationCacheKey, IRAnnotation*> m_annotationLookupCache;
-
 };
 
 

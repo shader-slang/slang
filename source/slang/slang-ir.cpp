@@ -2728,12 +2728,13 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
             // is located after the insert location, we need to move it to the insert location,
             // except for insts at the module level, where order does not matter.
             //
-            // This last condition helps to accelerate the common case of emitting global hoistable insts (types,
-            // sets, etc.)
+            // This last condition helps to accelerate the common case of emitting global hoistable
+            // insts (types, sets, etc.)
             //
             auto foundInst = *found;
             if (foundInst->getParent() && foundInst->getParent() == getInsertLoc().getParent() &&
-                getInsertLoc().getMode() == IRInsertLoc::Mode::Before && foundInst->getParent() != getModule()->getModuleInst())
+                getInsertLoc().getMode() == IRInsertLoc::Mode::Before &&
+                foundInst->getParent() != getModule()->getModuleInst())
             {
                 auto insertLoc = getInsertLoc().getInst();
                 bool isAfter = false;

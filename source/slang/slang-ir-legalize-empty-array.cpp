@@ -104,17 +104,13 @@ struct EmptyArrayLoweringContext
                            ? builder.getPoison(gep->getDataType())
                            : nullptr;
             },
-            [&](IRLoad* load)
-            {
-                return as<IRUndefined>(load->getOperand(0))
-                           ? builder.getPoison(load->getDataType())
-                           : nullptr;
+            [&](IRLoad* load) {
+                return as<IRUndefined>(load->getOperand(0)) ? builder.getPoison(load->getDataType())
+                                                            : nullptr;
             },
-            [&](IRImageLoad* load)
-            {
-                return as<IRUndefined>(load->getOperand(0))
-                           ? builder.getPoison(load->getDataType())
-                           : nullptr;
+            [&](IRImageLoad* load) {
+                return as<IRUndefined>(load->getOperand(0)) ? builder.getPoison(load->getDataType())
+                                                            : nullptr;
             },
             [&](IRStore* store)
             {
