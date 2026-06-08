@@ -88,11 +88,27 @@ So the pass cannot just inline `WaveActiveSum(1)` / `WaveIsFirstLane()`.
    wave intrinsics per target and select the fallback where wave ops are
    unsupported (CPU, pre-SM6.0 HLSL).
 
-   **Open question / next step:** the helper must be present in the linked IR
-   when the post-link coverage pass runs. Need to confirm the mechanism for
-   guaranteeing a runtime helper is linked and findable by mangled name at
-   that stage (how do other late passes reference runtime functions?), or
-   move the helper-call emission to just before/within linking.
+   **Resolved — how the helper survives to the post-link pass.** Slang already
+   force-copies specific `[KnownBuiltin(name)]` functions through `linkIR`
+   even when unused (see `KnownBuiltinDeclName::NullDifferential` in
+   `slang-ir-link.cpp`). The coverage helper(s) get the same treatment:
+   annotate with `[KnownBuiltin(...)]`, add the name to `KnownBuiltinDeclName`,
+   and add it to the force-copy switch in `slang-ir-link.cpp`. The pass then
+   finds the function by its known-builtin decoration and emits a call.
+
+   **Important constraint — the helper must be non-generic.** Generic
+   specialization runs *before* `instrumentCoverage`, so a generic
+   `helper<T>` emitted at that point would never be specialized. Define two
+   concrete helpers instead — one taking `RWStructuredBuffer<uint>` and one
+   `RWStructuredBuffer<uint64_t>` — and have the pass pick the variant that
+   matches `counterElementType`. The subsequent inlining + target-lowering
+   passes in `linkAndOptimizeIR` (which run after `instrumentCoverage`) expand
+   the call and the wave intrinsics normally.
+
+   **CPU fallback.** Coverage runs on the CPU (C++ source) target, which has
+   no waves, so the helper body must `__target_switch` to a plain
+   `InterlockedAdd(buf[slot], 1)` on cpu/default; only the GPU SIMT cases use
+   the wave-aggregated form. (WGSL and CPU-via-LLVM skip coverage entirely.)
 
 2. **Emit the aggregate from low-level IR ops.** Use `WaveGetActiveMask` +
    `WaveMaskBallot` + a popcount + an elected-lane test built from the
@@ -108,7 +124,33 @@ So the pass cannot just inline `WaveActiveSum(1)` / `WaveIsFirstLane()`.
 
 **Recommendation: approach 1.** It reuses the capability system and per-target
 lowering, keeps the coverage pass target-agnostic, and gives the fallback for
-free. The one thing to resolve is the helper-linking mechanism.
+free.
+
+## Validated emission
+
+The wave-aggregated increment body was prototyped and compiled with the local
+`slangc` to confirm it lowers correctly on every relevant target:
+
+```slang
+void coverageIncrement(uint slot)
+{
+    uint activeLaneCount = WaveActiveSum(1u);   // lanes active at this marker
+    if (WaveIsFirstLane())
+        InterlockedAdd(counters[slot], activeLaneCount);
+}
+```
+
+- **SPIR-V** (passes `spirv-val`): `OpGroupNonUniformIAdd %uint ... Reduce
+  %uint_1` (the wave sum), `OpGroupNonUniformElect` (first-lane), then
+  `OpAtomicIAdd` of the aggregated count. Capabilities `GroupNonUniform` /
+  `GroupNonUniformArithmetic` are auto-declared.
+- **HLSL**: `WaveActiveSum(1U)`, `WaveIsFirstLane()`, `InterlockedAdd(...)`.
+- **CUDA**: `_waveSum(...)` over the active mask, `atomicAdd(...)`.
+
+The divergent test case (only some lanes call the helper) confirms the
+reduction is over the lanes active at the call site, matching per-execution
+counts. So the increment *code* is settled; the remaining work is the
+plumbing that makes the coverage pass emit it (above).
 
 ## Target gating
 
