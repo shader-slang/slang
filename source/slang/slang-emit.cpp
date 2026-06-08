@@ -1077,10 +1077,9 @@ Result linkAndOptimizeIR(
                 reservedSpaces.add((int)value.intValue);
             }
         }
-        // Read the wave-aggregation profile gate from the MERGED TargetProgram
-        // option set, not the per-target request — an API-supplied SM6.0 profile
-        // lands on the merged set, and reading the per-target set alone would
-        // leave it Unknown and silently disable aggregation for those callers.
+        // Gate read from the MERGED TargetProgram profile (see the
+        // `isCoverageWaveAggregationSupported` declaration in
+        // slang-ir-coverage-instrument.h for the canonical rationale).
         const bool coverageWaveAggregationSupported = isCoverageWaveAggregationSupported(
             targetRequest,
             targetProgram->getOptionSet().getProfileVersion());

@@ -518,10 +518,13 @@ static bool isCoverageInstrumentationTargetSupported(TargetRequest* targetReques
 // calls resolve through the normal pipeline afterwards.
 //
 // Precondition: link leaves at most one IR func per `[KnownBuiltin]` name. The
-// asserts below pin that — if two clones of `WaveActiveCountBits` ever survived
-// link, picking one arbitrarily would be a silent miscompile, so we fail loudly
-// instead. Either out-param is left null when its intrinsic is absent (the
-// caller falls back to the per-lane path), so absence is not an error here.
+// single-definition guarantee itself comes from link's `[KnownBuiltin]`
+// force-keep, which copies exactly one decorated definition per name; the
+// `SLANG_ASSERT`s below are a DEBUG-BUILD tripwire on that invariant, not a
+// release-build guard (in release `SLANG_ASSERT` expands to `SLANG_ASSUME`).
+// In a release build the loop simply binds that sole definition. Either
+// out-param is left null when its intrinsic is absent (the caller falls back to
+// the per-lane path), so absence is not an error here.
 static void findCoverageWaveFuncs(IRModule* module, IRFunc*& outCountBits, IRFunc*& outFirstLane)
 {
     outCountBits = nullptr;
@@ -1069,10 +1072,17 @@ struct CoverageInstrumenter
         }
     }
 
-    // Lower a single coverage marker op to an atomic add on
-    // `coverageBuffer[slot]`. Appends the source-entry metadata that
-    // currently points at this direct counter slot, then removes the
-    // marker op.
+    // Lower a single coverage marker op to a counter increment on
+    // `coverageBuffer[slot]`, then append the source-entry metadata that points
+    // at this slot and remove the marker op. The `waveAggregate` member selects
+    // between two lowerings:
+    //   - per-lane (waveAggregate == false): a plain `AtomicAdd(slot, 1)`, one
+    //     atomic per active lane;
+    //   - wave-aggregated (waveAggregate == true): count the active lanes
+    //     (`WaveActiveCountBits`), elect one lane (`WaveIsFirstLane`), and have
+    //     that lane apply the whole increment via a guarded
+    //     `AtomicAdd(slot, laneCount)` — this splits the marker's block and
+    //     emits an if/else around the atomic.
     void lowerMarkerOp(IRInst* markerOp, UInt slot)
     {
         CoverageTracingEntry entry;
@@ -1104,7 +1114,13 @@ struct CoverageInstrumenter
             //   uint lc = WaveActiveCountBits(true);
             //   if (WaveIsFirstLane()) atomicAdd(slot, lc);
             // `WaveActiveCountBits(true)` counts lanes active at this marker, so
-            // the aggregated total matches the per-lane total exactly.
+            // the aggregated total matches the per-lane total exactly. The
+            // equality is load-bearing on one premise: the wave active-mask at
+            // this marker equals the set of lanes that, in the per-lane
+            // lowering, each execute `atomicAdd(slot, 1)` here. For markers
+            // inside divergent control flow this relies on the active mask at
+            // the (partially-converged) marker point matching the per-lane
+            // execution mask.
             //
             // Placement is load-bearing: `WaveActiveCountBits`/`WaveIsFirstLane`
             // are wave-collective, so every lane that participates in the count
@@ -1124,6 +1140,9 @@ struct CoverageInstrumenter
             thenBlock->insertAfter(headBlock);
 
             builder.setInsertInto(headBlock);
+            // `afterBlock` is passed as BOTH the false-branch and the merge
+            // block: a non-elected lane falls through directly to the
+            // continuation; only the elected (first) lane runs `thenBlock`.
             builder.emitIfElse(isFirstLane, thenBlock, afterBlock, afterBlock);
 
             builder.setInsertInto(thenBlock);
@@ -1331,10 +1350,9 @@ static bool tryGetCoverageUniformBindingInfo(
 // `glsl_450` profile auto-declares the subgroup extension rather than
 // erroring, so we gate on SPIR-V only via `isSPIRV`.
 //
-// `profileVersion` must be the MERGED `TargetProgram` profile (see the header):
-// the HLSL branch compares against `DX_6_0`, and reading the per-target
-// `targetRequest->getOptionSet()` instead would miss an API-supplied profile
-// and silently fall back to per-lane on SM6.0+ callers.
+// `profileVersion` must be the MERGED `TargetProgram` profile — see the
+// `isCoverageWaveAggregationSupported` declaration in
+// slang-ir-coverage-instrument.h for the canonical rationale.
 bool isCoverageWaveAggregationSupported(TargetRequest* targetRequest, ProfileVersion profileVersion)
 {
     if (!isCoverageInstrumentationTargetSupported(targetRequest)) // excludes WGSL + CPU-via-LLVM

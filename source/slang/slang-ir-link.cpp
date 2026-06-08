@@ -2257,10 +2257,12 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // codegen.
     //
     // `shouldTraceAnyCoverage()` is the same "any coverage mode on" predicate
-    // the coverage pass keys off (it reads the merged TargetProgram option set),
-    // so reusing it keeps the force-keep in lockstep with whether the pass runs
-    // rather than re-spelling the three-flag disjunction here. The profile gate
-    // likewise reads the merged set so it matches the pass's own decision.
+    // the coverage pass keys off, so reusing it keeps the force-keep in lockstep
+    // with whether the pass runs (rather than re-spelling the three-flag
+    // disjunction here). The force-keep-iff-the-pass-calls-them invariant and
+    // the merged-profile gate rationale live canonically on the
+    // `isCoverageWaveAggregationSupported` declaration in
+    // slang-ir-coverage-instrument.h.
     const bool keepCoverageWaveFuncs = codeGenContext->shouldTraceAnyCoverage() &&
                                        isCoverageWaveAggregationSupported(
                                            targetReq,

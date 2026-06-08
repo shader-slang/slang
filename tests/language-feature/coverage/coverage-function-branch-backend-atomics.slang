@@ -55,6 +55,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //GLSL-DAG: atomicAdd{{.*_slang_coverage.*uint\(1\)}}
 //GLSL-DAG: atomicAdd{{.*_slang_coverage.*uint\(2\)}}
 //GLSL-NOT: atomicAdd{{.*_slang_coverage.*uint\(3\)}}
+// GLSL is intentionally per-lane (issue #11509): no wave-aggregation, so the
+// subgroup wave intrinsics must be absent — this pins the GLSL boundary the
+// same way the cs_5_0 HLSL-NOT lines pin HLSL's sub-SM6.0 per-lane boundary.
+//GLSL-NOT: subgroupElect
+//GLSL-NOT: subgroupBallotBitCount
 
 // Metal is wave-capable (SIMD-group functions), so coverage increments are
 // wave-aggregated (issue #11509): WaveActiveCountBits lowers to

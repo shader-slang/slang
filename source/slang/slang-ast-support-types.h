@@ -238,6 +238,9 @@ FIDDLE() namespace Slang
         IBwdCallable,
         NullDifferential,
         OperatorAddressOf,
+        // Tagged solely so the shader-coverage wave-aggregation pass can locate
+        // these intrinsics and the linker can force-keep them; see
+        // slang-ir-coverage-instrument.cpp (issue #11509).
         WaveActiveCountBits,
         WaveIsFirstLane,
         COUNT

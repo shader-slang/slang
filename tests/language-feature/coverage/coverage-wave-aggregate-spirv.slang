@@ -14,6 +14,9 @@
 // per-lane total under divergent control flow) needs a GPU and is not possible
 // in CI; the subsystem owner validates that via the image-pipeline demo.
 
+// This is a STRUCTURAL FileCheck over `spirv-asm` text; it does not invoke
+// spirv-val, so it pins the aggregated shape, not SPIR-V validity. Validity is
+// exercised separately (SLANG_RUN_SPIRV_VALIDATION / the -target spirv path).
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -trace-coverage
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
