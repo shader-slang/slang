@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:10:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: a7b1c184243cc33ab7365f1e766ae76123f4e9039f529babd0a030cb03949933
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 2e16e4101249030a9cd977caed2ab437622083f3808b536a0a0e81f0c47cf487
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -122,8 +122,8 @@ declarations live in
 | Opcode | `struct_name` | Operands | Notes |
 | --- | --- | --- | --- |
 | `Int`, `Float`, `Bool`, ... | `IntType`, `FloatType`, `BoolType`, ... | — | Basic scalar types; see [../ir-reference/types.md](../ir-reference/types.md). |
-| `vector` | `VectorType` | `elementType, elementCount` | Vector types; hoistable. |
-| `matrix` | `MatrixType` | `elementType, rowCount, columnCount, layout` | Matrix types; hoistable. |
+| `Vec` | `VectorType` | `elementType, elementCount` | Vector types; hoistable. |
+| `Mat` | `MatrixType` | `elementType, rowCount, columnCount, layout` | Matrix types; hoistable. |
 | `Array` | `ArrayType` | `elementType, elementCount` | Fixed-size array; hoistable. |
 | `Ptr` | `PtrType` | `valueType, accessQualifier?, addressSpace?, dataLayout?` | Pointer type; hoistable. |
 | `Texture` | — | `elementType, shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format` | Texture types; hoistable. |
@@ -158,7 +158,7 @@ declarations live in
 | --- | --- | --- | --- |
 | `block` | `IRBlock` | parent of `Param`s and instructions | Basic block; first N children are `Param`s. |
 | `param` | `IRParam` | (variadic) | Block or function parameter; replaces SSA `phi`. |
-| `branch` / `condBranch` / `ifElse` / `switch` / `loop` | — | (terminator-specific) | Terminators in the `TerminatorInst` family. |
+| `unconditionalBranch` / `conditionalBranch` / `ifElse` / `switch` / `loop` | — | (terminator-specific) | Terminators in the `TerminatorInst` family. |
 | `return_val` / `unreachable` / `discard` | — | (terminator-specific) | Return and exit terminators. |
 | `RequirePrelude`, `RequireTargetExtension`, `Printf`, `StaticAssert`, ... | — | (variadic) | Other control-flow / backend-hint opcodes. |
 | (...see [../ir-reference/control-flow.md](../ir-reference/control-flow.md) for the full list) | | | |
@@ -240,6 +240,22 @@ The semantics of these flags and the consequences for IR transformation
 covered in [../../../design/ir.md](../../../design/ir.md). Pass authors
 **must** read that document before writing transformations that mutate
 the IR.
+
+## Decorations
+
+A number of opcodes are conceptually *decorations*: every entry in the
+`Decoration` family in
+[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) (the
+`*Decoration` opcodes such as `NameHintDecoration` and
+`TargetIntrinsicDecoration`) is modeled as an ordinary `IRInst`,
+wrapped by `IRDecoration` in
+[slang-ir.h](../../../../source/slang/slang-ir.h). A decoration does
+not sit in a block's instruction stream; it is attached to a host
+instruction's decoration list and reached via
+`IRInst::getFirstDecoration`, annotating the host with metadata
+(names, linkage, layout, target-intrinsic spellings) without
+producing a value. The full per-opcode catalog is in
+[../ir-reference/decorations.md](../ir-reference/decorations.md).
 
 ## Module versioning and opcode insertion
 

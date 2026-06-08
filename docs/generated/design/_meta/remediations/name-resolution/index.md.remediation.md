@@ -1,11 +1,11 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T19:00:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-05T15:45:00Z
 target_doc: name-resolution/index.md
 review_report: ../../reviews/name-resolution/index.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
 actions:
   fixed: 1
   rejected_bogus: 0
@@ -18,12 +18,10 @@ actions:
 
 ## Summary
 
-One minor finding addressed by renaming the glossary cross-link to
-the actual glossary entry name (`visibility`, not
-`visibility modifier`).
+The review reported one minor factual finding, which was fixed. The pipeline-context paragraph claimed breadcrumb chains become IR access patterns during AST-to-IR lowering, but `ConstructLookupResultExpr` in `source/slang/slang-check-expr.cpp:873` expands breadcrumbs into AST access expressions during semantic checking (loop at line 895). The sentence now attributes breadcrumb expansion to semantic checking and links to `lookup.md`, keeping the page within the name-resolution contract.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | The glossary entry is `visibility`; the link text was the only mismatch. | Changed `[\`visibility modifier\`](../glossary.md)` to `[\`visibility\`](../glossary.md)` in the "Related glossary terms" bullet. |
+| F-001 | fixed | `source/slang/slang-check-expr.cpp:891-895` expands breadcrumbs in the checker (`ConstructLookupResultExpr`), not in the lowerer. | Reworded the downstream paragraph to say breadcrumbs are expanded into AST access expressions during semantic checking before lowering; linked `lookup.md`. |

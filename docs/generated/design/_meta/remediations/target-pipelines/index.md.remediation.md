@@ -1,11 +1,11 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T20:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-05T15:45:00Z
 target_doc: target-pipelines/index.md
 review_report: ../../reviews/target-pipelines/index.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
 actions:
   fixed: 1
   rejected_bogus: 0
@@ -18,12 +18,12 @@ actions:
 
 ## Summary
 
-Removed the per-pass detail from the four-phase overview, leaving
-just the high-level "what each phase does" summary as the contract
-requires.
+The single minor finding was fixed. The post-table paragraph that
+named per-pass behavior was generalized so the index no longer
+documents individual passes, as the index contract requires.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | The index contract in `_common.md` forbids documenting individual passes; the four-phase block was citing specific pass names and line ranges. | Rewrote the four-phase bullet list to describe each phase in one or two sentences and removed the cited pass names (`collectEntryPointUniformParams`, `simplifyIR`, `specializeArrayParameters`, `legalizeByteAddressBufferOps`, etc.) and the line ranges (928-1205, 1207-1773, 1798-2413, ~2418, ~2957). Readers wanting that detail are routed to the per-target pages and `pipeline/05-ir-passes.md`. |
+| F-001 | fixed | The target-pipeline index contract in `docs/generated/design/_meta/prompts/_common.md` forbids per-pass details on the index page. | Replaced the paragraph naming `eliminatePhis` register-allocation settings and `specializeAddressSpaceForMetal`/`specializeAddressSpaceForWGSL` placement with a generalized pointer to the per-target pages. |

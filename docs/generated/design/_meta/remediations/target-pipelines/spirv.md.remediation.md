@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T20:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-05T15:45:00Z
 target_doc: target-pipelines/spirv.md
 review_report: ../../reviews/target-pipelines/spirv.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
 actions:
-  fixed: 1
+  fixed: 4
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,12 +18,20 @@ actions:
 
 ## Summary
 
-Promoted `applyGLSLLiveness` from the filtered-out list into Phase
-C, gated on `shouldTrackLiveness() && isKhronosTarget`, in both the
-diagram and the table.
+All four findings were fixed. The three entry-point-shape passes were
+moved from Phase A to Phase C (after `resolveTextureFormat`, before
+`legalizeEntryPointsForGLSL`) in both the diagrams and tables, with
+row renumbering and stale step-number cross-references updated. The
+Phase D spirv-val description now states the freshly emitted buffer
+is validated, the `legalizeEmptyTypes` file link was corrected, and
+the editorial "re-enable the disabled block" recommendation was made
+neutral.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | The gate at `slang-emit.cpp` lines 2347-2352 is `shouldTrackLiveness() && isKhronosTarget(targetRequest)`, which is satisfied by SPIR-V direct-emit (the doc had wrongly claimed it ran only on the via-GLSL path). | Added `applyGLSLLiveness` as a new row 35 in the Phase C table with the correct gate and a citation to lines 2347-2352. Removed the `applyGLSLLiveness (only when shouldTrackLiveness and Khronos non-direct)` entry from the filtered-out list. Added a `liveKhrGate` / `aGL` node pair to the mermaid diagram between `LivenessUtil::addRangeEnds` and `replaceLocationIntrinsicsWithRaytracingObject`. Updated the gate-summary table to say `applyGLSLLiveness` fires on every Khronos target (SPIR-V direct-emit and via-GLSL) rather than only the via-GLSL path. Renumbered subsequent rows (35-39 → 36-40, `checkUnsupportedInst` is now row 41). |
+| F-001 | fixed | `source/slang/slang-emit.cpp:982-1001` holds only borrow/replace/bind passes; `1952-1962` runs the three varying passes after specialization. | Moved `translateGlobalVaryingVar`/`resolveVaryingInputRef`/`fixEntryPointCallsites` from Phase A (diagram+rows 5-7) to Phase C (after `resolveTextureFormat`, new rows 3-5); renumbered both tables and updated step references and phase prose. |
+| F-002 | fixed | `source/slang/slang-emit.cpp:3135-3138` validates `spirv.getBuffer()`, not the linked artifact replaced at 3131. | Clarified the spirv-val Notable-passes bullet to say it validates the freshly emitted `spirv` buffer even after `spirv-link` replaces `artifact`. |
+| F-003 | fixed | `source/slang/slang-ir-legalize-types.cpp:4026` defines `legalizeEmptyTypes`. | Changed the `legalizeEmptyTypes` Phase C row File link from `slang-ir-legalize-empty-array.cpp` to `slang-ir-legalize-types.cpp`. |
+| F-004 | fixed | `source/slang/slang-emit.cpp:3053-3060` shows only a disabled `#if 0` block with no re-enable guidance. | Replaced the "future readers should re-enable that block" closing sentence with a neutral statement that the inline `optimizeSPIRV` is disabled. |

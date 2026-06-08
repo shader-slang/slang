@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-28T08:21:36+00:00
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-watched_paths_digest: a2217d02da7f2680d73efe9d3b894939543b9dd5ba9d5ebd665f3da62641c2f4
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 4fbff6632ead047a5c7b8f1f94ae347684e102e096ad26276f0083b8dab39d3e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -131,7 +131,7 @@ carry no FIDDLE concrete tag. Concrete leaves below.
 | `HasDiffTypeInfoConstraintDecl` | `Decl` | `type: TypeExp` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | Differentiable-type constraint. |
 | `EmptyDecl` | `Decl` | (no additional state) | (none) | An empty declaration that exists only to carry modifiers (e.g. GLSL `layout(...) in;`). |
 | `SyntaxDecl` | `Decl` | `syntaxClass: SyntaxClass<NodeBase>`, `parseCallback: SyntaxParseCallback` | (none) | Binds a keyword to a parser callback; see `## Notable nodes` and [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md). |
-| `AttributeDecl` | `ContainerDecl` | `syntaxClass: SyntaxClass<NodeBase>` | [attribute](../syntax-reference/grammar.md#modifiers-and-attributes) | Declares an attribute (`[name(args)]`); its body is the parameter list. |
+| `AttributeDecl` | `ContainerDecl` | `syntaxClass: SyntaxClass<NodeBase>` | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | Declares an attribute (`[name(args)]`); its body is the parameter list. |
 
 ## Notable nodes
 

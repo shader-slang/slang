@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
+model: claude-opus-4.8
+generated_at: 2026-06-05T10:25:25+00:00
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -167,6 +167,20 @@ concrete children are listed here.
 | `CastResourceToDescriptorHandle` | — | `resource` | | (synthesized) | Reverse of `CastDescriptorHandleToResource`. |
 | `TreatAsDynamicUniform` | — | `value` | | (synthesized) | Annotation cast marking a value as dynamically uniform; affects target legalization. |
 | `GetLegalizedSPIRVGlobalParamAddr` | — | (variadic, `min=1`) | | (synthesized) | Returns the legalized address of a global parameter for the SPIR-V backend. |
+
+### Variable struct-wrapping legalization
+
+Concrete children of the `ForceVarIntoStructTemporarilyBase` parent.
+They wrap a variable so a callee that expects a struct receives one;
+the `slang-ir-hlsl-legalize.cpp` pass either unwraps the argument
+(when its base type is already a `StructType`) or materializes a
+temporary single-field struct and copies the value back for
+`out`/`inout` parameters.
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `ForceVarIntoStructTemporarily` | — | `var` | | core-module `__forceVarIntoStructTemporarily` intrinsic | Forces a variable to be passed as a struct temporary; legalized by `slang-ir-hlsl-legalize.cpp`. |
+| `ForceVarIntoRayPayloadStructTemporarily` | — | `var` | | core-module ray-payload intrinsic | Same as above, additionally adding the `RayPayload` decoration and default payload access qualifiers to the wrapping struct. |
 
 ### Annotations
 
