@@ -56,9 +56,9 @@
 // target either delegates propagation to its downstream compiler (HLSL, GLSL)
 // or has no way to express the concept (Metal, WGSL, CUDA, CPU).
 //
-// Two passes cooperate to achieve this for SPIR-V:
+// Two passes cooperate to achieve this for SPIR-V, and both live in this file:
 //
-// 1. Float pass (this file, called during SPIR-V legalization):
+// 1. Float pass (processNonUniformResourceIndex / floatNonUniformResourceIndex):
 //    Bubbles the NonUniformResourceIndex wrapper outward through the
 //    use-def chain (GetElement, Load, MakeCombinedTextureSampler,
 //    CombinedTextureSamplerGetTexture, ImageTexelPointer, etc.).
@@ -68,9 +68,8 @@
 //    attach IRSPIRVNonUniformResourceDecoration to the index and
 //    all intermediate resource-creating ops.
 //
-// 2. Legalize propagation (propagateNonUniformDecorations in
-//    slang-ir-spirv-legalize.cpp): A single forward linear scan
-//    that runs after processGlobalParam rewrites getElement to
+// 2. Forward scan (propagateNonUniformDecorations): A single forward
+//    linear scan that runs after the legalizer rewrites getElement to
 //    getElementPtr. Syncs NonUniform between access-chain indices
 //    and their instructions (bidirectional), and forward-propagates
 //    through Load, FieldAddress/FieldExtract, and ImageSubscript to
@@ -78,7 +77,7 @@
 //
 // Resource-creating ops (MakeCombinedTextureSampler,
 // CombinedTextureSamplerGetTexture, ImageTexelPointer) are handled
-// exclusively by the float pass. The legalize propagation handles
+// exclusively by the float pass. The forward scan handles
 // access chains, loads, field accesses, and image subscripts.
 //
 // ImageSubscript is a forward case (not a float-pass case) because it
@@ -87,6 +86,30 @@
 // must land on the ImageSubscript inst itself. This mirrors how the
 // HLSL `RWTexture[coord]` __ref-accessor atomic path differs from the
 // GLSL imageAtomic* path that uses kIROp_ImageTexelPointer directly.
+//
+// Invocation / ownership
+// ----------------------
+// This file owns the NonUniform logic, but it does not schedule itself; the
+// callers decide when each phase runs:
+//
+//   * Textual mode: floatNonUniformResourceIndex(module, Textual) runs as a
+//     standalone SLANG_PASS from slang-emit.cpp (the IR lowering pipeline) for
+//     all non-SPIR-V targets. It only repositions the wrapper; it emits no
+//     decorations, and the forward scan is NOT run.
+//
+//   * SPIR-V mode: both phases are scheduled by the SPIR-V legalize pass
+//     (SPIRVLegalizationContext::processModule in slang-ir-spirv-legalize.cpp):
+//       - the float phase runs per-instruction, dispatched from the legalize
+//         worklist as the kIROp_NonUniformResourceIndex handler
+//         (processNonUniformResourceIndex(..., SPIRV));
+//       - propagateNonUniformDecorations(module) runs once, as the FINAL step
+//         of processModule.
+//     The forward scan must run last (after getElement -> getElementPtr,
+//     buffer-to-pointer lowering, legalizeStructBlocks, and force-inlining)
+//     because it decorates the resulting emit-shape access chains / loads /
+//     field accesses / image subscripts, which do not exist in final form
+//     earlier. That ordering constraint is why its invocation stays in the
+//     legalize pipeline even though its code lives here.
 
 namespace Slang
 {
@@ -458,6 +481,137 @@ void floatNonUniformResourceIndex(IRModule* module, NonUniformResourceIndexFloat
         {
             if (inst->getParent() != nullptr)
                 processNonUniformResourceIndex(inst, floatMode);
+        }
+    }
+}
+
+// Forward-scan decoration phase, phase 2 of the SPIR-V path (see the
+// "Invocation / ownership" note in the file header). Complements the float
+// pass: it runs once, as the FINAL step of SPIR-V legalization
+// (SPIRVLegalizationContext::processModule in slang-ir-spirv-legalize.cpp),
+// and decorates the post-legalization, emit-shape instructions.
+//
+// It must run last, after the legalizer has rewritten getElement ->
+// getElementPtr, lowered structured/constant buffers to pointer access chains,
+// run legalizeStructBlocks, and force-inlined wrapper functions -- those
+// rewrites produce the access chains / loads / field accesses / image
+// subscripts this scan decorates, which do not exist in final form earlier.
+// That ordering constraint is why the *invocation* lives in the legalize
+// pipeline even though the logic lives here.
+//
+// This handles post-rewrite propagation: bidirectional sync between
+// access-chain indices and instructions, and forward propagation through
+// loads, field accesses, and image subscripts. Resource-creating ops
+// (MakeCombinedTextureSampler, etc.) are handled by the float pass, not here.
+//
+// Single forward pass suffices because IR instructions are in dominance
+// order (producers before consumers).
+void propagateNonUniformDecorations(IRModule* module)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                switch (inst->getOp())
+                {
+                case kIROp_GetElement:
+                case kIROp_GetElementPtr:
+                case kIROp_RWStructuredBufferGetElementPtr:
+                    {
+                        // Contract (VUID-RuntimeSpirv-None-10148): the
+                        // resource operand consumed by the access (the final
+                        // OpAccessChain result) must be NonUniform. So when a
+                        // base, index, or inst on this chain is decorated, we
+                        // decorate this inst to guarantee the consumed result
+                        // carries NonUniform, and decorate the index so a
+                        // non-uniform index operand is marked too. The base
+                        // check propagates into inner access chains (e.g.
+                        // structured-buffer element pointers) derived from a
+                        // decorated outer access chain.
+                        //
+                        // A constant index (e.g. a fixed [0] offset) is
+                        // dynamically uniform and is skipped automatically by
+                        // addSPIRVNonUniformResourceDecoration -- so only the
+                        // result is decorated for the constant-index case.
+                        auto baseOperand = inst->getOperand(0);
+                        auto indexOperand = inst->getOperand(1);
+                        auto baseDecorated =
+                            baseOperand->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                            nullptr;
+                        auto indexDecorated =
+                            indexOperand->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                            nullptr;
+                        auto instDecorated =
+                            inst->findDecoration<IRSPIRVNonUniformResourceDecoration>() != nullptr;
+                        if (!baseDecorated && !indexDecorated && !instDecorated)
+                            break;
+                        IRBuilder builder(inst);
+                        builder.setInsertBefore(inst);
+                        if (!indexDecorated)
+                            builder.addSPIRVNonUniformResourceDecoration(indexOperand);
+                        if (!instDecorated)
+                            builder.addSPIRVNonUniformResourceDecoration(inst);
+                    }
+                    break;
+                case kIROp_FieldAddress:
+                case kIROp_FieldExtract:
+                    if (inst->getOperand(0)
+                            ->findDecoration<IRSPIRVNonUniformResourceDecoration>() &&
+                        !inst->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                    {
+                        IRBuilder builder(inst);
+                        builder.addSPIRVNonUniformResourceDecoration(inst);
+                    }
+                    break;
+                case kIROp_ImageSubscript:
+                    // ImageSubscript lowers directly to SpvOpImageTexelPointer
+                    // at emit time (it is never turned into a
+                    // kIROp_ImageTexelPointer IR inst), so the NonUniform
+                    // decoration required for image atomics
+                    // (VUID-RuntimeSpirv-None-10148) must land on this inst.
+                    // Forward-propagate from the image operand. For the array
+                    // access paths this targets, processImageSubscript's load
+                    // HACK has rewired operand 0 to the decorated access-chain
+                    // pointer, so the operand carries NonUniform here. Note
+                    // that HACK only fires when the image operand is a Load;
+                    // if it is not (the HACK's stated failure mode), operand 0
+                    // is left unchanged and may be undecorated, in which case
+                    // this propagates nothing -- the same limitation the HACK
+                    // already carries, not a new one introduced here.
+                    if (inst->getOperand(0)
+                            ->findDecoration<IRSPIRVNonUniformResourceDecoration>() &&
+                        !inst->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                    {
+                        IRBuilder builder(inst);
+                        builder.addSPIRVNonUniformResourceDecoration(inst);
+                    }
+                    break;
+                case kIROp_Load:
+                    if (inst->getOperand(0)
+                            ->findDecoration<IRSPIRVNonUniformResourceDecoration>() &&
+                        !inst->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                    {
+                        IRBuilder builder(inst);
+                        builder.addSPIRVNonUniformResourceDecoration(inst);
+                    }
+                    break;
+                default:
+                    // MakeCombinedTextureSampler, CombinedTextureSamplerGetTexture,
+                    // ImageTexelPointer, and GetLegalizedSPIRVGlobalParamAddr are
+                    // intentionally absent -- handled by the float pass.
+                    // SPIRVLoadTexelPointerFromHeap is also absent and is not
+                    // handled anywhere: the descriptor-heap image-atomic path
+                    // that would need it is rejected by E41403 (see the note
+                    // in processImageSubscript), so it is currently unreachable.
+                    break;
+                }
+            }
         }
     }
 }
