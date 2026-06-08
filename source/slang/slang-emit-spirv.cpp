@@ -7116,10 +7116,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // converted to acceleration structure handles after loading.
         auto descriptorElementType = ensureInst(builder.getUInt64Type());
 
+        static const int kAccelerationStructureDescriptorHeapStride = 8;
+
         auto userDefinedStride = m_targetProgram->getOptionSet().getIntOption(
             CompilerOptionName::SPIRVResourceHeapStride);
         if (userDefinedStride == 0)
-            userDefinedStride = 8;
+        {
+            userDefinedStride = kAccelerationStructureDescriptorHeapStride;
+        }
+        else if (userDefinedStride < kAccelerationStructureDescriptorHeapStride)
+        {
+            m_sink->diagnose(Diagnostics::SpirvResourceHeapStrideTooSmall{
+                .stride = userDefinedStride,
+                .minimumStride = kAccelerationStructureDescriptorHeapStride,
+            });
+            userDefinedStride = kAccelerationStructureDescriptorHeapStride;
+        }
 
         auto runtimeArrayType = emitOpTypeRuntimeArray(nullptr, descriptorElementType);
         m_descriptorHeapAccelerationStructureRuntimeArrayType = runtimeArrayType;

@@ -1,6 +1,8 @@
 // Regression test for GitHub issues #10671 and #11231.
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry computeMain -profile sm_6_6 -capability spvDescriptorHeapEXT -capability spvRayQueryKHR
 //TEST:SIMPLE(filecheck=OVERRIDE): -target spirv-asm -stage compute -entry computeMain -profile sm_6_6 -capability spvDescriptorHeapEXT -capability spvRayQueryKHR -spirv-resource-heap-stride 32
+//TEST:SIMPLE(filecheck=TOO_SMALL): -target spirv-asm -stage compute -entry computeMain -profile sm_6_6 -capability spvDescriptorHeapEXT -capability spvRayQueryKHR -spirv-resource-heap-stride 4
+// TOO_SMALL: error[E57005]: SPIR-V resource heap stride '4' is too small for RaytracingAccelerationStructure descriptor heap entries; expected at least '8' bytes.
 
 struct PushConstants
 {
@@ -43,6 +45,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID, uniform PushConsta
     // CHECK-DAG: %[[AS_HEAP_ARRAY:[A-Za-z0-9_]+]] = OpTypeRuntimeArray %[[U64]]
     // CHECK-DAG: OpDecorate %[[AS_HEAP_ARRAY]] ArrayStride 8
     // OVERRIDE-DAG: %[[OVERRIDE_U64:[A-Za-z0-9_]+]] = OpTypeInt 64 0
+    // OVERRIDE-DAG: %[[OVERRIDE_AS_TYPE:[A-Za-z0-9_]+]] = OpTypeAccelerationStructureKHR
     // OVERRIDE-DAG: %[[OVERRIDE_AS_HEAP_ARRAY:[A-Za-z0-9_]+]] = OpTypeRuntimeArray %[[OVERRIDE_U64]]
     // OVERRIDE-DAG: OpDecorate %[[OVERRIDE_AS_HEAP_ARRAY]] ArrayStride 32
     // CHECK-DAG: OpCapability RayQueryKHR
