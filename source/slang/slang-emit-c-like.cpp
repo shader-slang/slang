@@ -3817,6 +3817,9 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
         }
     }
 
+    // IMPORTANT: emitMeshShaderModifiers must be called immediately before
+    // emitParamType as HLSL targets track state internallly to avoid duplicate
+    // mesh shader "in"/"out" qualifiers.
     emitMeshShaderModifiers(param);
     emitParamType(paramType, paramName);
     emitSemantics(param);
