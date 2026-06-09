@@ -44,6 +44,10 @@ typealias BarInt = Bar<int>;
 struct EqBody<T> where optional T == int {}
 typealias EqAlias<T> = EqBody<T>;
 
+// Observable check: calling useEq requires T == int, proving the constraint
+// propagated through the alias so the witness is still an equality witness.
+int useEq<T>(EqAlias<T>) where T == int { return 99; }
+
 // --- Case 2: value param in the alias ---
 // ordinaryParamCount must count the let N : int param (GenericValueParamDecl)
 // so that argIdx starts past both ordinary params and lands on the constraint slot.
@@ -90,9 +94,11 @@ void main()
     // Original: non-generic alias, constraint not satisfied for int.
     int d = BarInt().test();
 
-    // Case 1: equality constraint alias compiles for matching and non-matching T.
+    // Case 1: equality constraint alias — verify isEqualityConstraint propagation
+    // by calling useEq, which requires T == int through the alias.
     EqAlias<int> _eq1;
     EqAlias<float> _eq2;
+    int l = useEq(_eq1); // 99 — T=int satisfies T==int
 
     // Case 2: value param alias.
     int e = WithValueAlias<5, MyFoo>().test();  // MyFoo satisfies IFoo: 5
@@ -109,7 +115,7 @@ void main()
     // Case 5: functype alias is callable.
     int k = callFn((int x) => x + 1, 5);  // 6
 
-    printf("%d %d %d %d %d %d %d %d %d %d %d\n", a, b, c, d, e, f, g, h, i, j, k);
+    printf("%d %d %d %d %d %d %d %d %d %d %d %d\n", a, b, c, d, e, f, g, h, i, j, k, l);
 }
 
-// CHECK: 3 1 0 0 5 0 1 0 0 0 6
+// CHECK: 3 1 0 0 5 0 1 0 0 0 6 99

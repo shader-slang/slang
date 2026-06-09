@@ -1,4 +1,6 @@
 //TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECKBUF):-cpu -output-using-type
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0], stride=4)
 
 // Regression test for https://github.com/shader-slang/slang/issues/10639
 // Optional conformance should work through a typealias.
@@ -45,3 +47,22 @@ void main()
 
 // CHECK: 1 1 1 0 0 0
 
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    outputBuffer[0] = Bar<MyFoo>().test();
+    outputBuffer[1] = Baz<MyFoo>().test();
+    outputBuffer[2] = Qux<MyFoo>().test();
+    outputBuffer[3] = Bar<int>().test();
+    outputBuffer[4] = Baz<int>().test();
+    outputBuffer[5] = Qux<int>().test();
+}
+
+// CHECKBUF: 1
+// CHECKBUF: 1
+// CHECKBUF: 1
+// CHECKBUF: 0
+// CHECKBUF: 0
+// CHECKBUF: 0

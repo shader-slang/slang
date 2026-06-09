@@ -12143,6 +12143,8 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
     Index ordinaryParamCount = 0;
     for (auto mm : bodyGenericDecl->getDirectMemberDecls())
     {
+        if (mm == bodyGenericDecl->inner)
+            continue;
         if (as<GenericTypeParamDeclBase>(mm) || as<GenericValueParamDecl>(mm) ||
             as<GenericValuePackParamDecl>(mm))
             ordinaryParamCount++;
@@ -12161,6 +12163,11 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
 
     for (auto mm : bodyGenericDecl->getDirectMemberDecls())
     {
+        // Skip the inner decl (the typedef/struct that the GenericDecl wraps) — it is
+        // not a param or constraint and must not advance argIdx.
+        if (mm == bodyGenericDecl->inner)
+            continue;
+
         // Skip ordinary (type/value) params — they don't occupy constraint arg slots.
         if (as<GenericTypeParamDeclBase>(mm) || as<GenericValueParamDecl>(mm) ||
             as<GenericValuePackParamDecl>(mm))
@@ -12240,14 +12247,9 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
             }
         }
 
-        // Any member that is not an ordinary (type/value/pack) param occupies exactly one
-        // constraint arg slot.  Using the negated ordinary-param check mirrors the skip
-        // condition above and automatically handles any future constraint member types.
-        if (!as<GenericTypeParamDeclBase>(mm) && !as<GenericValueParamDecl>(mm) &&
-            !as<GenericValuePackParamDecl>(mm))
-        {
-            argIdx++;
-        }
+        // Every member that reaches this point is a constraint slot (we skipped inner,
+        // ordinary type/value/pack params, and the early-continue paths above).
+        argIdx++;
     }
 
     if (modified)
