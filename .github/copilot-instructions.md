@@ -47,12 +47,12 @@ You can also use `./extras/formatting.sh --check-only` to verify formatting with
 
 ## Labeling your PR
 
-All PRs needs to be labeled as either "pr: non-breaking" or "pr: breaking".
-Add the "pr: breaking" label to your PR if you are introducing public API changes that breaks ABI compabibility,
+All PRs needs to be labeled as either "pr: non-breaking" or "pr: breaking change".
+Add the "pr: breaking change" label to your PR if you are introducing public API changes that breaks ABI compabibility,
 or you are introducing changes to the Slang language that will cause the compiler to error out on existing Slang code.
 It is rare for a PR to be a breaking change.
 
-## Problem-solving methodology
+## Problem-Solving Methodology
 
 Follow the principled path, not the minimal-edit-distance path: fix root causes (usually upstream
 in an IR pass, lowering, or the AST/IR representation), not symptoms in emit/codegen. Question every
@@ -64,17 +64,24 @@ throughout the task recording the problem, how issues cascade (one fix exposing 
 for each and why it is principled (with a code trace), and rejected alternatives; distill that log
 into the PR description.
 
-## PR description format
+## PR Description Format
 
-Write every PR description in this four-part format:
+Write every PR description in this five-part format:
 
 1. **Motivation** — the problem, with a concrete example / motivating test case.
 2. **Proposed solution** — the approach and why it is principled.
 3. **Change summary** — the files/areas touched and what each does.
-4. **Process report** — explain every change with a logical reason. For a change addressing a
+4. **Concepts and vocabulary** — a short glossary between the change summary and the process report.
+   Restate only the codebase-specific or subtle terms the report relies on (e.g. witness, facet,
+   the fixpoint solver, a non-obvious distinction the fix hinges on), as a reminder. Do not explain
+   basic, well-known concepts (interface, associated type) — assume them.
+5. **Process report** — explain every change with a logical reason. For a change addressing a
    cascading issue, describe the issue (with its motivating test case) and justify the fix with a
    code trace (the exact functions/insts involved), explaining why it is necessary and principled
    rather than a workaround.
+
+Write for a reviewer without the full context in their head: ground each abstract claim in a
+concrete example, and wire explanations to the source (function name and file, or `file.cpp:line`).
 
 ## Debugging
 

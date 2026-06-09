@@ -119,7 +119,7 @@ representation that is robust by construction, even when that means a larger rew
 ### PR Workflow
 
 1. **Format your code**: Run `./extras/formatting.sh` before committing
-2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking" (for ABI/language breaking changes)
+2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking change" (for ABI/language breaking changes)
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
 4. **Write the PR description in this required five-part format:**
    1. **Motivation** — the problem being solved, with a concrete example / motivating test case.
