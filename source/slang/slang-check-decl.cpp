@@ -11975,6 +11975,20 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
                 SLANG_ASSERT(subType && supType);
                 if (subType && supType)
                 {
+                    // Only propagate when the substituted sub type is a type variable
+                    // that belongs directly to the alias's own generic.  If it is a
+                    // concrete type (e.g. `int` in `typealias Half<T> = Pair<T, int>`)
+                    // the constraint cannot be satisfied through the alias's type params
+                    // and the NoneWitness is the correct permanent result.
+                    auto subTypeDeclRefType = as<DeclRefType>(subType);
+                    if (!subTypeDeclRefType ||
+                        subTypeDeclRefType->getDeclRef().getDecl()->parentDecl != parentGenericDecl)
+                    {
+                        // Leave the NoneWitness intact; advance argIdx below.
+                        argIdx++;
+                        continue;
+                    }
+
                     // Add an equivalent optional constraint to the alias's own generic
                     // so that `Baz<float>` can resolve it against float's conformances.
                     auto synConstraintDecl = m_astBuilder->create<GenericTypeConstraintDecl>();
