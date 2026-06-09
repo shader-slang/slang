@@ -3959,7 +3959,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // signature before emitting it (issue #11518). This covers non-inlined
         // functions whose signature is the only place a Workgroup/StorageBuffer
         // pointer appears.
-        requireFunctionTypeCapabilitiesIfNeeded(irFunc->getDataType());
+        requireFunctionTypeCapabilitiesIfNeeded(irFunc);
 
         // [2.4: Logical Layout of a Module]
         //
@@ -11341,6 +11341,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Walk the signature's result and parameter types so the capability follows
     // the surviving signature.
     //
+    // Only declare for a function that survives inlining as a real, separately
+    // emitted SPIR-V function: its signature is the sole site of the pointer
+    // only when the function is genuinely called across a function boundary.
+    // A `[noinline]` helper is exactly that case. A function without the
+    // decoration is folded into its callers, leaving a dead `IRFunc` whose
+    // Workgroup/StorageBuffer-pointer signature no longer backs any emitted
+    // pointer operation. Declaring the capability for such a dead signature is
+    // not merely redundant: for a Workgroup pointer it re-introduces
+    // `VariablePointers` into a module that would otherwise not need it,
+    // re-triggering a graphics-driver miscompile that yields wrong results
+    // (shader-slang/slang#9061; regression caught by
+    // tests/language-feature/pointer/ptr-to-groupshared.slang).
+    //
+    // The discriminator is the no-inline decoration, mirroring the
+    // `SpvFunctionControlDontInlineMask` logic in `emitFuncDeclaration`. Note
+    // `hasUses()` does NOT work here: an inlined-away function can still report
+    // uses (e.g. via its surviving orphan function-type), so liveness does not
+    // distinguish a real callee from a folded-away one.
+    //
     // Despite the general name, this declares only the variable-pointers
     // capability: it forwards to `requireVariableBufferCapabilityIfNeeded` and
     // is not a catch-all for every signature-derived capability. Only the
@@ -11348,8 +11367,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // pointer nested inside a struct parameter or behind a pointer-to-pointer is
     // not reached; this matches the existing value-site behavior. Requires are
     // idempotent, so any overlap with value-site declarations is harmless.
-    void requireFunctionTypeCapabilitiesIfNeeded(IRFuncType* funcType)
+    void requireFunctionTypeCapabilitiesIfNeeded(IRFunc* irFunc)
     {
+        if (!irFunc)
+            return;
+        if (!irFunc->findDecoration<IRNoInlineDecoration>())
+            return;
+        auto funcType = as<IRFuncType>(irFunc->getDataType());
         if (!funcType)
             return;
         requireVariableBufferCapabilityIfNeeded(funcType->getResultType());
