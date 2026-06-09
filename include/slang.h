@@ -1197,6 +1197,12 @@ typedef uint32_t SlangSizeT;
                  //   within any practical run. The corresponding CLI flag
                  //   `-trace-coverage-counter-width <bits>` takes a bit count (32/64)
                  //   and stores the matching byte width here.
+        TraceCoverageHitMiss =
+            152, // bool: record hit/miss (CoverageCounterMode::Boolean) instead of exact
+                 //   execution counts. Each counter is written with a plain non-atomic store
+                 //   of `1`, eliminating atomic contention (much faster, and avoids the GPU
+                 //   watchdog timeouts heavy coverage can trigger) at the cost of exact
+                 //   counts. Off by default.
 
         CountOf,
     };
@@ -4622,7 +4628,15 @@ enum class CoverageEntryKind : uint32_t
 
 enum class CoverageCounterMode : uint32_t
 {
+    /// The counter holds the number of times the entry executed
+    /// (atomic add per execution).
     Count = 0,
+    /// The counter is a hit/miss flag: `0` if the entry never executed,
+    /// non-zero if it executed at least once. Written with a plain
+    /// (non-atomic) store of `1`, so it carries no execution count but
+    /// avoids all atomic contention. Selected by
+    /// `-trace-coverage-hit-miss`.
+    Boolean = 1,
 };
 
 enum class CoverageBranchArmKind : uint32_t

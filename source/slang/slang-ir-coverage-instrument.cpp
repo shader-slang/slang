@@ -950,6 +950,11 @@ struct CoverageInstrumenter
     IRType* counterElementType;
     IRType* counterElementPtrType;
     IRType* intType;
+    // Caller opted in to hit/miss recording (`-trace-coverage-hit-miss`): each
+    // counter is written with a plain non-atomic store of 1 instead of an
+    // atomic add, recording whether the entry executed (0 / non-zero) rather
+    // than an exact count.
+    bool hitMiss = false;
     List<BranchSiteRemap> branchSiteRemaps;
     uint32_t nextBranchSiteID = 1;
 
@@ -957,8 +962,9 @@ struct CoverageInstrumenter
         IRModule* m,
         IRGlobalParam* buf,
         SourceManager* sm,
-        ArtifactPostEmitMetadata& md)
-        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md)
+        ArtifactPostEmitMetadata& md,
+        bool hitMiss)
+        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md), hitMiss(hitMiss)
     {
         IRBuilder tmpBuilder(module);
         // The unchecked `cast` is safe: this instrumenter only ever runs
@@ -997,7 +1003,8 @@ struct CoverageInstrumenter
     void populateEntryForMarker(IRInst* markerOp, UInt slot, CoverageTracingEntry& entry)
     {
         entry.counterIndex = (uint32_t)slot;
-        entry.counterMode = slang::CoverageCounterMode::Count;
+        entry.counterMode =
+            hitMiss ? slang::CoverageCounterMode::Boolean : slang::CoverageCounterMode::Count;
         resolveHumaneLoc(sourceManager, markerOp, entry.file, entry.line, entry.startColumn);
 
         switch (markerOp->getOp())
@@ -1046,19 +1053,36 @@ struct CoverageInstrumenter
             2,
             getElemArgs);
 
-        // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
-        // backend emitter to its native atomic-increment idiom
-        // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
-        // SPIR-V, etc.). The immediate and the result type are typed
-        // against `counterElementType` (uint or uint64), so the same
-        // lowering path produces a 64-bit `OpAtomicIAdd` /
-        // `atomicAdd(ulonglong*)` when the buffer is wide.
-        IRInst* atomicArgs[] = {
-            slotPtr,
-            builder.getIntValue(counterElementType, 1),
-            builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
-        };
-        builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
+        if (hitMiss)
+        {
+            // Hit/miss recording: a plain, non-atomic store of `1`. Every lane
+            // that reaches this marker writes the same value, so the concurrent
+            // writes are a benign race — the slot ends up `1` iff the entry
+            // executed at least once. The store being non-atomic is the whole
+            // point: a *relaxed atomic* store would be memory-model-clean but
+            // still serializes on the hot counter address — measured just as
+            // slow as the atomic-add counting path (~15x slower than this plain
+            // store), defeating the purpose. The trade-off vs `Count` mode is
+            // that no exact execution count is recorded
+            // (`CoverageCounterMode::Boolean`).
+            builder.emitStore(slotPtr, builder.getIntValue(counterElementType, 1));
+        }
+        else
+        {
+            // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
+            // backend emitter to its native atomic-increment idiom
+            // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
+            // SPIR-V, etc.). The immediate and the result type are typed
+            // against `counterElementType` (uint or uint64), so the same
+            // lowering path produces a 64-bit `OpAtomicIAdd` /
+            // `atomicAdd(ulonglong*)` when the buffer is wide.
+            IRInst* atomicArgs[] = {
+                slotPtr,
+                builder.getIntValue(counterElementType, 1),
+                builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
+            };
+            builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
+        }
 
         // The marker op has void return type and, by construction, no uses.
         // Catch a future IR transform that takes a use of it before we reach
@@ -1264,6 +1288,7 @@ void instrumentCoverage(
     const int* reservedSpaces,
     int reservedSpaceCount,
     int counterByteWidth,
+    bool hitMiss,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
@@ -1419,7 +1444,8 @@ void instrumentCoverage(
         module,
         buffer,
         sink ? sink->getSourceManager() : nullptr,
-        outMetadata);
+        outMetadata,
+        hitMiss);
     instrumenter.run(markerOps);
 }
 
