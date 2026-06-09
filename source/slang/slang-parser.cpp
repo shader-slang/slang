@@ -14,7 +14,6 @@
 #include <float.h>
 #include <limits>
 #include <optional>
-#include <stdfloat>
 
 namespace Slang
 {
@@ -7768,7 +7767,7 @@ static FloatFixKind _fixFloatLiteralValue(
             nonzeroMin = double{std::numeric_limits<float>::denorm_min()} / 2.0;
             static_assert(0x1.FFFFFE0p127 == double{std::numeric_limits<float>::max()});
             positiveMax = 0x1.FFFFFE0p127;
-            finiteMax = 0x1.FFFFFE8p127; // this still rounds down to positiveMax
+            finiteMax = 0x1.FFFFFFp127; // this still rounds down to positiveMax
             break;
 
         case BaseType::Half:

@@ -32,11 +32,11 @@ void main()
 //CHECK:    ^^^^^^^^^^^^^ '.0000000297hf' is smaller than the smallest representable value for type half, converted to '0'
 
     // float overflows and underflows
-    // max: ~3.40282346e38, epsilon = .00000020e38, limit: ~3.40282357e38
-    getType(3.4028235e38);
-    getType(3.4028236e38);
-//CHECK:    ^^^^^^^^^^^^ floating-point literal unrepresentable
-//CHECK:    ^^^^^^^^^^^^ float literal '3.4028236e38' unrepresentable, converted to 'inf'
+    // max: ~3.40282346e38, epsilon = .00000020e38, limit: ~3.40282356e38
+    getType(3.40282355e38);
+    getType(3.40282357e38);
+//CHECK:    ^^^^^^^^^^^^^ floating-point literal unrepresentable
+//CHECK:    ^^^^^^^^^^^^^ float literal '3.40282357e38' unrepresentable, converted to 'inf'
 
     // min denormal: ~1.401298464324e-45
     // half of that: ~.7006492321624e-45, anything below rounds to zero
