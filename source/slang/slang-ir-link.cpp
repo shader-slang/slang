@@ -216,9 +216,9 @@ static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRI
         return;
 
     auto originalModule = originalInst->getModule();
-    if (originalModule && originalModule->hasModuleScopeAnnotationTargetMap())
+    if (originalModule && originalModule->_hasModuleScopeAnnotationCache())
     {
-        auto annotations = originalModule->getModuleScopeAnnotationsForTarget(originalInst);
+        auto annotations = originalModule->_getModuleScopeAnnotationCacheForTarget(originalInst);
         for (auto annotation : annotations)
             cloneInst(context, context->builder, annotation, annotation);
         return;
@@ -2159,10 +2159,11 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     ArrayView<IRModule*> userModules = irModules.getArrayView(0, userModuleCount);
 
     // Source/layout/builtin modules are fully built by this point. Build the module-owned
-    // annotation indices once here so linker annotation cloning can avoid repeatedly walking
-    // high-fanout use lists, while earlier prelink/front-end paths keep the old use-list walk.
+    // annotation acceleration cache once here so linker annotation cloning can avoid repeatedly
+    // walking high-fanout use lists, while earlier prelink/front-end paths keep the old use-list
+    // walk.
     for (auto irModule : irModules)
-        irModule->buildModuleScopeAnnotationTargetMap();
+        irModule->_buildModuleScopeAnnotationCache();
 
     // Check if any user module uses auto-diff, if so we will need to link
     // additional witnesses and decorations.

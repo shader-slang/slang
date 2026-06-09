@@ -2107,9 +2107,19 @@ public:
     {
         return &m_annotationLookupCache;
     }
-    void buildModuleScopeAnnotationTargetMap();
-    bool hasModuleScopeAnnotationTargetMap();
-    List<IRAnnotation*> getModuleScopeAnnotationsForTarget(IRInst* target);
+
+    /// Build the module-scope annotation acceleration cache used by linker annotation cloning.
+    /// This cache assumes the module will not change after it is built; callers must manually
+    /// rebuild it if module-scope annotations or their targets change.
+    void _buildModuleScopeAnnotationCache();
+
+    /// Return true if the linker annotation acceleration cache has already been built.
+    /// A built cache assumes the module has not changed since `_buildModuleScopeAnnotationCache()`.
+    bool _hasModuleScopeAnnotationCache();
+
+    /// Query the linker annotation acceleration cache for module-scope annotations on `target`.
+    /// The result is only valid while the module is unchanged from when the cache was built.
+    List<IRAnnotation*> _getModuleScopeAnnotationCacheForTarget(IRInst* target);
 
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
     {
@@ -2188,7 +2198,7 @@ public:
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:
-    void _buildModuleScopeAnnotationTargetMap();
+    void _buildModuleScopeAnnotationCacheImpl();
 
     friend struct IRSerialReadContext;
     friend struct IRSerialWriteContext;
@@ -2249,10 +2259,12 @@ private:
     // (inst, association-kind) -> associated-inst
     Dictionary<AnnotationCacheKey, IRAnnotation*> m_annotationLookupCache;
 
+    // Acceleration cache for linker annotation cloning:
     // target-inst -> module-scope annotations that reference it.
-    Dictionary<IRInst*, List<IRAnnotation*>> m_mapInstToModuleScopeAnnotations;
-    bool m_isModuleScopeAnnotationTargetMapBuilt = false;
-    std::mutex m_moduleScopeAnnotationTargetMapMutex;
+    // Assumes the module will not change after the cache is built; rebuild manually if it does.
+    Dictionary<IRInst*, List<IRAnnotation*>> m_moduleScopeAnnotationCache;
+    bool m_isModuleScopeAnnotationCacheBuilt = false;
+    std::mutex m_moduleScopeAnnotationCacheMutex;
 };
 
 

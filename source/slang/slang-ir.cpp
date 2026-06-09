@@ -4903,14 +4903,14 @@ RefPtr<IRModule> IRModule::create(Session* session)
     return module;
 }
 
-void IRModule::_buildModuleScopeAnnotationTargetMap()
+void IRModule::_buildModuleScopeAnnotationCacheImpl()
 {
-    m_mapInstToModuleScopeAnnotations.clear();
+    m_moduleScopeAnnotationCache.clear();
 
     auto moduleInst = getModuleInst();
     if (!moduleInst)
     {
-        m_isModuleScopeAnnotationTargetMapBuilt = true;
+        m_isModuleScopeAnnotationCacheBuilt = true;
         return;
     }
 
@@ -4920,35 +4920,35 @@ void IRModule::_buildModuleScopeAnnotationTargetMap()
         if (!annotation || annotation->getParent() != moduleInst)
             continue;
 
-        m_mapInstToModuleScopeAnnotations[annotation->getTarget()].add(annotation);
+        m_moduleScopeAnnotationCache[annotation->getTarget()].add(annotation);
     }
 
-    m_isModuleScopeAnnotationTargetMapBuilt = true;
+    m_isModuleScopeAnnotationCacheBuilt = true;
 }
 
-void IRModule::buildModuleScopeAnnotationTargetMap()
+void IRModule::_buildModuleScopeAnnotationCache()
 {
-    std::lock_guard<std::mutex> lock(m_moduleScopeAnnotationTargetMapMutex);
-    if (m_isModuleScopeAnnotationTargetMapBuilt)
+    std::lock_guard<std::mutex> lock(m_moduleScopeAnnotationCacheMutex);
+    if (m_isModuleScopeAnnotationCacheBuilt)
         return;
 
-    _buildModuleScopeAnnotationTargetMap();
+    _buildModuleScopeAnnotationCacheImpl();
 }
 
-bool IRModule::hasModuleScopeAnnotationTargetMap()
+bool IRModule::_hasModuleScopeAnnotationCache()
 {
-    std::lock_guard<std::mutex> lock(m_moduleScopeAnnotationTargetMapMutex);
-    return m_isModuleScopeAnnotationTargetMapBuilt;
+    std::lock_guard<std::mutex> lock(m_moduleScopeAnnotationCacheMutex);
+    return m_isModuleScopeAnnotationCacheBuilt;
 }
 
-List<IRAnnotation*> IRModule::getModuleScopeAnnotationsForTarget(IRInst* target)
+List<IRAnnotation*> IRModule::_getModuleScopeAnnotationCacheForTarget(IRInst* target)
 {
     if (!target)
         return {};
 
-    std::lock_guard<std::mutex> lock(m_moduleScopeAnnotationTargetMapMutex);
+    std::lock_guard<std::mutex> lock(m_moduleScopeAnnotationCacheMutex);
 
-    auto annotations = m_mapInstToModuleScopeAnnotations.tryGetValue(target);
+    auto annotations = m_moduleScopeAnnotationCache.tryGetValue(target);
     if (!annotations)
         return {};
 
@@ -4966,7 +4966,7 @@ List<IRAnnotation*> IRModule::getModuleScopeAnnotationsForTarget(IRInst* target)
 
     if (annotations->getCount() == 0)
     {
-        m_mapInstToModuleScopeAnnotations.remove(target);
+        m_moduleScopeAnnotationCache.remove(target);
         return {};
     }
 
