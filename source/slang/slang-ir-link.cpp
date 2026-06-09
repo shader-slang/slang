@@ -216,9 +216,9 @@ static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRI
         return;
 
     auto originalModule = originalInst->getModule();
-    if (originalModule && originalModule->_hasModuleScopeAnnotationCache())
+    if (originalModule && originalModule->_hasLinkerGlobalCache())
     {
-        auto annotations = originalModule->_getModuleScopeAnnotationCacheForTarget(originalInst);
+        auto annotations = originalModule->_getLinkerGlobalAnnotationsForTarget(originalInst);
         for (auto annotation : annotations)
             cloneInst(context, context->builder, annotation, annotation);
         return;
@@ -1711,19 +1711,6 @@ struct IRSpecializationState
     }
 };
 
-static bool _isHLSLExported(IRInst* inst)
-{
-    for (auto decoration : inst->getDecorations())
-    {
-        const auto op = decoration->getOp();
-        if (op == kIROp_HLSLExportDecoration || op == kIROp_DownstreamModuleExportDecoration)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 static bool doesFuncHaveDefinition(IRFunc* func)
 {
     if (func->getFirstBlock() != nullptr)
@@ -2158,12 +2145,11 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     irModules.addRange(builtinModules);
     ArrayView<IRModule*> userModules = irModules.getArrayView(0, userModuleCount);
 
-    // Source/layout/builtin modules are fully built by this point. Build the module-owned
-    // annotation acceleration cache once here so linker annotation cloning can avoid repeatedly
-    // walking high-fanout use lists, while earlier prelink/front-end paths keep the old use-list
-    // walk.
+    // Source/layout/builtin modules are fully built by this point. Build the module-owned linker
+    // global acceleration cache once here so the linker can avoid repeated global scans and
+    // high-fanout use-list walks. Earlier prelink/front-end paths keep the old traversal behavior.
     for (auto irModule : irModules)
-        irModule->_buildModuleScopeAnnotationCache();
+        irModule->_buildLinkerGlobalCache();
 
     // Check if any user module uses auto-diff, if so we will need to link
     // additional witnesses and decorations.
@@ -2281,49 +2267,38 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     bool shouldCopyGlobalParams =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::PreserveParameters);
 
-    auto shouldCopy = [&](IRInst* inst) -> bool
+    HashSet<IRInst*> extraInstsToClone;
+    auto cloneAndKeepAlive = [&](IRInst* inst)
     {
-        // We need to copy over exported symbols,
-        // and any global parameters if preserve-params option is set.
-        //
-        if (_isHLSLExported(inst))
-        {
-            return true;
-        }
+        if (!inst || !extraInstsToClone.add(inst))
+            return;
 
-        if (shouldCopyGlobalParams && as<IRGlobalParam>(inst))
+        auto cloned = cloneValue(context, inst);
+        if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
         {
-            return true;
+            context->builder->addKeepAliveDecoration(cloned);
         }
-
-        if (auto knownBuiltin = inst->findDecoration<IRKnownBuiltinDecoration>())
-        {
-            switch (knownBuiltin->getName())
-            {
-            case KnownBuiltinDeclName::NullDifferential:
-                return true;
-            default:
-                break;
-            }
-        }
-
-        return false;
     };
 
     for (IRModule* irModule : irModules)
     {
-        for (auto inst : irModule->getGlobalInsts())
+        // We need to copy over exported symbols, any global parameters if preserve-params option
+        // is set, and specific known builtins that must be present even when not referenced from
+        // the entry-point clone graph.
+        for (auto inst : irModule->_getLinkerGlobalHLSLExports())
+            cloneAndKeepAlive(inst);
+
+        if (shouldCopyGlobalParams)
         {
-            // We need to copy over exported symbols,
-            // and any global parameters if preserve-params option is set.
-            if (shouldCopy(inst))
-            {
-                auto cloned = cloneValue(context, inst);
-                if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
-                {
-                    context->builder->addKeepAliveDecoration(cloned);
-                }
-            }
+            for (auto inst : irModule->_getLinkerGlobalParams())
+                cloneAndKeepAlive(inst);
+        }
+
+        for (auto inst : irModule->_getLinkerGlobalKnownBuiltins())
+        {
+            auto knownBuiltin = inst->findDecoration<IRKnownBuiltinDecoration>();
+            if (knownBuiltin && knownBuiltin->getName() == KnownBuiltinDeclName::NullDifferential)
+                cloneAndKeepAlive(inst);
         }
     }
 

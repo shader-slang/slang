@@ -25,23 +25,44 @@ void findGetStringHashInsts(IRModule* module, List<IRGetStringHash*>& outInsts)
     _findGetStringHashRec(module->getModuleInst(), outInsts);
 }
 
-void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
+static void _addGlobalHashedStringLiteralsToPool(
+    IRGlobalHashedStringLiterals* hashedStringLits,
+    StringSlicePool& pool)
+{
+    const Index count = hashedStringLits->getOperandCount();
+    for (Index i = 0; i < count; ++i)
+    {
+        IRStringLit* stringLit = as<IRStringLit>(hashedStringLits->getOperand(i));
+        pool.add(stringLit->getStringSlice());
+    }
+}
+
+static IRGlobalHashedStringLiterals* _findAndCacheGlobalHashedStringLiterals(IRModule* module)
 {
     IRModuleInst* moduleInst = module->getModuleInst();
-
+    IRGlobalHashedStringLiterals* foundInst = nullptr;
     for (IRInst* child : moduleInst->getChildren())
     {
         if (IRGlobalHashedStringLiterals* hashedStringLits =
                 as<IRGlobalHashedStringLiterals>(child))
         {
-            const Index count = hashedStringLits->getOperandCount();
-            for (Index i = 0; i < count; ++i)
-            {
-                IRStringLit* stringLit = as<IRStringLit>(hashedStringLits->getOperand(i));
-                pool.add(stringLit->getStringSlice());
-            }
+            SLANG_RELEASE_ASSERT(!foundInst || foundInst == hashedStringLits);
+            foundInst = hashedStringLits;
         }
     }
+
+    module->_setGlobalHashedStringLiterals(foundInst);
+    return foundInst;
+}
+
+void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
+{
+    auto hashedStringLits = module->_getGlobalHashedStringLiterals();
+    if (!hashedStringLits)
+        hashedStringLits = _findAndCacheGlobalHashedStringLiterals(module);
+
+    if (hashedStringLits)
+        _addGlobalHashedStringLiteralsToPool(hashedStringLits, pool);
 }
 
 void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module)
@@ -51,6 +72,11 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module
     {
         return;
     }
+
+    auto existingGlobalHashedInst = module->_getGlobalHashedStringLiterals();
+    if (!existingGlobalHashedInst)
+        existingGlobalHashedInst = _findAndCacheGlobalHashedStringLiterals(module);
+    SLANG_RELEASE_ASSERT(!existingGlobalHashedInst);
 
     IRBuilder builder(module);
 
@@ -66,11 +92,12 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module
         operandInsts.add(stringLit);
     }
 
-    IRInst* globalHashedInst = builder.emitIntrinsicInst(
+    auto globalHashedInst = as<IRGlobalHashedStringLiterals>(builder.emitIntrinsicInst(
         nullptr,
         kIROp_GlobalHashedStringLiterals,
         UInt(slicesCount),
-        operandInsts.getArrayView().getBuffer());
+        operandInsts.getArrayView().getBuffer()));
+    module->_setGlobalHashedStringLiterals(globalHashedInst);
 
     // Mark to keep alive
     builder.addKeepAliveDecoration(globalHashedInst);

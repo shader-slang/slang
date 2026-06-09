@@ -14930,11 +14930,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         if (stringLitCount != 0)
         {
             builder->setInsertInto(module->getModuleInst());
-            builder->emitIntrinsicInst(
-                builder->getVoidType(),
-                kIROp_GlobalHashedStringLiterals,
-                stringLitCount,
-                stringLits.getBuffer());
+            auto globalHashedStringLiterals =
+                as<IRGlobalHashedStringLiterals>(builder->emitIntrinsicInst(
+                    builder->getVoidType(),
+                    kIROp_GlobalHashedStringLiterals,
+                    stringLitCount,
+                    stringLits.getBuffer()));
+            module->_setGlobalHashedStringLiterals(globalHashedStringLiterals);
         }
     }
 

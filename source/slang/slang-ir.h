@@ -2108,18 +2108,41 @@ public:
         return &m_annotationLookupCache;
     }
 
-    /// Build the module-scope annotation acceleration cache used by linker annotation cloning.
+    /// Build the acceleration cache used by linker global handling.
     /// This cache assumes the module will not change after it is built; callers must manually
-    /// rebuild it if module-scope annotations or their targets change.
-    void _buildModuleScopeAnnotationCache();
+    /// rebuild it if module-scope annotations, global params, exports, or known builtins change.
+    void _buildLinkerGlobalCache();
 
-    /// Return true if the linker annotation acceleration cache has already been built.
-    /// A built cache assumes the module has not changed since `_buildModuleScopeAnnotationCache()`.
-    bool _hasModuleScopeAnnotationCache();
+    /// Return true if the linker global acceleration cache has already been built.
+    /// A built cache assumes the module has not changed since `_buildLinkerGlobalCache()`.
+    bool _hasLinkerGlobalCache();
 
-    /// Query the linker annotation acceleration cache for module-scope annotations on `target`.
+    /// Query the linker global acceleration cache for module-scope annotations on `target`.
     /// The result is only valid while the module is unchanged from when the cache was built.
-    List<IRAnnotation*> _getModuleScopeAnnotationCacheForTarget(IRInst* target);
+    List<IRAnnotation*> _getLinkerGlobalAnnotationsForTarget(IRInst* target);
+
+    /// Query the linker global acceleration cache for global HLSL/downstream exports.
+    /// The result is only valid while the module is unchanged from when the cache was built.
+    ArrayView<IRInst*> _getLinkerGlobalHLSLExports();
+
+    /// Query the linker global acceleration cache for global shader parameters.
+    /// The result is only valid while the module is unchanged from when the cache was built.
+    ArrayView<IRInst*> _getLinkerGlobalParams();
+
+    /// Query the linker global acceleration cache for globals with KnownBuiltin decorations.
+    /// The result is only valid while the module is unchanged from when the cache was built.
+    ArrayView<IRInst*> _getLinkerGlobalKnownBuiltins();
+
+    /// Return the cached GlobalHashedStringLiterals aggregate, if one has been registered.
+    IRGlobalHashedStringLiterals* _getGlobalHashedStringLiterals();
+
+    /// Register the module's GlobalHashedStringLiterals aggregate.
+    /// This is an acceleration cache for string-hash collection and assumes at most one
+    /// GlobalHashedStringLiterals instruction exists per module.
+    void _setGlobalHashedStringLiterals(IRGlobalHashedStringLiterals* inst);
+
+    /// Clear the cached GlobalHashedStringLiterals aggregate if it matches `inst`.
+    void _clearGlobalHashedStringLiterals(IRGlobalHashedStringLiterals* inst);
 
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
     {
@@ -2198,7 +2221,7 @@ public:
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:
-    void _buildModuleScopeAnnotationCacheImpl();
+    void _buildLinkerGlobalCacheImpl();
 
     friend struct IRSerialReadContext;
     friend struct IRSerialWriteContext;
@@ -2259,12 +2282,18 @@ private:
     // (inst, association-kind) -> associated-inst
     Dictionary<AnnotationCacheKey, IRAnnotation*> m_annotationLookupCache;
 
-    // Acceleration cache for linker annotation cloning:
-    // target-inst -> module-scope annotations that reference it.
+    // Acceleration cache for linker global handling.
     // Assumes the module will not change after the cache is built; rebuild manually if it does.
-    Dictionary<IRInst*, List<IRAnnotation*>> m_moduleScopeAnnotationCache;
-    bool m_isModuleScopeAnnotationCacheBuilt = false;
-    std::mutex m_moduleScopeAnnotationCacheMutex;
+    Dictionary<IRInst*, List<IRAnnotation*>> m_linkerGlobalAnnotationsByTarget;
+    List<IRInst*> m_linkerGlobalHLSLExports;
+    List<IRInst*> m_linkerGlobalParams;
+    List<IRInst*> m_linkerGlobalKnownBuiltins;
+    bool m_isLinkerGlobalCacheBuilt = false;
+    std::mutex m_linkerGlobalCacheMutex;
+
+    // Acceleration cache for the module's global string-hash literal aggregate. This cache
+    // enforces the invariant that each module has at most one IRGlobalHashedStringLiterals inst.
+    IRGlobalHashedStringLiterals* m_globalHashedStringLiterals = nullptr;
 };
 
 
