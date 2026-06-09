@@ -7,7 +7,7 @@
 // covered by the sibling SPIR-V test
 // (`coverage-counter-width-opt-down-uint32-spirv.slang`).
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain -profile cs_6_6 -trace-coverage
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -profile cs_6_6 -trace-coverage
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
@@ -19,9 +19,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 }
 
 // HLSL: the buffer's element type is `uint64_t`, and the marker ops
-// lower to `InterlockedAdd` calls. The element type plus the
-// `InterlockedAdd` call together pin the default-width emission for
-// HLSL.
-//CHECK: __slang_coverage
-//CHECK-DAG: uint64_t
+// lower to `InterlockedAdd` calls with a `1ULL` value-operand. The
+// emitter renames `__slang_coverage` (two leading underscores in IR)
+// to `_slang_coverage_0` (one leading underscore plus index suffix)
+// in generated source. The three CHECK-DAGs together pin the
+// default-uint64 emission for HLSL.
+//CHECK-DAG: RWStructuredBuffer<uint64_t {{[^>]*}}> _slang_coverage
 //CHECK-DAG: InterlockedAdd
+//CHECK-DAG: 1ULL

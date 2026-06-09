@@ -2546,13 +2546,23 @@ SLANG_UNIT_TEST(coverageTracingInvalidCounterWidthFailsCodegen)
         return codeResult;
     };
 
+    // The CPP target's `getEntryPointCode` returns the prelude
+    // textually expanded (not as an `#include` directive), so a plain
+    // substring search for `_slang_atomic_add_u64` would always hit
+    // the prelude's function definition regardless of which helper
+    // the coverage pass actually calls. Distinguish the call site
+    // from the definition by matching the call pattern
+    // `<helper>((` — coverage atomic-add lowering emits the pointer
+    // operand inside an extra set of parentheses (`((&...))`), while
+    // the prelude's function signature is `<helper>(uint32_t* ptr,
+    // ...)`. The double opening paren is the call-site marker.
     String code32;
     SLANG_CHECK(SLANG_SUCCEEDED(compileAndGetCode(4, code32)));
-    SLANG_CHECK(code32.indexOf(toSlice("_slang_atomic_add_u32")) != -1);
-    SLANG_CHECK(code32.indexOf(toSlice("_slang_atomic_add_u64")) == -1);
+    SLANG_CHECK(code32.indexOf(toSlice("_slang_atomic_add_u32((")) != -1);
+    SLANG_CHECK(code32.indexOf(toSlice("_slang_atomic_add_u64((")) == -1);
 
     String code64;
     SLANG_CHECK(SLANG_SUCCEEDED(compileAndGetCode(8, code64)));
-    SLANG_CHECK(code64.indexOf(toSlice("_slang_atomic_add_u64")) != -1);
-    SLANG_CHECK(code64.indexOf(toSlice("_slang_atomic_add_u32")) == -1);
+    SLANG_CHECK(code64.indexOf(toSlice("_slang_atomic_add_u64((")) != -1);
+    SLANG_CHECK(code64.indexOf(toSlice("_slang_atomic_add_u32((")) == -1);
 }
