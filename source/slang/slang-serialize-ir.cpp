@@ -548,10 +548,6 @@ static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRe
 
 static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serializer, IRModule* module)
 {
-    // Bound recursive child traversal so malformed flat tables cannot exhaust the host stack.
-    // Keep this well below typical 1 MiB debug-thread stacks, even with unoptimized frames.
-    static const Int64 kMaxIRDeserializeDepth = 512;
-
     IRSerialReadContext& readContext = *serializer.getContext();
 #if DIRECT_FROM_FOSSIL
     const auto flatPtr = as<Fossilized<FlatInstTable>>(serializer.getImpl()->readValPtr());
@@ -650,7 +646,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     };
     const auto go = [&](auto& go, IRInst* parent, Int64 depth) -> IRInst*
     {
-        SLANG_RELEASE_ASSERT(depth < kMaxIRDeserializeDepth);
+        SLANG_RELEASE_ASSERT(depth < kMaxIRSerializationDepth);
         SLANG_RELEASE_ASSERT(instIndex < numInsts);
 
         const auto thisInstIndex = instIndex++;
@@ -740,10 +736,15 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     };
     const auto moduleInst = go(go, nullptr, 0);
     SLANG_RELEASE_ASSERT(instIndex == numInsts);
-    SLANG_RELEASE_ASSERT(litIndex == flat.literals.getCount());
     SLANG_RELEASE_ASSERT(operandIndex == operandIndicesCount);
-    SLANG_RELEASE_ASSERT(stringLengthIndex == flat.stringLengths.getCount());
-    SLANG_RELEASE_ASSERT(stringDataIndex == flat.stringChars.getCount());
+    // Unknown future opcodes intentionally become a recoverable read failure later.
+    // This reader cannot know whether those opcodes consume literal or string payloads.
+    if (!readContext._foundUnrecognizedInstructions)
+    {
+        SLANG_RELEASE_ASSERT(litIndex == flat.literals.getCount());
+        SLANG_RELEASE_ASSERT(stringLengthIndex == flat.stringLengths.getCount());
+        SLANG_RELEASE_ASSERT(stringDataIndex == flat.stringChars.getCount());
+    }
     SLANG_RELEASE_ASSERT(as<IRModuleInst>(moduleInst));
     return cast<IRModuleInst>(moduleInst);
 }
