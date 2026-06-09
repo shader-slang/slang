@@ -80,7 +80,7 @@ struct DeadCodeEliminationContext
         if (!undefInst)
         {
             IRBuilder builder(module);
-            undefInst = Slang::getUnitPoisonVal(&builder, module);
+            undefInst = Slang::getUnitPoisonVal(&builder);
         }
         return undefInst;
     }

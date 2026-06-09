@@ -2725,7 +2725,12 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
             memoryArena.rewindToCursor(cursor);
 
             // If the found inst is defined in the same parent as current insert location but
-            // is located after the insert location, we need to move it to the insert location.
+            // is located after the insert location, we need to move it to the insert location,
+            // except for insts at the module level, where order does not matter.
+            //
+            // This last condition helps to accelerate the common case of emitting global hoistable
+            // insts (types, sets, etc.)
+            //
             auto foundInst = *found;
             if (foundInst->getParent() && foundInst->getParent() == getInsertLoc().getParent() &&
                 getInsertLoc().getMode() == IRInsertLoc::Mode::Before &&
@@ -3139,7 +3144,7 @@ IRLoadFromUninitializedMemory* IRBuilder::emitLoadFromUninitializedMemory(IRType
     return inst;
 }
 
-IRPoison* IRBuilder::emitPoison(IRType* type)
+IRPoison* IRBuilder::getPoison(IRType* type)
 {
     auto inst = createInst<IRPoison>(this, kIROp_Poison, type);
     addInst(inst);

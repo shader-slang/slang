@@ -358,7 +358,7 @@ static void legalizeSubpassInputsForMetal(
                 {
                     IRBuilder localBuilder(user);
                     localBuilder.setInsertBefore(user);
-                    user->replaceUsesWith(localBuilder.emitPoison(resultType));
+                    user->replaceUsesWith(localBuilder.getPoison(resultType));
                 }
                 user->removeAndDeallocate();
                 continue;
@@ -382,7 +382,7 @@ static void legalizeSubpassInputsForMetal(
             {
                 IRBuilder localBuilder(user);
                 localBuilder.setInsertBefore(user);
-                user->replaceUsesWith(localBuilder.emitPoison(resultType));
+                user->replaceUsesWith(localBuilder.getPoison(resultType));
             }
             user->removeAndDeallocate();
         }
