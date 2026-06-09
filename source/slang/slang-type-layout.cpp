@@ -3515,7 +3515,6 @@ static void maybePromoteDescriptorHandleCapability(TargetRequest* targetReq)
             break;
         }
     }
-
     if (!specificProfileRequested && !specificCapabilityRequested)
     {
         auto targetCaps = targetReq->getTargetCaps();

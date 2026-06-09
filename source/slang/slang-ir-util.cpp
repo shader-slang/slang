@@ -74,6 +74,8 @@ IRType* getAtomicOperationValueType(IRInst* inst)
     if (valueType && valueType->getOp() != kIROp_VoidType)
         return valueType;
 
+    // Some atomic ops are rewritten to return void before later SPIR-V checks.
+    // Recover the original atomic value type from the pointer operand.
     IRBuilder builder(inst);
     auto ptrValueType = tryGetPointedToType(&builder, inst->getOperand(0)->getDataType());
     if (auto atomicType = as<IRAtomicType>(ptrValueType))
