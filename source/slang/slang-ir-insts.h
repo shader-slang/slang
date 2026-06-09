@@ -3908,7 +3908,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitGpuForeach(List<IRInst*> args);
 
     IRLoadFromUninitializedMemory* emitLoadFromUninitializedMemory(IRType* type);
-    IRPoison* emitPoison(IRType* type);
+    IRPoison* getPoison(IRType* type);
 
     IRInst* emitReinterpret(IRInst* type, IRInst* value);
     IRInst* emitOutImplicitCast(IRInst* type, IRInst* value);
