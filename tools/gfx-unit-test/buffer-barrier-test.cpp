@@ -115,26 +115,14 @@ void barrierTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, outputBuffer, makeArray<float>(11.0f, 12.0f, 13.0f, 14.0f));
 }
 
-void barrierTestAPI(UnitTestContext* context, DeviceType deviceType)
-{
-    if (!deviceTypeInEnabledApis(deviceType, context->enabledApis))
-    {
-        SLANG_IGNORE_TEST
-    }
-    Slang::List<const char*> searchPaths = {"", "../../tools/gfx-unit-test", "tools/gfx-unit-test"};
-    auto device = createTestingDevice(context, deviceType, searchPaths);
-
-    if (!device)
-    {
-        SLANG_IGNORE_TEST
-    }
-
-    barrierTestImpl(device.get(), context);
-}
-
 SLANG_UNIT_TEST(bufferBarrierVulkan)
 {
-    barrierTestAPI(unitTestContext, DeviceType::Vulkan);
+    runTestImpl(
+        [](ComPtr<IDevice> device, UnitTestContext* context)
+        { barrierTestImpl(device.get(), context); },
+        unitTestContext,
+        DeviceType::Vulkan,
+        {"", "../../tools/gfx-unit-test", "tools/gfx-unit-test"});
 }
 
 } // namespace gfx_test
