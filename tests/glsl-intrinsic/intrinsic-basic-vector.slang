@@ -47,7 +47,7 @@ bool Test_VectorType()
     genIType outGenIType, outGenIType2;
     genUType outGenUType, outGenUType2;
 
-    constexpr const float epsilon = 0.000001;
+    const float epsilon = 0.000001;
 
     // CHECK_SPIR-LABEL: Op{{.*}}AccessChain {{.*}} %inputBuffer
     const int zero = inputBuffer.data[0];
