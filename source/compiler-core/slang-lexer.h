@@ -186,9 +186,14 @@ IntegerLiteralValue getIntegerLiteralValue(
     UnownedStringSlice* outSuffix = 0,
     bool* outIsDecimalBase = 0,
     bool* outHasOverflowed = 0);
+
+// When *outIsOutOfRange is true, the return value is either:
+// - 0        - underflow (between 0 and denormal min)
+// - INFINITY - overflow (above maximum double value)
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
-    UnownedStringSlice* outSuffix = 0);
+    UnownedStringSlice* outSuffix = 0,
+    bool* outIsOutOfRange = 0);
 
 IntegerLiteralValue getCharLiteralValue(Token const& token);
 } // namespace Slang

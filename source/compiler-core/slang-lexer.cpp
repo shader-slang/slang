@@ -12,6 +12,8 @@
 #include "slang-name.h"
 #include "slang-source-loc.h"
 
+#include <charconv>
+
 namespace Slang
 {
 Token TokenReader::getEndOfFileToken()
@@ -777,7 +779,8 @@ IntegerLiteralValue getIntegerLiteralValue(
 
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
-    UnownedStringSlice* outSuffix)
+    UnownedStringSlice* outSuffix,
+    bool* outIsOutOfRange)
 {
     FloatingPointLiteralValue value{};
 
@@ -786,23 +789,50 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     char const* cursor = content.begin();
     char const* end = content.end();
 
-    auto result = fast_float::from_chars(cursor, end, value);
-    switch (result.ec)
+    std::errc ec{};
+    bool isOutOfRange{};
+
+    if (UnownedStringSlice(cursor, end).startsWith("0x") ||
+        UnownedStringSlice(cursor, end).startsWith("0X"))
     {
-    case std::errc():
+        // Note: fast_float handles only decimal float formats. Since hex floats
+        // are much simpler (no base-10 to base-2 conversion with rounding
+        // issues), the toolchain-provided std::from_chars should be ok.
+
+        value = INFINITY; // default in case of errors
+        auto result = std::from_chars(cursor + 2U, end, value, std::chars_format::hex);
+        ec = result.ec;
+        cursor = result.ptr;
+    }
+    else
+    {
+        // We'll use fast_float to handle decimal float formats. This should
+        // give us bit-exact input regardless of the toolchain used to compile
+        // slang.
+
+        value = 0.0; // default in case of errors. fast_float sets the value
+                     // appropriately in case of result_out_of_range
+        auto result = fast_float::from_chars(cursor, end, value);
+        ec = result.ec;
+        cursor = result.ptr;
+    }
+
+    switch (ec)
+    {
+    case std::errc{}:
+        break;
+
+    case std::errc::result_out_of_range:
+        isOutOfRange = true;
         break;
 
     default:
-        // this should never happen, since we've prevalidated the input, but...
-        SLANG_ASSERT(!"Floating-point literal parsing failure\n");
-
-        // fallthrough
-    case std::errc::result_out_of_range:
-        value = INFINITY;
+        // We can still fail to parse literals here, since our accepted
+        // floating point format is narrower than the tokenizer general
+        // literal format
+        value = 0.0;
         break;
     }
-
-    cursor = result.ptr;
 
     // check for special exponent for infinity
     if ((cursor != end) && (*cursor == '#'))
@@ -817,9 +847,10 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     }
 
     if (outSuffix)
-    {
         *outSuffix = UnownedStringSlice(cursor, end);
-    }
+
+    if (outIsOutOfRange)
+        *outIsOutOfRange = isOutOfRange;
 
     return value;
 }

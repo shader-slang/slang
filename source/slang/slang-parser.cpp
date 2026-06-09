@@ -10,8 +10,11 @@
 #include "slang-visitor.h"
 
 #include <assert.h>
+#include <cmath>
 #include <float.h>
+#include <limits>
 #include <optional>
+#include <stdfloat>
 
 namespace Slang
 {
@@ -7728,20 +7731,6 @@ static NodeBase* parseTreatAsDifferentiableExpr(Parser* parser, void* /*userData
     return noDiffExpr;
 }
 
-static bool _isFinite(double value)
-{
-    // Lets type pun double to uint64_t, so we can detect special double values
-    union
-    {
-        double d;
-        uint64_t i;
-    } u = {value};
-    // Detects nan and +-inf
-    const uint64_t i = u.i;
-    int e = int(i >> 52) & 0x7ff;
-    return (e != 0x7ff);
-}
-
 enum class FloatFixKind
 {
     None,            ///< No modification was made
@@ -7755,92 +7744,119 @@ static FloatFixKind _fixFloatLiteralValue(
     IRFloatingPointValue value,
     IRFloatingPointValue& outValue)
 {
-    IRFloatingPointValue epsilon = 1e-10f;
-
-    // Check the value is finite for checking narrowing to literal type losing information
-    if (_isFinite(value))
+    // Notes:
+    // - Infinite and NaN values don't need fixing. They're infinites and NaNs
+    //   regardless of the precision.
+    // - Double-to-double conversion never loses precision
+    if ((type != BaseType::Double) && std::isfinite(value))
     {
+        // our logic depends on that IRFloatingPointValue is double
+        static_assert(
+            std::is_same_v<IRFloatingPointValue, double>,
+            "_fixFloatLiteralValue() logic assumption");
+
+        // representable range
+        double positiveMin; // minimum value
+        double nonzeroMin;  // minimum value that we'll still consider rounded to non-zero
+        double positiveMax; // maximum value
+        double finiteMax;   // maximum value that we'll still consider finite
+
         switch (type)
         {
         case BaseType::Float:
-            {
-                // Fix out of range
-                if (value > FLT_MAX)
-                {
-                    if (Math::AreNearlyEqual(value, FLT_MAX, epsilon))
-                    {
-                        outValue = FLT_MAX;
-                        return FloatFixKind::Truncated;
-                    }
-                    else
-                    {
-                        outValue = float(INFINITY);
-                        return FloatFixKind::Unrepresentable;
-                    }
-                }
-                else if (value < -FLT_MAX)
-                {
-                    if (Math::AreNearlyEqual(-value, FLT_MAX, epsilon))
-                    {
-                        outValue = -FLT_MAX;
-                        return FloatFixKind::Truncated;
-                    }
-                    else
-                    {
-                        outValue = -float(INFINITY);
-                        return FloatFixKind::Unrepresentable;
-                    }
-                }
-                else if (value && float(value) == 0.0f)
-                {
-                    outValue = 0.0f;
-                    return FloatFixKind::Zeroed;
-                }
-                break;
-            }
-        case BaseType::Double:
-            {
-                // All representable
-                break;
-            }
-        case BaseType::Half:
-            {
-                // Fix out of range
-                if (value > SLANG_HALF_MAX)
-                {
-                    if (Math::AreNearlyEqual(value, FLT_MAX, epsilon))
-                    {
-                        outValue = SLANG_HALF_MAX;
-                        return FloatFixKind::Truncated;
-                    }
-                    else
-                    {
-                        outValue = float(INFINITY);
-                        return FloatFixKind::Unrepresentable;
-                    }
-                }
-                else if (value < -SLANG_HALF_MAX)
-                {
-                    if (Math::AreNearlyEqual(-value, FLT_MAX, epsilon))
-                    {
-                        outValue = -SLANG_HALF_MAX;
-                        return FloatFixKind::Truncated;
-                    }
-                    else
-                    {
-                        outValue = -float(INFINITY);
-                        return FloatFixKind::Unrepresentable;
-                    }
-                }
-                else if (value && Math::Abs(value) < SLANG_HALF_SUB_NORMAL_MIN)
-                {
-                    outValue = 0.0f;
-                    return FloatFixKind::Zeroed;
-                }
-                break;
-            }
-        default:
+            positiveMin = std::numeric_limits<float>::denorm_min();
+            nonzeroMin = double{std::numeric_limits<float>::denorm_min()} / 2.0;
+            static_assert(0x1.FFFFFE0p127 == double{std::numeric_limits<float>::max()});
+            positiveMax = 0x1.FFFFFE0p127;
+            finiteMax = 0x1.FFFFFE8p127; // this still rounds down to positiveMax
             break;
+
+        case BaseType::Half:
+            static_assert(0x0.004p-14 == SLANG_HALF_SUB_NORMAL_MIN);
+            positiveMin = 0x0.004p-14;
+            nonzeroMin = 0x0.002p-14;
+
+            static_assert(0x1.FFC0p15 == SLANG_HALF_MAX);
+            positiveMax = 0x1.FFC0p15;
+            finiteMax = 0x1.FFE0p15; // this still rounds up to positiveMax
+            break;
+
+        default:
+            outValue = value;
+            return FloatFixKind::None;
+        }
+
+        if (!std::signbit(value))
+        {
+            // positive number
+            if (value > finiteMax)
+            {
+                outValue = INFINITY;
+                return FloatFixKind::Unrepresentable;
+            }
+
+            if (value > positiveMax)
+            {
+                outValue = positiveMax;
+                return FloatFixKind::Truncated;
+            }
+
+            if (value >= positiveMin)
+            {
+                outValue = value;
+                return FloatFixKind::None;
+            }
+
+            if (value >= nonzeroMin)
+            {
+                outValue = positiveMin;
+                return FloatFixKind::Truncated;
+            }
+
+            if (value > 0.0)
+            {
+                outValue = 0.0;
+                return FloatFixKind::Zeroed;
+            }
+
+            outValue = value;
+            return FloatFixKind::None;
+        }
+        else
+        {
+            // negative number
+            if (value < -finiteMax)
+            {
+                outValue = -INFINITY;
+                return FloatFixKind::Unrepresentable;
+            }
+
+            if (value < -positiveMax)
+            {
+                outValue = -positiveMax;
+                return FloatFixKind::Truncated;
+            }
+
+            if (value <= -positiveMin)
+            {
+                outValue = value;
+                return FloatFixKind::None;
+            }
+
+            if (value <= -nonzeroMin)
+            {
+                outValue = -positiveMin;
+                return FloatFixKind::Truncated;
+            }
+
+            if (value < 0.0)
+            {
+                outValue = -0.0;
+                return FloatFixKind::Zeroed;
+            }
+
+            outValue = value;
+            return FloatFixKind::None;
         }
     }
 
@@ -8552,8 +8568,10 @@ static Expr* parseAtomicExpr(Parser* parser)
             auto token = parser->tokenReader.advanceToken();
             constExpr->token = token;
 
-            UnownedStringSlice suffix;
-            FloatingPointLiteralValue value = getFloatingPointLiteralValue(token, &suffix);
+            UnownedStringSlice suffix{};
+            bool isOutOfRange{};
+            FloatingPointLiteralValue value =
+                getFloatingPointLiteralValue(token, &suffix, &isOutOfRange);
 
             // Look at any suffix on the value
             char const* suffixCursor = suffix.begin();
@@ -8621,6 +8639,26 @@ static Expr* parseAtomicExpr(Parser* parser)
                         .suffix = String(suffix),
                         .location = token.loc});
                     suffixBaseType = BaseType::Float;
+                }
+            }
+
+            if (isOutOfRange)
+            {
+                if (std::isfinite(value))
+                {
+                    parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
+                        .literal = String(token.getContent()),
+                        .type = String(BaseTypeInfo::asText(suffixBaseType)),
+                        .convertedValue = String(value),
+                        .location = token.loc});
+                }
+                else
+                {
+                    parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
+                        .type = String(BaseTypeInfo::asText(suffixBaseType)),
+                        .literal = String(token.getContent()),
+                        .convertedValue = String(value),
+                        .location = token.loc});
                 }
             }
 
