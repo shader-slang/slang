@@ -3959,7 +3959,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // signature before emitting it (issue #11518). This covers non-inlined
         // functions whose signature is the only place a Workgroup/StorageBuffer
         // pointer appears.
-        requireFunctionTypeCapabilitiesIfNeeded(as<IRFuncType>(irFunc->getDataType()));
+        requireFunctionTypeCapabilitiesIfNeeded(irFunc->getDataType());
 
         // [2.4: Logical Layout of a Module]
         //
@@ -11332,15 +11332,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    // Capabilities for variable pointers are normally declared from value
-    // materialization sites (variable/load/store/element-pointer). A pointer
-    // that appears only in the signature of a function that is not inlined
-    // (e.g. a `[noinline]` groupshared-pointer helper) never reaches such a
-    // site, so its `SPV_KHR_variable_pointers` requirement would be silently
-    // omitted, producing invalid SPIR-V (see shader-slang/slang#11518). Walk
-    // the signature's result and parameter types so the capability follows the
-    // surviving signature. Requires are idempotent, so any overlap with
-    // value-site declarations is harmless.
+    // Variable-pointers capabilities are normally declared from value
+    // materialization sites (variable, phi, call, element-pointer, load). A
+    // pointer that appears only in the signature of a function that is not
+    // inlined (e.g. a `[noinline]` groupshared-pointer helper) never reaches
+    // such a site, so its `SPV_KHR_variable_pointers` requirement would be
+    // silently omitted, producing invalid SPIR-V (see shader-slang/slang#11518).
+    // Walk the signature's result and parameter types so the capability follows
+    // the surviving signature.
+    //
+    // Despite the general name, this declares only the variable-pointers
+    // capability: it forwards to `requireVariableBufferCapabilityIfNeeded` and
+    // is not a catch-all for every signature-derived capability. Only the
+    // top-level pointer of each type is inspected, so a Workgroup/StorageBuffer
+    // pointer nested inside a struct parameter or behind a pointer-to-pointer is
+    // not reached; this matches the existing value-site behavior. Requires are
+    // idempotent, so any overlap with value-site declarations is harmless.
     void requireFunctionTypeCapabilitiesIfNeeded(IRFuncType* funcType)
     {
         if (!funcType)

@@ -13,10 +13,21 @@
 // site declares the capability either. Before the fix the capability was
 // silently omitted and the module was invalid SPIR-V; the fix declares the
 // capability from the surviving function signature.
+//
+// This covers the (GroupShared, parameter) combination, which is the only one
+// that can be isolated as a regression: the new helper also walks the result
+// type and forwards the StorageBuffer address space, but a pointer in those
+// positions is always produced/consumed by a value site that already declares
+// the capability (a returned groupshared pointer declares it at the call's
+// result type in `emitCall`; a StorageBuffer pointer comes from an access
+// chain), so a test of those arms would pass with or without the fix. They are
+// exercised by the same `requireVariableBufferCapabilityIfNeeded` forwarding.
 
 groupshared float gs;
 
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+// `outputBuffer` and the write below exist only to keep `gs` and the
+// `readScalar` call (and thus its non-inlined signature) from being
+// dead-code-eliminated.
 RWStructuredBuffer<float> outputBuffer;
 
 [noinline]
