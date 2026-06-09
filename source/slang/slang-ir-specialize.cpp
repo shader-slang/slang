@@ -678,7 +678,7 @@ struct SpecializationContext
             // later passes from encountering an unresolvable specialize instruction.
             IRBuilder builder(module);
             builder.setInsertBefore(specInst);
-            auto poison = builder.emitPoison(specInst->getFullType());
+            auto poison = builder.getPoison(specInst->getFullType());
             specInst->replaceUsesWith(poison);
             specInst->removeAndDeallocate();
             return true;

@@ -1,5 +1,7 @@
 # PR Review Protocol
 
+> For AI review agents (Claude GitHub Actions + CodeRabbit), not humans.
+
 Follow this protocol. Do NOT skip steps. Do NOT write a free-form review. Do NOT post a review without dispatching all 6 teammates first.
 
 ## Optional Clarity Review Candidate Pass

@@ -10,7 +10,7 @@ Pipeline:
        assigned according to the coverage metadata. The current
        line/function/branch modes use one direct counter per marker op,
        but consumers must treat the manifest as authoritative.
-    2. Read the `.coverage-mapping.json` sidecar describing each
+    2. Read the `.coverage-manifest.json` sidecar describing each
        source coverage entry's counter/source mapping, or query the
        same data through
        `ICoverageTracingMetadata`.
@@ -20,7 +20,7 @@ Pipeline:
        one per counter.
     5. Run this script:
            slang-coverage-to-lcov.py \\
-               --manifest shader.spv.coverage-mapping.json \\
+               --manifest shader.spv.coverage-manifest.json \\
                --counters shader.buffer.bin \\
                --output shader.lcov
 
@@ -147,7 +147,7 @@ def main():
     p.add_argument(
         "--manifest",
         required=True,
-        help="path to .coverage-mapping.json (or equivalent JSON built from "
+        help="path to .coverage-manifest.json (or equivalent JSON built from "
         "ICoverageTracingMetadata)",
     )
     p.add_argument("--counters", help="binary uint32 little-endian counter buffer")

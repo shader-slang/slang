@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-05T15:06:28+00:00
 target_doc: ir-reference/values.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
+source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: fail
+  completeness: partial
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 3
+finding_count: 2
 severity_breakdown:
   critical: 0
-  major: 3
+  major: 2
   minor: 0
   nit: 0
 ---
@@ -24,15 +24,18 @@ severity_breakdown:
 # Review report for ir-reference/values.md
 
 ## Summary
-The page is structurally lint-clean, but review found 3 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The page has valid front matter, all required top-level sections, and all relative links resolve at the recorded source commit. Two major issues remain: several prompt-required value opcodes are missing from the tables, and `logicalAnd` plus `logicalOr` are described with source-language short-circuit semantics that the IR instructions do not have.
 
 ## Items checked
-- Checked literal, undefined, arithmetic, conversion, memory, aggregate, optional/result tables, duplicates, source value clusters, links, and front matter.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/values.md` and verified the prompt, dependency list, watched paths, target source commit, and digest against the document front matter.
+- Read the target doc, `_common.md`, `ir-reference-values.md`, and the dependency docs `cross-cutting/ir-instructions.md`, `pipeline/04-ast-to-ir.md`, `ast-reference/expressions.md`, and `ir-reference/types.md`.
+- Resolved all 22 relative links in the target document against `52339028a2aa703271533454c6b9528a534bac31`.
+- Checked required sections and extracted 144 opcode rows from the `## Opcodes` tables.
+- Spot-checked more than 10 factual claims against `source/slang/slang-ir-insts.lua`, `source/slang/slang-ir-insts.h`, `source/slang/slang-ir.cpp`, and `source/slang/slang-lower-to-ir.cpp`, including literal payloads, `LoadFromUninitializedMemory`, `Poison`, `defaultConstruct`, arithmetic op operands, comparison op wrappers, conversion op operands, `var`, `load`, `store`, field and element access, swizzles, aggregate constructors, optional helpers, and constexpr rows.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | lines 96-103 | `Undefined` is listed as an opcode row despite being a grouping parent. | `source/slang/slang-ir-insts.lua:857-894` defines `Undefined` as the parent for `LoadFromUninitializedMemory` and `Poison`. | Remove the `Undefined` row from `## Opcodes` and leave it in hierarchy/prose only. |
-| F-002 | major | lines 78-236 | Several concrete value-like opcodes are omitted, including `allocObj`, `CUDA_LDG`, `getNativeStr`, `makeString`, `getNativePtr`, managed-pointer helpers, and managed-pointer attach/detach operations. | `source/slang/slang-ir-insts.lua:946`, `:1067`, and `:1139-1149` define these opcodes. | Add these to the values or misc table, with cross-links if ownership is intentionally elsewhere. |
-| F-003 | major | lines 105-169 | The compile-time arithmetic/cast opcode family is missing. | `source/slang/slang-ir-insts.lua:3145-3174` defines `constexprAdd` through `constexprEnumCast`. | Add a constexpr arithmetic/cast sub-table or explicitly move these to `misc.md`. |
+| F-001 | major | `## Opcodes`, lines 215-255 | The values prompt explicitly includes aggregate and conversion helpers that are absent from the tables. In particular, `makeValuePack`, `makeCombinedTextureSampler`, `packAnyValue`, and `unpackAnyValue` are concrete Lua opcodes in the watched ranges, but none has a row in this page. | `docs/generated/design/_meta/prompts/ir-reference-values.md:38-47` lists `Pack*`, `Unpack*`, and `makeCombinedTextureSampler`; `source/slang/slang-ir-insts.lua:970-971` defines `makeValuePack` and `makeCombinedTextureSampler`; `source/slang/slang-ir-insts.lua:1040-1041` defines `packAnyValue` and `unpackAnyValue`. | Add rows for these opcodes in the relevant aggregate or conversion sub-tables, or revise the manifest and prompt if ownership is intentionally moved to another IR-reference page. |
+| F-002 | major | `### Logical`, lines 132-133 | The table describes `logicalAnd` and `logicalOr` as short-circuiting, but the IR opcodes are ordinary two-operand instructions. Short-circuit behavior belongs to source-expression lowering before both operands become IR values, not to these opcodes themselves. | `source/slang/slang-ir-insts.lua:1465-1471` defines `logicalAnd` and `logicalOr` with `left, right` operands; `source/slang/slang-ir.cpp:6730-6739` emits `kIROp_And` and `kIROp_Or` from already supplied `left` and `right` operands. | Change the summaries to describe boolean AND and boolean OR over already-lowered operands, and remove the word `Short-circuit` from both rows. |

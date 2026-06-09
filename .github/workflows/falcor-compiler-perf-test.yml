@@ -30,7 +30,6 @@ jobs:
         include:
           # Self-hosted falcor tests
           - warnings-as-errors: true
-            test-category: full
             full-gpu-tests: false
             runs-on: [Windows, self-hosted, perf]
     runs-on: ${{ matrix.runs-on }}

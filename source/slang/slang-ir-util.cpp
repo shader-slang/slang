@@ -1340,26 +1340,10 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
     return false;
 }
 
-IRInst* getUnitPoisonVal(IRBuilder* builder, IRModule* module)
+IRInst* getUnitPoisonVal(IRBuilder* builder)
 {
-    IRInst* undefInst = nullptr;
-
-    for (auto inst : module->getModuleInst()->getChildren())
-    {
-        if (inst->getOp() == kIROp_Poison && inst->getDataType() &&
-            inst->getDataType()->getOp() == kIROp_VoidType)
-        {
-            undefInst = inst;
-            break;
-        }
-    }
-    if (!undefInst)
-    {
-        auto voidType = builder->getVoidType();
-        builder->setInsertAfter(voidType);
-        undefInst = builder->emitPoison(voidType);
-    }
-    return undefInst;
+    builder->setInsertInto(builder->getModule()->getModuleInst());
+    return builder->getPoison(builder->getVoidType());
 }
 
 IROp getSwapSideComparisonOp(IROp op)
