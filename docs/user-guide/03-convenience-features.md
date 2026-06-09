@@ -661,10 +661,12 @@ void test()
 
 When targeting SPIR-V, Slang can generate two flavors of code for descriptor handles depending on whether
 the `spvDescriptorHeapEXT` capability is declared or requested on the compilation request.
-By default (without requesting `spvDescriptorHeapEXT`), Slang introduces a global array of descriptors and
-fetches from the global array.
-The descriptor set ID of the global descriptor array can be configured with the `-bindless-space-index`
-(or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
+
+### Default Slang Behavior
+
+Without requesting `spvDescriptorHeapEXT`, Slang introduces a global array of descriptors and fetches
+from it. The descriptor set ID of the global descriptor array can be configured with the
+`-bindless-space-index` (or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
 
 Default behavior assigns binding indices based on descriptor types:
 
@@ -682,13 +684,32 @@ Default behavior assigns binding indices based on descriptor types:
 
 > `ACCELERATION_STRUCTURE` is excluded from the list of types since Slang by default uses the handle to a `RaytracingAccelerationStructure` as a GPU address, casting the handle to a `RaytracingAccelerationStructure`. This removes the need for a binding-slot of `RaytracingAccelerationStructure`.
 
-When the `spvDescriptorHeapEXT` capability is requested (either via the `-capability` command-line option or via the compilation API), Slang will map descriptor handles to the `SPV_EXT_descriptor_heap` extension
-without declaring any explicit descriptor sets. Descriptor handles are still lowered to `uint2`.
-For resources other than `CombinedTextureSampler`, Slang uses `uint2.x` as the index to access the global sampler or resource heap.
-For `CombinedTextureSampler` handles, Slang uses `uint2.x` to index into the resource heap to obtain the texture, and `uint2.y` to index into the sampler
-heap to obtain the sampler state, and combines the objects with an `OpSampledImage` instruction. By default, when using the `spvDescriptorHeapEXT` capability, Slang will reinterpret the resource or sampler heap as an array of requested resource type, whose stride is defined by the resource type, obtained from `OpConstantSizeOfEXT` instruction. The user can override this behavior and specify a different stride with the `-spirv-resource-heap-stride` or `-spirv-sampler-heap-stride` compiler options.
+### SPIR-V with `spvDescriptorHeapEXT`
 
-Additionally, if none of the above behaviors are desired, users can customize the conversion logic from descriptor handle to resource objects by providing a `getDescriptorFromHandle` in user code. For example:
+When the `spvDescriptorHeapEXT` capability is requested (either via the `-capability` command-line option
+or via the compilation API), Slang maps descriptor handles to the `SPV_EXT_descriptor_heap` extension
+without declaring any explicit descriptor sets. Descriptor handles are still lowered to `uint2`.
+For resources other than `CombinedTextureSampler`, Slang uses `uint2.x` as the index to access the global
+sampler or resource heap. For `CombinedTextureSampler` handles, Slang uses `uint2.x` to index into the
+resource heap to obtain the texture, and `uint2.y` to index into the sampler heap to obtain the sampler
+state, and combines the objects with an `OpSampledImage` instruction.
+
+By default, when using the `spvDescriptorHeapEXT` capability, Slang reinterprets the resource or sampler
+heap as an array of the requested resource type, whose stride is defined by the resource type and obtained
+from the `OpConstantSizeOfEXT` instruction. The user can override this behavior and specify a different
+stride with the `-spirv-resource-heap-stride` or `-spirv-sampler-heap-stride` compiler options.
+
+> **Note on `RaytracingAccelerationStructure`:** When the `spvDescriptorHeapEXT` capability is active and
+> a `DescriptorHandle<RaytracingAccelerationStructure>` is dereferenced, Slang loads a 64-bit device address
+> from the descriptor heap and converts it to an acceleration structure handle via
+> `OpConvertUToAccelerationStructureKHR`. This matches how GPU drivers expose acceleration structure
+> descriptors in the heap (as device addresses), and requires either the `SPV_KHR_ray_tracing` or
+> `SPV_KHR_ray_query` extension.
+
+### Custom Descriptor Fetch
+
+If none of the above behaviors are desired, users can customize the conversion logic from descriptor handle
+to resource objects by providing a `getDescriptorFromHandle` in user code. For example:
 
 ```slang
 // All texture and buffer handles are defined in descriptor set 100.

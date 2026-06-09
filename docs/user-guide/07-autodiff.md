@@ -240,6 +240,45 @@ struct syn_MyPartialDiffType_Differential
 };
 ```
 
+If you manually provide the `dzero` or `dadd` requirements for an `IDifferentiable`
+type, those methods must also be marked `[Differentiable]`. Their parameter and
+return types must be differentiable too, so a custom `Differential` type should
+usually conform to `IDifferentiable` as well:
+
+```csharp
+struct MyVecDiff : IDifferentiable
+{
+    float x;
+    float y;
+}
+
+struct MyVec : IDifferentiable
+{
+    typealias Differential = MyVecDiff;
+
+    [DerivativeMember(Differential.x)]
+    float x;
+
+    [DerivativeMember(Differential.y)]
+    float y;
+
+    [Differentiable]
+    static Differential dzero()
+    {
+        return { 0.0f, 0.0f };
+    }
+
+    [Differentiable]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return { a.x + b.x, a.y + b.y };
+    }
+}
+```
+
+The same rule applies if the custom `Differential` type manually implements its
+own `dzero` or `dadd` methods.
+
 You can make existing types differentiable through Slang's extension mechanism.
 For instance, `extension MyType : IDifferentiable { }` will make `MyType` differentiable retroactively.
 

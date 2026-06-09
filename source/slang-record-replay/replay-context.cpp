@@ -217,6 +217,7 @@ void ReplayContext::reset()
     m_indexStream.reset();
     m_referenceStream.reset();
     m_arena.reset();
+    m_replayArenaAllocationSize = 0;
     m_mode = Mode::Idle;
     m_objectToHandle.clear();
     m_handleToObject.clear();
@@ -232,6 +233,7 @@ void ReplayContext::switchToPlayback()
     // Clear all local state
     m_referenceStream.reset();
     m_arena.reset();
+    m_replayArenaAllocationSize = 0;
     m_objectToHandle.clear();
     m_handleToObject.clear();
     m_nextHandle = kFirstValidHandle;
@@ -255,6 +257,7 @@ void ReplayContext::switchToSync()
 
     // Clear local state
     m_arena.reset();
+    m_replayArenaAllocationSize = 0;
     m_objectToHandle.clear();
     m_handleToObject.clear();
     m_nextHandle = kFirstValidHandle;
@@ -422,6 +425,29 @@ void ReplayContext::writeIndexEntry()
     m_indexStream.write(&entry, sizeof(entry));
 }
 
+static size_t getReplayArenaAllocationBudget(size_t streamSize)
+{
+    const size_t minBudget = size_t(kMaxReplayStringLength) + 1;
+    size_t budget = kMaxReplayTotalAllocationSize;
+    if (streamSize <= kMaxReplayTotalAllocationSize / kMaxReplayAllocationToStreamSizeRatio)
+        budget = streamSize * kMaxReplayAllocationToStreamSizeRatio;
+    if (budget < minBudget)
+        budget = minBudget;
+    return budget;
+}
+
+void ReplayContext::requireReplayArenaAllocation(size_t offset, size_t size)
+{
+    if (m_mode != Mode::Playback || size == 0)
+        return;
+
+    const size_t budget = getReplayArenaAllocationBudget(m_stream.getSize());
+    if (size > budget || m_replayArenaAllocationSize > budget - size)
+        throw DataMismatchException(offset, size);
+
+    m_replayArenaAllocationSize += size;
+}
+
 // =============================================================================
 // Call Index Access
 // =============================================================================
@@ -519,6 +545,8 @@ SlangResult ReplayContext::loadReplay(const char* folderPath)
         }
         m_currentReplayPath = folderPath;
 
+        m_arena.reset();
+        m_replayArenaAllocationSize = 0;
         m_mode = Mode::Playback;
         return SLANG_OK;
     }

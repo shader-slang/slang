@@ -1264,22 +1264,30 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
             out << ", \"end_line\": " << (int64_t)entry.endLine;
         if (entry.endColumn != 0)
             out << ", \"end_column\": " << (int64_t)entry.endColumn;
-        if (entry.functionName)
+        if (entry.kind == slang::CoverageEntryKind::Function)
         {
-            out << ", \"function\": ";
-            _appendCoverageManifestJsonStringOrNull(out, entry.functionName);
+            if (!entry.functionName && !entry.functionMangledName)
+                return SLANG_FAIL;
+            if (entry.functionName)
+            {
+                out << ", \"function\": ";
+                _appendCoverageManifestJsonStringOrNull(out, entry.functionName);
+            }
+            if (entry.functionMangledName)
+            {
+                out << ", \"function_mangled\": ";
+                _appendCoverageManifestJsonStringOrNull(out, entry.functionMangledName);
+            }
         }
-        if (entry.functionMangledName)
+        if (entry.kind == slang::CoverageEntryKind::Branch)
         {
-            out << ", \"function_mangled\": ";
-            _appendCoverageManifestJsonStringOrNull(out, entry.functionMangledName);
-        }
-        if (entry.branchSiteID != 0)
+            if (entry.branchSiteID == 0 || entry.branchArmID == 0 ||
+                entry.branchArmKind == slang::CoverageBranchArmKind::Unknown)
+            {
+                return SLANG_FAIL;
+            }
             out << ", \"branch_site\": " << (int64_t)entry.branchSiteID;
-        if (entry.branchArmID != 0)
             out << ", \"branch_arm\": " << (int64_t)entry.branchArmID;
-        if (entry.branchArmKind != slang::CoverageBranchArmKind::Unknown)
-        {
             out << ", \"branch_arm_kind\": \"" << _getCoverageBranchArmKindName(entry.branchArmKind)
                 << "\"";
         }

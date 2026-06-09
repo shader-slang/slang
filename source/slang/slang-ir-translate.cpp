@@ -284,11 +284,46 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             }
         }
         break;
+    case kIROp_IdentityRemat:
+        return memoize(maybeTranslateIdentityRemat(inst));
     default:
         break;
     }
 
     return translationResult;
+}
+
+IRInst* TranslationContext::maybeTranslateIdentityRemat(IRInst* inst)
+{
+    // Identity remat: MinimalContext == BwdCallable, so remat is the identity.
+    // Build a function that takes (MinCtx, <original params>) and returns MinCtx.
+    IRBuilder subBuilder(inst->getModule());
+    subBuilder.setInsertBefore(inst);
+
+    DifferentiableTypeConformanceContext ctx(&autodiffContext);
+    auto funcType = cast<IRFuncType>(ctx.resolveType(&subBuilder, inst->getFullType()));
+    SLANG_ASSERT(funcType->getParamCount() > 0);
+    if (funcType->getParamCount() == 0)
+        return inst;
+
+    IRBuilder funcBuilder(subBuilder);
+    auto func = funcBuilder.createFunc();
+    func->setFullType(funcType);
+
+    funcBuilder.setInsertInto(func);
+    auto block = funcBuilder.emitBlock();
+    funcBuilder.setInsertInto(block);
+
+    // Emit parameters.
+    List<IRParam*> params;
+    for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+        params.add(funcBuilder.emitParam(funcType->getParamType(i)));
+
+    // Return the first parameter (the MinimalContext).
+    SLANG_ASSERT(params[0]->getDataType() == funcType->getResultType());
+    funcBuilder.emitReturn(params[0]);
+
+    return func;
 }
 
 static IRInst* specializeWitnessLookup(IRLookupWitnessMethod* lookupInst)

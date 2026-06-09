@@ -402,8 +402,23 @@ static void checkReplayContextIsPristine()
     SLANG_CHECK(!ctx().isActive());
     SLANG_CHECK(ctx().getStream().getSize() == 0);
     SLANG_CHECK(!ctx().hasCallIndex());
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() == 0);
     SLANG_CHECK(ctx().getNextHandle() == kFirstValidHandle);
     SLANG_CHECK(ctx().getCurrentThisHandle() == kNullHandle);
+}
+
+static void readStringIntoReplayArena()
+{
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    const char* text = "arena allocation";
+    ctx().record(RecordFlag::None, text);
+    ctx().switchToPlayback();
+
+    const char* readText = nullptr;
+    ctx().record(RecordFlag::None, readText);
+    SLANG_CHECK(readText != nullptr);
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() > 0);
 }
 
 // Build a dirty singleton state covering everything reset() clears that has an
@@ -470,17 +485,24 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyPlaybackState)
 {
     ctx().reset();
 
-    // Record two values, switch to playback, consume the first one. The stream
-    // is now in reading mode at a non-zero position, mimicking the state an
-    // aborted SLANG_CHECK during a read would leave behind.
+    // Record two values and a string, switch to playback, and consume the first
+    // value plus string. The stream is now in reading mode at a non-zero
+    // position, and the playback arena has a live allocation, mimicking the
+    // state an aborted SLANG_CHECK during a read would leave behind.
     ctx().setMode(Mode::Record);
     int32_t value = 42;
+    const char* text = "dirty";
     ctx().record(RecordFlag::None, value);
+    ctx().record(RecordFlag::None, text);
     ctx().record(RecordFlag::None, value);
     ctx().switchToPlayback();
     int32_t consumed = 0;
     ctx().record(RecordFlag::None, consumed);
     SLANG_CHECK(consumed == 42);
+    const char* readText = nullptr;
+    ctx().record(RecordFlag::None, readText);
+    SLANG_CHECK(readText != nullptr);
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() > 0);
     SLANG_CHECK(ctx().isPlayback());
     SLANG_CHECK(ctx().getStream().getPosition() > 0);
 
@@ -488,6 +510,41 @@ SLANG_UNIT_TEST(replayContextRecoversFromDirtyPlaybackState)
     SLANG_UNUSED(unitTestContext);
 
     checkReplayContextIsPristine();
+}
+
+SLANG_UNIT_TEST(replayContextSwitchToSyncClearsReplayArenaAllocation)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    readStringIntoReplayArena();
+
+    ctx().switchToSync();
+    SLANG_CHECK(ctx().getMode() == Mode::Sync);
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() == 0);
+}
+
+SLANG_UNIT_TEST(replayContextLoadReplayClearsReplayArenaAllocation)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    readStringIntoReplayArena();
+
+    String tempReplayPath;
+    SLANG_CHECK(SLANG_SUCCEEDED(File::generateTemporary(toSlice("slang-replay"), tempReplayPath)));
+    SLANG_CHECK(SLANG_SUCCEEDED(File::remove(tempReplayPath)));
+    SLANG_CHECK(Path::createDirectoryRecursive(tempReplayPath));
+
+    String streamPath = Path::combine(tempReplayPath, "stream.bin");
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        File::writeAllBytes(streamPath, ctx().getStream().getData(), ctx().getStream().getSize())));
+
+    SLANG_CHECK(SLANG_SUCCEEDED(ctx().loadReplay(tempReplayPath.getBuffer())));
+    SLANG_CHECK(ctx().isPlayback());
+    SLANG_CHECK(ctx().testsOnlyGetReplayArenaAllocationSize() == 0);
+
+    SLANG_CHECK(SLANG_SUCCEEDED(Path::removeNonEmpty(tempReplayPath)));
 }
 
 // Dtor side of the REPLAY_TEST contract: when a test leaves the singleton
