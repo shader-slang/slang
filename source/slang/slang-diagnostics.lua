@@ -4834,9 +4834,9 @@ err(
 )
 
 err(
-    "coverage-counter-width-byte-width-invalid",
+    "coverage-counter-width-bytes-invalid",
     45114,
-    "coverage counter width API option value is invalid: the `CompilerOptionName::TraceCoverageCounterWidth` API option is a per-slot *byte* width and accepts only `4` (uint32) or `8` (uint64), but got `~byteWidth:Int`. Note the `-trace-coverage-counter-width` command-line flag is in *bits* (32/64); a host setting the API option directly must pass the byte width (divide bits by 8), not the bit width."
+    "coverage counter width API option value is invalid: the `CompilerOptionName::TraceCoverageCounterByteWidth` API option accepts only `4` (uint32) or `8` (uint64), but got `~byteWidth:Int`. This is the API-path counterpart to `E45113` (the CLI parser, which validates bits 32/64 before storing the byte width here); a host setting the API option directly must pass the byte width (divide bits by 8), not the bit width."
 )
 
 -- 41xxx - Semantic checking (continued)

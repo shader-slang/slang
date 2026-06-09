@@ -307,13 +307,17 @@ public:
     // (`4` for `uint`, `8` for `uint64_t`). The width is the caller's
     // choice via `-trace-coverage-counter-width`, not something the
     // compiler derives from the target: the compiler cannot see the
-    // runtime driver's int64-atomic support. `instrumentCoverage` sets
-    // this field by reading the synthesized buffer's element type back,
-    // so the recorded width can never drift from the actual storage
-    // width. Defaults to `4` only as a legacy sentinel: an artifact
-    // whose coverage pass never ran (or predates this field) surfaces
-    // as the historical uint32 layout. Whenever the coverage pass does
-    // run, this is always overwritten with `4` or `8`.
+    // runtime driver's int64-atomic support. `instrumentCoverage`
+    // sets this field by reading the synthesized buffer's element
+    // type back, so the recorded width can never drift from the
+    // actual storage width. The field is overwritten with `4` or `8`
+    // whenever a buffer is actually synthesized; if the pass early-
+    // returns before synthesis (coverage disabled, no marker ops
+    // survived, unsupported target, name collision, binding
+    // collision), the legacy sentinel `4` remains — which is
+    // self-consistent because no buffer was produced for the host to
+    // read back. The legacy sentinel also covers reads from older
+    // metadata objects that pre-date this field.
     uint32_t m_coverageCounterByteWidth = 4;
     List<CoverageTracingEntry> m_coverageEntries;
 

@@ -1186,19 +1186,17 @@ typedef uint32_t SlangSizeT;
                  //   metadata. Explicit paths are valid only when exactly one compiled
                  //   artifact carries coverage metadata and must not overlap any emitted
                  //   artifact path. Query/set with the string option APIs.
-        TraceCoverageCounterWidth =
-            151, // intValue0: per-slot *byte* width for the synthesized __slang_coverage
-                 //   buffer. This API value is in BYTES: exactly 4 (uint32) or 8 (uint64).
-                 //   Note the unit difference from the `-trace-coverage-counter-width <bits>`
-                 //   command-line flag, which is in BITS (32/64); the CLI parser divides by 8
-                 //   and stores the byte width here, so a host setting this option directly
-                 //   must pass 4/8, not 32/64. Omitting the option yields 8 when any coverage
-                 //   mode is enabled (the default is applied where the option is read, in
-                 //   slang-emit.cpp). Use 4 to opt down to uint32 when the runtime driver
-                 //   lacks 64-bit shader atomic support (notably MoltenVK on Apple Silicon,
-                 //   where Vulkan exposes shaderBufferInt64Atomics = false). uint32 counters
-                 //   wrap silently at 2^32 hits per slot; uint64 counters effectively do not
-                 //   wrap within any practical run.
+        TraceCoverageCounterByteWidth =
+            151, // intValue0: per-slot byte width of the synthesized __slang_coverage
+                 //   buffer. Accepts 4 (uint32) or 8 (uint64). Omitting the option
+                 //   yields 8 when any coverage mode is enabled. Use 4 to opt down to
+                 //   uint32 when the runtime driver lacks 64-bit shader atomic support
+                 //   (notably MoltenVK on Apple Silicon, where Vulkan exposes
+                 //   shaderBufferInt64Atomics = false). uint32 counters wrap silently
+                 //   at 2^32 hits per slot; uint64 counters effectively do not wrap
+                 //   within any practical run. The corresponding CLI flag
+                 //   `-trace-coverage-counter-width <bits>` takes a bit count (32/64)
+                 //   and stores the matching byte width here.
 
         CountOf,
     };
@@ -4741,25 +4739,18 @@ struct CoverageBufferInfo
     int32_t binding = -1;
 
     /// Byte width of one counter slot in the synthesized buffer:
-    /// `4` when the IR coverage pass synthesizes a
-    /// `RWStructuredBuffer<uint>`, `8` when it synthesizes a
-    /// `RWStructuredBuffer<uint64_t>`. The host must read back
-    /// `getCounterCount() * elementByteWidth` bytes and interpret
+    /// `4` for a `RWStructuredBuffer<uint>`, `8` for a
+    /// `RWStructuredBuffer<uint64_t>`. The host reads back
+    /// `getCounterCount() * elementByteWidth` bytes and interprets
     /// each slot as a little-endian unsigned integer of this width.
+    /// Mirrored on the JSON sidecar as `buffer.element_stride`.
     ///
-    /// The width forms a closed pair with the manifest's
-    /// `buffer.element_type` / `buffer.element_stride`: today only
-    /// `{4: "uint32", 8: "uint64"}` are produced, kept in lockstep.
-    ///
-    /// Two "unassigned" conventions exist for compatibility and a
-    /// caller should treat both as the historical uint32 layout:
-    ///   - the in-class default `4`, observed when a current
-    ///     implementation populates the field but no coverage pass ran;
-    ///   - the sentinel `0`, which only arises when the field is read
-    ///     from an output produced by a compiler too old to populate it
-    ///     (the `structSize`-gated writer leaves it untouched). A
-    ///     current in-process implementation always writes a real `4`
-    ///     or `8`, so `0` cannot occur on the in-process path.
+    /// A current in-process implementation always writes `4` or `8`;
+    /// the in-class default `4` only appears if the caller forgot to
+    /// pass the field to `getBufferInfo`. A sentinel `0` can only
+    /// arise when reading a metadata object from an older compiler
+    /// that pre-dates this field; both values should be treated as
+    /// the historical uint32 layout.
     uint32_t elementByteWidth = 4;
 };
 

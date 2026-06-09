@@ -1201,16 +1201,30 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
     uint32_t entryCount = metadata->getEntryCount();
     out << "  \"counter_count\": " << (int64_t)counterCount << ",\n";
     // Resolve the per-slot byte width from the metadata's
-    // `CoverageBufferInfo`. The compiler always populates the new
-    // `elementByteWidth` field; a `0` here would only arise from a
-    // sufficiently old metadata object that didn't, in which case we
-    // mirror the historical layout (uint32) so existing tooling keeps
-    // working.
+    // `CoverageBufferInfo`. The IR coverage pass restricts the
+    // synthesized element type to `{4, 8}` and the API path
+    // validates the option with `E45114`, so only those two widths
+    // should ever reach this writer. A `0` would only arise from a
+    // sufficiently old metadata object that pre-dates the field; we
+    // mirror the historical layout (uint32) for that legacy case.
+    // Anything else means an upstream invariant has been broken —
+    // assert rather than ship a malformed manifest.
     slang::CoverageBufferInfo bufferInfo;
     if (SLANG_FAILED(metadata->getBufferInfo(&bufferInfo)))
         return SLANG_FAIL;
     uint32_t elementByteWidth = bufferInfo.elementByteWidth == 0 ? 4 : bufferInfo.elementByteWidth;
-    const char* elementTypeName = elementByteWidth == 8 ? "uint64" : "uint32";
+    const char* elementTypeName = nullptr;
+    switch (elementByteWidth)
+    {
+    case 4:
+        elementTypeName = "uint32";
+        break;
+    case 8:
+        elementTypeName = "uint64";
+        break;
+    default:
+        SLANG_RELEASE_ASSERT(!"coverage manifest writer: unexpected elementByteWidth");
+    }
     out << "  \"buffer\": {\n";
     out << "    \"name\": \"__slang_coverage\",\n";
     out << "    \"element_type\": \"" << elementTypeName << "\",\n";

@@ -225,12 +225,12 @@ The synthesized `__slang_coverage` buffer defaults to `uint64` counters
 back the buffer at the matching stride — do not assume 4 bytes.
 
 A host driving compilation through the API selects the width with the
-`CompilerOptionName::TraceCoverageCounterWidth` option. Note the unit
-difference from the CLI flag: the API option is a *byte* width and
-accepts only `4` or `8`, whereas the `-trace-coverage-counter-width`
-command-line flag is a *bit* width (`32`/`64`). A value other than 4 or
+`CompilerOptionName::TraceCoverageCounterByteWidth` option. Note the
+unit difference from the CLI flag: the API option accepts only `4` or
+`8` (bytes), whereas the `-trace-coverage-counter-width` command-line
+flag is a bit width (`32`/`64`). A value other than 4 or
 8 — most easily produced by forwarding the bit width without dividing by
-8 — fails codegen with `E45114 coverage-counter-width-byte-width-invalid`
+8 — fails codegen with `E45114 coverage-counter-width-bytes-invalid`
 rather than silently selecting uint32.
 
 The default 64-bit width requires runtime support for 64-bit integer
@@ -252,8 +252,11 @@ creation is rejected and no counters are written:
   select one that advertises the feature (or fall back to
   `-trace-coverage-counter-width 32`).
 - **HLSL / D3D12** — the `uint64` `InterlockedAdd` overload requires
-  Shader Model 6.6; SM 5.x / 6.0–6.5 must use
-  `-trace-coverage-counter-width 32`.
+  Shader Model 6.6 and the `Int64BufferAtomics` shader feature. Slang
+  does not reject the 64-bit width when an older profile is requested;
+  it emits the `uint64_t` `InterlockedAdd` call, and DXC then rejects
+  the resulting HLSL at downstream compile. Callers targeting SM 5.x
+  or SM 6.0–6.5 must pass `-trace-coverage-counter-width 32`.
 - **CUDA / CPU** — no device opt-in; the backend selects the 64-bit
   atomic-add form directly.
 

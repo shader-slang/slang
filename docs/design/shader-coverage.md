@@ -252,8 +252,12 @@ is the right choice:
   default fails at `vkCreateShaderModule` / pipeline-create.
 - **HLSL targeting Shader Model 5.x / 6.0–6.5**. DXC's
   `InterlockedAdd(uint64_t, ...)` overload requires SM6.6 and the
-  `Int64BufferAtomics` shader feature. Older profiles must use
-  the 32-bit path.
+  `Int64BufferAtomics` shader feature. The Slang front-end does not
+  reject the 64-bit width when the requested HLSL profile is older
+  than SM6.6 — it emits the `uint64_t` `InterlockedAdd` call against
+  the chosen profile, and DXC rejects the resulting HLSL at downstream
+  compile time. Callers targeting older profiles must pass
+  `-trace-coverage-counter-width 32` themselves.
 
 The chosen width is recorded on the manifest's
 `buffer.element_type` (`"uint32"` or `"uint64"`) and
@@ -269,11 +273,11 @@ Invalid values are rejected on both entry paths. On the CLI,
 `-trace-coverage-counter-width` accepts only the bit values `32` or
 `64`; anything else (`16`, `128`, etc.) produces a clear
 `E45113 coverage-counter-width-invalid` front-end diagnostic. The
-public API option `CompilerOptionName::TraceCoverageCounterWidth` is a
-*byte* width and accepts only `4` or `8`; a host that sets some other
+public API option `CompilerOptionName::TraceCoverageCounterByteWidth`
+accepts only `4` or `8`; a host that sets some other
 value — most realistically by forwarding the bit width `32`/`64`
 without dividing by 8 — fails codegen with
-`E45114 coverage-counter-width-byte-width-invalid` rather than silently
+`E45114 coverage-counter-width-bytes-invalid` rather than silently
 falling back to uint32.
 
 Coverage marker ops are side-effectful by default in DCE analysis, so

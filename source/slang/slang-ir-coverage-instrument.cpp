@@ -512,17 +512,26 @@ static bool isCoverageInstrumentationTargetSupported(TargetRequest* targetReques
 }
 
 // Maps the per-slot byte-width selector (`counterByteWidth`, in bytes)
-// to the counter buffer's element `IRType`: 8 -> `uint64_t`, anything
-// else -> `uint`. The clamp keeps a mistakenly forwarded value from
-// asking for an unsupported width (see the validation gap discussed at
-// the option-read site in `slang-emit.cpp`). For the uint32-vs-uint64
-// tradeoff and why the choice is the caller's, see the
-// `-trace-coverage-counter-width` flag docs and `docs/design/shader-coverage.md`.
+// to the counter buffer's element `IRType`: `8` -> `uint64_t`, `4` ->
+// `uint`. Both entry paths (the `-trace-coverage-counter-width` CLI
+// parser and the `TraceCoverageCounterByteWidth` API option) validate
+// the value to `{4, 8}` before reaching this helper, so any other
+// width indicates a compiler-internal bug rather than a user input
+// error — assert rather than coerce, so the bug surfaces at the
+// broken caller. For the uint32-vs-uint64 tradeoff and why the choice
+// is the caller's, see the `-trace-coverage-counter-width` flag docs
+// and `docs/design/shader-coverage.md`.
 static IRType* getCoverageCounterElementType(IRBuilder& builder, int counterByteWidth)
 {
-    if (counterByteWidth == 8)
+    switch (counterByteWidth)
+    {
+    case 4:
+        return builder.getUIntType();
+    case 8:
         return builder.getUInt64Type();
-    return builder.getUIntType();
+    default:
+        SLANG_UNEXPECTED("coverage counter byte width must be 4 or 8");
+    }
 }
 
 static void addReservedCoverageSpaces(
@@ -934,7 +943,10 @@ struct CoverageInstrumenter
     // own element type rather than re-querying the target, so the
     // atomic op's operand width can never drift out of sync with the
     // buffer's storage width even if a future change moves the type
-    // decision elsewhere.
+    // decision elsewhere. `intType` is the IR scalar type used for
+    // small integer literals threaded into the atomic op (slot
+    // index, memory-order constant) and is independent of the
+    // counter slot's storage width.
     IRType* counterElementType;
     IRType* counterElementPtrType;
     IRType* intType;
@@ -1070,16 +1082,28 @@ struct CoverageInstrumenter
         outMetadata.m_coverageCounterCount = (uint32_t)counterCount;
         // Record the per-slot byte width so the manifest writer and
         // every host that reads back the buffer can pick the right
-        // element type without re-deriving it from the target.
-        // `getCoverageCounterElementType` synthesizes this buffer's
-        // element as exactly `uint` (4 bytes) or `uint64_t` (8 bytes),
-        // both unsigned, so those are the only two cases possible here.
-        // Assert that invariant rather than matching a wider set we can
-        // never produce (e.g. signed 64-bit), which would only obscure
-        // which configurations are actually supported.
-        const auto elementOp = counterElementType->getOp();
-        SLANG_ASSERT(elementOp == kIROp_UIntType || elementOp == kIROp_UInt64Type);
-        outMetadata.m_coverageCounterByteWidth = (elementOp == kIROp_UInt64Type) ? 8 : 4;
+        // element type without re-deriving it from the target. The
+        // value is sourced from the IR type of the synthesized buffer
+        // (rather than from the original `counterByteWidth` selector
+        // passed in) so the recorded width cannot drift from the
+        // actually-emitted storage if a future change moves the type
+        // decision elsewhere. `getCoverageCounterElementType`
+        // produces exactly `uint` or `uint64_t`; the release-mode
+        // assertion below enforces that invariant even when debug
+        // assertions are compiled out, so an unexpected element type
+        // in release surfaces as a crash at the broken producer
+        // instead of silently writing `4` into the manifest.
+        switch (counterElementType->getOp())
+        {
+        case kIROp_UIntType:
+            outMetadata.m_coverageCounterByteWidth = 4;
+            break;
+        case kIROp_UInt64Type:
+            outMetadata.m_coverageCounterByteWidth = 8;
+            break;
+        default:
+            SLANG_UNEXPECTED("coverage counter element type must be uint or uint64_t");
+        }
         outMetadata.m_coverageEntries.reserve(counterCount);
         // Each marker op gets its own slot: the op's identity IS the
         // UID, and we assign a consecutive index in traversal order.

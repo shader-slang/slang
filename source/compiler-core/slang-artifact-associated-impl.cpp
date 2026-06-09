@@ -389,6 +389,14 @@ static constexpr size_t kSyntheticResourceInfoV1MinSize =
             (outInfo)->fieldName = (value);                                               \
     } while (0)
 
+#define SLANG_WRITE_OPTIONAL_COVERAGE_BUFFER_FIELD(outInfo, fieldName, value)              \
+    do                                                                                     \
+    {                                                                                      \
+        if ((outInfo)->structSize >=                                                       \
+            offsetof(slang::CoverageBufferInfo, fieldName) + sizeof((outInfo)->fieldName)) \
+            (outInfo)->fieldName = (value);                                                \
+    } while (0)
+
 SlangResult ArtifactPostEmitMetadata::getEntryInfo(
     uint32_t index,
     slang::CoverageEntryInfo* outInfo)
@@ -453,11 +461,10 @@ SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* o
     // Older callers (smaller `structSize`) see no field; their
     // pre-existing default of `4` from the struct's in-class
     // initializer continues to apply at the caller side.
-    if (outInfo->structSize >=
-        offsetof(slang::CoverageBufferInfo, elementByteWidth) + sizeof(outInfo->elementByteWidth))
-    {
-        outInfo->elementByteWidth = m_coverageCounterByteWidth;
-    }
+    SLANG_WRITE_OPTIONAL_COVERAGE_BUFFER_FIELD(
+        outInfo,
+        elementByteWidth,
+        m_coverageCounterByteWidth);
     return SLANG_OK;
 }
 

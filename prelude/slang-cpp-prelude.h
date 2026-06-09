@@ -341,6 +341,11 @@ public:                                                                         
 //     `__atomic_*` builtins; the fallback is racy under concurrency
 //     but keeps the prelude buildable there. Platforms that need
 //     real atomics on those compilers can add a bespoke branch.
+// === MSVC implementations ===
+//
+// Use the `_Interlocked*` intrinsics. The 32-bit overload operates on
+// `long`; the 64-bit overload operates on `long long`. The static
+// asserts above pin the expected widths.
 #if SLANG_VC
 #include <intrin.h>
 static_assert(
@@ -372,6 +377,11 @@ static inline int64_t _slang_atomic_add_i64(int64_t* ptr, int64_t val)
         reinterpret_cast<volatile long long*>(ptr),
         static_cast<long long>(val)));
 }
+// === GCC / Clang implementations ===
+//
+// Use the `__atomic_fetch_add` built-in with relaxed ordering; the
+// IR-side AtomicAdd emit ignores the memory-order operand and lets
+// each toolchain pick its native default.
 #elif SLANG_GCC || SLANG_CLANG
 static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
 {
@@ -389,11 +399,13 @@ static inline int64_t _slang_atomic_add_i64(int64_t* ptr, int64_t val)
 {
     return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
 }
+// === Non-atomic fallback implementations ===
+//
+// For compilers without a known atomic builtin (Sony SNC, Green Hills
+// MULTI, etc.). Racy under concurrent invocation but keeps the
+// prelude compilable; CPU-target coverage on these platforms is
+// single-threaded in practice.
 #else
-// Non-atomic fallback for compilers without a known atomic builtin
-// (Sony SNC, Green Hills MULTI, etc.). Racy under concurrent invocation
-// but keeps the prelude compilable; CPU-target coverage on these
-// platforms is single-threaded in practice.
 static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
 {
     uint32_t old = *ptr;

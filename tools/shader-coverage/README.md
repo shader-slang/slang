@@ -34,9 +34,11 @@ slangc shader.slang -target spirv -stage compute -entry main \
 
 Every executable statement in the shader gets instrumented to
 increment a counter at runtime. The compiler synthesizes a
-`RWStructuredBuffer<uint> __slang_coverage` directly in the IR
-coverage pass — no AST decl, so it does not appear in Slang's
-public reflection. Hosts discover the hidden resource binding through
+`RWStructuredBuffer<uint64_t> __slang_coverage` directly in the IR
+coverage pass (or `RWStructuredBuffer<uint>` under
+`-trace-coverage-counter-width 32`; see [Counter buffer
+format](#counter-buffer-format)) — no AST decl, so it does not
+appear in Slang's public reflection. Hosts discover the hidden resource binding through
 `slang::ISyntheticResourceMetadata` and use
 `slang::ICoverageTracingMetadata` to learn how many counters to
 allocate and how source coverage entries map to those counters.

@@ -657,7 +657,7 @@ void initCommandOptions(CommandOptions& options)
          "is not supported for container outputs, and is valid only when exactly one compiled "
          "artifact carries coverage metadata. The path must not overlap any emitted artifact "
          "path."},
-        {OptionKind::TraceCoverageCounterWidth,
+        {OptionKind::TraceCoverageCounterByteWidth,
          "-trace-coverage-counter-width",
          "-trace-coverage-counter-width <bits>",
          "Per-slot bit width of the synthesized `__slang_coverage` buffer. "
@@ -3075,7 +3075,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 linkage->m_optionSet.set(OptionKind::CoverageManifestOutput, outputPath.value);
                 break;
             }
-        case OptionKind::TraceCoverageCounterWidth:
+        case OptionKind::TraceCoverageCounterByteWidth:
             {
                 // -trace-coverage-counter-width <bits>
                 // Validate up front rather than at IR-pass time: this is a
@@ -3104,7 +3104,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // internal consumer reads bytes. The IR pass and metadata
                 // writer can then treat the value as a stride directly.
                 linkage->m_optionSet.set(
-                    OptionKind::TraceCoverageCounterWidth,
+                    OptionKind::TraceCoverageCounterByteWidth,
                     (int)(widthBits / 8));
                 break;
             }

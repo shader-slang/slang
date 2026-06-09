@@ -1358,11 +1358,18 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             // through the CPU prelude helpers. Matches HLSL/GLSL
             // semantics: returns the prior value as the inst result.
             //
-            // This is the general integer-AtomicAdd lowering for the CPU
-            // target, not coverage-specific: any user `InterlockedAdd`
-            // reaches it. Coverage is one client and only ever emits the
-            // unsigned variants (its synthesized buffer is uint/uint64),
-            // but the signed cases are exercised by ordinary user code.
+            // This is the general integer-AtomicAdd lowering for the
+            // CPU target, not coverage-specific: any user
+            // `InterlockedAdd` reaches it. Coverage is one client
+            // and only ever emits the unsigned variants (its
+            // synthesized buffer element type is uint/uint64); the
+            // signed variants are reachable from ordinary user code
+            // that calls `InterlockedAdd` on an `int`/`int64_t`
+            // slot, but the CPU target's existing `InterlockedAdd`
+            // tests (e.g. `tests/hlsl-intrinsic/atomic/atomic-
+            // intrinsics.slang`) disable the `-cpu` line, so the
+            // signed CPU paths here are not currently covered by
+            // a regression test.
             //
             // 32-bit and 64-bit integer widths are supported via the
             // matching prelude helper pair
@@ -1371,7 +1378,7 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             // opcode diagnostic so the build fails loudly instead
             // of producing bogus code.
             auto dataType = inst->getDataType();
-            char const* helper = nullptr;
+            char const* helper;
             switch (dataType->getOp())
             {
             case kIROp_UIntType:
@@ -1394,17 +1401,15 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(", ");
+            // The value-operand literal's C++ suffix (`U`/`ULL`) is
+            // chosen by `emitOperand` from the IR operand's type, so
+            // the literal width here matches the chosen `helper`
+            // signature automatically.
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            // Memory-order operand (operand 2) is intentionally
-            // ignored: the prelude helpers in `slang-cpp-prelude.h`
-            // pick the strongest ordering each toolchain provides
-            // out-of-the-box — `__ATOMIC_RELAXED` on GCC/Clang
-            // (which honors operand 2's intent), and
-            // `_InterlockedExchangeAdd` on MSVC (sequentially
-            // consistent on the supported architectures, stronger
-            // than relaxed but still correct under concurrency).
-            // Other backends (SPIR-V/Metal/CUDA) map operand 2 to
-            // native ordering; CPU's coupling lives in the prelude.
+            // Operand 2 (memory order) is consumed by the prelude
+            // helpers in `slang-cpp-prelude.h`, not threaded through
+            // here; see those helpers for the per-toolchain ordering
+            // choice.
             m_writer->emit(");\n");
             return true;
         }
