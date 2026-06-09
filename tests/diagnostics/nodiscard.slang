@@ -43,6 +43,14 @@ Widget operator+(Widget a, Widget b) { return Widget(a.v + b.v); }
 [nodiscard]
 T identity<T>(T x) { return x; }
 
+// The motivating use case: a function that has side effects via an `out` parameter but also
+// returns a result the caller is expected to consume (like `linalg::CoopMat::Load`).
+struct OutWidget
+{
+    [nodiscard]
+    int loadWith(out int sideEffect) { sideEffect = 1; return 2; }
+}
+
 [numthreads(1, 1, 1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -158,6 +166,24 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     // then discarded (the `[nodiscard]` call's result is consumed by `+`, not discarded).
     t.compute() + c;
 
+    // The motivating case: a method with an `out` parameter that also returns a value warns when
+    // the returned value is discarded, but not when it is used.
+    OutWidget ow;
+    int side;
+    ow.loadWith(side); // warn
+/*DIAG:
+               ^ result of '[nodiscard]' function is discarded
+               ^ the result of calling 'loadWith' is discarded; this function is marked '[nodiscard]'.
+*/
+    int used = ow.loadWith(side);
+
+    // Used as a control-flow predicate, the result is consumed by the condition, not discarded,
+    // so none of these warn.
+    if (check()) {}
+    while (check()) break;
+    do {} while (check());
+    for (int k = 0; check(); k++) break;
+
     // Silence unused-variable concerns.
-    t.val = loaded.val + c;
+    t.val = loaded.val + c + side + used;
 }
