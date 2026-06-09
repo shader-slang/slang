@@ -16,6 +16,7 @@
 #include "slang-type-system-shared.h"
 
 #include <functional>
+#include <mutex>
 
 //
 #include "slang-ir.h.fiddle"
@@ -2106,6 +2107,9 @@ public:
     {
         return &m_annotationLookupCache;
     }
+    void buildModuleScopeAnnotationTargetMap();
+    bool hasModuleScopeAnnotationTargetMap();
+    List<IRAnnotation*> getModuleScopeAnnotationsForTarget(IRInst* target);
 
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
     {
@@ -2181,6 +2185,8 @@ public:
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:
+    void _buildModuleScopeAnnotationTargetMap();
+
     friend struct IRSerialReadContext;
     friend struct IRSerialWriteContext;
     friend struct Fossilized_IRModule;
@@ -2239,6 +2245,11 @@ private:
 
     // (inst, association-kind) -> associated-inst
     Dictionary<AnnotationCacheKey, IRAnnotation*> m_annotationLookupCache;
+
+    // target-inst -> module-scope annotations that reference it.
+    Dictionary<IRInst*, List<IRAnnotation*>> m_mapInstToModuleScopeAnnotations;
+    bool m_isModuleScopeAnnotationTargetMapBuilt = false;
+    std::mutex m_moduleScopeAnnotationTargetMapMutex;
 };
 
 

@@ -4903,6 +4903,76 @@ RefPtr<IRModule> IRModule::create(Session* session)
     return module;
 }
 
+void IRModule::_buildModuleScopeAnnotationTargetMap()
+{
+    m_mapInstToModuleScopeAnnotations.clear();
+
+    auto moduleInst = getModuleInst();
+    if (!moduleInst)
+    {
+        m_isModuleScopeAnnotationTargetMapBuilt = true;
+        return;
+    }
+
+    for (auto inst : getGlobalInsts())
+    {
+        auto annotation = as<IRAnnotation>(inst);
+        if (!annotation || annotation->getParent() != moduleInst)
+            continue;
+
+        m_mapInstToModuleScopeAnnotations[annotation->getTarget()].add(annotation);
+    }
+
+    m_isModuleScopeAnnotationTargetMapBuilt = true;
+}
+
+void IRModule::buildModuleScopeAnnotationTargetMap()
+{
+    std::lock_guard<std::mutex> lock(m_moduleScopeAnnotationTargetMapMutex);
+    if (m_isModuleScopeAnnotationTargetMapBuilt)
+        return;
+
+    _buildModuleScopeAnnotationTargetMap();
+}
+
+bool IRModule::hasModuleScopeAnnotationTargetMap()
+{
+    std::lock_guard<std::mutex> lock(m_moduleScopeAnnotationTargetMapMutex);
+    return m_isModuleScopeAnnotationTargetMapBuilt;
+}
+
+List<IRAnnotation*> IRModule::getModuleScopeAnnotationsForTarget(IRInst* target)
+{
+    if (!target)
+        return {};
+
+    std::lock_guard<std::mutex> lock(m_moduleScopeAnnotationTargetMapMutex);
+
+    auto annotations = m_mapInstToModuleScopeAnnotations.tryGetValue(target);
+    if (!annotations)
+        return {};
+
+    for (Index i = 0; i < annotations->getCount();)
+    {
+        auto annotation = (*annotations)[i];
+        if (!annotation || annotation->getParent() != getModuleInst() ||
+            annotation->getTarget() != target)
+        {
+            annotations->removeAt(i);
+            continue;
+        }
+        i++;
+    }
+
+    if (annotations->getCount() == 0)
+    {
+        m_mapInstToModuleScopeAnnotations.remove(target);
+        return {};
+    }
+
+    return *annotations;
+}
+
 void IRModule::buildMangledNameToGlobalInstMap()
 {
     m_mapMangledNameToGlobalInst.clear();
