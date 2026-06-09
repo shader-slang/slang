@@ -26,7 +26,7 @@ void foo(Ptr<Data, Access::ReadWrite, AddressSpace::GroupShared> ptr)
     outputBuffer[1] = ptr.value2;
 }
 
-[numthreads(3, 1, 1)]
+[numthreads(1, 1, 1)]
 void computeMain(uint3 group_thread_id: SV_GroupThreadID)
 {
     shared = Data(1, 2);
