@@ -24,21 +24,26 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     hit.triIndex = -1;
     hit.materialId = -1;
 
-    // Iterative traversal with a small per-thread stack.
-    int stack[24];
+    // Iterative traversal with a small per-thread stack. The depth
+    // is chosen to comfortably hold a tree over the demo's small
+    // input set; pathological inputs that would overflow fall back
+    // to the linear-scan branch below.
+    const int kStackDepth = 24;
+    int stack[kStackDepth];
     int stackPtr = 0;
     stack[stackPtr++] = 0; // root
 
-    int overflowFallbackHits = 0;
-
     while (stackPtr > 0)
     {
-        if (stackPtr >= 24)
+        if (stackPtr >= kStackDepth)
         {
             // Stack-overflow fallback: linear scan over remaining
-            // primitives instead of recursing further. Triggers only
-            // for pathological rays through deeply imbalanced BVHs.
-            overflowFallbackHits = linearScanRemaining(ray, hit, g.triCount);
+            // primitives instead of recursing further. The scan
+            // updates `hit` in place; the return value would be the
+            // number of intersections found and is unused here.
+            // Triggers only for pathological rays through deeply
+            // imbalanced BVHs.
+            linearScanRemaining(ray, hit, g.triCount);
             break;
         }
 

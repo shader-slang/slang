@@ -4,6 +4,11 @@
 // (clamp / wrap / reflect / black) and the radius-dependent fast-path
 // are the branches that the coverage demo highlights.
 
+// Mirrors the host-side `BoundaryMode` enum in `main.cpp`. The
+// integer values must stay in lockstep — the host passes the
+// selected mode through as a `uint32_t` uniform, and Slang reads it
+// back here. If you add a case, add it in both places and pick an
+// integer value that does not collide with an existing one.
 public enum BoundaryMode
 {
     Clamp = 0,
@@ -48,6 +53,14 @@ public float3 sampleWithBoundary(
     case BoundaryMode::Black:
         if (sx < 0 || sx >= width || sy < 0 || sy >= height)
             return float3(0.0, 0.0, 0.0);
+        break;
+    default:
+        // An out-of-range `mode` indicates a broken caller (e.g. host
+        // uniform corruption). Fall back to clamp so the final
+        // indexed read at `image[sy * width + sx]` stays in bounds
+        // instead of reading off the end of the buffer.
+        sx = clamp(x, 0, width - 1);
+        sy = clamp(y, 0, height - 1);
         break;
     }
 

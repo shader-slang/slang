@@ -55,3 +55,10 @@ set_target_properties(
     shader-coverage-bvh-traversal
     PROPERTIES FOLDER examples
 )
+
+# Wire this demo into the `all-examples` meta target so PR CI that
+# builds `all-examples` catches regressions here. The other examples
+# pick this up implicitly via `slang_add_target(... REQUIRED_BY
+# all-examples)`; this demo uses a raw `add_executable`, so attach it
+# explicitly.
+add_dependencies(all-examples shader-coverage-bvh-traversal)
