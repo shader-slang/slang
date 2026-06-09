@@ -3,6 +3,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry closestHitShader -stage closesthit
 //TEST:SIMPLE(filecheck=INT_CHECK): -target cuda -entry closestHitShaderInt -stage closesthit
+//TEST:SIMPLE(filecheck=MULTI_CUDA): -target cuda -entry closestHitShader -stage closesthit -entry closestHitShaderInt -stage closesthit
 
 // CHECK: __global__ void __closesthit__closestHitShader
 // CHECK-NOT: primitiveID
@@ -12,6 +13,8 @@
 // INT_CHECK-NOT: primitiveID
 // INT_CHECK: uint [[PRIMITIVE_ID:[A-Za-z_][A-Za-z_0-9]*]] = optixGetPrimitiveIndex()
 // INT_CHECK: {{getPrimitiveIDAsFloat[^ ]*}}(int([[PRIMITIVE_ID]]))
+
+// MULTI_CUDA-COUNT-2: optixGetPrimitiveIndex()
 
 struct Payload
 {
