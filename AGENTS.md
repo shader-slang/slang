@@ -124,6 +124,19 @@ Conventions:
 - Use `SLANG_`-prefixed `SCREAMING_SNAKE_CASE` for macros.
 - Prefer comments that explain why code exists.
 
+Review conventions (recurring review feedback — following them avoids review round-trips):
+
+- Comment functions in complete sentences: what it does first, then why if non-obvious; include a
+  concrete example for non-trivial logic.
+- Reuse before you write: check shared headers (`slang-ast-type.h`, `slang-ir-util.h`, the `*-util.h`
+  files) for an existing helper (e.g. `isDeclRefTypeOf<T>`) before adding one. When the logic is
+  genuinely new, extract it into a named, documented helper rather than an inline lambda/long block.
+- Keep one source of truth for a mapping or classification, and delete any branch/fallback a refactor
+  makes unreachable.
+- Don't create a second AST/IR/`Val` representation of a value that already has one (it breaks
+  `equals`/dedup); `SLANG_ASSERT` such invariants at the construction site.
+- `SLANG_RELEASE_ASSERT` on out-of-contract input instead of silently returning a default.
+
 ## Shell Scripts
 
 Scripts under `extras/` (and other repository shell scripts) must run on bash 3.2, the version

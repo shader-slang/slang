@@ -67,6 +67,28 @@ throughout the task recording the problem, how issues cascade (one fix exposing 
 for each and why it is principled (with a code trace), and rejected alternatives; distill that log
 into the PR description.
 
+## Code Style and Review Conventions
+
+Recurring review feedback distilled into rules — following them avoids review round-trips. (These
+govern how code reads and is structured; the Problem-Solving Methodology above governs what to
+change.)
+
+- **Comment functions as complete sentences: what, then why.** Say what the function does first;
+  then, if non-obvious, why it exists. Include a concrete example for non-trivial behavior; avoid
+  terse fragment/bullet-only function comments.
+- **Reuse before you write; then extract.** Before adding a helper, check shared headers
+  (`slang-ast-type.h`, `slang-ir-util.h`, the `*-util.h` files) for an existing one (e.g.
+  `isDeclRefTypeOf<T>`). When the logic is genuinely new, extract it into a named, documented helper
+  with an intention-revealing name instead of an inline lambda or long inline block.
+- **Keep one source of truth; delete dead code.** Map/classify a thing in exactly one place, and
+  remove any branch or fallback that a refactor makes unreachable.
+- **One canonical representation per value; assert the invariant.** Don't add a second AST/IR/`Val`
+  form for a value that already has one (it breaks `equals`/identity and deduplication); when an
+  invariant guarantees a form is never produced for some inputs, `SLANG_ASSERT` it at the
+  construction site.
+- **Fail loudly on out-of-contract input.** When a helper is only valid for a restricted set of
+  inputs, `SLANG_RELEASE_ASSERT` outside that set rather than silently returning a default.
+
 ## PR Description Format
 
 Write every PR description in this five-part format:
