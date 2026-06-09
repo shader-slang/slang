@@ -465,6 +465,16 @@ int main(int argc, char** argv)
         // exact counts. The LCOV report is identical either way (any
         // positive count is "covered").
         bool coverageHitMiss = false;
+        // `--dispatch=tiled` (default) submits each config as a sequence
+        // of horizontal-band dispatches; see the "Why the dispatch is
+        // tiled" section in README.md for the TDR-mitigation rationale.
+        // `--dispatch=whole` submits each config as a single whole-image
+        // dispatch — convenient for measuring "all-at-once" cost or
+        // observing TDR risk directly under coverage=on / count mode.
+        // The tiled / whole choice is independent of the coverage mode;
+        // with `hit-miss`, atomic contention is gone and whole-image
+        // dispatches are typically safe even on hot pipelines.
+        bool tiledDispatch = true;
         for (int i = 1; i < argc; ++i)
         {
             std::string_view a = argv[i];
@@ -484,6 +494,10 @@ int main(int argc, char** argv)
                 coverageHitMiss = false;
             else if (a == "--coverage-mode=hit-miss")
                 coverageHitMiss = true;
+            else if (a == "--dispatch=tiled")
+                tiledDispatch = true;
+            else if (a == "--dispatch=whole")
+                tiledDispatch = false;
             else
             {
                 std::cerr << "unknown arg: " << a << "\n";
@@ -602,23 +616,40 @@ int main(int argc, char** argv)
             sets.push_back(set1);
         }
 
-        // Dispatch each config as a sequence of horizontal tiles rather than
-        // one whole-image dispatch. Coverage instrumentation makes every
-        // pixel perform many counter atomic-adds that contend on a handful
-        // of buffer slots (the per-line counters inside the bilateral
-        // filter's inner loop), so a single whole-image dispatch runs long
-        // enough to risk a GPU watchdog reset (TDR / VK_ERROR_DEVICE_LOST)
-        // under that load. Tiling caps the per-submission GPU time. It does
-        // not change the coverage results: the tiles partition the image,
-        // every pixel is still processed exactly once, and the counter
-        // buffer accumulates across all tiles and configs.
+        // Two dispatch shapes are supported, selected by `--dispatch`:
+        //
+        //   - `tiled` (default): each config is split into horizontal
+        //     bands of `kTileRows` rows; the band's row offset is
+        //     passed to the shader as `PipelineParams.tileOriginY` so
+        //     each band recovers its real pixel row. This caps the
+        //     per-submission GPU time. Under coverage=on with the
+        //     default count mode, every pixel performs many atomic
+        //     adds that contend on a handful of counter slots (the
+        //     bilateral filter's inner loop), so a single whole-image
+        //     dispatch can run long enough to trip the GPU watchdog
+        //     (Windows TDR / `VK_ERROR_DEVICE_LOST`). Tiling avoids
+        //     that by submitting many shorter dispatches.
+        //
+        //   - `whole`: each config is one whole-image dispatch with
+        //     `tileOriginY = 0`. Simpler, fewer submissions, but
+        //     vulnerable to TDR under count mode on hot pipelines.
+        //     Safe with `--coverage-mode=hit-miss` (no atomic
+        //     contention) or `--no-coverage` (no instrumentation
+        //     cost). Useful for "all-at-once" cost measurements or
+        //     for demonstrating TDR risk directly.
+        //
+        // Neither shape affects the coverage results: tiles partition
+        // the image, every pixel is processed exactly once, and the
+        // counter buffer accumulates across all submissions.
         const uint32_t kTileRows = 128;
+        const uint32_t bandRowsTarget = tiledDispatch ? kTileRows : kImageHeight;
         const uint32_t groupsX = (kImageWidth + 7) / 8;
         uint32_t dispatchCount = 0;
 
         std::cout << "running " << configs.size() << " config(s) in mode=" << mode
-                  << " (coverage=" << (enableCoverage ? "on" : "off") << ", tiled in " << kTileRows
-                  << "-row bands)\n";
+                  << " (coverage=" << (enableCoverage ? "on" : "off") << ", dispatch="
+                  << (tiledDispatch ? (std::to_string(kTileRows) + "-row tiles") : "whole-image")
+                  << ")\n";
 
         const auto renderStart = std::chrono::steady_clock::now();
         for (const auto& cfg : configs)
@@ -632,12 +663,12 @@ int main(int argc, char** argv)
             p.bilateralSigmaS = cfg.sigmaS;
             p.bilateralSigmaR = cfg.sigmaR;
             p.exposure = cfg.exposure;
-            for (uint32_t y0 = 0; y0 < kImageHeight; y0 += kTileRows)
+            for (uint32_t y0 = 0; y0 < kImageHeight; y0 += bandRowsTarget)
             {
                 p.tileOriginY = y0;
                 ctx.upload(paramsBuf, &p, sizeof(p));
                 const uint32_t bandRows =
-                    (kImageHeight - y0 < kTileRows) ? (kImageHeight - y0) : kTileRows;
+                    (kImageHeight - y0 < bandRowsTarget) ? (kImageHeight - y0) : bandRowsTarget;
                 const uint32_t groupsY = (bandRows + 7) / 8;
                 ctx.dispatch(pipe, sets, groupsX, groupsY, 1);
                 ++dispatchCount;
@@ -647,7 +678,7 @@ int main(int argc, char** argv)
         const double renderMs =
             std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
         std::cout << "render wall time: " << renderMs << " ms (" << configs.size() << " config(s), "
-                  << dispatchCount << " tiled dispatches, " << (renderMs / configs.size())
+                  << dispatchCount << " dispatches, " << (renderMs / configs.size())
                   << " ms/config)\n";
 
         if (!enableCoverage)
