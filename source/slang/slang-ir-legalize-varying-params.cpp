@@ -366,7 +366,52 @@ static bool isPrimitiveIDSystemValueParam(IRParam* param)
     return systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid"));
 }
 
-static IRFunc* findRayTracingPrimitiveIndexFunc(IRModule* module)
+static bool hasRayTracingPrimitiveIndexTargetIntrinsicDecoration(
+    IRFunc* func,
+    CapabilityName capabilityName,
+    UnownedStringSlice const& definition)
+{
+    auto expectedCaps = CapabilitySet(capabilityName);
+    for (auto decoration : func->getDecorations())
+    {
+        auto targetIntrinsic = as<IRTargetIntrinsicDecoration>(decoration);
+        if (!targetIntrinsic)
+            continue;
+
+        if (targetIntrinsic->getTargetCaps() == expectedCaps &&
+            targetIntrinsic->getDefinition() == definition)
+            return true;
+    }
+
+    return false;
+}
+
+static bool isRayTracingPrimitiveIndexFunc(IRBuilder& builder, IRFunc* func)
+{
+    auto nameHint = func->findDecoration<IRNameHintDecoration>();
+    if (!nameHint || nameHint->getName() != "__slang_ray_tracing_primitive_index")
+        return false;
+
+    auto funcType = as<IRFuncType>(func->getDataType());
+    if (!funcType || funcType->getParamCount() != 0 ||
+        funcType->getResultType() != builder.getUIntType())
+        return false;
+
+    return hasRayTracingPrimitiveIndexTargetIntrinsicDecoration(
+               func,
+               CapabilityName::hlsl,
+               UnownedStringSlice("PrimitiveIndex")) &&
+           hasRayTracingPrimitiveIndexTargetIntrinsicDecoration(
+               func,
+               CapabilityName::glsl,
+               UnownedStringSlice("(gl_PrimitiveID)")) &&
+           hasRayTracingPrimitiveIndexTargetIntrinsicDecoration(
+               func,
+               CapabilityName::cuda,
+               UnownedStringSlice("optixGetPrimitiveIndex"));
+}
+
+static IRFunc* findRayTracingPrimitiveIndexFunc(IRModule* module, IRBuilder& builder)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -374,8 +419,7 @@ static IRFunc* findRayTracingPrimitiveIndexFunc(IRModule* module)
         if (!func)
             continue;
 
-        auto nameHint = func->findDecoration<IRNameHintDecoration>();
-        if (nameHint && nameHint->getName() == "__slang_ray_tracing_primitive_index")
+        if (isRayTracingPrimitiveIndexFunc(builder, func))
             return func;
     }
 
@@ -384,10 +428,10 @@ static IRFunc* findRayTracingPrimitiveIndexFunc(IRModule* module)
 
 static IRFunc* getRayTracingPrimitiveIndexFunc(IRModule* module)
 {
-    if (auto existingFunc = findRayTracingPrimitiveIndexFunc(module))
+    IRBuilder builder(module);
+    if (auto existingFunc = findRayTracingPrimitiveIndexFunc(module, builder))
         return existingFunc;
 
-    IRBuilder builder(module);
     builder.setInsertInto(module->getModuleInst());
 
     auto primitiveIndexFunc = builder.createFunc();

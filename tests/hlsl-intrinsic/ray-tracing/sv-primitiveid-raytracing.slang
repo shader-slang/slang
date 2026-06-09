@@ -15,6 +15,7 @@
 //TEST:SIMPLE(filecheck=FORWARD_GLSL):-target glsl -entry main_chit_forward -stage closesthit
 //TEST:SIMPLE(filecheck=FORWARD_HLSL):-target hlsl -entry main_chit_forward -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=FORWARD_DXIL):-target dxil-assembly -entry main_chit_forward -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=NAME_COLLISION_DXIL):-target dxil-assembly -entry main_chit_name_collision -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=ISECT_CUDA):-target cuda -entry main_isect_cuda -stage intersection
 //TEST:SIMPLE(filecheck=AHIT_CUDA):-target cuda -entry main_ahit -stage anyhit
 //TEST:SIMPLE(filecheck=CHIT_CUDA):-target cuda -entry main_chit -stage closesthit
@@ -32,6 +33,11 @@ struct Attribs
 float getPrimitiveIDAsFloat(in int value)
 {
     return float(value);
+}
+
+uint __slang_ray_tracing_primitive_index()
+{
+    return 7;
 }
 
 [shader("intersection")]
@@ -147,3 +153,15 @@ void main_chit_forward(
 
 // FORWARD_DXIL: call i32 @dx.op.primitiveIndex.i32
 // FORWARD_DXIL: sitofp i32
+
+[shader("closesthit")]
+void main_chit_name_collision(
+    inout Payload payload,
+    in BuiltInTriangleIntersectionAttributes attribs,
+    int pid : SV_PrimitiveID)
+{
+    payload.val = float(pid) + float(__slang_ray_tracing_primitive_index()) +
+                  attribs.barycentrics.x + attribs.barycentrics.y;
+}
+
+// NAME_COLLISION_DXIL: call i32 @dx.op.primitiveIndex.i32
