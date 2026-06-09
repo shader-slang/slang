@@ -24,6 +24,25 @@ void consume(int x) {}
 // Returning the result is using it, not discarding it, so no warning.
 int useResult() { return freeFunc(); }
 
+[nodiscard]
+bool check() { return true; }
+
+// `[nodiscard]` is accepted on any `FunctionDeclBase`, so it should also warn when the
+// discarded result comes from a constructor, a user-defined operator, or a generic function.
+struct Widget
+{
+    int v;
+
+    [nodiscard]
+    __init(int x) { v = x; }
+}
+
+[nodiscard]
+Widget operator+(Widget a, Widget b) { return Widget(a.v + b.v); }
+
+[nodiscard]
+T identity<T>(T x) { return x; }
+
 [numthreads(1, 1, 1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -84,6 +103,46 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
                                  ^ result of '[nodiscard]' function is discarded
                                  ^ the result of calling 'freeFunc' is discarded; this function is marked '[nodiscard]'.
 */
+
+    // A cast is a transparent wrapper, so a cast-wrapped discarded call still warns.
+    (uint)freeFunc();
+/*DIAG:
+                  ^ result of '[nodiscard]' function is discarded
+                  ^ the result of calling 'freeFunc' is discarded; this function is marked '[nodiscard]'.
+*/
+
+    // Short-circuit `&&`/`||` pass their right operand through as the expression's result, so a
+    // discarded `[nodiscard]` call in that position warns. Storing the result does not warn.
+    bool stored = cond && check();
+    cond && check();
+/*DIAG:
+                 ^ result of '[nodiscard]' function is discarded
+                 ^ the result of calling 'check' is discarded; this function is marked '[nodiscard]'.
+*/
+    cond || check();
+/*DIAG:
+                 ^ result of '[nodiscard]' function is discarded
+                 ^ the result of calling 'check' is discarded; this function is marked '[nodiscard]'.
+*/
+
+    // A discarded user-defined operator result and a discarded generic-function result both warn.
+    Widget w1 = Widget(1);
+    Widget w2 = Widget(2);
+    w1 + w2;
+/*DIAG:
+       ^ result of '[nodiscard]' function is discarded
+       ^ the result of calling '+' is discarded; this function is marked '[nodiscard]'.
+*/
+    identity<int>(3);
+/*DIAG:
+                 ^ result of '[nodiscard]' function is discarded
+                 ^ the result of calling 'identity' is discarded; this function is marked '[nodiscard]'.
+*/
+
+    // A bare discarded constructor call is not flagged: the call resolves through initializer
+    // handling rather than a direct callee `DeclRef`, so `[nodiscard]` on `__init` has no effect
+    // here. (A discarded constructor call is already an obvious no-op.)
+    Widget(7);
 
     // Storing the result is fine, no warning.
     let loaded = t.load();

@@ -700,9 +700,24 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
 void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
 {
     // Peel transparent wrappers that don't change whether the result is discarded: a call
-    // wrapped in parentheses (e.g. `(t.load());`) still discards its result.
-    while (auto paren = as<ParenExpr>(expr))
-        expr = paren->base;
+    // wrapped in parentheses (`(t.load());`) or a cast (`(uint)t.load();`) still discards the
+    // call's result. A cast is a `TypeCastExpr`, which derives from `InvokeExpr`, so it must be
+    // peeled before the `InvokeExpr` check below; otherwise that check would inspect the cast's
+    // conversion decl instead of the underlying call.
+    for (;;)
+    {
+        if (auto paren = as<ParenExpr>(expr))
+        {
+            expr = paren->base;
+            continue;
+        }
+        if (auto cast = as<TypeCastExpr>(expr); cast && cast->arguments.getCount() >= 1)
+        {
+            expr = cast->arguments[0];
+            continue;
+        }
+        break;
+    }
 
     // A comma operator in a discarded context discards each of its operands, so recurse
     // into them (e.g. `for (int i = 0; i < n; t.load(), i++)` discards `t.load()`).
@@ -719,9 +734,13 @@ void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
         }
     }
 
-    // A ternary `?:` discards the result of whichever arm is selected, so recurse into both
-    // arms (e.g. `cond ? t.load() : t.compute();`). The condition is `arguments[0]`; it is
-    // consumed to choose an arm rather than discarded, so only the two arms are checked.
+    // A ternary `?:` and a short-circuiting `&&`/`||` both yield a chosen operand's result
+    // verbatim, so discarding the whole expression discards that operand's result. Recurse into
+    // the operands that can become the result:
+    //   - both arms of a ternary (`arguments[1]`/`arguments[2]`; the condition `arguments[0]` is
+    //     consumed to choose an arm, not passed through), and
+    //   - the right-hand operand of `&&`/`||` (`arguments[1]`; the left operand is consumed to
+    //     decide whether the right is evaluated, not passed through).
     if (auto select = as<SelectExpr>(expr))
     {
         if (select->arguments.getCount() == 3)
@@ -729,6 +748,12 @@ void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
             maybeDiagnoseDiscardedNodiscardResult(select->arguments[1]);
             maybeDiagnoseDiscardedNodiscardResult(select->arguments[2]);
         }
+        return;
+    }
+    if (auto shortCircuit = as<LogicOperatorShortCircuitExpr>(expr))
+    {
+        if (shortCircuit->arguments.getCount() == 2)
+            maybeDiagnoseDiscardedNodiscardResult(shortCircuit->arguments[1]);
         return;
     }
 
