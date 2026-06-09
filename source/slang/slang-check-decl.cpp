@@ -19251,34 +19251,37 @@ void SemanticsDeclCapabilityVisitor::_checkExtensionMemberCapConflict(Decl* memb
         if (auto req = as<RequireCapabilityAttribute>(mod))
             ownDeclaredCaps.unionWith(req->capabilitySet);
     }
-    if (!ownDeclaredCaps.isEmpty())
-    {
-        if (auto extensionDecl = as<ExtensionDecl>(getParentAggTypeDeclBase(memberDecl)))
-        {
-            if (auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType.type))
-            {
-                if (auto targetTypeDecl = targetDeclRefType->getDeclRef().getDecl())
-                {
-                    // Ensure the target type is capability-checked before reading its
-                    // inferredCapabilityRequirements. _propagateRequirement evaluates
-                    // its nodeCaps argument before its internal ensureDecl call, so we
-                    // must pre-compute it here to avoid reading a null/stale pointer.
-                    // Call unconditionally; _propagateRequirement's own isBeingChecked()
-                    // early-exit handles genuine cycles without needing a guard here.
-                    ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
-                    _propagateRequirement(
-                        this,
-                        ownDeclaredCaps,
-                        memberDecl,
-                        targetTypeDecl,
-                        targetTypeDecl->inferredCapabilityRequirements,
-                        memberDecl->loc);
-                    // Intentionally do not use ownDeclaredCaps after this: we only
-                    // called _propagateRequirement for its conflict-detection side-effect.
-                }
-            }
-        }
-    }
+    if (ownDeclaredCaps.isEmpty())
+        return;
+
+    auto extensionDecl = as<ExtensionDecl>(getParentAggTypeDeclBase(memberDecl));
+    if (!extensionDecl)
+        return;
+
+    auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType.type);
+    if (!targetDeclRefType)
+        return;
+
+    auto targetTypeDecl = targetDeclRefType->getDeclRef().getDecl();
+    if (!targetTypeDecl)
+        return;
+
+    // Ensure the target type is capability-checked before reading its
+    // inferredCapabilityRequirements. _propagateRequirement evaluates
+    // its nodeCaps argument before its internal ensureDecl call, so we
+    // must pre-compute it here to avoid reading a null/stale pointer.
+    // Call unconditionally; _propagateRequirement's own isBeingChecked()
+    // early-exit handles genuine cycles without needing a guard here.
+    ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
+    _propagateRequirement(
+        this,
+        ownDeclaredCaps,
+        memberDecl,
+        targetTypeDecl,
+        targetTypeDecl->inferredCapabilityRequirements,
+        memberDecl->loc);
+    // Intentionally do not use ownDeclaredCaps after this: we only
+    // called _propagateRequirement for its conflict-detection side-effect.
 }
 
 void SemanticsDeclCapabilityVisitor::visitSubscriptDecl(SubscriptDecl* subscriptDecl)

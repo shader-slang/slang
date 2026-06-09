@@ -156,7 +156,8 @@ struct Foo1 : IFoo1
 An `extension` declaration adds members to an existing type. Because the extension can only be used
 where its target type is available, the capabilities declared on the extension itself must be
 compatible with the capabilities of the target type. Declaring an incompatible capability on an
-extension or on one of its non-static member functions is an error.
+extension, on one of its non-static member functions, on a constructor, or on a subscript is an
+error.
 
 ```csharp
 [require(glsl)]
@@ -181,8 +182,9 @@ extension MyType
 }
 ```
 
-Static extension members are exempt from this check because they do not carry an implicit `this`
-parameter and therefore do not require the type to be available in any particular capability context.
+Static extension members (other than constructors) are exempt from this check because they can be
+called without an instance of the target type. Constructors are not exempt: a constructor produces
+a value of the target type, so its capabilities must be compatible with the target's.
 
 ## Capabilities Between Requirement and Implementation
 

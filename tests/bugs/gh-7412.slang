@@ -10,7 +10,7 @@ struct Bar
 // ext1: extension declares [require(hlsl)] but Bar only supports glsl -- should error
 [require(hlsl)]
 extension Bar
-//CHECK:  ^^^ conflicting capability requirement
+//CHECK:  ^^^ error E36100
 //CHECK:  ^^^ requires capability
 {
 }
@@ -20,7 +20,7 @@ extension Bar
 {
     [require(hlsl)]
     void foo2(){}
-//CHECK: ^^^^ conflicting capability requirement
+//CHECK: ^^^^ error E36100
 //CHECK: ^^^^ requires capability
 }
 
@@ -35,7 +35,7 @@ extension Baz
 {
     [require(hlsl)]
     void foo3(){}
-//CHECK: ^^^^ conflicting capability requirement
+//CHECK: ^^^^ error E36100
 //CHECK: ^^^^ requires capability
 }
 
@@ -45,7 +45,7 @@ extension Bar
     [require(hlsl)]
     __init(int x) {}
 /*CHECK:
-    ^^^^^^ conflicting capability requirement
+    ^^^^^^ error E36100
     ^^^^^^ requires capability
 */
 }
@@ -55,7 +55,48 @@ extension Bar
 {
     [require(hlsl)]
     __subscript(int i) -> int
-//CHECK:       ^ conflicting capability requirement
+//CHECK:       ^ error E36100
 //CHECK:       ^ requires capability
     { get { return 0; } }
+}
+
+// ext6: generic extension with extension-level [require(hlsl)] on a [require(glsl)] type -- should error
+[require(glsl)]
+struct GBox<T> { T x; }
+
+[require(hlsl)]
+extension<T> GBox<T>
+//CHECK:     ^^^^ error E36100
+//CHECK:     ^^^^ requires capability
+{
+}
+
+// ext7: member of generic extension with [require(hlsl)] on a [require(glsl)] type -- should error
+extension<T> GBox<T>
+{
+    [require(hlsl)]
+    void gfoo(){}
+//CHECK: ^^^^ error E36100
+//CHECK: ^^^^ requires capability
+}
+
+// ext8: stage capability conflict -- extension requires compute but type only supports fragment
+[require(fragment)]
+struct FragOnly {}
+
+[require(compute)]
+extension FragOnly
+//CHECK:  ^^^^^^^^ error E36100
+//CHECK:  ^^^^^^^^ requires capability
+{
+}
+
+// ext9: extension-level [require] fires even when all members are static
+// The extension declaration itself has [require(hlsl)], which conflicts with Bar's [require(glsl)].
+[require(hlsl)]
+extension Bar
+//CHECK:  ^^^ error E36100
+//CHECK:  ^^^ requires capability
+{
+    static void staticOnly() {}
 }

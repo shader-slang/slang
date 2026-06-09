@@ -94,3 +94,25 @@ extension Foo
     [require(glsl)]
     __subscript(int i) -> int { get { return 0; } }
 }
+
+// Case 10: Generic extension with compatible caps on a typed target.
+[require(glsl)]
+struct GFoo<T>
+{
+}
+
+extension<T> GFoo<T>
+{
+    [require(glsl)]
+    void compatThing() {}
+}
+
+// Case 11: Stage cap -- extension member with matching stage requirement.
+[require(compute)]
+struct ComputeOnly {}
+
+extension ComputeOnly
+{
+    [require(compute)]
+    void computeMethod() {}
+}
