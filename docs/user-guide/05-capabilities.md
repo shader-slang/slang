@@ -157,8 +157,8 @@ An `extension` declaration adds members to an existing type. Because the extensi
 where its target type is available, the capabilities declared on the extension must not be disjoint
 from the target type's capabilities — the two capability sets must share at least one common
 target/stage (non-empty intersection). Declaring a `[require(...)]` attribute on an extension, or
-on one of its non-static member functions, constructors, or subscripts, that is disjoint from the
-target type's capabilities is an error.
+on one of its non-static member functions, constructors, subscripts, or properties, that is disjoint
+from the target type's capabilities is an error.
 
 ```csharp
 [require(glsl)]
@@ -191,9 +191,10 @@ extension MyType {}
 ```
 
 Static extension *member functions* are exempt from this check because they can be called without
-an instance of the target type. A `[require(...)]` attribute on a constructor or subscript is
-always checked: a constructor produces a value of the target type, and a subscript provides indexed
-access to it, so both must be compatible with the target's capabilities. Members that carry no
+an instance of the target type. A `[require(...)]` attribute on a constructor, subscript, or property is
+always checked: a constructor produces a value of the target type, a subscript provides indexed
+access to it, and a property provides named access to it, so all three must be compatible with the
+target's capabilities. Members that carry no
 `[require(...)]` attribute of their own are not individually checked at the member level (the
 extension's own capability constraint, if any, is checked separately at the extension level).
 

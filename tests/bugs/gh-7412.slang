@@ -133,6 +133,19 @@ extension Bar
 {
 }
 
+// ext_combined: extension-level conflict with a non-static member that has no own [require].
+// Only the extension-level error must fire. _checkExtensionMemberCapConflict checks own caps
+// only (not the joined declaredCaps), so `inner` -- which carries no [require] of its own --
+// does not produce a second E36100. A refactor that switches to checking declaredCaps would
+// cause `inner` to also fire, which the exhaustive diagnostic check would catch.
+[require(hlsl)]
+extension Bar
+//CHECK:  ^^^ error E36100
+//CHECK:  ^^^ requires capability
+{
+    void inner() {}
+}
+
 // ext13: property-level [require(hlsl)] in a [require(glsl)] extension -- should error
 extension Bar
 {
