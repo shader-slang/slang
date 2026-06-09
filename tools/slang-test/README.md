@@ -80,8 +80,15 @@ Available APIs:
 - `-generate-hlsl-baselines`: Generate HLSL test baselines
 - `-emit-spirv-via-glsl`: Emit SPIR-V through GLSL instead of directly
 - `-expected-failure-list <file>`: Specify file containing expected failures
-- `-skip-list <file>`: Specify file containing tests to skip (path prefixes)
-- `-exclude-prefix <prefix>`: Exclude tests with specified path prefix
+- `-skip-list <file>`: Specify file containing tests to skip. Each line is
+  either a file-path prefix (matched against the test file path) or an exact
+  expanded subtest display name (e.g. `tests/compute/parameter-block.slang.6 syn (llvm)`).
+  Subtest entries match by exact equality so `.6` does not also match `.60`.
+- `-exclude-prefix <prefix>`: Exclude tests with specified path prefix. The
+  same dual semantics as `-skip-list` apply: a value with no spaces matches
+  by file-path prefix, while an exact expanded subtest display name skips
+  just that subtest. This is useful when a single synthesized subtest crashes
+  the worker before `-expected-failure-list` can reclassify it.
 
 ## Test Types
 
