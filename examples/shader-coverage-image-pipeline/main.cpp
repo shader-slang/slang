@@ -103,28 +103,35 @@ struct CompiledShader
     slang::ICoverageTracingMetadata* coverageMetadata = nullptr;
 };
 
-// Compile pipeline.slang to SPIR-V plus optional coverage metadata.
-// `enableCoverage` toggles the `-trace-coverage*` flags so the same
-// binary can produce a baseline (uncovered) timing measurement.
-// `counterWidthBits` is forwarded to `-trace-coverage-counter-width`
-// when coverage is enabled; valid values are 32 and 64. The default
-// (64) is correct on any Vulkan driver that supports
-// `VK_KHR_shader_atomic_int64`; pass 32 on runtimes that do not
-// (most notably MoltenVK on Apple Silicon as of MoltenVK 1.4).
-//
-// `hitMiss` selects between the two coverage recording modes:
-//   - `false` (Count, default): each counter is incremented with an
-//     atomic add per hit; the slot holds an exact execution count.
-//   - `true` (Boolean, opted into via `-trace-coverage-hit-miss`):
-//     each counter is written non-atomically with `1`; the slot is
-//     `0` if the entry never executed, non-zero otherwise. This
-//     removes all atomic contention (the dominant cost on hot loops
-//     like the bilateral filter), at the price of losing exact
-//     counts. The exhaustive sweep in this demo runs roughly an
-//     order of magnitude faster in hit/miss mode; LCOV output is
-//     identical because the converter treats any positive count as
-//     "covered" either way.
-CompiledShader compileShader(bool enableCoverage, int counterWidthBits, bool hitMiss)
+// Bundles the demo's compile-time choices so call sites name each
+// option at the call site instead of relying on positional `bool`s.
+// Members:
+//   - `enableCoverage` — toggles `-trace-coverage*` flags so the same
+//     binary can produce a baseline (uncovered) timing measurement.
+//   - `counterWidthBits` — forwarded to `-trace-coverage-counter-width`.
+//     `64` is the default on any Vulkan driver that supports
+//     `VK_KHR_shader_atomic_int64`; pass `32` on runtimes that do not
+//     (most notably MoltenVK on Apple Silicon as of MoltenVK 1.4).
+//   - `hitMiss` — selects between the two coverage recording modes:
+//       false (Count, default): each counter is incremented with an
+//       atomic add per hit; the slot holds an exact execution count.
+//       true (Boolean, opted into via `-trace-coverage-hit-miss`):
+//       each counter is written non-atomically with `1`; the slot is
+//       `0` if the entry never executed, non-zero otherwise. This
+//       removes all atomic contention (the dominant cost on hot
+//       loops like the bilateral filter), at the price of losing
+//       exact counts. The exhaustive sweep in this demo runs roughly
+//       an order of magnitude faster in hit/miss mode; LCOV output
+//       is identical because the converter treats any positive count
+//       as "covered" either way.
+struct CompileOptions
+{
+    bool enableCoverage = true;
+    int counterWidthBits = 32;
+    bool hitMiss = false;
+};
+
+CompiledShader compileShader(const CompileOptions& options)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     checkSlang(slang::createGlobalSession(globalSession.writeRef()), "createGlobalSession");
@@ -133,17 +140,19 @@ CompiledShader compileShader(bool enableCoverage, int counterWidthBits, bool hit
     targetDesc.format = SLANG_SPIRV;
     targetDesc.profile = globalSession->findProfile("spirv_1_5");
 
-    std::vector<slang::CompilerOptionEntry> options;
+    // Renamed from `options` to avoid shadowing the `const
+    // CompileOptions& options` parameter.
+    std::vector<slang::CompilerOptionEntry> optionEntries;
     auto pushBool = [&](slang::CompilerOptionName name)
     {
         slang::CompilerOptionEntry e = {};
         e.name = name;
         e.value.kind = slang::CompilerOptionValueKind::Int;
         e.value.intValue0 = 1;
-        options.push_back(e);
+        optionEntries.push_back(e);
     };
     pushBool(slang::CompilerOptionName::EmitSpirvDirectly);
-    if (enableCoverage)
+    if (options.enableCoverage)
     {
         pushBool(slang::CompilerOptionName::TraceCoverage);
         pushBool(slang::CompilerOptionName::TraceFunctionCoverage);
@@ -154,7 +163,7 @@ CompiledShader compileShader(bool enableCoverage, int counterWidthBits, bool hit
         pin.value.kind = slang::CompilerOptionValueKind::Int;
         pin.value.intValue0 = kCoverageBinding;
         pin.value.intValue1 = kCoverageSet;
-        options.push_back(pin);
+        optionEntries.push_back(pin);
 
         // Forward the counter-width selection. The slangc CLI parser
         // converts `-trace-coverage-counter-width <bits>` to a byte
@@ -162,12 +171,12 @@ CompiledShader compileShader(bool enableCoverage, int counterWidthBits, bool hit
         slang::CompilerOptionEntry widthOpt = {};
         widthOpt.name = slang::CompilerOptionName::TraceCoverageCounterByteWidth;
         widthOpt.value.kind = slang::CompilerOptionValueKind::Int;
-        widthOpt.value.intValue0 = counterWidthBits / 8;
-        options.push_back(widthOpt);
+        widthOpt.value.intValue0 = options.counterWidthBits / 8;
+        optionEntries.push_back(widthOpt);
 
         // Hit/miss mode opts the coverage pass into non-atomic stores
         // of `1` instead of atomic adds. Off (count mode) by default.
-        if (hitMiss)
+        if (options.hitMiss)
             pushBool(slang::CompilerOptionName::TraceCoverageHitMiss);
     }
 
@@ -179,8 +188,8 @@ CompiledShader compileShader(bool enableCoverage, int counterWidthBits, bool hit
     sessionDesc.targetCount = 1;
     sessionDesc.searchPaths = searchPaths;
     sessionDesc.searchPathCount = 1;
-    sessionDesc.compilerOptionEntries = options.data();
-    sessionDesc.compilerOptionEntryCount = (uint32_t)options.size();
+    sessionDesc.compilerOptionEntries = optionEntries.data();
+    sessionDesc.compilerOptionEntryCount = (uint32_t)optionEntries.size();
 
     ComPtr<slang::ISession> session;
     checkSlang(globalSession->createSession(sessionDesc, session.writeRef()), "createSession");
@@ -224,7 +233,7 @@ CompiledShader compileShader(bool enableCoverage, int counterWidthBits, bool hit
         (const uint8_t*)code->getBufferPointer(),
         (const uint8_t*)code->getBufferPointer() + code->getBufferSize());
 
-    if (enableCoverage)
+    if (options.enableCoverage)
     {
         diagnostics.setNull();
         checkSlang(
@@ -515,6 +524,23 @@ int main(int argc, char** argv)
             }
         }
 
+        // Warn (but don't block) on the combination most likely to trip
+        // the GPU watchdog (Windows TDR / `VK_ERROR_DEVICE_LOST`) on
+        // this demo's hot bilateral filter: count mode (atomic-add
+        // contention on a few counter slots) + whole-image dispatch
+        // (no per-submission cap). Hit-miss + whole, or count + tiled,
+        // are both safe combinations. The user explicitly asked for
+        // this configuration on the CLI, so we proceed anyway — the
+        // warning is there so a hung run gets attributed to TDR
+        // rather than to a bug in the demo.
+        if (enableCoverage && !coverageHitMiss && !tiledDispatch)
+        {
+            std::cerr << "warning: --coverage-mode=count with --dispatch=whole risks GPU watchdog\n"
+                      << "         reset (Windows TDR / VK_ERROR_DEVICE_LOST) on hot pipelines\n"
+                      << "         like this demo's bilateral filter. If the dispatch hangs, try\n"
+                      << "         --coverage-mode=hit-miss or --dispatch=tiled. Continuing.\n";
+        }
+
         // Build the parenthesized status in one place so the parentheses are
         // self-evidently balanced and a future edit to one branch can't
         // silently unbalance the line.
@@ -524,7 +550,11 @@ int main(int argc, char** argv)
                               "-bit counters, " + coverageModeLabel + " mode)")
                            : " (no coverage)";
         std::cout << "compiling pipeline.slang" << coverageStatus << "\n";
-        auto shader = compileShader(enableCoverage, counterWidthBits, coverageHitMiss);
+        CompileOptions compileOpts;
+        compileOpts.enableCoverage = enableCoverage;
+        compileOpts.counterWidthBits = counterWidthBits;
+        compileOpts.hitMiss = coverageHitMiss;
+        auto shader = compileShader(compileOpts);
 
         uint32_t counterCount = 0;
         uint32_t counterByteWidth = 4;
