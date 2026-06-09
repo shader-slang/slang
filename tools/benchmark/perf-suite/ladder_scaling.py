@@ -35,7 +35,7 @@ def main():
         tag = rec.get("tag")
         if "slangc" not in rec:
             continue
-        p = os.path.join(args.results, tag, "results.json")
+        p = analyze.results_path(args.results, tag)
         if not os.path.exists(p):
             continue
         pts = []

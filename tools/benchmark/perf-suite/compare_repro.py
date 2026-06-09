@@ -14,6 +14,8 @@ baseline are listed separately, not diffed).
 import argparse
 import json
 import os
+
+import analyze
 import statistics
 
 
@@ -21,7 +23,7 @@ def load(run_dir):
     """run_dir/<tag>/results.json -> {(tag, workload, size): record}."""
     out = {}
     for tag in sorted(os.listdir(run_dir)):
-        jp = os.path.join(run_dir, tag, "results.json")
+        jp = analyze.results_path(run_dir, tag)
         if not os.path.isfile(jp):
             continue
         for r in json.load(open(jp)):

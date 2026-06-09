@@ -20,13 +20,15 @@ sensitivity figure, not a user-facing slowdown; mdl_dxr is the realistic signal.
 import argparse
 import json
 import os
+
+import analyze
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def load(results_dir, label):
-    p = os.path.join(results_dir, label, "results.json")
+    p = analyze.results_path(results_dir, label)
     if not os.path.exists(p):
         raise SystemExit(f"no run at {p}; bench.py --label {label} first")
     runs = json.load(open(p))

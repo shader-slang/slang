@@ -89,6 +89,8 @@ jobs:
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE/perf-results"
+          # Keep transient build scratch / regenerable reports out of the results repo.
+          cp "$GITHUB_WORKSPACE/tools/benchmark/perf-suite/perf-results.gitignore" .gitignore
           git config user.name "slang-perf-bot"
           git config user.email "slang-perf-bot@users.noreply.github.com"
           git add -A

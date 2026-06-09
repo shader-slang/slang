@@ -11,6 +11,8 @@ import argparse
 import json
 import math
 import os
+
+import analyze
 import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -31,7 +33,7 @@ def load(index_path, results_dir, timer):
     series = {}  # workload -> [value or None per release]
     recs = []
     for rec in index:
-        p = os.path.join(results_dir, rec["tag"], "results.json")
+        p = analyze.results_path(results_dir, rec["tag"])
         if "slangc" not in rec or not os.path.exists(p):
             continue
         recs.append(rec)
@@ -41,9 +43,8 @@ def load(index_path, results_dir, timer):
     if all(vkey(r["tag"]) != (0, 0, 0) for r in recs):
         recs.sort(key=lambda r: vkey(r["tag"]))
     order = [r["tag"] for r in recs]
-    import analyze
     for i, rec in enumerate(recs):
-        raw = json.load(open(os.path.join(results_dir, rec["tag"], "results.json")))
+        raw = json.load(open(analyze.results_path(results_dir, rec["tag"])))
         runs = {r["workload"]: r for r in analyze.canonical_runs(raw)}
         for wl, r in runs.items():
             st = r["timers"].get(timer)

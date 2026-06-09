@@ -15,7 +15,7 @@ stamps a runner fingerprint. The daily ToT job appends one point and rebuilds.
 
 Layout under --results (a checkout of the perf results repo in CI):
     index.json                   release list {tag,date,version} (fetch_releases.py)
-    <tag>/results.json           per-release sweep (bench.py output) — the history
+    releases/<tag>/results.json  per-release sweep (bench.py output) — the history
     daily/<label>/results.json   one ToT sweep per night (label = <date>-<shortsha>)
     daily/<label>/meta.json      {date, commit, runner, kind:"daily"}
     runner.json                  {fingerprint, label} the history was built on
@@ -77,7 +77,7 @@ def _release_points(results_dir, index_path):
         return []
     pts = []
     for rec in json.load(open(index_path)):
-        rj = os.path.join(results_dir, rec.get("tag", ""), "results.json")
+        rj = analyze.results_path(results_dir, rec.get("tag", ""))
         if "slangc" not in rec or not os.path.exists(rj):
             continue
         pts.append({"label": rec["tag"], "date": rec.get("date", ""), "kind": "release",

@@ -132,17 +132,25 @@ must come from the _same_ machine. The **tracking series** is:
 `track.py` (stdlib) owns this: `register` (stamp a daily run + rebuild),
 `rebuild` (recompute `_tracking/tracking.json`), `stamp-runner` (record the
 runner fingerprint the history was built on), `runner-id`, `summary`. Points are
-reduced to per-(workload, timer) `min` via `analyze.canonical_runs`, so swept
+reduced to per-(workload, timer) `median` via `analyze.canonical_runs`, so swept
 (multi-size) runs collapse to `default_size` and history vs daily compare
 like-with-like.
 
 ## Storage layout (the `slang-compile-perf` results repo)
 
     index.json                   release manifest {tag,date,version} (fetch_releases.py)
-    <tag>/results.json           per-release sweep — the history baseline
+    releases/<tag>/results.json  per-release sweep — the history baseline (source of truth)
     daily/<date>-<sha>/results.json + meta.json   one ToT sweep per night
     runner.json                  {fingerprint,label} the history was built on
     _tracking/tracking.json      derived series consumed by plots / trend.py
+
+`results.json` (all of median/min/mean/stdev per timer) is the only measurement
+artifact stored — no CSV; the analysis/report tools read it directly. Excluded
+from the repo (transient or regenerable): generated sources + compiled outputs
+(`gen/`, which `bench.py --gen-dir` keeps out of the results dir by default) and
+the derived HTML/SVG reports (`_analysis/`, `_sweep/`, `_breakdown/`). Both
+workflows copy `perf-suite/perf-results.gitignore` into the results checkout
+before `git add -A` so this scratch never gets committed.
 
 ## Workflows
 

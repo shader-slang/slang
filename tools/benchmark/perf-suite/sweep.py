@@ -13,6 +13,8 @@ Typical:
 import argparse
 import json
 import os
+
+import analyze
 import subprocess
 import sys
 
@@ -42,7 +44,7 @@ def main():
     failures = []
     for i, rec in enumerate(ready, 1):
         tag = rec["tag"]
-        done = os.path.join(args.results, tag, "results.json")
+        done = analyze.results_path(args.results, tag)
         if os.path.exists(done) and not args.force:
             # skip only if the requested workloads are already present (a bare
             # results.json from a different --only run must NOT mask new work)
@@ -54,7 +56,7 @@ def main():
         print(f"[{i}/{len(ready)}] {tag} ({rec.get('date','?')})")
         cmd = [sys.executable, os.path.join(HERE, "bench.py"),
                "--slangc", rec["slangc"], "--label", tag,
-               "--out", args.results,
+               "--out", os.path.join(args.results, "releases"),
                "--samples", str(args.samples), "--warmup", str(args.warmup)]
         if args.only:
             cmd += ["--only", args.only]

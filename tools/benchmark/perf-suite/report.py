@@ -62,7 +62,7 @@ def main():
     # primary timers per workload
     primary = {}
     for rec in index:
-        p = os.path.join(args.results, rec.get("tag", ""), "results.json")
+        p = analyze.results_path(args.results, rec.get("tag", ""))
         if rec.get("slangc") and os.path.exists(p):
             for run in json.load(open(p)):
                 primary[run["workload"]] = set(run.get("primary_timers", []))

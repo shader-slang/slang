@@ -17,6 +17,7 @@ import json
 import os
 
 import analyze
+import breakdown  # stacked phase-composition vs N
 import plot  # for esc() + PALETTE
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -42,7 +43,7 @@ code{background:#f0f1f3;padding:1px 5px;border-radius:3px;font-size:13px}
 def load_sweeps(results_dir, label, metric):
     """{workload: {"timers": {timer: [(size, val), ...]}, "primary": [...]}} for
     every workload in results/<label>/results.json that has >=2 distinct sizes."""
-    path = os.path.join(results_dir, label, "results.json")
+    path = analyze.results_path(results_dir, label)
     if not os.path.exists(path):
         raise SystemExit(f"no results at {path}; run bench.py --label {label} --sweep first")
     runs = json.load(open(path))
@@ -88,37 +89,35 @@ def superlinear(k):
     return k is not None and k > 1.15
 
 
-def render_panels(sweeps, metric, out, floor=0.0, cols=3):
-    """One panel per workload: each primary timer (+ compileInner) as a line vs N,
-    linear zero-based y, with the compileInner fit annotated."""
+def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
+    """One panel per workload: just the compileInner scaling curve vs N (zero-based
+    linear y). The panel title links to the workload's own page (full sub-counter
+    stacked view + analysis + numbers); a compact ∝N^k flag stays for at-a-glance
+    super-linearity. The per-timer lines and fit text block live on those pages."""
     names = sorted(sweeps)
     n = len(names)
     cols = min(cols, n) or 1
     rows = (n + cols - 1) // cols
     pw, ph = 300, 188
-    # right margin holds the per-panel legend AND the (long) fit annotation, so it
-    # must fit e.g. "fit: -4051ms + 62.13·N  (R²=0.966)" (~200px) without spilling
-    # into the next column or off the canvas.
-    ml, mt, mr, mb = 56, 40, 218, 58
+    ml, mt, mr, mb = 56, 40, 24, 58
     cw, chh = ml + pw + mr, mt + ph + mb
-    W = cols * cw + 24       # +pad so the rightmost legend/fit text isn't clipped
-    H = rows * chh + 60      # +pad below the last row
+    W = cols * cw + 24
+    H = rows * chh + 60
 
-    s = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
-         f'viewBox="0 0 {W} {H}" font-family="sans-serif" font-size="11">',
+    s = [f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
+         f'width="{W}" height="{H}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet" '
+         f'font-family="sans-serif" font-size="11">',
          f'<rect width="{W}" height="{H}" fill="white"/>',
          f'<text x="12" y="30" font-size="17" font-weight="bold">'
-         f'Complexity sweep — compile time vs workload size N ({metric} ms, linear)</text>']
+         f'Complexity sweep — compileInner vs workload size N ({metric} ms, linear)</text>']
 
     for k, wl in enumerate(names):
         timers = sweeps[wl]["timers"]
-        primary = [t for t in sweeps[wl]["primary"] if t in timers]
-        # always show compileInner; primaries first, compileInner last (bold)
-        lines = [t for t in primary if t != "compileInner"]
-        if "compileInner" in timers:
-            lines.append("compileInner")
-        sizes = sorted({sz for t in lines for sz, _ in timers[t]})
-        vmax = max((v for t in lines for _, v in timers[t]), default=1.0) or 1.0
+        if "compileInner" not in timers:
+            continue
+        pts_ci = timers["compileInner"]
+        sizes = [sz for sz, _ in pts_ci]
+        vmax = max((v for _, v in pts_ci), default=1.0) or 1.0
         nmin, nmax = sizes[0], sizes[-1]
         hi = vmax * 1.08
 
@@ -128,62 +127,124 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3):
         xmap = lambda x: ox + ml + (x - nmin) / (nmax - nmin) * pw if nmax > nmin else ox + ml + pw / 2
         ymap = lambda v: oy + mt + ph - (v / hi) * ph
 
-        s.append(f'<text x="{ox+ml}" y="{oy+18}" font-size="13" font-weight="600">{plot.esc(wl)}</text>')
+        ft = fit(pts_ci, floor)
+        kk = ft["k"]
+        kcl = "#c0392b" if superlinear(kk) else "#888"
+        link = (link_for or {}).get(wl)
+        nfill = "#1a5fb4" if link else "#1a1a1a"
+        deco = ' text-decoration="underline"' if link else ""
+        ttl = (f'<text x="{ox+ml}" y="{oy+18}" font-size="13" font-weight="600" fill="{nfill}"{deco}>'
+               f'{plot.esc(wl)}</text>')
+        if link:
+            ttl = f'<a xlink:href="{plot.esc(link)}" href="{plot.esc(link)}" target="_top">{ttl}</a>'
+        s.append(ttl)
+        s.append(f'<text x="{ox+ml+pw}" y="{oy+18}" text-anchor="end" font-size="11" '
+                 f'fill="{kcl}" font-weight="600">{plot.esc(f"∝N^{kk:.2f}")}</text>')
 
-        # y gridlines (0, mid, max)
         for frac in (0.0, 0.5, 1.0):
             yv = hi * frac
             y = ymap(yv)
             s.append(f'<line x1="{ox+ml:.1f}" y1="{y:.1f}" x2="{ox+ml+pw:.1f}" y2="{y:.1f}" stroke="#eee"/>')
             lbl = f"{yv:.0f}" if yv >= 10 else f"{yv:.1f}"
             s.append(f'<text x="{ox+ml-4:.1f}" y="{y+3:.1f}" text-anchor="end" fill="#999">{lbl}</text>')
-        # axes
         s.append(f'<line x1="{ox+ml:.1f}" y1="{oy+mt:.1f}" x2="{ox+ml:.1f}" y2="{oy+mt+ph:.1f}" stroke="#333"/>')
         s.append(f'<line x1="{ox+ml:.1f}" y1="{oy+mt+ph:.1f}" x2="{ox+ml+pw:.1f}" y2="{oy+mt+ph:.1f}" stroke="#333"/>')
-        # x ticks: every swept size
         for sz in sizes:
             x = xmap(sz)
             s.append(f'<line x1="{x:.1f}" y1="{oy+mt+ph:.1f}" x2="{x:.1f}" y2="{oy+mt+ph+3:.1f}" stroke="#999"/>')
             s.append(f'<text x="{x:.1f}" y="{oy+mt+ph+15:.1f}" text-anchor="middle" fill="#666">{sz}</text>')
         s.append(f'<text x="{ox+ml+pw/2:.0f}" y="{oy+mt+ph+34:.0f}" text-anchor="middle" fill="#444">N</text>')
 
-        # lines
-        for li, tname in enumerate(lines):
-            color = plot.PALETTE[li % len(plot.PALETTE)]
-            bold = tname == "compileInner"
-            pts = [(xmap(x), ymap(v)) for x, v in timers[tname]]
-            if len(pts) >= 2:
-                path = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
-                s.append(f'<polyline points="{path}" fill="none" stroke="{color}" '
-                         f'stroke-width="{2.6 if bold else 1.6}"/>')
-            for x, y in pts:
-                s.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{2.4 if bold else 1.8}" fill="{color}"/>')
-            ly = oy + mt + 4 + li * 16
-            weight = ' font-weight="600"' if bold else ""
-            s.append(f'<line x1="{ox+ml+pw+10}" y1="{ly}" x2="{ox+ml+pw+28}" y2="{ly}" '
-                     f'stroke="{color}" stroke-width="{3 if bold else 2}"/>')
-            s.append(f'<text x="{ox+ml+pw+32}" y="{ly+4}" fill="#222"{weight}>{plot.esc(tname)}</text>')
-
-        # fit annotation (compileInner): floor-subtracted power-law exponent
-        if "compileInner" in timers:
-            ft = fit(timers["compileInner"], floor)
-            k, top = ft["k"], ft["top"]
-            ly = oy + mt + 4 + len(lines) * 16 + 10
-            kcl = "#c0392b" if superlinear(k) else "#555"
-            s.append(f'<text x="{ox+ml+pw+10}" y="{ly}" fill="{kcl}" font-weight="600">'
-                     f'{plot.esc(f"(t−floor) ∝ N^{k:.2f}")}'
-                     f'<tspan fill="#888" font-weight="400"> (R²={ft["pow_r2"]:.3f})</tspan></text>')
-            s.append(f'<text x="{ox+ml+pw+10}" y="{ly+15}" fill="#777">'
-                     f'{plot.esc(f"floor {floor:.0f}ms (minimal)")}</text>')
-            if top:
-                tcl = "#c0392b" if top > 2.15 else "#777"
-                s.append(f'<text x="{ox+ml+pw+10}" y="{ly+30}" fill="{tcl}">'
-                         f'{plot.esc(f"top-2×: {top:.2f}×")}</text>')
+        pts = [(xmap(x), ymap(v)) for x, v in pts_ci]
+        if len(pts) >= 2:
+            path = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+            s.append(f'<polyline points="{path}" fill="none" stroke="#2171b5" stroke-width="2.6"/>')
+        for x, y in pts:
+            s.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.4" fill="#2171b5"/>')
 
     s.append("</svg>")
     with open(out, "w") as fh:
         fh.write("\n".join(s))
     return out
+
+
+def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
+    """One detail page per swept workload: the stacked sub-counter view vs N, the
+    scaling analysis (floor / k / top-2×), and the raw per-size sweep numbers.
+    Returns {workload: href relative to the sweep report} for linking."""
+    import inspect
+    import manifest
+    wdir = os.path.join(outdir, "workloads")
+    os.makedirs(wdir, exist_ok=True)
+    pre = ("background:#fff;border:1px solid #eee;border-radius:6px;padding:8px;overflow:auto")
+    links = {}
+    for wl in sorted(sweeps):
+        spec = manifest.BY_NAME.get(wl)
+        timers = sweeps[wl]["timers"]
+        ci = timers.get("compileInner")
+        if not ci:
+            continue
+        svgp = os.path.join(wdir, f"{wl}.svg")
+        breakdown.render_stacked_sweep(
+            results_dir, label, metric, svgp, cols=1, names=[wl], panel=(1000, 420),
+            title=f"{wl} — phase composition vs N ({label}, {metric} ms)")
+        svg = open(svgp).read()
+
+        ft = fit(ci, floor)
+        kk, top = ft["k"], ft["top"]
+        kcls = "reg" if superlinear(kk) else "flat"
+        topcls = "reg" if (top and top > 2.15) else "flat"
+        desc = (inspect.getdoc(spec.gen) if spec and spec.gen else "") or "(no description)"
+        flags = " ".join(spec.extra_flags) if spec and spec.extra_flags else "(none)"
+        meta = (f"<b>bucket:</b> {plot.esc(spec.bucket)} &nbsp;·&nbsp; <b>mode:</b> "
+                f"{plot.esc(spec.mode)} &nbsp;·&nbsp; <b>flags:</b> <code>{plot.esc(flags)}</code>"
+                if spec else "")
+
+        # sweep numbers: one row per size; compileInner + the workload's primary timers
+        cols_t = ["compileInner"] + [t for t in sweeps[wl]["primary"]
+                                     if t != "compileInner" and t in timers]
+        sizes = [sz for sz, _ in ci]
+        bytimer = {t: dict(timers[t]) for t in cols_t}
+        num = ["<table><tr><th class=num>N</th>"
+               + "".join(f"<th class=num>{html.escape(t)}</th>" for t in cols_t) + "</tr>"]
+        for sz in sizes:
+            cells = "".join(f"<td class=num>{bytimer[t].get(sz, float('nan')):.0f}</td>"
+                            if bytimer[t].get(sz) is not None else "<td class=num>–</td>"
+                            for t in cols_t)
+            num.append(f"<tr><td class=num>{sz}</td>{cells}</tr>")
+        num.append("</table>")
+
+        body = (f'<!doctype html><meta charset="utf-8">'
+                f"<title>{html.escape(wl)} — sweep ({html.escape(label)})</title>"
+                f"<style>{CSS}</style><div class='wrap'>"
+                f"<p><a href='../sweep_report.html'>&larr; all workloads</a></p>"
+                f"<h1>{html.escape(wl)}</h1>"
+                f"<p style='color:#444;white-space:pre-wrap'>{html.escape(desc)}</p>"
+                f"<p class='small'>{meta}</p>"
+                f"<h2>Phase composition vs N (stacked sub-counters)</h2>"
+                f"<p class='small'>compileInner split into phase buckets (named leaves + "
+                f"<code>(self)</code> residuals) stacked across the sweep sizes — the top edge "
+                f"is compileInner, so you can see <i>which</i> phase drives the scaling.</p>"
+                f"<div class='chart'>{svg}</div>"
+                f"<h2>Scaling analysis</h2>"
+                f"<p class='small'>floor-subtracted power-law fit "
+                f"<code>(t − floor) = a·N<sup>k</sup></code>; <b>floor</b> = the "
+                f"<code>minimal</code> workload (fixed per-compile cost), <b>k</b> the global "
+                f"exponent, <b>top-2×</b> the local high-end doubling ratio.</p>"
+                f"<table><tr><th class=num>N range</th><th class=num>floor (ms)</th>"
+                f"<th class=num>k (work)</th><th class=num>fit R²</th>"
+                f"<th class=num>t(N<sub>min</sub>)</th><th class=num>t(N<sub>max</sub>)</th>"
+                f"<th class=num>top-2×</th></tr>"
+                f"<tr><td class=num>{sizes[0]}–{sizes[-1]}</td><td class=num>{floor:.0f}</td>"
+                f"<td class='num {kcls}'>{kk:.2f}</td><td class=num>{ft['pow_r2']:.3f}</td>"
+                f"<td class=num>{ci[0][1]:.0f}</td><td class=num>{ci[-1][1]:.0f}</td>"
+                f"<td class='num {topcls}'>{(f'{top:.2f}×' if top else '–')}</td></tr></table>"
+                f"<h2>Sweep numbers ({metric} ms)</h2>" + "".join(num)
+                + "</div>")
+        with open(os.path.join(wdir, f"{wl}.html"), "w") as fh:
+            fh.write(body)
+        links[wl] = f"workloads/{wl}.html"
+    return links
 
 
 def main():
@@ -202,15 +263,19 @@ def main():
     # build (the suite's floor canary). Subtracted before the power-law fit so the
     # exponent reflects feature work, not the floor. 0 if minimal wasn't run.
     floor = 0.0
-    raw = json.load(open(os.path.join(args.results, args.label, "results.json")))
+    raw = json.load(open(analyze.results_path(args.results, args.label)))
     for r in raw:
         if r["workload"] == "minimal" and r["timers"].get("compileInner"):
             floor = r["timers"]["compileInner"][args.metric]
             break
 
-    outdir = os.path.join(args.results, args.label, "_sweep")
+    outdir = os.path.join(analyze.results_dir_for(args.results, args.label), "_sweep")
     os.makedirs(outdir, exist_ok=True)
-    svg = render_panels(sweeps, args.metric, os.path.join(outdir, "sweep_curves.svg"), floor)
+    # Per-workload pages (stacked sub-counters + analysis + numbers), then the
+    # index's compileInner-only curves linking into them.
+    links = write_sweep_pages(args.results, args.label, args.metric, sweeps, floor, outdir)
+    svg = render_panels(sweeps, args.metric, os.path.join(outdir, "sweep_curves.svg"),
+                        floor, link_for=links)
     inline = open(svg).read()
 
     names = sorted(sweeps)
@@ -221,49 +286,22 @@ def main():
          f'<p class="sub">build <b>{html.escape(args.label)}</b> · metric: {args.metric} (ms) · '
          f'{len(names)} swept workload(s) · compile time vs workload size <code>N</code>, '
          "each curve a single binary scaled simple→complex.</p>",
-         "<h2>Scaling curves</h2>",
-         '<p class="small">Each panel: the workload\'s primary phase timers and '
-         '<b>compileInner</b> (bold) on a zero-based linear axis vs <code>N</code>. '
-         'Headlined with the floor-subtracted power-law exponent <b>(t−floor) ∝ N<sup>k</sup></b> '
-         '(red when k&gt;1.15 ⇒ super-linear), the measured floor, and the top-doubling ratio.</p>',
-         f'<div class="chart">{inline}</div>',
-         "<h2>Scaling fit (compileInner)</h2>",
-         f'<p class="small"><b>floor</b> = fixed per-compile cost, measured as the '
-         f'<code>minimal</code> workload on this build (<b>{floor:.0f} ms</b>) — subtracted '
-         'before the fit so the exponent reflects feature work, not the floor. '
-         '<b>k</b> = power-law exponent of <code>(t − floor) = a·N<sup>k</sup></code> '
-         '(log-log fit): <b>k≈1</b> linear, <b>k&gt;1</b> super-linear — always positive, '
-         'unlike a back-extrapolated linear intercept. <b>top-2×</b> = '
-         't(N<sub>max</sub>)/t(N<sub>max</sub>/2), the <i>local</i> high-end slope. '
-         'When <b>k</b> and <b>top-2×</b> disagree the exponent varies across the range '
-         '(near-linear at small N, bending up at large N).</p>',
-         "<table><tr><th>Workload</th><th class=num>N range</th><th class=num>floor (ms)</th>"
-         "<th class=num>k (work)</th><th class=num>fit R²</th>"
-         "<th class=num>t(N<sub>min</sub>)</th><th class=num>t(N<sub>max</sub>)</th>"
-         "<th class=num>top-2×</th></tr>"]
-    for wl in names:
-        pts = sweeps[wl]["timers"].get("compileInner")
-        if not pts:
-            continue
-        ft = fit(pts, floor)
-        k, top = ft["k"], ft["top"]
-        n0, y0, n1, y1 = pts[0][0], pts[0][1], pts[-1][0], pts[-1][1]
-        kcls = "reg" if superlinear(k) else "flat"
-        topcls = "reg" if (top and top > 2.15) else "flat"
-        tops = f"{top:.2f}×" if top else "—"
-        H.append(f"<tr><td>{html.escape(wl)}</td><td class=num>{n0}–{n1}</td>"
-                 f"<td class=num>{floor:.0f}</td>"
-                 f"<td class='num {kcls}'>{k:.2f}</td><td class=num>{ft['pow_r2']:.3f}</td>"
-                 f"<td class=num>{y0:.0f}</td><td class=num>{y1:.0f}</td>"
-                 f"<td class='num {topcls}'>{tops}</td></tr>")
-    H.append("</table>")
+         "<h2>Scaling curves (compileInner)</h2>",
+         '<p class="small">Each panel is one workload\'s <b>compileInner</b> vs '
+         '<code>N</code> on a zero-based linear axis, flagged with the floor-subtracted '
+         'exponent <b>∝N<sup>k</sup></b> (red ⇒ super-linear, k&gt;1.15). '
+         f'<b>Click a workload name</b> for its sub-counter stacked view, the full scaling '
+         f'analysis (floor {floor:.0f} ms / k / top-2×), and the raw sweep numbers.</p>',
+         f'<div class="chart">{inline}</div>']
     H.append('<div class="note"><b>Reading these:</b> these synthetic workloads amplify one '
-             'compiler pass each — the curve <i>shape</i> (the exponent <b>k</b>), not the '
+             'compiler pass each — the curve <i>shape</i> (the exponent <b>k</b> of the '
+             'floor-subtracted fit <code>(t − floor) = a·N<sup>k</sup></code>), not the '
              'absolute ms, is the signal. <b>k≈1</b> ⇒ cost is linear in code size; '
              '<b>k&gt;1</b> ⇒ a pass whose cost grows faster than its input, where regressions '
-             'on large real shaders hide. The fixed floor is the <code>minimal</code> workload '
-             '(subtracted here, not refitted per workload), which is also the suite\'s '
-             'standalone regression canary for "the stdlib got heavier".</div>')
+             'on large real shaders hide. The fixed <b>floor</b> is the <code>minimal</code> '
+             'workload (subtracted before the fit, not refitted per workload), also the suite\'s '
+             'standalone canary for "the stdlib got heavier". Per-workload pages carry the full '
+             'analysis and numbers.</div>')
     H.append('<p class="small">Generated by perf-suite/sweep_report.py from '
              f'results/{html.escape(args.label)}/results.json. Companion to report.py '
              '(cross-release) and ladder_scaling.py (cross-release fit table).</p>')

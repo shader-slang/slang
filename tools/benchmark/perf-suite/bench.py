@@ -173,8 +173,8 @@ def real_error(text):
     return None
 
 
-def run_spec(slangc, spec, size, samples, warmup, root):
-    gen_dir = os.path.join(root, "gen", spec.name + f"_n{size}")
+def run_spec(slangc, spec, size, samples, warmup, gen_root):
+    gen_dir = os.path.join(gen_root, spec.name + f"_n{size}")
     if os.path.exists(gen_dir):
         shutil.rmtree(gen_dir)
     os.makedirs(gen_dir, exist_ok=True)
@@ -242,6 +242,11 @@ def main():
                     help="comma-separated workload names to run (default all)")
     ap.add_argument("--sweep", action="store_true",
                     help="run each workload's sweep_sizes instead of default_size")
+    ap.add_argument("--gen-dir", default=None,
+                    help="scratch dir for generated sources + compiled outputs "
+                         "(default: a tempdir, auto-removed — keeps the results dir, which "
+                         "is committed to the perf-results repo, free of build scratch). "
+                         "Pass a path to keep them for inspection.")
     args = ap.parse_args()
 
     slangc = os.path.abspath(args.slangc)
@@ -258,13 +263,18 @@ def main():
 
     root = os.path.join(os.path.abspath(args.out), args.label)
     os.makedirs(root, exist_ok=True)
+    # Generated sources + compiled outputs are large, transient build scratch; keep
+    # them OUT of the results dir so it stores only results.json. Default to a
+    # tempdir that is removed at the end (overridable with --gen-dir to keep them).
+    gen_root = os.path.abspath(args.gen_dir) if args.gen_dir else tempfile.mkdtemp(prefix="perfsuite_gen_")
+    os.makedirs(gen_root, exist_ok=True)
 
     records = []
     for spec in specs:
         sizes = spec.sweep_sizes if (args.sweep and spec.sweep_sizes) else [spec.default_size]
         for size in sizes:
             print(f"[run] {spec.name:18s} n={size:<5d} ", end="", flush=True)
-            rec = run_spec(slangc, spec, size, args.samples, args.warmup, root)
+            rec = run_spec(slangc, spec, size, args.samples, args.warmup, gen_root)
             rec["label"] = args.label
             rec["slangc"] = slangc
             records.append(rec)
@@ -288,25 +298,14 @@ def main():
     with open(jpath, "w") as fh:
         json.dump(records, fh, indent=2)
 
-    # CSV (long format: one row per timer)
-    cpath = os.path.join(root, "results.csv")
-    with open(cpath, "w") as fh:
-        fh.write("label,workload,bucket,size,mode,timer,median_ms,min_ms,stdev_ms,n,ok,primary\n")
-        for r in records:
-            for tname, st in r["timers"].items():
-                if st is None:
-                    continue
-                primary = 1 if tname in r["primary_timers"] else 0
-                fh.write(
-                    f'{r["label"]},{r["workload"]},{r["bucket"]},{r["size"]},{r["mode"]},'
-                    f'{tname},{st["median"]},{st["min"]},{st["stdev"]},{st["n"]},'
-                    f'{int(r["ok"])},{primary}\n'
-                )
+    # results.json is the single source of truth (all of median/min/mean/stdev per
+    # timer); the analysis/report tools read it directly. No CSV is emitted.
+    if not args.gen_dir:
+        shutil.rmtree(gen_root, ignore_errors=True)
 
     n_ok = sum(1 for r in this_run if r["ok"])
     print(f"\n{n_ok}/{len(this_run)} runs ok")
     print(f"wrote {jpath}")
-    print(f"wrote {cpath}")
     if n_ok != len(this_run):
         sys.exit(1)
 

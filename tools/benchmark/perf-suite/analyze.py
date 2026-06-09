@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Stack per-release perf results into time-series and flag regressions.
 
-Loads results/<tag>/results.json for every release in releases/index.json
+Loads releases/<tag>/results.json for every release in the index
 (chronological order), then for each (workload, timer):
   - builds a release-ordered series of the chosen metric (median by default —
     reflects the typical run; --metric min/mean also available),
@@ -32,6 +32,23 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # emission + any bundled downstream tool such as spirv-opt).
 LEAF_TIMERS = ["parseTranslationUnit", "SemanticChecking", "generateIR",
                "specializeModule", "simplifyIR", "linkIR", "unrollLoopsInModule"]
+
+
+def results_dir_for(results_dir, label):
+    """Directory holding a label's results.json (and its derived _sweep/_breakdown).
+    Release sweeps live under releases/<tag>/, nightly ToT under daily/<label>/,
+    ad-hoc/dev builds at <label>/ (top level). Returns the first that exists, else
+    the releases/ path (the canonical location for release tags)."""
+    for sub in ("releases", "daily", ""):
+        d = os.path.join(results_dir, sub, label) if sub else os.path.join(results_dir, label)
+        if os.path.exists(os.path.join(d, "results.json")):
+            return d
+    return os.path.join(results_dir, "releases", label)
+
+
+def results_path(results_dir, label):
+    """Path to a label's results.json — see results_dir_for()."""
+    return os.path.join(results_dir_for(results_dir, label), "results.json")
 
 
 def leaf_deltas(lookup, ptag, tag, wl):
@@ -78,7 +95,7 @@ def load_series(index, results_dir, metric):
         if "slangc" not in rec:
             continue
         tag, date = rec["tag"], rec.get("date", "?")
-        path = os.path.join(results_dir, tag, "results.json")
+        path = results_path(results_dir, tag)
         if not os.path.exists(path):
             continue
         order.append((tag, date))
@@ -163,7 +180,7 @@ def slope_report(results_dir, label, metric):
     --sweep run (multiple sizes per workload). A regression in `floor` (heavier
     stdlib, e.g. PR #9808) is a different bug from a regression in `slope`
     (a pass got per-element slower) or in scaling (slope rising super-linearly)."""
-    path = os.path.join(results_dir, label, "results.json")
+    path = results_path(results_dir, label)
     if not os.path.exists(path):
         raise SystemExit(f"no results at {path} (run bench.py --sweep --label {label})")
     by_wl = {}
@@ -229,7 +246,7 @@ def main():
     for rec in index:
         if "slangc" not in rec:
             continue
-        p = os.path.join(args.results, rec["tag"], "results.json")
+        p = results_path(args.results, rec["tag"])
         if os.path.exists(p):
             for run in json.load(open(p)):
                 primary[run["workload"]] = set(run.get("primary_timers", []))
