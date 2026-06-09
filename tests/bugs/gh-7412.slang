@@ -146,6 +146,21 @@ extension Bar
     void inner() {}
 }
 
+// ext_both: extension AND member each have their own incompatible [require].
+// Both errors must fire independently: the member's own [require(hlsl)] is disjoint from
+// Bar's [require(glsl)], so the cascade-suppression logic (own-caps-only) does not apply
+// here -- the member is independently checked and must also produce E36100.
+[require(hlsl)]
+extension Bar
+//CHECK:  ^^^ error E36100
+//CHECK:  ^^^ requires capability
+{
+    [require(hlsl)]
+    void m() {}
+//CHECK: ^ error E36100
+//CHECK: ^ requires capability
+}
+
 // ext13: property-level [require(hlsl)] in a [require(glsl)] extension -- should error
 extension Bar
 {
