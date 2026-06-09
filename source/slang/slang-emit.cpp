@@ -1106,6 +1106,14 @@ Result linkAndOptimizeIR(
             });
             return SLANG_FAIL;
         }
+        // Opt-in hit/miss mode (off by default): record whether each entry
+        // executed (non-atomic store of 1) instead of an exact count.
+        bool coverageHitMiss = false;
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageHitMiss))
+        {
+            if (values->getCount() > 0)
+                coverageHitMiss = (*values)[0].intValue != 0;
+        }
         SLANG_PASS(
             instrumentCoverage,
             sink,
@@ -1115,6 +1123,7 @@ Result linkAndOptimizeIR(
             reservedSpaces.getBuffer(),
             (int)reservedSpaces.getCount(),
             counterByteWidth,
+            coverageHitMiss,
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);
