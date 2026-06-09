@@ -1970,6 +1970,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         specificCapabilityRequested = true;
                     break;
                 case CompilerOptionValueKind::String:
+                    // User made a specific capability request
                     specificCapabilityRequested = true;
                     break;
                 }

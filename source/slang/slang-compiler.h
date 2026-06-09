@@ -228,7 +228,6 @@ enum class DiagnosticCategory
     None = 0,
     Capability = 1 << 0,
 };
-
 template<typename P, typename... Args>
 bool maybeDiagnose(
     DiagnosticSink* sink,
