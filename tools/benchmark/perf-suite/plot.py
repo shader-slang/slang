@@ -48,7 +48,7 @@ def load(index_path, results_dir, timer):
         for wl, r in runs.items():
             st = r["timers"].get(timer)
             series.setdefault(wl, [None] * len(recs))
-            series[wl][i] = st["min"] if st else None
+            series[wl][i] = st["median"] if st else None
     return order, series
 
 
@@ -86,7 +86,7 @@ def render(order, series, title, ylabel, logy, normalize, highlight, out):
     xmap = lambda i: ml + (i * pw / (n - 1) if n > 1 else pw / 2)
 
     s = []
-    s.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" font-family="sans-serif" font-size="12">')
+    s.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet" font-family="sans-serif" font-size="12">')
     s.append(f'<rect width="{W}" height="{H}" fill="white"/>')
     s.append(f'<text x="{ml}" y="28" font-size="17" font-weight="bold">{esc(title)}</text>')
 
@@ -169,6 +169,7 @@ def render_small_multiples(order, series, title, out, cols=4):
     nrel = len(order)
 
     s = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
+         f'viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet" '
          f'font-family="sans-serif" font-size="11">',
          f'<rect width="{W}" height="{H}" fill="white"/>',
          f'<text x="12" y="26" font-size="17" font-weight="bold">{esc(title)}</text>']

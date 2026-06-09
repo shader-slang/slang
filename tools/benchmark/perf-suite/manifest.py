@@ -179,6 +179,38 @@ WORKLOADS = [
         primary_timers=["SemanticChecking", "frontEndExecute"],
         sweep_sizes=[250, 500, 1000, 2000],
     ),
+    # ---- type checking: operator overload resolution + implicit conversion -
+    # Front-end-only (module mode) stressors for the quietly expensive part of
+    # semantic checking: every binary operator and cross-type assignment runs
+    # overload resolution + conversion-cost ranking. parse/sema_generics don't
+    # isolate this (uniform types / generic-constraint cost dominate there).
+    WorkloadSpec(
+        name="operator_typecheck",
+        bucket="typecheck",
+        gen=workloads.gen_operator_typecheck,
+        default_size=800,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[200, 400, 800, 1600],
+    ),
+    WorkloadSpec(
+        name="implicit_conversion",
+        bucket="typecheck",
+        gen=workloads.gen_implicit_conversion,
+        default_size=600,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[150, 300, 600, 1200],
+    ),
+    WorkloadSpec(
+        name="overload_resolution",
+        bucket="typecheck",
+        gen=workloads.gen_overload_resolution,
+        default_size=600,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[150, 300, 600, 1200],
+    ),
     WorkloadSpec(
         name="specialization",
         bucket="specialization",

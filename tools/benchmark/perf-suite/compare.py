@@ -10,7 +10,7 @@ variance, so what's left is your change's actual impact:
     python3 compare.py base head
 
 For every workload's primary timers (+ compileInner) measured at matching sizes,
-reports Δ% = head/base − 1 (min metric), sorted by impact, flagging changes past
+reports Δ% = head/base − 1 (median metric), sorted by impact, flagging changes past
 --threshold (default 15%) and --abs (default 2 ms). Exits non-zero if any timer
 regressed (use --no-fail to disable), so it can gate a pre-push hook.
 
@@ -39,7 +39,7 @@ def main():
     ap.add_argument("base", help="baseline run label (results/<base>/)")
     ap.add_argument("head", help="changed run label (results/<head>/)")
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
-    ap.add_argument("--metric", default="min", choices=["min", "median", "mean"])
+    ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])
     ap.add_argument("--threshold", type=float, default=15.0,
                     help="percent change to flag (default 15)")
     ap.add_argument("--abs", type=float, default=2.0, help="min absolute ms delta to flag")

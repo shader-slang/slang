@@ -58,15 +58,17 @@ def runner_id():
 
 
 def _point_metrics(results_json_path):
-    """{ 'workload|timer': min_ms } for the default-size run of each workload.
+    """{ 'workload|timer': median_ms } for the default-size run of each workload.
     canonical_runs() collapses any swept (multi-size) data to default_size so
-    history and daily points compare like-with-like."""
+    history and daily points compare like-with-like. The median (not min) is the
+    saved/compared value: it reflects the typical run rather than the single
+    luckiest one, and is steadier when a build's run-to-run spread shifts."""
     runs = analyze.canonical_runs(json.load(open(results_json_path)))
     out = {}
     for r in runs:
         for timer, st in r["timers"].items():
             if st is not None:
-                out[f"{r['workload']}|{timer}"] = st["min"]
+                out[f"{r['workload']}|{timer}"] = st["median"]
     return out
 
 

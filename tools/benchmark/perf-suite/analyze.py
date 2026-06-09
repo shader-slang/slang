@@ -3,8 +3,8 @@
 
 Loads results/<tag>/results.json for every release in releases/index.json
 (chronological order), then for each (workload, timer):
-  - builds a release-ordered series of the chosen metric (min by default —
-    most noise-robust for cross-version comparison),
+  - builds a release-ordered series of the chosen metric (median by default —
+    reflects the typical run; --metric min/mean also available),
   - flags release-over-release step-changes that exceed both a relative and an
     absolute threshold (the latter scaled by sample noise),
   - for a flagged compileInner jump, attributes it to the child stage timer with
@@ -204,7 +204,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--index", default=os.path.join(HERE, "releases", "index.json"))
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
-    ap.add_argument("--metric", default="min", choices=["min", "median", "mean"])
+    ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])
     ap.add_argument("--rel", type=float, default=1.15, help="min ratio to flag (1.15 = +15%%)")
     ap.add_argument("--abs", type=float, default=2.0, help="min absolute ms jump to flag")
     ap.add_argument("--primary-only", action="store_true",

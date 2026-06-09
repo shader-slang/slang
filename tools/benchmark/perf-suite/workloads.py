@@ -400,6 +400,103 @@ def gen_sema_generics(n):
     return {"sema_generics.slang": "".join(s)}
 
 
+# --------------------------------------------------------------------------- #
+# Type checking: operator overload resolution + implicit conversions
+# --------------------------------------------------------------------------- #
+# These isolate the front-end type-checker's most quietly expensive work: every
+# binary operator and every cross-type assignment runs overload resolution over
+# a candidate set and ranks implicit-conversion costs. `parse` deliberately uses
+# uniform-`float` arithmetic so each operator matches one overload trivially;
+# the workloads below force a *mixed-type* decision at every node instead.
+
+def gen_operator_typecheck(n):
+    """`n` functions, each a long arithmetic expression whose operands alternate
+    among float/int/uint (typed locals and literals of differing kinds). Every
+    `+`/`-`/`*` must resolve the builtin arithmetic operator overload set and
+    insert an implicit conversion to the common type — the "checking the types of
+    1 and 2 in 1 + 2" cost, multiplied across many nodes. Contrast `parse`, whose
+    same-type float expressions skip overload ranking. Module mode -> the signal
+    is SemanticChecking, not codegen."""
+    s = [_HEADER, _buf()]
+    # Each term mixes operand types so the common-type/coercion decision is
+    # non-trivial; all conversions are standard widening (int/uint -> float) so
+    # the source compiles cleanly across the whole release window.
+    terms = [
+        "+ 2 * fx", "- ix + 3u", "+ 4.0 * ix", "- ux * 5", "+ fx * 6u",
+        "- 7 + ux", "+ ix * 8.0", "- 9u + fx", "+ ux * 10", "- fx * 11",
+    ]
+    for i in range(n):
+        body = " ".join(terms[(i + j) % len(terms)] for j in range(24))
+        s.append(
+            f"float op_{i}(float fx, int ix, uint ux) {{ return fx {body}; }}\n"
+        )
+    s.append('\n[shader("compute")]\n[numthreads(1,1,1)]\n')
+    s.append("void computeMain()\n{\n    float acc = 0.0;\n")
+    s.append("    float fx = outBuf[0]; int ix = int(outBuf[0]); uint ux = uint(outBuf[0]);\n")
+    for i in range(min(n, 64)):
+        s.append(f"    acc += op_{i}(fx, ix, ux);\n")
+    s.append("    outBuf[0] = acc;\n}\n")
+    return {"operator_typecheck.slang": "".join(s)}
+
+
+def gen_implicit_conversion(n):
+    """`n` functions, each a cascade of cross-type conversions: scalar widening
+    (int/uint -> float), splats, mixed initializer lists (per-element coercion),
+    vector compose/truncate, and explicit narrowing. Stresses the coercion /
+    conversion-cost engine in semantic checking rather than operator overloading."""
+    s = [_HEADER, _buf()]
+    for i in range(n):
+        b = [f"float conv_{i}()", "{"]
+        b.append(f"    int i = {i % 7}; uint u = {i % 5}u; float f = {i % 9}.0;")
+        b.append("    float a = i;")                      # int -> float (widen)
+        b.append("    float b = u;")                      # uint -> float (widen)
+        b.append("    float2 v2 = f;")                    # scalar -> vector splat
+        b.append("    float3 v3 = float3(i, u, f);")      # mixed init: per-elem coerce
+        b.append("    float4 v4 = float4(v3, a);")        # vector compose
+        b.append("    int2 iv = int2(v2);")               # float2 -> int2 (explicit)
+        b.append("    float3 w = v4.xyz;")                # swizzle / truncate
+        b.append("    return a + b + v2.x + v3.y + v4.w + float(iv.x) + w.z;")
+        b.append("}")
+        s.append("\n".join(b) + "\n")
+    s.append('\n[shader("compute")]\n[numthreads(1,1,1)]\n')
+    s.append("void computeMain()\n{\n    float acc = 0.0;\n")
+    for i in range(min(n, 64)):
+        s.append(f"    acc += conv_{i}();\n")
+    s.append("    outBuf[0] = acc;\n}\n")
+    return {"implicit_conversion.slang": "".join(s)}
+
+
+def gen_overload_resolution(n):
+    """A large user-defined overload set (`pick`/`pick2`, scalar + vector + two-arg
+    candidates), then `n` call sites with rotating argument types. Every call
+    enumerates all candidates and ranks them by conversion cost to choose the best
+    match — isolating the candidate-ranking cost that scales with overload-set
+    size times call-site count."""
+    s = [_HEADER, _buf()]
+    for ty in ("float", "int", "uint", "float2", "float3", "float4"):
+        s.append(f"float pick({ty} x) {{ return float(x[0] + x[0]); }}\n"
+                 if ty.startswith("float") and ty != "float"
+                 else f"float pick({ty} x) {{ return float(x) + 1.0; }}\n")
+    # two-argument overloads exercise multi-parameter rank comparison
+    for a, bb in (("float", "float"), ("int", "float"), ("float", "int"),
+                  ("int", "int"), ("uint", "float"), ("float", "uint")):
+        s.append(f"float pick2({a} a, {bb} b) {{ return float(a) + float(b); }}\n")
+    s.append("\n")
+    args1 = ["1.0", "2", "3u", "float2(1.0)", "float3(1.0)", "float4(1.0)"]
+    args2 = [("1.0", "2.0"), ("3", "4.0"), ("5.0", "6"), ("7", "8"),
+             ("9u", "10.0"), ("11.0", "12u")]
+    for i in range(n):
+        a = args1[i % len(args1)]
+        p, q = args2[i % len(args2)]
+        s.append(f"float call_{i}() {{ return pick({a}) + pick2({p}, {q}); }}\n")
+    s.append('\n[shader("compute")]\n[numthreads(1,1,1)]\n')
+    s.append("void computeMain()\n{\n    float acc = 0.0;\n")
+    for i in range(min(n, 64)):
+        s.append(f"    acc += call_{i}();\n")
+    s.append("    outBuf[0] = acc;\n}\n")
+    return {"overload_resolution.slang": "".join(s)}
+
+
 def gen_specialization(n):
     """A generic struct over a type parameter, instantiated at n distinct
     wrapper types. Forces specializeModule to clone the generic n ways."""

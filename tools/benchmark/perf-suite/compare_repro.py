@@ -38,8 +38,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--baseline", default="results_baseline_orig")
     ap.add_argument("--new", default="results")
-    ap.add_argument("--stat", default="min", choices=["min", "median"],
-                    help="compileInner statistic to compare (min is most stable)")
+    ap.add_argument("--stat", default="median", choices=["min", "median"],
+                    help="compileInner statistic to compare (median is the reported metric)")
     ap.add_argument("--warn", type=float, default=10.0,
                     help="flag drift above this percent")
     args = ap.parse_args()

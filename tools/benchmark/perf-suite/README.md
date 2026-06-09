@@ -34,8 +34,11 @@ regression points at a specific release.
   Attribution therefore uses **leaf** timers (a jump in `generateOutput` is just
   its child `linkAndOptimizeIR`, whose jump is its child `specializeModule`…).
 
-- **Robustness:** each data point is `1 warmup + 5 timed` runs; the **min** is
-  used for cross-version comparison (least perturbed by scheduling noise).
+- **Robustness:** each data point is `1 warmup + 5 timed` runs; the **median** is
+  saved and used for cross-version comparison (reflects the typical run, and is
+  steadier than the min when a build's run-to-run spread shifts). All of
+  `median`/`min`/`mean`/`stdev` are kept in `results.json`; the reporting tools
+  take `--metric` to switch (default `median`).
 - **Memory:** when GNU `/usr/bin/time` is present, peak RSS per compile is also
   captured (`rss_kb`) — a heavier core module inflates memory, not just time.
 - **Floor + slope:** `analyze.py --slope-label <label>` fits `time = floor + k·N`
@@ -77,6 +80,21 @@ Workloads run per release. Synthetic ones are generated deterministically by
 | **codegen_spirv**              | one shader, `N` lines of backend math                                   | **target code emission** (SPIR-V, direct)                                                                                                                         | `generateOutput`              |
 | **emit_metal** / **emit_wgsl** | the same shader as `codegen_spirv`, emitted to **textual** Metal / WGSL | the **source-emission backend** (`emitEntryPointsSourceFromIR` + target legalization) that `-emit-spirv-directly` skips entirely — no other workload exercises it | `emitEntryPointsSourceFromIR` |
 | **module_link**                | `N` modules precompiled to `.slang-module`, then linked                 | **module read + IR link**                                                                                                                                         | `linkIR`                      |
+
+### Type-checking tests
+
+The quietly expensive part of semantic checking: every binary operator and every
+cross-type assignment runs **overload resolution** over a candidate set and ranks
+**implicit-conversion** costs. `parse` deliberately uses uniform-`float`
+arithmetic (each operator matches one overload trivially) and `sema_generics` is
+dominated by generic-constraint cost, so neither isolates this. These compile to
+`.slang-module` (front-end only), so the signal is `SemanticChecking`, not codegen.
+
+| Test                    | What it generates                                                                                                         | Targets                                                                                                                          | Primary timer      |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| **operator_typecheck**  | `N` functions, each a long arithmetic expression with operands alternating among `float`/`int`/`uint` (typed + literal)   | **operator overload resolution + coercion at every node** — the "checking the types of `1` and `2` in `1 + 2`" cost, ×many nodes | `SemanticChecking` |
+| **implicit_conversion** | `N` functions, each a cascade of conversions: scalar widening, splats, mixed initializer lists, vector compose/truncate   | the **coercion / conversion-cost engine** (distinct from operator overloading)                                                   | `SemanticChecking` |
+| **overload_resolution** | a large user-defined overload set (`pick`/`pick2`, scalar + vector + 2-arg) called from `N` sites with rotating arg types | **candidate enumeration + conversion-rank comparison** to choose the best match                                                  | `SemanticChecking` |
 
 ### Shared-infrastructure & scaling tests
 
@@ -172,22 +190,23 @@ python3 compare.py base head                # primary-timer Δ%, flags regressio
 
 ### Scripts
 
-| File                | Role                                                                                                                        |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `workloads.py`      | deterministic workload generators, `gen_*(n) -> {filename: source}`                                                         |
-| `manifest.py`       | per-workload spec: invocation, compile mode, primary timers                                                                 |
-| `bench.py`          | **test runner** — runs slangc, parses all timers, writes per-run JSON/CSV (merge-on-write)                                  |
-| `fetch_corpus.py`   | downloads the MDL real-shader corpus (GitHub contents API)                                                                  |
-| `fetch_releases.py` | downloads + caches prebuilt `slangc` per release tag                                                                        |
-| `sweep.py`          | **release sweep** — runs `bench.py` against every cached release                                                            |
-| `compare.py`        | **local base-vs-head diff** — "did my change slow compilation?" (bench two slangc on one machine, then diff primary timers) |
-| `track.py`          | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint                |
-| `trend.py`          | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression    |
-| `analyze.py`        | per-`(workload,timer)` series, leaf-attributed step-change detection, diagnostics path-cost                                 |
-| `plot.py`           | self-contained SVG charts (normalized + absolute log)                                                                       |
-| `report.py`         | single self-contained **HTML report**, cross-release (charts inline + tables)                                               |
-| `ladder_scaling.py` | cross-release `floor + slope·N` fit table for any swept workload                                                            |
-| `sweep_report.py`   | **complexity-sweep HTML report** for one build — compile time vs size `N`, per-workload scaling curves + fit                |
+| File                | Role                                                                                                                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `workloads.py`      | deterministic workload generators, `gen_*(n) -> {filename: source}`                                                                                                                              |
+| `manifest.py`       | per-workload spec: invocation, compile mode, primary timers                                                                                                                                      |
+| `bench.py`          | **test runner** — runs slangc, parses all timers, writes per-run JSON/CSV (merge-on-write)                                                                                                       |
+| `fetch_corpus.py`   | downloads the MDL real-shader corpus (GitHub contents API)                                                                                                                                       |
+| `fetch_releases.py` | downloads + caches prebuilt `slangc` per release tag                                                                                                                                             |
+| `sweep.py`          | **release sweep** — runs `bench.py` against every cached release                                                                                                                                 |
+| `compare.py`        | **local base-vs-head diff** — "did my change slow compilation?" (bench two slangc on one machine, then diff primary timers)                                                                      |
+| `track.py`          | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint                                                                                     |
+| `trend.py`          | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression                                                                         |
+| `analyze.py`        | per-`(workload,timer)` series, leaf-attributed step-change detection, diagnostics path-cost                                                                                                      |
+| `breakdown.py`      | **phase attribution** — splits `compileInner` into mutually-exclusive buckets (named leaves + `(self)` residuals); aggregate + per-workload tree, and `--html` **stacked-bar** per-workload view |
+| `plot.py`           | self-contained SVG charts (normalized + absolute log)                                                                                                                                            |
+| `report.py`         | single self-contained **HTML report**, cross-release (charts inline + tables)                                                                                                                    |
+| `ladder_scaling.py` | cross-release `floor + slope·N` fit table for any swept workload                                                                                                                                 |
+| `sweep_report.py`   | **complexity-sweep HTML report** for one build — compile time vs size `N`, per-workload scaling curves + fit                                                                                     |
 
 ### Documents
 

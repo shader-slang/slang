@@ -190,7 +190,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
     ap.add_argument("--label", default="dev", help="results/<label>/ to report on")
-    ap.add_argument("--metric", default="min", choices=["min", "median", "mean"])
+    ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])
     args = ap.parse_args()
 
     sweeps = load_sweeps(args.results, args.label, args.metric)
