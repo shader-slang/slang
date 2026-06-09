@@ -40,6 +40,11 @@ The coverage delta between the two runs is the demo's headline.
 # directory (the default). `--output-dir` creates the directory if
 # needed:
 ./shader-coverage-image-pipeline --mode=exhaustive --output-dir=./out
+
+# Point the demo at a different copy of the `.slang` files (useful
+# when the binary has been moved away from the source tree):
+./shader-coverage-image-pipeline --mode=exhaustive \
+    --demo-dir=/path/to/shader-coverage-image-pipeline
 ```
 
 Each coverage run writes alongside the executable:

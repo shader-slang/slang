@@ -44,6 +44,11 @@ uploads, and dispatches 512×512 = 262144 rays from a synthetic camera.
 # directory (the default). `--output-dir` creates the directory if
 # needed:
 ./shader-coverage-bvh-traversal --mode=stress --output-dir=./out
+
+# Point the demo at a different copy of the `.slang` files (useful
+# when the binary has been moved away from the source tree):
+./shader-coverage-bvh-traversal --mode=stress \
+    --demo-dir=/path/to/shader-coverage-bvh-traversal
 ```
 
 `--coverage-mode=count` (default) records exact execution counts via

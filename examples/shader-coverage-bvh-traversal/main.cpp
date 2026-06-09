@@ -136,16 +136,29 @@ void diagnoseIfNeeded(slang::IBlob* diagnostics)
     }
 }
 
+// Set by `main()` from `--demo-dir=<path>` when supplied; otherwise
+// stays empty and `getDemoDirectory()` falls back to its default
+// `__FILE__`-then-CWD discovery. Process-scope (anonymous-namespace)
+// because every caller of `getDemoDirectory()` lives in the same
+// translation unit and threading the override through compileShader
+// and friends would clutter unrelated signatures.
+std::filesystem::path g_demoDirOverride;
+
 // Resolves the directory containing the demo's `.slang` assets.
-// `__FILE__` expands at compile time, so it works when the demo is
-// run from the source tree (the intended setup) but fails after the
-// binary is moved (installed elsewhere, copied to a CI runner, etc.).
-// Fall back to the current working directory if the build-time path
-// no longer exists, so a user who runs the demo from its install
-// directory still gets a meaningful error from `loadModule` rather
-// than a silent path-not-found.
+// Discovery order:
+//   1. `--demo-dir=<path>` from the CLI, if supplied.
+//   2. The compile-time `__FILE__` parent directory, if the anchor
+//      `bvh_traverse.slang` is still there. Works for the intended
+//      "run from source tree" workflow.
+//   3. The current working directory, as a last-resort fallback for
+//      a user who runs the binary from a directory that happens to
+//      contain the demo shaders (e.g. a CI runner that `cd`s in).
+// If none of these point at the shaders, the subsequent
+// `loadModule` call surfaces a clear path-not-found error.
 std::filesystem::path getDemoDirectory()
 {
+    if (!g_demoDirOverride.empty())
+        return g_demoDirOverride;
     std::filesystem::path sourceDir = std::filesystem::path(__FILE__).parent_path();
     if (std::filesystem::exists(sourceDir / "bvh_traverse.slang"))
         return sourceDir;
@@ -690,7 +703,16 @@ int main(int argc, char** argv)
         // robustness fallback. When set, the demo creates the directory
         // if needed.
         std::filesystem::path outputDir;
+        // `--demo-dir=<path>`: explicit override for the directory
+        // containing the demo's `.slang` assets. Empty (default) means
+        // `getDemoDirectory()` discovers them itself (`__FILE__`
+        // parent, falling back to CWD). When set, the demo trusts the
+        // override unconditionally and a missing `bvh_traverse.slang`
+        // there surfaces as a `loadModule` error rather than silently
+        // falling back to a different directory.
+        std::filesystem::path demoDir;
         constexpr std::string_view kOutputDirFlag = "--output-dir=";
+        constexpr std::string_view kDemoDirFlag = "--demo-dir=";
         for (int i = 1; i < argc; ++i)
         {
             std::string_view a = argv[i];
@@ -712,12 +734,20 @@ int main(int argc, char** argv)
                 coverageHitMiss = true;
             else if (a.substr(0, kOutputDirFlag.size()) == kOutputDirFlag)
                 outputDir = std::string(a.substr(kOutputDirFlag.size()));
+            else if (a.substr(0, kDemoDirFlag.size()) == kDemoDirFlag)
+                demoDir = std::string(a.substr(kDemoDirFlag.size()));
             else
             {
                 std::cerr << "unknown arg: " << a << "\n";
                 return 1;
             }
         }
+
+        // Publish the `--demo-dir` override to file-scope storage so
+        // `getDemoDirectory()` (called from `compileShader` and from
+        // the output-dir resolution below) sees it without each call
+        // site having to thread an override parameter.
+        g_demoDirOverride = demoDir;
 
         const char* coverageModeLabel = coverageHitMiss ? "hit-miss" : "count";
         std::cout << "compiling bvh_traverse.slang"
