@@ -3817,11 +3817,8 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
         }
     }
 
-    // IMPORTANT: emitMeshShaderModifiers must be called immediately before
-    // emitParamType as HLSL targets track state internallly to avoid duplicate
-    // mesh shader "in"/"out" qualifiers.
     emitMeshShaderModifiers(param);
-    emitParamType(paramType, paramName);
+    emitParamType(paramType, paramName, param);
     emitSemantics(param);
     emitPostDeclarationAttributesForType(paramType);
 }
@@ -3885,8 +3882,10 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     }
 }
 
-void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
+void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name, IRInst *param)
 {
+    SLANG_UNUSED(param);
+
     // An `out` or `inout` parameter will have been
     // encoded as a parameter of pointer type, so
     // we need to decode that here.

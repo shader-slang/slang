@@ -42,7 +42,6 @@ protected:
     // Allow caching of capability results for easier lookup.
     Dictionary<CapabilityAtom, bool> m_capabilityCache{};
     bool m_sm610OrAbove = false;
-    bool m_lastParamMeshOutput = false; // used for tracking in emitParamTypeImpl
 
     virtual void emitLayoutSemanticsImpl(
         IRInst* inst,
@@ -96,7 +95,7 @@ protected:
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) SLANG_OVERRIDE;
     virtual void emitFuncDecorationsImpl(IRFunc* func) SLANG_OVERRIDE;
-    virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
+    virtual void emitParamTypeImpl(IRType* type, String const& name, IRInst *param) SLANG_OVERRIDE;
 
     virtual void emitSwitchDecorationsImpl(IRSwitch* switchInst) SLANG_OVERRIDE;
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) SLANG_OVERRIDE;

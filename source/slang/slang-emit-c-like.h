@@ -423,7 +423,7 @@ public:
         emitSwitchCaseSelectorsImpl(currentCase, isDefault);
     }
 
-    void emitParamType(IRType* type, String const& name) { emitParamTypeImpl(type, name); }
+    void emitParamType(IRType* type, String const& name, IRInst *param = nullptr) { emitParamTypeImpl(type, name, param); }
 
     void emitFuncDecl(IRFunc* func);
     void emitFuncDecl(IRFunc* func, const String& name);
@@ -640,7 +640,7 @@ protected:
     virtual void emitSimpleFuncImpl(IRFunc* func);
     virtual void emitVarExpr(IRInst* inst, EmitOpInfo const& outerPrec);
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec);
-    virtual void emitParamTypeImpl(IRType* type, String const& name);
+    virtual void emitParamTypeImpl(IRType* type, String const& name, IRInst *param);
     virtual void emitParamTypeModifier(IRType* type) { SLANG_UNUSED(type); }
     virtual void emitIntrinsicCallExprImpl(
         IRCall* inst,

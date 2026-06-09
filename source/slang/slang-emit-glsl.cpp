@@ -3282,7 +3282,7 @@ void GLSLSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAnd
     return Super::emitTypeImpl(type, nameAndLoc);
 }
 
-void GLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
+void GLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name, IRInst *param)
 {
     if (auto refType = as<IRRefParamType>(type))
     {
@@ -3305,7 +3305,7 @@ void GLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
         type = spirvLiteralType->getValueType();
     }
 
-    Super::emitParamTypeImpl(type, name);
+    Super::emitParamTypeImpl(type, name, param);
 }
 
 void GLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)

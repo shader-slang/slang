@@ -602,8 +602,9 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc)
     m_hasString = (artifactDesc.style == ArtifactStyle::Host);
 }
 
-void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
+void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name, IRInst *param)
 {
+    SLANG_UNUSED(param);
     // For use the CPP-specific emitType implementation
     emitType(type, name);
 }

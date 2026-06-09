@@ -1195,8 +1195,9 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     }
 }
 
-void WGSLSourceEmitter::emitParamTypeImpl(IRType* type, const String& name)
+void WGSLSourceEmitter::emitParamTypeImpl(IRType* type, const String& name, IRInst *param)
 {
+    SLANG_UNUSED(param);
     emitType(type, name);
 }
 

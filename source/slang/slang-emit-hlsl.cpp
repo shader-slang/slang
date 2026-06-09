@@ -1602,14 +1602,11 @@ static bool _canEmitExport(const Profile& profile)
 }
 
 
-void HLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name) {
-    // Mesh shader parameters have their "in"/"out" qualifiers already added in
-    // emitMeshShaderModifiers, so we do not need that here. This is tracked
-    // through a cache variable. (This is safe because emitParamTypeImpl will
-    // be called immediately after emitMeshShaderModifiers.)
-    if (m_lastParamMeshOutput)
+void HLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name, IRInst *param) {
+    // Mesh shader parameters already have their "in"/"out" qualifiers added.
+    if (param->findDecoration<IRMeshOutputDecoration>() ||
+        param->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
-        m_lastParamMeshOutput = false; // consume
         if (auto outType = as<IROutParamType>(type))
         {
             type = outType->getValueType();
@@ -1620,8 +1617,7 @@ void HLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name) {
         }
     }
 
-    // Use the default case in general.
-    Super::emitParamTypeImpl(type, name);
+    Super::emitParamTypeImpl(type, name, param);
 }
 
 void HLSLSourceEmitter::emitIfDecorationsImpl(IRIfElse* ifInst)
@@ -2325,13 +2321,11 @@ void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
                                                                : nullptr;
         SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
         m_writer->emit(s);
-        m_lastParamMeshOutput = true;
     }
     if (varInst->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
         // DXC requires that mesh payload parameters have "in" specified
         m_writer->emit("in payload ");
-        m_lastParamMeshOutput = true;
     }
 }
 

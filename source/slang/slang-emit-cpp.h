@@ -72,7 +72,7 @@ protected:
     virtual void emitModuleImpl(IRModule* module, DiagnosticSink* sink) SLANG_OVERRIDE;
     virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
     virtual void emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec) SLANG_OVERRIDE;
-    virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
+    virtual void emitParamTypeImpl(IRType* type, String const& name, IRInst *param) SLANG_OVERRIDE;
     virtual void emitGlobalRTTISymbolPrefix();
     virtual void emitWitnessTable(IRWitnessTable* witnessTable) SLANG_OVERRIDE;
     virtual void emitInterface(IRInterfaceType* interfaceType) SLANG_OVERRIDE;

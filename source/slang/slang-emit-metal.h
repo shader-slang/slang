@@ -58,7 +58,7 @@ protected:
 
     virtual void emitMeshShaderModifiersImpl(IRInst* varInst) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
-    virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
+    virtual void emitParamTypeImpl(IRType* type, String const& name, IRInst *param) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
         SLANG_OVERRIDE;
     virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;

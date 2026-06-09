@@ -1163,8 +1163,9 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     Super::emitSimpleValueImpl(inst);
 }
 
-void MetalSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
+void MetalSourceEmitter::emitParamTypeImpl(IRType* type, String const& name, IRInst *param)
 {
+    SLANG_UNUSED(param);
     emitType(type, name);
 }
 

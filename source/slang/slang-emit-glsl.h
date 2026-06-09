@@ -64,7 +64,7 @@ protected:
     virtual void emitVarDecorationsImpl(IRInst* varDecl) SLANG_OVERRIDE;
     virtual void emitMatrixLayoutModifiersImpl(IRType* varType) SLANG_OVERRIDE;
     virtual void emitTypeImpl(IRType* type, const StringSliceLoc* nameAndLoc) SLANG_OVERRIDE;
-    virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
+    virtual void emitParamTypeImpl(IRType* type, String const& name, IRInst *param) SLANG_OVERRIDE;
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) SLANG_OVERRIDE;
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* decl) SLANG_OVERRIDE;
 

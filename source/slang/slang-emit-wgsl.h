@@ -42,7 +42,7 @@ public:
     virtual void emitStructDeclarationSeparatorImpl() SLANG_OVERRIDE;
     virtual void emitLayoutQualifiersImpl(IRVarLayout* layout) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
-    virtual void emitParamTypeImpl(IRType* type, const String& name) SLANG_OVERRIDE;
+    virtual void emitParamTypeImpl(IRType* type, const String& name, IRInst *param) SLANG_OVERRIDE;
     virtual void _emitType(IRType* type, DeclaratorInfo* declarator) SLANG_OVERRIDE;
     virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
     virtual void emitSemanticsPrefixImpl(IRInst* inst) SLANG_OVERRIDE;
