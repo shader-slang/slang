@@ -8,10 +8,10 @@ only, below) and a **full nightly + release-history** time-series, which is now
 
 Per release, 11 workloads × (1 warmup + 5 timed) runs:
 
-| slangc | bench wall-clock |
-|---|---|
-| pre-regression (v2026.5) | ~1.4 min |
-| post-regression (v2026.7/.8) | ~2.3 min |
+| slangc                       | bench wall-clock |
+| ---------------------------- | ---------------- |
+| pre-regression (v2026.5)     | ~1.4 min         |
+| post-regression (v2026.7/.8) | ~2.3 min         |
 
 Benchmarking is **~1.5–2.5 min**; building slangc (~5–20 min) dominates either
 tier. So adding perf to a PR that already builds slangc is cheap in wall-clock —
@@ -45,10 +45,11 @@ required check**, so it never blocks merge; it also posts a PR comment table.
 out of branch-protection required checks.)
 
 **Why baseline-relative:** absolute thresholds drift with hardware/runner state.
-Build **both** the PR HEAD and its **merge-base** on the *same* machine in the
+Build **both** the PR HEAD and its **merge-base** on the _same_ machine in the
 same job and compare — machine variance cancels.
 
 **Steps:**
+
 1. `checkout` PR with `fetch-depth: 0` (need merge-base), submodules.
 2. common-setup; build slangc (release) → HEAD slangc.
 3. `git worktree add` the merge-base commit; build → BASE slangc.
@@ -73,6 +74,7 @@ figures, not user-facing slowdowns; `mdl_dxr` is the realistic one.
 **Runner:** `[self-hosted, benchmark]`.
 
 **Steps:**
+
 1. checkout master; common-setup; build release slangc.
 2. checkout MDL-SDK sparse → `corpus/mdl/`.
 3. `bench.py --slangc <slangc> --label <YYYY-MM-DD>-<sha> --samples 7`
@@ -108,12 +110,12 @@ figures, not user-facing slowdowns; `mdl_dxr` is the realistic one.
 The time-series tier is wired up as two GitHub Actions workflows on the dedicated
 benchmark runner, plus `track.py` (data model) and `trend.py` (drift alert).
 `compare.py` (base-vs-head diff) is implemented as a **local dev tool**; the
-automated per-PR *workflow* (Tier 1 above) is intentionally not deployed yet.
+automated per-PR _workflow_ (Tier 1 above) is intentionally not deployed yet.
 
 ## Data model
 
 Absolute compile times are **runner-specific**, so every point in a comparison
-must come from the *same* machine. The **tracking series** is:
+must come from the _same_ machine. The **tracking series** is:
 
     tracking = [per-release history, all on the current runner]
                ++ [daily tip-of-tree (ToT) points dated after the last release]

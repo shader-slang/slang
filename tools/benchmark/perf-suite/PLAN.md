@@ -7,8 +7,8 @@ compiler. Originally surfaced while building Slang for Falcor
 (`nvresearch-gfx/Tools/falcor2` pipeline). Suspected regressed areas:
 **autodiff**, **diagnostics**, **dynamic dispatch**. We also want general
 compile-perf coverage of the main compiler stages, and the ability to replay
-the suite against every Slang release over the last ~10 months to find *which
-release* a regression entered.
+the suite against every Slang release over the last ~10 months to find _which
+release_ a regression entered.
 
 ## Decisions (locked)
 
@@ -51,22 +51,22 @@ headline, so a regression can be attributed to a stage.
 
 Suspected-regression features (deepest workloads):
 
-| Bucket | Workload (param N) | Primary signal |
-|---|---|---|
-| **autodiff** | many `[Differentiable]` fns, nested fwd/bwd calls, custom `bwd_diff`/`fwd_diff` derivatives, differentiable generics & arrays | `compileInner`, autodiff transform within `linkAndOptimizeIR` |
-| **dynamic dispatch** | one interface, M implementations, existential/`dyn` params, witness-table-heavy call sites; also run with `-report-dynamic-dispatch-sites` | `specializeModule`, `linkIR` |
-| **diagnostics** | source emitting many errors+warnings, plus a size-matched **clean control** to isolate diagnostic-path cost | `frontEndExecute`, `SemanticChecking` |
+| Bucket               | Workload (param N)                                                                                                                         | Primary signal                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| **autodiff**         | many `[Differentiable]` fns, nested fwd/bwd calls, custom `bwd_diff`/`fwd_diff` derivatives, differentiable generics & arrays              | `compileInner`, autodiff transform within `linkAndOptimizeIR` |
+| **dynamic dispatch** | one interface, M implementations, existential/`dyn` params, witness-table-heavy call sites; also run with `-report-dynamic-dispatch-sites` | `specializeModule`, `linkIR`                                  |
+| **diagnostics**      | source emitting many errors+warnings, plus a size-matched **clean control** to isolate diagnostic-path cost                                | `frontEndExecute`, `SemanticChecking`                         |
 
 Core compiler-stage buckets:
 
-| Bucket | Workload (param N) | Primary signal |
-|---|---|---|
-| lex/parse | very large but semantically trivial source | `parseTranslationUnit` |
-| sema / generics / overload | deep generic instantiation, large overload sets | `SemanticChecking` |
-| specialization | generic + interface specialization blowup | `specializeModule` |
-| inlining / SSA | deep call graphs, large function bodies | `simplifyIR`, inlining |
-| codegen targets | one shader → SPIR-V / DXIL / Metal / CPU (host-available only) | `generateOutput` |
-| module precompile + link | multi-module separate compile then link | `linkIR`, module-read |
+| Bucket                     | Workload (param N)                                             | Primary signal         |
+| -------------------------- | -------------------------------------------------------------- | ---------------------- |
+| lex/parse                  | very large but semantically trivial source                     | `parseTranslationUnit` |
+| sema / generics / overload | deep generic instantiation, large overload sets                | `SemanticChecking`     |
+| specialization             | generic + interface specialization blowup                      | `specializeModule`     |
+| inlining / SSA             | deep call graphs, large function bodies                        | `simplifyIR`, inlining |
+| codegen targets            | one shader → SPIR-V / DXIL / Metal / CPU (host-available only) | `generateOutput`       |
+| module precompile + link   | multi-module separate compile then link                        | `linkIR`, module-read  |
 
 (Real-world MDL/DXR already covered by `compile.py`; a Falcor-representative
 shader and reflection/layout + loop-unroll buckets are deferred to the expansion.)
