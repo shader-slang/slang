@@ -1504,6 +1504,15 @@ local insts = {
 	{ waveMaskBallot = { operands = { { "mask" }, { "condition" } } } },
 	-- matchMask = waveMaskBallot(mask, value)
 	{ waveMaskMatch = { operands = { { "mask" }, { "value" } } } },
+	-- Shader-coverage wave-aggregated counter support (#11509). Both ops
+	-- operate on the implicit subgroup of the lanes active at the op, so they
+	-- are side-effecting / non-hoistable like the other wave ops above and
+	-- must not be CSE'd or moved across control flow.
+	-- count = number of lanes active here (WaveActiveSum(1)); result is uint.
+	{ coverageActiveLaneCount = {} },
+	-- isFirst = this lane is the elected first active lane (WaveIsFirstLane());
+	-- result is bool.
+	{ coverageElectFirstLane = {} },
 	-- Texture sampling operation of the form `t.Sample(s,u)`
 	{ sample = { operands = { { "texture" }, { "sampler" }, { "coord" } } } },
 	{ sampleGrad = { operands = { { "texture" }, { "sampler" }, { "coord" }, { "gradX" } } } },

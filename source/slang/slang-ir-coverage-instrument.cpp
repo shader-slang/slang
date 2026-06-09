@@ -938,6 +938,9 @@ struct CoverageInstrumenter
     IRType* counterElementType;
     IRType* counterElementPtrType;
     IRType* intType;
+    // Target this instrumentation is for, used to gate target-specific
+    // lowering of the counter increment (wave aggregation). May be null.
+    TargetRequest* targetRequest = nullptr;
     List<BranchSiteRemap> branchSiteRemaps;
     uint32_t nextBranchSiteID = 1;
 
@@ -945,8 +948,9 @@ struct CoverageInstrumenter
         IRModule* m,
         IRGlobalParam* buf,
         SourceManager* sm,
-        ArtifactPostEmitMetadata& md)
-        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md)
+        ArtifactPostEmitMetadata& md,
+        TargetRequest* tr)
+        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md), targetRequest(tr)
     {
         IRBuilder tmpBuilder(module);
         // The unchecked `cast` is safe: this instrumenter only ever runs
@@ -957,6 +961,18 @@ struct CoverageInstrumenter
         counterElementType = bufferType->getElementType();
         counterElementPtrType = tmpBuilder.getPtrType(counterElementType);
         intType = tmpBuilder.getIntType();
+    }
+
+    // Wave-aggregated increments (one atomic per wave instead of per lane)
+    // apply on targets with subgroup ops. SPIR-V is wired up here (#11509);
+    // the `uint` element check keeps it to the implemented helper variant
+    // (uint64 / non-Khronos targets keep the per-lane atomic). The active-
+    // lane reduction preserves the exact per-execution count, so coverage
+    // numbers are unchanged.
+    bool shouldUseWaveAggregation() const
+    {
+        return targetRequest != nullptr && isKhronosTarget(targetRequest) &&
+               counterElementType->getOp() == kIROp_UIntType;
     }
 
     uint32_t getRemappedBranchSiteID(IRInst* markerOp, uint32_t originalSiteID)
@@ -1011,35 +1027,94 @@ struct CoverageInstrumenter
         }
     }
 
-    // Emit the increment of one coverage counter slot, given a pointer
-    // to it. `slotPtr` points at `counterElementType` (uint or uint64).
-    //
-    // Emits `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each backend
-    // emitter to its native atomic-increment idiom (InterlockedAdd on
-    // HLSL, atomicAdd on GLSL, OpAtomicIAdd on SPIR-V, etc.). The
-    // immediate and the result type are typed against `counterElementType`,
-    // so the same lowering path produces a 64-bit `OpAtomicIAdd` /
-    // `atomicAdd(ulonglong*)` when the buffer is wide.
-    //
-    // This is the single point where a counter is incremented, so it is
-    // also the extension point for wave/subgroup-aggregated increments:
-    // when the target has wave ops, the per-lane atomic here should be
-    // replaced by one atomic per wave (`AtomicAdd(slotPtr, activeLaneCount)`
-    // from the elected lane) to cut atomic contention on hot counters.
-    // See `docs/design/shader-coverage-wave-aggregation.md` and
-    // https://github.com/shader-slang/slang/issues/11509. The aggregation
-    // is not wired up yet; today every lane increments by 1.
-    void emitCoverageCounterIncrement(IRBuilder& builder, IRInst* slotPtr)
+    // Emit a pointer to coverage counter slot `slot`
+    // (`&coverageBuffer[slot]`, typed against `counterElementPtrType`).
+    IRInst* emitCounterSlotPtr(IRBuilder& builder, UInt slot)
+    {
+        IRInst* getElemArgs[] = {
+            coverageBuffer,
+            builder.getIntValue(intType, (IRIntegerValue)slot),
+        };
+        return builder.emitIntrinsicInst(
+            counterElementPtrType,
+            kIROp_RWStructuredBufferGetElementPtr,
+            2,
+            getElemArgs);
+    }
+
+    // Emit `AtomicAdd(slotPtr, amount, relaxed)` — lowered by each backend
+    // emitter to its native atomic-increment idiom (InterlockedAdd on HLSL,
+    // OpAtomicIAdd on SPIR-V, etc.). The amount and result type are typed
+    // against `counterElementType` (uint or uint64), so the same lowering
+    // path produces a 64-bit atomic when the buffer is wide.
+    void emitCounterAtomicAdd(IRBuilder& builder, IRInst* slotPtr, IRInst* amount)
     {
         IRInst* atomicArgs[] = {
             slotPtr,
-            builder.getIntValue(counterElementType, 1),
+            amount,
             builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
         };
         builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
     }
 
-    // Lower a single coverage marker op to an atomic add on
+    // Per-lane increment: every active lane atomically adds 1 to its slot.
+    void emitPerLaneIncrement(IRBuilder& builder, UInt slot)
+    {
+        IRInst* slotPtr = emitCounterSlotPtr(builder, slot);
+        emitCounterAtomicAdd(builder, slotPtr, builder.getIntValue(counterElementType, 1));
+    }
+
+    // Wave-aggregated increment (#11509): the lanes active at this marker
+    // reduce their count, and a single elected lane performs one atomic add
+    // of that count — cutting atomic contention on hot counters while
+    // preserving the exact per-execution total. `builder` is positioned
+    // before `markerOp`; this splits the marker's block to introduce the
+    // `if (firstLane)` guard.
+    void emitWaveAggregatedIncrement(IRBuilder& builder, IRInst* markerOp, UInt slot)
+    {
+        IRInst* activeLaneCount = builder.emitIntrinsicInst(
+            builder.getUIntType(),
+            kIROp_CoverageActiveLaneCount,
+            0,
+            nullptr);
+        IRInst* isFirstLane = builder.emitIntrinsicInst(
+            builder.getBoolType(),
+            kIROp_CoverageElectFirstLane,
+            0,
+            nullptr);
+
+        // Split the marker's block immediately before `markerOp`: move the
+        // marker and everything after it into a fresh merge block, leaving
+        // the original block ending after `isFirstLane` (no terminator yet).
+        // Values defined before the split dominate the merge block, so no
+        // block parameters are needed.
+        auto originalBlock = as<IRBlock>(markerOp->getParent());
+        SLANG_ASSERT(originalBlock);
+        IRBlock* mergeBlock = builder.createBlock();
+        mergeBlock->insertAfter(originalBlock);
+        for (IRInst* inst = markerOp; inst;)
+        {
+            IRInst* nextInst = inst->getNextInst();
+            inst->removeFromParent();
+            inst->insertAtEnd(mergeBlock);
+            inst = nextInst;
+        }
+
+        IRBlock* incrementBlock = builder.createBlock();
+        incrementBlock->insertBefore(mergeBlock);
+
+        // Original block: `if (isFirstLane) goto incrementBlock; else merge`.
+        builder.setInsertInto(originalBlock);
+        builder.emitIfElse(isFirstLane, incrementBlock, mergeBlock, mergeBlock);
+
+        // Increment block: one atomic add of the active-lane count, then merge.
+        builder.setInsertInto(incrementBlock);
+        IRInst* slotPtr = emitCounterSlotPtr(builder, slot);
+        emitCounterAtomicAdd(builder, slotPtr, activeLaneCount);
+        builder.emitBranch(mergeBlock);
+    }
+
+    // Lower a single coverage marker op to a counter increment on
     // `coverageBuffer[slot]`. Appends the source-entry metadata that
     // currently points at this direct counter slot, then removes the
     // marker op.
@@ -1052,17 +1127,10 @@ struct CoverageInstrumenter
         IRBuilder builder(module);
         builder.setInsertBefore(markerOp);
 
-        IRInst* getElemArgs[] = {
-            coverageBuffer,
-            builder.getIntValue(intType, (IRIntegerValue)slot),
-        };
-        IRInst* slotPtr = builder.emitIntrinsicInst(
-            counterElementPtrType,
-            kIROp_RWStructuredBufferGetElementPtr,
-            2,
-            getElemArgs);
-
-        emitCoverageCounterIncrement(builder, slotPtr);
+        if (shouldUseWaveAggregation())
+            emitWaveAggregatedIncrement(builder, markerOp, slot);
+        else
+            emitPerLaneIncrement(builder, slot);
 
         // The marker op has void return type and, by construction, no uses.
         // Catch a future IR transform that takes a use of it before we reach
@@ -1411,7 +1479,8 @@ void instrumentCoverage(
         module,
         buffer,
         sink ? sink->getSourceManager() : nullptr,
-        outMetadata);
+        outMetadata,
+        targetRequest);
     instrumenter.run(markerOps);
 }
 

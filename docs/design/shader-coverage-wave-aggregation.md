@@ -1,8 +1,17 @@
 # Shader coverage: wave-aggregated counter increments (design notes)
 
 Tracking issue: [#11509](https://github.com/shader-slang/slang/issues/11509).
-Status: **design / in progress.** This document captures the investigation
-and the chosen approach; the implementation is not yet wired up.
+Status: **implemented for SPIR-V (uint counters); follow-ups remain.** The
+emit-side recipe below is now wired up: coverage emits two IR ops
+(`coverageActiveLaneCount`, `coverageElectFirstLane`) inside an `if`-guard,
+and the SPIR-V backend lowers them to `OpGroupNonUniformIAdd (Reduce)` /
+`OpGroupNonUniformElect`. Verified: `-trace-coverage-counter-width 32` SPIR-V
+emits the aggregated sequence (one elected atomic of the active-lane count),
+passes `spirv-val`, and all 62 coverage + 11 unit tests pass (regression test
+`coverage-wave-aggregated-spirv.slang`). **Remaining:** extend to the default
+uint64 counters (needs a uint→uint64 widen of the count before the atomic) and
+to HLSL/CUDA/Metal emitters; re-measure the demo speedup. The rest of this
+document is the original investigation/design.
 
 ## Problem
 

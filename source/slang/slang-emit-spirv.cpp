@@ -5502,6 +5502,39 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 ensureAtomicCapability(inst, spvOp);
             }
             break;
+        case kIROp_CoverageActiveLaneCount:
+            {
+                // Wave-aggregated coverage counter (#11509): number of lanes
+                // active here == WaveActiveSum(1) over the subgroup. The Scope
+                // is a constant <id>; GroupOperation (Reduce) is a literal.
+                IRBuilder builder{inst};
+                result = emitInst(
+                    parent,
+                    inst,
+                    SpvOpGroupNonUniformIAdd,
+                    inst->getFullType(),
+                    kResultID,
+                    emitIntConstant(IRIntegerValue{SpvScopeSubgroup}, builder.getUIntType()),
+                    SpvLiteralInteger::from32((uint32_t)SpvGroupOperationReduce),
+                    emitIntConstant(IRIntegerValue{1}, builder.getUIntType()));
+                requireSPIRVCapability(SpvCapabilityGroupNonUniformArithmetic);
+            }
+            break;
+        case kIROp_CoverageElectFirstLane:
+            {
+                // Wave-aggregated coverage counter (#11509): true on the elected
+                // first active lane of the subgroup == WaveIsFirstLane().
+                IRBuilder builder{inst};
+                result = emitInst(
+                    parent,
+                    inst,
+                    SpvOpGroupNonUniformElect,
+                    inst->getFullType(),
+                    kResultID,
+                    emitIntConstant(IRIntegerValue{SpvScopeSubgroup}, builder.getUIntType()));
+                requireSPIRVCapability(SpvCapabilityGroupNonUniform);
+            }
+            break;
         case kIROp_ControlBarrier:
             {
                 IRBuilder builder{inst};
