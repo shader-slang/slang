@@ -19723,15 +19723,23 @@ void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extension
         return;
 
     // An extension can only be used where its target type is available. Therefore the
-    // capabilities declared on the extension itself must be a subset of the target type's
-    // capabilities. Use _propagateRequirement to detect conflicts: it handles cycle
-    // detection, calls ensureDecl on the target type, and emits a diagnostic if the
-    // extension's declared caps conflict with the target type's caps.
+    // capabilities declared on the extension must be compatible with (i.e. have a non-empty
+    // intersection with) the target type's capabilities. We use _propagateRequirement to
+    // detect conflicts: it emits a diagnostic when the intersection of the extension's caps
+    // and the target's caps is empty (i.e. no shared target/stage survives the join).
+    //
+    // Note: this is a non-empty-intersection check, not a strict subset check. An extension
+    // may declare caps that are a superset of or overlap with the target's caps — the check
+    // only fires when the two are disjoint. For example, [require(hlsl)][require(glsl)]
+    // extension on a [require(hlsl)] type passes silently because the intersection {hlsl}
+    // is non-empty. If strict subset semantics are ever desired, the check here and in
+    // _checkExtensionMemberCapConflict would need to be replaced with an explicit subset test.
     //
     // We deliberately do NOT write back to extensionDecl->inferredCapabilityRequirements
     // here: doing so would alter how getDeclaredCapabilitySet walks the parent chain for
     // child declarations and would produce false positives in code where extension members
-    // legitimately target a subset of the target type's platforms.
+    // legitimately target a narrower subset of the target type's platforms (e.g. a member
+    // [require(hlsl)] on a [require(glsl)][require(hlsl)] extension is valid).
     auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType.type);
     if (!targetDeclRefType)
         return;
@@ -19740,11 +19748,13 @@ void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extension
     if (!targetTypeDecl)
         return;
 
-    // Ensure the target type is capability-checked before reading its
-    // inferredCapabilityRequirements, since _propagateRequirement's internal ensureDecl
-    // call happens after its nodeCaps argument is already evaluated. We call ensureDecl
-    // unconditionally (matching the pattern at the non-static-member path below), relying
-    // on _propagateRequirement's own isBeingChecked() early-exit to handle true cycles.
+    // We must call ensureDecl before the _propagateRequirement call below because
+    // targetTypeDecl->inferredCapabilityRequirements is evaluated as a C++ argument
+    // expression at the call site, before _propagateRequirement runs its own ensureDecl.
+    // Without this pre-call the field can still be null/stale, and _propagateRequirement
+    // tolerates null nodeCaps by no-opping — the conflict check would silently be skipped.
+    // Genuine cycles are diagnosed inside ensureDecl itself (Diagnostics::CyclicReference),
+    // so we do not need a separate guard here.
     ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
 
     CapabilitySet checkCapSet{extensionDecl->inferredCapabilityRequirements};
@@ -19912,12 +19922,13 @@ void SemanticsDeclCapabilityVisitor::_checkExtensionMemberCapConflict(Decl* memb
     if (!targetTypeDecl)
         return;
 
-    // Ensure the target type is capability-checked before reading its
-    // inferredCapabilityRequirements. _propagateRequirement evaluates
-    // its nodeCaps argument before its internal ensureDecl call, so we
-    // must pre-compute it here to avoid reading a null/stale pointer.
-    // Call unconditionally; _propagateRequirement's own isBeingChecked()
-    // early-exit handles genuine cycles without needing a guard here.
+    // We must call ensureDecl before the _propagateRequirement call below because
+    // targetTypeDecl->inferredCapabilityRequirements is evaluated as a C++ argument
+    // expression at the call site, before _propagateRequirement runs its own ensureDecl.
+    // Without this pre-call the field can still be null/stale, and _propagateRequirement
+    // tolerates null nodeCaps by no-opping — the conflict check would silently be skipped.
+    // Genuine cycles are diagnosed inside ensureDecl itself (Diagnostics::CyclicReference),
+    // so we do not need a separate guard here.
     ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
     _propagateRequirement(
         this,

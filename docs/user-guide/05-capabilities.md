@@ -155,9 +155,9 @@ struct Foo1 : IFoo1
 
 An `extension` declaration adds members to an existing type. Because the extension can only be used
 where its target type is available, the capabilities declared on the extension itself must be
-compatible with the capabilities of the target type. Declaring an incompatible capability on an
-extension, on one of its non-static member functions, on a constructor, or on a subscript is an
-error.
+compatible with the capabilities of the target type. Declaring an incompatible `[require(...)]`
+attribute on an extension, or on one of its non-static member functions, constructors, or
+subscripts, is an error.
 
 ```csharp
 [require(glsl)]
@@ -183,9 +183,11 @@ extension MyType
 ```
 
 Static extension *member functions* are exempt from this check because they can be called without
-an instance of the target type. Constructors and subscripts are always checked: a constructor
-produces a value of the target type, and a subscript provides indexed access to it, so both must
-be compatible with the target's capabilities.
+an instance of the target type. A `[require(...)]` attribute on a constructor or subscript is
+always checked: a constructor produces a value of the target type, and a subscript provides indexed
+access to it, so both must be compatible with the target's capabilities. Members that carry no
+`[require(...)]` attribute of their own are not individually checked at the member level (the
+extension's own capability constraint, if any, is checked separately at the extension level).
 
 ## Capabilities Between Requirement and Implementation
 

@@ -125,3 +125,64 @@ extension Foo
         [require(glsl)] get { return 0; }
     }
 }
+
+// Case 13: set accessor with compatible [require] -- no error.
+extension Foo
+{
+    __subscript(int i) -> int
+    {
+        get { return 0; }
+        [require(glsl)] set {}
+    }
+}
+
+// Case 14: Capability alias whose expansion intersects the target's caps -- no error.
+// glsl_spirv = glsl | spirv; Foo is [require(glsl)], so intersection = {glsl} is non-empty.
+[require(glsl_spirv)]
+extension Foo
+{
+}
+
+// Case 15: Stacked [require] on the extension where the union intersects target's caps.
+// Extension declares both glsl and hlsl support; Foo only supports glsl.
+// Under non-empty-intersection semantics this must NOT error (intersection = {glsl}).
+[require(glsl)]
+[require(hlsl)]
+extension Foo
+{
+}
+
+// Case 16: Write-back invariant: member [require] that is valid vs the target type but
+// would be incorrectly flagged if visitExtensionDecl wrote the intersected caps back to
+// extensionDecl->inferredCapabilityRequirements.
+// M supports both glsl and hlsl. The extension only requires glsl, so the check passes
+// (intersection = {glsl}). The member requires hlsl, which is also in M's caps, so the
+// member-level check passes too. If visitExtensionDecl wrote back {glsl} (the intersection)
+// to the extension, member-level or parent-chain logic could see the wrong extension caps
+// and produce a false positive.
+[require(glsl)]
+[require(hlsl)]
+struct M {}
+
+[require(glsl)]
+extension M
+{
+    [require(hlsl)]
+    void onlyHlsl() {}
+}
+
+// Case 16: Extension of a type-parameter (extension<T:IFoo> T).
+// The target is a GenericTypeParamDecl, whose inferredCapabilityRequirements is null.
+// _propagateRequirement tolerates null nodeCaps and no-ops — no error expected.
+// This is intentional: extensions on unconstrained/interface-constrained type params
+// are not currently checked against the param's (unknown) capabilities.
+interface IHasMethod
+{
+    void method();
+}
+
+extension<T : IHasMethod> T
+{
+    [require(glsl)]
+    void extraGlsl() {}
+}

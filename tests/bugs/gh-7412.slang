@@ -111,3 +111,24 @@ extension Bar
 //CHECK:                ^^^ requires capability
     }
 }
+
+// ext11: set accessor with [require(hlsl)] in a [require(glsl)] extension -- should error
+extension Bar
+{
+    __subscript(int i) -> int
+    {
+        get { return 0; }
+        [require(hlsl)] set {}
+//CHECK:                ^^^ error E36100
+//CHECK:                ^^^ requires capability
+    }
+}
+
+// ext12: capability alias on extension that is disjoint from target -- should error
+// hlsl_spirv = hlsl | spirv; Bar only supports glsl, so the intersection is empty.
+[require(hlsl_spirv)]
+extension Bar
+//CHECK:  ^^^ error E36100
+//CHECK:  ^^^ requires capability
+{
+}
