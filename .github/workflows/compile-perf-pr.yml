@@ -1,0 +1,166 @@
+name: Compile Perf — PR Gate
+
+# Per-PR compile-time regression gate (CI_PLAN.md Tier 1). SOFT-FAIL / advisory:
+# this job may go red on a regression but is intentionally NOT a required check,
+# so it never blocks merge — it flags gross compile-time regressions at review
+# and posts a comparison table on the PR.
+#
+# Method (baseline-relative): build BOTH the PR head and its merge-base on the
+# SAME dedicated, quiesced runner and diff them, so machine/runner variance
+# cancels and what is left is the change's own impact. Because it builds slangc
+# twice it runs a small workload subset; teams worried about runner load can gate
+# it behind a label instead of every PR (swap the `if:` for a
+# `contains(github.event.pull_request.labels.*.name, 'perf')` check).
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - "docs/**"
+      - "LICENSES/**"
+      - "LICENSE"
+      - "CONTRIBUTING.md"
+      - "**/*.md"
+  workflow_dispatch:
+    inputs:
+      subset:
+        description: "comma-separated workload subset"
+        default: "minimal,autodiff,dynamic_dispatch,diagnostics_errors,diagnostics_clean,specialization,inlining,mdl_dxr"
+      samples:
+        description: "timed samples per run"
+        default: "3"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write # post/update the comparison comment
+
+env:
+  # Fast, representative subset (sizes come from manifest default_size): the floor
+  # canary (minimal), the suspected-regression workloads, the diagnostics control
+  # pair, and the realistic mdl_dxr end-to-end signal.
+  PR_SUBSET: ${{ github.event.inputs.subset || 'minimal,autodiff,dynamic_dispatch,diagnostics_errors,diagnostics_clean,specialization,inlining,mdl_dxr' }}
+  SAMPLES: ${{ github.event.inputs.samples || '3' }}
+
+jobs:
+  perf-gate:
+    # Skip drafts and fork PRs: fork PRs get a read-only token (can't comment) and
+    # running their code on a self-hosted runner is a security risk. The nightly
+    # trend job still covers anything that lands on master.
+    if: github.event.pull_request.draft != true && github.event.pull_request.head.repo.fork != true
+    # The same dedicated, quiesced machine the MDL benchmark uses — required for
+    # trustworthy timing.
+    runs-on: [Windows, self-hosted, benchmark]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "0" # full history: need the merge-base
+
+      - name: Common setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: windows
+          compiler: cl
+          platform: x86_64
+          config: release
+          build-llvm: true
+
+      - name: Build PR head slangc
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --workflow --preset release
+          mkdir -p "$GITHUB_WORKSPACE/.perf-bin"
+          cp build/Release/bin/slangc.exe "$GITHUB_WORKSPACE/.perf-bin/slangc-head.exe"
+
+      - name: Build merge-base slangc
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA="$(git merge-base "origin/${{ github.event.pull_request.base.ref }}" HEAD)"
+          echo "merge-base = $BASE_SHA"
+          git worktree add --detach "$RUNNER_TEMP/perf-base" "$BASE_SHA"
+          cd "$RUNNER_TEMP/perf-base"
+          git submodule update --init --recursive
+          cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --workflow --preset release
+          cp build/Release/bin/slangc.exe "$GITHUB_WORKSPACE/.perf-bin/slangc-base.exe"
+
+      - name: Checkout MDL-SDK corpus
+        uses: actions/checkout@v4
+        with:
+          repository: "shader-slang/MDL-SDK"
+          path: "external/MDL-SDK"
+          sparse-checkout: |
+            ./examples/mdl_sdk/dxr/content/slangified
+
+      - name: Benchmark base + head on this machine, then compare
+        id: compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          SUITE="$GITHUB_WORKSPACE/tools/benchmark/perf-suite"
+          mkdir -p "$SUITE/corpus/mdl"
+          cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang "$SUITE/corpus/mdl/"
+          cd "$SUITE"
+          # Same workload sources (HEAD's generators) compiled by each slangc, so
+          # the only difference is the compiler.
+          python bench.py --slangc "$GITHUB_WORKSPACE/.perf-bin/slangc-base.exe" --label base --only "$PR_SUBSET" --samples "$SAMPLES" --warmup 1
+          python bench.py --slangc "$GITHUB_WORKSPACE/.perf-bin/slangc-head.exe" --label head --only "$PR_SUBSET" --samples "$SAMPLES" --warmup 1
+          # compare.py exits non-zero on a >15% regression; capture without aborting.
+          set +e
+          python compare.py base head --threshold 15 | tee "$GITHUB_WORKSPACE/compare.txt"
+          echo "code=${PIPESTATUS[0]}" >>"$GITHUB_OUTPUT"
+
+      - name: Post comparison on the PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- compile-perf-gate -->";
+            let table = "_compare step produced no output_";
+            try {
+              table = fs.readFileSync("compare.txt", "utf8");
+            } catch (e) {}
+            const regressed = "${{ steps.compare.outputs.code }}" !== "0";
+            const body =
+              `${marker}\n### Compile-perf PR gate ${regressed ? "⚠️ regression flagged" : "✅ no regression past threshold"}\n` +
+              `<sub>Advisory / non-blocking. Synthetic workloads amplify one pass each — Δ% is a sensitivity figure, not a user-facing slowdown; <code>mdl_dxr</code> is the realistic signal. Baseline = merge-base, built on the same runner.</sub>\n\n` +
+              "```\n" +
+              table.trim() +
+              "\n```";
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Soft-fail if a workload regressed
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.compare.outputs.code }}" != "0" ]; then
+            echo "::warning::compile-perf gate flagged a regression vs the merge-base (advisory, non-blocking) — see the PR comment."
+            exit 1
+          fi
+          echo "no compile-time regression past threshold"

@@ -33,9 +33,12 @@ the real constraints are **timing noise** and **runner contention**, not runtime
 
 ## Tier 1 — per-PR fast gate (soft-fail / warning)
 
-> **Status:** the diff script `compare.py` is built and used **locally** by devs
-> (bench base + head on one machine, then `compare.py base head`). The automated
-> `pull_request` workflow below is **not deployed yet** — design only.
+> **Status:** implemented as `.github/workflows/compile-perf-pr.yml`. It builds
+> the PR head and its merge-base on the same runner, benches a subset of both,
+> runs `compare.py`, posts a sticky PR comment, and soft-fails. `compare.py` also
+> doubles as a local dev tool (bench base and head on one machine, then
+> `compare.py base head`). The gate is kept out of branch-protection (non-required
+> by design) and is unproven on the runner until the benchmark machine picks it up.
 
 **Trigger:** `pull_request` to `master`, `paths-ignore` docs, skip drafts.
 **Runner:** `[self-hosted, benchmark]` (same dedicated machine).
@@ -109,8 +112,9 @@ figures, not user-facing slowdowns; `mdl_dxr` is the realistic one.
 
 The time-series tier is wired up as two GitHub Actions workflows on the dedicated
 benchmark runner, plus `track.py` (data model) and `trend.py` (drift alert).
-`compare.py` (base-vs-head diff) is implemented as a **local dev tool**; the
-automated per-PR _workflow_ (Tier 1 above) is intentionally not deployed yet.
+`compare.py` (base-vs-head diff) is both a **local dev tool** and the engine of
+the per-PR gate workflow (`compile-perf-pr.yml`, Tier 1 above), which is kept
+non-required so it never blocks merge.
 
 ## Data model
 
