@@ -1387,8 +1387,10 @@ class NonmutatingAttribute : public Attribute
 
 // A `[nodiscard]` attribute, which indicates that the result of a
 // function call should not be discarded. When a call to a function
-// marked with this attribute is used as a statement (its result is
-// ignored), the compiler emits a warning.
+// marked with this attribute is made in a context where its result is
+// discarded — an expression statement, or a `for` loop's side-effect
+// expression, including through transparent wrappers and pass-through
+// operands — the compiler emits a warning.
 //
 FIDDLE()
 class NoDiscardAttribute : public Attribute
