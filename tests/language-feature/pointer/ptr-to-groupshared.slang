@@ -29,6 +29,8 @@ void foo(Ptr<Data, Access::ReadWrite, AddressSpace::GroupShared> ptr)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 group_thread_id: SV_GroupThreadID)
 {
-    shared = Data(1, 2);
+    // Store fields individually to avoid relying on a composite Workgroup struct store on Vulkan drivers.
+    shared.value1 = 1;
+    shared.value2 = 2;
     foo(__getAddress(shared));
 }
