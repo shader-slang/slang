@@ -161,22 +161,13 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
 
 void legalizeParametersForHLSL(IRModule* module)
 {
-    List<IRFunc*> funcs;
-
     for (auto globalInst : module->getGlobalInsts())
     {
         // Only process functions - at this stage generics are already resolved,
         // and the search only handles Block and Call children.
-        auto func = as<IRFunc>(globalInst);
-        if (!func)
+        if (globalInst->getOp() != kIROp_Func)
             continue;
-
-        funcs.add(func);
-    }
-
-    for (auto func : funcs)
-    {
-        searchChildrenForForceVarIntoStructTemporarily(module, func);
+        searchChildrenForForceVarIntoStructTemporarily(module, globalInst);
     }
 
     legalizeRayTracingPrimitiveIDParamsForHLSL(module);

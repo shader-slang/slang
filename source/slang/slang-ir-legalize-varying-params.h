@@ -103,7 +103,6 @@ bool tryLegalizeRayTracingPrimitiveIDParam(
     IRModule* module,
     IRBuilder& builder,
     IRParam* param,
-    IRFunc*& primitiveIndexFunc,
     bool removeParam);
 
 void legalizeRayTracingPrimitiveIDParamsForHLSL(IRModule* module);

@@ -341,6 +341,8 @@ IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType)
     return builder.emitCast(toType, val);
 }
 
+// Hit-stage SV_PrimitiveID is handled here because it is a runtime-provided
+// ray-tracing builtin that maps to target intrinsics rather than a user varying.
 static bool isPrimitiveIDSystemValueParam(IRParam* param)
 {
     if (auto semanticDecor = param->findDecoration<IRSemanticDecoration>())
@@ -364,15 +366,34 @@ static bool isPrimitiveIDSystemValueParam(IRParam* param)
     return systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid"));
 }
 
-static IRFunc* getRayTracingPrimitiveIndexFunc(IRModule* module, IRFunc*& primitiveIndexFunc)
+static IRFunc* findRayTracingPrimitiveIndexFunc(IRModule* module)
 {
-    if (primitiveIndexFunc)
-        return primitiveIndexFunc;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+
+        auto nameHint = func->findDecoration<IRNameHintDecoration>();
+        if (nameHint && nameHint->getName() == "__slang_ray_tracing_primitive_index")
+            return func;
+    }
+
+    return nullptr;
+}
+
+static IRFunc* getRayTracingPrimitiveIndexFunc(IRModule* module)
+{
+    if (auto existingFunc = findRayTracingPrimitiveIndexFunc(module))
+        return existingFunc;
 
     IRBuilder builder(module);
     builder.setInsertInto(module->getModuleInst());
 
-    primitiveIndexFunc = builder.createFunc();
+    auto primitiveIndexFunc = builder.createFunc();
+    builder.addNameHintDecoration(
+        primitiveIndexFunc,
+        UnownedStringSlice("__slang_ray_tracing_primitive_index"));
     builder.setDataType(primitiveIndexFunc, builder.getFuncType(0, nullptr, builder.getUIntType()));
     builder.addTargetIntrinsicDecoration(
         primitiveIndexFunc,
@@ -392,7 +413,6 @@ static IRFunc* getRayTracingPrimitiveIndexFunc(IRModule* module, IRFunc*& primit
 static IRInst* emitRayTracingPrimitiveIndexValue(
     IRModule* module,
     IRBuilder& builder,
-    IRFunc*& primitiveIndexFunc,
     IRType* paramType)
 {
     IRType* valueType = paramType;
@@ -403,7 +423,7 @@ static IRInst* emitRayTracingPrimitiveIndexValue(
 
     auto primitiveIndexCall = builder.emitCallInst(
         builder.getUIntType(),
-        getRayTracingPrimitiveIndexFunc(module, primitiveIndexFunc),
+        getRayTracingPrimitiveIndexFunc(module),
         0,
         nullptr);
 
@@ -456,7 +476,6 @@ bool tryLegalizeRayTracingPrimitiveIDParam(
     IRModule* module,
     IRBuilder& builder,
     IRParam* param,
-    IRFunc*& primitiveIndexFunc,
     bool removeParam)
 {
     if (!isPrimitiveIDSystemValueParam(param))
@@ -478,8 +497,7 @@ bool tryLegalizeRayTracingPrimitiveIDParam(
 
     if (param->hasUses())
     {
-        auto valueReplacement =
-            emitRayTracingPrimitiveIndexValue(module, builder, primitiveIndexFunc, paramType);
+        auto valueReplacement = emitRayTracingPrimitiveIndexValue(module, builder, paramType);
         if (!valueReplacement)
         {
             // Source-level semantic type validation should reject this. Leave malformed IR
@@ -1265,7 +1283,6 @@ protected:
 
 struct HLSLRayTracingPrimitiveIDParamLegalizeContext : EntryPointVaryingParamLegalizeContext
 {
-    IRFunc* primitiveIndexFunc = nullptr;
     bool modifiedFuncType = false;
 
     bool shouldProcessEntryPoint(IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE
@@ -1283,7 +1300,6 @@ struct HLSLRayTracingPrimitiveIDParamLegalizeContext : EntryPointVaryingParamLeg
                 m_module,
                 builder,
                 param,
-                primitiveIndexFunc,
                 /* removeParam */ true))
         {
             modifiedFuncType = true;
@@ -1315,7 +1331,6 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     IRGlobalParam* threadIdxGlobalParam = nullptr;
     IRGlobalParam* blockIdxGlobalParam = nullptr;
     IRGlobalParam* blockDimGlobalParam = nullptr;
-    IRFunc* primitiveIndexFunc = nullptr;
 
     // All of our system values will be exposed with the
     // `uint3` type, and we'll cache a pointer to that
@@ -2247,11 +2262,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
                 IRBuilder builder(m_module);
                 builder.setInsertBefore(m_firstOrdinaryInst);
-                auto primitiveIndex = emitRayTracingPrimitiveIndexValue(
-                    m_module,
-                    builder,
-                    primitiveIndexFunc,
-                    info.type);
+                auto primitiveIndex =
+                    emitRayTracingPrimitiveIndexValue(m_module, builder, info.type);
                 if (!primitiveIndex)
                     return diagnoseUnsupportedSystemVal(info);
                 return LegalizedVaryingVal::makeValue(primitiveIndex);

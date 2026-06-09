@@ -4915,7 +4915,18 @@ void legalizeEntryPointForGLSL(
 
     if (isRayTracingHitStage(stage) && !shouldEmitSPIRVDirectly)
     {
-        IRFunc* primitiveIndexFunc = nullptr;
+        // Canonicalize hit-stage SV_PrimitiveID before ray-tracing parameter
+        // consolidation rewrites entry-point parameters. For SPIR-V via GLSL,
+        // this changes a Slang entry point parameter:
+        //
+        //     void main_chit(int primitiveID : SV_PrimitiveID) { use(primitiveID); }
+        //
+        // into GLSL-style body code that reads the builtin:
+        //
+        //     int primitiveID = int(gl_PrimitiveID);
+        //     use(primitiveID);
+        //
+        // and removes the original parameter before consolidation runs.
         if (auto firstBlock = func->getFirstBlock())
         {
             for (auto pp = firstBlock->getFirstParam(); pp;)
@@ -4926,7 +4937,6 @@ void legalizeEntryPointForGLSL(
                     module,
                     builder,
                     pp,
-                    primitiveIndexFunc,
                     /* removeParam */ true);
                 pp = next;
             }
