@@ -133,7 +133,7 @@ change.)
   why. For non-trivial behavior, include a concrete example. Avoid terse fragment- or bullet-only
   comments on a function. For instance, `substituteElementOfCompositeType` should read like _"Return
   `target` with its element type replaced by `newElementType`, preserving shape: scalar →
-  newElementType, vector<T,N> → vector<newElementType,N>, matrix<T,R,C> → matrix<newElementType,R,C>."_
+  newElementType, `vector<T,N>` → `vector<newElementType,N>`, `matrix<T,R,C>` → `matrix<newElementType,R,C>`."_
   — not _"element coerce target"_.
 
 - **Reuse before you write; then extract non-trivial logic into a named, documented helper.** Before
