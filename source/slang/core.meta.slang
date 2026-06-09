@@ -4530,7 +4530,7 @@ attribute_syntax [nonmutating] : NonmutatingAttribute;
 /// ignored, the compiler emits a warning.
 /// @remarks
 /// This is useful for functions that look like they mutate the object they are called
-/// on, but instead return a result. For example, a member function `Load` that returns
+/// on, but instead return a result. For example, a member function `load` that returns
 /// the loaded value rather than mutating `this`:
 /// ```
 /// struct MyType
