@@ -6,11 +6,101 @@
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
+#include "slang-type-system-shared.h"
 
 #include <functional>
 
 namespace Slang
 {
+
+static IRInst* getBarrierFlagValueInst(IRInst* inst)
+{
+    while (inst->getOp() == kIROp_InOutImplicitCast || inst->getOp() == kIROp_OutImplicitCast)
+        inst = inst->getOperand(0);
+    return inst;
+}
+
+static bool tryGetBarrierFlagValue(IRInst* inst, IRIntegerValue& outValue)
+{
+    if (auto intLit = as<IRIntLit>(getBarrierFlagValueInst(inst)))
+    {
+        outValue = getIntVal(intLit);
+        return true;
+    }
+    return false;
+}
+
+static String getBarrierFlagValueString(uint32_t flagVal)
+{
+    StringBuilder sb;
+    sb << "0x" << String(flagVal, 16);
+    return sb.produceString();
+}
+
+static bool isValidBarrierMemoryTypeFlags(uint32_t flagVal)
+{
+    const uint32_t knownFlags =
+        BarrierMemoryTypeFlags::UavMemory | BarrierMemoryTypeFlags::GroupSharedMemory |
+        BarrierMemoryTypeFlags::NodeInputMemory | BarrierMemoryTypeFlags::NodeOutputMemory;
+    return flagVal == BarrierMemoryTypeFlags::AllMemory ||
+           (flagVal != 0 && (flagVal & ~knownFlags) == 0);
+}
+
+static bool isValidBarrierSemanticFlags(uint32_t flagVal)
+{
+    const uint32_t knownFlags =
+        BarrierSemanticFlags::GroupSync | BarrierSemanticFlags::GroupScope |
+        BarrierSemanticFlags::DeviceScope;
+    return flagVal == BarrierSemanticFlags::Reorder || (flagVal & ~knownFlags) == 0;
+}
+
+static void validateBarrierFlagsForHLSLInst(IRInst* inst, DiagnosticSink* sink)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+        {
+            IRIntegerValue rawFlagVal = 0;
+            if (!tryGetBarrierFlagValue(inst->getOperand(0), rawFlagVal))
+                break;
+
+            auto flagVal = (uint32_t)rawFlagVal;
+            if (!isValidBarrierMemoryTypeFlags(flagVal))
+            {
+                sink->diagnose(Diagnostics::InvalidBarrierMemoryTypeFlagsValue{
+                    .value = getBarrierFlagValueString(flagVal),
+                    .location = inst->sourceLoc});
+            }
+            break;
+        }
+    case kIROp_GetEnumBarrierSemanticFlags:
+        {
+            IRIntegerValue rawFlagVal = 0;
+            if (!tryGetBarrierFlagValue(inst->getOperand(0), rawFlagVal))
+                break;
+
+            auto flagVal = (uint32_t)rawFlagVal;
+            if (!isValidBarrierSemanticFlags(flagVal))
+            {
+                sink->diagnose(Diagnostics::InvalidBarrierSemanticFlagsValue{
+                    .value = getBarrierFlagValueString(flagVal),
+                    .location = inst->sourceLoc});
+            }
+            break;
+        }
+    default:
+        break;
+    }
+
+    for (auto child : inst->getChildren())
+        validateBarrierFlagsForHLSLInst(child, sink);
+}
+
+void validateBarrierFlagsForHLSL(IRModule* module, DiagnosticSink* sink)
+{
+    validateBarrierFlagsForHLSLInst(module->getModuleInst(), sink);
+}
 
 static void addDefaultPayloadAccessQualifiersToField(IRBuilder& builder, IRStructKey* fieldKey)
 {

@@ -24,4 +24,6 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module);
 // one-sided qualifiers and rejected by DXC.
 void legalizeRayPayloadAccessQualifiersForHLSL(IRModule* module);
 
+void validateBarrierFlagsForHLSL(IRModule* module, DiagnosticSink* sink);
+
 } // namespace Slang

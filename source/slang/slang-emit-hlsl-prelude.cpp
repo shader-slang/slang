@@ -1,6 +1,7 @@
 // slang-emit-hlsl-prelude.cpp
 #include "slang-emit-hlsl.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-type-system-shared.h"
 
 namespace Slang
 {
@@ -423,6 +424,38 @@ __slang_cm_muladd(
         return UnownedStringSlice(sm610OrAbove ? "U32" : "DATA_TYPE_UINT32");
     default:
         SLANG_UNEXPECTED("Unsupported cooperative vector component type for HLSL emission");
+    }
+}
+
+/* static */ const char* HLSLSourceEmitter::getBarrierMemoryTypeFlagName(uint32_t flag)
+{
+    switch (flag)
+    {
+    case BarrierMemoryTypeFlags::UavMemory:
+        return "UAV_MEMORY";
+    case BarrierMemoryTypeFlags::GroupSharedMemory:
+        return "GROUP_SHARED_MEMORY";
+    case BarrierMemoryTypeFlags::NodeInputMemory:
+        return "NODE_INPUT_MEMORY";
+    case BarrierMemoryTypeFlags::NodeOutputMemory:
+        return "NODE_OUTPUT_MEMORY";
+    default:
+        return nullptr;
+    }
+}
+
+/* static */ const char* HLSLSourceEmitter::getBarrierSemanticFlagName(uint32_t flag)
+{
+    switch (flag)
+    {
+    case BarrierSemanticFlags::GroupSync:
+        return "GROUP_SYNC";
+    case BarrierSemanticFlags::GroupScope:
+        return "GROUP_SCOPE";
+    case BarrierSemanticFlags::DeviceScope:
+        return "DEVICE_SCOPE";
+    default:
+        return nullptr;
     }
 }
 

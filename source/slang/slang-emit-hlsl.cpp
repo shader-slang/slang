@@ -32,13 +32,8 @@ bool HLSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_InOutImplicitCast:
-    case kIROp_OutImplicitCast:
-        return true;
-
     // Barrier flag conversion ops do not have a standalone HLSL temporary form. The
-    // use-site emitter expands their folded integer operand to DXC barrier flag tokens and
-    // diagnoses non-constant or unknown values there.
+    // use-site emitter expands their folded integer operand to DXC barrier flag tokens.
     case kIROp_GetEnumBarrierMemoryTypeFlags:
     case kIROp_GetEnumBarrierSemanticFlags:
         return true;
@@ -1199,8 +1194,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             IRIntegerValue rawFlagVal = 0;
             if (!tryGetBarrierFlagValueInst(inst->getOperand(0), rawFlagVal))
             {
-                getSink()->diagnose(
-                    Diagnostics::NeedCompileTimeConstant{.location = inst->sourceLoc});
+                SLANG_ASSERT(!"expected validated BarrierMemoryTypeFlags constant");
                 m_writer->emit("(0)");
                 return true;
             }
@@ -1216,37 +1210,29 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             else if (flagVal & ~knownFlags)
             {
-                StringBuilder sb;
-                sb << "0x" << String(flagVal, 16);
-                getSink()->diagnose(Diagnostics::InvalidBarrierMemoryTypeFlagsValue{
-                    .value = sb.produceString(),
-                    .location = inst->sourceLoc});
                 m_writer->emit("0");
             }
             else
             {
                 bool first = true;
-                auto emitFlag = [&](const char* name, uint32_t bit)
+                auto emitFlag = [&](uint32_t bit)
                 {
                     if (flagVal & bit)
                     {
                         if (!first)
                             m_writer->emit(" | ");
+                        auto name = getBarrierMemoryTypeFlagName(bit);
+                        SLANG_ASSERT(name);
                         m_writer->emit(name);
                         first = false;
                     }
                 };
-                emitFlag("UAV_MEMORY", BarrierMemoryTypeFlags::UavMemory);
-                emitFlag("GROUP_SHARED_MEMORY", BarrierMemoryTypeFlags::GroupSharedMemory);
-                emitFlag("NODE_INPUT_MEMORY", BarrierMemoryTypeFlags::NodeInputMemory);
-                emitFlag("NODE_OUTPUT_MEMORY", BarrierMemoryTypeFlags::NodeOutputMemory);
+                emitFlag(BarrierMemoryTypeFlags::UavMemory);
+                emitFlag(BarrierMemoryTypeFlags::GroupSharedMemory);
+                emitFlag(BarrierMemoryTypeFlags::NodeInputMemory);
+                emitFlag(BarrierMemoryTypeFlags::NodeOutputMemory);
                 if (first)
                 {
-                    StringBuilder sb;
-                    sb << "0x" << String(flagVal, 16);
-                    getSink()->diagnose(Diagnostics::InvalidBarrierMemoryTypeFlagsValue{
-                        .value = sb.produceString(),
-                        .location = inst->sourceLoc});
                     m_writer->emit("0");
                 }
             }
@@ -1260,8 +1246,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             IRIntegerValue rawFlagVal = 0;
             if (!tryGetBarrierFlagValueInst(inst->getOperand(0), rawFlagVal))
             {
-                getSink()->diagnose(
-                    Diagnostics::NeedCompileTimeConstant{.location = inst->sourceLoc});
+                SLANG_ASSERT(!"expected validated BarrierSemanticFlags constant");
                 m_writer->emit("(0)");
                 return true;
             }
@@ -1276,29 +1261,26 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             else if (flagVal & ~knownFlags)
             {
-                StringBuilder sb;
-                sb << "0x" << String(flagVal, 16);
-                getSink()->diagnose(Diagnostics::InvalidBarrierSemanticFlagsValue{
-                    .value = sb.produceString(),
-                    .location = inst->sourceLoc});
                 m_writer->emit("0");
             }
             else
             {
                 bool first = true;
-                auto emitFlag = [&](const char* name, uint32_t bit)
+                auto emitFlag = [&](uint32_t bit)
                 {
                     if (flagVal & bit)
                     {
                         if (!first)
                             m_writer->emit(" | ");
+                        auto name = getBarrierSemanticFlagName(bit);
+                        SLANG_ASSERT(name);
                         m_writer->emit(name);
                         first = false;
                     }
                 };
-                emitFlag("GROUP_SYNC", BarrierSemanticFlags::GroupSync);
-                emitFlag("GROUP_SCOPE", BarrierSemanticFlags::GroupScope);
-                emitFlag("DEVICE_SCOPE", BarrierSemanticFlags::DeviceScope);
+                emitFlag(BarrierSemanticFlags::GroupSync);
+                emitFlag(BarrierSemanticFlags::GroupScope);
+                emitFlag(BarrierSemanticFlags::DeviceScope);
             }
             m_writer->emit(")");
             return true;

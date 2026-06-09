@@ -17,8 +17,8 @@
 namespace Slang
 {
 
-static constexpr char kNodeLaunchModeBroadcasting[] = "broadcasting";
-static constexpr char kNodeLaunchModeThread[] = "thread";
+static constexpr char const* kNodeLaunchModeBroadcasting = "broadcasting";
+static constexpr char const* kNodeLaunchModeThread = "thread";
 
 // Direction of a semantic value (input from previous stage, or output to next stage)
 enum class SemanticDirection
@@ -1931,6 +1931,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             auto hasMaxGrid = entryPointFuncDecl->findModifier<NodeMaxDispatchGridAttribute>();
             auto hasFixedGrid = entryPointFuncDecl->findModifier<NodeDispatchGridAttribute>();
             auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
+            // Fixed and maximum dispatch-grid attributes are valid only on broadcasting nodes,
+            // e.g. `[NodeLaunch("broadcasting")] [NodeDispatchGrid(1, 1, 1)]`.
             if ((hasMaxGrid || hasFixedGrid) && launchAttr &&
                 launchAttr->mode != kNodeLaunchModeBroadcasting)
             {
@@ -1947,6 +1949,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         if (auto allowSparseNodesAttr = param->findModifier<AllowSparseNodesAttribute>())
         {
+            // `[AllowSparseNodes]` is valid on node output arrays, e.g.
+            // `[AllowSparseNodes] NodeOutputArray<MyRecord> outputs`.
             if (!isIntrinsicTypeWithOp(param->getType(), kIROp_NodeOutputArrayType))
             {
                 sink->diagnose(Diagnostics::AllowSparseNodesRequiresNodeOutputArray{

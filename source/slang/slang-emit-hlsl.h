@@ -88,6 +88,8 @@ protected:
     void emitMappedCoopVecComponentType(
         IRInst* operand,
         IRInst* inputInterpretationPackingFactor = nullptr);
+    static const char* getBarrierMemoryTypeFlagName(uint32_t flag);
+    static const char* getBarrierSemanticFlagName(uint32_t flag);
     void emitMatrixLayoutEnum_sm609(IRInst* operand);
     void emitMatrixLayoutEnum_sm610(IRInst* memoryLayout, bool isTranspose);
     void emitCoopVecMatMulBufferType(IRInst* bufferPtrInst);
