@@ -694,6 +694,11 @@ __intrinsic_type($(kIROp_BackwardDiffFuncType))
 struct BwdDiffFuncType<FType> where __hasDiffTypeInfo(FType)
 { };
 
+__magic_type(ValueAndBwdDiffFuncType)
+__intrinsic_type($(kIROp_ValueAndBackwardDiffFuncType))
+struct ValueAndBwdDiffFuncType<FType> where __hasDiffTypeInfo(FType)
+{ };
+
 __magic_type(ForwardDiffFuncInterfaceType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IForwardDifferentiable))]
 [__FunctionInterface]

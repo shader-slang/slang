@@ -23,6 +23,11 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
     DiagnosticSink* sink,
     IRLegacyBackwardDifferentiate* translateInst);
 
+IRInst* maybeTranslateValueAndBackwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRValueAndBackwardDifferentiate* translateInst);
+
 IRInst* maybeTranslateBackwardDerivative(
     AutoDiffSharedContext* sharedContext,
     DiagnosticSink* sink,

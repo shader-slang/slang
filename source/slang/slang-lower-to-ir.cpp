@@ -2394,6 +2394,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             kIROp_BackwardDiffFuncType));
     }
 
+    LoweredValInfo visitValueAndBwdDiffFuncType(ValueAndBwdDiffFuncType* valueAndBwdFuncType)
+    {
+        return LoweredValInfo::simple(lowerFuncDependentType(
+            as<Type>(as<GenericAppDeclRef>(valueAndBwdFuncType->getDeclRefBase())->getArg(0)),
+            kIROp_ValueAndBackwardDiffFuncType));
+    }
+
     LoweredValInfo visitApplyForBwdFuncType(ApplyForBwdFuncType* applyForBwdFuncType)
     {
         auto base =
@@ -5592,6 +5599,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         SLANG_UNUSED(expr);
         SLANG_UNEXPECTED("BackwardDifferentiateExpr present during IR lowered");
+    }
+
+    LoweredValInfo visitValueAndBackwardDifferentiateExpr(ValueAndBackwardDifferentiateExpr* expr)
+    {
+        auto baseVal = lowerSubExpr(expr->baseFunction);
+        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+
+        return LoweredValInfo::simple(getBuilder()->emitValueAndBackwardDifferentiateInst(
+            lowerType(context, expr->type),
+            baseVal.val));
     }
 
     LoweredValInfo visitApplyForBwdExpr(ApplyForBwdExpr* expr)

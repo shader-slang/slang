@@ -912,6 +912,263 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
     return bwdDiffFunc;
 }
 
+IRInst* maybeTranslateValueAndBackwardDerivative(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRValueAndBackwardDifferentiate* translateInst)
+{
+    IRFuncType* bwdDiffFuncType = cast<IRFuncType>(translateInst->getDataType());
+
+    // The op now carries a single base-function operand (mirroring fwd_diff). Derive the
+    // backward machinery by building a kIROp_BackwardDifferentiate over the same base and
+    // translating it to the standard 5-tuple
+    //   (primalFunc, rematFunc, propagateFunc, ctxType, minimalCtxType).
+    // Elements 0/1/2 are the apply(primal)/remat/propagate funcs the wrapper below composes,
+    // semantically identical to the (applyBwdFunc, rematFunc, bwdPropFunc) operands this op used
+    // to carry directly. Element 0 (primalFunc) is the same function translate.cpp surfaces as
+    // kIROp_BackwardDifferentiatePrimal, so its result shape (Tuple<R, MinimalCtx> for non-void
+    // R, else bare R) matches the emitElementExtract sites in the wrapper below.
+    IRInst* baseFn = translateInst->getOperand(0);
+
+    IRInst* applyBwdFunc = nullptr;
+    IRInst* rematFunc = nullptr;
+    IRInst* bwdPropFunc = nullptr;
+    {
+        IRBuilder subBuilder(sharedContext->moduleInst);
+        subBuilder.setInsertBefore(translateInst);
+        auto bwdDiffInst =
+            subBuilder.emitIntrinsicInst(nullptr, kIROp_BackwardDifferentiate, 1, &baseFn);
+
+        auto translatedTuple = maybeTranslateBackwardDerivative(
+            sharedContext,
+            sink,
+            cast<IRBackwardDifferentiate>(bwdDiffInst));
+
+        // If the base function could not be translated (e.g. not an IRFunc yet), leave the op
+        // in place to be retried after further specialization.
+        if (translatedTuple == bwdDiffInst)
+            return translateInst;
+
+        SLANG_ASSERT(as<IRMakeTuple>(translatedTuple));
+        applyBwdFunc = as<IRMakeTuple>(translatedTuple)->getOperand(0);
+        rematFunc = as<IRMakeTuple>(translatedTuple)->getOperand(1);
+        bwdPropFunc = as<IRMakeTuple>(translatedTuple)->getOperand(2);
+    }
+
+    IRBuilder builder(sharedContext->moduleInst);
+
+    // This will nest the func at the right place (inside any generic contexts).
+    builder.setInsertAfter(translateInst);
+    // Like the legacy bwd_diff translator, we call the applyBwdFunc() with all the primal parts of
+    // the parameters then call the bwdPropFunc() with the differential parts of the parameters &
+    // write back any output derivatives. The difference is that we surface the primal value back
+    // to the caller through the return value (Q1 = bare R; semantic check rejects void R).
+    //
+    auto bwdDiffFunc = builder.createFunc();
+    bwdDiffFunc->setFullType(bwdDiffFuncType);
+
+    builder.setInsertInto(bwdDiffFunc);
+    builder.emitBlock();
+    List<IRInst*> bwdDiffFuncParams;
+    // Emit parameters for the backward derivative function.
+    for (auto paramType : bwdDiffFuncType->getParamTypes())
+    {
+        auto param = builder.emitParam(paramType);
+        bwdDiffFuncParams.add(param);
+    }
+
+    auto applyBwdFuncType = cast<IRFuncType>(applyBwdFunc->getDataType());
+    auto rematFuncType = cast<IRFuncType>(rematFunc->getDataType());
+    auto bwdPropFuncType = cast<IRFuncType>(bwdPropFunc->getDataType());
+    List<IRInst*> applyBwdFuncArgs;
+    List<IRInst*> rematFuncArgs;
+    List<IRInst*> bwdPropFuncParams;
+
+    Index bwdDiffParamIdx = 0;
+    for (UIndex i = 0; i < applyBwdFuncType->getParamCount(); i++)
+    {
+        auto applyParamType = applyBwdFuncType->getParamType(i);
+        auto bwdPropParamType =
+            bwdPropFuncType->getParamType(i + 1); // +1 to skip the context param
+
+        if (as<IRVoidType>(bwdPropParamType))
+        {
+            bwdPropFuncParams.add(builder.getVoidValue());
+        }
+
+        if (as<IROutParamType>(applyParamType))
+        {
+            applyBwdFuncArgs.add(
+                builder.emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType()));
+            rematFuncArgs.add(builder.emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType()));
+
+            if (!as<IRVoidType>(bwdPropParamType))
+            {
+                bwdPropFuncParams.add(bwdDiffFuncParams[bwdDiffParamIdx]);
+                bwdDiffParamIdx++;
+            }
+            continue;
+        }
+        else if (as<IRBorrowInOutParamType>(applyParamType) && as<IRVoidType>(bwdPropParamType))
+        {
+            {
+                auto var = builder.emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType());
+                applyBwdFuncArgs.add(var);
+                builder.emitStore(var, bwdDiffFuncParams[bwdDiffParamIdx]);
+            }
+
+            {
+                auto var = builder.emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType());
+                rematFuncArgs.add(var);
+                builder.emitStore(var, bwdDiffFuncParams[bwdDiffParamIdx]);
+            }
+
+            bwdDiffParamIdx++;
+            continue;
+        }
+        else if (!as<IRVoidType>(bwdPropParamType))
+        {
+            // inout diff-pair or in diff-ptr-pair
+            if (auto bwdDiffParamPtrType =
+                    as<IRPtrTypeBase>(bwdDiffFuncType->getParamType(bwdDiffParamIdx));
+                bwdDiffParamPtrType)
+            {
+                if (auto applyParamPtrType = as<IRPtrTypeBase>(applyParamType))
+                {
+                    {
+                        auto var =
+                            builder.emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType());
+                        applyBwdFuncArgs.add(var);
+                        builder.emitStore(
+                            var,
+                            builder.emitLoad(builder.emitIntrinsicInst(
+                                builder.getPtrType(applyParamPtrType->getValueType()),
+                                kIROp_DifferentialPairGetPrimal,
+                                1,
+                                &bwdDiffFuncParams[bwdDiffParamIdx])));
+                    }
+
+                    {
+                        auto var =
+                            builder.emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType());
+                        rematFuncArgs.add(var);
+                        builder.emitStore(
+                            var,
+                            builder.emitLoad(builder.emitIntrinsicInst(
+                                builder.getPtrType(applyParamPtrType->getValueType()),
+                                kIROp_DifferentialPairGetPrimal,
+                                1,
+                                &bwdDiffFuncParams[bwdDiffParamIdx])));
+                    }
+                }
+                else
+                {
+                    applyBwdFuncArgs.add(builder.emitLoad(builder.emitIntrinsicInst(
+                        builder.getPtrType(applyParamType),
+                        kIROp_DifferentialPairGetPrimal,
+                        1,
+                        &bwdDiffFuncParams[bwdDiffParamIdx])));
+                    rematFuncArgs.add(builder.emitLoad(builder.emitIntrinsicInst(
+                        builder.getPtrType(applyParamType),
+                        kIROp_DifferentialPairGetPrimal,
+                        1,
+                        &bwdDiffFuncParams[bwdDiffParamIdx])));
+                }
+
+                if (auto bwdPropParamPtrType = as<IRPtrTypeBase>(bwdPropParamType))
+                {
+                    bwdPropFuncParams.add(builder.emitIntrinsicInst(
+                        builder.getPtrType(bwdPropParamPtrType->getValueType()),
+                        kIROp_DifferentialPairGetDifferential,
+                        1,
+                        &bwdDiffFuncParams[bwdDiffParamIdx]));
+                }
+                else
+                {
+                    bwdPropFuncParams.add(builder.emitLoad(builder.emitIntrinsicInst(
+                        bwdPropParamType,
+                        kIROp_DifferentialPairGetDifferential,
+                        1,
+                        &bwdDiffFuncParams[bwdDiffParamIdx])));
+                }
+                bwdDiffParamIdx++;
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Unexpected parameter type in backward diff translater");
+            }
+        }
+        else
+        {
+            applyBwdFuncArgs.add(bwdDiffFuncParams[bwdDiffParamIdx]);
+            rematFuncArgs.add(bwdDiffFuncParams[bwdDiffParamIdx]);
+            bwdDiffParamIdx++;
+        }
+    }
+
+    // Do we have a left over parameter? This should be the d_Out parameter.
+    if (bwdDiffFuncParams.getCount() > (Index)bwdDiffParamIdx)
+    {
+        bwdPropFuncParams.add(bwdDiffFuncParams[bwdDiffParamIdx]);
+    }
+
+    auto applyResult = builder.emitCallInst(
+        applyBwdFuncType->getResultType(),
+        applyBwdFunc,
+        applyBwdFuncArgs.getCount(),
+        applyBwdFuncArgs.getBuffer());
+    builder.addDecoration(applyResult, kIROp_IgnoreSideEffectsDecoration);
+
+    bool isContextTypeInTuple = false;
+    if (auto tupleType = as<IRTupleType>(applyResult->getDataType()))
+    {
+        if (tupleType->getOperandCount() >= 2 &&
+            tupleType->getOperand(1) == rematFuncType->getParamType(0))
+        {
+            isContextTypeInTuple = true;
+        }
+    }
+
+    // Capture the primal R that we will return at the end. For non-void R the apply func
+    // returns Tuple<R, MinimalCtx>, otherwise the bare R / MinimalCtx. Semantic check has
+    // already rejected void R for value_and_bwd_diff (Q2), so applyResult is either
+    // Tuple<R, MinimalCtx> (when context is needed) or bare R (no context).
+    IRInst* primalValue = nullptr;
+    if (isContextTypeInTuple)
+    {
+        // The apply func returns a tuple — extract the context value and insert
+        // at position 0 (MinimalContext is always the first remat parameter).
+        auto contextVal = builder.emitElementExtract(applyResult, builder.getIntValue(1));
+        rematFuncArgs.insert(0, contextVal);
+
+        primalValue = builder.emitElementExtract(applyResult, builder.getIntValue(0));
+    }
+    else
+    {
+        rematFuncArgs.insert(0, applyResult);
+        // No context tuple — applyResult is bare R.
+        primalValue = applyResult;
+    }
+
+    auto rematResult = builder.emitCallInst(
+        rematFuncType->getResultType(),
+        rematFunc,
+        rematFuncArgs.getCount(),
+        rematFuncArgs.getBuffer());
+
+    bwdPropFuncParams.insert(0, rematResult);
+
+    builder.emitCallInst(
+        bwdPropFuncType->getResultType(),
+        bwdPropFunc,
+        bwdPropFuncParams.getCount(),
+        bwdPropFuncParams.getBuffer());
+
+    builder.emitReturn(primalValue);
+
+    return bwdDiffFunc;
+}
+
 IRInst* maybeTranslateBackwardDerivative(
     AutoDiffSharedContext* sharedContext,
     DiagnosticSink* sink,

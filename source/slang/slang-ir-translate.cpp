@@ -104,6 +104,7 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
     case kIROp_ForwardDiffFuncType:
     case kIROp_BwdCallableFuncType:
     case kIROp_BackwardDiffFuncType:
+    case kIROp_ValueAndBackwardDiffFuncType:
     case kIROp_RematFuncType:
         {
             DifferentiableTypeConformanceContext ctx(&autodiffContext);
@@ -159,6 +160,13 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
                 &autodiffContext,
                 sink,
                 cast<IRLegacyBackwardDifferentiate>(inst)));
+        }
+    case kIROp_ValueAndBackwardDifferentiate:
+        {
+            return memoize(maybeTranslateValueAndBackwardDerivative(
+                &autodiffContext,
+                sink,
+                cast<IRValueAndBackwardDifferentiate>(inst)));
         }
     case kIROp_BackwardDifferentiatePrimal:
     case kIROp_BackwardRemat:

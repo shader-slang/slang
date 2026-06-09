@@ -3601,6 +3601,17 @@ IRInst* IRBuilder::emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn)
     return inst;
 }
 
+IRInst* IRBuilder::emitValueAndBackwardDifferentiateInst(IRType* type, IRInst* baseFn)
+{
+    auto inst = createInst<IRValueAndBackwardDifferentiate>(
+        this,
+        kIROp_ValueAndBackwardDifferentiate,
+        type,
+        baseFn);
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitDispatchKernelInst(
     IRType* type,
     IRInst* baseFn,
@@ -9681,6 +9692,7 @@ IRInst* getResolvedInstForDecorations(IRInst* inst, bool resolveThroughDifferent
             {
             case kIROp_ForwardDifferentiate:
             case kIROp_BackwardDifferentiate:
+            case kIROp_ValueAndBackwardDifferentiate:
             case kIROp_BackwardDifferentiatePrimal:
             case kIROp_BackwardDifferentiatePropagate:
             case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
