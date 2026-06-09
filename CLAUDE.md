@@ -121,15 +121,24 @@ representation that is robust by construction, even when that means a larger rew
 1. **Format your code**: Run `./extras/formatting.sh` before committing
 2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking" (for ABI/language breaking changes)
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
-4. **Write the PR description in this required four-part format:**
+4. **Write the PR description in this required five-part format:**
    1. **Motivation** — the problem being solved, with a concrete example / motivating test case.
    2. **Proposed solution** — the approach, and why it is the principled one.
    3. **Change summary** — a table or list of the files/areas touched and what each does.
-   4. **Process report** — explain _every_ change with a logical reason. For a change that
+   4. **Concepts and vocabulary** — a short glossary, placed between the change summary and the
+      process report. Restate only the _codebase-specific or subtle_ terms the report relies on, as
+      a reminder for the reviewer (e.g. witness / `getSub`, facet / `getInheritanceInfo`, the
+      fixpoint solver, or a non-obvious distinction the fix hinges on). Do **not** explain basic,
+      well-known concepts (e.g. interface, associated type) — assume them.
+   5. **Process report** — explain _every_ change with a logical reason. For a change that
       addresses a **cascading** issue, describe the issue (with its motivating test case) and
       justify why the fix is correct with a **code trace** (the exact functions/insts involved),
       not just a description. State explicitly why each change is necessary and principled rather
       than a workaround.
+
+   Write for a reviewer who does not have the full context in their head: ground each abstract claim
+   in a concrete example, and wire explanations to the source — name the function and file (or
+   `file.cpp:line`) — so the reader can navigate from prose to code without searching.
 
 ### Testing
 

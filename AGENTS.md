@@ -164,12 +164,19 @@ Follow the principled path, not the minimal-edit-distance path.
 - For formatting failures, run installed hooks from `./extras/install-git-hooks.sh` or
   request the format bot with `/format`.
 
-Write the PR description in this four-part format:
+Write the PR description in this five-part format:
 
 1. **Motivation** — the problem, with a concrete example / motivating test case.
 2. **Proposed solution** — the approach and why it is principled.
 3. **Change summary** — the files/areas touched and what each does.
-4. **Process report** — explain every change with a logical reason. For a change addressing a
+4. **Concepts and vocabulary** — a short glossary between the change summary and the process report.
+   Restate only the codebase-specific or subtle terms the report relies on (e.g. witness, facet,
+   the fixpoint solver, a non-obvious distinction the fix hinges on), as a reminder. Do not explain
+   basic, well-known concepts (interface, associated type) — assume them.
+5. **Process report** — explain every change with a logical reason. For a change addressing a
    cascading issue, describe the issue (with its motivating test case) and justify the fix with a
    code trace (the exact functions/insts involved), explaining why it is necessary and principled
    rather than a workaround.
+
+Write for a reviewer without the full context in their head: ground each abstract claim in a
+concrete example, and wire explanations to the source (function name and file, or `file.cpp:line`).
