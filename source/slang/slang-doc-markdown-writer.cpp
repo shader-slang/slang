@@ -605,10 +605,10 @@ void DocMarkdownWriter::writeVar(const ASTMarkup::Entry& entry, VarDecl* varDecl
     {
         out << toSlice("<span class='code_keyword'>const</span> ");
     }
-    if (varDecl->hasModifier<ConstExprModifier>())
-    {
-        out << toSlice("<span class='code_keyword'>constexpr</span> ");
-    }
+    // Note: ConstExprModifier on variable declarations is rewritten to ConstModifier
+    // during semantic checking (see slang-check-modifier.cpp), so no constexpr branch
+    // is needed here. constexpr on function parameters is intentionally omitted from
+    // documentation signatures as it is a call-site constraint, not a type qualifier.
     if (varDecl->hasModifier<InModifier>())
     {
         out << toSlice("<span class='code_keyword'>in</span> ");

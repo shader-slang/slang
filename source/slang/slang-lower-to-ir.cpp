@@ -4374,6 +4374,10 @@ void collectParameterLists(
 
 bool isConstExprVar(Decl* decl)
 {
+    // Note: for VarDeclBase nodes, ConstExprModifier is rewritten to ConstModifier
+    // during semantic checking (see slang-check-modifier.cpp). This branch is only
+    // reachable for ParamDecl, where constexpr is a supported feature meaning the
+    // argument must be a compile-time constant at the call site.
     if (decl->hasModifier<ConstExprModifier>())
     {
         return true;

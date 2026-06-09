@@ -1630,6 +1630,10 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
 
     case ASTNodeType::ConstModifier:
     case ASTNodeType::HLSLStaticModifier:
+    // ConstExprModifier is intentionally allowed on VarDeclBase (in addition to
+    // CallableDecl/ParamDecl) so that checkModifier() can intercept it, emit
+    // E31227, and replace it with ConstModifier. Without this, the parser-level
+    // modifier would be rejected before checkModifier() ever runs.
     case ASTNodeType::ConstExprModifier:
     case ASTNodeType::PreciseModifier:
         return as<VarDeclBase>(decl) || as<CallableDecl>(decl);
