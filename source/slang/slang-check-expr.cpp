@@ -2499,22 +2499,22 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             // re-evaluates once its operands become concrete. This is the same representation
             // the fast path's `BuiltinOperatorExpr` folds to, so there is exactly one `IntVal`
             // form per operator regardless of which path reached it.
-            BuiltinOperationKind kind;
+            BuiltinOperationKind opKind;
             if (opName == getName("?:"))
-                kind = BuiltinOperationKind::Conditional;
+                opKind = BuiltinOperationKind::Conditional;
             else if (opName == getName("&&"))
-                kind = BuiltinOperationKind::And;
+                opKind = BuiltinOperationKind::And;
             else if (opName == getName("||"))
-                kind = BuiltinOperationKind::Or;
+                opKind = BuiltinOperationKind::Or;
             else
-                kind = getBuiltinOperationKindFromString(
+                opKind = getBuiltinOperationKindFromString(
                     getText(opName).getUnownedSlice(),
                     argCount == 1 ? OperatorArity::Unary : OperatorArity::Binary);
-            if (kind == BuiltinOperationKind::Unknown)
+            if (opKind == BuiltinOperationKind::Unknown)
                 return nullptr;
             return m_astBuilder->getOrCreate<BuiltinOperationIntVal>(
                 invokeExpr.getExpr()->type.type,
-                kind,
+                opKind,
                 makeArrayView(argVals, argCount));
         }
         // A `+`/`-`/`*` with an unexpected argument count falls through to here.

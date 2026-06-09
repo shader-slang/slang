@@ -237,6 +237,14 @@ class BuiltinOperationIntVal : public IntVal
 
     BuiltinOperationIntVal(Type* inType, BuiltinOperationKind inOp, ArrayView<IntVal*> inArgs)
     {
+        // `+`/`-`/`*`/unary-`-` are always represented as `PolynomialIntVal` (so value
+        // unification can canonicalize them), and an all-constant fold of any operator produces
+        // a `ConstantIntVal`; a `BuiltinOperationIntVal` is therefore never formed for these
+        // opcodes. Keeping this invariant means there is a single `IntVal` representation per
+        // builtin operator.
+        SLANG_ASSERT(
+            inOp != BuiltinOperationKind::Add && inOp != BuiltinOperationKind::Sub &&
+            inOp != BuiltinOperationKind::Mul && inOp != BuiltinOperationKind::Neg);
         setOperands(inType, (IntegerLiteralValue)inOp);
         for (auto arg : inArgs)
             m_operands.add(ValNodeOperand(arg));
