@@ -1,0 +1,11 @@
+# Tests expected to fail on the GitHub-hosted aarch64 CI runners.
+#
+# Dropping -category means the aarch64 jobs now run the full suite with
+# `-api all`, which includes gfx-unit-test-tool Vulkan tests. These four fail
+# to create a Vulkan instance on the aarch64 runners. They are silenced here so
+# the rest of the aarch64 suite stays green; the underlying aarch64 Vulkan
+# behavior is tracked as a separate follow-up issue and should be revisited.
+gfx-unit-test-tool/neuralSlangNetworkConverterVulkan.internal
+gfx-unit-test-tool/pointerInBufferDoublePtrRoundtripVulkan.internal
+gfx-unit-test-tool/pointerInBufferRoundtripVulkan.internal
+gfx-unit-test-tool/pointerInParamBlockRoundtripVulkan.internal

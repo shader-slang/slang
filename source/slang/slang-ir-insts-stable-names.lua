@@ -833,5 +833,7 @@ return {
 	["TranslateBase.IdentityRemat"] = 857,
 	["IncrementFunctionCoverageCounter"] = 858,
 	["IncrementBranchCoverageCounter"] = 859,
-	["ImageTexelPointer"] = 860
+	["Decoration.BuiltinRequirementDecoration"] = 860,
+	["builtinRequirementKey"] = 861,
+	["ImageTexelPointer"] = 862
 }
