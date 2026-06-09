@@ -194,9 +194,12 @@ Static extension *member functions* are exempt from this check because they can 
 an instance of the target type. A `[require(...)]` attribute on a constructor, subscript, or property is
 always checked: a constructor produces a value of the target type, a subscript provides indexed
 access to it, and a property provides named access to it, so all three must be compatible with the
-target's capabilities. Members that carry no
-`[require(...)]` attribute of their own are not individually checked at the member level (the
-extension's own capability constraint, if any, is checked separately at the extension level).
+target's capabilities. Individual accessors (`get`, `set`, `ref`) inside a subscript or property are
+also each checked independently — a `[require(...)]` attribute on one accessor is validated against
+the target type even if its enclosing subscript or property carries no `[require(...)]` of its own.
+Members that carry no `[require(...)]` attribute of their own are not individually checked at the
+member level (the extension's own capability constraint, if any, is checked separately at the
+extension level). Conflicts produce diagnostic `E36100`.
 
 ## Capabilities Between Requirement and Implementation
 

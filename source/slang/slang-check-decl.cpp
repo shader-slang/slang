@@ -19914,7 +19914,19 @@ void SemanticsDeclCapabilityVisitor::_checkExtensionMemberCapConflict(Decl* memb
     if (ownDeclaredCaps.isEmpty())
         return;
 
-    auto extensionDecl = getParentExtensionDecl(memberDecl);
+    // Walk up to find an enclosing ExtensionDecl, but stop at any AggTypeDeclBase:
+    // a member that lives inside a nested struct/class inside the extension belongs to
+    // that nested type, not to the extension target, and must not be checked here.
+    // SubscriptDecl, PropertyDecl, and GenericDecl are transparent wrappers that we
+    // skip past (e.g. an accessor's parent is the subscript, which lives in the extension).
+    auto parentDecl = memberDecl->parentDecl;
+    while (parentDecl && !as<ExtensionDecl>(parentDecl))
+    {
+        if (as<AggTypeDeclBase>(parentDecl))
+            return;
+        parentDecl = parentDecl->parentDecl;
+    }
+    auto extensionDecl = as<ExtensionDecl>(parentDecl);
     if (!extensionDecl)
         return;
 

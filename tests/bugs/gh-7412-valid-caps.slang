@@ -193,3 +193,17 @@ extension<T : IHasMethod> T
     [require(glsl)]
     void extraGlsl() {}
 }
+
+// Case 19: Method of a type nested inside an extension -- no error expected.
+// The nested struct's method has [require(hlsl)] which is disjoint from Foo's [require(glsl)],
+// but the method belongs to Nested, not to Foo. The direct-parent check in
+// _checkExtensionMemberCapConflict sees Nested (an AggTypeDecl), not the extension, so it
+// returns early without firing E36100.
+extension Foo
+{
+    struct Nested
+    {
+        [require(hlsl)]
+        void m() {}
+    }
+}
