@@ -2152,6 +2152,16 @@ BuiltinOperationKind getBuiltinOperationKindFromString(
         return BuiltinOperationKind::Lsh;
     if (opText == toSlice(">>"))
         return BuiltinOperationKind::Rsh;
+    // `?:`/`&&`/`||` are not rewritten by the fast path (`?:` is not an infix operator and
+    // `&&`/`||` short-circuit), but a *resolved* operator call on them can still fold to a
+    // constant `BuiltinOperationIntVal`; the fast path naturally ignores these kinds because
+    // they are neither arithmetic, comparison, nor bitwise.
+    if (opText == toSlice("?:"))
+        return BuiltinOperationKind::Conditional;
+    if (opText == toSlice("&&"))
+        return BuiltinOperationKind::And;
+    if (opText == toSlice("||"))
+        return BuiltinOperationKind::Or;
     return BuiltinOperationKind::Unknown;
 }
 

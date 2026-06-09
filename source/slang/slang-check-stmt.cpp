@@ -742,59 +742,27 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
 
     ConstantIntVal* finalVal = nullptr;
     IROp compareOp = kIROp_Nop;
-    // The loop predicate `i < N` is either a fast-path `BuiltinOperatorExpr` (read its op
-    // kind) or a resolved comparison `InfixExpr` (read the intrinsic-op modifier). Both carry
-    // their operands in `arguments` (`ExprWithArgsBase`).
-    ExprWithArgsBase* cmpExpr = nullptr;
-    if (auto builtinOp = as<BuiltinOperatorExpr>(stmt->predicateExpression))
+    // A comparison loop predicate `i < N` on builtin scalar operands is always rewritten by the
+    // fast path to a `BuiltinOperatorExpr`, so that is the only form we need to recognize here.
+    auto cmpExpr = as<BuiltinOperatorExpr>(stmt->predicateExpression);
+    if (!cmpExpr)
+        return;
+    switch (cmpExpr->op)
     {
-        cmpExpr = builtinOp;
-        switch (builtinOp->op)
-        {
-        case BuiltinOperationKind::Less:
-            compareOp = kIROp_Less;
-            break;
-        case BuiltinOperationKind::Leq:
-            compareOp = kIROp_Leq;
-            break;
-        case BuiltinOperationKind::Greater:
-            compareOp = kIROp_Greater;
-            break;
-        case BuiltinOperationKind::Geq:
-            compareOp = kIROp_Geq;
-            break;
-        case BuiltinOperationKind::Eql:
-            compareOp = kIROp_Eql;
-            break;
-        case BuiltinOperationKind::Neq:
-            compareOp = kIROp_Neq;
-            break;
-        default:
-            break;
-        }
-        // `==`/`!=` are recognized for parity with the resolved branch; the trip-count logic
-        // below only acts on the ordering comparisons.
-        if (compareOp == kIROp_Nop)
-            return;
-    }
-    else if (auto binaryExpr = as<InfixExpr>(stmt->predicateExpression))
-    {
-        auto compareFuncExpr = as<DeclRefExpr>(binaryExpr->functionExpr);
-        if (!compareFuncExpr || !compareFuncExpr->declRef.getDecl())
-            return;
-        if (auto intrinsicOpModifier =
-                compareFuncExpr->declRef.getDecl()->findModifier<IntrinsicOpModifier>())
-        {
-            compareOp = (IROp)intrinsicOpModifier->op;
-        }
-        else
-        {
-            return;
-        }
-        cmpExpr = binaryExpr;
-    }
-    else
-    {
+    case BuiltinOperationKind::Less:
+        compareOp = kIROp_Less;
+        break;
+    case BuiltinOperationKind::Leq:
+        compareOp = kIROp_Leq;
+        break;
+    case BuiltinOperationKind::Greater:
+        compareOp = kIROp_Greater;
+        break;
+    case BuiltinOperationKind::Geq:
+        compareOp = kIROp_Geq;
+        break;
+    default:
+        // Only ordering comparisons drive trip-count inference.
         return;
     }
     if (cmpExpr->arguments.getCount() != 2)

@@ -787,34 +787,19 @@ struct SharedSemanticsContext : public RefObject
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
 
-    // Whether builtin operators follow GLSL semantics in this checking session (see
-    // `SemanticsExprVisitor::isGLSLOperatorScope`). Computed lazily on first query and cached
-    // here because the builtin-operator fast path consults it for every operator expression.
-    // -1 = not yet computed, 0 = false, 1 = true.
-    int8_t m_isGLSLOperatorScopeCache = -1;
+    // Whether the `glsl` module has been imported into this checking session. Set when the
+    // `glsl` import is handled (see `importModuleIntoScope`), rather than scanning the imported
+    // module list on demand, because the builtin-operator fast path consults
+    // `isGLSLOperatorScope()` for every operator expression.
+    bool m_isGLSLModuleImported = false;
 
 public:
-    /// Is the current checking session in GLSL operator scope (`-allow-glsl` or `import glsl;`)?
-    /// Computed once and cached.
+    /// Is the current checking session in GLSL operator scope? True when `-allow-glsl` is set or
+    /// the `glsl` module has been imported (its overloads give builtin operators GLSL semantics).
     bool isGLSLOperatorScope()
     {
-        if (m_isGLSLOperatorScopeCache < 0)
-        {
-            bool result = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
-            if (!result)
-            {
-                for (auto moduleDecl : importedModulesList)
-                {
-                    if (moduleDecl->getName() && getText(moduleDecl->getName()) == "glsl")
-                    {
-                        result = true;
-                        break;
-                    }
-                }
-            }
-            m_isGLSLOperatorScopeCache = result ? 1 : 0;
-        }
-        return m_isGLSLOperatorScopeCache != 0;
+        return getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL) ||
+               m_isGLSLModuleImported;
     }
 
 public:
@@ -3742,16 +3727,22 @@ private:
     // Convert the logic operator expression to not use 'InvokeExpr' type
     Expr* convertToLogicOperatorExpr(InvokeExpr* expr);
 
-    // If `expr` is an arithmetic (`+ - * / %`), comparison (`== != < > <= >=`), bitwise/
-    // shift (`& | ^ << >>`), or unary (`- ! ~`) operator on builtin integer/floating-point/
-    // bool scalar, vector, or matrix operands, return a `BuiltinOperatorExpr` (carrying the
-    // resolved `BuiltinOperationKind`) for direct builtin IR lowering, skipping generic
-    // operator overload resolution. Operands of the same builtin type are handled as-is;
-    // operands of different builtin types are promoted via `getBuiltinArithmeticCommonType`
-    // (the usual arithmetic conversions). Returns null to fall back to normal resolution: the
-    // short-circuiting `&&`/`||`, mixed shapes that are not broadcast-compatible, user-defined
-    // operand types, and -- in GLSL operator scope only -- matrix operands and vector
-    // equality (`==`/`!=`), whose semantics the `glsl` module's overloads own.
+    // Recognize an ordinary builtin operator on builtin scalar/vector/matrix operands and
+    // rewrite it directly to a `BuiltinOperatorExpr` carrying the resolved `BuiltinOperationKind`,
+    // returning null when the operator should instead go through normal overload resolution.
+    //
+    // This exists for performance: the vast majority of operators in real shader code are builtin
+    // arithmetic/comparison/bitwise/unary ops on numeric scalars/vectors/matrices, and routing
+    // each one through full generic `operator OP` overload resolution (candidate collection,
+    // inference, coercion) is a large front-end cost. Handling them here lets the common case skip
+    // all of that and lower straight to the corresponding builtin IR op.
+    //
+    // Recognized: `+ - * / %`, `== != < > <= >=`, `& | ^ << >>`, and unary `- ! ~` on builtin
+    // integer/floating-point/bool operands (same-type operands as-is; different builtin types
+    // promoted via `getBuiltinArithmeticCommonType`). Returns null to fall back to normal
+    // resolution for: the short-circuiting `&&`/`||`, mixed shapes that are not
+    // broadcast-compatible, user-defined operand types, and -- in GLSL operator scope only --
+    // matrix operands and vector equality (`==`/`!=`), whose semantics the `glsl` module owns.
     Expr* convertToBuiltinArithmeticOp(InvokeExpr* expr);
 
     // For a builtin binary operator `a OP b` whose operands have *different* builtin
@@ -3764,6 +3755,25 @@ private:
     // not both builtin numeric scalar/vector/matrix types or the shapes are not
     // broadcast-compatible, in which case the caller falls back to overload resolution.
     Type* getBuiltinArithmeticCommonType(Type* left, Type* right);
+
+    // Return `target` with its element/base type replaced by `newElementType`, preserving the
+    // composite shape: a scalar becomes `newElementType`, a `vector<T,N>` becomes
+    // `vector<newElementType,N>`, and a `matrix<T,R,C>` becomes `matrix<newElementType,R,C>`.
+    Type* substituteElementOfCompositeType(Type* target, Type* newElementType);
+
+    // Coerce the operands of a builtin binary operator to the common operand type that overload
+    // resolution would have selected (via `getBuiltinArithmeticCommonType`), and return that
+    // type. Each operand is converted to its *own* shape with the common element base (so e.g. a
+    // `vector * scalar` stays a two-shape operation that backends can lower to a vector-times-
+    // scalar instruction). `outLeftArg`/`outRightArg` receive the (possibly coerced) operand
+    // expressions. Operands that are already the same type are returned unchanged. Returns null
+    // when the operands are not broadcast-compatible builtin numeric types or a coercion fails,
+    // signalling that the fast-path conversion should be abandoned.
+    Type* coerceOperandsOfBuiltinBinaryExpr(
+        Expr* leftArg,
+        Expr* rightArg,
+        Expr*& outLeftArg,
+        Expr*& outRightArg);
 
     // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either
     // `-allow-glsl` is set, or the `glsl` module is in scope (its `operator*` overloads

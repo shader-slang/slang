@@ -2499,17 +2499,9 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             // re-evaluates once its operands become concrete. This is the same representation
             // the fast path's `BuiltinOperatorExpr` folds to, so there is exactly one `IntVal`
             // form per operator regardless of which path reached it.
-            BuiltinOperationKind opKind;
-            if (opName == getName("?:"))
-                opKind = BuiltinOperationKind::Conditional;
-            else if (opName == getName("&&"))
-                opKind = BuiltinOperationKind::And;
-            else if (opName == getName("||"))
-                opKind = BuiltinOperationKind::Or;
-            else
-                opKind = getBuiltinOperationKindFromString(
-                    getText(opName).getUnownedSlice(),
-                    argCount == 1 ? OperatorArity::Unary : OperatorArity::Binary);
+            auto opKind = getBuiltinOperationKindFromString(
+                getText(opName).getUnownedSlice(),
+                argCount == 1 ? OperatorArity::Unary : OperatorArity::Binary);
             if (opKind == BuiltinOperationKind::Unknown)
                 return nullptr;
             return m_astBuilder->getOrCreate<BuiltinOperationIntVal>(
@@ -4447,7 +4439,7 @@ bool SemanticsExprVisitor::isGLSLOperatorScope()
 // Decompose a builtin numeric type into (base element type, shape). `outRows`/`outCols`
 // describe the shape: both null => scalar, rows set & cols null => vector<rows>, both set =>
 // matrix<rows,cols>. Returns false if `type` is not a builtin scalar/vector/matrix.
-static bool _getBuiltinNumericShape(
+static bool _getBuiltinCompositeTypeShape(
     Type* type,
     BaseType& outBase,
     IntVal*& outRows,
@@ -4477,7 +4469,7 @@ static bool _getBuiltinNumericShape(
 // Compute the common element base type for `a OP b`, following the "usual arithmetic
 // conversions": float beats int; among floats the larger size wins; among ints the larger
 // size wins and on a size tie the unsigned type wins; bool promotes to the other operand.
-static BaseType _getBuiltinCommonBaseType(BaseType a, BaseType b)
+static BaseType unifyBaseType(BaseType a, BaseType b)
 {
     if (a == b)
         return a;
@@ -4501,6 +4493,67 @@ static BaseType _getBuiltinCommonBaseType(BaseType a, BaseType b)
     // Same size, differing signedness: the unsigned type wins.
     bool aSigned = (ia.flags & BaseTypeInfo::Flag::Signed) != 0;
     return aSigned ? b : a;
+}
+
+Type* SemanticsExprVisitor::substituteElementOfCompositeType(Type* target, Type* newElementType)
+{
+    if (auto v = as<VectorExpressionType>(target))
+        return createVectorType(newElementType, v->getElementCount());
+    if (auto m = as<MatrixExpressionType>(target))
+        return m_astBuilder
+            ->getMatrixType(newElementType, m->getRowCount(), m->getColumnCount(), m->getLayout());
+    return newElementType;
+}
+
+Type* SemanticsExprVisitor::coerceOperandsOfBuiltinBinaryExpr(
+    Expr* leftArg,
+    Expr* rightArg,
+    Expr*& outLeftArg,
+    Expr*& outRightArg)
+{
+    outLeftArg = leftArg;
+    outRightArg = rightArg;
+
+    // Same builtin type on both sides: nothing to coerce.
+    if (leftArg->type.type->equals(rightArg->type.type))
+        return leftArg->type.type;
+
+    // The broadcast result type with the common element base, matching the candidate overload
+    // resolution would have selected. Null => not a fast-pathable pair of builtin numeric
+    // scalar/vector/matrix operands.
+    Type* commonType = getBuiltinArithmeticCommonType(leftArg->type.type, rightArg->type.type);
+    if (!commonType)
+        return nullptr;
+    BaseType commonBase;
+    IntVal *cRows, *cCols;
+    _getBuiltinCompositeTypeShape(commonType, commonBase, cRows, cCols);
+    Type* commonElementType = m_astBuilder->getBuiltinType(commonBase);
+
+    // Coerce each operand to its *own* shape with the common element base, converting only the
+    // element type and never the shape. Keeping the operands in their mixed vector/scalar (or
+    // matrix/scalar) form preserves the canonical IR that backends optimize -- e.g. a
+    // `vector * scalar` stays a two-shape `mul`, which SPIR-V lowers to `OpVectorTimesScalar`
+    // rather than a splat followed by a component-wise multiply. Because the common element base
+    // is the wider / no-narrowing one, the conversions here are not narrowing, so they do not
+    // emit the "implicit conversion not recommended" warning (which would break the
+    // warning-fatal core module bootstrap).
+    Type* leftTarget = substituteElementOfCompositeType(leftArg->type.type, commonElementType);
+    Type* rightTarget = substituteElementOfCompositeType(rightArg->type.type, commonElementType);
+    if (!leftArg->type.type->equals(leftTarget))
+    {
+        auto c = coerce(CoercionSite::Argument, leftTarget, leftArg, getSink());
+        if (IsErrorExpr(c))
+            return nullptr;
+        outLeftArg = c;
+    }
+    if (!rightArg->type.type->equals(rightTarget))
+    {
+        auto c = coerce(CoercionSite::Argument, rightTarget, rightArg, getSink());
+        if (IsErrorExpr(c))
+            return nullptr;
+        outRightArg = c;
+    }
+    return commonType;
 }
 
 Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
@@ -4615,63 +4668,18 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
             return nullptr;
     }
 
-    Type* operandType = leftArg->type.type;
-    if (!leftArg->type.type->equals(rightArg->type.type))
-    {
-        // Shift operators do not promote to a common type: `a << b` keeps the type of `a`
-        // (the shift amount `b` is converted independently). That asymmetry is not modeled
-        // by the common-type rule below, so leave mixed-type shifts to overload resolution.
-        if (isShift)
-            return nullptr;
-        // The broadcast result type with the common element base, matching the candidate
-        // overload resolution would have selected. Null => not a fast-pathable pair of
-        // builtin numeric scalar/vector/matrix operands.
-        Type* commonType = getBuiltinArithmeticCommonType(leftArg->type.type, rightArg->type.type);
-        if (!commonType)
-            return nullptr;
-        BaseType commonBase;
-        IntVal *cRows, *cCols;
-        _getBuiltinNumericShape(commonType, commonBase, cRows, cCols);
-        Type* commonElementType = m_astBuilder->getBuiltinType(commonBase);
-
-        // Coerce each operand to its *own* shape with the common element base, converting
-        // only the element type and never the shape. Keeping the operands in their mixed
-        // vector/scalar (or matrix/scalar) form preserves the canonical IR that backends
-        // optimize -- e.g. a `vector * scalar` stays a two-shape `mul`, which SPIR-V lowers
-        // to `OpVectorTimesScalar` rather than a splat followed by a component-wise multiply.
-        // Because the common element base is the wider / no-narrowing one, the conversions
-        // here are not narrowing, so they do not emit the "implicit conversion not
-        // recommended" warning (which would break the warning-fatal core module bootstrap).
-        auto elementCoerceTarget = [&](Type* t) -> Type*
-        {
-            if (auto v = as<VectorExpressionType>(t))
-                return createVectorType(commonElementType, v->getElementCount());
-            if (auto m = as<MatrixExpressionType>(t))
-                return m_astBuilder->getMatrixType(
-                    commonElementType,
-                    m->getRowCount(),
-                    m->getColumnCount(),
-                    m->getLayout());
-            return commonElementType;
-        };
-        Type* leftTarget = elementCoerceTarget(leftArg->type.type);
-        Type* rightTarget = elementCoerceTarget(rightArg->type.type);
-        if (!leftArg->type.type->equals(leftTarget))
-        {
-            auto c = coerce(CoercionSite::Argument, leftTarget, leftArg, getSink());
-            if (IsErrorExpr(c))
-                return nullptr;
-            expr->arguments[0] = leftArg = c;
-        }
-        if (!rightArg->type.type->equals(rightTarget))
-        {
-            auto c = coerce(CoercionSite::Argument, rightTarget, rightArg, getSink());
-            if (IsErrorExpr(c))
-                return nullptr;
-            expr->arguments[1] = rightArg = c;
-        }
-        operandType = commonType;
-    }
+    // Shift operators do not promote to a common type: `a << b` keeps the type of `a` (the
+    // shift amount `b` is converted independently). That asymmetry is not modeled by the
+    // common-type rule, so leave mixed-type shifts to overload resolution.
+    if (isShift && !leftArg->type.type->equals(rightArg->type.type))
+        return nullptr;
+    // Promote mixed-type operands to the common operand type (and carry the coerced operands
+    // back onto the expression). Null => not a fast-pathable pair of builtin numeric operands.
+    Type* operandType = coerceOperandsOfBuiltinBinaryExpr(leftArg, rightArg, leftArg, rightArg);
+    if (!operandType)
+        return nullptr;
+    expr->arguments[0] = leftArg;
+    expr->arguments[1] = rightArg;
 
     Type* elementType = operandType;
     VectorExpressionType* vecType = nullptr;
@@ -4688,10 +4696,14 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     bool isIntegerBase = (baseFlags & BaseTypeInfo::Flag::Integer) != 0;
     bool isFloatBase = (baseFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
     bool isBoolBase = (baseType == BaseType::Bool);
-    // Element-type eligibility per operator family:
-    //  - bitwise/shift: integer only;
-    //  - equality (`==`/`!=`): integer, floating-point, or bool;
-    //  - arithmetic and ordering comparison: integer or floating-point.
+    // Some operators do not apply to every element type. For example, it is invalid to apply a
+    // bitwise operator to a floating-point operand, and arithmetic does not apply to `bool`. When
+    // the element type is not valid for the operator family we return null, so the expression
+    // falls back to normal overload resolution (which will either find a user-provided overload
+    // or produce the appropriate diagnostic) instead of being lowered as a builtin operation.
+    //   - bitwise/shift (`& | ^ << >> ~`): integer only;
+    //   - equality (`== !=`): integer, floating-point, or bool;
+    //   - arithmetic (`+ - * / %`) and ordering comparison (`< > <= >=`): integer or float.
     bool eligible;
     if (isBitwise)
         eligible = isIntegerBase;
@@ -4756,9 +4768,9 @@ Type* SemanticsExprVisitor::getBuiltinArithmeticCommonType(Type* left, Type* rig
 {
     BaseType leftBase, rightBase;
     IntVal *leftRows, *leftCols, *rightRows, *rightCols;
-    if (!_getBuiltinNumericShape(left, leftBase, leftRows, leftCols))
+    if (!_getBuiltinCompositeTypeShape(left, leftBase, leftRows, leftCols))
         return nullptr;
-    if (!_getBuiltinNumericShape(right, rightBase, rightRows, rightCols))
+    if (!_getBuiltinCompositeTypeShape(right, rightBase, rightRows, rightCols))
         return nullptr;
 
     // Only well-known numeric base types are handled here; anything else (Void and other
@@ -4772,7 +4784,7 @@ Type* SemanticsExprVisitor::getBuiltinArithmeticCommonType(Type* left, Type* rig
     if (!isHandledBase(leftBase) || !isHandledBase(rightBase))
         return nullptr;
 
-    BaseType commonBase = _getBuiltinCommonBaseType(leftBase, rightBase);
+    BaseType commonBase = unifyBaseType(leftBase, rightBase);
     Type* commonElementType = m_astBuilder->getBuiltinType(commonBase);
 
     bool leftIsScalar = (leftRows == nullptr);

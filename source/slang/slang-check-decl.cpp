@@ -1111,6 +1111,15 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             dispatchIfNotNull(arg);
     }
 
+    // A fast-path builtin operator (e.g. `getClock() + 1`) is a `BuiltinOperatorExpr`, not an
+    // `InvokeExpr`, so it needs its own recursion into the operands -- otherwise decl references
+    // inside an operand (and their inferred capability requirements) would be missed.
+    void visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+    {
+        for (auto arg : expr->arguments)
+            dispatchIfNotNull(arg);
+    }
+
     void visitTypeCastExpr(TypeCastExpr* expr)
     {
         dispatchIfNotNull(expr->functionExpr);
@@ -16156,6 +16165,7 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
     if (getText(moduleDecl->getName()) == "glsl")
     {
         getShared()->glslModuleDecl = moduleDecl;
+        getShared()->m_isGLSLModuleImported = true;
     }
 
     importedModulesList.add(moduleDecl);
