@@ -2768,27 +2768,12 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         return as<IntVal>(val);
     }
 
-    // Fall back to the decl's stored, serializable folded value (substituted for this
-    // declRef) when there is no initializer expression to fold, or when re-folding it
-    // fails. The stored `val` round-trips through serialization and folds correctly under
-    // substitution, so this is a robust safety net for imported (cross-module) initializers
-    // whose expression form does not re-fold.
-    auto foldFromStoredVal = [&]() -> IntVal*
-    {
-        if (auto storedVal = decl->val)
-            return as<IntVal>(storedVal->substitute(m_astBuilder, SubstitutionSet(declRef)));
-        return nullptr;
-    };
-
     if (!getInitExpr(m_astBuilder, declRef))
-        return foldFromStoredVal();
+        return nullptr;
 
     ensureDecl(declRef.getDecl(), DeclCheckState::DefinitionChecked);
     ConstantFoldingCircularityInfo newCircularityInfo(declRef, circularityInfo);
-    if (auto folded =
-            tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), kind, &newCircularityInfo))
-        return folded;
-    return foldFromStoredVal();
+    return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), kind, &newCircularityInfo);
 }
 
 IntVal* SemanticsVisitor::tryConstantFoldBuiltinOperatorExpr(
