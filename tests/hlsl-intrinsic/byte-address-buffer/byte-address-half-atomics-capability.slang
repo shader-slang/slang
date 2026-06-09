@@ -6,7 +6,8 @@
 //TEST:SIMPLE(filecheck=VECTOR_F16): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV
 
 // Direct half-vector `__atomic_*` checks.
-// RHI does not yet expose a feature gate for VK_NV_shader_atomic_float16_vector, so these
+// RHI does not yet expose a feature gate for VK_NV_shader_atomic_float16_vector
+// (tracked by shader-slang/slang#11519), so these
 // runtime checks stay disabled while the active tests below cover SPIR-V codegen/diagnostics.
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_DIRECT4):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16VectorNV -output-using-type -xslang -DTEST_RUNTIME_DIRECT_VECTOR4
@@ -34,6 +35,7 @@
 //TEST:SIMPLE(filecheck=SCALAR_HALF_EXCHANGE): -target spirv -entry computeMain -stage compute -emit-spirv-directly -DTEST_DIRECT_SCALAR_HALF_EXCHANGE
 //TEST:SIMPLE(filecheck=EMULATED): -target spirv -entry computeMain -stage compute -emit-spirv-directly -DTEST_EMULATED
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -capability cuda_sm_7_0
+//TEST:SIMPLE(filecheck=CUDA_UNSUPPORTED_VECTOR_WIDTH): -target cuda -entry computeMain -stage compute -capability cuda_sm_7_0 -DTEST_UNSUPPORTED_VECTOR_WIDTH
 
 //TEST_INPUT:ubuffer(stride=4, count=8):name=tmpBuffer
 RWByteAddressBuffer tmpBuffer;
@@ -195,7 +197,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 #else
     half originalValue;
     tmpBuffer.InterlockedAddF16(0, 1.0h, originalValue);
-// NO_FP16_ATOMIC: entry point uses capabilities not in specified profile
+// NO_FP16_ATOMIC: error[E41013]: entry point uses capabilities not in specified profile
 // NO_FP16_ATOMIC: Missing capabilities are: 'spvAtomicFloat16AddEXT'
 // IGNORE_CAPS-NOT: entry point uses capabilities not in specified profile
     outputBuffer[0] = float(originalValue);
@@ -365,3 +367,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CUDA-COUNT-5: atomicAdd((&{{.*}}), __half(1.0))
 // CUDA-NOT: atomicAdd((half2 *
 // CUDA-NOT: atomicAdd((__half2 *
+// CUDA_UNSUPPORTED_VECTOR_WIDTH-NOT: SPIR-V fp16 vector atomics
+// CUDA_UNSUPPORTED_VECTOR_WIDTH: atomicAdd((&{{.*}}), make___half3
+// CUDA_UNSUPPORTED_VECTOR_WIDTH-NOT: SPIR-V fp16 vector atomics

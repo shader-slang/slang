@@ -2787,7 +2787,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // For SPIR-V, we don't skip this validation, because we might then be generating
         // invalid SPIR-V.
         bool skipFuncParamValidation = false;
-        validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
+        validateSPIRVAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
     }
 
     void updateFunctionTypes()

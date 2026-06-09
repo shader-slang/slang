@@ -583,6 +583,7 @@ static void validateSPIRVFp16VectorAtomicOperation(DiagnosticSink* sink, IRInst*
 
 static void validateAtomicOperationsImpl(
     bool skipFuncParamValidation,
+    bool validateSPIRVFp16VectorAtomics,
     DiagnosticSink* sink,
     IRInst* inst)
 {
@@ -607,7 +608,8 @@ static void validateAtomicOperationsImpl(
                 sink->diagnose(Diagnostics::InvalidAtomicDestinationPointer{
                     .location = inst->sourceLoc,
                 });
-            validateSPIRVFp16VectorAtomicOperation(sink, inst);
+            if (validateSPIRVFp16VectorAtomics)
+                validateSPIRVFp16VectorAtomicOperation(sink, inst);
         }
         break;
 
@@ -617,13 +619,22 @@ static void validateAtomicOperationsImpl(
 
     for (auto child : inst->getModifiableChildren())
     {
-        validateAtomicOperationsImpl(skipFuncParamValidation, sink, child);
+        validateAtomicOperationsImpl(
+            skipFuncParamValidation,
+            validateSPIRVFp16VectorAtomics,
+            sink,
+            child);
     }
 }
 
 void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst)
 {
-    validateAtomicOperationsImpl(skipFuncParamValidation, sink, inst);
+    validateAtomicOperationsImpl(skipFuncParamValidation, false, sink, inst);
+}
+
+void validateSPIRVAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst)
+{
+    validateAtomicOperationsImpl(skipFuncParamValidation, true, sink, inst);
 }
 
 static void validateVectorOrMatrixElementType(
