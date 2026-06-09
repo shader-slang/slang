@@ -699,6 +699,11 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
 
 void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
 {
+    // Peel transparent wrappers that don't change whether the result is discarded: a call
+    // wrapped in parentheses (e.g. `(t.load());`) still discards its result.
+    while (auto paren = as<ParenExpr>(expr))
+        expr = paren->base;
+
     // A comma operator in a discarded context discards each of its operands, so recurse
     // into them (e.g. `for (int i = 0; i < n; t.load(), i++)` discards `t.load()`).
     if (auto operatorExpr = as<OperatorExpr>(expr))
@@ -712,6 +717,19 @@ void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
                 return;
             }
         }
+    }
+
+    // A ternary `?:` discards the result of whichever arm is selected, so recurse into both
+    // arms (e.g. `cond ? t.load() : t.compute();`). The condition is `arguments[0]`; it is
+    // consumed to choose an arm rather than discarded, so only the two arms are checked.
+    if (auto select = as<SelectExpr>(expr))
+    {
+        if (select->arguments.getCount() == 3)
+        {
+            maybeDiagnoseDiscardedNodiscardResult(select->arguments[1]);
+            maybeDiagnoseDiscardedNodiscardResult(select->arguments[2]);
+        }
+        return;
     }
 
     // If the discarded expression is a call to a function marked `[nodiscard]`, warn that

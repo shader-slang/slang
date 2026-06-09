@@ -67,6 +67,24 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
     }
 
+    // Parentheses are transparent: a parenthesized discarded call still warns.
+    (t.load());
+/*DIAG:
+           ^ result of '[nodiscard]' function is discarded
+           ^ the result of calling 'load' is discarded; this function is marked '[nodiscard]'.
+*/
+
+    // A ternary discards whichever arm is selected, so both `[nodiscard]` arms warn.
+    // (`?:` itself is deprecated in Slang, hence the extra deprecation diagnostic.)
+    bool cond = t.val > 0;
+    cond ? t.compute() : freeFunc();
+/*DIAG:
+                    ^ result of '[nodiscard]' function is discarded
+                    ^ the result of calling 'compute' is discarded; this function is marked '[nodiscard]'.
+                                 ^ result of '[nodiscard]' function is discarded
+                                 ^ the result of calling 'freeFunc' is discarded; this function is marked '[nodiscard]'.
+*/
+
     // Storing the result is fine, no warning.
     let loaded = t.load();
     int c = t.compute();
