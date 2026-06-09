@@ -156,7 +156,9 @@ static bool _isBindlessResourceHeapGlobalParam(IRInst* inst, SlangInt bindlessSp
 
 static bool _instUsesBindlessResourceHeap(IRInst* inst, SlangInt bindlessSpaceIndex)
 {
-    if (bindlessSpaceIndex >= 0 && _isBindlessResourceHeapGlobalParam(inst, bindlessSpaceIndex))
+    SLANG_ASSERT(bindlessSpaceIndex >= 0);
+
+    if (_isBindlessResourceHeapGlobalParam(inst, bindlessSpaceIndex))
         return true;
 
     switch (inst->getOp())
@@ -293,8 +295,11 @@ void collectMetadata(
     bool usesBindlessResourceHeap = false;
     for (const auto& inst : irModule->getGlobalInsts())
     {
-        if (!usesBindlessResourceHeap && _subtreeUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
-            usesBindlessResourceHeap = true;
+        if (bindlessSpaceIndex >= 0 && !usesBindlessResourceHeap)
+        {
+            if (_subtreeUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
+                usesBindlessResourceHeap = true;
+        }
 
         if (auto func = as<IRFunc>(inst))
         {

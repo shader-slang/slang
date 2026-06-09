@@ -13,7 +13,7 @@ namespace Slang
 /// Get the bindless descriptor set/space index from the program layout.
 /// This index was allocated during layout generation (before DCE),
 /// ensuring consistency with reflection data.
-bool tryGetBindlessSpaceIndex(TargetProgram* targetProgram, UInt& outBindlessSpaceIndex)
+UInt getBindlessSpaceIndex(TargetProgram* targetProgram)
 {
     SLANG_RELEASE_ASSERT(targetProgram);
     auto programLayout = targetProgram->getExistingLayout();
@@ -21,11 +21,9 @@ bool tryGetBindlessSpaceIndex(TargetProgram* targetProgram, UInt& outBindlessSpa
 
     // Do not fall back to the requested option here; only layout knows the
     // bindless space that was actually reserved after conflict resolution.
-    if (programLayout->bindlessSpaceIndex < 0)
-        return false;
+    SLANG_RELEASE_ASSERT(programLayout->bindlessSpaceIndex >= 0);
 
-    outBindlessSpaceIndex = (UInt)programLayout->bindlessSpaceIndex;
-    return true;
+    return (UInt)programLayout->bindlessSpaceIndex;
 }
 
 IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
@@ -73,9 +71,7 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
         }
     }
 
-    UInt bindlessSpaceIndex = 0;
-    bool foundBindlessSpaceIndex = tryGetBindlessSpaceIndex(targetProgram, bindlessSpaceIndex);
-    SLANG_RELEASE_ASSERT(foundBindlessSpaceIndex);
+    UInt bindlessSpaceIndex = getBindlessSpaceIndex(targetProgram);
 
     for (auto inst : workList)
     {
