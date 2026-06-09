@@ -4502,6 +4502,10 @@ Type* SemanticsExprVisitor::substituteElementOfCompositeType(Type* target, Type*
     if (auto m = as<MatrixExpressionType>(target))
         return m_astBuilder
             ->getMatrixType(newElementType, m->getRowCount(), m->getColumnCount(), m->getLayout());
+    // Otherwise `target` must be a builtin scalar, whose element is the type itself. This
+    // function is only ever called with builtin scalar/vector/matrix operand types; anything
+    // else is a caller bug.
+    SLANG_RELEASE_ASSERT(as<BasicExpressionType>(target));
     return newElementType;
 }
 
