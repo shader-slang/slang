@@ -151,11 +151,11 @@ void main()
     d = 0x1.fffffffffffffp1023LF;
     printf("0x%016llx\n", bit_cast<uint64_t>(d));
     // Note: 0111'1111'1110'1111'1111'1111'1111'1111
-    //CHECK-NEXT: 0x7fefffff
+    //CHECK-NEXT: 0x7fefffffffffffff
 
     // maximum double / exponent
     d = 0x1fffffffffffffp971LF;
     printf("0x%016llx\n", bit_cast<uint64_t>(d));
     // Note: 0111'1111'1110'1111'1111'1111'1111'1111
-    //CHECK-NEXT: 0x7fefffff
+    //CHECK-NEXT: 0x7fefffffffffffff
 }
