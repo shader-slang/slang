@@ -148,6 +148,10 @@ Follow the principled path, not the minimal-edit-distance path.
 - Do not mask. A guard, null-check, or special case that papers over malformed AST/IR/witness-table
   data is a band-aid hiding a representation bug. Make the representation correct so consumers stay
   simple.
+- Interrogate the input shape. For any code that handles a particular shape of input (AST node, IR
+  inst, witness, type, ...), always ask: is that shape itself correct and principled, or should the
+  upstream producer be fixed instead? Fix the producer when the shape is wrong; handle it here only
+  when the shape is genuinely valid input. Record the answer in the PR description (Process report).
 - Address conceptually unordered key→value data (witness-table / interface requirement entries) by
   role/key, never by position/index.
 - Keep a working log throughout the task: the problem and a motivating example, how issues cascade
@@ -176,7 +180,10 @@ Write the PR description in this five-part format:
 5. **Process report** — explain every change with a logical reason. For a change addressing a
    cascading issue, describe the issue (with its motivating test case) and justify the fix with a
    code trace (the exact functions/insts involved), explaining why it is necessary and principled
-   rather than a workaround.
+   rather than a workaround. For any change that handles, guards, or special-cases a particular
+   input shape, the report must answer the input-shape check from the methodology — is that shape
+   correct and principled, or should its producer have been fixed instead? — so a reviewer can
+   confirm the fix sits at the right layer.
 
 Write for a reviewer without the full context in their head: ground each abstract claim in a
 concrete example, and wire explanations to the source (function name and file, or `file.cpp:line`).

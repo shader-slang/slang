@@ -58,7 +58,10 @@ Follow the principled path, not the minimal-edit-distance path: fix root causes 
 in an IR pass, lowering, or the AST/IR representation), not symptoms in emit/codegen. Question every
 change — if you cannot name a test that fails without it, it probably should not exist. Do not mask
 malformed AST/IR with guards or special cases; make the representation correct so consumers stay
-simple. When data is conceptually an unordered key→value set (e.g. witness-table / interface
+simple. For any code that handles a particular shape of input (AST node, IR inst, witness, type),
+always ask whether that shape is itself correct and principled or whether its upstream producer
+should be fixed instead — fix the producer when the shape is wrong — and record the answer in the
+PR description. When data is conceptually an unordered key→value set (e.g. witness-table / interface
 requirement entries), address it by role/key, never by position/index. Keep a scratch log
 throughout the task recording the problem, how issues cascade (one fix exposing the next), the fix
 for each and why it is principled (with a code trace), and rejected alternatives; distill that log
@@ -78,7 +81,10 @@ Write every PR description in this five-part format:
 5. **Process report** — explain every change with a logical reason. For a change addressing a
    cascading issue, describe the issue (with its motivating test case) and justify the fix with a
    code trace (the exact functions/insts involved), explaining why it is necessary and principled
-   rather than a workaround.
+   rather than a workaround. For any change that handles, guards, or special-cases a particular
+   input shape, the report must answer the input-shape check from the methodology — is that shape
+   correct and principled, or should its producer have been fixed instead? — so a reviewer can
+   confirm the fix sits at the right layer.
 
 Write for a reviewer without the full context in their head: ground each abstract claim in a
 concrete example, and wire explanations to the source (function name and file, or `file.cpp:line`).

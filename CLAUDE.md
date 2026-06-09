@@ -105,6 +105,12 @@ representation that is robust by construction, even when that means a larger rew
   AST/IR/witness-table is a band-aid that hides a representation bug. A guard that is never hit
   under correct input is dead code. Prefer making the representation correct so consumers stay
   simple.
+- **Interrogate the input shape.** Whenever you write or change code that handles a particular
+  shape of input — an AST node, IR inst, witness, type, etc. — always ask: _is that input shape
+  itself correct and principled, or should the upstream producer of it be fixed instead?_ If the
+  shape is wrong or accidental, fix the producer; handle it here only when the shape is genuinely
+  valid input. This is the routine double-check that root-causing was done at the right layer, and
+  its answer is required in the PR description (see the Process report below).
 - **Prefer correct representation over edit distance.** If two surface forms _should_ be
   equivalent, model them identically. If a consumer reads data by position/index/identity when the
   data is conceptually an unordered key→value set (e.g. witness-table / interface requirement
@@ -134,7 +140,10 @@ representation that is robust by construction, even when that means a larger rew
       addresses a **cascading** issue, describe the issue (with its motivating test case) and
       justify why the fix is correct with a **code trace** (the exact functions/insts involved),
       not just a description. State explicitly why each change is necessary and principled rather
-      than a workaround.
+      than a workaround. For any change that handles, guards, or special-cases a particular input
+      shape, the report **must** answer the input-shape check from the methodology — _is that shape
+      correct and principled, or should its producer have been fixed instead?_ — so a reviewer can
+      confirm the fix sits at the right layer.
 
    Write for a reviewer who does not have the full context in their head: ground each abstract claim
    in a concrete example, and wire explanations to the source — name the function and file (or
