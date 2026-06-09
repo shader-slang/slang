@@ -3,8 +3,6 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
-
 //CHECK: constexpr is not a supported Slang language feature
 
 static constexpr uint N = 4;

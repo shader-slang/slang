@@ -2878,13 +2878,6 @@ err(
     span { loc = "decl:Decl", message = "global const variable with initializer must be declared static: '~decl'" }
 )
 
-warning(
-    "constexpr-unsupported",
-    31227,
-    "constexpr is not a supported Slang language feature; treating as const",
-    span { loc = "modifier:Modifier", message = "constexpr is treated as const" }
-)
-
 err(
     "static-const-variable-requires-initializer",
     31225,
@@ -2897,6 +2890,13 @@ err(
     31226,
     "static const global initializer must be a compile-time constant",
     span { loc = "decl:Decl", message = "initializer of static const global '~decl' does not evaluate to a compile-time constant" }
+)
+
+warning(
+    "constexpr-unsupported",
+    31227,
+    "constexpr is not a supported Slang language feature; treating as const",
+    span { loc = "modifier:Modifier", message = "constexpr is treated as const" }
 )
 
 -- 3123x - Modifiers and Deprecation (part 2)
