@@ -1962,6 +1962,10 @@ struct TypeFlowSpecializationContext
         // Handle interprocedural edge
         auto callInst = edge.callInst;
         auto targetCallee = edge.targetContext;
+        // If the target has no function body, it is likely an intrinsic method.
+        // There is no callee body for type-flow information to propagate into.
+        if (!getFuncDefinitionForContext(targetCallee))
+            return;
 
         switch (edge.direction)
         {
@@ -5776,6 +5780,17 @@ struct TypeFlowSpecializationContext
 
     bool specializeLookupWitnessMethod(IRInst* context, IRLookupWitnessMethod* inst)
     {
+        // If the witness table is a poison value, propagate poison to the result.
+        if (as<IRPoison>(inst->getWitnessTable()))
+        {
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto poison = builder.emitPoison(inst->getDataType());
+            inst->replaceUsesWith(poison);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
         // Handle trivial case where inst's operand is a concrete table.
         if (auto witnessTable = as<IRWitnessTable>(inst->getWitnessTable()))
         {
@@ -6867,23 +6882,35 @@ struct TypeFlowSpecializationContext
             auto calleeSet = as<IRElementOfSetType>(*callSiteInfoPtr)->getSet();
             SLANG_ASSERT(calleeSet->isSingleton());
 
+            auto selectedCallee = calleeSet->getElement(0);
+            if (as<IRPoison>(selectedCallee))
+            {
+                IRBuilder builder(context);
+                builder.setInsertBefore(inst);
+                auto defaultVal = builder.emitDefaultConstruct(inst->getDataType());
+                inst->replaceUsesWith(defaultVal);
+                inst->removeAndDeallocate();
+                module->getContainerPool().free(&callArgs);
+                return true;
+            }
+
             if (isIntrinsic(callee))
                 effectiveFuncType = as<IRFuncType>(callee->getDataType());
             else
-                effectiveFuncType = getEffectiveFuncType(calleeSet->getElement(0));
+                effectiveFuncType = getEffectiveFuncType(selectedCallee);
 
             // If we're dealing with bindings, materialize a new function now.
-            if (as<IRSpecializeExistentialsInFunc>(calleeSet->getElement(0)))
+            if (as<IRSpecializeExistentialsInFunc>(selectedCallee))
             {
                 // If our callee is a SpecializeExistentialsInFunc, we need to lower it to get a
                 // concrete
                 // function.
                 callee = lowerSpecializeExistentialsInFunc(
-                    as<IRSpecializeExistentialsInFunc>(calleeSet->getElement(0)));
+                    as<IRSpecializeExistentialsInFunc>(selectedCallee));
             }
             else
             {
-                callee = calleeSet->getElement(0);
+                callee = selectedCallee;
             }
 
             globalsWorkList.enqueue(callee);

@@ -2728,7 +2728,8 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
             // is located after the insert location, we need to move it to the insert location.
             auto foundInst = *found;
             if (foundInst->getParent() && foundInst->getParent() == getInsertLoc().getParent() &&
-                getInsertLoc().getMode() == IRInsertLoc::Mode::Before)
+                getInsertLoc().getMode() == IRInsertLoc::Mode::Before &&
+                foundInst->getParent() != getModule()->getModuleInst())
             {
                 auto insertLoc = getInsertLoc().getInst();
                 bool isAfter = false;

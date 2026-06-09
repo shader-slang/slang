@@ -80,10 +80,6 @@ struct DeadCodeEliminationContext
         if (!undefInst)
         {
             IRBuilder builder(module);
-            if (auto firstChild = module->getModuleInst()->getFirstChild())
-                builder.setInsertBefore(firstChild);
-            else
-                builder.setInsertInto(module->getModuleInst());
             undefInst = Slang::getUnitPoisonVal(&builder, module);
         }
         return undefInst;
