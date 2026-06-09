@@ -1304,7 +1304,7 @@ err(
     "nodiscard-on-void-function",
     30069,
     "'[nodiscard]' applied to a function returning 'void'",
-    span { loc = "decl:Decl", message = "'[nodiscard]' has no effect on a function that returns 'void'." }
+    span { loc = "decl:Decl", message = "'[nodiscard]' is not allowed on a function that returns 'void'; there is no result to discard." }
 )
 
 err(

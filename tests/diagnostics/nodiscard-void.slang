@@ -11,7 +11,7 @@ struct MyType
     void touch() {}
 /*DIAG:
          ^^^^^ '[nodiscard]' applied to a function returning 'void'
-         ^^^^^ '[nodiscard]' has no effect on a function that returns 'void'.
+         ^^^^^ '[nodiscard]' is not allowed on a function that returns 'void'; there is no result to discard.
 */
 }
 
@@ -19,7 +19,7 @@ struct MyType
 void freeVoid() {}
 /*DIAG:
      ^^^^^^^^ '[nodiscard]' applied to a function returning 'void'
-     ^^^^^^^^ '[nodiscard]' has no effect on a function that returns 'void'.
+     ^^^^^^^^ '[nodiscard]' is not allowed on a function that returns 'void'; there is no result to discard.
 */
 
 [numthreads(1, 1, 1)]
