@@ -4169,7 +4169,7 @@ void legalizeEntryPointParameterForGLSL(
         // operations like `TraceRay` are handled.
         //
         builder->setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
-        auto undefinedVal = builder->emitPoison(pp->getFullType());
+        auto undefinedVal = builder->getPoison(pp->getFullType());
         pp->replaceUsesWith(undefinedVal);
 
         return;
