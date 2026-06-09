@@ -1993,6 +1993,8 @@ local insts = {
 				},
 			},
 			{
+				-- Keep these decoration names reserved for stable IR serialization; new
+				-- workgraph records use dedicated Type.WorkGraphRecordTypeBase ops.
 				workGraphRecordType = {
 					struct_name = "WorkGraphRecordTypeDecoration",
 				},

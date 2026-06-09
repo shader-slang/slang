@@ -49,9 +49,8 @@ static bool isValidBarrierMemoryTypeFlags(uint32_t flagVal)
 
 static bool isValidBarrierSemanticFlags(uint32_t flagVal)
 {
-    const uint32_t knownFlags =
-        BarrierSemanticFlags::GroupSync | BarrierSemanticFlags::GroupScope |
-        BarrierSemanticFlags::DeviceScope;
+    const uint32_t knownFlags = BarrierSemanticFlags::GroupSync | BarrierSemanticFlags::GroupScope |
+                                BarrierSemanticFlags::DeviceScope;
     return flagVal == BarrierSemanticFlags::Reorder || (flagVal & ~knownFlags) == 0;
 }
 

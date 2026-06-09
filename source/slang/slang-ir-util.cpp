@@ -321,6 +321,7 @@ bool isValueType(IRInst* dataType)
     case kIROp_RaytracingAccelerationStructureType:
     case kIROp_GLSLAtomicUintType:
     case kIROp_EnumType:
+    // Work-graph input records are immutable payload views, so treat them as values.
     case kIROp_DispatchNodeInputRecordType:
     case kIROp_ThreadNodeInputRecordType:
     case kIROp_GroupNodeInputRecordsType:
@@ -1243,6 +1244,7 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
     case kIROp_GLSLShaderStorageBufferType:
+    // Work-graph output records are mutable handles, so treat them as pointer-like.
     case kIROp_ThreadNodeOutputRecordsType:
     case kIROp_GroupNodeOutputRecordsType:
     case kIROp_NodeOutputType:
