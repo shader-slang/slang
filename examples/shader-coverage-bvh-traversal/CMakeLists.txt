@@ -39,7 +39,12 @@ endforeach()
 add_custom_target(${_copy_target} DEPENDS ${_copied_assets})
 set_target_properties(${_copy_target} PROPERTIES FOLDER "examples/copy_assets")
 
-add_executable(shader-coverage-bvh-traversal main.cpp vk_compute_demo.h)
+add_executable(
+    shader-coverage-bvh-traversal
+    main.cpp
+    vk_compute_demo.h
+    vk_compute_demo.cpp
+)
 add_dependencies(shader-coverage-bvh-traversal ${_copy_target})
 
 target_include_directories(
