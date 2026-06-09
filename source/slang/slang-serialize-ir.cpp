@@ -549,7 +549,8 @@ static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRe
 static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serializer, IRModule* module)
 {
     // Bound recursive child traversal so malformed flat tables cannot exhaust the host stack.
-    static const Int64 kMaxIRDeserializeDepth = 4096;
+    // Keep this well below typical 1 MiB debug-thread stacks, even with unoptimized frames.
+    static const Int64 kMaxIRDeserializeDepth = 512;
 
     IRSerialReadContext& readContext = *serializer.getContext();
 #if DIRECT_FROM_FOSSIL
