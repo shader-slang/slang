@@ -291,6 +291,8 @@ struct SpecializationContext
         if (workListSet.add(inst))
         {
             workList.add(inst);
+
+
             addUsersToWorkList(inst);
         }
     }
@@ -440,9 +442,7 @@ struct SpecializationContext
             builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), specializeInst);
 
         if (auto existingVal = entry->getValue())
-        {
             return existingVal;
-        }
 
         // We want to see if an existing specialization
         // has already been made. To detect recursive specialization,
@@ -640,6 +640,7 @@ struct SpecializationContext
         //
         if (!areAllOperandsFullySpecialized(specInst))
             return false;
+
 
         if (!hasNonTrivialUses(specInst))
             return false;
