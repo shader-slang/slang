@@ -1815,6 +1815,10 @@ Modifier* SemanticsVisitor::checkModifier(
         // "must be a compile-time constant at the call site". On a variable
         // declaration it is not supported — warn and treat it as `const` so
         // that common idioms like `static constexpr uint N = 4` compile.
+        // On a function declaration, `constexpr` is silently accepted and
+        // ignored (no warning), intentionally: warning on function-level
+        // constexpr is out of scope for this PR and would be a separate
+        // diagnostic with its own discussion.
         if (as<VarDeclBase>(syntaxNode) && !as<ParamDecl>(syntaxNode))
         {
             getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = m});
