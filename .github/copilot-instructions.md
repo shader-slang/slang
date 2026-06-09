@@ -47,10 +47,47 @@ You can also use `./extras/formatting.sh --check-only` to verify formatting with
 
 ## Labeling your PR
 
-All PRs needs to be labeled as either "pr: non-breaking" or "pr: breaking".
-Add the "pr: breaking" label to your PR if you are introducing public API changes that breaks ABI compabibility,
+All PRs needs to be labeled as either "pr: non-breaking" or "pr: breaking change".
+Add the "pr: breaking change" label to your PR if you are introducing public API changes that breaks ABI compabibility,
 or you are introducing changes to the Slang language that will cause the compiler to error out on existing Slang code.
 It is rare for a PR to be a breaking change.
+
+## Problem-Solving Methodology
+
+Follow the principled path, not the minimal-edit-distance path: fix root causes (usually upstream
+in an IR pass, lowering, or the AST/IR representation), not symptoms in emit/codegen. Question every
+change — if you cannot name a test that fails without it, it probably should not exist. Do not mask
+malformed AST/IR with guards or special cases; make the representation correct so consumers stay
+simple. For any code that handles a particular shape of input (AST node, IR inst, witness, type),
+always ask whether that shape is itself correct and principled or whether its upstream producer
+should be fixed instead — fix the producer when the shape is wrong — and record the answer in the
+PR description. When data is conceptually an unordered key→value set (e.g. witness-table / interface
+requirement entries), address it by role/key, never by position/index. Keep a scratch log
+throughout the task recording the problem, how issues cascade (one fix exposing the next), the fix
+for each and why it is principled (with a code trace), and rejected alternatives; distill that log
+into the PR description.
+
+## PR Description Format
+
+Write every PR description in this five-part format:
+
+1. **Motivation** — the problem, with a concrete example / motivating test case.
+2. **Proposed solution** — the approach and why it is principled.
+3. **Change summary** — the files/areas touched and what each does.
+4. **Concepts and vocabulary** — a short glossary between the change summary and the process report.
+   Restate only the codebase-specific or subtle terms the report relies on (e.g. witness, facet,
+   the fixpoint solver, a non-obvious distinction the fix hinges on), as a reminder. Do not explain
+   basic, well-known concepts (interface, associated type) — assume them.
+5. **Process report** — explain every change with a logical reason. For a change addressing a
+   cascading issue, describe the issue (with its motivating test case) and justify the fix with a
+   code trace (the exact functions/insts involved), explaining why it is necessary and principled
+   rather than a workaround. For any change that handles, guards, or special-cases a particular
+   input shape, the report must answer the input-shape check from the methodology — is that shape
+   correct and principled, or should its producer have been fixed instead? — so a reviewer can
+   confirm the fix sits at the right layer.
+
+Write for a reviewer without the full context in their head: ground each abstract claim in a
+concrete example, and wire explanations to the source (function name and file, or `file.cpp:line`).
 
 ## Debugging
 
