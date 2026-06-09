@@ -3251,6 +3251,13 @@ warning(
     span { loc = "decl:Decl", message = "failed to resolve canonical order of generic equality constraint" }
 )
 
+err(
+    "constraint-subject-cannot-be-this-type",
+    30427,
+    "the subject of a constraint cannot be the 'This' type",
+    span { loc = "typeExp:Expr", message = "constrain an associated type such as 'This.A' here, or use an inheritance clause (e.g. 'interface IFoo : IBar') to give an interface a base" }
+)
+
 --
 -- 305xx: initializer lists
 --
