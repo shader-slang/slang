@@ -16,6 +16,9 @@
 //TEST:SIMPLE(filecheck=FORWARD_HLSL):-target hlsl -entry main_chit_forward -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=FORWARD_DXIL):-target dxil-assembly -entry main_chit_forward -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=NAME_COLLISION_DXIL):-target dxil-assembly -entry main_chit_name_collision -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=NAME_COLLISION_SPIRV):-target spirv-assembly -entry main_chit_name_collision -stage closesthit
+//TEST:SIMPLE(filecheck=NAME_COLLISION_GLSL):-target glsl -entry main_chit_name_collision -stage closesthit
+//TEST:SIMPLE(filecheck=NAME_COLLISION_CUDA):-target cuda -entry main_chit_name_collision -stage closesthit
 //TEST:SIMPLE(filecheck=ISECT_CUDA):-target cuda -entry main_isect_cuda -stage intersection
 //TEST:SIMPLE(filecheck=AHIT_CUDA):-target cuda -entry main_ahit -stage anyhit
 //TEST:SIMPLE(filecheck=CHIT_CUDA):-target cuda -entry main_chit -stage closesthit
@@ -165,3 +168,18 @@ void main_chit_name_collision(
 }
 
 // NAME_COLLISION_DXIL: call i32 @dx.op.primitiveIndex.i32
+
+// NAME_COLLISION_SPIRV: OpEntryPoint ClosestHitKHR
+// NAME_COLLISION_SPIRV: BuiltIn PrimitiveId
+// NAME_COLLISION_SPIRV: OpLoad %int %gl_PrimitiveID
+// NAME_COLLISION_SPIRV: OpConvertUToF %float %uint_7
+
+// NAME_COLLISION_GLSL: #version 460
+// NAME_COLLISION_GLSL-DAG: uint [[USER_FUNC:[A-Za-z_][A-Za-z_0-9]*]]()
+// NAME_COLLISION_GLSL: gl_PrimitiveID
+// NAME_COLLISION_GLSL: float([[USER_FUNC]]())
+
+// NAME_COLLISION_CUDA-DAG: __device__ uint [[USER_FUNC:[A-Za-z_][A-Za-z_0-9]*]]()
+// NAME_COLLISION_CUDA: __global__ void __closesthit__main_chit_name_collision
+// NAME_COLLISION_CUDA: optixGetPrimitiveIndex()
+// NAME_COLLISION_CUDA: float([[USER_FUNC]]())
