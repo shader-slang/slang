@@ -2261,6 +2261,28 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     // We will keep track of the modifiers for each conflict group.
     Dictionary<ASTNodeType, Modifier*> mapExclusiveGroupToModifier;
 
+    // Pre-scan: if both `constexpr` and explicit `const` appear on a non-param
+    // VarDecl, emit the warning for `constexpr` and remove it from the list
+    // before the main loop so that the main loop does not see `constexpr` and
+    // produce a spurious duplicate-ConstModifier error (E31202).
+    // (The `modifier->next` clobbering in the main loop prevents findModifier
+    // from working there, so this must be done before the loop starts.)
+    if (as<VarDeclBase>(syntaxNode) && !as<ParamDecl>(syntaxNode))
+    {
+        if (syntaxNode->findModifier<ConstExprModifier>() &&
+            syntaxNode->findModifier<ConstModifier>())
+        {
+            Modifier** link = &syntaxNode->modifiers.first;
+            while (*link && !as<ConstExprModifier>(*link))
+                link = &(*link)->next;
+            if (auto ceM = *link)
+            {
+                *link = ceM->next;
+                getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = ceM});
+            }
+        }
+    }
+
     Modifier* modifier = syntaxNode->modifiers.first;
     bool ignoreUnallowedModifier = false;
     while (modifier)
