@@ -99,7 +99,9 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["unrollLoopsInModule", "simplifyIR", "compileInner"],
-        sweep_sizes=[100, 200, 400, 800],
+        # default_size must be a member so a --sweep run also yields the canonical
+        # (default-size) point used for cross-release comparison.
+        sweep_sizes=[100, 200, 300, 600],
     ),
     # ---- suspected-regression features -----------------------------------
     WorkloadSpec(
@@ -137,7 +139,8 @@ WORKLOADS = [
         # signal of the bare-local dynamic_dispatch workload.
         primary_timers=["compileInner", "specializeModule",
                         "legalizeExistentialTypeLayout", "simplifyIR"],
-        sweep_sizes=[40, 80, 160, 320],
+        # default_size (100) must be a member so --sweep yields the canonical point.
+        sweep_sizes=[40, 80, 100, 200, 320],
     ),
     WorkloadSpec(
         name="diagnostics_errors",
