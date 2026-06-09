@@ -3501,7 +3501,22 @@ static void maybePromoteDescriptorHandleCapability(TargetRequest* targetReq)
         return;
 
     auto& targetOptionSet = targetReq->getOptionSet();
-    if (!isSpecificProfileOrCapabilityRequested(targetOptionSet))
+    bool specificProfileRequested =
+        targetOptionSet.hasOption(CompilerOptionName::Profile) &&
+        (targetOptionSet.getIntOption(CompilerOptionName::Profile) != SLANG_PROFILE_UNKNOWN);
+    bool specificCapabilityRequested = false;
+    for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
+    {
+        if ((atomVal.kind == CompilerOptionValueKind::Int &&
+             atomVal.intValue != SLANG_CAPABILITY_UNKNOWN) ||
+            atomVal.kind == CompilerOptionValueKind::String)
+        {
+            specificCapabilityRequested = true;
+            break;
+        }
+    }
+
+    if (!specificProfileRequested && !specificCapabilityRequested)
     {
         auto targetCaps = targetReq->getTargetCaps();
         targetCaps.addUnexpandedCapabilites(CapabilityName::descriptor_handle);

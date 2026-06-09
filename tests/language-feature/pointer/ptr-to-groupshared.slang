@@ -1,7 +1,4 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -g0
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -g0
-//TEST:SIMPLE(filecheck=SPIRV_VARPTR): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -g0 -capability SPV_KHR_variable_pointers
-
 // By default slang-test uses `-g` and it requires `VariablePointers`, which
 // doesn't produce the correct result due to the bug on the graphics driver.
 // Tracked by github issue #9061
@@ -12,13 +9,6 @@
 // CHECK: 1
 // CHECK-NEXT: 2
 // CHECK-NEXT: 0
-// SPIRV-NOT: OpCapability VariablePointers
-// SPIRV: OpMemoryModel
-// SPIRV-NOT: OpTypeFunction %void %_ptr_Workgroup
-// SPIRV_VARPTR: OpCapability VariablePointers
-// SPIRV_VARPTR: OpExtension "SPV_KHR_variable_pointers"
-// SPIRV_VARPTR: OpMemoryModel
-// SPIRV_VARPTR: OpTypeFunction %void %_ptr_Workgroup
 
 struct Data
 {

@@ -80,14 +80,6 @@ private:
 // lead back to in/inout parameters that we can't validate.
 void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst);
 
-// If 'validateSPIRVAtomics' is true, also reject fp16 vector atomic operations
-// and widths that cannot be represented by the SPIR-V NV vector atomic extension.
-void validateAtomicOperations(
-    bool skipFuncParamValidation,
-    DiagnosticSink* sink,
-    IRInst* inst,
-    bool validateSPIRVAtomics);
-
 // Overload that takes IRModule* first for use with SLANG_PASS macro
 void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, DiagnosticSink* sink);
 

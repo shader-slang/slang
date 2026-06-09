@@ -229,31 +229,6 @@ enum class DiagnosticCategory
     Capability = 1 << 0,
 };
 
-inline bool isSpecificProfileRequested(CompilerOptionSet& optionSet)
-{
-    return optionSet.hasOption(CompilerOptionName::Profile) &&
-           (optionSet.getIntOption(CompilerOptionName::Profile) != SLANG_PROFILE_UNKNOWN);
-}
-
-inline bool isSpecificCapabilityRequested(CompilerOptionSet& optionSet)
-{
-    for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
-    {
-        if ((atomVal.kind == CompilerOptionValueKind::Int &&
-             atomVal.intValue != SLANG_CAPABILITY_UNKNOWN) ||
-            atomVal.kind == CompilerOptionValueKind::String)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-inline bool isSpecificProfileOrCapabilityRequested(CompilerOptionSet& optionSet)
-{
-    return isSpecificProfileRequested(optionSet) || isSpecificCapabilityRequested(optionSet);
-}
-
 template<typename P, typename... Args>
 bool maybeDiagnose(
     DiagnosticSink* sink,
