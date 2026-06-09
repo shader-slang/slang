@@ -7,12 +7,16 @@
 // `OpAtomicIAdd` of that count. The active-lane reduction preserves the exact
 // per-execution total, so coverage numbers are unchanged.
 //
-// This path engages for Khronos targets when the counter element is uint
-// (`-trace-coverage-counter-width 32`); the per-lane atomic is still used
-// otherwise (verified by the other coverage SPIR-V tests, which default to
-// uint64 and do not emit GroupNonUniform ops).
+// This path engages for the direct SPIR-V backend (GLSL and other targets
+// keep the per-lane atomic) for both counter widths: uint32 adds the count
+// directly; uint64 widens the uint count with `OpUConvert` before the
+// 64-bit atomic.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage -trace-coverage-counter-width 32
+// uint32 counters (`-trace-coverage-counter-width 32`).
+//TEST:SIMPLE(filecheck=CHECK32):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage -trace-coverage-counter-width 32
+
+// uint64 counters (the default width).
+//TEST:SIMPLE(filecheck=CHECK64):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
@@ -26,13 +30,19 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         outputBuffer[tid.x] = 2;
 }
 
-// Subgroup arithmetic capability must be auto-declared (it implies the
-// base GroupNonUniform capability that the elect below also needs).
-//CHECK-DAG: OpCapability GroupNonUniformArithmetic
+// --- uint32 path ---
+// Subgroup arithmetic capability is auto-declared (it implies the base
+// GroupNonUniform capability that the elect also needs).
+//CHECK32-DAG: OpCapability GroupNonUniformArithmetic
+//CHECK32-DAG: OpGroupNonUniformIAdd {{.*}} Reduce
+//CHECK32-DAG: OpGroupNonUniformElect
+//CHECK32-DAG: OpAtomicIAdd
 
-// The active-lane count reduction and the first-lane election.
-//CHECK-DAG: OpGroupNonUniformIAdd {{.*}} Reduce
-//CHECK-DAG: OpGroupNonUniformElect
-
-// The counter is still a uint atomic add (the opt-down width), now guarded.
-//CHECK-DAG: OpAtomicIAdd
+// --- uint64 path: same aggregation, plus a widen of the uint count to the
+// 64-bit counter element before the atomic. ---
+//CHECK64-DAG: OpCapability GroupNonUniformArithmetic
+//CHECK64-DAG: OpCapability Int64Atomics
+//CHECK64-DAG: OpGroupNonUniformIAdd {{.*}} Reduce
+//CHECK64-DAG: OpGroupNonUniformElect
+//CHECK64-DAG: OpUConvert %ulong
+//CHECK64-DAG: OpAtomicIAdd %ulong

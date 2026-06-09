@@ -1,17 +1,18 @@
 # Shader coverage: wave-aggregated counter increments (design notes)
 
 Tracking issue: [#11509](https://github.com/shader-slang/slang/issues/11509).
-Status: **implemented for SPIR-V (uint counters); follow-ups remain.** The
-emit-side recipe below is now wired up: coverage emits two IR ops
-(`coverageActiveLaneCount`, `coverageElectFirstLane`) inside an `if`-guard,
-and the SPIR-V backend lowers them to `OpGroupNonUniformIAdd (Reduce)` /
-`OpGroupNonUniformElect`. Verified: `-trace-coverage-counter-width 32` SPIR-V
-emits the aggregated sequence (one elected atomic of the active-lane count),
-passes `spirv-val`, and all 62 coverage + 11 unit tests pass (regression test
-`coverage-wave-aggregated-spirv.slang`). **Remaining:** extend to the default
-uint64 counters (needs a uint→uint64 widen of the count before the atomic) and
-to HLSL/CUDA/Metal emitters; re-measure the demo speedup. The rest of this
-document is the original investigation/design.
+Status: **implemented for SPIR-V (both uint32 and the default uint64);
+follow-ups remain.** The emit-side recipe below is wired up: coverage emits
+two IR ops (`coverageActiveLaneCount`, `coverageElectFirstLane`) inside an
+`if`-guard, and the SPIR-V backend lowers them to `OpGroupNonUniformIAdd
+(Reduce)` / `OpGroupNonUniformElect`. The gate is the **direct SPIR-V backend**
+(`isSPIRV`), not all Khronos targets — GLSL keeps the per-lane atomic. For
+uint64 counters the uint active-lane count is widened with `OpUConvert` before
+the 64-bit atomic. Verified: both widths emit the aggregated sequence and pass
+`spirv-val`; 63 coverage + 11 unit tests pass (regression test
+`coverage-wave-aggregated-spirv.slang` covers both widths). **Remaining:**
+HLSL/CUDA/Metal emitter lowering of the two ops; re-measure the demo speedup.
+The rest of this document is the original investigation/design.
 
 ## Problem
 

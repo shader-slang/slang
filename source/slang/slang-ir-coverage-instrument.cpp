@@ -964,15 +964,21 @@ struct CoverageInstrumenter
     }
 
     // Wave-aggregated increments (one atomic per wave instead of per lane)
-    // apply on targets with subgroup ops. SPIR-V is wired up here (#11509);
-    // the `uint` element check keeps it to the implemented helper variant
-    // (uint64 / non-Khronos targets keep the per-lane atomic). The active-
-    // lane reduction preserves the exact per-execution count, so coverage
-    // numbers are unchanged.
+    // apply on targets with subgroup ops. Only the direct SPIR-V backend
+    // lowers the `coverageActiveLaneCount` / `coverageElectFirstLane` ops so
+    // far (#11509); every other target — including GLSL, which is also a
+    // Khronos target — keeps the per-lane atomic. Both counter widths are
+    // supported: the active-lane count is computed as uint and widened to
+    // the element type (uint64) before the atomic. The reduction preserves
+    // the exact per-execution count, so coverage numbers are unchanged.
     bool shouldUseWaveAggregation() const
     {
-        return targetRequest != nullptr && isKhronosTarget(targetRequest) &&
-               counterElementType->getOp() == kIROp_UIntType;
+        if (targetRequest == nullptr || !isSPIRV(targetRequest->getTarget()))
+            return false;
+        // The synthesized counter element is always uint or uint64 (see
+        // `run()`); both are handled.
+        const auto elementOp = counterElementType->getOp();
+        return elementOp == kIROp_UIntType || elementOp == kIROp_UInt64Type;
     }
 
     uint32_t getRemappedBranchSiteID(IRInst* markerOp, uint32_t originalSiteID)
@@ -1108,9 +1114,16 @@ struct CoverageInstrumenter
         builder.emitIfElse(isFirstLane, incrementBlock, mergeBlock, mergeBlock);
 
         // Increment block: one atomic add of the active-lane count, then merge.
+        // `activeLaneCount` is a uint; widen it to the counter element type
+        // (a zero-extend to uint64) so the atomic-add amount matches a wide
+        // counter buffer. A wave is far smaller than 2^32, so the count
+        // always fits.
         builder.setInsertInto(incrementBlock);
         IRInst* slotPtr = emitCounterSlotPtr(builder, slot);
-        emitCounterAtomicAdd(builder, slotPtr, activeLaneCount);
+        IRInst* amount = activeLaneCount;
+        if (counterElementType->getOp() != kIROp_UIntType)
+            amount = builder.emitCast(counterElementType, activeLaneCount);
+        emitCounterAtomicAdd(builder, slotPtr, amount);
         builder.emitBranch(mergeBlock);
     }
 
