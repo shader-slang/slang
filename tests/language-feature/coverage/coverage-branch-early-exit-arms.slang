@@ -4,7 +4,11 @@
 // transfers control away.
 
 //TEST:SIMPLE(filecheck=CPP):-target cpp -stage compute -entry computeMain -trace-branch-coverage
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain -trace-branch-coverage -profile cs_5_0
+// HLSL TEST below pins `-trace-coverage-counter-width 32` because
+// cs_5_0 does not support `uint64_t` types or the SM 6.6
+// `InterlockedAdd(uint64_t*, ...)` overload that the default uint64
+// counter width would otherwise emit.
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain -trace-branch-coverage -profile cs_5_0 -trace-coverage-counter-width 32
 
 RWStructuredBuffer<uint> outputBuffer;
 
