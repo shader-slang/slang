@@ -35,13 +35,12 @@
 
 #pragma once
 
-#include <vulkan/vulkan.h>
-
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <vulkan/vulkan.h>
 
 namespace vkdemo
 {
@@ -65,7 +64,7 @@ struct ComputePipeline
 class Context
 {
 public:
-    void init();
+    void init(bool requireInt64Atomics = false);
     ~Context();
 
     Buffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage);
@@ -124,7 +123,7 @@ inline uint32_t findMemoryType(
     throw std::runtime_error("no suitable Vulkan memory type");
 }
 
-inline void Context::init()
+inline void Context::init(bool requireInt64Atomics)
 {
     // Instance: enable portability enumeration on macOS for MoltenVK.
     std::vector<const char*> instanceExts;
@@ -149,7 +148,11 @@ inline void Context::init()
     appInfo.applicationVersion = 0;
     appInfo.pEngineName = "shader-coverage-demo";
     appInfo.engineVersion = 0;
-    appInfo.apiVersion = VK_API_VERSION_1_1;
+    // Vulkan 1.2: the `-trace-coverage-counter-width 64` path emits SPIR-V 1.5
+    // (Int64 + Int64Atomics on a StorageBuffer), which a 1.1 instance (max
+    // SPIR-V 1.3) rejects. 1.2 also makes shaderBufferInt64Atomics a core
+    // feature we can enable below. The 32-bit default path is unaffected.
+    appInfo.apiVersion = VK_API_VERSION_1_2;
 
     VkInstanceCreateInfo ci = {};
     ci.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -160,7 +163,12 @@ inline void Context::init()
         ci.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
     check(vkCreateInstance(&ci, nullptr, &instance), "vkCreateInstance");
 
-    // Pick first physical device with a compute-capable queue family.
+    // Pick a physical device with a compute-capable queue family. When 64-bit
+    // coverage counters are requested, require shaderBufferInt64Atomics — the
+    // integrated GPU on many laptops (e.g. Intel UHD) exposes a compute queue
+    // but not 64-bit buffer atomics, so a naive "first compute device" pick
+    // silently selects a device that cannot run the instrumented shader.
+    // Prefer a discrete GPU among the eligible candidates.
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
     if (deviceCount == 0)
@@ -168,28 +176,60 @@ inline void Context::init()
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
-    bool picked = false;
-    for (auto pd : devices)
+    auto findComputeQueue = [](VkPhysicalDevice pd) -> int
     {
         uint32_t qCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(pd, &qCount, nullptr);
         std::vector<VkQueueFamilyProperties> queues(qCount);
         vkGetPhysicalDeviceQueueFamilyProperties(pd, &qCount, queues.data());
         for (uint32_t i = 0; i < qCount; ++i)
-        {
             if (queues[i].queueFlags & VK_QUEUE_COMPUTE_BIT)
-            {
-                physical = pd;
-                queueFamilyIndex = i;
-                picked = true;
-                break;
-            }
+                return (int)i;
+        return -1;
+    };
+    auto supportsBufferInt64Atomics = [](VkPhysicalDevice pd) -> bool
+    {
+        VkPhysicalDeviceShaderAtomicInt64Features a = {};
+        a.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES;
+        VkPhysicalDeviceFeatures2 f = {};
+        f.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        f.pNext = &a;
+        vkGetPhysicalDeviceFeatures2(pd, &f);
+        return f.features.shaderInt64 == VK_TRUE && a.shaderBufferInt64Atomics == VK_TRUE;
+    };
+
+    // Pick the best eligible device. Ineligible devices (no compute
+    // queue, or missing the requested int64 atomics) are filtered out
+    // by the `continue` arms; among the survivors we prefer discrete
+    // GPUs (score 2) over integrated/other (score 1). `bestScore =
+    // -1` only exists so the first eligible device always wins on
+    // the strictly-greater comparison.
+    bool picked = false;
+    int bestScore = -1;
+    for (auto pd : devices)
+    {
+        int qf = findComputeQueue(pd);
+        if (qf < 0)
+            continue;
+        if (requireInt64Atomics && !supportsBufferInt64Atomics(pd))
+            continue;
+        VkPhysicalDeviceProperties props = {};
+        vkGetPhysicalDeviceProperties(pd, &props);
+        int score = (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) ? 2 : 1;
+        if (score > bestScore)
+        {
+            bestScore = score;
+            physical = pd;
+            queueFamilyIndex = (uint32_t)qf;
+            picked = true;
         }
-        if (picked)
-            break;
     }
     if (!picked)
-        throw std::runtime_error("no Vulkan device with compute queue");
+        throw std::runtime_error(
+            requireInt64Atomics ? "no Vulkan device with a compute queue and "
+                                  "shaderBufferInt64Atomics (needed for --counter-width=64); "
+                                  "try --counter-width=32"
+                                : "no Vulkan device with compute queue");
 
     vkGetPhysicalDeviceMemoryProperties(physical, &memProps);
 
@@ -208,6 +248,33 @@ inline void Context::init()
         }
     }
 
+    // Enable the features the `-trace-coverage-counter-width 64` path needs:
+    // `shaderInt64` (the SPIR-V Int64 capability) and `shaderBufferInt64Atomics`
+    // (64-bit atomicAdd on the StorageBuffer-class `__slang_coverage` counters).
+    // Both must be turned on at device-creation time or the shader module is
+    // rejected and no counters are written. Querying first keeps the 32-bit
+    // default path working on drivers that lack 64-bit atomics (e.g. MoltenVK).
+    // Query via the standalone VkPhysicalDeviceShaderAtomicInt64Features struct:
+    // some drivers (e.g. NVIDIA) surface shaderBufferInt64Atomics here but report
+    // 0 for the same bit in the aggregated VkPhysicalDeviceVulkan12Features.
+    VkPhysicalDeviceShaderAtomicInt64Features atomic64Supported = {};
+    atomic64Supported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES;
+    VkPhysicalDeviceFeatures2 featuresSupported = {};
+    featuresSupported.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    featuresSupported.pNext = &atomic64Supported;
+    vkGetPhysicalDeviceFeatures2(physical, &featuresSupported);
+    const bool haveBufferInt64Atomics = featuresSupported.features.shaderInt64 == VK_TRUE &&
+                                        atomic64Supported.shaderBufferInt64Atomics == VK_TRUE;
+
+    // Enable structs kept in scope until vkCreateDevice (chained via pNext).
+    VkPhysicalDeviceShaderAtomicInt64Features atomic64Enable = {};
+    atomic64Enable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES;
+    atomic64Enable.shaderBufferInt64Atomics = VK_TRUE;
+    VkPhysicalDeviceFeatures2 featuresEnable = {};
+    featuresEnable.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    featuresEnable.features.shaderInt64 = VK_TRUE;
+    featuresEnable.pNext = &atomic64Enable;
+
     float queuePriority = 1.0f;
     VkDeviceQueueCreateInfo qci = {};
     qci.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -221,6 +288,17 @@ inline void Context::init()
     dci.pQueueCreateInfos = &qci;
     dci.enabledExtensionCount = (uint32_t)deviceExts.size();
     dci.ppEnabledExtensionNames = deviceExts.data();
+    // When using VkPhysicalDeviceFeatures2 via pNext, pEnabledFeatures stays null.
+    //
+    // The four `(requireInt64Atomics, haveBufferInt64Atomics)` cases:
+    //   - (true,  true):  device was selected for int64 atomics; attach the chain so they are
+    //   enabled.
+    //   - (true,  false): impossible — the selection loop above filtered this device out.
+    //   - (false, true):  caller did not request 64-bit counters, but the device happens to support
+    //   them.
+    //                     Skipping the chain keeps the device-create surface minimal.
+    //   - (false, false): caller did not request and device does not support; skip the chain.
+    dci.pNext = haveBufferInt64Atomics ? &featuresEnable : nullptr;
     check(vkCreateDevice(physical, &dci, nullptr, &device), "vkCreateDevice");
 
     vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
@@ -333,7 +411,9 @@ inline ComputePipeline Context::createComputePipeline(
         dslci.bindingCount = (uint32_t)bindings.size();
         dslci.pBindings = bindings.data();
         VkDescriptorSetLayout dsl = VK_NULL_HANDLE;
-        check(vkCreateDescriptorSetLayout(device, &dslci, nullptr, &dsl), "vkCreateDescriptorSetLayout");
+        check(
+            vkCreateDescriptorSetLayout(device, &dslci, nullptr, &dsl),
+            "vkCreateDescriptorSetLayout");
         p.setLayouts.push_back(dsl);
     }
 
