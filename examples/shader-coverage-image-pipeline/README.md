@@ -45,6 +45,30 @@ The wall-clock time is printed for the dispatch loop so you can
 measure the coverage instrumentation overhead by comparing
 `--coverage` vs `--no-coverage` runs at the same `--mode=`.
 
+## Why the dispatch is tiled
+
+Each config does **not** run as one whole-image dispatch — it is split
+into horizontal bands (`kTileRows` rows at a time), and the band's row
+offset is passed to the shader as `PipelineParams.tileOriginY` so each
+band recovers its real pixel row (`tid.y + tileOriginY`).
+
+The reason is the **cost of coverage instrumentation**. Each covered
+line/branch/function increments a counter with an atomic add, and on a
+hot path — the bilateral filter's inner loop runs for every pixel — a
+handful of counter slots take millions of contended atomic adds. That
+makes the instrumented shader far slower than the uninstrumented one
+(20–30× on the GPUs we measured). A single whole-image dispatch of that
+instrumented kernel can run long enough to trip the GPU's watchdog
+timeout (Windows TDR / `VK_ERROR_DEVICE_LOST`) and abort the run —
+especially the 48-config `--mode=exhaustive` sweep.
+
+Tiling caps how long any single GPU submission runs, keeping each one
+well under the watchdog limit. It does **not** change the coverage
+results: the bands partition the image, every pixel is processed exactly
+once, and the counter buffer accumulates across all bands and configs.
+(Total GPU work is unchanged — tiling spreads it across more, shorter
+submissions; it does not reduce the per-execution atomic cost itself.)
+
 ## Generate an HTML report
 
 ```bash
