@@ -135,20 +135,7 @@ static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
 
 static IRFormatDecoration* _findImageFormatDecoration(IRInst* resourceInst)
 {
-    // JS(TODO):
-    // There could perhaps be other situations, that need to be covered
-
-    // If this is a load, we need to get the decoration from the field key
-    if (IRLoad* load = as<IRLoad>(resourceInst))
-    {
-        if (IRFieldAddress* fieldAddress = as<IRFieldAddress>(load->getOperand(0)))
-        {
-            IRInst* field = fieldAddress->getField();
-            return field->findDecoration<IRFormatDecoration>();
-        }
-    }
-    // Otherwise just try on the instruction
-    return resourceInst->findDecoration<IRFormatDecoration>();
+    return findImageFormatDecoration(resourceInst);
 }
 
 // Returns true if dataType and imageFormat are compatible - that they have the same representation,
@@ -225,18 +212,6 @@ static size_t _calcBackingElementSizeInBytes(IRInst* resourceInst)
 
     // When in doubt 4 is not a terrible guess based on limitations around DX11 etc
     return 4;
-}
-
-static bool _isResourceRead(IRCall* call)
-{
-    IRType* returnType = call->getDataType();
-    return returnType && (as<IRVoidType>(returnType) == nullptr);
-}
-
-static bool _isResourceWrite(IRCall* call)
-{
-    IRType* returnType = call->getDataType();
-    return returnType && (as<IRVoidType>(returnType) != nullptr);
 }
 
 static Index parseNumber(const char*& cursor, const char* end)
@@ -441,47 +416,20 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
     case 'C':
         {
-            // The $C intrinsic is a mechanism to change the name of an invocation depending on if
-            // there is a format conversion required between the type associated by the resource and
-            // the backing ImageFormat. Currently this is only implemented on CUDA, where there are
-            // specialized versions of the RWTexture writes that will do a format conversion.
+            // After the legalizeCUDASurfaceFormat IR pass, format conversion is handled
+            // inline in IR. The format decoration is removed by the pass, so $C should
+            // never need to emit "_convert" for CUDA targets.
             if (isCUDATarget(m_emitter->getTargetReq()))
             {
                 IRInst* resourceInst = m_callInst->getArg(0);
-
-                if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
+                if (IRFormatDecoration* formatDecoration =
+                        _findImageFormatDecoration(resourceInst))
                 {
                     const ImageFormat imageFormat = formatDecoration->getFormat();
-                    if (_isConvertRequired(imageFormat, resourceInst))
-                    {
-                        // If the function returns something it's a reader so we may need to convert
-                        // and in doing so require half
-                        if (_isResourceRead(m_callInst))
-                        {
-                            // If the source format if half derived, then we need to enable half
-                            switch (imageFormat)
-                            {
-                            case ImageFormat::r16f:
-                            case ImageFormat::rg16f:
-                            case ImageFormat::rgba16f:
-                                {
-                                    CUDAExtensionTracker* extensionTracker =
-                                        as<CUDAExtensionTracker>(m_emitter->getExtensionTracker());
-                                    if (extensionTracker)
-                                    {
-                                        extensionTracker->requireBaseType(BaseType::Half);
-                                    }
-                                    break;
-                                }
-                            default:
-                                break;
-                            }
-                        }
-
-                        // Append _convert on the name to signify we need to use a code path, that
-                        // will automatically do the format conversion.
-                        m_writer->emit("_convert");
-                    }
+                    SLANG_ASSERT(
+                        !_isConvertRequired(imageFormat, resourceInst) &&
+                        "CUDA surface format conversion should have been lowered by IR "
+                        "pass");
                 }
             }
             break;
@@ -495,17 +443,6 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
             IRInst* resourceInst = m_callInst->getArg(0);
             size_t elemSizeInBytes = _calcBackingElementSizeInBytes(resourceInst);
-
-            // If we have a format converstion and its a *write* we don't need to scale
-            if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
-            {
-                const ImageFormat imageFormat = formatDecoration->getFormat();
-                if (_isConvertRequired(imageFormat, resourceInst) && _isResourceWrite(m_callInst))
-                {
-                    // If there is a conversion *and* it's a write we don't need to scale.
-                    elemSizeInBytes = 1;
-                }
-            }
 
             SLANG_ASSERT(elemSizeInBytes > 0);
             m_writer->emitUInt64(UInt64(elemSizeInBytes));
