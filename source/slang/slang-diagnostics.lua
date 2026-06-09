@@ -1297,7 +1297,7 @@ err(
     "expected-a-type",
     30060,
     "expected a type",
-    span { loc = "expr:Expr", message = "expected a type, got a '~whatWeGot'" }
+    span { loc = "expr:Expr", message = "expected a type, got ~whatWeGot" }
 )
 
 err(
@@ -3251,6 +3251,13 @@ warning(
     span { loc = "decl:Decl", message = "failed to resolve canonical order of generic equality constraint" }
 )
 
+err(
+    "constraint-subject-cannot-be-this-type",
+    30427,
+    "the subject of a constraint cannot be the 'This' type",
+    span { loc = "typeExp:Expr", message = "constrain an associated type such as 'This.A' here, or use an inheritance clause (e.g. 'interface IFoo : IBar') to give an interface a base" }
+)
+
 --
 -- 305xx: initializer lists
 --
@@ -4472,6 +4479,13 @@ err(
     40013,
     "argument is not a compile-time constant",
     span { loc = "location", message = "arg ~argIndex:Int in '~funcName:IRInst' is not a compile-time constant" }
+)
+
+err(
+    "unsupported-assignment-target",
+    40017,
+    "assignment target is not supported",
+    span { loc = "location", message = "this form of assignment is not currently supported; consider assigning to the whole value instead of an individual element" }
 )
 
 err(
