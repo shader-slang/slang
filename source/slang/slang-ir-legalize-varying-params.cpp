@@ -2892,9 +2892,7 @@ private:
         for (auto param : func->getParams())
         {
             auto paramType = as<IRStructType>(param->getDataType());
-            // Skip legalization on workgraph record type, because it can contain semantics that
-            // shouldn't be modified such as SV_DispatchGrid.
-            if (paramType && !isWorkGraphRecordType(paramType))
+            if (paramType)
             {
                 paramsToProcess.add(param);
             }

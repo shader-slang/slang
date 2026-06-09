@@ -31,6 +31,18 @@ static bool tryGetBarrierFlagValue(IRInst* inst, IRIntegerValue& outValue)
     return false;
 }
 
+static bool tryGetBarrierFlagValueOrDiagnose(
+    IRInst* inst,
+    DiagnosticSink* sink,
+    IRIntegerValue& outValue)
+{
+    if (tryGetBarrierFlagValue(inst->getOperand(0), outValue))
+        return true;
+
+    sink->diagnose(Diagnostics::NeedCompileTimeConstant{.location = inst->sourceLoc});
+    return false;
+}
+
 static String getBarrierFlagValueString(uint32_t flagVal)
 {
     StringBuilder sb;
@@ -61,7 +73,7 @@ static void validateBarrierFlagsForHLSLInst(IRInst* inst, DiagnosticSink* sink)
     case kIROp_GetEnumBarrierMemoryTypeFlags:
         {
             IRIntegerValue rawFlagVal = 0;
-            if (!tryGetBarrierFlagValue(inst->getOperand(0), rawFlagVal))
+            if (!tryGetBarrierFlagValueOrDiagnose(inst, sink, rawFlagVal))
                 break;
 
             auto flagVal = (uint32_t)rawFlagVal;
@@ -76,7 +88,7 @@ static void validateBarrierFlagsForHLSLInst(IRInst* inst, DiagnosticSink* sink)
     case kIROp_GetEnumBarrierSemanticFlags:
         {
             IRIntegerValue rawFlagVal = 0;
-            if (!tryGetBarrierFlagValue(inst->getOperand(0), rawFlagVal))
+            if (!tryGetBarrierFlagValueOrDiagnose(inst, sink, rawFlagVal))
                 break;
 
             auto flagVal = (uint32_t)rawFlagVal;

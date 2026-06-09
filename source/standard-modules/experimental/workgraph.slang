@@ -12,7 +12,7 @@ module workgraph;
 // Work Graph Node Shader attributes
 
 /// Specifies the launch mode for a work-graph node shader.
-/// @param mode One of "broadcasting", "thread", or "coalescing".
+/// @param mode Case-insensitive; one of "broadcasting", "thread", or "coalescing".
 __attributeTarget(FuncDecl)
 attribute_syntax [NodeLaunch(mode: String)] : NodeLaunchAttribute;
 
