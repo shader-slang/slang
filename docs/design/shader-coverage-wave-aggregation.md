@@ -167,6 +167,58 @@ coverage-marker *lowering* earlier (before stdlib specialization) so high-level
 wave intrinsics are usable; rejected so far because it changes which
 (specialized) code coverage counts.
 
+## SPIR-V emit-side implementation recipe (concrete)
+
+Investigation has reduced the emit-side path to a mechanical checklist; every
+API below was located in the tree. Two hard sub-problems, both solved:
+
+**A. Emitting the subgroup ops (no GroupNonUniform op currently goes through
+the SPIR-V op-switch — they only come via `spirv_asm`).** Use the generic
+`emitInst(parent, irInst, SpvOp, operands...)` in `slang-emit-spirv.cpp`
+(line ~1308). Scope/group-operation operands follow the atomic-emission
+pattern at `slang-emit-spirv.cpp:5468`:
+  - active-lane count → `OpGroupNonUniformIAdd`:
+    `emitInst(parent, inst, SpvOpGroupNonUniformIAdd, inst->getFullType(),
+    emitIntConstant(SpvScopeSubgroup, uint), SpvLiteralInteger::from32(SpvGroupOperationReduce),
+    emitIntConstant(1, uint))` — note `Scope` is an `<id>` constant but
+    `GroupOperation` is a **literal** (`SpvLiteralInteger::from32`, line ~334).
+    Then `requireSPIRVCapability(SpvCapabilityGroupNonUniformArithmetic)`.
+  - elect → `OpGroupNonUniformElect`:
+    `emitInst(parent, inst, SpvOpGroupNonUniformElect, boolType,
+    emitIntConstant(SpvScopeSubgroup, uint))` +
+    `requireSPIRVCapability(SpvCapabilityGroupNonUniform)`.
+
+**B. The `if (elect)` conditional (mid-block insertion).** The coverage marker
+sits mid-block, so emitting an `IfElse` terminator there requires **splitting
+the block** — move the instructions after the marker into a new "after" block,
+terminate the original block with `emitIfElse(elect, trueBlock, afterBlock,
+afterBlock)`, fill `trueBlock` with the atomic + `emitBranch(afterBlock)`.
+`emitIfElseWithBlocks` (`slang-ir.cpp:6235`) creates/append the blocks but does
+**not** split, so the pass must do the split (or factor the increment into a
+helper-shaped block layout). Alternatively make the increment one IR op and emit
+the control flow in the backend — rejected: creating SpvInst blocks mid-emit is
+more exotic than an IR-level split.
+
+### Steps
+1. Two IR ops in `slang-ir-insts.lua` (e.g. `coverageActiveLaneCount` → uint,
+   `coverageElectFirstLane` → bool), no operands. **Watch the cascade:** adding
+   an op typically also needs a `slang-ir-insts-stable-names.lua` entry and may
+   hit exhaustive switches (side-effect/hoistability classification — these must
+   be marked non-hoistable / has-side-effect-ish so CSE/code-motion can't lift
+   them across control flow or merge two subgroup reads).
+2. SPIR-V backend: two `case`s per **A** in the op switch near `kIROp_AtomicAdd`.
+3. Coverage pass (`emitCoverageCounterIncrement`, gated by
+   `shouldUseWaveAggregation()` = helper-free now: `isKhronosTarget(target) &&
+   counterElementType is uint`): split the block per **B**, emit the two ops +
+   the guarded atomic.
+4. Tests: a SPIR-V FileCheck test asserting `OpGroupNonUniformIAdd`/`Elect`; a
+   CPU count-equivalence test (CPU path unaffected = reference).
+5. Validate on `tmp/spike-cov.slang` (already used during the spike) that the
+   output matches the validated reference sequence and passes `spirv-val`.
+
+Then HLSL/CUDA follow by lowering the same two ops in their emitters
+(`WaveActiveSum`/`WaveIsFirstLane`, `_waveSum`/elect).
+
 ## Validated emission
 
 The wave-aggregated increment body was prototyped and compiled with the local
