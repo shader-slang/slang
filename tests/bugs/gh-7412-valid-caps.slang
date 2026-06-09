@@ -116,3 +116,12 @@ extension ComputeOnly
     [require(compute)]
     void computeMethod() {}
 }
+
+// Case 12: Accessor-level [require] compatible with the target type -- no error.
+extension Foo
+{
+    __subscript(int i) -> int
+    {
+        [require(glsl)] get { return 0; }
+    }
+}

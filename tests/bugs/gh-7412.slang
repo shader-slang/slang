@@ -100,3 +100,14 @@ extension Bar
 {
     static void staticOnly() {}
 }
+
+// ext10: accessor-level [require(hlsl)] inside an extension subscript -- should error
+extension Bar
+{
+    __subscript(int i) -> int
+    {
+        [require(hlsl)] get { return 0; }
+//CHECK:                ^^^ error E36100
+//CHECK:                ^^^ requires capability
+    }
+}

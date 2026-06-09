@@ -19866,24 +19866,8 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         }
     }
 
-    // For non-static member functions of extensions: verify that the function's
-    // OWN explicitly-declared capabilities are compatible with the extension's
-    // target type's capabilities.
-    //
-    // We check only the function's own [require(...)] attributes rather than the
-    // full declaredCaps (which includes caps inherited from the parent extension)
-    // for two reasons:
-    //  1. Avoids cascading errors: when the extension itself has an incompatible
-    //     [require(X)] (already caught by visitExtensionDecl), members that inherit
-    //     X should not also generate errors — fixing the extension fixes them too.
-    //  2. Catches a case that full declaredCaps misses: if an extension has a
-    //     compatible [require(glsl)] and a member adds its own [require(hlsl)],
-    //     declaredCaps would be {hlsl|glsl} and joining that with {glsl} gives the
-    //     valid {glsl}, hiding the conflict. Using just {hlsl} detects it.
-    //
-    // Note: ExtensionDecl is AggTypeDeclBase but not AggTypeDecl, so
-    // getParentAggTypeDecl returns nullptr for extension members; we use
-    // getParentAggTypeDeclBase instead (see _checkExtensionMemberCapConflict).
+    // See _checkExtensionMemberCapConflict for the rationale behind checking
+    // only own [require(...)] attributes here.
     //
     // Constructors are also checked despite isEffectivelyStatic returning true for
     // them: a [require(hlsl)] __init inside a [require(glsl)] extension target is
@@ -19916,7 +19900,7 @@ void SemanticsDeclCapabilityVisitor::_checkExtensionMemberCapConflict(Decl* memb
     if (ownDeclaredCaps.isEmpty())
         return;
 
-    auto extensionDecl = as<ExtensionDecl>(getParentAggTypeDeclBase(memberDecl));
+    auto extensionDecl = getParentExtensionDecl(memberDecl);
     if (!extensionDecl)
         return;
 

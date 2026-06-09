@@ -182,9 +182,10 @@ extension MyType
 }
 ```
 
-Static extension members (other than constructors) are exempt from this check because they can be
-called without an instance of the target type. Constructors are not exempt: a constructor produces
-a value of the target type, so its capabilities must be compatible with the target's.
+Static extension *member functions* are exempt from this check because they can be called without
+an instance of the target type. Constructors and subscripts are always checked: a constructor
+produces a value of the target type, and a subscript provides indexed access to it, so both must
+be compatible with the target's capabilities.
 
 ## Capabilities Between Requirement and Implementation
 
