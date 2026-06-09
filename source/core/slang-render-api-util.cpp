@@ -6,6 +6,10 @@
 #include "slang-string-util.h"
 #include "slang.h"
 
+#ifndef SLANG_ENABLE_WEBGPU
+#define SLANG_ENABLE_WEBGPU 0
+#endif
+
 namespace Slang
 {
 
@@ -274,9 +278,6 @@ static bool _canLoadSharedLibrary(const char* libName)
 #if SLANG_WINDOWS_FAMILY
     case RenderApiType::Vulkan:
         return _canLoadSharedLibrary("vulkan-1") || _canLoadSharedLibrary("vk_swiftshader");
-    case RenderApiType::WebGPU:
-        return _canLoadSharedLibrary("webgpu_dawn") && _canLoadSharedLibrary("dxcompiler") &&
-               _canLoadSharedLibrary("dxil");
 #elif SLANG_APPLE_FAMILY
     case RenderApiType::Vulkan:
         return true;
@@ -285,6 +286,18 @@ static bool _canLoadSharedLibrary(const char* libName)
 #elif SLANG_UNIX_FAMILY
     case RenderApiType::Vulkan:
         return true;
+#endif
+
+#if SLANG_ENABLE_WEBGPU
+    case RenderApiType::WebGPU:
+#if SLANG_WINDOWS_FAMILY
+        return (_canLoadSharedLibrary("dawn") || _canLoadSharedLibrary("webgpu_dawn")) &&
+               _canLoadSharedLibrary("dxcompiler") && _canLoadSharedLibrary("dxil");
+#elif SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY
+        return _canLoadSharedLibrary("dawn");
+#else
+        return false;
+#endif
 #endif
 
 #if SLANG_ENABLE_DIRECTX

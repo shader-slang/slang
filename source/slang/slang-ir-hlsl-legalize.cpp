@@ -12,6 +12,53 @@
 namespace Slang
 {
 
+static void addDefaultPayloadAccessQualifiersToField(IRBuilder& builder, IRStructKey* fieldKey)
+{
+    const bool hasReadAccess = fieldKey->findDecoration<IRStageReadAccessDecoration>() != nullptr;
+    const bool hasWriteAccess = fieldKey->findDecoration<IRStageWriteAccessDecoration>() != nullptr;
+    if (hasReadAccess && hasWriteAccess)
+        return;
+
+    IRInst* stageNames[] = {
+        builder.getStringValue(UnownedStringSlice("caller")),
+        builder.getStringValue(UnownedStringSlice("anyhit")),
+        builder.getStringValue(UnownedStringSlice("closesthit")),
+        builder.getStringValue(UnownedStringSlice("miss")),
+    };
+
+    if (!hasReadAccess)
+    {
+        builder.addDecoration(
+            fieldKey,
+            kIROp_StageReadAccessDecoration,
+            stageNames,
+            SLANG_COUNT_OF(stageNames));
+    }
+
+    if (!hasWriteAccess)
+    {
+        builder.addDecoration(
+            fieldKey,
+            kIROp_StageWriteAccessDecoration,
+            stageNames,
+            SLANG_COUNT_OF(stageNames));
+    }
+}
+
+static void addDefaultPayloadAccessQualifiersToStruct(IRBuilder& builder, IRStructType* structType)
+{
+    for (auto field : structType->getFields())
+    {
+        addDefaultPayloadAccessQualifiersToField(builder, field->getKey());
+    }
+}
+
+static void addRayPayloadDecorationIfNeeded(IRBuilder& builder, IRType* type)
+{
+    if (!type->findDecoration<IRRayPayloadDecoration>())
+        builder.addRayPayloadDecoration(type);
+}
+
 void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* inst)
 {
     for (auto child : inst->getChildren())
@@ -42,7 +89,12 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
                     {
                         call->setArg(i, arg->getOperand(0));
                         if (isForcedRayPayloadStruct)
-                            builder.addRayPayloadDecoration(forceStructBaseType);
+                        {
+                            addRayPayloadDecorationIfNeeded(builder, forceStructBaseType);
+                            addDefaultPayloadAccessQualifiersToStruct(
+                                builder,
+                                cast<IRStructType>(forceStructBaseType));
+                        }
                         continue;
                     }
 
@@ -62,13 +114,16 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
 
                     builder.setInsertBefore(call->getCallee());
                     auto structType = builder.createStructType();
-                    StringBuilder structName;
                     builder.addNameHintDecoration(structType, UnownedStringSlice(typeNameHint));
                     if (isForcedRayPayloadStruct)
-                        builder.addRayPayloadDecoration(structType);
+                        addRayPayloadDecorationIfNeeded(builder, structType);
 
                     auto elementBufferKey = builder.createStructKey();
                     builder.addNameHintDecoration(elementBufferKey, UnownedStringSlice("data"));
+                    if (isForcedRayPayloadStruct)
+                    {
+                        addDefaultPayloadAccessQualifiersToField(builder, elementBufferKey);
+                    }
                     auto _dataField = builder.createStructField(
                         structType,
                         elementBufferKey,
@@ -180,9 +235,7 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
         builder.addNameHintDecoration(dummyKey, UnownedStringSlice("_slang_dummy"));
 
         // Add stage access decorations that ray payload fields require
-        IRInst* stageName = builder.getStringValue(UnownedStringSlice("caller"));
-        builder.addDecoration(dummyKey, kIROp_StageReadAccessDecoration, &stageName, 1);
-        builder.addDecoration(dummyKey, kIROp_StageWriteAccessDecoration, &stageName, 1);
+        addDefaultPayloadAccessQualifiersToField(builder, dummyKey);
 
         builder.createStructField(structType, dummyKey, builder.getIntType());
 

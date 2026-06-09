@@ -84,17 +84,19 @@ These answer:
 - the legacy coverage-specific descriptor binding view
 - how many source coverage entries exist
 
-Line counters are source-location based, but the current producer emits
-one source entry per inserted counter op. If generic specialization,
-inlining, or other IR cloning creates multiple executable copies that
-map to the same source line, those entries keep distinct counter slots;
-LCOV export aggregates them by `(file, line)` at report-generation
-time. For the current line-coverage mode, `getEntryCount()` equals
-`getCounterCount()`, `CoverageEntryInfo::kind` is `Line`, and
-`CoverageEntryInfo::counterIndex` selects the runtime counter slot.
-Future branch, function, and source-region coverage can add entries
-that carry function names, branch arm identity, or source ranges without
-changing the binding contract.
+Coverage entries are source-location based. The current producers emit
+one source entry per inserted marker op: line entries, function-entry
+entries, and branch-arm entries. If generic specialization, inlining,
+or other IR cloning creates multiple executable copies that map to the
+same source location, those entries keep distinct counter slots; LCOV
+export aggregates line entries by `(file, line)`, function entries by
+function name, and branch entries by `(line, branch_site, branch_arm)`.
+Current entries all carry a runtime counter, but hosts should still use
+`CoverageEntryInfo::counterIndex` instead of assuming entry index equals
+counter index. Future source-region coverage can add ranged entries
+that use direct counters, shared counters, derived counter expressions,
+or no direct runtime counter of their own without changing the binding
+contract.
 
 Hosts use `ICoverageTracingMetadata` when they need to interpret the
 counter values they read back, or emit LCOV or manifest output.
@@ -188,7 +190,10 @@ exist in the host's runtime pipeline layout and are not referenced by
 the compiled shader IR. Khronos descriptor-set hosts with such externally
 owned sets should pass `-trace-coverage-reserved-space <space>` when
 compiling, or set `CompilerOptionName::TraceCoverageReservedSpace`
-through the API while also enabling `CompilerOptionName::TraceCoverage`.
+through the API while also enabling at least one coverage mode, such as
+`CompilerOptionName::TraceCoverage`,
+`CompilerOptionName::TraceFunctionCoverage`, or
+`CompilerOptionName::TraceBranchCoverage`.
 The option is repeatable and duplicate values are idempotent. It is an
 auto-allocation hint for whole Khronos descriptor sets; explicit
 `-trace-coverage-binding` still wins. Metal, CPU, CUDA, and D3D targets

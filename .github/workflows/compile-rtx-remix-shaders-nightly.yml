@@ -122,6 +122,51 @@ jobs:
             packman-
           enableCrossOsArchive: false
 
+      # Pin packman entries we can't fetch back to a public-CDN
+      # version before invoking packman pull. Currently:
+      #
+      #   - rtx-remix-ngx_sdk_dlfg v4 is published only to NVIDIA's
+      #     internal NVGTL packman remote (which requires
+      #     NVM_GTLAPI_TOKEN). v3 is still on the public CloudFront
+      #     CDN. The DLFG SDK is consumed by dxvk-remix's C++ code
+      #     only -- no shader includes any header under
+      #     external/ngx_sdk_dlfg/ -- but meson resolves
+      #     include_directories('../../external/ngx_sdk_dlfg/include')
+      #     during configure even for build_shaders_only.ps1, so the
+      #     directory has to exist. Pinning to v3 gives meson the
+      #     directory it wants without needing the NVGTL token.
+      #
+      # If a future package needs the same treatment, extend the
+      # python regex below.
+      - name: Pin NVGTL-only packman entries to public-CDN versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dxvk-remix
+          xml=packman-external.xml
+          python3 - "$xml" <<'PY'
+          import re
+          import sys
+          path = sys.argv[1]
+          src = open(path).read()
+          # Rewrite the version attribute inside the
+          # <package name="rtx-remix-ngx_sdk_dlfg" version="N" />
+          # element from any value to "3". The version attribute is
+          # the only thing on that line that needs rewriting; the
+          # surrounding <dependency> wrapper stays intact.
+          pattern = re.compile(
+              r'(<package\s+name="rtx-remix-ngx_sdk_dlfg"\s+version=")[^"]*(")'
+          )
+          new, n = pattern.subn(r"\g<1>3\g<2>", src)
+          if n != 1:
+              sys.exit(
+                  f"expected exactly 1 rtx-remix-ngx_sdk_dlfg package "
+                  f"entry, found {n}"
+              )
+          open(path, "w").write(new)
+          PY
+          echo "Patched $xml: pinned rtx-remix-ngx_sdk_dlfg to v3 (public CDN)."
+
       # Download shader compilation tools via packman
       # First run: ~2-5 min (downloads ~340MB)
       # Cached run: ~30 seconds

@@ -248,7 +248,6 @@ Not Supported
 Some features of the current HLSL language are not supported, but probably will be given enough time/resources:
 
 * Local variables of texture/sampler type (or that contain these)
-* Matrix swizzles
 * Explicit `packoffset` annotations on members of `cbuffer`s
 
 Some things from HLSL are *not* planned to be supported, unless there is significant outcry from users:

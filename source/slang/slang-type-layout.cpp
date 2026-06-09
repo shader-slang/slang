@@ -3360,7 +3360,7 @@ static bool getLLVMBuiltinTypeLayoutInfo(TargetRequest* targetReq, TargetBuiltin
     using InfoFuncV1 =
         SlangResult (*)(Slang::CharSlice targetTriple, Slang::TargetBuiltinTypeLayoutInfo* info);
 
-    auto infoFunc = (InfoFuncV1)llvmLib->findFuncByName("getLLVMTargetBuiltinTypeLayoutInfo_V1");
+    auto infoFunc = (InfoFuncV1)llvmLib->findFuncByName("getLLVMTargetBuiltinTypeLayoutInfo_V2");
 
     if (!infoFunc)
         return false;
@@ -3373,6 +3373,8 @@ TargetBuiltinTypeLayoutInfo getBuiltinTypeLayoutInfo(TargetRequest* targetReq)
 {
     TargetBuiltinTypeLayoutInfo info;
     info.genericPointerSize = 8; // Assume 64-bit pointers by default.
+    info.stringSize = 0;         // Assume strings are unsized types by default.
+    info.stringAlignment = 0;
 
     // If we don't know the target, we just have to assume the defaults. This
     // type of usage occurs in IR checking passes prior to target-specific

@@ -2395,10 +2395,8 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
             inst->replaceUsesWith(newInst);
             inst->removeFromParent();
             context->replacedInstructions.add(inst);
-            for (auto child : inst->getDecorationsAndChildren())
-            {
+            while (auto child = inst->getFirstDecorationOrChild())
                 child->insertAtEnd(newInst);
-            }
             return LegalVal::simple(newInst);
         }
         return LegalVal::simple(inst);

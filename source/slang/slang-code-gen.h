@@ -179,6 +179,7 @@ public:
     bool shouldReportCheckpointIntermediates();
     bool shouldReportDynamicDispatchSites();
     bool shouldTraceCoverage();
+    bool shouldTraceAnyCoverage();
 
     bool shouldTrackLiveness();
 

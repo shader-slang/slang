@@ -28,8 +28,9 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           sparse-checkout: .github/cmake-options-matrix.json
           sparse-checkout-cone-mode: false
       - id: set-matrix
@@ -48,8 +49,10 @@ jobs:
       contents: read
       packages: read # Required to pull container from ghcr.io
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
-      options: --user root -v /:/host_root
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
+      # Current callers use GitHub-hosted Ubuntu, where the mounted workspace is
+      # writable by UID/GID 1001. The published image has no named non-root user.
+      options: --user 1001:1001
 
     defaults:
       run:
@@ -60,13 +63,23 @@ jobs:
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
-      - name: Configure Git safe directory
-        run: git config --global --add safe.directory '*'
-
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          persist-credentials: false
           submodules: "recursive"
           fetch-depth: "2"
+
+      - name: Configure Git safe directory
+        run: |
+          # RUNNER_TEMP is GitHub Actions' job-local temporary directory.
+          if [[ -n "${RUNNER_TEMP:-}" && -d "$RUNNER_TEMP" && -w "$RUNNER_TEMP" ]]; then
+            git_config_dir="$RUNNER_TEMP"
+          else
+            git_config_dir="/tmp"
+          fi
+          git_config_global="$git_config_dir/gitconfig"
+          echo "GIT_CONFIG_GLOBAL=$git_config_global" >> "$GITHUB_ENV"
+          GIT_CONFIG_GLOBAL="$git_config_global" git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Set environment variables
         run: |

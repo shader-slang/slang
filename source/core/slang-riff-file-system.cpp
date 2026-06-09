@@ -54,8 +54,17 @@ SlangResult RiffFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
     if (m_compressionSystem)
     {
         // Okay lets decompress into a blob
+        if (!isArchiveFileUncompressedSizeInBounds(UInt64(entry->m_uncompressedSizeInBytes)))
+        {
+            return SLANG_E_OUT_OF_MEMORY;
+        }
+
         ScopedAllocation alloc;
         void* dst = alloc.allocateTerminated(entry->m_uncompressedSizeInBytes);
+        if (!dst)
+        {
+            return SLANG_E_OUT_OF_MEMORY;
+        }
         SLANG_RETURN_ON_FAIL(m_compressionSystem->decompress(
             contents->getBufferPointer(),
             contents->getBufferSize(),
@@ -91,7 +100,7 @@ SlangResult RiffFileSystem::saveFile(const char* path, const void* data, size_t 
     else
     {
         // Just store the data directly.
-        contents = RawBlob::create(data, size);
+        SLANG_RETURN_ON_FAIL(RawBlob::tryCreate(data, size, contents));
     }
     entry->setContents(size, contents);
     return SLANG_OK;
@@ -207,8 +216,10 @@ SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeI
                     }
 
                     // Get the compressed data
-                    dstEntry.m_contents =
-                        RawBlob::create(reader.getRemainingData(), srcEntry.compressedSize);
+                    SLANG_RETURN_ON_FAIL(RawBlob::tryCreate(
+                        reader.getRemainingData(),
+                        srcEntry.compressedSize,
+                        dstEntry.m_contents));
                     break;
                 }
             case SLANG_PATH_TYPE_DIRECTORY:

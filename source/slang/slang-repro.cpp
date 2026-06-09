@@ -1,15 +1,16 @@
 // slang-repro.cpp
 #include "slang-repro.h"
 
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-util.h"
-#include "../compiler-core/slang-source-loc.h"
-#include "../core/slang-castable.h"
-#include "../core/slang-math.h"
-#include "../core/slang-stream.h"
-#include "../core/slang-text-io.h"
-#include "../core/slang-type-text-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-util.h"
+#include "compiler-core/slang-source-loc.h"
+#include "core/slang-castable.h"
+#include "core/slang-math.h"
+#include "core/slang-stream.h"
+#include "core/slang-text-io.h"
+#include "core/slang-type-text-util.h"
 #include "slang-options.h"
+#include "slang-repro-validator.h"
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
@@ -64,7 +65,7 @@ static StableHashCode32 _calcTypeHash()
     return getStableHashCode32((const char*)&sizes, sizeof(sizes));
 }
 
-static StableHashCode32 _getTypeHash()
+/* static */ StableHashCode32 ReproUtil::getTypeHash()
 {
     static StableHashCode32 s_hash = _calcTypeHash();
     return s_hash;
@@ -874,6 +875,11 @@ struct LoadContext
     ISlangFileSystem* replaceFileSystem,
     ComPtr<ISlangFileSystemExt>& outFileSystem)
 {
+    if (!requestState)
+    {
+        return SLANG_FAIL;
+    }
+
     LoadContext context(nullptr, replaceFileSystem, &base);
 
     CacheFileSystem* cacheFileSystem = new CacheFileSystem(nullptr);
@@ -932,6 +938,11 @@ struct LoadContext
     ISlangFileSystem* optionalFileSystem,
     EndToEndCompileRequest* request)
 {
+    if (!requestState || !request)
+    {
+        return SLANG_FAIL;
+    }
+
     auto externalRequest = asExternal(request);
 
     auto linkage = request->getLinkage();
@@ -1075,7 +1086,7 @@ struct LoadContext
             {
                 // Create the source file
                 SourceFile* sourceFile =
-                    context.getSourceFile(base.asRaw(base.asRaw(srcSourceFiles[i])));
+                    context.getSourceFile(base.asRaw(base.asRaw(srcSourceFiles[j])));
 
                 // Create the artifact
                 auto sourceArtifact = ArtifactUtil::createArtifact(
@@ -1175,7 +1186,7 @@ struct LoadContext
 
     Header header;
     header.m_semanticVersion = g_semanticVersion;
-    header.m_typeHash = _getTypeHash();
+    header.m_typeHash = getTypeHash();
 
     cursor.addData(header);
     cursor.addUnownedData(container.getData(), container.getDataCount());
@@ -1271,7 +1282,7 @@ struct LoadContext
         return SLANG_FAIL;
     }
 
-    if (header.m_typeHash != _getTypeHash())
+    if (header.m_typeHash != getTypeHash())
     {
         sink->diagnose(Diagnostics::RiffHashMismatch{});
         return SLANG_FAIL;
@@ -1280,13 +1291,22 @@ struct LoadContext
     auto remainingSize = reader.getRemainingSize();
     outBuffer.setCount(remainingSize);
 
+    if (remainingSize)
     {
-        auto result = reader.read(&outBuffer[0], remainingSize);
-        if (SLANG_FAILED(result))
+        auto readResult = reader.read(outBuffer.getBuffer(), remainingSize);
+        if (SLANG_FAILED(readResult))
         {
+            outBuffer.clear();
             sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
-            return result;
+            return readResult;
         }
+    }
+
+    if (!isReproStateValid(outBuffer))
+    {
+        outBuffer.clear();
+        sink->diagnose(Diagnostics::InvalidReproState{});
+        return SLANG_FAIL;
     }
 
     return SLANG_OK;
@@ -1294,6 +1314,11 @@ struct LoadContext
 
 /* static */ ReproUtil::RequestState* ReproUtil::getRequest(const List<uint8_t>& buffer)
 {
+    if (size_t(buffer.getCount()) < kStartOffset + sizeof(ReproUtil::RequestState))
+    {
+        return nullptr;
+    }
+
     return (ReproUtil::RequestState*)(buffer.getBuffer() + kStartOffset);
 }
 
@@ -1577,7 +1602,7 @@ static SlangResult _calcCommandLine(
 
             for (Index j = 0; j < srcSourceFiles.getCount(); ++j)
             {
-                SourceFileState* sourceFile = base.asRaw(base.asRaw(srcSourceFiles[i]));
+                SourceFileState* sourceFile = base.asRaw(base.asRaw(srcSourceFiles[j]));
                 OffsetString* path = base[sourceFile->foundPath];
 
                 if (path)
@@ -1622,6 +1647,11 @@ static SlangResult _calcCommandLine(
     RequestState* requestState,
     ISlangMutableFileSystem* fileSystem)
 {
+    if (!requestState || !fileSystem)
+    {
+        return SLANG_FAIL;
+    }
+
     StringBuilder builder;
 
     builder << "[command-line]\n";

@@ -31,10 +31,12 @@ permissions:
 
 jobs:
   review:
-    # Skip bot PRs and Claude's own branches (loop prevention)
+    # Skip draft PRs, bot PRs, and Claude's own branches (loop prevention)
+    # Drafts will trigger automatically on `ready_for_review` (see types: above)
     # workflow_dispatch bypasses these checks (manual trigger = intentional)
     if: |
       github.event_name == 'workflow_dispatch' || (
+        github.event.pull_request.draft == false &&
         !contains(github.event.pull_request.user.login, '[bot]') &&
         !startsWith(github.event.pull_request.head.ref, 'claude/')
       )
