@@ -60,9 +60,18 @@ public bool isDegenerate(Triangle tri)
     return dot(n, n) < 1e-12;
 }
 
+// Returns a unit normal for the triangle. For a degenerate
+// triangle (`cross(e1, e2)` near zero), returns the fixed fallback
+// `(0, 1, 0)` rather than dividing by ~0 and producing NaN. Callers
+// that need to distinguish degenerate triangles should check
+// `isDegenerate` first; this guard is here so that downstream
+// shading code can use the result unconditionally without NaN
+// propagation.
 public float3 triangleNormal(Triangle tri)
 {
     float3 e1 = tri.v1 - tri.v0;
     float3 e2 = tri.v2 - tri.v0;
-    return normalize(cross(e1, e2));
+    float3 n = cross(e1, e2);
+    float len = length(n);
+    return len > 1e-6 ? n / len : float3(0.0, 1.0, 0.0);
 }

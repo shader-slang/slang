@@ -136,9 +136,20 @@ void diagnoseIfNeeded(slang::IBlob* diagnostics)
     }
 }
 
+// Resolves the directory containing the demo's `.slang` assets.
+// `__FILE__` expands at compile time, so it works when the demo is
+// run from the source tree (the intended setup) but fails after the
+// binary is moved (installed elsewhere, copied to a CI runner, etc.).
+// Fall back to the current working directory if the build-time path
+// no longer exists, so a user who runs the demo from its install
+// directory still gets a meaningful error from `loadModule` rather
+// than a silent path-not-found.
 std::filesystem::path getDemoDirectory()
 {
-    return std::filesystem::path(__FILE__).parent_path();
+    std::filesystem::path sourceDir = std::filesystem::path(__FILE__).parent_path();
+    if (std::filesystem::exists(sourceDir / "bvh_traverse.slang"))
+        return sourceDir;
+    return std::filesystem::current_path();
 }
 
 void addQuad(std::vector<Triangle>& tris, Vec3 p0, Vec3 p1, Vec3 p2, Vec3 p3, int materialId)
@@ -323,21 +334,32 @@ int buildBVHRec(BuildState& s, int triStart, int triEnd)
     return nodeIdx;
 }
 
+// `buildBVHRec` returns the index of the actual root node, which is
+// not necessarily slot 0 (the recursion appends nodes as it goes).
+// Move that node to slot 0 so the GPU side can assume `nodes[0]` is
+// the root, and remap every child reference accordingly: anything
+// that pointed at the new-root slot now points at the old-slot-0,
+// and anything that pointed at slot 0 now points at the new-root
+// slot. Using an explicit two-value swap lambda keeps the mapping
+// obviously correct — any other arrangement of `if`/`else` branches
+// can silently cascade.
 void rerootNodes(std::vector<BVHNode>& nodes, int rootIndex)
 {
     if (rootIndex == 0)
         return;
     std::swap(nodes[0], nodes[rootIndex]);
+    auto remap = [&](int idx)
+    {
+        if (idx == 0)
+            return rootIndex;
+        if (idx == rootIndex)
+            return 0;
+        return idx;
+    };
     for (auto& n : nodes)
     {
-        if (n.leftIndex == 0)
-            n.leftIndex = rootIndex;
-        else if (n.leftIndex == rootIndex)
-            n.leftIndex = 0;
-        if (n.rightIndex == 0)
-            n.rightIndex = rootIndex;
-        else if (n.rightIndex == rootIndex)
-            n.rightIndex = 0;
+        n.leftIndex = remap(n.leftIndex);
+        n.rightIndex = remap(n.rightIndex);
     }
 }
 
@@ -607,194 +629,212 @@ void printSummary(const char* label, const CoverageSummary& s)
 
 int main(int argc, char** argv)
 {
-    std::string mode = "smoke";
-    bool enableCoverage = true;
-    // This demo intentionally defaults to 32-bit counters even though
-    // the compiler default is 64-bit (see
-    // `CompilerOptionName::TraceCoverageCounterByteWidth`): MoltenVK on
-    // Apple Silicon does not expose `shaderBufferInt64Atomics`, and we
-    // want the demo to run there out of the box. Pass
-    // `--counter-width=64` on any Vulkan driver that does support
-    // `VK_KHR_shader_atomic_int64` to exercise the wider counters and
-    // match the compiler-side default.
-    int counterWidthBits = 32;
-    for (int i = 1; i < argc; ++i)
+    // Wrap the demo body in try/catch so a Vulkan/Slang failure (no
+    // device, allocation failure, shader-module rejection, ...) exits
+    // with a diagnostic line instead of letting `std::terminate` fire.
+    // The `vkdemo::check` helper and various Slang call sites throw
+    // `std::runtime_error`, so catching `std::exception` covers both.
+    try
     {
-        std::string_view a = argv[i];
-        if (a == "--mode=smoke")
-            mode = "smoke";
-        else if (a == "--mode=stress")
-            mode = "stress";
-        else if (a == "--no-coverage")
-            enableCoverage = false;
-        else if (a == "--coverage")
-            enableCoverage = true;
-        else if (a == "--counter-width=32")
-            counterWidthBits = 32;
-        else if (a == "--counter-width=64")
-            counterWidthBits = 64;
+        std::string mode = "smoke";
+        bool enableCoverage = true;
+        // This demo intentionally defaults to 32-bit counters even though
+        // the compiler default is 64-bit (see
+        // `CompilerOptionName::TraceCoverageCounterByteWidth`): MoltenVK on
+        // Apple Silicon does not expose `shaderBufferInt64Atomics`, and we
+        // want the demo to run there out of the box. Pass
+        // `--counter-width=64` on any Vulkan driver that does support
+        // `VK_KHR_shader_atomic_int64` to exercise the wider counters and
+        // match the compiler-side default.
+        int counterWidthBits = 32;
+        for (int i = 1; i < argc; ++i)
+        {
+            std::string_view a = argv[i];
+            if (a == "--mode=smoke")
+                mode = "smoke";
+            else if (a == "--mode=stress")
+                mode = "stress";
+            else if (a == "--no-coverage")
+                enableCoverage = false;
+            else if (a == "--coverage")
+                enableCoverage = true;
+            else if (a == "--counter-width=32")
+                counterWidthBits = 32;
+            else if (a == "--counter-width=64")
+                counterWidthBits = 64;
+            else
+            {
+                std::cerr << "unknown arg: " << a << "\n";
+                return 1;
+            }
+        }
+
+        std::cout << "compiling bvh_traverse.slang"
+                  << (enableCoverage ? " (coverage on, " : " (no coverage")
+                  << (enableCoverage ? (std::to_string(counterWidthBits) + "-bit counters)\n")
+                                     : ")\n");
+        auto shader = compileShader(enableCoverage, counterWidthBits);
+
+        uint32_t counterCount = 0;
+        uint32_t counterByteWidth = 4;
+        if (enableCoverage)
+        {
+            counterCount = shader.coverageMetadata->getCounterCount();
+            // Match the GPU-side buffer's per-slot byte width to whatever
+            // the compiler synthesized (uint64 by default, uint32 under
+            // `-trace-coverage-counter-width 32`). A missing or zero
+            // `elementByteWidth` here is a hard error — silently falling
+            // back to 4 would mis-size the buffer whenever the user
+            // requested 64-bit counters.
+            slang::CoverageBufferInfo bufferInfo = {};
+            if (SLANG_FAILED(shader.coverageMetadata->getBufferInfo(&bufferInfo)) ||
+                bufferInfo.elementByteWidth == 0)
+            {
+                std::cerr << "coverage: getBufferInfo returned no element width; cannot size "
+                             "the readback buffer to match the compiled counter layout\n";
+                return 1;
+            }
+            counterByteWidth = bufferInfo.elementByteWidth;
+            std::cout << "coverage counter count: " << counterCount << " ("
+                      << (counterByteWidth * 8) << "-bit slots)\n";
+        }
+
+        auto tris = (mode == "smoke") ? buildSmokeMesh() : buildStressMesh();
+        std::cout << "mesh: " << tris.size() << " triangles (" << mode << ")\n";
+        auto nodes = buildBVH(tris);
+        std::cout << "BVH: " << nodes.size() << " nodes\n";
+        auto rays = generateRays(kRayGridDim);
+        std::cout << "rays: " << rays.size() << " (" << kRayGridDim << "x" << kRayGridDim << ")\n";
+
+        Globals globalsData = {};
+        globalsData.rayCount = (uint32_t)rays.size();
+        globalsData.triCount = (uint32_t)tris.size();
+        globalsData.nodeCount = (uint32_t)nodes.size();
+
+        vkdemo::Context ctx;
+        // 64-bit counters (8-byte slots) need a device with
+        // shaderBufferInt64Atomics; request that feature so device selection
+        // skips integrated GPUs that only support a 32-bit counter buffer.
+        const bool needsInt64Atomics = enableCoverage && counterByteWidth == 8;
+        ctx.init(needsInt64Atomics);
+
+        std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings;
+        setBindings.resize(2);
+        auto pushBinding = [](std::vector<VkDescriptorSetLayoutBinding>& v, uint32_t b)
+        {
+            VkDescriptorSetLayoutBinding lb = {};
+            lb.binding = b;
+            lb.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            lb.descriptorCount = 1;
+            lb.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+            v.push_back(lb);
+        };
+        for (uint32_t i = 0; i < 5; ++i)
+            pushBinding(setBindings[0], i);
+        if (enableCoverage)
+            pushBinding(setBindings[1], kCoverageBinding);
         else
+            setBindings.pop_back();
+
+        // Slang's SPIR-V emit renames the entry point to "main" by default.
+        auto pipe = ctx.createComputePipeline(
+            shader.spirv.data(),
+            shader.spirv.size(),
+            setBindings,
+            "main");
+
+        auto rayBuf =
+            ctx.createBuffer(rays.size() * sizeof(Ray), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        ctx.upload(rayBuf, rays.data(), rayBuf.size);
+        auto triBuf =
+            ctx.createBuffer(tris.size() * sizeof(Triangle), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        ctx.upload(triBuf, tris.data(), triBuf.size);
+        auto nodeBuf =
+            ctx.createBuffer(nodes.size() * sizeof(BVHNode), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        ctx.upload(nodeBuf, nodes.data(), nodeBuf.size);
+        auto globalsBuf = ctx.createBuffer(sizeof(Globals), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        ctx.upload(globalsBuf, &globalsData, sizeof(globalsData));
+        auto outputBuf =
+            ctx.createBuffer(rays.size() * 4 * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+        vkdemo::Buffer coverageBuf = {};
+        if (enableCoverage)
         {
-            std::cerr << "unknown arg: " << a << "\n";
-            return 1;
-        }
-    }
-
-    std::cout << "compiling bvh_traverse.slang"
-              << (enableCoverage ? " (coverage on, " : " (no coverage")
-              << (enableCoverage ? (std::to_string(counterWidthBits) + "-bit counters)\n") : ")\n");
-    auto shader = compileShader(enableCoverage, counterWidthBits);
-
-    uint32_t counterCount = 0;
-    uint32_t counterByteWidth = 4;
-    if (enableCoverage)
-    {
-        counterCount = shader.coverageMetadata->getCounterCount();
-        // Match the GPU-side buffer's per-slot byte width to whatever
-        // the compiler synthesized (uint64 by default, uint32 under
-        // `-trace-coverage-counter-width 32`). A missing or zero
-        // `elementByteWidth` here is a hard error — silently falling
-        // back to 4 would mis-size the buffer whenever the user
-        // requested 64-bit counters.
-        slang::CoverageBufferInfo bufferInfo = {};
-        if (SLANG_FAILED(shader.coverageMetadata->getBufferInfo(&bufferInfo)) ||
-            bufferInfo.elementByteWidth == 0)
-        {
-            std::cerr << "coverage: getBufferInfo returned no element width; cannot size "
-                         "the readback buffer to match the compiled counter layout\n";
-            return 1;
-        }
-        counterByteWidth = bufferInfo.elementByteWidth;
-        std::cout << "coverage counter count: " << counterCount << " (" << (counterByteWidth * 8)
-                  << "-bit slots)\n";
-    }
-
-    auto tris = (mode == "smoke") ? buildSmokeMesh() : buildStressMesh();
-    std::cout << "mesh: " << tris.size() << " triangles (" << mode << ")\n";
-    auto nodes = buildBVH(tris);
-    std::cout << "BVH: " << nodes.size() << " nodes\n";
-    auto rays = generateRays(kRayGridDim);
-    std::cout << "rays: " << rays.size() << " (" << kRayGridDim << "x" << kRayGridDim << ")\n";
-
-    Globals globalsData = {};
-    globalsData.rayCount = (uint32_t)rays.size();
-    globalsData.triCount = (uint32_t)tris.size();
-    globalsData.nodeCount = (uint32_t)nodes.size();
-
-    vkdemo::Context ctx;
-    // 64-bit counters (8-byte slots) need a device with
-    // shaderBufferInt64Atomics; request that feature so device selection
-    // skips integrated GPUs that only support a 32-bit counter buffer.
-    const bool needsInt64Atomics = enableCoverage && counterByteWidth == 8;
-    ctx.init(needsInt64Atomics);
-
-    std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings;
-    setBindings.resize(2);
-    auto pushBinding = [](std::vector<VkDescriptorSetLayoutBinding>& v, uint32_t b)
-    {
-        VkDescriptorSetLayoutBinding lb = {};
-        lb.binding = b;
-        lb.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        lb.descriptorCount = 1;
-        lb.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-        v.push_back(lb);
-    };
-    for (uint32_t i = 0; i < 5; ++i)
-        pushBinding(setBindings[0], i);
-    if (enableCoverage)
-        pushBinding(setBindings[1], kCoverageBinding);
-    else
-        setBindings.pop_back();
-
-    // Slang's SPIR-V emit renames the entry point to "main" by default.
-    auto pipe =
-        ctx.createComputePipeline(shader.spirv.data(), shader.spirv.size(), setBindings, "main");
-
-    auto rayBuf = ctx.createBuffer(rays.size() * sizeof(Ray), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    ctx.upload(rayBuf, rays.data(), rayBuf.size);
-    auto triBuf =
-        ctx.createBuffer(tris.size() * sizeof(Triangle), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    ctx.upload(triBuf, tris.data(), triBuf.size);
-    auto nodeBuf =
-        ctx.createBuffer(nodes.size() * sizeof(BVHNode), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    ctx.upload(nodeBuf, nodes.data(), nodeBuf.size);
-    auto globalsBuf = ctx.createBuffer(sizeof(Globals), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    ctx.upload(globalsBuf, &globalsData, sizeof(globalsData));
-    auto outputBuf =
-        ctx.createBuffer(rays.size() * 4 * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-
-    vkdemo::Buffer coverageBuf = {};
-    if (enableCoverage)
-    {
-        coverageBuf = ctx.createBuffer(
-            (size_t)counterCount * counterByteWidth,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-        std::vector<uint8_t> zero((size_t)counterCount * counterByteWidth, 0u);
-        ctx.upload(coverageBuf, zero.data(), coverageBuf.size);
-    }
-
-    VkDescriptorSet set0 = ctx.allocateDescriptorSet(pipe.setLayouts[0]);
-    ctx.writeStorageBuffer(set0, 0, rayBuf);
-    ctx.writeStorageBuffer(set0, 1, triBuf);
-    ctx.writeStorageBuffer(set0, 2, nodeBuf);
-    ctx.writeStorageBuffer(set0, 3, globalsBuf);
-    ctx.writeStorageBuffer(set0, 4, outputBuf);
-
-    std::vector<VkDescriptorSet> sets = {set0};
-    if (enableCoverage)
-    {
-        VkDescriptorSet set1 = ctx.allocateDescriptorSet(pipe.setLayouts[1]);
-        ctx.writeStorageBuffer(set1, kCoverageBinding, coverageBuf);
-        sets.push_back(set1);
-    }
-
-    std::cout << "dispatching (coverage=" << (enableCoverage ? "on" : "off") << ")\n";
-    const auto renderStart = std::chrono::steady_clock::now();
-    const uint32_t groups = (kRayCount + 63) / 64;
-    ctx.dispatch(pipe, sets, groups, 1, 1);
-    const auto renderEnd = std::chrono::steady_clock::now();
-    const double renderMs =
-        std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
-    std::cout << "render wall time: " << renderMs << " ms\n";
-
-    if (enableCoverage)
-    {
-        std::vector<uint8_t> rawBytes((size_t)counterCount * counterByteWidth);
-        ctx.download(coverageBuf, rawBytes.data(), coverageBuf.size);
-        std::vector<uint64_t> hits(counterCount, 0);
-        for (uint32_t i = 0; i < counterCount; ++i)
-        {
-            uint64_t value = 0;
-            const uint8_t* slot = rawBytes.data() + (size_t)i * counterByteWidth;
-            for (uint32_t b = 0; b < counterByteWidth; ++b)
-                value |= (uint64_t)slot[b] << (b * 8);
-            hits[i] = value;
+            coverageBuf = ctx.createBuffer(
+                (size_t)counterCount * counterByteWidth,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+            std::vector<uint8_t> zero((size_t)counterCount * counterByteWidth, 0u);
+            ctx.upload(coverageBuf, zero.data(), coverageBuf.size);
         }
 
-        auto summary = summarize(shader.coverageMetadata, hits);
-        printSummary(mode.c_str(), summary);
+        VkDescriptorSet set0 = ctx.allocateDescriptorSet(pipe.setLayouts[0]);
+        ctx.writeStorageBuffer(set0, 0, rayBuf);
+        ctx.writeStorageBuffer(set0, 1, triBuf);
+        ctx.writeStorageBuffer(set0, 2, nodeBuf);
+        ctx.writeStorageBuffer(set0, 3, globalsBuf);
+        ctx.writeStorageBuffer(set0, 4, outputBuf);
 
-        const auto outDir = getDemoDirectory();
-        writeManifest(shader.coverageMetadata, outDir / (mode + ".coverage-manifest.json"));
-        writeLcov(
-            shader.coverageMetadata,
-            hits,
-            outDir / (mode + ".lcov"),
-            ("bvh-" + mode).c_str());
-        writeCountersBinary(rawBytes, outDir / (mode + ".counters.bin"));
-        std::cout << "wrote " << (outDir / (mode + ".coverage-manifest.json")) << "\n";
-        std::cout << "wrote " << (outDir / (mode + ".lcov")) << "\n";
-        std::cout << "wrote " << (outDir / (mode + ".counters.bin")) << "\n";
+        std::vector<VkDescriptorSet> sets = {set0};
+        if (enableCoverage)
+        {
+            VkDescriptorSet set1 = ctx.allocateDescriptorSet(pipe.setLayouts[1]);
+            ctx.writeStorageBuffer(set1, kCoverageBinding, coverageBuf);
+            sets.push_back(set1);
+        }
+
+        std::cout << "dispatching (coverage=" << (enableCoverage ? "on" : "off") << ")\n";
+        const auto renderStart = std::chrono::steady_clock::now();
+        const uint32_t groups = (kRayCount + 63) / 64;
+        ctx.dispatch(pipe, sets, groups, 1, 1);
+        const auto renderEnd = std::chrono::steady_clock::now();
+        const double renderMs =
+            std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
+        std::cout << "render wall time: " << renderMs << " ms\n";
+
+        if (enableCoverage)
+        {
+            std::vector<uint8_t> rawBytes((size_t)counterCount * counterByteWidth);
+            ctx.download(coverageBuf, rawBytes.data(), coverageBuf.size);
+            std::vector<uint64_t> hits(counterCount, 0);
+            for (uint32_t i = 0; i < counterCount; ++i)
+            {
+                uint64_t value = 0;
+                const uint8_t* slot = rawBytes.data() + (size_t)i * counterByteWidth;
+                for (uint32_t b = 0; b < counterByteWidth; ++b)
+                    value |= (uint64_t)slot[b] << (b * 8);
+                hits[i] = value;
+            }
+
+            auto summary = summarize(shader.coverageMetadata, hits);
+            printSummary(mode.c_str(), summary);
+
+            const auto outDir = getDemoDirectory();
+            writeManifest(shader.coverageMetadata, outDir / (mode + ".coverage-manifest.json"));
+            writeLcov(
+                shader.coverageMetadata,
+                hits,
+                outDir / (mode + ".lcov"),
+                ("bvh-" + mode).c_str());
+            writeCountersBinary(rawBytes, outDir / (mode + ".counters.bin"));
+            std::cout << "wrote " << (outDir / (mode + ".coverage-manifest.json")) << "\n";
+            std::cout << "wrote " << (outDir / (mode + ".lcov")) << "\n";
+            std::cout << "wrote " << (outDir / (mode + ".counters.bin")) << "\n";
+        }
+
+        ctx.destroyBuffer(rayBuf);
+        ctx.destroyBuffer(triBuf);
+        ctx.destroyBuffer(nodeBuf);
+        ctx.destroyBuffer(globalsBuf);
+        ctx.destroyBuffer(outputBuf);
+        if (enableCoverage)
+            ctx.destroyBuffer(coverageBuf);
+        ctx.destroyPipeline(pipe);
+        std::cout << "done\n";
+        return 0;
     }
-
-    ctx.destroyBuffer(rayBuf);
-    ctx.destroyBuffer(triBuf);
-    ctx.destroyBuffer(nodeBuf);
-    ctx.destroyBuffer(globalsBuf);
-    ctx.destroyBuffer(outputBuf);
-    if (enableCoverage)
-        ctx.destroyBuffer(coverageBuf);
-    ctx.destroyPipeline(pipe);
-    std::cout << "done\n";
-    return 0;
+    catch (const std::exception& e)
+    {
+        std::cerr << "fatal: " << e.what() << "\n";
+        return 1;
+    }
 }

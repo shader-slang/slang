@@ -382,11 +382,15 @@ inline void Context::destroyBuffer(Buffer& b)
 
 inline void Context::upload(Buffer& b, const void* data, VkDeviceSize size)
 {
+    if (size > b.size)
+        throw std::runtime_error("upload size exceeds buffer size");
     std::memcpy(b.mapped, data, size_t(size));
 }
 
 inline void Context::download(Buffer& b, void* data, VkDeviceSize size)
 {
+    if (size > b.size)
+        throw std::runtime_error("download size exceeds buffer size");
     std::memcpy(data, b.mapped, size_t(size));
 }
 
@@ -497,7 +501,7 @@ inline void Context::dispatch(
     VkCommandBufferBeginInfo bi = {};
     bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(cmd, &bi);
+    check(vkBeginCommandBuffer(cmd, &bi), "vkBeginCommandBuffer");
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline);
     vkCmdBindDescriptorSets(
