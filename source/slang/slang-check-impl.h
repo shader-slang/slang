@@ -787,6 +787,36 @@ struct SharedSemanticsContext : public RefObject
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
 
+    // Whether builtin operators follow GLSL semantics in this checking session (see
+    // `SemanticsExprVisitor::isGLSLOperatorScope`). Computed lazily on first query and cached
+    // here because the builtin-operator fast path consults it for every operator expression.
+    // -1 = not yet computed, 0 = false, 1 = true.
+    int8_t m_isGLSLOperatorScopeCache = -1;
+
+public:
+    /// Is the current checking session in GLSL operator scope (`-allow-glsl` or `import glsl;`)?
+    /// Computed once and cached.
+    bool isGLSLOperatorScope()
+    {
+        if (m_isGLSLOperatorScopeCache < 0)
+        {
+            bool result = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
+            if (!result)
+            {
+                for (auto moduleDecl : importedModulesList)
+                {
+                    if (moduleDecl->getName() && getText(moduleDecl->getName()) == "glsl")
+                    {
+                        result = true;
+                        break;
+                    }
+                }
+            }
+            m_isGLSLOperatorScopeCache = result ? 1 : 0;
+        }
+        return m_isGLSLOperatorScopeCache != 0;
+    }
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,

@@ -1973,6 +1973,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             return LoweredValInfo::simple(builder->emitConstexprShr(resType, args[0], args[1]));
         case BuiltinOperationKind::Not:
             return LoweredValInfo::simple(builder->emitConstexprNot(resType, args[0]));
+        case BuiltinOperationKind::Unknown:
+            break;
         }
         SLANG_UNIMPLEMENTED_X("BuiltinOperationIntVal lowering");
     }
@@ -5354,6 +5356,11 @@ struct ExprLoweringContext
             break;
         case BuiltinOperationKind::Rsh:
             op = kIROp_Rsh;
+            break;
+        case BuiltinOperationKind::Unknown:
+            // `convertToBuiltinArithmeticOp` never produces a `BuiltinOperatorExpr` for an
+            // operator with no builtin form, so a node with `Unknown` should not exist.
+            SLANG_UNEXPECTED("BuiltinOperatorExpr with Unknown operation kind");
             break;
         }
         return LoweredValInfo::simple(

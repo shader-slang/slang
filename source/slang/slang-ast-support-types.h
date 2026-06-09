@@ -1897,18 +1897,28 @@ FIDDLE() namespace Slang
         Lsh,
         Rsh,
         Not,
+        // Sentinel for "not a builtin fast-path operator" (e.g. `&&`/`||`). Never stored on a
+        // node and never serialized, so it is kept last to preserve the append-only integer
+        // values of the real operators above.
+        Unknown,
+    };
+
+    // Whether an operator is being applied to one operand or two; disambiguates the prefix `-`
+    // (Neg) from the binary `-` (Sub) in `getBuiltinOperationKindFromString`.
+    enum class OperatorArity
+    {
+        Unary,
+        Binary,
     };
 
     // Operator-name text for a `BuiltinOperationKind` (e.g. `Add` -> "+"); used for `toText`
     // and mangling so a `BuiltinOperationIntVal` is identified consistently.
     UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op);
 
-    // Map an operator-name + arity to a `BuiltinOperationKind`. Returns false for operators
-    // that don't have a builtin fast-path form (e.g. `&&`/`||`). `isUnary` disambiguates the
-    // prefix `-` (Neg) from the binary `-` (Sub).
-    bool findBuiltinOperationKind(
+    // Map an operator-name + arity to a `BuiltinOperationKind`, or `Unknown` for operators
+    // that have no builtin fast-path form (e.g. `&&`/`||`).
+    BuiltinOperationKind getBuiltinOperationKindFromString(
         UnownedStringSlice opText,
-        bool isUnary,
-        BuiltinOperationKind& out);
+        OperatorArity arity);
 
 } // namespace Slang

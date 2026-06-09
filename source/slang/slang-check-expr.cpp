@@ -2770,9 +2770,9 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
 
     // Fall back to the decl's stored, serializable folded value (substituted for this
     // declRef) when there is no initializer expression to fold, or when re-folding it
-    // fails. The stored `val` (e.g. a `BuiltinOperationIntVal`) round-trips through
-    // serialization and folds correctly under substitution, so this is a robust safety net
-    // for imported (cross-module) initializers whose expression form does not re-fold.
+    // fails. The stored `val` round-trips through serialization and folds correctly under
+    // substitution, so this is a robust safety net for imported (cross-module) initializers
+    // whose expression form does not re-fold.
     auto foldFromStoredVal = [&]() -> IntVal*
     {
         if (auto storedVal = decl->val)
@@ -4450,14 +4450,7 @@ Expr* SemanticsExprVisitor::visitSelectExpr(SelectExpr* expr)
 
 bool SemanticsExprVisitor::isGLSLOperatorScope()
 {
-    if (getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL))
-        return true;
-    for (auto moduleDecl : getShared()->importedModulesList)
-    {
-        if (moduleDecl->getName() && getText(moduleDecl->getName()) == "glsl")
-            return true;
-    }
-    return false;
+    return getShared()->isGLSLOperatorScope();
 }
 
 // Decompose a builtin numeric type into (base element type, shape). `outRows`/`outCols`
@@ -4521,27 +4514,26 @@ static BaseType _getBuiltinCommonBaseType(BaseType a, BaseType b)
 
 Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
 {
-    // GLSL-compatibility scope (`-allow-glsl` or an `import glsl;`) only changes the
-    // semantics of a *subset* of builtin operators, which are owned by the `glsl` module's
-    // overloads: `mat * mat` (and matrix/vector products) is an algebraic product rather than
-    // a component-wise op, and `vec == vec` / `vec != vec` yields a scalar `bool`
-    // (all-components-equal) rather than a `vector<bool,N>`. The fast path therefore bails in
-    // GLSL scope only for those cases (matrix operands, and vector equality); scalar and
-    // vector arithmetic/comparison are identical to HLSL and stay fast-pathed -- which also
-    // keeps scalar constant folding going through `BuiltinOperationIntVal` in every scope.
+    // Recognize a builtin arithmetic (`+ - * / %`), comparison (`< > <= >=`), equality
+    // (`== !=`), bitwise/shift (`& | ^ << >>`), or unary (`- ! ~`) operator on builtin
+    // integer/floating-point/bool scalar, vector, or matrix operands, and rewrite it to a
+    // `BuiltinOperatorExpr` (carrying the resolved `BuiltinOperationKind`) for direct IR
+    // lowering / constant folding, skipping generic `operator OP` overload resolution. Returns
+    // null to leave the expression for normal resolution. The operator-name is mapped to a
+    // `BuiltinOperationKind` once (here), and everything downstream keys off the kind.
 
-    // Unary prefix operators on a builtin scalar/vector/matrix operand: `-x` (negate),
-    // `!x` (logical not, bool operand), `~x` (bitwise not, integer operand). Same idea as
-    // the binary case below; handled separately because there is a single operand.
+    // Unary prefix operators: `-x` (negate), `!x` (logical-not, bool), `~x` (bitwise-not, int).
     if (as<PrefixExpr>(expr) && expr->arguments.getCount() == 1)
     {
         auto uVarExpr = as<VarExpr>(expr->functionExpr);
         if (!uVarExpr || !uVarExpr->name)
             return nullptr;
-        auto uOpText = getText(uVarExpr->name);
-        bool isNeg = (uOpText == "-");
-        bool isLogicalNot = (uOpText == "!");
-        bool isBitNot = (uOpText == "~");
+        auto uKind = getBuiltinOperationKindFromString(
+            getText(uVarExpr->name).getUnownedSlice(),
+            OperatorArity::Unary);
+        bool isNeg = (uKind == BuiltinOperationKind::Neg);
+        bool isLogicalNot = (uKind == BuiltinOperationKind::Not);
+        bool isBitNot = (uKind == BuiltinOperationKind::BitNot);
         if (!isNeg && !isLogicalNot && !isBitNot)
             return nullptr;
 
@@ -4549,7 +4541,8 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         if (!arg->type.type)
             return nullptr;
         Type* uOperandType = arg->type.type;
-        // Bail on matrix operands in GLSL scope (see above).
+        // In GLSL operator scope the `glsl` module owns matrix operator semantics, so leave
+        // matrix operands to normal resolution (see the binary case for the full rationale).
         if (isGLSLOperatorScope() && as<MatrixExpressionType>(uOperandType))
             return nullptr;
         Type* uElementType = uOperandType;
@@ -4570,9 +4563,6 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         if (!uEligible)
             return nullptr;
 
-        BuiltinOperationKind uKind;
-        if (!findBuiltinOperationKind(uOpText.getUnownedSlice(), /*isUnary*/ true, uKind))
-            return nullptr;
         auto node = m_astBuilder->create<BuiltinOperatorExpr>();
         node->op = uKind;
         node->arguments.add(arg);
@@ -4592,24 +4582,31 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     auto varExpr = as<VarExpr>(expr->functionExpr);
     if (!varExpr || !varExpr->name)
         return nullptr;
-    auto opText = getText(varExpr->name);
+    auto kind = getBuiltinOperationKindFromString(
+        getText(varExpr->name).getUnownedSlice(),
+        OperatorArity::Binary);
 
-    bool isArithmetic =
-        (opText == "+" || opText == "-" || opText == "*" || opText == "/" || opText == "%");
-    bool isComparison =
-        (opText == "==" || opText == "!=" || opText == "<" || opText == ">" || opText == "<=" ||
-         opText == ">=");
-    bool isBitwise =
-        (opText == "&" || opText == "|" || opText == "^" || opText == "<<" || opText == ">>");
+    // Classify the operator by kind (enum, not text). `Unknown` covers operators with no
+    // builtin fast-path form, notably the short-circuiting `&&`/`||`.
+    bool isArithmetic = kind == BuiltinOperationKind::Add || kind == BuiltinOperationKind::Sub ||
+                        kind == BuiltinOperationKind::Mul || kind == BuiltinOperationKind::Div ||
+                        kind == BuiltinOperationKind::Mod;
+    bool isComparison = kind == BuiltinOperationKind::Eql || kind == BuiltinOperationKind::Neq ||
+                        kind == BuiltinOperationKind::Less ||
+                        kind == BuiltinOperationKind::Greater ||
+                        kind == BuiltinOperationKind::Leq || kind == BuiltinOperationKind::Geq;
+    bool isBitwise = kind == BuiltinOperationKind::BitAnd || kind == BuiltinOperationKind::BitOr ||
+                     kind == BuiltinOperationKind::BitXor || kind == BuiltinOperationKind::Lsh ||
+                     kind == BuiltinOperationKind::Rsh;
     if (!isArithmetic && !isComparison && !isBitwise)
         return nullptr;
+    bool isEquality = kind == BuiltinOperationKind::Eql || kind == BuiltinOperationKind::Neq;
+    bool isShift = kind == BuiltinOperationKind::Lsh || kind == BuiltinOperationKind::Rsh;
 
     auto leftArg = expr->arguments[0];
     auto rightArg = expr->arguments[1];
     if (!leftArg->type.type || !rightArg->type.type)
         return nullptr;
-
-    bool isEquality = (opText == "==" || opText == "!=");
 
     // GLSL operator scope only overrides matrix operators (algebraic products) and vector
     // equality (`vec == vec` / `!=` -> scalar `bool`); bail to normal resolution for those so
@@ -4627,7 +4624,6 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
             return nullptr;
     }
 
-    bool isShift = (opText == "<<" || opText == ">>");
     Type* operandType = leftArg->type.type;
     if (!leftArg->type.type->equals(rightArg->type.type))
     {
@@ -4738,14 +4734,11 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         resultType = QualType(operandType);
     }
 
-    // Resolve the operator-name to a `BuiltinOperationKind` exactly once, here, and produce a
-    // dedicated `BuiltinOperatorExpr`. Every downstream consumer (IR lowering, constant
-    // folding via `BuiltinOperationIntVal`, for-loop trip-count inference) reads the kind from
-    // the node rather than re-parsing the operator name. The original `InvokeExpr`'s
-    // (already-checked, possibly element-coerced) operands are carried over verbatim.
-    BuiltinOperationKind kind;
-    if (!findBuiltinOperationKind(opText.getUnownedSlice(), /*isUnary*/ false, kind))
-        return nullptr;
+    // Produce a dedicated `BuiltinOperatorExpr` carrying the `kind` resolved at the top of this
+    // function. Every downstream consumer (IR lowering, constant folding via
+    // `BuiltinOperationIntVal`, for-loop trip-count inference) reads the kind from the node
+    // rather than re-parsing the operator name. The original `InvokeExpr`'s (already-checked,
+    // possibly element-coerced) operands are carried over verbatim.
     auto node = m_astBuilder->create<BuiltinOperatorExpr>();
     node->op = kind;
     node->arguments.add(leftArg);

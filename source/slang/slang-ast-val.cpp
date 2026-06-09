@@ -2125,12 +2125,10 @@ Val* FuncCallIntVal::_resolveImplOverride()
     return resolvedVal;
 }
 
-// Fold a constant integer shift consistently for every `Val` path that can represent a
-// shift (`FuncCallIntVal` from resolved operator overloads, `BuiltinOperationIntVal` from the
-// builtin-operator fast path). Negative counts leave the value symbolic (returns false);
+// Fold a constant integer shift. Negative counts leave the value symbolic (returns false);
 // out-of-range counts are masked to the operand width, matching common hardware behavior and
-// avoiding C++ undefined behavior. Folding `x << y` therefore produces the same constant
-// regardless of which path reaches it, so the two representations stay `Val::equals`-equal.
+// avoiding C++ undefined behavior. Shared by every constant-folding path so `x << y` produces
+// the same constant regardless of which path reaches it.
 static bool _tryFoldConstantShift(
     IntegerLiteralValue base,
     IntegerLiteralValue count,
@@ -2357,54 +2355,58 @@ UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op)
         return toSlice(">>");
     case BuiltinOperationKind::Not:
         return toSlice("!");
+    case BuiltinOperationKind::Unknown:
+        break;
     }
-    // Every `BuiltinOperationKind` must have op text (it feeds `toText` and mangling); a
-    // missing case is a bug, not a silently-"?" operator.
+    // Every real `BuiltinOperationKind` must have op text (it feeds `toText` and mangling); a
+    // missing case (or the `Unknown` sentinel reaching here) is a bug, not a silently-"?"
+    // operator.
     SLANG_UNEXPECTED("unhandled BuiltinOperationKind in getBuiltinOperationOpText");
     UNREACHABLE_RETURN(toSlice("?"));
 }
 
-bool findBuiltinOperationKind(UnownedStringSlice opText, bool isUnary, BuiltinOperationKind& out)
+BuiltinOperationKind getBuiltinOperationKindFromString(
+    UnownedStringSlice opText,
+    OperatorArity arity)
 {
+    const bool isUnary = (arity == OperatorArity::Unary);
     if (opText == toSlice("+"))
-        out = BuiltinOperationKind::Add;
-    else if (opText == toSlice("-"))
-        out = isUnary ? BuiltinOperationKind::Neg : BuiltinOperationKind::Sub;
-    else if (opText == toSlice("*"))
-        out = BuiltinOperationKind::Mul;
-    else if (opText == toSlice("/"))
-        out = BuiltinOperationKind::Div;
-    else if (opText == toSlice("%"))
-        out = BuiltinOperationKind::Mod;
-    else if (opText == toSlice("~"))
-        out = BuiltinOperationKind::BitNot;
-    else if (opText == toSlice("!"))
-        out = BuiltinOperationKind::Not;
-    else if (opText == toSlice("=="))
-        out = BuiltinOperationKind::Eql;
-    else if (opText == toSlice("!="))
-        out = BuiltinOperationKind::Neq;
-    else if (opText == toSlice("<"))
-        out = BuiltinOperationKind::Less;
-    else if (opText == toSlice(">"))
-        out = BuiltinOperationKind::Greater;
-    else if (opText == toSlice("<="))
-        out = BuiltinOperationKind::Leq;
-    else if (opText == toSlice(">="))
-        out = BuiltinOperationKind::Geq;
-    else if (opText == toSlice("&"))
-        out = BuiltinOperationKind::BitAnd;
-    else if (opText == toSlice("|"))
-        out = BuiltinOperationKind::BitOr;
-    else if (opText == toSlice("^"))
-        out = BuiltinOperationKind::BitXor;
-    else if (opText == toSlice("<<"))
-        out = BuiltinOperationKind::Lsh;
-    else if (opText == toSlice(">>"))
-        out = BuiltinOperationKind::Rsh;
-    else
-        return false;
-    return true;
+        return BuiltinOperationKind::Add;
+    if (opText == toSlice("-"))
+        return isUnary ? BuiltinOperationKind::Neg : BuiltinOperationKind::Sub;
+    if (opText == toSlice("*"))
+        return BuiltinOperationKind::Mul;
+    if (opText == toSlice("/"))
+        return BuiltinOperationKind::Div;
+    if (opText == toSlice("%"))
+        return BuiltinOperationKind::Mod;
+    if (opText == toSlice("~"))
+        return BuiltinOperationKind::BitNot;
+    if (opText == toSlice("!"))
+        return BuiltinOperationKind::Not;
+    if (opText == toSlice("=="))
+        return BuiltinOperationKind::Eql;
+    if (opText == toSlice("!="))
+        return BuiltinOperationKind::Neq;
+    if (opText == toSlice("<"))
+        return BuiltinOperationKind::Less;
+    if (opText == toSlice(">"))
+        return BuiltinOperationKind::Greater;
+    if (opText == toSlice("<="))
+        return BuiltinOperationKind::Leq;
+    if (opText == toSlice(">="))
+        return BuiltinOperationKind::Geq;
+    if (opText == toSlice("&"))
+        return BuiltinOperationKind::BitAnd;
+    if (opText == toSlice("|"))
+        return BuiltinOperationKind::BitOr;
+    if (opText == toSlice("^"))
+        return BuiltinOperationKind::BitXor;
+    if (opText == toSlice("<<"))
+        return BuiltinOperationKind::Lsh;
+    if (opText == toSlice(">>"))
+        return BuiltinOperationKind::Rsh;
+    return BuiltinOperationKind::Unknown;
 }
 
 void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)

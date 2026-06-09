@@ -257,9 +257,9 @@ class FuncCallIntVal : public IntVal
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
-// `BuiltinOperationKind` and its helpers (`getBuiltinOperationOpText` / `findBuiltinOperationKind`)
-// are declared in slang-ast-support-types.h, since they are shared with the AST-level
-// `BuiltinOperatorExpr` node.
+// `BuiltinOperationKind` and its helpers (`getBuiltinOperationOpText` /
+// `getBuiltinOperationKindFromString`) are declared in slang-ast-support-types.h, since they are
+// shared with the AST-level `BuiltinOperatorExpr` node.
 
 // A compile-time integer that is the result of a builtin operator applied to operands that
 // are not all concrete yet (e.g. `N / 2` for a generic value parameter `N`). Unlike
