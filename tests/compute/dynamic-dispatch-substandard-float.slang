@@ -1,6 +1,6 @@
 // Test using interface typed shader parameters with texture typed fields.
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-features fp8
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -render-features fp8
 
 [anyValueSize(4)]
 interface IFoo

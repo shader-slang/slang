@@ -947,6 +947,7 @@ function buildCharts(hours) {{
       backgroundColor: 'rgba(255,193,7,0.0)',
       fill: false,
       tension: 0.3,
+      stack: 'queued',
     }});
     hostedDatasets.push({{
       label: 'Cap (' + hostedRunnerChart.cap + ')',

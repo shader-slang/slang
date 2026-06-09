@@ -279,6 +279,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             slang-llvm
             copy-dxcompiler
             copy-dxil
+            stage-dxc-headers
             copy-webgpu_dawn
             copy-slang-tint
         FOLDER test
@@ -396,6 +397,17 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         FOLDER test/tools
     )
 
+    if(SLANG_HAS_WEBGPU_SUPPORT AND CMAKE_SYSTEM_NAME MATCHES "Linux|Darwin")
+        # slang-rhi loads Dawn from the directory containing the module/executable that
+        # contains RHI. Put render-test beside the runtime sidecar libraries in WGPU builds.
+        set_target_properties(
+            render-test
+            PROPERTIES
+                LIBRARY_OUTPUT_DIRECTORY
+                    "${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}"
+        )
+    endif()
+
     slang_add_target(
         slang-unit-test
         MODULE
@@ -405,9 +417,29 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             SLANG_NO_DEPRECATION
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
+        INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/source
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools
+    )
+    # slang-repro-validator.cpp is part of the slang DLL's normal source set, but
+    # isReproStateValid() is a free function in namespace Slang with no SLANG_API
+    # export annotation, so it is not visible from outside the DLL. The unit tests
+    # call it directly, so compile the .cpp again into this module without
+    # publishing an internal validator as part of the stable public ABI.
+    target_sources(
+        slang-unit-test
+        PRIVATE ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+    )
+    # The unit tests include internal slang headers (e.g. slang-repro.h) that
+    # transitively pull in FIDDLE / capability generated headers. The `slang`
+    # target consumes these as PRIVATE link dependencies so their include
+    # directories do not propagate; expose them here so the unit test compiles.
+    target_include_directories(
+        slang-unit-test
+        PRIVATE
+            $<TARGET_PROPERTY:slang-capability-defs,INTERFACE_INCLUDE_DIRECTORIES>
+            $<TARGET_PROPERTY:slang-fiddle-output,INTERFACE_INCLUDE_DIRECTORIES>
     )
     slang_add_target(
         slang-reflection-test

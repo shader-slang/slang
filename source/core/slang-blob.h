@@ -8,6 +8,7 @@
 #include "slang-string.h"
 #include "slang.h"
 
+#include <limits>
 #include <stdarg.h>
 
 namespace Slang
@@ -146,8 +147,22 @@ public:
     /// Allocate size including a 0 byte at `size`.
     void* allocateTerminated(size_t size)
     {
-        SLANG_ASSUME(size != std::numeric_limits<size_t>::max());
+        if (size == std::numeric_limits<size_t>::max())
+        {
+            deallocate();
+            return nullptr;
+        }
+
         uint8_t* data = (uint8_t*)allocate(size + 1);
+        if (!data)
+        {
+            // allocate() updates m_sizeInBytes/m_capacityInBytes even when
+            // ::malloc returns nullptr; reset to a fully deallocated state
+            // so callers don't see inconsistent sizes alongside a null buffer.
+            deallocate();
+            return nullptr;
+        }
+
         data[size] = 0;
         m_sizeInBytes = size;
         return data;
@@ -272,21 +287,55 @@ public:
     }
 
     /// Create a blob that will retain (a copy of) raw data.
+    /// Returns null if allocation fails.
     static inline ComPtr<ISlangBlob> create(void const* inData, size_t size)
     {
-        return ComPtr<ISlangBlob>(new RawBlob(inData, size));
+        ComPtr<ISlangBlob> blob;
+        if (SLANG_FAILED(tryCreate(inData, size, blob)))
+        {
+            return nullptr;
+        }
+        return blob;
+    }
+
+    /// Create a blob that will retain (a copy of) raw data.
+    static inline SlangResult tryCreate(
+        void const* inData,
+        size_t size,
+        ComPtr<ISlangBlob>& outBlob)
+    {
+        if (size > 0 && !inData)
+        {
+            outBlob.setNull();
+            return SLANG_E_INVALID_ARG;
+        }
+
+        RawBlob* blob = new RawBlob;
+        if (!blob->init(inData, size))
+        {
+            delete blob;
+            outBlob.setNull();
+            return SLANG_E_OUT_OF_MEMORY;
+        }
+
+        outBlob = ComPtr<ISlangBlob>(blob);
+        return SLANG_OK;
     }
 
 protected:
-    // Ctor
-    // NOTE! Takes a copy of the input data
-    RawBlob(const void* data, size_t size)
+    bool init(const void* data, size_t size)
     {
-        m_data.allocateTerminated(size);
+        void* dst = m_data.allocateTerminated(size);
+        if (!dst)
+        {
+            return false;
+        }
+
         if (size > 0)
         {
-            memcpy(m_data.getData(), data, size);
+            memcpy(dst, data, size);
         }
+        return true;
     }
 
     void* getObject(const Guid& guid);

@@ -73,8 +73,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     else if (idx == 8)
     {
         // Should be 1. Shows decimal literals can represent INT64_MIN or 0x8000000000000000.
-        // Warning will be emitted as negative(-) is scanned separately in the lexer, and the positive
-        // literal portion will emit a warning.
+        // No warning will be emitted here, since -9223372036854775808 and -2147483648 are
+        // handled as exceptional cases for better quality of life.
+        //
         // The final value must be correctly set as INT64_MIN and must be negative.
         if (-9223372036854775808 < 0L)
         {
@@ -84,13 +85,15 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         {
             v = 0;
         }
-        //CHK: warning[E40004]: integer literal is too large to be represented in a signed integer type, interpreting as unsigned
     }
     else
     {
-        // Shoud be 0xfaaaaaaabaaaaaaa. Shows hexadecimal literals can represent unsigned 64-bit integers.
+        // Should be 0xfaaaaaaabaaaaaaa. Shows hexadecimal literals can represent unsigned 64-bit integers.
         v = 0xfaaaaaaabaaaaaaa;
     }
-    
+
     outputBuffer[idx] = v;
 }
+
+//CHK: result code = 0
+//CHK-NOT: warning

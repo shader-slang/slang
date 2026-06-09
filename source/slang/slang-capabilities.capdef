@@ -391,6 +391,10 @@ alias cpp_hlsl = cpp | hlsl;
 /// [Compound]
 alias cuda_glsl_hlsl = cuda | glsl | hlsl;
 
+/// CUDA, GLSL, and NVAPI code-gen targets
+/// [Compound]
+alias cuda_glsl_nvapi = cuda | glsl | hlsl_nvapi;
+
 /// CUDA, HLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias cuda_hlsl_metal_spirv = cuda | hlsl | metal | spirv;
@@ -1319,9 +1323,10 @@ def ser_hlsl_native : _sm_6_9;
 alias ser_dxr = raytracing + ser_hlsl_native;
 
 /// Capabilities needed for shader-execution-reordering (all paths)
-/// Includes NVIDIA-specific (NV), cross-vendor standard (EXT), DXR 1.3 native, and CUDA paths
+/// Defaults SPIR-V/GLSL to the cross-vendor standard EXT path; explicit NV still satisfies this
+/// through the NV-to-EXT capability hierarchy. Use ser_nv for APIs that require NV opcodes.
 /// [Compound]
-alias ser = raytracing + GL_NV_shader_invocation_reorder | raytracing + GL_EXT_shader_invocation_reorder | ser_nvapi | ser_dxr | cuda;
+alias ser = raytracing + GL_EXT_shader_invocation_reorder | ser_nvapi | ser_dxr | cuda;
 
 /// NVIDIA-specific SER capabilities (excludes cross-vendor EXT)
 /// Includes GL_NV_shader_invocation_reorder (GLSL/SPIRV) and CUDA paths
@@ -1743,7 +1748,7 @@ alias sm_6_0_version = _sm_6_0
 /// Includes related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_0 = sm_6_0_version
-             |  GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_shuffle + GL_KHR_shader_subgroup_arithmetic + GL_KHR_shader_subgroup_quad + GL_KHR_shader_subgroup_vote
+             |  GL_KHR_shader_subgroup_basic + GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_shuffle + GL_KHR_shader_subgroup_arithmetic + GL_KHR_shader_subgroup_quad + GL_KHR_shader_subgroup_vote
              // previous
              | sm_5_1
              ;
@@ -2355,9 +2360,16 @@ alias texture_querylod = texture_sm_4_1 | GL_EXT_texture_query_lod;
 /// Capabilities required to query texture level info
 /// [Compound]
 alias texture_querylevels = texture_sm_4_1 | GL_ARB_texture_query_levels;
-/// Capabilities required to query shadow texture lod info
+/// Capabilities required for shadow texture LOD sampling on types
+/// natively supported by GLSL 1.50 (sampler1DShadow, sampler1DArrayShadow,
+/// sampler2DShadow).
 /// [Compound]
 alias texture_shadowlod = texture_sm_4_1;
+/// Capabilities required for shadow texture LOD sampling on types
+/// that need GL_EXT_texture_shadow_lod (sampler2DArrayShadow, samplerCubeShadow,
+/// samplerCubeArrayShadow).
+/// [Compound]
+alias texture_shadowlod_ext = texture_sm_4_1 | GL_EXT_texture_shadow_lod;
 /// Capabilities required for shadow texture sampling with bias and gradients.
 /// New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 /// [Compound]

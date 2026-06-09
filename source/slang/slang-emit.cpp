@@ -545,6 +545,8 @@ void calcRequiredLoweringPassSet(
             result.nonVectorCompositeSelect = true;
         break;
     case kIROp_IncrementCoverageCounter:
+    case kIROp_IncrementFunctionCoverageCounter:
+    case kIROp_IncrementBranchCoverageCounter:
         result.coverageTracing = true;
         break;
     }
@@ -937,7 +939,7 @@ Result linkAndOptimizeIR(
 
     // Create the post-emit metadata object up-front so that IR passes
     // that need to record reportable data (e.g. `instrumentCoverage`'s
-    // slot → source mapping) can write into it directly. `collectMetadata`
+    // source-entry mapping) can write into it directly. `collectMetadata`
     // later fills in binding / exported-function fields.
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
@@ -982,14 +984,6 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(translateEntryPointInParamToBorrow, sink);
 
-    if (requiredLoweringPassSet.globalVaryingVar)
-        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
-
-    if (requiredLoweringPassSet.resolveVaryingInputRef)
-        SLANG_PASS(resolveVaryingInputRef);
-
-    SLANG_PASS(fixEntryPointCallsites);
-
     // Replace any global constants with their values.
     //
     SLANG_PASS(replaceGlobalConstants);
@@ -1028,14 +1022,14 @@ Result linkAndOptimizeIR(
     // Shader coverage instrumentation. The pass synthesizes
     // `__slang_coverage` as an `IRGlobalParam` directly in the
     // linked program IR, extends the program-scope var layout, and
-    // rewrites counter ops to atomic adds. Runs BEFORE
+    // rewrites coverage marker ops to atomic adds. Runs BEFORE
     // `collectGlobalUniformParameters` so the synthesized buffer
     // gets packed into `GlobalParams` alongside user globals on
     // targets that pack ordinary uniforms (CPU, CUDA).
     //
-    // Counter ops carry source position on their built-in `sourceLoc`,
+    // Coverage markers carry source position on their built-in `sourceLoc`,
     // so this pass is independent of debug-info state. It writes its
-    // slot → source mapping into `metadata`, exposed to hosts via
+    // source-entry mapping into `metadata`, exposed to hosts via
     // ICoverageTracingMetadata.
     if (requiredLoweringPassSet.coverageTracing)
     {
@@ -1086,7 +1080,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(
             instrumentCoverage,
             sink,
-            codeGenContext->shouldTraceCoverage(),
+            codeGenContext->shouldTraceAnyCoverage(),
             explicitBinding,
             explicitSpace,
             reservedSpaces.getBuffer(),
@@ -1187,7 +1181,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(
             finalizeCoverageInstrumentationMetadata,
             sink,
-            codeGenContext->shouldTraceCoverage(),
+            codeGenContext->shouldTraceAnyCoverage(),
             outLinkedIR.globalScopeVarLayout,
             targetRequest,
             *metadata);
@@ -1876,7 +1870,9 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HLSL:
             {
-                auto profile = codeGenContext->getTargetProgram()->getOptionSet().getProfile();
+                auto profile = getEffectiveTargetProfile(
+                    targetProgram->getTargetReq(),
+                    targetProgram->getOptionSet());
                 if (profile.getFamily() == ProfileFamily::DX)
                 {
                     if (profile.getVersion() <= ProfileVersion::DX_5_0)
@@ -1952,6 +1948,18 @@ Result linkAndOptimizeIR(
         SLANG_PASS(resolveTextureFormat);
         break;
     }
+
+    // Specialization can expose references to global varying builtins that were
+    // previously hidden behind generic/interface dispatch. Translate all global
+    // varying inputs/outputs now, after specialization, but before target
+    // entry-point legalization.
+    if (requiredLoweringPassSet.globalVaryingVar)
+        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
+
+    if (requiredLoweringPassSet.resolveVaryingInputRef)
+        SLANG_PASS(resolveVaryingInputRef);
+
+    SLANG_PASS(fixEntryPointCallsites);
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
@@ -2362,6 +2370,73 @@ Result linkAndOptimizeIR(
     // Run a final round of simplifications to clean up unused things after phi-elimination.
     SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
 
+    // Metal rejects pointer-to-pointer types in buffer pointee types (e.g.
+    // `device int* device*` as a struct field in a [[buffer(N)]] binding).
+    //
+    // Required predecessors:
+    //   (a) specializeAddressSpaceForMetal — needs real pointer types
+    //   (b) the main lowerBufferElementTypeToStorageType — matrix/bool
+    //       fields must already be lowered
+    //   (c) the main eliminatePhis — so the late eliminatePhis below
+    //       only processes phis introduced by this pass
+    //
+    // Metal buffer element types go through three lowerBufferElementTypeToStorageType
+    // invocations:
+    //   1. MetalParameterBlock (~line 1606): resource fields -> DescriptorHandle
+    //   2. Default/Khronos (~line 2225): matrix/bool -> lowered representations
+    //   3. MetalPointerLowering (here): pointer fields -> UIntPtr
+    // Each can decorate types with [PhysicalType]; pass 3 uses
+    // shouldSkipPhysicalTypes = false to re-process types from passes 1 and 2.
+    //
+    // This does not conflict with the earlier MetalParameterBlock run
+    // because they target orthogonal field kinds within the same types:
+    // that pass converts resource fields to DescriptorHandle; this one
+    // converts pointer fields to UIntPtr (shouldSkipPhysicalTypes returns
+    // false to re-process types already decorated by that earlier pass).
+    //
+    // Safety: this sequence is safe to run in every Metal compilation,
+    // even when no pointer fields are present. processModule scans all
+    // global buffer types; if needsElementLowering returns false for all
+    // of them, no types are created and no IR is modified, making the
+    // subsequent passes no-ops on unchanged IR.
+    if (isMetalTarget(targetRequest))
+    {
+        BufferElementTypeLoweringOptions metalPtrOptions;
+        metalPtrOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::MetalPointerLowering;
+        SLANG_PASS(lowerBufferElementTypeToStorageType, targetProgram, metalPtrOptions);
+
+        // Materialize the [ForceInline] pack/unpack helpers the pass
+        // creates. This is a module-wide call, but at this point in the
+        // pipeline all prior [ForceInline] functions have already been
+        // inlined and removed by the earlier performForceInlining call.
+        // The only remaining [ForceInline] functions are the pack/unpack
+        // helpers just created above.
+        SLANG_PASS(performForceInlining);
+
+        // The loop-based pack/unpack for large arrays (>kMaxArraySizeToUnroll)
+        // introduces block parameters via emitLoopBlocks. Since the main
+        // eliminatePhis already ran, these new phis must be eliminated
+        // before emission.
+        //
+        // Liveness is disabled because liveness markers serve downstream
+        // GLSL targets via applyGLSLLiveness; Metal does not consume them,
+        // and the markers were already finalized before the main
+        // eliminatePhis. LivenessMode::Disabled skips marker insertion;
+        // it does not strip or invalidate markers placed by earlier passes.
+        PhiEliminationOptions phiEliminationOptions;
+        SLANG_PASS(eliminatePhis, LivenessMode::Disabled, phiEliminationOptions);
+
+        // Address-space specialization is not re-run here — it already
+        // executed against the original typed IR and must not see the
+        // lowered UIntPtr types. eliminateMultiLevelBreak is unnecessary
+        // because the generated loops are single-level. Full simplifyIR
+        // (which includes constructSSA) is counterproductive because
+        // eliminatePhis just took the IR out of SSA form — the emitter
+        // expects non-SSA IR at this point.
+        SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
+    }
+
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
     // reflect the IR that code is generated from as closely as possible.
@@ -2470,7 +2545,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     else
     {
         desc.entryPointStage = Stage::Unknown;
-        desc.effectiveProfile = targetProgram->getOptionSet().getProfile();
+        desc.effectiveProfile =
+            getEffectiveTargetProfile(targetRequest, targetProgram->getOptionSet());
     }
     desc.sourceWriter = &sourceWriter;
 

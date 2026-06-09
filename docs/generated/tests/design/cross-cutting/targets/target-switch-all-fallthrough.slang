@@ -1,0 +1,56 @@
+//META: generated=true
+//META: model=claude-opus-4-7
+//META: generated_at=2026-05-21T00:00:00+00:00
+//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: doc_ref=docs/generated/design/cross-cutting/targets.md#how-target-choice-affects-ir
+//META: doc_section_digest=96146019aaea16661ac66159cf8328c2ae1406fa65d0708df73480a207c02e9c
+//META: purpose=A `__target_switch` where every text-emit target's case falls through to a single shared body still has its body selected by `slang-ir-specialize-target-switch.cpp` for each target.
+//META: intent=boundary
+//META: pipeline_stage=ir-pass
+//META: warning=Auto-generated. May drift from source. Do not edit by hand.
+
+// `__target_switch` boundary: all cases fall through to one shared
+// body. The doc's specialization pass entry says the switch resolves
+// against the active TargetRequest; the all-fallthrough shape stresses
+// the IR pass's case-merging path. Each text-emit target should see
+// the same constant in its emitted source.
+
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
+
+int shared()
+{
+    __target_switch
+    {
+    case hlsl:
+    case glsl:
+    case spirv:
+    case metal:
+    case wgsl:
+    case cuda:
+    case cpp:
+        return 4242;
+    }
+}
+
+RWStructuredBuffer<int> outBuf;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    outBuf[tid.x] = shared();
+}
+
+// HLSL: 4242
+// GLSL: 4242
+// SPIRV: OpConstant {{.*}} 4242
+// METAL: 4242
+// WGSL: 4242
+// CUDA: 4242
+// CPP: 4242

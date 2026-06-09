@@ -10,10 +10,6 @@ on:
         required: false
         type: number
         default: 2
-      test-category:
-        required: false
-        type: string
-        default: smoke
       timeout-minutes:
         required: false
         type: number
@@ -44,7 +40,7 @@ jobs:
 
     steps:
       - name: Configure Git safe directory
-        run: git config --global --add safe.directory '*'
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@v4
         with:
@@ -190,7 +186,6 @@ jobs:
       - name: Run Tests with Sanitizers
         if: steps.build.outcome == 'success'
         env:
-          TEST_CATEGORY: ${{ inputs.test-category }}
           SERVER_COUNT: ${{ inputs.server-count }}
         run: |
           # halt_on_error=0: continue after each error to find more issues
@@ -209,7 +204,6 @@ jobs:
           ldd "$bin_dir/slang-test" 2>&1 | head -30 || true
 
           slang_test_args=(
-            "-category" "$TEST_CATEGORY"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
             "-expected-failure-list" "tests/expected-failure-linux.txt"
@@ -222,6 +216,12 @@ jobs:
             slang_test_args+=("-use-test-server")
             slang_test_args+=("-server-count" "$SERVER_COUNT")
           fi
+
+          # Print the fully-resolved command so the CI log shows exactly which
+          # arguments were used (the conditional logic only shows the source).
+          printf '+ %q' "$bin_dir/slang-test"
+          printf ' %q' "${slang_test_args[@]}"
+          printf '\n'
 
           # Non-zero exits are expected (sanitizer errors, test failures); this
           # job gates only on sanitizer log output in the Summary step.

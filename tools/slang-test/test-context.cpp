@@ -92,7 +92,7 @@ TestReporter* TestContext::getTestReporter()
     return m_reporters[slangTestThreadIndex];
 }
 
-SlangResult TestContext::locateFileCheck()
+SlangResult TestContext::locateLLVMFileCheck()
 {
     DefaultSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
 
@@ -121,8 +121,6 @@ Result TestContext::init(const char* inExePath)
     exePath = inExePath;
     SLANG_RETURN_ON_FAIL(TestToolUtil::getExeDirectoryPath(inExePath, exeDirectoryPath));
     SLANG_RETURN_ON_FAIL(TestToolUtil::getDllDirectoryPath(inExePath, dllDirectoryPath));
-
-    SLANG_RETURN_ON_FAIL(locateFileCheck());
 
     return SLANG_OK;
 }

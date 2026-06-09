@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -capability cuda_sm_8_9
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -capability cuda_sm_8_9 -render-features fp8
 
 // CUDA fp8 (FloatE4M3) cooperative matrix multiply-add test using the
 // m16n8k16 shape (i.e. CoopMat element shape 16x16, which lowers to 2x

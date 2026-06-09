@@ -174,12 +174,23 @@ struct ShaderBindingRange
     }
 };
 
-/// One counter slot → (file, line) mapping entry for coverage tracing.
-/// Populated by `instrumentCoverage` when `-trace-coverage` is active.
+/// Source coverage entry populated by `instrumentCoverage` when
+/// `-trace-coverage` is active.
 struct CoverageTracingEntry
 {
     String file;
     uint32_t line = 0;
+    uint32_t counterIndex = slang::kInvalidCoverageCounterIndex;
+    slang::CoverageEntryKind kind = slang::CoverageEntryKind::Unknown;
+    slang::CoverageCounterMode counterMode = slang::CoverageCounterMode::Count;
+    uint32_t startColumn = 0;
+    uint32_t endLine = 0;
+    uint32_t endColumn = 0;
+    String functionName;
+    String functionMangledName;
+    uint32_t branchSiteID = 0;
+    uint32_t branchArmID = 0;
+    slang::CoverageBranchArmKind branchArmKind = slang::CoverageBranchArmKind::Unknown;
 };
 
 struct SyntheticResourceRecord
@@ -244,6 +255,7 @@ public:
     getEntryInfo(uint32_t index, slang::CoverageEntryInfo* outInfo) SLANG_OVERRIDE;
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL getBufferInfo(slang::CoverageBufferInfo* outInfo)
         SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE;
 
     // ISyntheticResourceMetadata
     SLANG_NO_THROW virtual uint32_t SLANG_MCALL getResourceCount() SLANG_OVERRIDE;
@@ -290,6 +302,7 @@ public:
 
     // Coverage tracing data, populated by `instrumentCoverage` when
     // `-trace-coverage` is active. Empty otherwise.
+    uint32_t m_coverageCounterCount = 0;
     List<CoverageTracingEntry> m_coverageEntries;
 
     // Generic compiler-synthesized bindable resources, including

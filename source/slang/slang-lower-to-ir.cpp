@@ -487,7 +487,11 @@ struct SharedIRGenContext
     // requirement to the IR-level "key" that
     // is used to fetch that requirement from a
     // witness table.
-    Dictionary<Decl*, IRStructKey*> interfaceRequirementKeys;
+    // Cached requirement keys per requirement decl. The value is an `IRInst*`
+    // rather than `IRStructKey*` because a built-in requirement uses a hoistable
+    // `IRBuiltinRequirementKey` (not a `StructKey`); ordinary requirements still
+    // use an `IRStructKey`.
+    Dictionary<Decl*, IRInst*> interfaceRequirementKeys;
 
     // Arrays we keep around strictly for memory-management purposes:
 
@@ -508,6 +512,8 @@ struct SharedIRGenContext
     Dictionary<IRInst*, DebugSourceLineColumnCache> mapDebugSourceToLineColumnCache;
 
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
+
+    uint32_t nextCoverageBranchSiteID = 1;
 
     // External (imported) unsafeForceInline functions that need to
     // prelink into the current module after lowering.
@@ -625,11 +631,12 @@ struct IRGenContext
 
     DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
 
-    // Shader-coverage instrumentation. When true, each lowered
-    // statement is preceded by an IncrementCoverageCounter op, which a
-    // later IR pass rewrites into an atomic counter write on a
-    // synthesized buffer.
+    // Shader-coverage instrumentation. Line, function, and branch modes
+    // emit distinct semantic marker ops; a later IR pass rewrites all
+    // markers into atomic counter writes on one synthesized buffer.
     bool traceCoverage = false;
+    bool traceFunctionCoverage = false;
+    bool traceBranchCoverage = false;
 
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
@@ -1639,7 +1646,7 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     return true;
 }
 
-IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
+IRInst* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
 {
     // Only specific types of decls are treated as requirements, e.g. methods and asssociated types.
     // Other types of decls are allowed but not regarded as a requirement.
@@ -1653,7 +1660,7 @@ IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirement
     if (auto genericDecl = as<GenericDecl>(requirementDecl))
         return getInterfaceRequirementKey(context, genericDecl->inner);
 
-    IRStructKey* requirementKey = nullptr;
+    IRInst* requirementKey = nullptr;
     if (context->shared->interfaceRequirementKeys.tryGetValue(requirementDecl, requirementKey))
     {
         return requirementKey;
@@ -1663,6 +1670,79 @@ IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirement
     auto builder = &builderStorage;
 
     builder->setInsertInto(builder->getModule());
+
+    // Determine whether this requirement is a recognized built-in requirement,
+    // and if so, its `BuiltinRequirementKind` role.
+    //
+    //  - A requirement tagged with `__builtin_requirement(kind)` carries the role
+    //    directly (e.g. `IDifferentiable.Differential`, `.dzero`, `.dadd`).
+    //  - The conformance-witness requirement of a built-in associated type (the
+    //    `Differential : IDifferentiable` inheritance clause) does not carry its
+    //    own marker, so we derive its role from the constrained associated type's
+    //    kind (`DifferentialType` -> `DifferentialWitness`). This lets autodiff
+    //    find the witness by role without having to split the associated type's
+    //    declaration (which would change front-end resolution of `Differential`).
+    bool hasBuiltinRole = false;
+    BuiltinRequirementKind builtinRole = BuiltinRequirementKind::DifferentialType;
+    if (auto builtinReq = requirementDecl->findModifier<BuiltinRequirementModifier>())
+    {
+        hasBuiltinRole = true;
+        builtinRole = builtinReq->kind;
+    }
+    else if (auto constraint = as<GenericTypeConstraintDecl>(requirementDecl);
+             constraint && !constraint->isEqualityConstraint)
+    {
+        // This is the conformance requirement of a built-in associated type
+        // (e.g. the relocated `Differential : IDifferentiable`). The built-in
+        // *role* tag lives on the constrained associated type itself --
+        // `IDifferentiable.Differential` carries `BuiltinRequirementModifier`
+        // with kind `DifferentialType` -- so we read that tag off `sub` (which
+        // must be the associated type) and map it to the corresponding *witness*
+        // role. A non-associated-type `sub` carries no such tag and is not a
+        // built-in requirement.
+        if (auto assoc = isDeclRefTypeOf<AssocTypeDecl>(constraint->sub.type))
+        {
+            if (auto assocReq = assoc.getDecl()->findModifier<BuiltinRequirementModifier>())
+            {
+                switch (assocReq->kind)
+                {
+                case BuiltinRequirementKind::DifferentialType:
+                    builtinRole = BuiltinRequirementKind::DifferentialWitness;
+                    hasBuiltinRole = true;
+                    break;
+                case BuiltinRequirementKind::DifferentialPtrType:
+                    builtinRole = BuiltinRequirementKind::DifferentialPtrWitness;
+                    hasBuiltinRole = true;
+                    break;
+                case BuiltinRequirementKind::BwdCallableContextType:
+                    builtinRole = BuiltinRequirementKind::BwdCallableContextWitness;
+                    hasBuiltinRole = true;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+
+    if (hasBuiltinRole)
+    {
+        // Use the hoistable, deduplicated-by-construction key for this built-in
+        // role. Its identity is the `kind` operand, so the same logical
+        // requirement always resolves to a single key inst -- whether referenced
+        // from the canonical interface constraint or from a constraint
+        // synthesized while building a type's `Differential`, and across the
+        // precompiled-core-module boundary. No `key_<mangled>` linkage decoration
+        // is needed (or wanted): identity comes from the operand, not a name.
+        requirementKey = builder->getBuiltinRequirementKey((IRIntegerValue)builtinRole);
+        context->shared->interfaceRequirementKeys.add(requirementDecl, requirementKey);
+        // Also tag the role as a decoration so role-scanning consumers (autodiff's
+        // `getInterfaceEntryByBuiltinRequirement`) work unchanged. The key is
+        // shared, so add the decoration only once.
+        if (!requirementKey->findDecoration<IRBuiltinRequirementDecoration>())
+            builder->addBuiltinRequirementDecoration(requirementKey, (IRIntegerValue)builtinRole);
+        return requirementKey;
+    }
 
     // Construct a key to serve as the representation of
     // this requirement in the IR, and to allow lookup
@@ -1727,6 +1807,12 @@ static bool _isTrivialLookupFromInterfaceThis(IRGenContext* context, DeclRefBase
     // then it is a trivial lookup and we should lower it as a struct key.
     return context->thisTypeWitness == nullptr;
 }
+
+static IRInst* ensureAbstractThisWitnessVisibleFromCurrentScope(
+    IRGenContext* context,
+    IRInst* abstractThisWitness,
+    Type* thisType);
+bool isAbstractWitnessTable(IRInst* inst);
 
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
 {
@@ -1845,6 +1931,20 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitWitnessLookupIntVal(WitnessLookupIntVal* val)
     {
         auto witnessVal = lowerVal(context, val->getWitness());
+        if (isAbstractWitnessTable(witnessVal.val))
+        {
+            // A static-const requirement used inside an interface signature lowers as a
+            // witness lookup through an abstract witness table. In a generic
+            // interface such as `interface I<T> { static const int N; void f(T[N]); }`,
+            // the `T` parameter and the lowered lookup for `N` become operands of the same
+            // hoistable IR type. Cloning the abstract witness into the current lowering
+            // scope keeps those operands visible from one IR parent without replacing the
+            // dependent lookup with a concrete value.
+            witnessVal.val = ensureAbstractThisWitnessVisibleFromCurrentScope(
+                context,
+                witnessVal.val,
+                val->getWitness()->getSub());
+        }
         auto key = getInterfaceRequirementKey(context, val->getKey());
         auto type = lowerType(context, val->getType());
         return LoweredValInfo::simple(
@@ -5571,6 +5671,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         SLANG_UNEXPECTED("BackwardDifferentiateExpr present during IR lowered");
     }
 
+    LoweredValInfo visitApplyForBwdExpr(ApplyForBwdExpr* expr)
+    {
+        context->getSink()->diagnose(
+            Diagnostics::ApplyForBwdExpressionRequiresInvocation{.expr = expr});
+        return LoweredValInfo::simple(getBuilder()->getVoidValue());
+    }
+
     LoweredValInfo visitDispatchKernelExpr(DispatchKernelExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->baseFunction);
@@ -5956,7 +6063,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         auto indexVal = getSimpleVal(context, lowerRValueExpr(context, expr->indexExprs[0]));
 
-        return subscriptValue(type, baseVal, indexVal);
+        return subscriptValue(type, baseVal, indexVal, expr->indexExprs[0]->loc);
     }
 
     LoweredValInfo visitThisExpr(ThisExpr* /*expr*/) { return context->thisVal; }
@@ -6823,21 +6930,25 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
     {
         auto superType = lowerType(context, expr->type);
-        auto value = lowerRValueExpr(context, expr->valueArg);
 
         // First, we check if the witness is a type equality witness.
-        // If so, we can simply emit a bit cast to the target type that should eventually
-        // fold out to a no-op.
-        // Note: if we are going to equivalent but not identical types in the future,
-        // then the cast between equivalent types shouldn't be as simple as a bit cast
-        // and will require actual coercion logic between the two types.
-        // For now, we don't support type equivalence witness so this is safe for
-        // equal types.
+        // If so, the types are structurally equal (e.g. T.Differential == T via
+        // a where clause), and the cast is a no-op.
         if (isTypeEqualityWitness(expr->witnessArg))
         {
+            // For l-value type-equality casts, lower as an l-value so that
+            // out/inout parameters work correctly through the cast.
+            if (expr->type.isLeftValue)
+            {
+                auto lval = lowerLValueExpr(context, expr->valueArg);
+                return lval;
+            }
+            auto value = lowerRValueExpr(context, expr->valueArg);
             return LoweredValInfo::simple(
                 getBuilder()->emitBitCast(superType, getSimpleVal(context, value)));
         }
+
+        auto value = lowerRValueExpr(context, expr->valueArg);
 
         // The actual operation that we need to perform here
         // depends on the kind of subtype relationship we
@@ -7016,7 +7127,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return this->dispatch(expr->valueArg);
     }
 
-    LoweredValInfo subscriptValue(IRType* type, LoweredValInfo baseVal, IRInst* indexVal)
+    LoweredValInfo subscriptValue(
+        IRType* type,
+        LoweredValInfo baseVal,
+        IRInst* indexVal,
+        SourceLoc indexLoc)
     {
         auto builder = getBuilder();
 
@@ -7024,6 +7139,67 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // and try to turn it into a single pointer, if possible.
         //
         baseVal = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
+
+        if (auto indexLit = as<IRIntLit>(indexVal))
+        {
+            const auto indexValue = indexLit->getValue();
+            if (indexValue >= 0)
+            {
+                switch (baseVal.flavor)
+                {
+                case LoweredValInfo::Flavor::SwizzledLValue:
+                    {
+                        auto baseSwizzleInfo = baseVal.getSwizzledLValueInfo();
+                        if (indexValue < (IRIntegerValue)baseSwizzleInfo->elementIndices.getCount())
+                        {
+                            const auto index = (Index)indexValue;
+                            RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo();
+                            context->shared->extValues.add(swizzledLValue);
+
+                            swizzledLValue->type = type;
+                            swizzledLValue->base = baseSwizzleInfo->base;
+                            swizzledLValue->elementIndices.add(
+                                baseSwizzleInfo->elementIndices[index]);
+                            return LoweredValInfo::swizzledLValue(swizzledLValue);
+                        }
+                    }
+                    break;
+
+                case LoweredValInfo::Flavor::SwizzledMatrixLValue:
+                    {
+                        auto baseSwizzleInfo = baseVal.getSwizzledMatrixLValueInfo();
+                        if (indexValue < (IRIntegerValue)baseSwizzleInfo->elementCount)
+                        {
+                            const auto index = (Index)indexValue;
+                            RefPtr<SwizzledMatrixLValueInfo> swizzledLValue =
+                                new SwizzledMatrixLValueInfo();
+                            context->shared->extValues.add(swizzledLValue);
+
+                            swizzledLValue->type = type;
+                            swizzledLValue->base = baseSwizzleInfo->base;
+                            swizzledLValue->elementCount = 1;
+                            swizzledLValue->elementCoords[0] =
+                                baseSwizzleInfo->elementCoords[index];
+                            return LoweredValInfo::swizzledMatrixLValue(swizzledLValue);
+                        }
+                    }
+                    break;
+
+                default:
+                    break;
+                }
+            }
+        }
+
+        if (!as<IRIntLit>(indexVal) && isLValueContext() &&
+            (baseVal.flavor == LoweredValInfo::Flavor::SwizzledLValue ||
+             baseVal.flavor == LoweredValInfo::Flavor::SwizzledMatrixLValue))
+        {
+            context->getSink()->diagnose(Diagnostics::NeedCompileTimeConstant{
+                .location = indexLoc,
+            });
+            return LoweredValInfo::ptr(builder->emitVar(type));
+        }
 
         // The `materialize` operation should ensure that we only have to deal
         // with the small number of base cases for lowered value representations.
@@ -7246,7 +7422,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
     LoweredValInfo visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr)
     {
         auto irType = lowerType(context, expr->type);
-        auto loweredBase = lowerRValueExpr(context, expr->base);
+        auto loweredBase = lowerLValueExpr(context, expr->base);
 
         RefPtr<SwizzledMatrixLValueInfo> swizzledLValue = new SwizzledMatrixLValueInfo();
         swizzledLValue->type = irType;
@@ -7394,9 +7570,10 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
             auto index2 =
                 builder->getIntValue(irIntType, (IRIntegerValue)expr->elementCoords[ii].col);
             // First index expression
-            auto irExtract1 = subscriptValue(subscript1, base, index1);
+            auto irExtract1 = subscriptValue(subscript1, base, index1, expr->loc);
             // Second index expression
-            irExtracts[ii] = getSimpleVal(context, subscriptValue(subscript2, irExtract1, index2));
+            irExtracts[ii] =
+                getSimpleVal(context, subscriptValue(subscript2, irExtract1, index2, expr->loc));
         }
 
         if (elementCount > 1)
@@ -7603,6 +7780,24 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     // so that it can be used for a label.
     IRBlock* createBlock() { return getBuilder()->createBlock(); }
 
+    uint32_t allocateCoverageBranchSiteID() { return context->shared->nextCoverageBranchSiteID++; }
+
+    void emitBranchCoverageMarker(
+        SourceLoc loc,
+        uint32_t branchSiteID,
+        uint32_t branchArmID,
+        slang::CoverageBranchArmKind branchArmKind)
+    {
+        if (!context->traceBranchCoverage)
+            return;
+
+        IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, loc);
+        context->irBuilder->emitIncrementBranchCoverageCounter(
+            IRIntegerValue(branchSiteID),
+            IRIntegerValue(branchArmID),
+            IRIntegerValue(uint32_t(branchArmKind)));
+    }
+
     /// Does the given block have a terminator?
     bool isBlockTerminated(IRBlock* block) { return block->getTerminator() != nullptr; }
 
@@ -7751,6 +7946,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
         IRInst* ifInst = nullptr;
+        uint32_t coverageBranchSiteID =
+            context->traceBranchCoverage ? allocateCoverageBranchSiteID() : 0;
 
         if (elseStmt)
         {
@@ -7762,11 +7959,50 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             insertBlock(thenBlock);
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
+            emitBranchCoverageMarker(
+                condExpr->loc,
+                coverageBranchSiteID,
+                1,
+                slang::CoverageBranchArmKind::TrueArm);
             lowerStmt(context, thenStmt);
             emitBranchIfNeeded(afterBlock);
             insertBlock(elseBlock);
+            emitBranchCoverageMarker(
+                condExpr->loc,
+                coverageBranchSiteID,
+                2,
+                slang::CoverageBranchArmKind::FalseArm);
             lowerStmt(context, elseStmt);
             popScopeBlock(prevScopeEndBlock, true);
+
+            insertBlock(afterBlock);
+        }
+        else if (context->traceBranchCoverage)
+        {
+            auto thenBlock = createBlock();
+            auto elseBlock = createBlock();
+            auto afterBlock = createBlock();
+
+            ifInst = builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
+
+            insertBlock(thenBlock);
+
+            IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
+            emitBranchCoverageMarker(
+                condExpr->loc,
+                coverageBranchSiteID,
+                1,
+                slang::CoverageBranchArmKind::TrueArm);
+            lowerStmt(context, thenStmt);
+            popScopeBlock(prevScopeEndBlock, true);
+            emitBranchIfNeeded(afterBlock);
+
+            insertBlock(elseBlock);
+            emitBranchCoverageMarker(
+                condExpr->loc,
+                coverageBranchSiteID,
+                2,
+                slang::CoverageBranchArmKind::FalseArm);
 
             insertBlock(afterBlock);
         }
@@ -7861,6 +8097,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
+        uint32_t coverageBranchSiteID = 0;
+        SourceLoc coverageBranchLoc;
         if (const auto condExpr = stmt->predicateExpression)
         {
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
@@ -7868,12 +8106,36 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             auto irCondition =
                 getSimpleVal(context, lowerRValueExpr(context, stmt->predicateExpression));
 
+            coverageBranchLoc = condExpr->loc;
+            coverageBranchSiteID =
+                context->traceBranchCoverage ? allocateCoverageBranchSiteID() : 0;
+
             // Now we want to `break` if the loop condition is false.
-            builder->emitLoopTest(irCondition, bodyLabel, breakLabel);
+            auto conditionFalseLabel = context->traceBranchCoverage ? createBlock() : breakLabel;
+            builder->emitLoopTest(irCondition, bodyLabel, conditionFalseLabel);
+
+            if (context->traceBranchCoverage)
+            {
+                insertBlock(conditionFalseLabel);
+                emitBranchCoverageMarker(
+                    coverageBranchLoc,
+                    coverageBranchSiteID,
+                    2,
+                    slang::CoverageBranchArmKind::FalseArm);
+                emitBranchIfNeeded(breakLabel);
+            }
         }
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
+        if (coverageBranchSiteID != 0)
+        {
+            emitBranchCoverageMarker(
+                coverageBranchLoc,
+                coverageBranchSiteID,
+                1,
+                slang::CoverageBranchArmKind::TrueArm);
+        }
         IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
         popScopeBlock(prevScopeEndBlock, true);
@@ -7970,18 +8232,44 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
+        uint32_t coverageBranchSiteID = 0;
+        SourceLoc coverageBranchLoc;
         if (auto condExpr = stmt->predicate)
         {
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
             auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
 
+            coverageBranchLoc = condExpr->loc;
+            coverageBranchSiteID =
+                context->traceBranchCoverage ? allocateCoverageBranchSiteID() : 0;
+
             // Now we want to `break` if the loop condition is false.
-            builder->emitLoopTest(irCondition, bodyLabel, breakLabel);
+            auto conditionFalseLabel = context->traceBranchCoverage ? createBlock() : breakLabel;
+            builder->emitLoopTest(irCondition, bodyLabel, conditionFalseLabel);
+
+            if (context->traceBranchCoverage)
+            {
+                insertBlock(conditionFalseLabel);
+                emitBranchCoverageMarker(
+                    coverageBranchLoc,
+                    coverageBranchSiteID,
+                    2,
+                    slang::CoverageBranchArmKind::FalseArm);
+                emitBranchIfNeeded(breakLabel);
+            }
         }
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
+        if (coverageBranchSiteID != 0)
+        {
+            emitBranchCoverageMarker(
+                coverageBranchLoc,
+                coverageBranchSiteID,
+                1,
+                slang::CoverageBranchArmKind::TrueArm);
+        }
         IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
         popScopeBlock(prevScopeEndBlock, true);
@@ -8065,10 +8353,38 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // mergeBlock:
             //   goto breakLabel;
             auto mergeBlock = builder->createBlock();
-            builder->emitIfElse(invCondition, breakLabel, mergeBlock, mergeBlock);
+            if (context->traceBranchCoverage)
+            {
+                auto coverageBranchSiteID = allocateCoverageBranchSiteID();
+                auto loopExitBlock = builder->createBlock();
+                // `invCondition` is the loop-exit test. Its true arm is the
+                // original condition's false branch, so it receives the
+                // FalseArm marker and exits the loop.
+                builder->emitIfElse(invCondition, loopExitBlock, mergeBlock, mergeBlock);
 
-            insertBlock(mergeBlock);
-            builder->emitBranch(loopHead);
+                insertBlock(loopExitBlock);
+                emitBranchCoverageMarker(
+                    condExpr->loc,
+                    coverageBranchSiteID,
+                    2,
+                    slang::CoverageBranchArmKind::FalseArm);
+                emitBranchIfNeeded(breakLabel);
+
+                insertBlock(mergeBlock);
+                emitBranchCoverageMarker(
+                    condExpr->loc,
+                    coverageBranchSiteID,
+                    1,
+                    slang::CoverageBranchArmKind::TrueArm);
+                builder->emitBranch(loopHead);
+            }
+            else
+            {
+                builder->emitIfElse(invCondition, breakLabel, mergeBlock, mergeBlock);
+
+                insertBlock(mergeBlock);
+                builder->emitBranch(loopHead);
+            }
         }
 
         // Finally we insert the label that a `break` will jump to
@@ -8451,6 +8767,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // The collected (value, label) pairs for
         // all the `case` statements.
         List<IRInst*> cases;
+
+        // Branch coverage state for this switch. Case/default arms are
+        // counted at switch-dispatch entry, not at case-body entry, so
+        // ordinary fallthrough between case bodies does not double-count
+        // selected arms.
+        uint32_t coverageBranchSiteID = 0;
+        uint32_t nextCoverageBranchArmID = 1;
+        SourceLoc coverageBranchFallbackLoc;
     };
 
     // We need a label to use for a `case` or `default` statement,
@@ -8483,6 +8807,33 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         info->currentCaseLabel = newCaseLabel;
         info->anythingEmittedToCurrentCaseBlock = false;
         return newCaseLabel;
+    }
+
+    IRBlock* createSwitchCoverageDispatchBlock(
+        SwitchStmtInfo* info,
+        IRBlock* bodyLabel,
+        SourceLoc armLoc,
+        slang::CoverageBranchArmKind armKind)
+    {
+        if (info->coverageBranchSiteID == 0)
+            return bodyLabel;
+
+        auto builder = getBuilder();
+        IRBuilderInsertLocScope insertLocScope(builder);
+
+        auto dispatchLabel = createBlock();
+        info->initialBlock->getParent()->addBlock(dispatchLabel);
+        builder->setInsertInto(dispatchLabel);
+
+        SourceLoc markerLoc = armLoc.isValid() ? armLoc : info->coverageBranchFallbackLoc;
+        emitBranchCoverageMarker(
+            markerLoc,
+            info->coverageBranchSiteID,
+            info->nextCoverageBranchArmID++,
+            armKind);
+        builder->emitBranch(bodyLabel);
+
+        return dispatchLabel;
     }
 
     bool hasSwitchCases(Stmt* inStmt)
@@ -8572,20 +8923,30 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             auto caseVal = getSimpleVal(context, caseValInfo);
 
             // Figure out where we are branching to.
-            auto label = getLabelForCase(info);
+            auto bodyLabel = getLabelForCase(info);
+            auto dispatchLabel = createSwitchCoverageDispatchBlock(
+                info,
+                bodyLabel,
+                caseStmt->loc,
+                slang::CoverageBranchArmKind::CaseArm);
 
             // Add this `case` to the list for the enclosing `switch`.
             info->cases.add(caseVal);
-            info->cases.add(label);
+            info->cases.add(dispatchLabel);
         }
         else if (const auto defaultStmt = as<DefaultStmt>(stmt); defaultStmt)
         {
-            auto label = getLabelForCase(info);
+            auto bodyLabel = getLabelForCase(info);
+            auto dispatchLabel = createSwitchCoverageDispatchBlock(
+                info,
+                bodyLabel,
+                defaultStmt->loc,
+                slang::CoverageBranchArmKind::DefaultArm);
 
             // We expect to only find a single `default` stmt.
             SLANG_ASSERT(!info->defaultLabel);
 
-            info->defaultLabel = label;
+            info->defaultLabel = dispatchLabel;
         }
         else if (const auto emptyStmt = as<EmptyStmt>(stmt); emptyStmt)
         {
@@ -8850,6 +9211,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         SwitchStmtInfo info;
         info.initialBlock = initialBlock;
         info.defaultLabel = nullptr;
+        info.coverageBranchSiteID =
+            context->traceBranchCoverage ? allocateCoverageBranchSiteID() : 0;
+        info.coverageBranchFallbackLoc = stmt->condition->loc;
 
         lowerSwitchCases(stmt->body, &info);
 
@@ -8876,9 +9240,19 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             }
         }
 
-        // If there was no `default` statement, then the
-        // default case will just branch directly to the end.
+        // If there was no `default` statement, then the default case
+        // normally branches directly to the end. Under branch coverage,
+        // still route that no-match path through a marker so the switch
+        // branch site has a recorded default outcome.
         auto defaultLabel = info.defaultLabel ? info.defaultLabel : breakLabel;
+        if (!info.defaultLabel && info.coverageBranchSiteID != 0)
+        {
+            defaultLabel = createSwitchCoverageDispatchBlock(
+                &info,
+                breakLabel,
+                stmt->condition->loc,
+                slang::CoverageBranchArmKind::DefaultArm);
+        }
 
         // Now that we've collected the cases, we are
         // prepared to emit the `switch` instruction
@@ -9174,7 +9548,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
     {
         maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
 
-        // Under `-trace-coverage`, emit a counter op before each executable
+        // Under `-trace-coverage`, emit a line marker before each executable
         // statement (skip Block/Seq/Empty wrappers — no execution to count).
         if (context->traceCoverage && stmt->loc.isValid() && !as<EmptyStmt>(stmt) &&
             !as<BlockStmt>(stmt) && !as<SeqStmt>(stmt))
@@ -9340,6 +9714,14 @@ LoweredValInfo tryGetAddress(
             UInt elementCount = originalSwizzleInfo->elementCount;
 
             auto newBase = tryGetAddress(context, originalBase, TryGetAddressMode::Aggressive);
+            if (newBase.flavor == LoweredValInfo::Flavor::Ptr && elementCount == 1)
+            {
+                auto coord = originalSwizzleInfo->elementCoords[0];
+                auto rowPtr = context->irBuilder->emitElementAddress(newBase.val, coord.row);
+                auto elementPtr = context->irBuilder->emitElementAddress(rowPtr, coord.col);
+                return LoweredValInfo::ptr(elementPtr);
+            }
+
             RefPtr<SwizzledMatrixLValueInfo> newSwizzleInfo = new SwizzledMatrixLValueInfo();
             context->shared->extValues.add(newSwizzleInfo);
 
@@ -9776,7 +10158,21 @@ top:
         break;
 
     default:
-        SLANG_UNIMPLEMENTED_X("assignment");
+        {
+            SourceLoc loc;
+            for (auto locInfo = context->irBuilder->getSourceLocInfo(); locInfo;
+                 locInfo = locInfo->next)
+            {
+                if (locInfo->sourceLoc.getRaw() != 0)
+                {
+                    loc = locInfo->sourceLoc;
+                    break;
+                }
+            }
+            context->getSink()->diagnose(Diagnostics::UnsupportedAssignmentTarget{
+                .location = loc,
+            });
+        }
         break;
     }
 }
@@ -9851,6 +10247,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(FileDecl)
     IGNORED_CASE(RequireCapabilityDecl)
     IGNORED_CASE(SemanticDecl)
+    IGNORED_CASE(FuncExtensionDecl)
 
 #undef IGNORED_CASE
 
@@ -10013,6 +10410,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
     {
+        // An interface-level constraint (declared via `__constraint` in an
+        // interface body) is a direct member of the interface. It lowers as the
+        // key for that interface requirement, just like a constraint attached to
+        // an associated type or interface method.
+        if (as<InterfaceDecl>(decl->parentDecl))
+        {
+            return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
+        }
+
         // This might be a type constraint on an associated type,
         // in which case it should lower as the key for that
         // interface requirement.
@@ -11156,7 +11562,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return varVal;
     }
 
-    IRStructKey* getInterfaceRequirementKey(Decl* requirementDecl)
+    IRInst* getInterfaceRequirementKey(Decl* requirementDecl)
     {
         return Slang::getInterfaceRequirementKey(context, requirementDecl);
     }
@@ -11307,15 +11713,35 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         UInt entryIndex = 0;
-        auto addEntry = [&](IRStructKey* requirementKey, DeclRef<Decl> requirementDeclRef)
+        auto addEntry = [&](IRInst* requirementKey, DeclRef<Decl> requirementDeclRef)
         {
             auto entry = subBuilder->createInterfaceRequirementEntry(requirementKey, nullptr);
+            auto relocatedSubtypeConstraint = requirementDeclRef.as<GenericTypeConstraintDecl>();
             if (auto inheritance = requirementDeclRef.as<InheritanceDecl>())
             {
                 auto irBaseType =
                     lowerType(subContext, getSup(subContext->astBuilder, inheritance));
                 auto irWitnessTableType = subBuilder->getWitnessTableType(irBaseType);
                 entry->setRequirementVal(irWitnessTableType);
+            }
+            else if (
+                relocatedSubtypeConstraint &&
+                !relocatedSubtypeConstraint.getDecl()->isEqualityConstraint)
+            {
+                // A subtype constraint on an associated type (`associatedtype A : IBar`,
+                // `associatedtype A where A : IBar`) is recorded in the unified
+                // representation as an interface-level requirement (a sibling of `A`). It is
+                // a *conformance* requirement: its witness is a witness table for the bound.
+                // We must lower it the same way the conformance was lowered when the bound was
+                // nested in the associated type (see the associated-type constraint loop
+                // below), i.e. with a `WitnessTableType` requirement value -- otherwise
+                // consumers (e.g. autodiff) that read the requirement get a malformed entry.
+                // (Equality constraints, e.g. `__constraint A == B`, are handled by the
+                // generic path below.)
+                auto irBaseType = lowerType(
+                    subContext,
+                    getSup(subContext->astBuilder, relocatedSubtypeConstraint));
+                entry->setRequirementVal(subBuilder->getWitnessTableType(irBaseType));
             }
             else
             {
@@ -13424,6 +13850,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // We lower whatever statement was stored on the declaration
             // as the body of the new IR function.
             //
+            if (subContext->traceFunctionCoverage && decl->loc.isValid())
+            {
+                String functionName;
+                if (auto name = decl->getName())
+                    functionName = name->text;
+                String functionMangledName = getMangledName(context->astBuilder, decl);
+                if (!functionName.getLength())
+                    functionName = functionMangledName;
+
+                IRBuilderSourceLocRAII sourceLocInfo(subContext->irBuilder, decl->loc);
+                subContext->irBuilder->emitIncrementFunctionCoverageCounter(
+                    functionName.getUnownedSlice(),
+                    functionMangledName.getUnownedSlice());
+            }
+
             lowerStmt(subContext, decl->body);
 
             // We need to carefully add a terminator instruction to the end
@@ -13985,20 +14426,23 @@ bool isAbstractWitnessTable(IRInst* inst)
     return false;
 }
 
-static IRInst* maybeCloneThisTypeWitness(
+static IRInst* ensureAbstractThisWitnessVisibleFromCurrentScope(
     IRGenContext* context,
-    IRInst* thisTypeWitness,
+    IRInst* abstractThisWitness,
     Type* thisType)
 {
+    SLANG_ASSERT(isAbstractWitnessTable(abstractThisWitness));
+
     auto currentInsertLoc = context->irBuilder->getInsertLoc().getParent();
-    auto parentOfThisTypeWitness = thisTypeWitness->parent;
+    auto parentOfAbstractWitness = abstractThisWitness->parent;
 
     while (currentInsertLoc != nullptr)
     {
-        // If current insert location is same as scope of ThisTypeWitness, don't copy it.
-        if (parentOfThisTypeWitness == currentInsertLoc)
+        // If the abstract witness is already visible from the current insert
+        // location, keep using the existing IR value.
+        if (parentOfAbstractWitness == currentInsertLoc)
         {
-            return thisTypeWitness;
+            return abstractThisWitness;
         }
 
         currentInsertLoc = currentInsertLoc->parent;
@@ -14167,8 +14611,10 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
 
             if (isAbstractWitnessTable(irWitnessTable))
             {
-                // Copy ThisTypeWitness locally if necessary
-                irWitnessTable = maybeCloneThisTypeWitness(
+                // Abstract interface-self witnesses may be defined outside the
+                // current IR scope. Recreate the `This` witness locally when the
+                // existing proof is not visible from this use site.
+                irWitnessTable = ensureAbstractThisWitnessVisibleFromCurrentScope(
                     context,
                     irWitnessTable,
                     thisTypeSubst->getLookupSource());
@@ -14414,8 +14860,11 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     context->irBuilder = builder;
     context->debugInfoLevel = compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel();
-    context->traceCoverage =
-        compileRequest->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage);
+    context->traceCoverage = linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage);
+    context->traceFunctionCoverage =
+        linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage);
+    context->traceBranchCoverage =
+        linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
 
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {
@@ -14803,6 +15252,11 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
         builder->setInsertInto(module);
 
         context->irBuilder = builder;
+        context->traceCoverage = option.getBoolOption(CompilerOptionName::TraceCoverage);
+        context->traceFunctionCoverage =
+            option.getBoolOption(CompilerOptionName::TraceFunctionCoverage);
+        context->traceBranchCoverage =
+            option.getBoolOption(CompilerOptionName::TraceBranchCoverage);
 
         componentType->acceptVisitor(this, nullptr);
         module->buildMangledNameToGlobalInstMap();

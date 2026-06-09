@@ -21,6 +21,7 @@ public interface IActivation<T>
     /// Apply activation function element-wise.
     /// @param input Input vector.
     /// @return Output vector with activation applied.
+    [ForceInline]
     [NoDiffThis]
     [Differentiable]
     public Vector eval<Vector>(Vector input)
