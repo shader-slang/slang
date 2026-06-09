@@ -1199,6 +1199,12 @@ typedef uint32_t SlangSizeT;
                  //   where Vulkan exposes shaderBufferInt64Atomics = false). uint32 counters
                  //   wrap silently at 2^32 hits per slot; uint64 counters effectively do not
                  //   wrap within any practical run.
+        TraceCoverageWaveAggregation =
+            152, // bool: opt in to wave/subgroup-aggregated counter increments (one atomic
+                 //   per wave instead of per active lane). Off by default. Only the direct
+                 //   SPIR-V backend implements it; it emits OpGroupNonUniform* and requires
+                 //   the runtime to support subgroup ops. Whether it is faster is
+                 //   workload/GPU-dependent (see issue #11509), so it is opt-in.
 
         CountOf,
     };

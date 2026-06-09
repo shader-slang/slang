@@ -319,6 +319,11 @@ Instrument the shader with per-function-entry coverage counters. Shares the synt
 Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths. Expression-level short-circuit and ternary branches are not instrumented by this mode yet. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
 
 
+<a id="trace-coverage-wave-aggregation"></a>
+### -trace-coverage-wave-aggregation
+Opt in to wave/subgroup-aggregated coverage counter increments: the lanes active at each counter reduce their count and a single elected lane performs one atomic add, instead of one atomic per active lane. Off by default. Only the direct SPIR-V backend implements it; it emits subgroup ops and requires the runtime to support them. Whether it improves performance is workload- and GPU-dependent, so it is opt-in. Ignored when no coverage mode is enabled. 
+
+
 <a id="trace-coverage-binding"></a>
 ### -trace-coverage-binding
 

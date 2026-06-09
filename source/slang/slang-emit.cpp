@@ -1105,6 +1105,15 @@ Result linkAndOptimizeIR(
             });
             return SLANG_FAIL;
         }
+        // Opt-in wave/subgroup-aggregated counter increments (off by default;
+        // only the SPIR-V backend honors it). See #11509.
+        bool coverageWaveAggregation = false;
+        if (auto values =
+                opts.options.tryGetValue(CompilerOptionName::TraceCoverageWaveAggregation))
+        {
+            if (values->getCount() > 0)
+                coverageWaveAggregation = (*values)[0].intValue != 0;
+        }
         SLANG_PASS(
             instrumentCoverage,
             sink,
@@ -1114,6 +1123,7 @@ Result linkAndOptimizeIR(
             reservedSpaces.getBuffer(),
             (int)reservedSpaces.getCount(),
             counterByteWidth,
+            coverageWaveAggregation,
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);

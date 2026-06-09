@@ -7,16 +7,17 @@
 // `OpAtomicIAdd` of that count. The active-lane reduction preserves the exact
 // per-execution total, so coverage numbers are unchanged.
 //
-// This path engages for the direct SPIR-V backend (GLSL and other targets
-// keep the per-lane atomic) for both counter widths: uint32 adds the count
-// directly; uint64 widens the uint count with `OpUConvert` before the
+// Wave aggregation is opt-in (`-trace-coverage-wave-aggregation`, off by
+// default); it engages only for the direct SPIR-V backend (GLSL and other
+// targets keep the per-lane atomic) for both counter widths: uint32 adds the
+// count directly; uint64 widens the uint count with `OpUConvert` before the
 // 64-bit atomic.
 
 // uint32 counters (`-trace-coverage-counter-width 32`).
-//TEST:SIMPLE(filecheck=CHECK32):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage -trace-coverage-counter-width 32
+//TEST:SIMPLE(filecheck=CHECK32):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage -trace-coverage-wave-aggregation -trace-coverage-counter-width 32
 
 // uint64 counters (the default width).
-//TEST:SIMPLE(filecheck=CHECK64):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage
+//TEST:SIMPLE(filecheck=CHECK64):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage -trace-coverage-wave-aggregation
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;

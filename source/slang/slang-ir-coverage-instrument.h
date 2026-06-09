@@ -53,6 +53,10 @@ class ArtifactPostEmitMetadata;
 // from cached modules are dropped so the backend never sees them, no
 // buffer is synthesized, and `outMetadata` and `globalScopeVarLayout`
 // are left untouched.
+// `waveAggregation` opts in to wave/subgroup-aggregated counter
+// increments (one atomic per wave instead of per active lane); off by
+// default and only honored by the direct SPIR-V backend. See issue
+// #11509 and `docs/design/shader-coverage-wave-aggregation.md`.
 void instrumentCoverage(
     IRModule* module,
     DiagnosticSink* sink,
@@ -62,6 +66,7 @@ void instrumentCoverage(
     const int* reservedSpaces,
     int reservedSpaceCount,
     int counterByteWidth,
+    bool waveAggregation,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);

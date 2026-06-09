@@ -632,6 +632,15 @@ void initCommandOptions(CommandOptions& options)
          "default paths. Expression-level short-circuit and ternary branches are "
          "not instrumented by this mode yet. "
          "Shares the synthesized `__slang_coverage` buffer and coverage metadata path."},
+        {OptionKind::TraceCoverageWaveAggregation,
+         "-trace-coverage-wave-aggregation",
+         nullptr,
+         "Opt in to wave/subgroup-aggregated coverage counter increments: the lanes "
+         "active at each counter reduce their count and a single elected lane performs "
+         "one atomic add, instead of one atomic per active lane. Off by default. Only "
+         "the direct SPIR-V backend implements it; it emits subgroup ops and requires the "
+         "runtime to support them. Whether it improves performance is workload- and "
+         "GPU-dependent, so it is opt-in. Ignored when no coverage mode is enabled."},
         {OptionKind::TraceCoverageBinding,
          "-trace-coverage-binding",
          "-trace-coverage-binding <index> <space>",
@@ -2607,6 +2616,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::TraceCoverage:
         case OptionKind::TraceFunctionCoverage:
         case OptionKind::TraceBranchCoverage:
+        case OptionKind::TraceCoverageWaveAggregation:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:

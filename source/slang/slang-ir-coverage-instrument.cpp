@@ -941,6 +941,8 @@ struct CoverageInstrumenter
     // Target this instrumentation is for, used to gate target-specific
     // lowering of the counter increment (wave aggregation). May be null.
     TargetRequest* targetRequest = nullptr;
+    // Caller opted in to wave-aggregated increments (`-trace-coverage-wave-aggregation`).
+    bool waveAggregation = false;
     List<BranchSiteRemap> branchSiteRemaps;
     uint32_t nextBranchSiteID = 1;
 
@@ -949,8 +951,14 @@ struct CoverageInstrumenter
         IRGlobalParam* buf,
         SourceManager* sm,
         ArtifactPostEmitMetadata& md,
-        TargetRequest* tr)
-        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md), targetRequest(tr)
+        TargetRequest* tr,
+        bool waveAggregation)
+        : module(m)
+        , coverageBuffer(buf)
+        , sourceManager(sm)
+        , outMetadata(md)
+        , targetRequest(tr)
+        , waveAggregation(waveAggregation)
     {
         IRBuilder tmpBuilder(module);
         // The unchecked `cast` is safe: this instrumenter only ever runs
@@ -973,6 +981,10 @@ struct CoverageInstrumenter
     // the exact per-execution count, so coverage numbers are unchanged.
     bool shouldUseWaveAggregation() const
     {
+        // Opt-in only (off by default); the perf payoff is workload/GPU
+        // dependent (see #11509), so it is never applied implicitly.
+        if (!waveAggregation)
+            return false;
         if (targetRequest == nullptr || !isSPIRV(targetRequest->getTarget()))
             return false;
         // The synthesized counter element is always uint or uint64 (see
@@ -1337,6 +1349,7 @@ void instrumentCoverage(
     const int* reservedSpaces,
     int reservedSpaceCount,
     int counterByteWidth,
+    bool waveAggregation,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
@@ -1493,7 +1506,8 @@ void instrumentCoverage(
         buffer,
         sink ? sink->getSourceManager() : nullptr,
         outMetadata,
-        targetRequest);
+        targetRequest,
+        waveAggregation);
     instrumenter.run(markerOps);
 }
 

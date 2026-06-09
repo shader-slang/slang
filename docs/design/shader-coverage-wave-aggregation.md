@@ -1,8 +1,14 @@
 # Shader coverage: wave-aggregated counter increments (design notes)
 
 Tracking issue: [#11509](https://github.com/shader-slang/slang/issues/11509).
-Status: **implemented for SPIR-V (both uint32 and the default uint64);
-follow-ups remain.** The emit-side recipe below is wired up: coverage emits
+Status: **implemented for SPIR-V (both uint32 and the default uint64),
+opt-in and OFF by default; follow-ups remain.** Enable with
+`-trace-coverage-wave-aggregation` (`CompilerOptionName::TraceCoverageWaveAggregation`).
+It is opt-in because the perf payoff is workload/GPU-dependent and did not
+materialize on an NVIDIA RTX A3000 laptop (the per-line subgroup reduce/elect
+overhead roughly cancels the reduced atomic contention — see "Measured result"
+at the end); the per-lane atomic remains the default. The emit-side recipe
+below is wired up: coverage emits
 two IR ops (`coverageActiveLaneCount`, `coverageElectFirstLane`) inside an
 `if`-guard, and the SPIR-V backend lowers them to `OpGroupNonUniformIAdd
 (Reduce)` / `OpGroupNonUniformElect`. The gate is the **direct SPIR-V backend**
@@ -290,3 +296,20 @@ The single emission site is `CoverageInstrumenter::lowerMarkerOp` in
 `source/slang/slang-ir-coverage-instrument.cpp`. The atomic emission has been
 factored into `emitCoverageCounterIncrement()` so the aggregated path is a
 localized change behind a target-capability check.
+
+## Measured result (why it is opt-in / off by default)
+
+On an NVIDIA RTX A3000 laptop GPU, the `shader-coverage-image-pipeline` demo
+(1080p bilateral filter, 251 instrumented counters) showed **no speedup** from
+aggregation: coverage-on stayed ~325-450 ms/config vs ~12 ms uninstrumented
+(~25-35x), essentially unchanged from the per-lane atomic. The aggregation does
+a full subgroup reduce + elect + branch on *every* covered line (millions of
+executions in the hot loop), and that overhead roughly cancels the reduced
+atomic contention. Apple GPUs coalesce atomics in hardware "for free", which is
+why Metal saw only ~3x; doing it explicitly in the shader is not free.
+
+The optimization is therefore left **off by default**, pending a measurement on
+a desktop/datacenter NVIDIA GPU (or different driver) where the atomic-contention
+gap might favor it. Note that coverage is a test/dev feature, so its runtime is
+not performance-critical; the important problem — GPU-watchdog crashes on long
+sweeps — is solved separately by tiling the dispatch (PR #11451), not by this.
