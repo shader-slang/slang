@@ -30,19 +30,25 @@ void main()
     //CHECK-NEXT: 0x0400
 
     // smallest half-float (subnormal)
-    h = .000000060hf;
+    h = .000000059hf;
     printf("0x%04x\n", (uint32_t)bit_cast<uint16_t>(h));
     // Note: 0000'0000'0000'0001
     //CHECK-NEXT: 0x0001
 
     // smallest half-float (subnormal) / exponent
-    h = 6.0e-8hf;
+    h = 5.9e-8hf;
     printf("0x%04x\n", (uint32_t)bit_cast<uint16_t>(h));
     // Note: 0000'0000'0000'0001
     //CHECK-NEXT: 0x0001
 
     // maximum half-float
     h = 65504.hf;
+    printf("0x%04x\n", (uint32_t)bit_cast<uint16_t>(h));
+    // Note: 0111'1011'1111'1110
+    //CHECK-NEXT: 0x7bff
+
+    // a bit over maximum half-float, rounds down to max float
+    h = 65505.hf;
     printf("0x%04x\n", (uint32_t)bit_cast<uint16_t>(h));
     // Note: 0111'1011'1111'1110
     //CHECK-NEXT: 0x7bff
@@ -96,6 +102,12 @@ void main()
 
     // maximum float
     f = 340282340000000000000000000000000000000.f;
+    printf("0x%08x\n", bit_cast<uint32_t>(f));
+    // Note: 0111'1111'0111'1111'1111'1111'1111'1111
+    //CHECK-NEXT: 0x7f7fffff
+
+    // a bit over maximum float, still converts to max float
+    f = 340282345000000000000000000000000000000.f;
     printf("0x%08x\n", bit_cast<uint32_t>(f));
     // Note: 0111'1111'0111'1111'1111'1111'1111'1111
     //CHECK-NEXT: 0x7f7fffff
