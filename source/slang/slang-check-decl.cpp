@@ -2689,7 +2689,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         if (as<BasicExpressionType>(varDecl->type.type))
         {
             auto parentDecl = getParentDecl(varDecl);
-            if (varDecl->findModifier<ConstModifier>() &&
+            if ((varDecl->findModifier<ConstModifier>() ||
+                 varDecl->findModifier<ConstExprModifier>()) &&
                 (as<NamespaceDeclBase>(parentDecl) || as<FileDecl>(parentDecl) ||
                  varDecl->findModifier<HLSLStaticModifier>()))
             {
@@ -3564,6 +3565,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
         bool isOpaque = (((int)varTypeTags & (int)TypeTag::Opaque) != 0);
         if (isOpaque && isGlobalDecl(varDecl) && !varDecl->hasModifier<ConstModifier>() &&
+            !varDecl->hasModifier<ConstExprModifier>() &&
             varDecl->hasModifier<HLSLStaticModifier>())
         {
             // Opaque type global variable must be const.

@@ -3147,9 +3147,10 @@ IntVal* SemanticsVisitor::tryFoldIndexExpr(
     auto arrayType = as<ArrayExpressionType>(type);
     if (!arrayType)
         return nullptr;
-    if (!varDecl->hasModifier<ConstModifier>())
+    if (!varDecl->hasModifier<ConstModifier>() && !varDecl->hasModifier<ConstExprModifier>())
         return nullptr;
-    if (isGlobalDecl(varDecl) && !varDecl->hasModifier<HLSLStaticModifier>())
+    if (isGlobalDecl(varDecl) && !varDecl->hasModifier<HLSLStaticModifier>() &&
+        !varDecl->hasModifier<ConstExprModifier>())
         return nullptr;
     if (!varDecl->initExpr)
         return nullptr;
