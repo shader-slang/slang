@@ -122,9 +122,50 @@ So the pass cannot just inline `WaveActiveSum(1)` / `WaveIsFirstLane()`.
    deliberately late (post-specialization) so it counts the final, specialized
    code; moving it changes coverage semantics.
 
-**Recommendation: approach 1.** It reuses the capability system and per-target
-lowering, keeps the coverage pass target-agnostic, and gives the fallback for
-free.
+**Recommendation (superseded — see spike result below): approach 1.** It reuses
+the capability system and per-target lowering, keeps the coverage pass
+target-agnostic, and gives the fallback for free.
+
+## SPIR-V de-risk spike result (approach 1 does NOT work)
+
+A spike implemented approach 1 for SPIR-V end to end: a `[KnownBuiltin]`
+`export`-ed `__coverageCounterIncrementWaveAggregated(RWStructuredBuffer<uint>,
+uint)` helper in `hlsl.meta.slang` with the validated wave body; a force-copy
+case in `slang-ir-link.cpp`; and a gated call-emission in the pass
+(`shouldUseWaveAggregation()` → emit `Call(helper, buffer, slot)` for
+Khronos/uint, else the per-lane atomic).
+
+**Outcome: the helper never reaches the post-link pass.** The compiled SPIR-V
+still showed only per-lane `OpAtomicIAdd %uint … %uint_1`; `shouldUseWaveAggregation()`
+returned false because the helper was absent from the module. Investigation
+(`-dump-ir-after linkIR`) showed the helper — and even `NullDifferential`, the
+force-copy precedent — are **absent from the linked IR for a plain compute
+compile**. Root cause: `linkIR` is demand-driven; unreferenced symbols are not
+retained even with `[KnownBuiltin]` + `export` + a `shouldCopy` force-copy case.
+`NullDifferential` only persists in autodiff flows because the autodiff pass
+*emits a reference to it* before dead-code elimination. The coverage helper has
+no reference until the pass emits the call — which is too late — and there is no
+on-demand "import a core-module function by name into the current module" API
+for a post-link pass to use.
+
+**Conclusion: pivot to approach 2 (emit-side lowering).** The coverage pass
+keeps emitting a primitive it can always produce — either the existing
+`kIROp_AtomicAdd` tagged with a decoration, or a dedicated
+`kIROp_CoverageCounterIncrement` — and the per-target emitters lower it to the
+wave-aggregated native sequence (the SPIR-V form is already validated:
+`OpGroupNonUniformIAdd Reduce` + `OpGroupNonUniformElect` + `OpAtomicIAdd`). The
+conditional is awkward to synthesize in the emitter (it works per-inst, not in
+blocks), so the most practical shape is: the pass emits the *blocks* (an `if`
+guarding the atomic) and a small marked op for "active-lane count", which the
+emitter lowers to the subgroup reduce/elect. Start with SPIR-V (highest value;
+NVIDIA is the worst case), then HLSL/CUDA.
+
+**Revised estimate:** ~1 week for the SPIR-V path (emitter work + the IR-op/
+decoration + tests), i.e. the "worst case" bucket from the original estimate —
+the clean helper-call route is closed. An alternative worth weighing is moving
+coverage-marker *lowering* earlier (before stdlib specialization) so high-level
+wave intrinsics are usable; rejected so far because it changes which
+(specialized) code coverage counts.
 
 ## Validated emission
 
