@@ -408,7 +408,19 @@ struct CompiledShader
 // driver that supports `VK_KHR_shader_atomic_int64`; pass 32 on
 // runtimes that do not (most notably MoltenVK on Apple Silicon as of
 // MoltenVK 1.4).
-CompiledShader compileShader(bool enableCoverage, int counterWidthBits)
+//
+// `hitMiss` selects between the two coverage recording modes:
+//   - `false` (Count, default): each counter is incremented with an
+//     atomic add per hit; the slot holds an exact execution count.
+//   - `true` (Boolean, opted into via `-trace-coverage-hit-miss`):
+//     each counter is written non-atomically with `1`; the slot is
+//     `0` if the entry never executed, non-zero otherwise. This
+//     removes all atomic contention (the dominant cost on hot loops)
+//     at the price of losing exact counts. Most line / function /
+//     branch coverage only needs covered-or-not, so hit/miss is the
+//     practical choice for those reports — the LCOV converter treats
+//     any positive count as "covered" either way.
+CompiledShader compileShader(bool enableCoverage, int counterWidthBits, bool hitMiss)
 {
     ComPtr<slang::IGlobalSession> globalSession;
     checkSlang(slang::createGlobalSession(globalSession.writeRef()), "createGlobalSession");
@@ -448,6 +460,11 @@ CompiledShader compileShader(bool enableCoverage, int counterWidthBits)
         widthOpt.value.kind = slang::CompilerOptionValueKind::Int;
         widthOpt.value.intValue0 = counterWidthBits / 8;
         options.push_back(widthOpt);
+
+        // Hit/miss mode opts the coverage pass into non-atomic stores
+        // of `1` instead of atomic adds. Off (count mode) by default.
+        if (hitMiss)
+            pushBool(slang::CompilerOptionName::TraceCoverageHitMiss);
     }
 
     const std::string searchPath = getDemoDirectory().string();
@@ -647,6 +664,14 @@ int main(int argc, char** argv)
         // `VK_KHR_shader_atomic_int64` to exercise the wider counters and
         // match the compiler-side default.
         int counterWidthBits = 32;
+        // `--coverage-mode=count` (default) records exact execution
+        // counts via atomic add; `--coverage-mode=hit-miss` records
+        // covered-or-not via non-atomic stores of `1`, which removes
+        // all atomic contention and runs roughly an order of
+        // magnitude faster on this demo at the cost of exact counts.
+        // The LCOV report is the same in both modes (any positive
+        // count is "covered").
+        bool coverageHitMiss = false;
         for (int i = 1; i < argc; ++i)
         {
             std::string_view a = argv[i];
@@ -662,6 +687,10 @@ int main(int argc, char** argv)
                 counterWidthBits = 32;
             else if (a == "--counter-width=64")
                 counterWidthBits = 64;
+            else if (a == "--coverage-mode=count")
+                coverageHitMiss = false;
+            else if (a == "--coverage-mode=hit-miss")
+                coverageHitMiss = true;
             else
             {
                 std::cerr << "unknown arg: " << a << "\n";
@@ -669,11 +698,13 @@ int main(int argc, char** argv)
             }
         }
 
+        const char* coverageModeLabel = coverageHitMiss ? "hit-miss" : "count";
         std::cout << "compiling bvh_traverse.slang"
                   << (enableCoverage ? " (coverage on, " : " (no coverage")
-                  << (enableCoverage ? (std::to_string(counterWidthBits) + "-bit counters)\n")
+                  << (enableCoverage ? (std::to_string(counterWidthBits) + "-bit counters, " +
+                                        coverageModeLabel + " mode)\n")
                                      : ")\n");
-        auto shader = compileShader(enableCoverage, counterWidthBits);
+        auto shader = compileShader(enableCoverage, counterWidthBits, coverageHitMiss);
 
         uint32_t counterCount = 0;
         uint32_t counterByteWidth = 4;

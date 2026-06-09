@@ -45,6 +45,28 @@ The wall-clock time is printed for the dispatch loop so you can
 measure the coverage instrumentation overhead by comparing
 `--coverage` vs `--no-coverage` runs at the same `--mode=`.
 
+## Picking a coverage mode
+
+`--coverage-mode=count` (default) records exact execution counts via
+atomic add. The bilateral filter's inner loop contends heavily on a
+few counter slots, so on this workload count mode is the dominant
+cost of instrumentation (the section below on tiling describes the
+mitigation for the resulting wall-time blow-up).
+
+`--coverage-mode=hit-miss` records covered-or-not instead — each slot
+is written non-atomically with `1` the first time it executes.
+Concurrent same-value stores are a benign race. This removes all
+atomic contention, so the exhaustive sweep runs roughly an order of
+magnitude faster while still producing the same LCOV report (any
+positive count is "covered", which is exactly what hit-miss
+preserves). Pick `count` when you need exact execution counts; pick
+`hit-miss` when you just want to know which paths fired.
+
+```bash
+# Same coverage map, much faster on the exhaustive sweep:
+./shader-coverage-image-pipeline --mode=exhaustive --coverage-mode=hit-miss
+```
+
 ## Why the dispatch is tiled
 
 Each config does **not** run as one whole-image dispatch — it is split

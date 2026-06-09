@@ -36,7 +36,16 @@ uploads, and dispatches 512×512 = 262144 rays from a synthetic camera.
 
 # Compile-time disable coverage instrumentation (baseline):
 ./shader-coverage-bvh-traversal --mode=stress --no-coverage
+
+# Hit/miss mode — non-atomic, no execution counts but same coverage map:
+./shader-coverage-bvh-traversal --mode=stress --coverage-mode=hit-miss
 ```
+
+`--coverage-mode=count` (default) records exact execution counts via
+atomic add. `--coverage-mode=hit-miss` records covered-or-not via
+non-atomic stores of `1`, removing all atomic contention; the LCOV
+report is identical because the converter treats any positive count
+as "covered".
 
 Each coverage run writes:
 
