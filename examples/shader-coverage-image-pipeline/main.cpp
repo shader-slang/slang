@@ -475,6 +475,14 @@ int main(int argc, char** argv)
         // with `hit-miss`, atomic contention is gone and whole-image
         // dispatches are typically safe even on hot pipelines.
         bool tiledDispatch = true;
+        // `--output-dir=<path>`: explicit output location for the three
+        // coverage artifacts (manifest JSON, LCOV, raw counter buffer).
+        // Empty (default) means use `getDemoDirectory()` — source dir
+        // when running from the tree, current working directory as the
+        // robustness fallback. When set, the demo creates the directory
+        // if needed.
+        std::filesystem::path outputDir;
+        constexpr std::string_view kOutputDirFlag = "--output-dir=";
         for (int i = 1; i < argc; ++i)
         {
             std::string_view a = argv[i];
@@ -498,6 +506,8 @@ int main(int argc, char** argv)
                 tiledDispatch = true;
             else if (a == "--dispatch=whole")
                 tiledDispatch = false;
+            else if (a.substr(0, kOutputDirFlag.size()) == kOutputDirFlag)
+                outputDir = std::string(a.substr(kOutputDirFlag.size()));
             else
             {
                 std::cerr << "unknown arg: " << a << "\n";
@@ -711,7 +721,20 @@ int main(int argc, char** argv)
         auto summary = summarize(shader.coverageMetadata, hits);
         printSummary(mode.c_str(), summary);
 
-        const auto outDir = getDemoDirectory();
+        // Resolve the output directory. When `--output-dir` is unset,
+        // fall back to the demo directory (source tree during
+        // development, current working directory under the robustness
+        // fallback). When set, `create_directories` makes the path on
+        // demand — `fail()` on error so a typo doesn't silently land
+        // artifacts somewhere unexpected.
+        std::filesystem::path outDir = outputDir.empty() ? getDemoDirectory() : outputDir;
+        if (!outputDir.empty())
+        {
+            std::error_code ec;
+            std::filesystem::create_directories(outDir, ec);
+            if (ec)
+                fail("could not create output directory " + outDir.string() + ": " + ec.message());
+        }
         writeManifest(shader.coverageMetadata, outDir / (mode + ".coverage-manifest.json"));
         writeLcov(
             shader.coverageMetadata,

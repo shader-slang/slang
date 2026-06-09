@@ -35,6 +35,11 @@ The coverage delta between the two runs is the demo's headline.
 # Single whole-image dispatch per config instead of horizontal tiles
 # (see "Why the dispatch is tiled" below for what tiling buys you):
 ./shader-coverage-image-pipeline --mode=exhaustive --dispatch=whole
+
+# Write the coverage artifacts somewhere other than the demo's source
+# directory (the default). `--output-dir` creates the directory if
+# needed:
+./shader-coverage-image-pipeline --mode=exhaustive --output-dir=./out
 ```
 
 Each coverage run writes alongside the executable:

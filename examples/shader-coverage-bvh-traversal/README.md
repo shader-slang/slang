@@ -39,6 +39,11 @@ uploads, and dispatches 512×512 = 262144 rays from a synthetic camera.
 
 # Hit/miss mode — non-atomic, no execution counts but same coverage map:
 ./shader-coverage-bvh-traversal --mode=stress --coverage-mode=hit-miss
+
+# Write the coverage artifacts somewhere other than the demo's source
+# directory (the default). `--output-dir` creates the directory if
+# needed:
+./shader-coverage-bvh-traversal --mode=stress --output-dir=./out
 ```
 
 `--coverage-mode=count` (default) records exact execution counts via
