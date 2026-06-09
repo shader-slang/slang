@@ -3955,6 +3955,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     /// Emit the given `irFunc` to SPIR-V
     SpvInst* emitFunc(IRFunc* irFunc)
     {
+        // Declare any capabilities required by pointer types in the function's
+        // signature before emitting it (issue #11518). This covers non-inlined
+        // functions whose signature is the only place a Workgroup/StorageBuffer
+        // pointer appears.
+        requireFunctionTypeCapabilitiesIfNeeded(as<IRFuncType>(irFunc->getDataType()));
+
         // [2.4: Logical Layout of a Module]
         //
         // > All function declarations ("declarations" are functions
@@ -11324,6 +11330,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 break;
             }
         }
+    }
+
+    // Capabilities for variable pointers are normally declared from value
+    // materialization sites (variable/load/store/element-pointer). A pointer
+    // that appears only in the signature of a function that is not inlined
+    // (e.g. a `[noinline]` groupshared-pointer helper) never reaches such a
+    // site, so its `SPV_KHR_variable_pointers` requirement would be silently
+    // omitted, producing invalid SPIR-V (see shader-slang/slang#11518). Walk
+    // the signature's result and parameter types so the capability follows the
+    // surviving signature. Requires are idempotent, so any overlap with
+    // value-site declarations is harmless.
+    void requireFunctionTypeCapabilitiesIfNeeded(IRFuncType* funcType)
+    {
+        if (!funcType)
+            return;
+        requireVariableBufferCapabilityIfNeeded(funcType->getResultType());
+        for (UInt i = 0; i < funcType->getParamCount(); i++)
+            requireVariableBufferCapabilityIfNeeded(funcType->getParamType(i));
     }
 
     // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
