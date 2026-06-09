@@ -91,25 +91,42 @@ def _t(timers, name):
 
 
 def buckets(timers):
-    """Mutually-exclusive {bucket: ms} summing to compileInner. Leaves keep their
-    name; each parent contributes '<parent> (self)' = parent − Σ measured children
-    (clamped at 0). Absent timers count as 0."""
+    """Mutually-exclusive {bucket: ms} that sum to compileInner, allocated TOP-DOWN
+    from the compileInner budget. Each parent places its measured children within
+    its budget; the remainder is '<parent> (self)'.
+
+    Slang's phase timers are not perfectly additive — named sub-timers can sum to
+    MORE than their parent (e.g. specializeModule + simplifyIR + … exceed
+    linkAndOptimizeIR after the v2026.7 specialization/autodiff work). When that
+    happens the children are scaled proportionally to fit the parent's budget, so
+    the overshoot stays LOCAL instead of propagating up and zeroing an ancestor's
+    self-time (which previously made generateOutput (self) vanish at v2026.7).
+    Either way the buckets sum exactly to compileInner."""
     out = {}
 
-    def walk(node):
+    def alloc(node, budget):
         name, children = node
-        total = _t(timers, name)
+        if budget <= 0:
+            return
         if not children:
-            out[name] = out.get(name, 0.0) + total
-            return total
-        child_sum = sum(walk(c) for c in children)
-        self_ms = max(total, child_sum) - child_sum  # >=0; tolerate parent<Σ noise
-        if self_ms > 0:
-            label = f"{name} (self)"
-            out[label] = out.get(label, 0.0) + self_ms
-        return max(total, child_sum)
+            out[name] = out.get(name, 0.0) + budget
+            return
+        cm = [(c, _t(timers, c[0])) for c in children]
+        csum = sum(v for _, v in cm)
+        if csum > budget and csum > 0:
+            scale = budget / csum  # children overshoot parent -> fit proportionally
+            for c, v in cm:
+                if v > 0:
+                    alloc(c, v * scale)
+        else:
+            for c, v in cm:
+                if v > 0:
+                    alloc(c, v)
+            self_ms = budget - csum
+            if self_ms > 0.05:
+                out[f"{name} (self)"] = out.get(f"{name} (self)", 0.0) + self_ms
 
-    walk(TREE)
+    alloc(TREE, _t(timers, "compileInner"))
     return out
 
 
