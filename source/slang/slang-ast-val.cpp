@@ -2030,101 +2030,6 @@ Val* TypeCastIntVal::_resolveImplOverride()
     return this;
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncCallIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-void FuncCallIntVal::_toTextOverride(StringBuilder& out)
-{
-    auto args = getArgs();
-    auto funcDeclRef = getFuncDeclRef();
-
-    auto argToText = [&](int index)
-    {
-        if (as<PolynomialIntVal>(args[index]) || as<FuncCallIntVal>(args[index]))
-        {
-            out << "(";
-            args[index]->toText(out);
-            out << ")";
-        }
-        else
-        {
-            args[index]->toText(out);
-        }
-    };
-    Name* name = funcDeclRef.getName();
-    if (args.getCount() == 2)
-    {
-        argToText(0);
-        out << (name ? name->text : "");
-        argToText(1);
-        ;
-    }
-    else if (args.getCount() == 1)
-    {
-        out << (name ? name->text : "");
-        argToText(0);
-    }
-    else if (name && name->text == "?:")
-    {
-        argToText(0);
-        out << "?";
-        argToText(1);
-        out << ":";
-        argToText(2);
-    }
-    else
-    {
-        if (name)
-        {
-            out << name->text;
-        }
-        out << "(";
-        for (Index i = 0; i < args.getCount(); i++)
-        {
-            if (i > 0)
-                out << ", ";
-            args[i]->toText(out);
-        }
-        out << ")";
-    }
-}
-
-Val* FuncCallIntVal::_resolveImplOverride()
-{
-    auto astBuilder = getCurrentASTBuilder();
-    auto args = getArgs();
-    auto funcDeclRef = getFuncDeclRef();
-    auto funcType = getFuncType();
-
-    Val* resolvedVal = this;
-
-    auto newFuncDeclRef = as<DeclRefBase>(funcDeclRef.declRefBase->resolve());
-    if (!newFuncDeclRef)
-        return this;
-    bool diff = false;
-    List<IntVal*> newArgs;
-    for (auto arg : args)
-    {
-        auto newArg = as<IntVal>(arg->resolve());
-        if (!newArg)
-            return this;
-        newArgs.add(newArg);
-        if (newArg != arg)
-            diff = true;
-    }
-
-    if (auto resolved = tryFoldImpl(astBuilder, getType(), newFuncDeclRef, newArgs, nullptr))
-        resolvedVal = resolved;
-    else if (diff)
-    {
-        resolvedVal = astBuilder->getOrCreate<FuncCallIntVal>(
-            getType(),
-            newFuncDeclRef,
-            funcType,
-            newArgs.getArrayView());
-    }
-    return resolvedVal;
-}
-
 // Fold a constant integer shift. Negative counts leave the value symbolic (returns false);
 // out-of-range counts are masked to the operand width, matching common hardware behavior and
 // avoiding C++ undefined behavior. Shared by every constant-folding path so `x << y` produces
@@ -2144,171 +2049,6 @@ static bool _tryFoldConstantShift(
                     static_cast<std::make_unsigned_t<IntegerLiteralValue>>(base) << shiftCount)
               : (base >> shiftCount);
     return true;
-}
-
-Val* FuncCallIntVal::tryFoldImpl(
-    ASTBuilder* astBuilder,
-    Type* resultType,
-    DeclRef<Decl> newFuncDecl,
-    List<IntVal*>& newArgs,
-    DiagnosticSink* sink)
-{
-    // Are all args const now?
-    List<ConstantIntVal*> constArgs;
-    bool allConst = true;
-    for (auto arg : newArgs)
-    {
-        if (auto c = as<ConstantIntVal>(arg))
-        {
-            constArgs.add(c);
-        }
-        else
-        {
-            allConst = false;
-            break;
-        }
-    }
-    if (allConst)
-    {
-        // Evaluate the function.
-        auto opName = newFuncDecl.getName();
-        SLANG_ASSERT(opName);
-
-        const auto opNameSlice = opName->text.getUnownedSlice();
-
-        IntegerLiteralValue resultValue = 0;
-
-        // Define convenience macros.
-        // The last macro used in the list *must* be
-        // TERMINATING_CASE, as this handles the closing else, and matches if nothing else does.
-
-#define BINARY_OPERATOR_CASE(op)                                            \
-    if (opNameSlice == toSlice(#op))                                        \
-    {                                                                       \
-        resultValue = constArgs[0]->getValue() op constArgs[1]->getValue(); \
-    }                                                                       \
-    else
-
-#define DIV_OPERATOR_CASE(op)                                                                \
-    if (opNameSlice == toSlice(#op))                                                         \
-    {                                                                                        \
-        if (constArgs[1]->getValue() == 0)                                                   \
-        {                                                                                    \
-            if (sink)                                                                        \
-                sink->diagnose(Diagnostics::DivideByZero{.location = newFuncDecl.getLoc()}); \
-            return nullptr;                                                                  \
-        }                                                                                    \
-        resultValue = constArgs[0]->getValue() op constArgs[1]->getValue();                  \
-    }                                                                                        \
-    else
-
-#define LOGICAL_OPERATOR_CASE(op)                                                          \
-    if (opNameSlice == toSlice(#op))                                                       \
-    {                                                                                      \
-        resultValue =                                                                      \
-            (((constArgs[0]->getValue() != 0) op(constArgs[1]->getValue() != 0)) ? 1 : 0); \
-    }                                                                                      \
-    else
-
-
-#define SPECIAL_OPERATOR_CASE(op, IF_MATCH) \
-    if (opNameSlice == toSlice(op))         \
-    {                                       \
-        IF_MATCH                            \
-    }                                       \
-    else
-
-#define TERMINATING_CASE(MATCH) {MATCH}
-
-        // Handle the cases using the macros
-        BINARY_OPERATOR_CASE(>=)
-        BINARY_OPERATOR_CASE(<=)
-        BINARY_OPERATOR_CASE(>)
-        BINARY_OPERATOR_CASE(<)
-        BINARY_OPERATOR_CASE(!=)
-        BINARY_OPERATOR_CASE(==)
-        SPECIAL_OPERATOR_CASE("<<",
-                              if (!_tryFoldConstantShift(
-                                      constArgs[0]->getValue(),
-                                      constArgs[1]->getValue(),
-                                      /*isLeftShift*/ true,
-                                      resultValue)) return nullptr;)
-        SPECIAL_OPERATOR_CASE(">>",
-                              if (!_tryFoldConstantShift(
-                                      constArgs[0]->getValue(),
-                                      constArgs[1]->getValue(),
-                                      /*isLeftShift*/ false,
-                                      resultValue)) return nullptr;)
-        BINARY_OPERATOR_CASE(&)
-        BINARY_OPERATOR_CASE(|)
-        BINARY_OPERATOR_CASE(^)
-        DIV_OPERATOR_CASE(/)
-        DIV_OPERATOR_CASE(%)
-        LOGICAL_OPERATOR_CASE(&&)
-        LOGICAL_OPERATOR_CASE(||)
-        // Special cases need their "operator" names quoted.
-        SPECIAL_OPERATOR_CASE("!", resultValue = ((constArgs[0]->getValue() == 0) ? 1 : 0);)
-        SPECIAL_OPERATOR_CASE("~", resultValue = ~constArgs[0]->getValue();)
-        SPECIAL_OPERATOR_CASE("?:",
-                              resultValue = constArgs[0]->getValue() != 0
-                                                ? constArgs[1]->getValue()
-                                                : constArgs[2]->getValue();)
-        TERMINATING_CASE(SLANG_UNREACHABLE("constant folding of FuncCallIntVal");)
-
-        return astBuilder->getIntVal(resultType, resultValue);
-
-        // The macros for the cases are no longer needed so undef them all.
-#undef BINARY_OPERATOR_CASE
-#undef DIV_OPERATOR_CASE
-#undef LOGICAL_OPERATOR_CASE
-#undef SPECIAL_OPERATOR_CASE
-#undef TERMINATING_CASE
-    }
-    return nullptr;
-}
-
-Val* FuncCallIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
-{
-    List<IntVal*> newArgs;
-    for (auto arg : getArgs())
-        newArgs.add(as<IntVal>(arg->linkTimeResolve(map)));
-    return tryFoldImpl(getCurrentASTBuilder(), getType(), getFuncDeclRef(), newArgs, nullptr);
-}
-
-Val* FuncCallIntVal::_substituteImplOverride(
-    ASTBuilder* astBuilder,
-    SubstitutionSet subst,
-    int* ioDiff)
-{
-    int diff = 0;
-    auto newFuncDeclRef = getFuncDeclRef().substituteImpl(astBuilder, subst, &diff);
-    List<IntVal*> newArgs;
-    for (auto& arg : getArgs())
-    {
-        auto substArg = arg->substituteImpl(astBuilder, subst, &diff);
-        if (substArg != arg)
-            diff++;
-        newArgs.add(as<IntVal>(substArg));
-    }
-    *ioDiff += diff;
-    if (diff)
-    {
-        // TODO: report diagnostics back.
-        auto newVal = tryFoldImpl(astBuilder, getType(), newFuncDeclRef, newArgs, nullptr);
-        if (newVal)
-            return newVal;
-        else
-        {
-            auto result = astBuilder->getOrCreate<FuncCallIntVal>(
-                getType(),
-                newFuncDeclRef,
-                getFuncType(),
-                newArgs.getArrayView());
-            return result;
-        }
-    }
-    // Nothing found: don't substitute.
-    return this;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinOperationIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2355,6 +2095,12 @@ UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op)
         return toSlice(">>");
     case BuiltinOperationKind::Not:
         return toSlice("!");
+    case BuiltinOperationKind::Conditional:
+        return toSlice("?:");
+    case BuiltinOperationKind::And:
+        return toSlice("&&");
+    case BuiltinOperationKind::Or:
+        return toSlice("||");
     case BuiltinOperationKind::Unknown:
         break;
     }
@@ -2412,11 +2158,9 @@ BuiltinOperationKind getBuiltinOperationKindFromString(
 void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
 {
     auto args = getArgs();
-    auto opText = getBuiltinOperationOpText(getOp());
     auto argToText = [&](Index index)
     {
-        if (as<PolynomialIntVal>(args[index]) || as<FuncCallIntVal>(args[index]) ||
-            as<BuiltinOperationIntVal>(args[index]))
+        if (as<PolynomialIntVal>(args[index]) || as<BuiltinOperationIntVal>(args[index]))
         {
             out << "(";
             args[index]->toText(out);
@@ -2427,6 +2171,16 @@ void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
             args[index]->toText(out);
         }
     };
+    if (getOp() == BuiltinOperationKind::Conditional && args.getCount() == 3)
+    {
+        argToText(0);
+        out << "?";
+        argToText(1);
+        out << ":";
+        argToText(2);
+        return;
+    }
+    auto opText = getBuiltinOperationOpText(getOp());
     if (args.getCount() == 2)
     {
         argToText(0);
@@ -2462,12 +2216,13 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
     const bool isUnary =
         (op == BuiltinOperationKind::Neg || op == BuiltinOperationKind::BitNot ||
          op == BuiltinOperationKind::Not);
-    const Index expectedArgs = isUnary ? 1 : 2;
+    const Index expectedArgs = (op == BuiltinOperationKind::Conditional) ? 3 : (isUnary ? 1 : 2);
     if (constArgs.getCount() != expectedArgs)
         return nullptr;
 
     const IntegerLiteralValue a0 = constArgs[0]->getValue();
     const IntegerLiteralValue a1 = (constArgs.getCount() > 1) ? constArgs[1]->getValue() : 0;
+    const IntegerLiteralValue a2 = (constArgs.getCount() > 2) ? constArgs[2]->getValue() : 0;
     // Do the wrapping arithmetic (negate/add/sub/mul) through the unsigned type: signed
     // overflow is UB (and `-INT64_MIN` / `INT64_MIN / -1` even trap on real hardware), while
     // unsigned wraps two's-complement, matching what the target IR ops compute at runtime.
@@ -2541,6 +2296,15 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
     case BuiltinOperationKind::Rsh:
         if (!_tryFoldConstantShift(a0, a1, /*isLeftShift*/ op == BuiltinOperationKind::Lsh, r))
             return nullptr;
+        break;
+    case BuiltinOperationKind::And:
+        r = ((a0 != 0) && (a1 != 0)) ? 1 : 0;
+        break;
+    case BuiltinOperationKind::Or:
+        r = ((a0 != 0) || (a1 != 0)) ? 1 : 0;
+        break;
+    case BuiltinOperationKind::Conditional:
+        r = (a0 != 0) ? a1 : a2;
         break;
     default:
         return nullptr;

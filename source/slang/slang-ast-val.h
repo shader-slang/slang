@@ -212,61 +212,17 @@ class TypeCastIntVal : public IntVal
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
-// An compile time int val as result of some general computation.
-FIDDLE()
-class FuncCallIntVal : public IntVal
-{
-    FIDDLE(...)
-    void _toTextOverride(StringBuilder& out);
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    Val* _resolveImplOverride();
-
-    DeclRef<Decl> getFuncDeclRef() { return as<DeclRefBase>(getOperand(1)); }
-    Type* getFuncType() { return as<Type>(getOperand(2)); }
-    OperandView<IntVal> getArgs() { return OperandView<IntVal>(this, 3, getOperandCount() - 3); }
-    Index getArgCount() { return getOperandCount() - 3; }
-
-    FuncCallIntVal(
-        Type* inType,
-        DeclRef<Decl> inFuncDeclRef,
-        Type* inFuncType,
-        ArrayView<IntVal*> inArgs)
-    {
-        setOperands(inType, inFuncDeclRef, inFuncType);
-        for (auto arg : inArgs)
-            m_operands.add(ValNodeOperand(arg));
-    }
-
-    static Val* tryFoldImpl(
-        ASTBuilder* astBuilder,
-        Type* resultType,
-        DeclRef<Decl> newFuncDecl,
-        List<IntVal*>& newArgs,
-        DiagnosticSink* sink);
-
-    bool _isLinkTimeValOverride()
-    {
-        for (auto arg : getArgs())
-        {
-            if (arg->isLinkTimeVal())
-                return true;
-        }
-        return false;
-    }
-
-    Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
-};
-
 // `BuiltinOperationKind` and its helpers (`getBuiltinOperationOpText` /
 // `getBuiltinOperationKindFromString`) are declared in slang-ast-support-types.h, since they are
 // shared with the AST-level `BuiltinOperatorExpr` node.
 
 // A compile-time integer that is the result of a builtin operator applied to operands that
-// are not all concrete yet (e.g. `N / 2` for a generic value parameter `N`). Unlike
-// `FuncCallIntVal`, it identifies the operator by a `BuiltinOperationKind` enum rather than
-// a resolved operator `DeclRef`, so it can represent operators recognized by the builtin
-// fast path (which never resolve to an operator declaration). It re-evaluates on
-// substitution and folds once its operands become concrete.
+// are not all concrete yet (e.g. `N / 2` for a generic value parameter `N`). It identifies the
+// operator by a `BuiltinOperationKind` enum rather than a resolved operator `DeclRef`, so it is
+// the single `IntVal` representation for a builtin operator whether the expression was rewritten
+// by the fast path (`BuiltinOperatorExpr`) or reached as a resolved operator call (`?:`, `&&`,
+// `||`, or operators on enum/generic operands). It re-evaluates on substitution and folds once
+// its operands become concrete.
 FIDDLE()
 class BuiltinOperationIntVal : public IntVal
 {

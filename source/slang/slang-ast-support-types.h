@@ -1897,9 +1897,16 @@ FIDDLE() namespace Slang
         Lsh,
         Rsh,
         Not,
-        // Sentinel for "not a builtin fast-path operator" (e.g. `&&`/`||`). Never stored on a
-        // node and never serialized, so it is kept last to preserve the append-only integer
-        // values of the real operators above.
+        // `?:` / `&&` / `||`. These are never produced by the fast-path `BuiltinOperatorExpr`
+        // (`?:` is not an infix operator and `&&`/`||` are short-circuiting), but a *resolved*
+        // operator call on them can still fold to a compile-time-constant `BuiltinOperationIntVal`
+        // (e.g. `cond ? N : M` in an array size). Appended after the real fast-path ops above.
+        Conditional,
+        And,
+        Or,
+        // Sentinel for "not a builtin fast-path operator". Returned by
+        // `getBuiltinOperationKindFromString` for operators the fast path does not rewrite (e.g.
+        // `&&`/`||`/`?:`). Never stored on a node and never serialized, so it is kept last.
         Unknown,
     };
 

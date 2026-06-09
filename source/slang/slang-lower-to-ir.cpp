@@ -1834,89 +1834,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             lowerType(context, getType(context->astBuilder, val->getDeclRef())));
     }
 
-    LoweredValInfo visitFuncCallIntVal(FuncCallIntVal* val)
-    {
-        TryClauseEnvironment tryEnv;
-        List<IRInst*> args;
-        IRType* specConstRateType = nullptr;
-        for (auto arg : val->getArgs())
-        {
-            auto loweredArg = lowerVal(context, arg);
-            args.add(loweredArg.val);
-            if (!specConstRateType && isSpecConstRateType(loweredArg.val->getFullType()))
-                specConstRateType = loweredArg.val->getFullType();
-        }
-        auto funcType = lowerType(context, val->getFuncType());
-        auto funcResType = maybeAddRateType(
-            getBuilder(),
-            specConstRateType,
-            as<IRFuncType>(funcType)->getResultType());
-
-        // Check for operators and emit constexpr ops instead of calls.
-        // This ensures that compile-time integer expressions get hoistable,
-        // deduplicatable IR instructions.
-        auto funcName = val->getFuncDeclRef().getName();
-        if (funcName)
-        {
-            auto nameSlice = funcName->text.getUnownedSlice();
-            auto builder = getBuilder();
-
-            // Binary operators (2 args)
-#define CONSTEXPR_BINARY_OP(opStr, emitMethod)                                             \
-    if (nameSlice == toSlice(opStr) && args.getCount() == 2)                               \
-    {                                                                                      \
-        return LoweredValInfo::simple(builder->emitMethod(funcResType, args[0], args[1])); \
-    }                                                                                      \
-    else
-
-            // Arithmetic (+,*,- are handled by PolynomialIntVal)
-            CONSTEXPR_BINARY_OP("/", emitConstexprDiv)
-            CONSTEXPR_BINARY_OP("%", emitConstexprIRem)
-            // Shifts
-            CONSTEXPR_BINARY_OP("<<", emitConstexprShl)
-            CONSTEXPR_BINARY_OP(">>", emitConstexprShr)
-            // Bitwise
-            CONSTEXPR_BINARY_OP("&", emitConstexprBitAnd)
-            CONSTEXPR_BINARY_OP("|", emitConstexprBitOr)
-            CONSTEXPR_BINARY_OP("^", emitConstexprBitXor)
-            // Comparisons
-            CONSTEXPR_BINARY_OP("==", emitConstexprEql)
-            CONSTEXPR_BINARY_OP("!=", emitConstexprNeq)
-            CONSTEXPR_BINARY_OP(">", emitConstexprGreater)
-            CONSTEXPR_BINARY_OP("<", emitConstexprLess)
-            CONSTEXPR_BINARY_OP(">=", emitConstexprGeq)
-            CONSTEXPR_BINARY_OP("<=", emitConstexprLeq)
-            // Logical
-            CONSTEXPR_BINARY_OP("&&", emitConstexprAnd)
-            CONSTEXPR_BINARY_OP("||", emitConstexprOr)
-
-#undef CONSTEXPR_BINARY_OP
-
-            // Unary operators (1 arg)
-            if (nameSlice == toSlice("!") && args.getCount() == 1)
-            {
-                return LoweredValInfo::simple(builder->emitConstexprNot(funcResType, args[0]));
-            }
-            else if (nameSlice == toSlice("~") && args.getCount() == 1)
-            {
-                return LoweredValInfo::simple(builder->emitConstexprBitNot(funcResType, args[0]));
-            }
-            // Ternary select (?:) operator (3 args)
-            else if (nameSlice == toSlice("?:") && args.getCount() == 3)
-            {
-                return LoweredValInfo::simple(
-                    builder->emitConstexprSelect(funcResType, args[0], args[1], args[2]));
-            }
-        }
-
-        // TODO: Eventually, we might want to have a hoistable "Call" instruction to emit const-expr
-        // calls.
-        //
-        auto resVal =
-            emitCallToDeclRef(context, funcResType, val->getFuncDeclRef(), funcType, args, tryEnv);
-        return resVal;
-    }
-
     LoweredValInfo visitBuiltinOperationIntVal(BuiltinOperationIntVal* val)
     {
         List<IRInst*> args;
@@ -1931,8 +1848,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto builder = getBuilder();
         auto resType =
             maybeAddRateType(builder, specConstRateType, lowerType(context, val->getType()));
-        // Emit the corresponding hoistable constexpr IR op (mirrors visitFuncCallIntVal's
-        // builtin-operator dispatch, but keyed on the operator enum since there is no decl).
+        // Emit the corresponding hoistable constexpr IR op, keyed on the operator enum.
         switch (val->getOp())
         {
         case BuiltinOperationKind::Add:
@@ -1973,6 +1889,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             return LoweredValInfo::simple(builder->emitConstexprShr(resType, args[0], args[1]));
         case BuiltinOperationKind::Not:
             return LoweredValInfo::simple(builder->emitConstexprNot(resType, args[0]));
+        case BuiltinOperationKind::And:
+            return LoweredValInfo::simple(builder->emitConstexprAnd(resType, args[0], args[1]));
+        case BuiltinOperationKind::Or:
+            return LoweredValInfo::simple(builder->emitConstexprOr(resType, args[0], args[1]));
+        case BuiltinOperationKind::Conditional:
+            return LoweredValInfo::simple(
+                builder->emitConstexprSelect(resType, args[0], args[1], args[2]));
         case BuiltinOperationKind::Unknown:
             break;
         }
@@ -5357,10 +5280,14 @@ struct ExprLoweringContext
         case BuiltinOperationKind::Rsh:
             op = kIROp_Rsh;
             break;
+        case BuiltinOperationKind::Conditional:
+        case BuiltinOperationKind::And:
+        case BuiltinOperationKind::Or:
         case BuiltinOperationKind::Unknown:
-            // `convertToBuiltinArithmeticOp` never produces a `BuiltinOperatorExpr` for an
-            // operator with no builtin form, so a node with `Unknown` should not exist.
-            SLANG_UNEXPECTED("BuiltinOperatorExpr with Unknown operation kind");
+            // `convertToBuiltinArithmeticOp` never produces a `BuiltinOperatorExpr` for `?:`,
+            // `&&`, `||` (short-circuit/ternary, not fast-pathed) or for an unrecognized
+            // operator, so a node with these kinds should not exist.
+            SLANG_UNEXPECTED("BuiltinOperatorExpr with non-fast-path operation kind");
             break;
         }
         return LoweredValInfo::simple(

@@ -378,14 +378,6 @@ void emitVal(ManglingContext* context, Val* val)
         emitRaw(context, "k");
         emit(context, (UInt)constantIntVal->getValue());
     }
-    else if (auto funcCallIntVal = dynamicCast<FuncCallIntVal>(val))
-    {
-        emitRaw(context, "KC");
-        emit(context, funcCallIntVal->getArgs().getCount());
-        emitName(context, funcCallIntVal->getFuncDeclRef().getName());
-        for (Index i = 0; i < funcCallIntVal->getArgs().getCount(); i++)
-            emitVal(context, funcCallIntVal->getArgs()[i]);
-    }
     else if (auto builtinOpIntVal = dynamicCast<BuiltinOperationIntVal>(val))
     {
         emitRaw(context, "KB");

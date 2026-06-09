@@ -3071,10 +3071,6 @@ static LayoutSize GetElementCount(IntVal* val)
     {
         return LayoutSize::invalid();
     }
-    else if (as<FuncCallIntVal>(val))
-    {
-        return LayoutSize::invalid();
-    }
     else if (as<BuiltinOperationIntVal>(val))
     {
         return LayoutSize::invalid();

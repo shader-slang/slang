@@ -2490,28 +2490,34 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
                 return PolynomialIntVal::mul(m_astBuilder, argVals[0], argVals[1]);
             }
         }
-        else if (
-            opName == getName("/") || opName == getName("==") || opName == getName(">=") ||
-            opName == getName("<=") || opName == getName("!=") || opName == getName(">") ||
-            opName == getName("<") || opName == getName("&&") || opName == getName("||") ||
-            opName == getName("!") || opName == getName("|") || opName == getName("&") ||
-            opName == getName("^") || opName == getName("~") || opName == getName("%") ||
-            opName == getName("?:") || opName == getName("<<") || opName == getName(">>"))
+        else
         {
-            // A symbolic builtin operator from a *resolved* operator call records the
-            // resolved decl in a deferred `FuncCallIntVal` that re-evaluates once its operands
-            // become concrete. (The fast path's `BuiltinOperatorExpr` form is folded
-            // separately by `tryConstantFoldBuiltinOperatorExpr`.)
-            auto result = m_astBuilder->getOrCreate<FuncCallIntVal>(
+            // A symbolic builtin operator from a *resolved* operator call (one the fast path
+            // doesn't rewrite to a `BuiltinOperatorExpr`: `?:`/`&&`/`||`, or operators on
+            // operands like enums/generic `T` that aren't builtin scalar/vector/matrix) folds
+            // via the decl-free `BuiltinOperationIntVal`, keyed on the operator enum, which
+            // re-evaluates once its operands become concrete. This is the same representation
+            // the fast path's `BuiltinOperatorExpr` folds to, so there is exactly one `IntVal`
+            // form per operator regardless of which path reached it.
+            BuiltinOperationKind kind;
+            if (opName == getName("?:"))
+                kind = BuiltinOperationKind::Conditional;
+            else if (opName == getName("&&"))
+                kind = BuiltinOperationKind::And;
+            else if (opName == getName("||"))
+                kind = BuiltinOperationKind::Or;
+            else
+                kind = getBuiltinOperationKindFromString(
+                    getText(opName).getUnownedSlice(),
+                    argCount == 1 ? OperatorArity::Unary : OperatorArity::Binary);
+            if (kind == BuiltinOperationKind::Unknown)
+                return nullptr;
+            return m_astBuilder->getOrCreate<BuiltinOperationIntVal>(
                 invokeExpr.getExpr()->type.type,
-                funcDeclRef,
-                as<Type>(funcDeclRefExpr.getExpr()->type->substitute(
-                    m_astBuilder,
-                    funcDeclRefExpr.getSubsts())),
+                kind,
                 makeArrayView(argVals, argCount));
-            SLANG_RELEASE_ASSERT(result->getFuncType());
-            return result;
         }
+        // A `+`/`-`/`*` with an unexpected argument count falls through to here.
         return nullptr;
     }
 
