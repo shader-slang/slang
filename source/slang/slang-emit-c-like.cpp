@@ -4603,7 +4603,7 @@ void CLikeSourceEmitter::emitClass(IRClassType* classType)
             param = param->getNextParam();
             for (; param; param = param->getNextParam())
             {
-                emitParamType(param->getFullType(), getName(param));
+                emitParamType(param->getFullType(), getName(param), param);
             }
             m_writer->emit(") override;\n");
         }

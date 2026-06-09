@@ -1604,17 +1604,14 @@ static bool _canEmitExport(const Profile& profile)
 
 void HLSLSourceEmitter::emitParamTypeImpl(IRType* type, String const& name, IRInst *param) {
     // Mesh shader parameters already have their "in"/"out" qualifiers added.
-    if (param->findDecoration<IRMeshOutputDecoration>() ||
-        param->findDecoration<IRHLSLMeshPayloadDecoration>())
+    if (param &&
+        (param->findDecoration<IRMeshOutputDecoration>() ||
+          param->findDecoration<IRHLSLMeshPayloadDecoration>()))
     {
         if (auto outType = as<IROutParamType>(type))
-        {
             type = outType->getValueType();
-        }
         else if (auto constRefType = as<IRBorrowInParamType>(type))
-        {
             type = constRefType->getValueType();
-        }
     }
 
     Super::emitParamTypeImpl(type, name, param);
