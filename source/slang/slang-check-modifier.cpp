@@ -1805,6 +1805,20 @@ Modifier* SemanticsVisitor::checkModifier(
         }
     }
 
+    if (as<ConstExprModifier>(m))
+    {
+        // `constexpr` on a parameter is a supported Slang feature meaning
+        // "must be a compile-time constant at the call site". On a variable
+        // declaration it is not supported — warn and treat it as `const` so
+        // that common idioms like `static constexpr uint N = 4` compile.
+        if (as<VarDeclBase>(syntaxNode) && !as<ParamDecl>(syntaxNode))
+        {
+            getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = m});
+            auto constMod = m_astBuilder->create<ConstModifier>();
+            constMod->loc = m->loc;
+            return constMod;
+        }
+    }
     if (as<ConstModifier>(m))
     {
         if (auto varDeclBase = as<VarDeclBase>(syntaxNode))

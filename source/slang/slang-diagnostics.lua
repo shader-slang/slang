@@ -2878,6 +2878,13 @@ err(
     span { loc = "decl:Decl", message = "global const variable with initializer must be declared static: '~decl'" }
 )
 
+warning(
+    "constexpr-unsupported",
+    31227,
+    "constexpr is not a supported Slang language feature; treating as const",
+    span { loc = "modifier:Modifier", message = "constexpr is treated as const" }
+)
+
 err(
     "static-const-variable-requires-initializer",
     31225,
