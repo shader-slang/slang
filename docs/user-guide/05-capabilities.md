@@ -154,32 +154,40 @@ struct Foo1 : IFoo1
 ## Capabilities of Extensions
 
 An `extension` declaration adds members to an existing type. Because the extension can only be used
-where its target type is available, the capabilities declared on the extension itself must be
-compatible with the capabilities of the target type. Declaring an incompatible `[require(...)]`
-attribute on an extension, or on one of its non-static member functions, constructors, or
-subscripts, is an error.
+where its target type is available, the capabilities declared on the extension must not be disjoint
+from the target type's capabilities — the two capability sets must share at least one common
+target/stage (non-empty intersection). Declaring a `[require(...)]` attribute on an extension, or
+on one of its non-static member functions, constructors, or subscripts, that is disjoint from the
+target type's capabilities is an error.
 
 ```csharp
 [require(glsl)]
 struct MyType {}
 
-// Error: extension requires hlsl, but MyType only supports glsl.
+// Error: extension requires hlsl only, which is disjoint from MyType's glsl support.
 [require(hlsl)]
 extension MyType {}
 
-// Error: member requires hlsl, but MyType only supports glsl.
+// Error: member requires hlsl only, which is disjoint from MyType's glsl support.
 extension MyType
 {
     [require(hlsl)]
     void foo() {}
 }
 
-// OK: member requires glsl, which is compatible with MyType's glsl requirement.
+// OK: member requires glsl, which intersects with MyType's glsl requirement.
 extension MyType
 {
     [require(glsl)]
     void bar() {}
 }
+
+// OK: extension declares both glsl and hlsl support. The intersection with MyType's
+// [require(glsl)] is {glsl}, which is non-empty, so no error. Note that the extension
+// is still only usable on glsl — the extra hlsl claim is permitted but ineffective.
+[require(glsl)]
+[require(hlsl)]
+extension MyType {}
 ```
 
 Static extension *member functions* are exempt from this check because they can be called without

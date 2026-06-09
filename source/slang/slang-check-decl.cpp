@@ -1416,11 +1416,14 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
 
     void visitSubscriptDecl(SubscriptDecl* subscriptDecl);
 
+    void visitPropertyDecl(PropertyDecl* propertyDecl);
+
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
-    // Check that a callable extension member's own [require(...)] attributes are
+    // Check that a callable or property extension member's own [require(...)] attributes are
     // compatible with the extension's target type capabilities. Shared by
-    // visitFunctionDeclBase (functions and constructors) and visitSubscriptDecl.
+    // visitFunctionDeclBase (functions and constructors), visitSubscriptDecl, and
+    // visitPropertyDecl.
     void _checkExtensionMemberCapConflict(Decl* memberDecl);
 
     enum class UndeclaredCapabilityDiagnosticKind
@@ -19716,8 +19719,9 @@ void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extension
     visitContainerDecl(extensionDecl);
 
     // If the extension has no explicit capability requirements, there is nothing to validate
-    // at the extension level. Member functions with their own [require(...)] attributes are
-    // validated individually in visitFunctionDeclBase.
+    // at the extension level. Member functions and constructors with their own [require(...)]
+    // attributes are validated individually in visitFunctionDeclBase; subscripts and properties
+    // are validated in visitSubscriptDecl and visitPropertyDecl via _checkExtensionMemberCapConflict.
     if (!extensionDecl->inferredCapabilityRequirements ||
         extensionDecl->inferredCapabilityRequirements->isEmpty())
         return;
@@ -19945,6 +19949,12 @@ void SemanticsDeclCapabilityVisitor::visitSubscriptDecl(SubscriptDecl* subscript
 {
     visitContainerDecl(subscriptDecl);
     _checkExtensionMemberCapConflict(subscriptDecl);
+}
+
+void SemanticsDeclCapabilityVisitor::visitPropertyDecl(PropertyDecl* propertyDecl)
+{
+    visitContainerDecl(propertyDecl);
+    _checkExtensionMemberCapConflict(propertyDecl);
 }
 
 void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inheritanceDecl)

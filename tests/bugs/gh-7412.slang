@@ -132,3 +132,13 @@ extension Bar
 //CHECK:  ^^^ requires capability
 {
 }
+
+// ext13: property-level [require(hlsl)] in a [require(glsl)] extension -- should error
+extension Bar
+{
+    [require(hlsl)]
+    property int prop
+//CHECK:         ^^^^ error E36100
+//CHECK:         ^^^^ requires capability
+    { get { return 0; } }
+}

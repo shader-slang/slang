@@ -171,7 +171,14 @@ extension M
     void onlyHlsl() {}
 }
 
-// Case 16: Extension of a type-parameter (extension<T:IFoo> T).
+// Case 17: Property with compatible [require] in extension -- no error.
+extension Foo
+{
+    [require(glsl)]
+    property int prop { get { return 0; } }
+}
+
+// Case 18: Extension of a type-parameter (extension<T:IFoo> T).
 // The target is a GenericTypeParamDecl, whose inferredCapabilityRequirements is null.
 // _propagateRequirement tolerates null nodeCaps and no-ops — no error expected.
 // This is intentional: extensions on unconstrained/interface-constrained type params
