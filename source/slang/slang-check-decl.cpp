@@ -19721,7 +19721,8 @@ void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extension
     // If the extension has no explicit capability requirements, there is nothing to validate
     // at the extension level. Member functions and constructors with their own [require(...)]
     // attributes are validated individually in visitFunctionDeclBase; subscripts and properties
-    // are validated in visitSubscriptDecl and visitPropertyDecl via _checkExtensionMemberCapConflict.
+    // are validated in visitSubscriptDecl and visitPropertyDecl via
+    // _checkExtensionMemberCapConflict.
     if (!extensionDecl->inferredCapabilityRequirements ||
         extensionDecl->inferredCapabilityRequirements->isEmpty())
         return;
