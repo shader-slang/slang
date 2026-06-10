@@ -85,8 +85,15 @@ C++ but is new to this subsystem.
   `core.meta.slang` constructors; do not call it a "table" unless there is actually a table.
 - Use existing codebase terminology and names. Do not invent new terms for concepts that already
   have names in nearby code, generated modules, diagnostics, IR ops, or design docs.
-- Ground abstract rationale in one or two concrete examples, such as `float(int)` or `float3(int)`,
-  so the reader can connect the prose to the control flow.
+- Ground rationale in real examples, not abstract claims. Include a logical code trace when the
+  behavior spans components: name the upstream producer and the input form it creates, the local
+  step being performed, and the downstream consumer or invariant that expects the result. For
+  example: "X generates input form A; Y expects invariant B; this block does Z before handing the
+  value to Y." Use actual function, type, file, IR op, or diagnostic names wherever possible. A
+  good trace might say: "`core.meta.slang` exposes `float3(int)` as a generated constructor;
+  `_coerce` recognizes the builtin scalar-to-vector input before overload resolution; this block
+  creates a `BuiltinCastExpr` so `IRBuilder::emitCast` can preserve the expected
+  `MakeVectorFromScalar` IR shape."
 - When a fast path, guard, or special case preserves existing behavior, say what general path it is
   bypassing, why that is safe, and what still falls back to the general path.
 - Keep comments synchronized with nearby control flow. If a new block now runs before the old
