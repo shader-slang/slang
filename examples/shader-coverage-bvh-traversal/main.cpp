@@ -1,9 +1,12 @@
 // BVH-traversal coverage demo — raw-Vulkan host driver.
 //
 // Build a BVH over a procedural mesh on CPU, upload to GPU, trace
-// rays through it via compute shader, read back coverage. Smoke mode
-// uses a clean icosphere with one material; full mode adds extra
-// material kinds + degenerate triangles + a packed cluster.
+// 4096×4096 rays through it via compute shader, read back coverage.
+// Smoke mode uses a clean icosphere with one material; full mode adds
+// extra material kinds + degenerate triangles + a packed cluster.
+// Rays are dispatched in fixed-size batches (kBatchRays) to keep each
+// GPU submission short and avoid OS watchdog resets (Windows TDR /
+// VK_ERROR_DEVICE_LOST) under coverage instrumentation.
 //
 // All GPU-runtime calls go through `vk_compute_demo.h`. See its
 // file-level comment for the swap procedure when slang-rhi PR #739
@@ -51,8 +54,15 @@ namespace
 // ------------------------------------------------------------------------------
 constexpr uint32_t kCoverageBinding = 0;
 constexpr uint32_t kCoverageSet = 1;
-constexpr uint32_t kRayGridDim = 512;
+constexpr uint32_t kRayGridDim = 4096;
 constexpr uint32_t kRayCount = kRayGridDim * kRayGridDim;
+// Maximum rays per dispatch batch. Each batch is a separate GPU submission,
+// which caps the per-submission wall time and prevents the OS watchdog
+// (Windows TDR / VK_ERROR_DEVICE_LOST) from killing a long-running dispatch.
+// Sized to match the old single-dispatch scale (512×512) so each batch runs
+// in roughly the same time regardless of the total grid size. Increase if you
+// want fewer submissions; decrease if you observe TDR on a slow GPU.
+constexpr uint32_t kBatchRays = 512 * 512;
 
 struct Vec3
 {
@@ -120,10 +130,10 @@ static_assert(sizeof(Ray) == 32, "Ray layout mismatch");
 
 struct alignas(16) Globals
 {
-    uint32_t rayCount;
+    uint32_t rayCount;       // total rays across all batches
     uint32_t triCount;
     uint32_t nodeCount;
-    uint32_t pad;
+    uint32_t rayBatchOffset; // first ray index of the current batch (was: pad)
 };
 
 [[noreturn]] void fail(const std::string& message)
@@ -905,14 +915,39 @@ int main(int argc, char** argv)
             // -----------------------------------------------------------------------
         }
 
-        std::cout << "dispatching (coverage=" << (enableCoverage ? "on" : "off") << ")\n";
+        // Dispatch in fixed-size batches (kBatchRays rays each) to avoid any
+        // single GPU submission running long enough to trip the OS watchdog
+        // (Windows TDR / VK_ERROR_DEVICE_LOST). Each batch re-uploads globals
+        // with the new rayBatchOffset; the shader adds that offset to tid.x to
+        // recover the true ray index. The coverage buffer is NOT reset between
+        // batches — counters accumulate across the full grid, which is exactly
+        // what we want: the final buffer reflects all 4096×4096 rays.
+        //
+        // This is the BVH analogue of the image-pipeline demo's tiled dispatch.
+        // The key difference: image-pipeline tiles a 2D image by horizontal
+        // bands (tileOriginY); this demo tiles a 1D ray array by flat offset
+        // (rayBatchOffset). Both patterns are the same WAR for GPU watchdog
+        // timeouts on coverage-instrumented kernels.
+        const uint32_t totalRays = (uint32_t)rays.size();
+        uint32_t batchCount = 0;
+        std::cout << "dispatching " << totalRays << " rays in batches of " << kBatchRays
+                  << " (coverage=" << (enableCoverage ? "on" : "off") << ")\n";
         const auto renderStart = std::chrono::steady_clock::now();
-        const uint32_t groups = (kRayCount + 63) / 64;
-        ctx.dispatch(pipe, sets, groups, 1, 1);
+        for (uint32_t offset = 0; offset < totalRays; offset += kBatchRays)
+        {
+            globalsData.rayBatchOffset = offset;
+            ctx.upload(globalsBuf, &globalsData, sizeof(globalsData));
+            const uint32_t batchRays = std::min(kBatchRays, totalRays - offset);
+            const uint32_t groups = (batchRays + 63) / 64;
+            ctx.dispatch(pipe, sets, groups, 1, 1);
+            ++batchCount;
+        }
         const auto renderEnd = std::chrono::steady_clock::now();
         const double renderMs =
             std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
-        std::cout << "render wall time: " << renderMs << " ms\n";
+        std::cout << "render wall time: " << renderMs << " ms ("
+                  << batchCount << " batches, "
+                  << (renderMs / batchCount) << " ms/batch)\n";
 
         if (enableCoverage)
         {

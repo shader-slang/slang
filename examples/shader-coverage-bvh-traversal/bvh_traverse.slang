@@ -13,7 +13,11 @@ import materials;
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     Globals g = globals[0];
-    uint rayIndex = tid.x;
+    // Shift by the batch offset so each dispatch processes a different
+    // slice of the ray array. The host re-uploads globals with a new
+    // rayBatchOffset before every batch; rayCount is the total across all
+    // batches and guards the last (potentially partial) batch.
+    uint rayIndex = tid.x + g.rayBatchOffset;
     if (rayIndex >= g.rayCount)
         return;
 

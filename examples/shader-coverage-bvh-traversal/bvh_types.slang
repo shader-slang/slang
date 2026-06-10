@@ -36,7 +36,12 @@ public struct Globals
     public uint rayCount;
     public uint triCount;
     public uint nodeCount;
-    public uint pad;
+    // Offset of the first ray in the current batch. The host dispatches
+    // the full ray grid in fixed-size batches to avoid long-running GPU
+    // submissions that could trip the OS watchdog (Windows TDR /
+    // VK_ERROR_DEVICE_LOST). Each batch shifts the thread-to-ray mapping
+    // by this value; rayCount stays as the total across all batches.
+    public uint rayBatchOffset;
 }
 
 public struct HitInfo
