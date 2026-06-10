@@ -516,10 +516,7 @@ static void replacePrimitiveIDParamUses(
         });
 }
 
-bool tryLegalizeRayTracingPrimitiveIDParam(
-    IRModule* module,
-    IRBuilder& builder,
-    IRParam* param)
+bool tryLegalizeRayTracingPrimitiveIDParam(IRModule* module, IRBuilder& builder, IRParam* param)
 {
     if (!isPrimitiveIDSystemValueParam(param))
         return false;

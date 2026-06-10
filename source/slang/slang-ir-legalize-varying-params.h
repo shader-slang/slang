@@ -99,10 +99,7 @@ SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticN
 
 bool isRayTracingHitStage(Stage stage);
 
-bool tryLegalizeRayTracingPrimitiveIDParam(
-    IRModule* module,
-    IRBuilder& builder,
-    IRParam* param);
+bool tryLegalizeRayTracingPrimitiveIDParam(IRModule* module, IRBuilder& builder, IRParam* param);
 
 void legalizeRayTracingPrimitiveIDParamsForHLSL(IRModule* module);
 
