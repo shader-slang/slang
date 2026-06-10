@@ -528,16 +528,14 @@ int main(int argc, char** argv)
         // exact counts. The LCOV report is identical either way (any
         // positive count is "covered").
         bool coverageHitMiss = false;
-        // `--dispatch=tiled` (default) submits each config as a sequence
-        // of horizontal-band dispatches; see the "Why the dispatch is
-        // tiled" section in README.md for the TDR-mitigation rationale.
-        // `--dispatch=whole` submits each config as a single whole-image
-        // dispatch — convenient for measuring "all-at-once" cost or
-        // observing TDR risk directly under coverage=on / count mode.
-        // The tiled / whole choice is independent of the coverage mode;
-        // with `hit-miss`, atomic contention is gone and whole-image
-        // dispatches are typically safe even on hot pipelines.
-        bool tiledDispatch = true;
+        // `--tile-rows=N`: split each config dispatch into horizontal bands
+        // of N rows to avoid OS watchdog resets (Windows TDR /
+        // VK_ERROR_DEVICE_LOST) on coverage-instrumented runs. Default is 0
+        // (whole-image dispatch). The bilateral filter's inner loop creates
+        // heavy atomic contention on a few counters; if TDR occurs under
+        // count mode, try --tile-rows=128 or switch to --coverage-mode=hit-miss.
+        uint32_t tileRows = 0; // 0 = whole-image
+        constexpr std::string_view kTileRowsFlag = "--tile-rows=";
         // `--output-dir=<path>`: explicit output location for the three
         // coverage artifacts (manifest JSON, LCOV, raw counter buffer).
         // Empty (default) means use `getDemoDirectory()` — source dir
@@ -574,10 +572,8 @@ int main(int argc, char** argv)
                 coverageHitMiss = false;
             else if (a == "--coverage-mode=hit-miss")
                 coverageHitMiss = true;
-            else if (a == "--dispatch=tiled")
-                tiledDispatch = true;
-            else if (a == "--dispatch=whole")
-                tiledDispatch = false;
+            else if (a.substr(0, kTileRowsFlag.size()) == kTileRowsFlag)
+                tileRows = (uint32_t)std::stoul(std::string(a.substr(kTileRowsFlag.size())));
             else if (a.substr(0, kOutputDirFlag.size()) == kOutputDirFlag)
                 outputDir = std::string(a.substr(kOutputDirFlag.size()));
             else if (a.substr(0, kDemoDirFlag.size()) == kDemoDirFlag)
@@ -594,23 +590,6 @@ int main(int argc, char** argv)
         // the output-dir resolution below) sees it without each call
         // site having to thread an override parameter.
         g_demoDirOverride = demoDir;
-
-        // Warn (but don't block) on the combination most likely to trip
-        // the GPU watchdog (Windows TDR / `VK_ERROR_DEVICE_LOST`) on
-        // this demo's hot bilateral filter: count mode (atomic-add
-        // contention on a few counter slots) + whole-image dispatch
-        // (no per-submission cap). Hit-miss + whole, or count + tiled,
-        // are both safe combinations. The user explicitly asked for
-        // this configuration on the CLI, so we proceed anyway — the
-        // warning is there so a hung run gets attributed to TDR
-        // rather than to a bug in the demo.
-        if (enableCoverage && !coverageHitMiss && !tiledDispatch)
-        {
-            std::cerr << "warning: --coverage-mode=count with --dispatch=whole risks GPU watchdog\n"
-                      << "         reset (Windows TDR / VK_ERROR_DEVICE_LOST) on hot pipelines\n"
-                      << "         like this demo's bilateral filter. If the dispatch hangs, try\n"
-                      << "         --coverage-mode=hit-miss or --dispatch=tiled. Continuing.\n";
-        }
 
         // Build the parenthesized status in one place so the parentheses are
         // self-evidently balanced and a future edit to one branch can't
@@ -735,40 +714,29 @@ int main(int argc, char** argv)
                 (uint32_t)shader.coverageBinding,
                 coverageBuf);
 
-        // Two dispatch shapes are supported, selected by `--dispatch`:
+        // Default: whole-image dispatch (tileOriginY = 0, single submission
+        // per config). Pass `--tile-rows=N` to split each config into
+        // horizontal bands of N rows; the shader recovers the real pixel row
+        // as `tid.y + tileOriginY`. Tiling caps the per-submission GPU time,
+        // which prevents OS watchdog resets (Windows TDR /
+        // VK_ERROR_DEVICE_LOST) under coverage count mode on this demo's hot
+        // bilateral filter. --tile-rows=128 is a safe starting point;
+        // --coverage-mode=hit-miss also eliminates TDR risk without tiling.
         //
-        //   - `tiled` (default): each config is split into horizontal
-        //     bands of `kTileRows` rows; the band's row offset is
-        //     passed to the shader as `PipelineParams.tileOriginY` so
-        //     each band recovers its real pixel row. This caps the
-        //     per-submission GPU time. Under coverage=on with the
-        //     default count mode, every pixel performs many atomic
-        //     adds that contend on a handful of counter slots (the
-        //     bilateral filter's inner loop), so a single whole-image
-        //     dispatch can run long enough to trip the GPU watchdog
-        //     (Windows TDR / `VK_ERROR_DEVICE_LOST`). Tiling avoids
-        //     that by submitting many shorter dispatches.
-        //
-        //   - `whole`: each config is one whole-image dispatch with
-        //     `tileOriginY = 0`. Simpler, fewer submissions, but
-        //     vulnerable to TDR under count mode on hot pipelines.
-        //     Safe with `--coverage-mode=hit-miss` (no atomic
-        //     contention) or `--no-coverage` (no instrumentation
-        //     cost). Useful for "all-at-once" cost measurements or
-        //     for demonstrating TDR risk directly.
-        //
-        // Neither shape affects the coverage results: tiles partition
-        // the image, every pixel is processed exactly once, and the
-        // counter buffer accumulates across all submissions.
-        const uint32_t kTileRows = 128;
-        const uint32_t bandRowsTarget = tiledDispatch ? kTileRows : kImageHeight;
+        // Neither shape affects coverage results: tiles partition the image,
+        // every pixel is processed exactly once, and counters accumulate
+        // across all submissions.
+        const uint32_t effectiveTileRows = (tileRows == 0) ? kImageHeight : tileRows;
         const uint32_t groupsX = (kImageWidth + 7) / 8;
         uint32_t dispatchCount = 0;
 
         std::cout << "running " << configs.size() << " config(s) in mode=" << mode
-                  << " (coverage=" << (enableCoverage ? "on" : "off") << ", dispatch="
-                  << (tiledDispatch ? (std::to_string(kTileRows) + "-row tiles") : "whole-image")
-                  << ")\n";
+                  << " (coverage=" << (enableCoverage ? "on" : "off") << ", dispatch=";
+        if (tileRows > 0)
+            std::cout << tileRows << "-row tiles";
+        else
+            std::cout << "whole-image";
+        std::cout << ")\n";
 
         const auto renderStart = std::chrono::steady_clock::now();
         for (const auto& cfg : configs)
@@ -782,12 +750,12 @@ int main(int argc, char** argv)
             p.bilateralSigmaS = cfg.sigmaS;
             p.bilateralSigmaR = cfg.sigmaR;
             p.exposure = cfg.exposure;
-            for (uint32_t y0 = 0; y0 < kImageHeight; y0 += bandRowsTarget)
+            for (uint32_t y0 = 0; y0 < kImageHeight; y0 += effectiveTileRows)
             {
                 p.tileOriginY = y0;
                 ctx.upload(paramsBuf, &p, sizeof(p));
                 const uint32_t bandRows =
-                    (kImageHeight - y0 < bandRowsTarget) ? (kImageHeight - y0) : bandRowsTarget;
+                    (kImageHeight - y0 < effectiveTileRows) ? (kImageHeight - y0) : effectiveTileRows;
                 const uint32_t groupsY = (bandRows + 7) / 8;
                 ctx.dispatch(pipe, sets, groupsX, groupsY, 1);
                 ++dispatchCount;

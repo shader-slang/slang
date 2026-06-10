@@ -32,9 +32,9 @@ The coverage delta between the two runs is the demo's headline.
 # measurement):
 ./shader-coverage-image-pipeline --mode=full --no-coverage
 
-# Single whole-image dispatch per config instead of horizontal tiles
-# (see "Why the dispatch is tiled" below for what tiling buys you):
-./shader-coverage-image-pipeline --mode=full --dispatch=whole
+# Tile each config into 128-row horizontal bands to avoid GPU watchdog
+# resets (Windows TDR) under count mode on the hot bilateral filter:
+./shader-coverage-image-pipeline --mode=full --tile-rows=128
 
 # Write the coverage artifacts somewhere other than the demo's source
 # directory (the default). `--output-dir` creates the directory if
@@ -64,8 +64,8 @@ measure the coverage instrumentation overhead by comparing
 `--coverage-mode=count` (default) records exact execution counts via
 atomic add. The bilateral filter's inner loop contends heavily on a
 few counter slots, so on this workload count mode is the dominant
-cost of instrumentation (the section below on tiling describes the
-mitigation for the resulting wall-time blow-up).
+cost of instrumentation. Use `--tile-rows=N` to cap per-submission
+GPU time if TDR is a concern (see **Tiled dispatch** below).
 
 `--coverage-mode=hit-miss` records covered-or-not instead — each slot
 is written non-atomically with `1` the first time it executes.
@@ -83,40 +83,27 @@ preserves). Pick `count` when you need exact execution counts; pick
 
 ## Tiled dispatch
 
-`--dispatch=tiled` (default) splits each config into horizontal bands
-(`kTileRows` rows at a time) and passes the band's row offset to the
-shader as `PipelineParams.tileOriginY` so each band recovers its real
-pixel row (`tid.y + tileOriginY`). `--dispatch=whole` submits each
-config as a single whole-image dispatch with `tileOriginY = 0`.
+`--tile-rows=N` splits each config dispatch into horizontal bands of N
+rows. The shader recovers the real pixel row as `tid.y + tileOriginY`.
+Default (no flag) is whole-image: each config is a single submission
+with `tileOriginY = 0`.
 
-The reason tiling is the default is the **cost of coverage
-instrumentation under count mode**. Each covered line / branch /
-function increments a counter with an atomic add, and on a hot path
-— the bilateral filter's inner loop runs for every pixel — a handful
-of counter slots take millions of contended atomic adds. That makes
-the instrumented shader far slower than the uninstrumented one
-(20–30× on the GPUs we measured). A single whole-image dispatch of
-that instrumented kernel can run long enough to trip the GPU's
-watchdog timeout (Windows TDR / `VK_ERROR_DEVICE_LOST`) and abort
-the run — especially the 48-config `--mode=full` sweep.
+The bilateral filter's inner loop creates heavy atomic contention on a
+handful of counter slots — millions of threads all increment the same
+few counters. This makes coverage count mode 20–30× slower than
+uninstrumented code, and a whole-image dispatch can run long enough to
+trip the GPU watchdog timeout (Windows TDR / `VK_ERROR_DEVICE_LOST`)
+on the 48-config `--mode=full` sweep.
 
-Tiling caps how long any single GPU submission runs, keeping each
-one well under the watchdog limit. It does **not** change the
-coverage results: the bands partition the image, every pixel is
-processed exactly once, and the counter buffer accumulates across
-all bands and configs. (Total GPU work is unchanged — tiling spreads
-it across more, shorter submissions; it does not reduce the per-
-execution atomic cost itself.)
+Tiling caps per-submission GPU time without affecting coverage results:
+bands partition the image, every pixel is processed exactly once, and
+counters accumulate across all bands and configs.
 
-`--dispatch=whole` is provided as an opt-in for cases where the TDR
-risk doesn't apply:
+`--tile-rows=128` is a safe starting point. Alternatives:
 
-- `--no-coverage`: no instrumentation cost, so whole-image is fine
-  (and a useful baseline for measuring tiled overhead).
-- `--coverage-mode=hit-miss`: no atomic contention, so whole-image
-  is fine on the workloads here even with coverage on.
-- demonstrating the TDR symptom directly under count mode (don't
-  use this on workloads you actually need to finish).
+- `--coverage-mode=hit-miss`: removes all atomic contention (non-atomic
+  stores of `1`), so whole-image dispatch is safe without tiling.
+- `--no-coverage`: baseline timing with no instrumentation overhead.
 
 ## HTML report
 
@@ -171,7 +158,7 @@ The five stages `main.cpp` walks through for each run:
 | **1. Compile** | `compileShader()` creates a Slang session with `-trace-coverage`, `-trace-coverage-function`, `-trace-coverage-branch`. The compiler injects `__slang_coverage` at IR time and emits SPIR-V with `OpAtomicIAdd` (count mode) or plain stores (hit-miss mode) at every instrumented point. | `slang::ISession::loadModule`, `IComponentType::link`, `getEntryPointCode` |
 | **2. Discover binding** | Query `ISyntheticResourceMetadata::getResourceInfo(0)` on the post-link metadata object to read back `(space, binding)` — the slot the compiler auto-assigned for `__slang_coverage`. | `IMetadata::castAs<ISyntheticResourceMetadata>` |
 | **3. Allocate & bind** | Allocate a zeroed `counterCount × counterByteWidth` storage buffer. Build a Vulkan descriptor layout with app resources on set 0 and the coverage buffer at the discovered `(space, binding)`. | `vkCreateDescriptorSetLayout`, `vkUpdateDescriptorSets` |
-| **4. Dispatch** | Submit compute dispatches (tiled by default to avoid GPU watchdog). The shader atomically increments counters as branches/lines execute. | `vkCmdDispatch` |
+| **4. Dispatch** | Submit whole-image dispatch per config (default), or horizontal-band batches if `--tile-rows=N` is set. The shader atomically increments counters as branches/lines execute. | `vkCmdDispatch` |
 | **5. Readback** | Download the raw counter bytes, widen each slot to `uint64_t`, call `getEntryInfo` per counter to map slot → file/line, write manifest + LCOV + binary. | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
 
 ### Raw Vulkan host
