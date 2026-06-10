@@ -78,13 +78,12 @@ Write comments as teaching notes for a reader who knows C++ but is new to this s
   comment, stop and check whether a reader new to this subsystem can still follow its purpose.
   Brief comments are fine for tiny accessors, callbacks, overrides, or code following an obvious
   local pattern, but do not leave new behavior unexplained.
-- State the implicit contract: assumptions or preconditions, the invariant being maintained, and
-  why the code sits at this layer. A reviewer should be able to read the comment, inspect the
-  following code, and conclude that the code maintains the stated invariant without assuming more
-  than the comment declared.
-- Explain the source of truth, invariant, or existing mechanism the code relies on. For example,
-  say a conversion cost comes from `getBaseTypeConversionCost` and is exposed through
-  `core.meta.slang` constructors; do not call it a "table" unless there is actually a table.
+- State the implicit contract: assumptions or preconditions, the invariant being maintained, the
+  source of truth or existing mechanism being relied on, and why the code sits at this layer. For
+  example, say a conversion cost comes from `getBaseTypeConversionCost` and is exposed through
+  `core.meta.slang` constructors; do not call it a "table" unless there is actually a table. A
+  reviewer should be able to read the comment, inspect the following code, and conclude that the
+  code maintains the stated invariant without assuming more than the comment declared.
 - Use existing codebase terminology and names. Do not invent new terms for concepts that already
   have names in nearby code, generated modules, diagnostics, IR ops, or design docs.
 - Ground rationale in real examples, not abstract claims. Include a logical code trace when the
