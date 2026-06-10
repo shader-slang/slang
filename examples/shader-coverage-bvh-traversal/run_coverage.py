@@ -70,11 +70,25 @@ def _candidate_paths(slang_root: Path) -> list:
     ]
 
 
+def _is_stale(binary: Path, slang_root: Path) -> bool:
+    """True if any source file in the demo directory is newer than the binary."""
+    binary_mtime = binary.stat().st_mtime
+    demo_dir = slang_root / "examples" / _TARGET
+    for pattern in ("*.cpp", "*.h", "*.slang"):
+        for src in demo_dir.glob(pattern):
+            if src.stat().st_mtime > binary_mtime:
+                return True
+    return False
+
+
 def _ensure_demo_binary(slang_root: Path) -> Path:
     """Return the demo binary path, building it first if necessary."""
-    # Fast path: already built.
+    # Fast path: already built and up to date.
     for c in _candidate_paths(slang_root):
         if c.exists():
+            if _is_stale(c, slang_root):
+                print(f"[build] binary is stale (source newer than binary) — rebuilding")
+                break
             return c
 
     # Slow path: trigger a CMake build.
