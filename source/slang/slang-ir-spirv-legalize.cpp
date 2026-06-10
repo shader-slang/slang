@@ -2045,6 +2045,117 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addUsersToWorkList(newInst);
     }
 
+    /// Lower an `Abort` instruction into the form expected by the SPIRV emitter.
+    ///
+    /// The front end produces `Abort(format, args...)`, where `format` must be a
+    /// string literal and the variadic arguments arrive either as a single
+    /// `MakeStruct` (the usual variadic-pack lowering) or as a flat operand list.
+    /// `OpAbortKHR` takes a single message operand: a struct whose first member is
+    /// the format string packed as a `uint` array (little-endian bytes, including
+    /// the null terminator) followed by the argument values. This function builds
+    /// that struct value in IR and rewrites the instruction to `Abort(message)`.
+    ///
+    /// The conversion is done here rather than at emit time so the array and
+    /// struct types go through the regular deduplicated type-emission path
+    /// instead of being created ad hoc per call site. The struct type is marked
+    /// physical so the emitter decorates its members with explicit `Offset`s, and
+    /// the array type carries an explicit stride so it receives an `ArrayStride`
+    /// decoration; both are required for the explicitly laid out message payload.
+    void processAbort(IRInst* inst)
+    {
+        // Skip instructions this function already rewrote: the lowered form has
+        // the single packed message-struct operand instead of a format string.
+        if (inst->getOperandCount() == 1 && as<IRMakeStruct>(inst->getOperand(0)))
+            return;
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+
+        auto formatLit = as<IRStringLit>(inst->getOperand(0));
+        if (!formatLit)
+        {
+            m_sharedContext->m_sink->diagnose(
+                Diagnostics::AbortFormatMustBeStringLiteral{.location = inst->sourceLoc});
+            // Compilation has failed; drop the malformed instruction so that
+            // downstream emit logic does not also trip over its string-typed
+            // operand and report a secondary internal error.
+            inst->replaceUsesWith(builder.getVoidValue());
+            inst->removeAndDeallocate();
+            return;
+        }
+
+        // Pack the format string, including its null terminator, into uint words
+        // (little-endian byte order).
+        auto uintType = builder.getUIntType();
+        auto format = formatLit->getStringSlice();
+        Index wordCount = (format.getLength() + 1 + 3) / 4;
+        List<IRInst*> words;
+        for (Index w = 0; w < wordCount; w++)
+        {
+            uint32_t word = 0;
+            for (Index b = 0; b < 4; b++)
+            {
+                Index byteIndex = w * 4 + b;
+                if (byteIndex < format.getLength())
+                    word |= uint32_t(uint8_t(format[byteIndex])) << (8 * b);
+            }
+            words.add(builder.getIntValue(uintType, word));
+        }
+        auto arrayType = builder.getArrayTypeBase(
+            kIROp_ArrayType,
+            uintType,
+            builder.getIntValue(builder.getIntType(), wordCount),
+            builder.getIntValue(builder.getIntType(), sizeof(uint32_t)));
+        auto formatArray =
+            builder.emitMakeArray(arrayType, (UInt)words.getCount(), words.getBuffer());
+
+        // Flatten the variadic arguments.
+        List<IRInst*> args;
+        if (inst->getOperandCount() == 2)
+        {
+            auto operand = inst->getOperand(1);
+            if (auto makeStruct = as<IRMakeStruct>(operand))
+            {
+                for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
+                    args.add(makeStruct->getOperand(i));
+            }
+            else
+            {
+                args.add(operand);
+            }
+        }
+        else
+        {
+            for (UInt i = 1; i < inst->getOperandCount(); i++)
+                args.add(inst->getOperand(i));
+        }
+
+        // Build the message struct type `{ uint format[]; args... }` and value.
+        auto structType = builder.createStructType();
+        builder.addNameHintDecoration(structType, toSlice("AbortMessage"));
+        builder.addPhysicalTypeDecoration(structType);
+        List<IRInst*> fieldValues;
+        auto addField = [&](IRType* fieldType, IRInst* fieldValue)
+        {
+            auto key = builder.createStructKey();
+            builder.createStructField(structType, key, fieldType);
+            fieldValues.add(fieldValue);
+        };
+        addField(arrayType, formatArray);
+        for (auto arg : args)
+            addField(arg->getDataType(), arg);
+        auto message = builder.emitMakeStruct(structType, fieldValues);
+
+        IRInst* newAbort =
+            builder.emitIntrinsicInst(builder.getVoidType(), kIROp_Abort, 1, &message);
+        inst->replaceUsesWith(newAbort);
+        inst->removeAndDeallocate();
+        // Give the new composite values their normal worklist processing (e.g.
+        // hoisting the all-constant format array to the global scope).
+        addToWorkList(formatArray);
+        addToWorkList(message);
+    }
+
     void processStructField(IRStructField* field)
     {
         auto newFieldType = field->getFieldType();
@@ -2224,6 +2335,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             case kIROp_PtrLit:
                 processPtrLit(inst);
+                break;
+            case kIROp_Abort:
+                processAbort(inst);
                 break;
             case kIROp_DefaultConstruct:
                 processDefaultConstruct(inst);

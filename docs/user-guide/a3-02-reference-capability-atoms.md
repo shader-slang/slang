@@ -475,7 +475,8 @@ Extensions
 > Represents the GL_EXT_samplerless_texture_functions extension.
 
 `GL_EXT_shader_abort`
-> Represents the GL_EXT_shader_abort extension.
+> Represents the GL_EXT_shader_abort extension for GLSL targets, and the
+> corresponding SPV_KHR_shader_abort extension for SPIR-V targets.
 
 `GL_EXT_shader_atomic_float`
 > Represents the GL_EXT_shader_atomic_float extension.
@@ -915,6 +916,9 @@ Extensions
 Compound Capabilities
 ----------------------
 *Capabilities to specify capabilities created by other capabilities (`raytracing`, `meshshading`...)*
+
+`abort`
+> Capabilities required to use 'abort' (VK_KHR_shader_abort)
 
 `amplification_mesh`
 > Collection of shader stages
@@ -1439,9 +1443,6 @@ Compound Capabilities
 
 `shader5_sm_5_0`
 > Capabilities required to use sm_5_0 features apart of GL_ARB_gpu_shader5
-
-`shader_abort`
-> Capabilities required to use 'abortShader' (VK_KHR_shader_abort)
 
 `shaderclock`
 > Capabilities needed for realtime clocks

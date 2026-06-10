@@ -846,7 +846,11 @@ static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<Leg
         legalArgs.getArrayView().getBuffer()));
 }
 
-static LegalVal legalizeAbortShader(IRTypeLegalizationContext* context, ArrayView<LegalVal> args)
+/// Legalize an `Abort` instruction by rebuilding it from its legalized operands.
+/// Operands that legalized to nothing (`none`) are dropped, `simple` operands are
+/// forwarded unchanged, and `pair` operands contribute only their ordinary
+/// (non-resource) side, since only ordinary data can be carried in an abort message.
+static LegalVal legalizeAbort(IRTypeLegalizationContext* context, ArrayView<LegalVal> args)
 {
     ShortList<IRInst*> legalArgs;
     for (auto arg : args)
@@ -862,12 +866,12 @@ static LegalVal legalizeAbortShader(IRTypeLegalizationContext* context, ArrayVie
             legalArgs.add(arg.getPair()->ordinaryVal.getSimple());
             break;
         default:
-            SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor for abortShader operand");
+            SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor for abort operand");
         }
     }
     return LegalVal::simple(context->builder->emitIntrinsicInst(
         context->builder->getVoidType(),
-        kIROp_AbortShader,
+        kIROp_Abort,
         (UInt)legalArgs.getCount(),
         legalArgs.getArrayView().getBuffer()));
 }
@@ -2107,8 +2111,8 @@ static LegalVal legalizeInst(
     case kIROp_Printf:
         result = legalizePrintf(context, args);
         break;
-    case kIROp_AbortShader:
-        result = legalizeAbortShader(context, args);
+    case kIROp_Abort:
+        result = legalizeAbort(context, args);
         break;
     case kIROp_LoadFromUninitializedMemory:
     case kIROp_Poison:

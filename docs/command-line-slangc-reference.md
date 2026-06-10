@@ -1751,7 +1751,7 @@ A capability describes an optional feature that a target may or may not support.
 * `image_loadstore` 
 * `nonuniformqualifier` 
 * `printf` 
-* `shader_abort` 
+* `abort` 
 * `texturefootprint` 
 * `texturefootprintclamp` 
 * `shader5_sm_4_0` 

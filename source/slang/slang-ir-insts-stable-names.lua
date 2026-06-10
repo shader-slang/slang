@@ -295,7 +295,7 @@ return {
 	["RequireComputeDerivative"] = 297,
 	["StaticAssert"] = 298,
 	["Printf"] = 299,
-	["AbortShader"] = 860,
+	["Abort"] = 863,
 	["RequireMaximallyReconverges"] = 300,
 	["RequireQuadDerivatives"] = 301,
 	["add"] = 302,

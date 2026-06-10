@@ -2769,7 +2769,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
-    case kIROp_AbortShader:
+    case kIROp_Abort:
         {
             m_glslExtensionTracker->requireExtension(toSlice("GL_EXT_shader_abort"));
             m_writer->emit("abortEXT(");

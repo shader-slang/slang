@@ -5187,6 +5187,13 @@ err(
 )
 
 err(
+    "abort-format-must-be-string-literal",
+    55210,
+    "abort format string must be a string literal",
+    span { loc = "location", message = "the format string passed to 'abort' must be a string literal." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",

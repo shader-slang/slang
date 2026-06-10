@@ -14094,9 +14094,9 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 __intrinsic_op($(kIROp_Printf))
 void printf<each T>(NativeString format, expand each T args);
 
-/// Abort shader execution with an optional debug message (VK_KHR_shader_abort).
+/// Abort shader execution with a debug message (VK_KHR_shader_abort).
 /// @param T The variadic type pack parameter for the arguments to be included in the message.
-/// @param format The format string.
+/// @param format The format string. Must be a string literal.
 /// @param args (optional) The arguments to be included in the message.
 /// @remarks The function maps to `abortEXT` for GLSL targets and emits `OpAbortKHR` for SPIR-V
 /// targets. When executed, shader execution terminates and the message is retrievable via the
@@ -14105,12 +14105,12 @@ void printf<each T>(NativeString format, expand each T args);
 /// ```cpp
 /// void test(uint val)
 /// {
-///     abortShader("Unexpected value: %u", val);
+///     abort("Unexpected value: %u", val);
 /// }
 /// ```
-[require(shader_abort)]
-__intrinsic_op($(kIROp_AbortShader))
-void abortShader<each T>(NativeString format, expand each T args);
+[require(abort)]
+__intrinsic_op($(kIROp_Abort))
+void abort<each T>(NativeString format, expand each T args);
 
 // Tessellation factor fixup routines
 /// @category tessellation Tessellation functions
