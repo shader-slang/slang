@@ -5101,15 +5101,32 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     List<ExtensionDecl*> extensionDecls;
     discoverExtensionDecls(extensionDecls, moduleDecl);
 
-    // Wire up each extension's enclosing `namespace` before resolving extension
-    // headers below. An extension header (target type, generic constraints,
-    // `where` clauses) is resolved by unqualified name and must see declarations
-    // from other `__include`/`implementing` fragments that reopen the same
-    // namespace. Those fragments are linked into one another's scope chain only
-    // when the `NamespaceDecl` reaches `ScopesWired` (visitNamespaceDecl), and
-    // driving an extension to `ReadyForLookup` does not advance its enclosing
-    // namespace. Wire them outermost-first: an inner fragment can find its
-    // siblings only once its outer namespace is wired (#11531).
+    // Wire up each extension's enclosing `namespace`(s) before resolving extension
+    // headers below. An extension header (target type, generic constraints, `where`
+    // clauses) is resolved by unqualified name and must see declarations from other
+    // `__include`/`implementing` fragments that reopen the same namespace. Cross-file
+    // fragments are linked into one another's sibling scope chain only when the
+    // `NamespaceDecl` reaches `ScopesWired` (visitNamespaceDecl ->
+    // addSiblingScopeForContainerDecl); driving an extension to `ReadyForLookup` does
+    // not advance its enclosing namespace, so without this the header would resolve
+    // against an unwired scope and unqualified names fail (#11531: 30015 -> 30855).
+    //
+    // The `as<NamespaceDecl>` filter is load-bearing -- do not widen it. `ModuleDecl`
+    // is also a `NamespaceDeclBase` and `FileDecl` is a `ContainerDecl`, so matching
+    // `NamespaceDecl` specifically skips the global module/file scope and drives only
+    // genuine namespaces. That narrowing keeps the global-scope core extensions (e.g.
+    // `extension _Texture<...>`) untouched: the rejected broad alternative,
+    // `ensureAllDeclsRec(moduleDecl, ScopesWired)`, regressed core-module checking by
+    // recursively advancing every decl (including `extension _Texture<...>` and its
+    // members); here `ensureDecl` advances only each namespace decl itself, never its
+    // members or extensions. A core-module namespace
+    // that does contain extensions (e.g. `linalg` in hlsl.meta.slang) is therefore
+    // still driven to `ScopesWired` early, but benignly -- only the namespace decl
+    // advances, and it is a single fragment with no sibling fragments to wire.
+    //
+    // `enclosingNamespaces` is collected innermost-first by the parent walk, so the
+    // descending-index loop drives them outermost-first: an inner fragment can find its
+    // siblings only once its outer namespace is wired.
     for (auto extensionDecl : extensionDecls)
     {
         List<NamespaceDecl*> enclosingNamespaces;

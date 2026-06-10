@@ -6,6 +6,11 @@
 // (generic-parameter constraints, target type, and `where`-clauses) was checked
 // before the namespace fragments were wired into each other's sibling scope chain,
 // so `IBase`/`ICollector`/`Add` resolved to nothing (error 30015, cascading 30855).
+//
+// The split across two `__include` fragments below is load-bearing: the bug only
+// reproduces when `repro` is reopened across separate files. An extension in the
+// same fragment as its referenced types resolves fine, so merging reopen_ns_types
+// and reopen_ns_ext into one file would silently neuter this regression.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -output-using-type
 
