@@ -11314,6 +11314,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    // Declare the SPV_KHR_variable_pointers extension together with the given
+    // variable-pointers capability (`VariablePointers` for Workgroup pointers,
+    // `VariablePointersStorageBuffer` for StorageBuffer pointers); both come
+    // from the same extension.
+    void requireSPIRVVariablePointersCapability(SpvCapability capability)
+    {
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
+        requireSPIRVCapability(capability);
+    }
+
     void requireVariableBufferCapabilityIfNeeded(IRInst* type)
     {
         if (auto ptrType = as<IRPtrTypeBase>(type))
@@ -11321,12 +11331,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             switch (ptrType->getAddressSpace())
             {
             case AddressSpace::StorageBuffer:
-                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
-                requireSPIRVCapability(SpvCapabilityVariablePointersStorageBuffer);
+                requireSPIRVVariablePointersCapability(SpvCapabilityVariablePointersStorageBuffer);
                 break;
             case AddressSpace::GroupShared:
-                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
-                requireSPIRVCapability(SpvCapabilityVariablePointers);
+                requireSPIRVVariablePointersCapability(SpvCapabilityVariablePointers);
                 break;
             }
         }
