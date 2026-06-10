@@ -617,6 +617,9 @@ Extensions
 `SPV_EXT_replicated_composites`
 > Represents the SPIR-V extension for SPV_EXT_replicated_composites.
 
+`SPV_EXT_shader_64bit_indexing`
+> Represents the SPIR-V extension for 64-bit integer indexing of resources and arrays.
+
 `SPV_EXT_shader_atomic_float16_add`
 > Represents the SPIR-V extension for atomic float16 add operations.
 
@@ -869,6 +872,9 @@ Extensions
 
 `spvReplicatedCompositesEXT`
 > Represents the SPIR-V capability for replicated composites
+
+`spvShader64BitIndexingEXT`
+> Represents the SPIR-V capability for 64-bit integer indexing of resources and arrays.
 
 `spvShaderClockKHR`
 > Represents the SPIR-V capability for shader clock.
