@@ -122,6 +122,46 @@ representation that is robust by construction, even when that means a larger rew
   PR description below. (Keep the log out of the commit — it feeds the PR body, it is not a repo
   artifact.)
 
+### Code Style and Review Conventions
+
+Recurring review feedback distilled into rules — following them avoids review round-trips. (These
+govern how code reads and is structured; the Problem-Solving Methodology above governs _what_ to
+change.)
+
+- **Write function comments as complete sentences: what, then why.** State what the function does
+  first; then, if the reason it exists isn't obvious from that description, add a brief summary of
+  why. For non-trivial behavior, include a concrete example. Avoid terse fragment- or bullet-only
+  comments on a function. For instance, `substituteElementOfCompositeType` should read like _"Return
+  `target` with its element type replaced by `newElementType`, preserving shape: scalar →
+  newElementType, `vector<T,N>` → `vector<newElementType,N>`, `matrix<T,R,C>` → `matrix<newElementType,R,C>`."_
+  — not _"element coerce target"_.
+
+- **Reuse before you write; then extract non-trivial logic into a named, documented helper.** Before
+  writing a new helper, search for an existing one — what you need is often already provided by a
+  shared header (the AST/IR helpers in `slang-ast-type.h`, `slang-ir-util.h`, and the various
+  `*-util.h` files). For example, to test whether a type is a `DeclRefType` of a particular
+  declaration, use the existing `isDeclRefTypeOf<T>(type)` rather than re-deriving it. When the
+  logic genuinely is new, don't bury a multi-step computation in an inline lambda or a long inline
+  block: give it an intention-revealing name (`coerceOperandsOfBuiltinBinaryExpr`,
+  `substituteElementOfCompositeType`, `unifyBaseType`) and a doc comment, so the caller stays
+  readable and the helper is reusable.
+
+- **Keep one source of truth; delete dead code after a refactor.** Map or classify a given thing in
+  exactly one place — e.g. the operator-name → operation-kind mapping lives only in
+  `getBuiltinOperationKindFromString`, not re-implemented at call sites. When a change makes a
+  branch, fallback, or helper unreachable, remove it rather than leaving it as dead code.
+
+- **One canonical representation per value; assert the invariant.** Don't introduce a second
+  AST/IR/`Val` representation for something that already has one — multiple forms of the same logical
+  value break `equals`/identity checks and deduplication. When an invariant guarantees a
+  representation is never produced for certain inputs (e.g. `+`/`-`/`*` are always a
+  `PolynomialIntVal`, never a `BuiltinOperationIntVal`), `SLANG_ASSERT` it at the construction site
+  so a violation is caught rather than silently producing a divergent form.
+
+- **Fail loudly on out-of-contract input.** When a helper is only valid for a restricted set of
+  inputs, `SLANG_RELEASE_ASSERT` on anything outside that set instead of silently returning a default
+  — e.g. `substituteElementOfCompositeType` asserts its operand is a builtin scalar/vector/matrix.
+
 ### PR Workflow
 
 1. **Format your code**: Run `./extras/formatting.sh` before committing
