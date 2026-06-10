@@ -5100,6 +5100,28 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // Discover and check all extension decls before anything else.
     List<ExtensionDecl*> extensionDecls;
     discoverExtensionDecls(extensionDecls, moduleDecl);
+
+    // Wire up each extension's enclosing `namespace` before resolving extension
+    // headers below. An extension header (target type, generic constraints,
+    // `where` clauses) is resolved by unqualified name and must see declarations
+    // from other `__include`/`implementing` fragments that reopen the same
+    // namespace. Those fragments are linked into one another's scope chain only
+    // when the `NamespaceDecl` reaches `ScopesWired` (visitNamespaceDecl), and
+    // driving an extension to `ReadyForLookup` does not advance its enclosing
+    // namespace. Wire them outermost-first: an inner fragment can find its
+    // siblings only once its outer namespace is wired (#11531).
+    for (auto extensionDecl : extensionDecls)
+    {
+        List<NamespaceDecl*> enclosingNamespaces;
+        for (Decl* p = getParentDecl(extensionDecl); p; p = getParentDecl(p))
+        {
+            if (auto ns = as<NamespaceDecl>(p))
+                enclosingNamespaces.add(ns);
+        }
+        for (Index i = enclosingNamespaces.getCount() - 1; i >= 0; --i)
+            ensureDecl(enclosingNamespaces[i], DeclCheckState::ScopesWired);
+    }
+
     for (auto s : states)
     {
         for (auto extensionDecl : extensionDecls)
