@@ -47,13 +47,20 @@ You can also use `./extras/formatting.sh --check-only` to verify formatting with
 
 ## Commenting
 
-Write comments for a new reader who understands C++ but not the local subsystem. Good comments
-explain why the code exists, what source of truth or invariant it relies on, and why the code sits
-at this layer.
+Comments are expected, not optional polish. Write them as teaching notes for a reader who knows
+C++ but is new to this subsystem.
 
-- Use precise names for real mechanisms, files, and functions instead of vague shorthand. For
-  example, say a conversion cost comes from `getBaseTypeConversionCost` and is exposed through
+- Every new function or helper must have a leading comment explaining what it does and why it
+  exists. For callbacks, overrides, tiny accessors, or functions matching a strong local pattern,
+  the comment can be brief, but do not leave a new function unexplained.
+- Inside a function body, if new or changed logic runs for more than about 10 lines without a
+  comment, stop and ask whether the purpose and control flow are obvious to a new reader. If not,
+  add a comment explaining why that block exists before explaining what it does mechanically.
+- Explain the source of truth, invariant, or existing mechanism the code relies on. For example,
+  say a conversion cost comes from `getBaseTypeConversionCost` and is exposed through
   `core.meta.slang` constructors; do not call it a "table" unless there is actually a table.
+- Use existing codebase terminology and names. Do not invent new terms for concepts that already
+  have names in nearby code, generated modules, diagnostics, IR ops, or design docs.
 - Ground abstract rationale in one or two concrete examples, such as `float(int)` or `float3(int)`,
   so the reader can connect the prose to the control flow.
 - When a fast path, guard, or special case preserves existing behavior, say what general path it is
