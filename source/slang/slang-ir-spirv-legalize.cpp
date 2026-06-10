@@ -1161,6 +1161,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     Dictionary<IRInst*, IRInst*> m_mapArrayValueToVar;
 
+    // Cache of `Abort` message struct types, keyed on the (deduplicated) tuple
+    // type of their field types, so abort sites with identical payload
+    // signatures share one struct type instead of bloating the module with a
+    // nominal type per call site.
+    Dictionary<IRInst*, IRStructType*> m_abortMessageTypes;
+
     // Replace getElement(x, i) with, y = store(x); p = getElementPtr(y, i); load(p),
     // when i is not a constant. SPIR-V has no support for dynamic indexing into values like we do.
     // It may be advantageous however to do this further up the pipeline
@@ -2130,26 +2136,63 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 args.add(inst->getOperand(i));
         }
 
-        // Build the message struct type `{ uint format[]; args... }` and value.
-        auto structType = builder.createStructType();
-        builder.addNameHintDecoration(structType, toSlice("AbortMessage"));
-        builder.addPhysicalTypeDecoration(structType);
-        List<IRInst*> fieldValues;
-        auto addField = [&](IRType* fieldType, IRInst* fieldValue)
+        // The message struct uses explicit layout, and `OpTypeBool` has no
+        // physical size in SPIRV, so widen bool arguments to uint (matching
+        // C variadic promotion for printf-style "%d").
+        for (auto& arg : args)
         {
-            auto key = builder.createStructKey();
-            builder.createStructField(structType, key, fieldType);
-            fieldValues.add(fieldValue);
-        };
-        addField(arrayType, formatArray);
+            if (as<IRBoolType>(arg->getDataType()))
+                arg = builder.emitCast(uintType, arg);
+        }
+
+        // Build the message struct type `{ uint format[]; args... }` and value,
+        // reusing a previously created struct type when another abort site has
+        // the same payload signature. The (structural, deduplicated) tuple type
+        // of the field types serves as the cache key.
+        List<IRType*> fieldTypes;
+        fieldTypes.add(arrayType);
         for (auto arg : args)
-            addField(arg->getDataType(), arg);
+            fieldTypes.add(arg->getDataType());
+        auto typeKey = builder.getTupleType((UInt)fieldTypes.getCount(), fieldTypes.getBuffer());
+
+        IRStructType* structType = nullptr;
+        if (!m_abortMessageTypes.tryGetValue(typeKey, structType))
+        {
+            structType = builder.createStructType();
+            builder.addNameHintDecoration(structType, toSlice("AbortMessage"));
+            builder.addPhysicalTypeDecoration(structType);
+            for (auto fieldType : fieldTypes)
+                builder.createStructField(structType, builder.createStructKey(), fieldType);
+            m_abortMessageTypes.add(typeKey, structType);
+        }
+
+        List<IRInst*> fieldValues;
+        fieldValues.add(formatArray);
+        for (auto arg : args)
+            fieldValues.add(arg);
         auto message = builder.emitMakeStruct(structType, fieldValues);
 
         IRInst* newAbort =
             builder.emitIntrinsicInst(builder.getVoidType(), kIROp_Abort, 1, &message);
         inst->replaceUsesWith(newAbort);
         inst->removeAndDeallocate();
+
+        // `OpAbortKHR` is a block terminator: everything after the abort in
+        // this block is unreachable, and the block's original branch must not
+        // survive in the IR — otherwise a successor's phi would still name
+        // this block as a predecessor that never actually branches to it in
+        // the emitted SPIRV. Strip the trailing instructions (including the
+        // terminator) and end the block with `unreachable`, mirroring the
+        // treatment `discard` gets for `OpKill` in
+        // removeUnreachableCodeAfterDiscardForOpKill().
+        List<IRInst*> unreachableInsts;
+        for (auto next = newAbort->getNextInst(); next; next = next->getNextInst())
+            unreachableInsts.add(next);
+        for (auto deadInst : unreachableInsts)
+            deadInst->removeAndDeallocate();
+        builder.setInsertAfter(newAbort);
+        builder.emitUnreachable();
+
         // Give the new composite values their normal worklist processing (e.g.
         // hoisting the all-constant format array to the global scope).
         addToWorkList(formatArray);

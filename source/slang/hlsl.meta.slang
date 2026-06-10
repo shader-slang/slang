@@ -14099,8 +14099,9 @@ void printf<each T>(NativeString format, expand each T args);
 /// @param format The format string. Must be a string literal.
 /// @param args (optional) The arguments to be included in the message.
 /// @remarks The function maps to `abortEXT` for GLSL targets and emits `OpAbortKHR` for SPIR-V
-/// targets. When executed, shader execution terminates and the message is retrievable via the
-/// Vulkan device fault mechanism (VK_KHR_device_fault).
+/// targets. When executed, shader execution terminates and the message is surfaced to the host
+/// through the retrieval mechanism defined by the VK_KHR_shader_abort extension (for example,
+/// the Vulkan device fault mechanism).
 /// @example
 /// ```cpp
 /// void test(uint val)

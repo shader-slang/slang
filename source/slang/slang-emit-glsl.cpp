@@ -2771,6 +2771,14 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     case kIROp_Abort:
         {
+            // abortEXT() requires a literal format string, matching the
+            // SPIRV path (see processAbort in slang-ir-spirv-legalize.cpp).
+            if (!as<IRStringLit>(inst->getOperand(0)))
+            {
+                getSink()->diagnose(
+                    Diagnostics::AbortFormatMustBeStringLiteral{.location = inst->sourceLoc});
+                return true;
+            }
             m_glslExtensionTracker->requireExtension(toSlice("GL_EXT_shader_abort"));
             m_writer->emit("abortEXT(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
