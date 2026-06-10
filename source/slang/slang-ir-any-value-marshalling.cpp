@@ -282,7 +282,7 @@ struct AnyValueMarshallingContext
             {
                 auto structType = cast<IRStructType>(dataType);
 
-                // Align the struct's start to its natural alignment, 
+                // Align the struct's start to its natural alignment,
                 // and pad its end out to its natural size.
                 IRSizeAndAlignment structLayout;
                 bool hasStructLayout =
@@ -308,9 +308,8 @@ struct AnyValueMarshallingContext
 
                 if (hasStructLayout)
                 {
-                    auto packedSize =
-                        (int64_t)(context->fieldOffset - startFieldOffset) * 4 +
-                        (int64_t)context->intraFieldOffset - startIntraFieldOffset;
+                    auto packedSize = (int64_t)(context->fieldOffset - startFieldOffset) * 4 +
+                                      (int64_t)context->intraFieldOffset - startIntraFieldOffset;
                     if (packedSize < structLayout.size)
                         context->advanceOffset(uint32_t(structLayout.size - packedSize));
                 }

@@ -21,7 +21,6 @@
 // The packing offsets are defined by the *natural* layout of the packed
 // type and must not change when the target's buffer layout rules change,
 // so the same checks must also hold with `-force-glsl-scalar-layout`
-// (last vk test line).
 
 [anyValueSize(40)]
 interface IInterface
