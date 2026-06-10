@@ -28,11 +28,12 @@ The traversal kernel has several rarely-fired branches:
 ## Run
 
 The host driver generates a procedural mesh, builds a BVH on CPU,
-uploads, and dispatches 4096×4096 = 16.7M rays from a synthetic camera
-in batches of 512×512 (64 batches). Batching keeps each GPU submission
-short to avoid OS watchdog resets (Windows TDR) under coverage
-instrumentation. Pass `--batch-size=N` to opt into batching; omitting
-the flag submits all rays in a single dispatch.
+uploads, and dispatches 4096×4096 = 16.7M rays from a synthetic camera.
+By default all rays are submitted in a single dispatch. Pass
+`--batch-size=N` to split them into batches of N rays per submission,
+which keeps each batch short and avoids OS watchdog resets (Windows TDR)
+under coverage instrumentation; `--batch-size=262144` (512×512) is a
+safe starting point on any GPU.
 
 ```bash
 ./shader-coverage-bvh-traversal --mode=smoke    # clean icosphere, Diffuse only

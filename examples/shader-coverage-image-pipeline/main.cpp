@@ -628,8 +628,9 @@ int main(int argc, char** argv)
             }
             counterByteWidth = bufferInfo.elementByteWidth;
             std::cout << "coverage counter count: " << counterCount << " ("
-                      << (counterByteWidth * 8) << "-bit slots), __slang_coverage bound at set="
-                      << shader.coverageSpace << " binding=" << shader.coverageBinding
+                      << (counterByteWidth * 8)
+                      << "-bit slots), __slang_coverage bound at set=" << shader.coverageSpace
+                      << " binding=" << shader.coverageBinding
                       << " (discovered from synthetic-resource metadata)\n";
         }
 
@@ -754,8 +755,9 @@ int main(int argc, char** argv)
             {
                 p.tileOriginY = y0;
                 ctx.upload(paramsBuf, &p, sizeof(p));
-                const uint32_t bandRows =
-                    (kImageHeight - y0 < effectiveTileRows) ? (kImageHeight - y0) : effectiveTileRows;
+                const uint32_t bandRows = (kImageHeight - y0 < effectiveTileRows)
+                                              ? (kImageHeight - y0)
+                                              : effectiveTileRows;
                 const uint32_t groupsY = (bandRows + 7) / 8;
                 ctx.dispatch(pipe, sets, groupsX, groupsY, 1);
                 ++dispatchCount;
