@@ -4781,49 +4781,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
 
     // Returns the scalar byte size of an IR type for the VK_KHR_shader_abort message struct.
-    uint32_t getAbortArgByteSize(IRType* type)
-    {
-        switch (type->getOp())
-        {
-        case kIROp_Int8Type:
-        case kIROp_UInt8Type:
-            return 1;
-        case kIROp_Int16Type:
-        case kIROp_UInt16Type:
-        case kIROp_HalfType:
-            return 2;
-        case kIROp_BoolType:
-        case kIROp_IntType:
-        case kIROp_UIntType:
-        case kIROp_FloatType:
-            return 4;
-        case kIROp_Int64Type:
-        case kIROp_UInt64Type:
-        case kIROp_DoubleType:
-            return 8;
-        case kIROp_VectorType:
-            {
-                auto vecType = as<IRVectorType>(type);
-                auto count = (uint32_t)getIntVal(vecType->getElementCount());
-                return getAbortArgByteSize(vecType->getElementType()) * count;
-            }
-        default:
-            return 4;
-        }
-    }
-
-    // Returns the scalar alignment for an IR type (scalar layout rules).
-    uint32_t getAbortArgAlignment(IRType* type)
-    {
-        switch (type->getOp())
-        {
-        case kIROp_VectorType:
-            return getAbortArgAlignment(as<IRVectorType>(type)->getElementType());
-        default:
-            return getAbortArgByteSize(type);
-        }
-    }
-
     /// Emit OpAbortKHR for a kIROp_AbortShader instruction.
     /// Packs the format string (as uint32 array) and variadic args into a struct with
     /// scalar layout, then emits OpAbortKHR with that struct.
@@ -4885,27 +4842,44 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         uint32_t currentOffset = (uint32_t)(numU32 * 4);
 
-        if (inst->getOperandCount() == 2)
+        // Gather variadic arguments into a flat list, handling both IRMakeStruct
+        // (the common variadic lowering) and flat/single-operand representations.
+        List<IRInst*> args;
+        UInt operandCount = inst->getOperandCount();
+        if (operandCount == 2)
         {
             auto operand = inst->getOperand(1);
             if (auto makeStruct = as<IRMakeStruct>(operand))
             {
                 for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
-                {
-                    auto arg = makeStruct->getOperand(i);
-                    auto argIRType = arg->getDataType();
-                    uint32_t argSize = getAbortArgByteSize(argIRType);
-                    uint32_t argAlign = getAbortArgAlignment(argIRType);
-
-                    // Align currentOffset to the scalar alignment of this member.
-                    currentOffset = (currentOffset + argAlign - 1) & ~(argAlign - 1);
-                    memberOffsets.add(currentOffset);
-                    currentOffset += argSize;
-
-                    memberTypes.add(ensureInst(argIRType));
-                    memberValues.add(ensureInst(arg));
-                }
+                    args.add(makeStruct->getOperand(i));
             }
+            else
+            {
+                args.add(operand);
+            }
+        }
+        else
+        {
+            for (UInt i = 1; i < operandCount; i++)
+                args.add(inst->getOperand(i));
+        }
+
+        for (auto arg : args)
+        {
+            auto argIRType = arg->getDataType();
+            IRSizeAndAlignment sizeAlign;
+            getNaturalSizeAndAlignment(m_targetRequest, argIRType, &sizeAlign);
+            uint32_t argSize = (uint32_t)sizeAlign.size;
+            uint32_t argAlign = (uint32_t)sizeAlign.alignment;
+
+            // Align currentOffset to the scalar alignment of this member.
+            currentOffset = (currentOffset + argAlign - 1) & ~(argAlign - 1);
+            memberOffsets.add(currentOffset);
+            currentOffset += argSize;
+
+            memberTypes.add(ensureInst(argIRType));
+            memberValues.add(ensureInst(arg));
         }
 
         // Create the struct type. Each call creates a distinct type (valid in SPIR-V).

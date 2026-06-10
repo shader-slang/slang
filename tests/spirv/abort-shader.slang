@@ -1,4 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -capability shader_abort -skip-spirv-validation
+// Note: -skip-spirv-validation is required because the bundled spirv-val does not yet
+// know about SPV_KHR_shader_abort. Remove this flag once the validator is updated.
 
 // Verify that abortShader emits OpAbortKHR with the required capability and extension,
 // and packages the format string + args into a struct with scalar layout.

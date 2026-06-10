@@ -475,6 +475,7 @@ Extensions
 > Represents the GL_EXT_samplerless_texture_functions extension.
 
 `GL_EXT_shader_abort`
+> Represents the GL_EXT_shader_abort extension.
 
 `GL_EXT_shader_atomic_float`
 > Represents the GL_EXT_shader_atomic_float extension.

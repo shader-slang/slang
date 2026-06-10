@@ -2774,7 +2774,8 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_glslExtensionTracker->requireExtension(toSlice("GL_EXT_shader_abort"));
             m_writer->emit("abortEXT(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            if (inst->getOperandCount() == 2)
+            UInt abortOperandCount = inst->getOperandCount();
+            if (abortOperandCount == 2)
             {
                 auto operand = inst->getOperand(1);
                 if (auto makeStruct = as<IRMakeStruct>(operand))
@@ -2785,6 +2786,19 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                         m_writer->emit(", ");
                         emitOperand(makeStruct->getOperand(bb), getInfo(EmitOp::General));
                     }
+                }
+                else
+                {
+                    m_writer->emit(", ");
+                    emitOperand(operand, getInfo(EmitOp::General));
+                }
+            }
+            else
+            {
+                for (UInt bb = 1; bb < abortOperandCount; ++bb)
+                {
+                    m_writer->emit(", ");
+                    emitOperand(inst->getOperand(bb), getInfo(EmitOp::General));
                 }
             }
             m_writer->emit(")");
