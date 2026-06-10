@@ -1615,6 +1615,11 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
         return modifierType;
 
     case ASTNodeType::NodeLaunchAttribute:
+    case ASTNodeType::MaxRecordsAttribute:
+    case ASTNodeType::NodeIDAttribute:
+    case ASTNodeType::NodeIsProgramEntryAttribute:
+    case ASTNodeType::AllowSparseNodesAttribute:
+    case ASTNodeType::NodeArraySizeAttribute:
         return modifierType;
 
     case ASTNodeType::NodeDispatchGridAttribute:

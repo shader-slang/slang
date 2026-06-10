@@ -123,8 +123,12 @@ bool isUserPointerType(IRInst* type);
 // True if inst produces a derived address from another base address.
 bool isAddressInst(IRInst* inst);
 
+// Returns the underlying integer value for a workgraph barrier flag expression, such as the
+// operand of `getEnumBarrierMemoryTypeFlags(intLiteral)`.
 IRInst* getBarrierFlagValueInst(IRInst* inst);
 
+// Returns true if an l-value cast only wraps a workgraph barrier flag value. For example, HLSL
+// barrier diagnostics may leave an enum-to-int cast around `getEnumBarrierSemanticFlags(...)`.
 bool isBarrierFlagValueCast(IRInst* castInst, IRType* fromType, IRType* toType);
 
 // Builds a dictionary that maps from requirement key to requirement value for `interfaceType`.
