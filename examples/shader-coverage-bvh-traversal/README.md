@@ -59,17 +59,80 @@ as "covered".
 
 Each coverage run writes:
 
-- `<mode>.coverage-mapping.json`
-- `<mode>.lcov`
-- `<mode>.counters.bin` — feed to
+- `<mode>.coverage-manifest.json` — counter ↔ source attribution
+- `<mode>.lcov` — line-only LCOV (quick view)
+- `<mode>.counters.bin` — raw counter buffer; feed to
   `tools/shader-coverage/slang-coverage-to-lcov.py` for the rich LCOV
   with branch+function records
 
+## End-to-end wrapper
+
+`run_coverage.py` (in this directory) compiles, dispatches, converts,
+renders, and opens the HTML report in one step:
+
+```bash
+python3 run_coverage.py --mode=smoke
+python3 run_coverage.py --mode=stress --coverage-mode=hit-miss
+```
+
+## Generate an HTML report (manual)
+
+```bash
+# 1. Convert raw counters to rich LCOV (adds branch + function records):
+python3 path/to/slang/tools/shader-coverage/slang-coverage-to-lcov.py \
+    --manifest stress.coverage-manifest.json \
+    --counters stress.counters.bin \
+    --output stress.full.lcov
+
+# 2. Render HTML:
+python3 path/to/slang/tools/coverage-html/slang-coverage-html.py \
+    stress.full.lcov \
+    --output-dir stress-html \
+    --title "bvh-traversal stress"
+```
+
 ## Architecture
 
-Same raw-Vulkan-based architecture as `shader-coverage-image-pipeline`
-— see that example's README for rationale + the `vk_compute_demo.h`
-swap-out boundary when slang-rhi gains synthetic-resource binding.
+### Why raw Vulkan instead of slang-rhi
+
+Same reason as `shader-coverage-image-pipeline`: Slang's
+`__slang_coverage` buffer is synthesized at IR time, after the
+parameter-binding layout pass, so it is invisible to ordinary
+`ProgramLayout` reflection and cannot be bound via slang-rhi's
+reflection-driven paths without additional support (slang-rhi PR
+#739). All raw-Vulkan code is isolated in `vk_compute_demo.h`; see
+the image-pipeline README for the full rationale and migration plan.
+
+### Explicit / raw binding (this demo)
+
+This demo uses the **explicit / raw-binding** approach: the host
+dictates where `__slang_coverage` lives before compilation using the
+`-trace-coverage-binding <binding> <space>` compiler option (or its
+API equivalent `CompilerOptionName::TraceCoverageBinding`), then
+writes the buffer to that same hardcoded slot at runtime:
+
+```cpp
+// Compile time: tell the compiler to place __slang_coverage at
+// descriptor set kCoverageSet, binding kCoverageBinding.
+pin.name  = slang::CompilerOptionName::TraceCoverageBinding;
+pin.value.intValue0 = kCoverageBinding; // binding index
+pin.value.intValue1 = kCoverageSet;     // descriptor set / space
+
+// Runtime: bind the counter buffer at exactly that slot.
+ctx.writeStorageBuffer(set1, kCoverageBinding, coverageBuf);
+```
+
+The advantage is simplicity: no post-compile metadata query; the slot
+is a compile-time constant. The trade-off is that the host must ensure
+the slot does not collide with any of the shader's own resources. This
+demo isolates the coverage buffer on a dedicated descriptor set
+(`kCoverageSet = 1`) so adding or removing application bindings on
+set 0 can never cause a collision.
+
+Compare the image-pipeline demo (`shader-coverage-image-pipeline`)
+which demonstrates the **metadata-derived** binding approach instead,
+where the compiler picks the slot and the host discovers it after
+compilation via `ISyntheticResourceMetadata`.
 
 ## Build dependencies
 

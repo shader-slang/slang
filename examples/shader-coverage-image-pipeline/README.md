@@ -120,14 +120,21 @@ risk doesn't apply:
 
 ## Generate an HTML report
 
+The `run_coverage.py` wrapper does all steps automatically and opens
+the report. To run the steps manually:
+
 ```bash
+# 1. Convert raw counters to rich LCOV (adds branch + function records):
 python3 path/to/slang/tools/shader-coverage/slang-coverage-to-lcov.py \
-    --manifest exhaustive.coverage-mapping.json \
+    --manifest exhaustive.coverage-manifest.json \
     --counters exhaustive.counters.bin \
     --output exhaustive.full.lcov
 
+# 2. Render HTML:
 python3 path/to/slang/tools/coverage-html/slang-coverage-html.py \
-    exhaustive.full.lcov --output-dir exhaustive-html
+    exhaustive.full.lcov \
+    --output-dir exhaustive-html \
+    --title "image-pipeline exhaustive"
 ```
 
 Open `exhaustive-html/index.html` and look at `tonemap.slang.*.html`
@@ -135,18 +142,64 @@ Open `exhaustive-html/index.html` and look at `tonemap.slang.*.html`
 `(0/1)` branch indicator. The smoke vs exhaustive diff turns three
 of the four operator branches from red to green.
 
+## End-to-end wrapper
+
+`run_coverage.py` (in this directory) is a convenience wrapper that
+compiles, dispatches, converts the raw counters to a rich LCOV, renders
+an HTML report and opens it — all in one command:
+
+```bash
+# Smoke run with HTML report opened automatically:
+python3 run_coverage.py --mode=smoke
+
+# Exhaustive sweep, hit/miss mode, custom output dir:
+python3 run_coverage.py --mode=exhaustive --coverage-mode=hit-miss --output-dir=./out
+```
+
+All flags accepted by the demo binary are forwarded verbatim; the
+script adds `--slang-root` (default: auto-discovered from its own path)
+to locate the renderer and converter.
+
 ## Architecture
 
-This example uses raw Vulkan rather than slang-rhi (unlike the other
-slang examples). The reason is documented in detail at the top of
-`vk_compute_demo.h`: slang-rhi's reflection-driven binding API has no
-view of Slang's synthesized `__slang_coverage` buffer, so the demo
-binds it via raw `vkUpdateDescriptorSets`.
+### Why raw Vulkan instead of slang-rhi
 
-**All raw-Vulkan code is isolated in `vk_compute_demo.h`.** When
-slang-rhi gains synthetic-resource binding support (slang-rhi PR
-#739), the migration path is to replace that single header and update
-the corresponding calls in `main.cpp` — slang sources stay unchanged.
+This example uses raw Vulkan rather than the standard slang-rhi helper
+because `__slang_coverage` is synthesized at **IR time** — after
+Slang's parameter-binding layout pass — so it is invisible to ordinary
+`ProgramLayout` reflection. slang-rhi's binding paths are all
+reflection-driven, so it cannot bind the buffer without extra support
+(slang-rhi PR #739). Raw Vulkan lets us bind it directly once we know
+its location.
+
+All raw-Vulkan code is isolated in `vk_compute_demo.h`. When slang-rhi
+PR #739 merges and the submodule is bumped, the migration replaces that
+header and its callers in `main.cpp`; the Slang shader sources stay
+unchanged.
+
+### Metadata-derived binding (this demo)
+
+This demo uses the **metadata-derived** binding approach: it does not
+tell the compiler where to place `__slang_coverage`; the compiler
+auto-assigns a free descriptor slot and records the choice. The host
+discovers that slot after compilation by querying
+`ISyntheticResourceMetadata`:
+
+```cpp
+auto* synth = (slang::ISyntheticResourceMetadata*)
+    metadata->castAs(slang::ISyntheticResourceMetadata::getTypeGuid());
+slang::SyntheticResourceInfo info = {};
+synth->getResourceInfo(0, &info);
+// info.space, info.binding now hold the assigned (set, binding)
+```
+
+The advantage over hardcoding is that the host never needs to predict
+or reserve a slot — if the shader's own resource count changes, the
+compiler picks a different free slot automatically and the host follows
+without a source change.
+
+Compare the BVH-traversal demo (`shader-coverage-bvh-traversal`) which
+demonstrates the **explicit / raw-binding** approach instead.
 
 ## Build dependencies
 

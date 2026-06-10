@@ -33,9 +33,22 @@ using Slang::ComPtr;
 namespace
 {
 
-// Set 0 holds the application's compute bindings; the coverage buffer
-// is isolated on its own descriptor set so adding or removing coverage
-// does not shift the application's binding indices.
+// ---- EXPLICIT / RAW BINDING --------------------------------------------------
+// This demo uses the explicit binding approach: the host dictates the
+// descriptor slot for `__slang_coverage` at compile time (via
+// TraceCoverageBinding below) and then binds the buffer at exactly that
+// slot at runtime.  The slot is a compile-time constant — no post-compile
+// metadata query is needed.
+//
+// To avoid collisions with the application's own resources (set 0), the
+// coverage buffer is placed on a dedicated descriptor set (kCoverageSet=1).
+// Adding or removing application bindings on set 0 can never shift the
+// coverage slot.
+//
+// Compare shader-coverage-image-pipeline, which uses the metadata-derived
+// approach instead: no slot is hardcoded; the compiler picks a free slot
+// and the host discovers it via ISyntheticResourceMetadata.
+// ------------------------------------------------------------------------------
 constexpr uint32_t kCoverageBinding = 0;
 constexpr uint32_t kCoverageSet = 1;
 constexpr uint32_t kRayGridDim = 512;
@@ -469,12 +482,21 @@ CompiledShader compileShader(const CompileOptions& options)
         pushBool(slang::CompilerOptionName::TraceFunctionCoverage);
         pushBool(slang::CompilerOptionName::TraceBranchCoverage);
 
+        // ---- EXPLICIT / RAW BINDING: tell the compiler the exact slot --------
+        // TraceCoverageBinding pins __slang_coverage to (set=kCoverageSet,
+        // binding=kCoverageBinding). The compiler emits the matching
+        // OpDecorate Binding / DescriptorSet into the SPIR-V.  The host
+        // must then bind the counter buffer to that same slot — there is
+        // no runtime discovery step (contrast metadata-derived binding in
+        // shader-coverage-image-pipeline where this block is absent and
+        // ISyntheticResourceMetadata is queried after compilation instead).
         slang::CompilerOptionEntry pin = {};
         pin.name = slang::CompilerOptionName::TraceCoverageBinding;
         pin.value.kind = slang::CompilerOptionValueKind::Int;
-        pin.value.intValue0 = kCoverageBinding;
-        pin.value.intValue1 = kCoverageSet;
+        pin.value.intValue0 = kCoverageBinding; // Vulkan binding index
+        pin.value.intValue1 = kCoverageSet;     // Vulkan descriptor set / D3D12 space
         optionEntries.push_back(pin);
+        // -----------------------------------------------------------------------
 
         // Forward the counter-width selection. The slangc CLI parser
         // converts `-trace-coverage-counter-width <bits>` to a byte
@@ -863,9 +885,14 @@ int main(int argc, char** argv)
         std::vector<VkDescriptorSet> sets = {set0};
         if (enableCoverage)
         {
+            // ---- EXPLICIT / RAW BINDING: runtime side ----------------------------
+            // Bind the coverage buffer at (set=kCoverageSet, binding=kCoverageBinding)
+            // — the same constants passed to TraceCoverageBinding at compile time.
+            // No metadata query is needed; the slot is fixed by the constants.
             VkDescriptorSet set1 = ctx.allocateDescriptorSet(pipe.setLayouts[1]);
             ctx.writeStorageBuffer(set1, kCoverageBinding, coverageBuf);
             sets.push_back(set1);
+            // -----------------------------------------------------------------------
         }
 
         std::cout << "dispatching (coverage=" << (enableCoverage ? "on" : "off") << ")\n";

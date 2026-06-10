@@ -34,11 +34,14 @@ using Slang::ComPtr;
 namespace
 {
 
-// Set 0 holds the application's compute bindings; the coverage buffer
-// is isolated on its own descriptor set so adding or removing coverage
-// does not shift the application's binding indices.
-constexpr uint32_t kCoverageBinding = 0;
-constexpr uint32_t kCoverageSet = 1;
+// The application's compute resources live on descriptor set 0. The
+// synthesized `__slang_coverage` buffer is placed on its own set by the
+// compiler; rather than hardcode that location, this demo *discovers* it
+// from `ISyntheticResourceMetadata` after compilation (see
+// `compileShader`) — the "metadata-derived binding" approach. Contrast
+// the BVH-traversal demo, which dictates the slot up front via
+// `-trace-coverage-binding` (the "raw/explicit binding" approach). Both
+// are valid; this pair exists to show each one end-to-end.
 constexpr uint32_t kImageWidth = 1920;
 constexpr uint32_t kImageHeight = 1080;
 
@@ -114,6 +117,12 @@ struct CompiledShader
     std::vector<uint8_t> spirv;
     ComPtr<slang::IMetadata> metadata;
     slang::ICoverageTracingMetadata* coverageMetadata = nullptr;
+    // Descriptor location the compiler assigned to the synthesized
+    // `__slang_coverage` buffer, discovered from `ISyntheticResourceMetadata`
+    // (not dictated via `-trace-coverage-binding`). Both stay -1 when
+    // coverage is disabled.
+    int32_t coverageSpace = -1;
+    int32_t coverageBinding = -1;
 };
 
 // Bundles the demo's compile-time choices so call sites name each
@@ -171,12 +180,13 @@ CompiledShader compileShader(const CompileOptions& options)
         pushBool(slang::CompilerOptionName::TraceFunctionCoverage);
         pushBool(slang::CompilerOptionName::TraceBranchCoverage);
 
-        slang::CompilerOptionEntry pin = {};
-        pin.name = slang::CompilerOptionName::TraceCoverageBinding;
-        pin.value.kind = slang::CompilerOptionValueKind::Int;
-        pin.value.intValue0 = kCoverageBinding;
-        pin.value.intValue1 = kCoverageSet;
-        optionEntries.push_back(pin);
+        // Note: this demo deliberately does NOT pass
+        // `TraceCoverageBinding`. It lets the compiler auto-assign a
+        // descriptor slot for the `__slang_coverage` buffer, then reads
+        // that slot back from `ISyntheticResourceMetadata` after
+        // compilation (the metadata-derived binding path, below). The
+        // BVH-traversal demo shows the alternative: dictate the slot here
+        // with `TraceCoverageBinding`.
 
         // Forward the counter-width selection. The slangc CLI parser
         // converts `-trace-coverage-counter-width <bits>` to a byte
@@ -257,6 +267,37 @@ CompiledShader compileShader(const CompileOptions& options)
             slang::ICoverageTracingMetadata::getTypeGuid());
         if (!out.coverageMetadata)
             fail("expected coverage metadata");
+
+        // ---- METADATA-DERIVED BINDING ----------------------------------------
+        // `__slang_coverage` is synthesized at IR time, after Slang's
+        // parameter-binding layout pass, so it is invisible to ordinary
+        // ProgramLayout reflection. ISyntheticResourceMetadata is the
+        // side-channel that reports where the compiler actually placed it.
+        // We did NOT pass TraceCoverageBinding above, so the compiler chose
+        // the slot freely; we read that choice back here and use it on the
+        // Vulkan side below. This is the key contrast with the BVH-traversal
+        // demo, which dictates the slot up front with TraceCoverageBinding.
+
+        // Same IMetadata object carries both coverage-specific and generic
+        // synthetic-resource interfaces; cast to get the latter.
+        auto* synthMetadata = (slang::ISyntheticResourceMetadata*)out.metadata->castAs(
+            slang::ISyntheticResourceMetadata::getTypeGuid());
+        if (!synthMetadata || synthMetadata->getResourceCount() == 0)
+            fail("expected synthetic-resource metadata for __slang_coverage");
+
+        // Index 0: coverage currently emits exactly one global resource.
+        slang::SyntheticResourceInfo resInfo = {};
+        checkSlang(synthMetadata->getResourceInfo(0, &resInfo), "getResourceInfo");
+
+        // Sentinel -1 means the target (e.g. CPU/CUDA) uses uniform offset
+        // rather than a descriptor set; SPIR-V always fills both fields.
+        if (resInfo.space < 0 || resInfo.binding < 0)
+            fail("coverage buffer has no (space, binding) for the SPIR-V target");
+
+        // Store so main() can build matching Vulkan descriptor layouts.
+        out.coverageSpace = resInfo.space;
+        out.coverageBinding = resInfo.binding;
+        // -----------------------------------------------------------------------
     }
     return out;
 }
@@ -608,7 +649,9 @@ int main(int argc, char** argv)
             }
             counterByteWidth = bufferInfo.elementByteWidth;
             std::cout << "coverage counter count: " << counterCount << " ("
-                      << (counterByteWidth * 8) << "-bit slots)\n";
+                      << (counterByteWidth * 8) << "-bit slots), __slang_coverage bound at set="
+                      << shader.coverageSpace << " binding=" << shader.coverageBinding
+                      << " (discovered from synthetic-resource metadata)\n";
         }
 
         vkdemo::Context ctx;
@@ -616,9 +659,17 @@ int main(int argc, char** argv)
         // selection skips integrated GPUs that only support a 32-bit counter buffer.
         ctx.init(enableCoverage && counterByteWidth == 8);
 
-        // Application bindings at set=0; coverage at set=kCoverageSet binding=kCoverageBinding.
+        // Application bindings live on set 0. When coverage is enabled,
+        // the coverage buffer goes wherever the compiler placed it
+        // (shader.coverageSpace / shader.coverageBinding, discovered from
+        // metadata above) rather than a hardcoded slot. Size the
+        // descriptor-set-layout array to span that set; for this demo the
+        // compiler picks set 1, immediately after the application set.
         std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings;
-        setBindings.resize(2);
+        uint32_t setCount = 1; // application set 0
+        if (enableCoverage)
+            setCount = std::max<uint32_t>(setCount, (uint32_t)shader.coverageSpace + 1);
+        setBindings.resize(setCount);
         auto pushBinding = [](std::vector<VkDescriptorSetLayoutBinding>& v, uint32_t b)
         {
             VkDescriptorSetLayoutBinding lb = {};
@@ -632,13 +683,7 @@ int main(int argc, char** argv)
         pushBinding(setBindings[0], 1); // outputImage
         pushBinding(setBindings[0], 2); // paramsBuffer
         if (enableCoverage)
-        {
-            pushBinding(setBindings[1], kCoverageBinding); // coverage buffer
-        }
-        else
-        {
-            setBindings.pop_back(); // no coverage set
-        }
+            pushBinding(setBindings[shader.coverageSpace], (uint32_t)shader.coverageBinding);
 
         // Slang's SPIR-V emit renames the entry point to "main" by default.
         auto pipe = ctx.createComputePipeline(
@@ -674,17 +719,21 @@ int main(int argc, char** argv)
         // each dispatch waits for idle). Allocating a fresh set per dispatch
         // would exhaust the descriptor pool once tiling multiplies the
         // dispatch count.
-        VkDescriptorSet set0 = ctx.allocateDescriptorSet(pipe.setLayouts[0]);
-        ctx.writeStorageBuffer(set0, 0, inputBuf);
-        ctx.writeStorageBuffer(set0, 1, outputBuf);
-        ctx.writeStorageBuffer(set0, 2, paramsBuf);
-        std::vector<VkDescriptorSet> sets = {set0};
+        // Allocate one descriptor set per layout so set indices line up
+        // with set numbers (the harness binds them contiguously from set
+        // 0). Set 0 carries the application buffers; the coverage set
+        // (shader.coverageSpace) carries the coverage buffer.
+        std::vector<VkDescriptorSet> sets;
+        for (auto layout : pipe.setLayouts)
+            sets.push_back(ctx.allocateDescriptorSet(layout));
+        ctx.writeStorageBuffer(sets[0], 0, inputBuf);
+        ctx.writeStorageBuffer(sets[0], 1, outputBuf);
+        ctx.writeStorageBuffer(sets[0], 2, paramsBuf);
         if (enableCoverage)
-        {
-            VkDescriptorSet set1 = ctx.allocateDescriptorSet(pipe.setLayouts[1]);
-            ctx.writeStorageBuffer(set1, kCoverageBinding, coverageBuf);
-            sets.push_back(set1);
-        }
+            ctx.writeStorageBuffer(
+                sets[shader.coverageSpace],
+                (uint32_t)shader.coverageBinding,
+                coverageBuf);
 
         // Two dispatch shapes are supported, selected by `--dispatch`:
         //
