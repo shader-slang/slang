@@ -31,11 +31,12 @@ The host driver generates a procedural mesh, builds a BVH on CPU,
 uploads, and dispatches 4096×4096 = 16.7M rays from a synthetic camera
 in batches of 512×512 (64 batches). Batching keeps each GPU submission
 short to avoid OS watchdog resets (Windows TDR) under coverage
-instrumentation; see `kBatchRays` in `main.cpp` to tune the batch size.
+instrumentation. Pass `--batch-size=N` to opt into batching; omitting
+the flag submits all rays in a single dispatch.
 
 ```bash
 ./shader-coverage-bvh-traversal --mode=smoke    # clean icosphere, Diffuse only
-./shader-coverage-bvh-traversal --mode=full   # +materials, +degenerates, +cluster
+./shader-coverage-bvh-traversal --mode=full     # +materials, +degenerates, +cluster
 
 # Compile-time disable coverage instrumentation (baseline):
 ./shader-coverage-bvh-traversal --mode=full --no-coverage
@@ -43,9 +44,12 @@ instrumentation; see `kBatchRays` in `main.cpp` to tune the batch size.
 # Hit/miss mode — non-atomic, no execution counts but same coverage map:
 ./shader-coverage-bvh-traversal --mode=full --coverage-mode=hit-miss
 
+# Batch dispatch to avoid GPU watchdog resets (Windows TDR) under heavy
+# coverage load. 262144 (512×512) is a safe starting point on any GPU:
+./shader-coverage-bvh-traversal --mode=full --batch-size=262144
+
 # Write the coverage artifacts somewhere other than the demo's source
-# directory (the default). `--output-dir` creates the directory if
-# needed:
+# directory (the default). `--output-dir` creates the directory if needed:
 ./shader-coverage-bvh-traversal --mode=full --output-dir=./out
 
 # Point the demo at a different copy of the `.slang` files (useful
@@ -105,7 +109,7 @@ The five stages `main.cpp` walks through for each run:
 | **1. Compile** | `compileShader()` creates a Slang session with `-trace-coverage`, `-trace-coverage-function`, `-trace-coverage-branch`, and `-trace-coverage-binding 0 1`. The compiler places `__slang_coverage` at the declared slot and emits SPIR-V with `OpAtomicIAdd` (count mode) or plain stores (hit-miss mode) at every instrumented point. | `slang::ISession::loadModule`, `IComponentType::link`, `getEntryPointCode` |
 | **2. Fix binding** | No runtime discovery step — the slot was dictated by `TraceCoverageBinding` at compile time. The host uses the same constants (`kCoverageBinding`, `kCoverageSet`) on the Vulkan side. | `CompilerOptionName::TraceCoverageBinding` |
 | **3. Allocate & bind** | Allocate a zeroed `counterCount × counterByteWidth` storage buffer. Build a Vulkan descriptor layout with app resources (rays/tris/nodes/globals/output) on set 0 and the coverage buffer at `(kCoverageSet, kCoverageBinding)` on set 1. | `vkCreateDescriptorSetLayout`, `vkUpdateDescriptorSets` |
-| **4. Dispatch** | Submit 64 batches of 512×512 rays. Each batch re-uploads `globals.rayBatchOffset`; the shader adds it to `tid.x` to recover the true ray index. Counters accumulate across all batches. Batching caps per-submission GPU time to avoid TDR. | `vkCmdDispatch` (×64) |
+| **4. Dispatch** | Submit rays in batches (if `--batch-size=N` is set) or as a single dispatch (default). Each batch re-uploads `globals.rayBatchOffset`; the shader adds it to `tid.x` to recover the true ray index. Counters accumulate across all batches. | `vkCmdDispatch` |
 | **5. Readback** | Download the raw counter bytes, widen each slot to `uint64_t`, call `getEntryInfo` per counter to map slot → file/line, write manifest + LCOV + binary. | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
 
 ### Raw Vulkan host

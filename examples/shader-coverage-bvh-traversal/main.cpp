@@ -56,13 +56,6 @@ constexpr uint32_t kCoverageBinding = 0;
 constexpr uint32_t kCoverageSet = 1;
 constexpr uint32_t kRayGridDim = 4096;
 constexpr uint32_t kRayCount = kRayGridDim * kRayGridDim;
-// Maximum rays per dispatch batch. Each batch is a separate GPU submission,
-// which caps the per-submission wall time and prevents the OS watchdog
-// (Windows TDR / VK_ERROR_DEVICE_LOST) from killing a long-running dispatch.
-// Sized to match the old single-dispatch scale (512×512) so each batch runs
-// in roughly the same time regardless of the total grid size. Increase if you
-// want fewer submissions; decrease if you observe TDR on a slow GPU.
-constexpr uint32_t kBatchRays = 512 * 512;
 
 struct Vec3
 {
@@ -743,8 +736,17 @@ int main(int argc, char** argv)
         // there surfaces as a `loadModule` error rather than silently
         // falling back to a different directory.
         std::filesystem::path demoDir;
+        // `--batch-size=N`: split the ray grid into batches of N rays,
+        // each dispatched as a separate GPU submission. Keeps individual
+        // submissions short to avoid OS watchdog resets (Windows TDR /
+        // VK_ERROR_DEVICE_LOST) under coverage instrumentation. Default
+        // is 0 (all rays in a single dispatch). A value of 262144
+        // (512×512) is a safe starting point on any GPU; reduce if you
+        // observe TDR, increase for fewer submissions on fast hardware.
+        uint32_t batchSize = 0; // 0 = single dispatch
         constexpr std::string_view kOutputDirFlag = "--output-dir=";
         constexpr std::string_view kDemoDirFlag = "--demo-dir=";
+        constexpr std::string_view kBatchSizeFlag = "--batch-size=";
         for (int i = 1; i < argc; ++i)
         {
             std::string_view a = argv[i];
@@ -768,6 +770,8 @@ int main(int argc, char** argv)
                 outputDir = std::string(a.substr(kOutputDirFlag.size()));
             else if (a.substr(0, kDemoDirFlag.size()) == kDemoDirFlag)
                 demoDir = std::string(a.substr(kDemoDirFlag.size()));
+            else if (a.substr(0, kBatchSizeFlag.size()) == kBatchSizeFlag)
+                batchSize = (uint32_t)std::stoul(std::string(a.substr(kBatchSizeFlag.size())));
             else
             {
                 std::cerr << "unknown arg: " << a << "\n";
@@ -915,29 +919,38 @@ int main(int argc, char** argv)
             // -----------------------------------------------------------------------
         }
 
-        // Dispatch in fixed-size batches (kBatchRays rays each) to avoid any
-        // single GPU submission running long enough to trip the OS watchdog
-        // (Windows TDR / VK_ERROR_DEVICE_LOST). Each batch re-uploads globals
-        // with the new rayBatchOffset; the shader adds that offset to tid.x to
-        // recover the true ray index. The coverage buffer is NOT reset between
-        // batches — counters accumulate across the full grid, which is exactly
-        // what we want: the final buffer reflects all 4096×4096 rays.
+        // Dispatch rays in batches to avoid any single GPU submission running
+        // long enough to trip the OS watchdog (Windows TDR /
+        // VK_ERROR_DEVICE_LOST) under coverage instrumentation. Each batch
+        // re-uploads globals with the new rayBatchOffset; the shader adds that
+        // offset to tid.x to recover the true ray index. The coverage buffer
+        // is NOT reset between batches — counters accumulate across the full
+        // grid so the final readback reflects all rays.
         //
-        // This is the BVH analogue of the image-pipeline demo's tiled dispatch.
-        // The key difference: image-pipeline tiles a 2D image by horizontal
-        // bands (tileOriginY); this demo tiles a 1D ray array by flat offset
-        // (rayBatchOffset). Both patterns are the same WAR for GPU watchdog
-        // timeouts on coverage-instrumented kernels.
+        // This is the BVH analogue of the image-pipeline demo's tiled dispatch:
+        // image-pipeline tiles a 2D image by horizontal bands (tileOriginY);
+        // this demo tiles a 1D ray array by flat offset (rayBatchOffset).
+        // Both patterns are the same WAR for GPU watchdog timeouts on
+        // coverage-instrumented kernels.
+        //
+        // `--batch-size=N` sets the rays-per-batch; omitting the flag submits
+        // all rays in a single dispatch (fast, no TDR protection). A value of
+        // 262144 (512×512) is a safe starting point on any GPU.
         const uint32_t totalRays = (uint32_t)rays.size();
+        // Resolve 0 (the "no flag" sentinel) to the full ray count so the loop
+        // always runs exactly one iteration by default.
+        const uint32_t effectiveBatchSize = (batchSize == 0) ? totalRays : batchSize;
         uint32_t batchCount = 0;
-        std::cout << "dispatching " << totalRays << " rays in batches of " << kBatchRays
-                  << " (coverage=" << (enableCoverage ? "on" : "off") << ")\n";
+        std::cout << "dispatching " << totalRays << " rays";
+        if (effectiveBatchSize < totalRays)
+            std::cout << " in batches of " << effectiveBatchSize;
+        std::cout << " (coverage=" << (enableCoverage ? "on" : "off") << ")\n";
         const auto renderStart = std::chrono::steady_clock::now();
-        for (uint32_t offset = 0; offset < totalRays; offset += kBatchRays)
+        for (uint32_t offset = 0; offset < totalRays; offset += effectiveBatchSize)
         {
             globalsData.rayBatchOffset = offset;
             ctx.upload(globalsBuf, &globalsData, sizeof(globalsData));
-            const uint32_t batchRays = std::min(kBatchRays, totalRays - offset);
+            const uint32_t batchRays = std::min(effectiveBatchSize, totalRays - offset);
             const uint32_t groups = (batchRays + 63) / 64;
             ctx.dispatch(pipe, sets, groups, 1, 1);
             ++batchCount;
@@ -945,9 +958,12 @@ int main(int argc, char** argv)
         const auto renderEnd = std::chrono::steady_clock::now();
         const double renderMs =
             std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
-        std::cout << "render wall time: " << renderMs << " ms ("
-                  << batchCount << " batches, "
-                  << (renderMs / batchCount) << " ms/batch)\n";
+        if (batchCount > 1)
+            std::cout << "render wall time: " << renderMs << " ms ("
+                      << batchCount << " batches, "
+                      << (renderMs / batchCount) << " ms/batch)\n";
+        else
+            std::cout << "render wall time: " << renderMs << " ms\n";
 
         if (enableCoverage)
         {
