@@ -444,6 +444,18 @@ __slang_cm_muladd(
     }
 }
 
+/* static */ uint32_t const* HLSLSourceEmitter::getBarrierMemoryTypeFlagBits(Count& outCount)
+{
+    static const uint32_t flagBits[] = {
+        BarrierMemoryTypeFlags::UavMemory,
+        BarrierMemoryTypeFlags::GroupSharedMemory,
+        BarrierMemoryTypeFlags::NodeInputMemory,
+        BarrierMemoryTypeFlags::NodeOutputMemory,
+    };
+    outCount = SLANG_COUNT_OF(flagBits);
+    return flagBits;
+}
+
 /* static */ const char* HLSLSourceEmitter::getBarrierSemanticFlagName(uint32_t flag)
 {
     switch (flag)
@@ -457,6 +469,17 @@ __slang_cm_muladd(
     default:
         return nullptr;
     }
+}
+
+/* static */ uint32_t const* HLSLSourceEmitter::getBarrierSemanticFlagBits(Count& outCount)
+{
+    static const uint32_t flagBits[] = {
+        BarrierSemanticFlags::GroupSync,
+        BarrierSemanticFlags::GroupScope,
+        BarrierSemanticFlags::DeviceScope,
+    };
+    outCount = SLANG_COUNT_OF(flagBits);
+    return flagBits;
 }
 
 void HLSLSourceEmitter::emitNamedBitFlagSet(

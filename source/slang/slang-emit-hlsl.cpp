@@ -1177,19 +1177,15 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto flagLit = as<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
             SLANG_RELEASE_ASSERT(flagLit);
             auto flagVal = (uint32_t)getIntVal(flagLit);
-            uint32_t const flagBits[] = {
-                BarrierMemoryTypeFlags::UavMemory,
-                BarrierMemoryTypeFlags::GroupSharedMemory,
-                BarrierMemoryTypeFlags::NodeInputMemory,
-                BarrierMemoryTypeFlags::NodeOutputMemory,
-            };
+            Count flagBitCount = 0;
+            auto flagBits = getBarrierMemoryTypeFlagBits(flagBitCount);
             emitNamedBitFlagSet(
                 flagVal,
                 getKnownBarrierMemoryTypeFlags(),
                 BarrierMemoryTypeFlags::AllMemory,
                 "ALL_MEMORY",
                 flagBits,
-                SLANG_COUNT_OF(flagBits),
+                flagBitCount,
                 getBarrierMemoryTypeFlagName);
             return true;
         }
@@ -1200,18 +1196,15 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto flagLit = as<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
             SLANG_RELEASE_ASSERT(flagLit);
             auto flagVal = (uint32_t)getIntVal(flagLit);
-            uint32_t const flagBits[] = {
-                BarrierSemanticFlags::GroupSync,
-                BarrierSemanticFlags::GroupScope,
-                BarrierSemanticFlags::DeviceScope,
-            };
+            Count flagBitCount = 0;
+            auto flagBits = getBarrierSemanticFlagBits(flagBitCount);
             emitNamedBitFlagSet(
                 flagVal,
                 getKnownBarrierSemanticFlags(),
                 BarrierSemanticFlags::Reorder,
                 "REORDER",
                 flagBits,
-                SLANG_COUNT_OF(flagBits),
+                flagBitCount,
                 getBarrierSemanticFlagName);
             return true;
         }

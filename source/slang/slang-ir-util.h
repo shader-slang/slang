@@ -626,7 +626,8 @@ bool isWorkGraphRecordType(IRType* type);
 char const* getWorkGraphRecordTypeName(IROp op);
 
 /// Returns the element type operand for generic work-graph record types, or null
-/// for non-generic record types.
+/// for non-generic record types. Empty record types such as `EmptyNodeOutput`
+/// intentionally return null because they carry no payload element type.
 IRType* getWorkGraphRecordElementType(IRType* type);
 
 } // namespace Slang

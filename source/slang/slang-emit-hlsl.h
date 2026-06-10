@@ -90,6 +90,11 @@ protected:
         IRInst* inputInterpretationPackingFactor = nullptr);
     static const char* getBarrierMemoryTypeFlagName(uint32_t flag);
     static const char* getBarrierSemanticFlagName(uint32_t flag);
+    static uint32_t const* getBarrierMemoryTypeFlagBits(Count& outCount);
+    static uint32_t const* getBarrierSemanticFlagBits(Count& outCount);
+    /// Emits a parenthesized HLSL bit-flag expression for a validated enum value. For example,
+    /// `UavMemory | NodeInputMemory` emits `(UAV_MEMORY | NODE_INPUT_MEMORY)`, the exact special
+    /// value emits its named token, and unknown or empty bit sets emit `(0)`.
     void emitNamedBitFlagSet(
         uint32_t flagVal,
         uint32_t knownFlags,
