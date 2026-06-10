@@ -621,6 +621,19 @@ Modifier* SemanticsVisitor::validateAttribute(
             return nullptr;
         nodeArraySizeAttr->count = count;
     }
+    else if (as<NodeIsProgramEntryAttribute>(attr) || as<AllowSparseNodesAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 0)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "0",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+    }
     else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
     {
         // This case handles GLSL-oriented layout attributes

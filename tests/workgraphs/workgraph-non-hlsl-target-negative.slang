@@ -1,4 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -stage compute -entry main -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target metal -stage compute -entry main -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target wgsl -stage compute -entry main -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target glsl -stage compute -entry main -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target cuda -stage compute -entry main -experimental-feature
 
 import experimental.workgraph;
 
