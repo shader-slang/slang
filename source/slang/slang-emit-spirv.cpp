@@ -7714,7 +7714,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitParam(SpvInstParent* parent, IRInst* inst)
     {
-        requireVariableBufferCapabilityIfNeeded(inst->getDataType());
         auto paramSpvInst = emitOpFunctionParameter(parent, inst, inst->getFullType());
         maybeEmitName(paramSpvInst, inst);
         maybeEmitPointerDecoration(paramSpvInst, inst);
