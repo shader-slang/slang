@@ -147,8 +147,6 @@ Commenting practice:
   `_coerce` recognizes the builtin scalar-to-vector input before overload resolution; this block
   creates a `BuiltinCastExpr` so `IRBuilder::emitCast` can preserve the expected
   `MakeVectorFromScalar` IR shape."
-- When a fast path, guard, or special case preserves existing behavior, say what general path it is
-  bypassing, why that is safe, and what still falls back to the general path.
 - Keep comments synchronized with nearby control flow. If a new block now runs before the old
   fallback, update the surrounding comments so they describe the order the reader sees in the code.
 
