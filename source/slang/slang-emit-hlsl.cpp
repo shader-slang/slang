@@ -1140,7 +1140,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     {
     case kIROp_InOutImplicitCast:
     case kIROp_OutImplicitCast:
-        SLANG_ASSERT(
+        SLANG_RELEASE_ASSERT(
             isBarrierFlagValueCast(inst, inst->getOperand(0)->getDataType(), inst->getDataType()));
         emitOperand(inst->getOperand(0), inOuterPrec);
         return true;
