@@ -6895,10 +6895,6 @@ struct TypeFlowSpecializationContext
             auto selectedCallee = calleeSet->getElement(0);
 
             if (as<IRPoison>(selectedCallee))
-                return replaceCallWithDefaultValue();
-
-            auto selectedCallee = calleeSet->getElement(0);
-            if (as<IRPoison>(selectedCallee))
             {
                 IRBuilder builder(context);
                 builder.setInsertBefore(inst);
