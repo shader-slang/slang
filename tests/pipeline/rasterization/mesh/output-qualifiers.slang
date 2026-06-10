@@ -10,6 +10,11 @@
 
 //TEST:SIMPLE(filecheck=GENERIC):-target hlsl -stage mesh -entry meshGeneric
 //TEST:SIMPLE(filecheck=HLSLSTYLE):-target hlsl -stage mesh -entry meshHlslStyle
+// Compile the emitted HLSL through DXC for both spellings: a doubled `out`
+// (the pre-fix bug) is invalid HLSL and is rejected by DXC, so a successful
+// dxil compile is itself the regression check.
+//TEST:SIMPLE(filecheck=DXIL_GEN):-target dxil-assembly -stage mesh -entry meshGeneric -profile sm_6_6
+//TEST:SIMPLE(filecheck=DXIL_HLSL):-target dxil-assembly -stage mesh -entry meshHlslStyle -profile sm_6_6
 
 struct Vertex { float4 pos : SV_Position; }
 struct Prim   { uint   pid : SV_PrimitiveID; }
@@ -73,3 +78,9 @@ void meshHlslStyle(
 // HLSLSTYLE-NOT: vertices out
 // HLSLSTYLE-NOT: primitives out
 // HLSLSTYLE: SetMeshOutputCounts
+
+// DXC accepts the emitted HLSL for both spellings (the mesh entry compiles to DXIL).
+// DXIL_GEN: call void @dx.op.setMeshOutputCounts
+// DXIL_GEN: @dx.op.emitIndices
+// DXIL_HLSL: call void @dx.op.setMeshOutputCounts
+// DXIL_HLSL: @dx.op.emitIndices
