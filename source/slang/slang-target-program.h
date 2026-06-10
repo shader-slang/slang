@@ -50,17 +50,9 @@ public:
     ///
     ProgramLayout* getOrCreateLayout(DiagnosticSink* sink);
 
-    /// Get the layout for the program on the target.
+    /// Get the existing layout for the program on the target, if already created.
     ///
-    /// This routine assumes that `getOrCreateLayout`
-    /// has already been called previously.
-    ///
-    ProgramLayout* getExistingLayout()
-    {
-        SLANG_ASSERT(m_layout);
-        return m_layout;
-    }
-    bool hasExistingLayout() const { return m_layout != nullptr; }
+    ProgramLayout* getExistingLayout() { return m_layout; }
 
     /// Get the compiled code for an entry point on the target.
     ///

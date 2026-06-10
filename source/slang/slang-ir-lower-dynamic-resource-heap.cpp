@@ -71,7 +71,7 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
         }
     }
 
-    UInt bindlessSpaceIndex = getBindlessSpaceIndex(targetProgram);
+    auto bindlessSpaceIndex = getBindlessSpaceIndex(targetProgram);
 
     for (auto inst : workList)
     {

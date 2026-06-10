@@ -283,10 +283,8 @@ void collectMetadata(
     SLANG_ASSERT(targetProgram);
 
     SlangInt bindlessSpaceIndex = -1;
-    if (targetProgram->hasExistingLayout())
+    if (auto programLayout = targetProgram->getExistingLayout())
     {
-        auto programLayout = targetProgram->getExistingLayout();
-        SLANG_ASSERT(programLayout);
         bindlessSpaceIndex = programLayout->bindlessSpaceIndex;
     }
 
