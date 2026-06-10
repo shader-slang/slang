@@ -860,6 +860,10 @@ def spvRayTracingClusterAccelerationStructureNV : SPV_NV_cluster_acceleration_st
 /// [EXT]
 def spvRayTracingLinearSweptSpheresGeometryNV : SPV_NV_linear_swept_spheres;
 
+/// Represents the SPIR-V capability for sphere geometry.
+/// [EXT]
+def spvRayTracingSpheresGeometryNV : SPV_NV_linear_swept_spheres;
+
 /// Represents the SPIR-V capability for shader clock.
 /// [EXT]
 def spvShaderClockKHR : SPV_KHR_shader_clock;
@@ -2580,6 +2584,22 @@ alias raytracing_anyhit_closesthit = anyhit_closesthit + raytracing;
 /// Collection of capabilities for linear swept spheres.
 /// [Compound]
 alias raytracing_lss = raytracing_anyhit_closesthit | spvRayTracingLinearSweptSpheresGeometryNV;
+
+/// Collection of capabilities for line-swept-spheres and sphere geometry
+/// accessed through an inline ray query. Available on any RayQuery-capable
+/// stage. On SPIR-V the sphere / linear-swept-sphere geometry capabilities are
+/// mandatory (not optional): the SPIR-V alternatives require spvRayQueryKHR
+/// together with the corresponding SPV_NV_linear_swept_spheres geometry
+/// capability, so a SPIR-V caller cannot satisfy this with plain ray query
+/// alone. The non-SPIR-V alternatives (GLSL ray query, SM 6.3 for HLSL/NVAPI,
+/// Metal, CUDA/OptiX) carry the geometry support implicitly.
+/// [Compound]
+alias rayquery_lss = _GL_EXT_ray_query
+                   | _sm_6_3
+                   | metal
+                   | cuda
+                   | spvRayQueryKHR + spvRayTracingLinearSweptSpheresGeometryNV
+                   | spvRayQueryKHR + spvRayTracingSpheresGeometryNV;
 
 /// hit object APIs allow raygen shaders, but not the non-hit object APIs. So we have this special
 /// capdef specifically for the hitobject variant.
