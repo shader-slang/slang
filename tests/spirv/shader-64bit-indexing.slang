@@ -1,17 +1,22 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -capability spvShader64BitIndexingEXT
 
-// Regression test for the spvShader64BitIndexingEXT capability atom (issue #11538).
+// Capability-declaration smoke test for the spvShader64BitIndexingEXT atom (issue #11538).
 //
-// The [require(spvShader64BitIndexingEXT)] clause below only type-checks once the atom exists
-// in slang-capabilities.capdef; before that it is an unknown-capability error. The inline
-// spirv_asm block declares the matching SPIR-V extension and capability so we can FileCheck
-// that both are emitted. OpCapability precedes OpExtension in SPIR-V logical layout.
+// The atom is inert (no emit wiring), so this does not exercise any atom-driven emission. Two
+// independent things are checked:
+//   1. The [require(spvShader64BitIndexingEXT)] clause type-checks. This is the actual regression
+//      guard: if the atom were removed from slang-capabilities.capdef it becomes an
+//      "unknown capability name" error and this file fails to compile.
+//   2. The hand-authored OpExtension/OpCapability inside the spirv_asm block survive to emission
+//      (they are hoisted verbatim, independent of the atom — a green FileCheck here is NOT evidence
+//      that the atom itself drives any emission). OpCapability precedes OpExtension in SPIR-V layout.
+// -capability is passed on the directive (as sibling spirv_asm tests do) so the [require] does not
+// trip the implicit-capability-upgrade warning under restrictive capability checking.
 
-//TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [require(spvShader64BitIndexingEXT)]
-int use64BitIndexing(int n)
+int requireShader64BitIndexing(int n)
 {
     return spirv_asm
     {
@@ -26,7 +31,7 @@ int use64BitIndexing(int n)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
-    outputBuffer[i] = use64BitIndexing(outputBuffer[i]);
+    outputBuffer[i] = requireShader64BitIndexing(outputBuffer[i]);
 }
 
 // CHECK: OpCapability Shader64BitIndexingEXT
