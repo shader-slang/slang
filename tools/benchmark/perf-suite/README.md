@@ -165,8 +165,8 @@ python3 fetch_corpus.py --name mdl
 python3 bench.py --slangc /path/to/slangc --label dev      # -> results/dev/
 
 # 3. (historical) fetch release binaries and sweep them all
-python3 fetch_releases.py                                   # v2025.14 .. v2026.9
-python3 sweep.py --samples 5                                # -> results/<tag>/
+python3 fetch_releases.py --since 2025-07-01                # v2025.12 .. latest
+python3 sweep.py --samples 5                                # -> results/releases/<tag>/
 
 # 4. analyze + visualize
 python3 analyze.py                          # ranked regressions + series.csv/flags.csv
@@ -190,43 +190,48 @@ python3 compare.py base head                # primary-timer Δ%, flags regressio
 
 ### Scripts
 
-| File                | Role                                                                                                                                                                                             |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `workloads.py`      | deterministic workload generators, `gen_*(n) -> {filename: source}`                                                                                                                              |
-| `manifest.py`       | per-workload spec: invocation, compile mode, primary timers                                                                                                                                      |
-| `bench.py`          | **test runner** — runs slangc, parses all timers, writes per-run JSON/CSV (merge-on-write)                                                                                                       |
-| `fetch_corpus.py`   | downloads the MDL real-shader corpus (GitHub contents API)                                                                                                                                       |
-| `fetch_releases.py` | downloads + caches prebuilt `slangc` per release tag                                                                                                                                             |
-| `sweep.py`          | **release sweep** — runs `bench.py` against every cached release                                                                                                                                 |
-| `compare.py`        | **local base-vs-head diff** — "did my change slow compilation?" (bench two slangc on one machine, then diff primary timers)                                                                      |
-| `track.py`          | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint                                                                                     |
-| `trend.py`          | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression                                                                         |
-| `analyze.py`        | per-`(workload,timer)` series, leaf-attributed step-change detection, diagnostics path-cost                                                                                                      |
-| `breakdown.py`      | **phase attribution** — splits `compileInner` into mutually-exclusive buckets (named leaves + `(self)` residuals); aggregate + per-workload tree, and `--html` **stacked-bar** per-workload view |
-| `plot.py`           | self-contained SVG charts (normalized + absolute log)                                                                                                                                            |
-| `report.py`         | single self-contained **HTML report**, cross-release (charts inline + tables)                                                                                                                    |
-| `ladder_scaling.py` | cross-release `floor + slope·N` fit table for any swept workload                                                                                                                                 |
-| `sweep_report.py`   | **complexity-sweep HTML report** for one build — compile time vs size `N`, per-workload scaling curves + fit                                                                                     |
+| File                | Role                                                                                                                                                                                                                                                                                                                  |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workloads.py`      | deterministic workload generators, `gen_*(n) -> {filename: source}`                                                                                                                                                                                                                                                   |
+| `manifest.py`       | per-workload spec: invocation, compile mode, primary timers                                                                                                                                                                                                                                                           |
+| `bench.py`          | **test runner** — runs slangc, parses all timers, writes `results.json` (merge-on-write); generated sources go to an auto-removed `--gen-dir` scratch, not the results dir                                                                                                                                            |
+| `fetch_corpus.py`   | downloads the MDL real-shader corpus (GitHub contents API)                                                                                                                                                                                                                                                            |
+| `fetch_releases.py` | downloads + caches prebuilt `slangc` per release tag                                                                                                                                                                                                                                                                  |
+| `sweep.py`          | **release sweep** — runs `bench.py` against every cached release                                                                                                                                                                                                                                                      |
+| `compare.py`        | **local base-vs-head diff** — "did my change slow compilation?" (bench two slangc on one machine, then diff primary timers)                                                                                                                                                                                           |
+| `track.py`          | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint                                                                                                                                                                                                          |
+| `trend.py`          | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression                                                                                                                                                                                              |
+| `analyze.py`        | per-`(workload,timer)` series, leaf-attributed step-change detection, diagnostics path-cost                                                                                                                                                                                                                           |
+| `breakdown.py`      | **phase attribution** — splits `compileInner` into mutually-exclusive buckets (named leaves + `(self)` residuals); aggregate + per-workload tree; stacked-area **per-release history** (index + per-workload detail pages in `report_per_workload.html`) and **per-sweep** (stacked-area vs N in `sweep_report.html`) |
+| `plot.py`           | self-contained SVG charts (normalized + absolute log)                                                                                                                                                                                                                                                                 |
+| `report.py`         | single self-contained **HTML report**, cross-release (charts inline + tables)                                                                                                                                                                                                                                         |
+| `ladder_scaling.py` | cross-release `floor + slope·N` fit table for any swept workload                                                                                                                                                                                                                                                      |
+| `sweep_report.py`   | **complexity-sweep HTML report** for one build — compileInner scaling curves (index) linking to per-workload pages with the stacked sub-counter-vs-N chart, scaling analysis (floor/k/top-2×), and raw per-size numbers                                                                                               |
 
 ### Documents
 
 | Document     | What it contains                                                           |
 | ------------ | -------------------------------------------------------------------------- |
 | `README.md`  | this file — overview, the tests and what they target, quickstart           |
-| `PLAN.md`    | the design/methodology: what to measure, why, the metric and phase plan    |
+| `PLAN.md`    | origin, locked decisions, storage layout, workload expansion history       |
 | `CI_PLAN.md` | deployment plan for **per-PR** (soft-fail gate) and **nightly** (trend) CI |
 
 ### Generated outputs (gitignored)
 
-| Path                                 | What it is                                                      |
-| ------------------------------------ | --------------------------------------------------------------- |
-| `results/<label>/results.{json,csv}` | every phase timer per run, per release                          |
-| `results/_analysis/series.csv`       | long-format time-series, one row per `(workload,timer,release)` |
-| `results/_analysis/flags.csv`        | ranked step-changes with leaf attribution                       |
-| `results/_analysis/*.svg`            | charts                                                          |
-| `results/_analysis/report.html`      | the combined HTML report                                        |
-| `releases/`                          | cached prebuilt `slangc` per tag (large)                        |
-| `corpus/`                            | fetched real-shader corpora (e.g. MDL)                          |
+| Path                                           | What it is                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------- |
+| `results/releases/<tag>/results.json`          | per-release measurements — source of truth (all timers, all stats)  |
+| `results/daily/<label>/results.json+meta.json` | nightly ToT sweeps                                                  |
+| `results/_tracking/tracking.json`              | derived tracking series (release history ++ daily tail)             |
+| `results/_analysis/series.csv`                 | long-format time-series, one row per `(workload,timer,release)`     |
+| `results/_analysis/flags.csv`                  | ranked step-changes with leaf attribution                           |
+| `results/_analysis/*.svg`                      | charts                                                              |
+| `results/_analysis/report.html`                | cross-release HTML report                                           |
+| `results/_analysis/report_per_workload.html`   | per-workload stacked-area history + drill-down pages                |
+| `results/releases/<tag>/_sweep/`               | complexity-sweep report for swept releases                          |
+| `releases/`                                    | cached prebuilt `slangc` per tag (large, gitignored)                |
+| `corpus/`                                      | fetched real-shader corpora, e.g. MDL (large, gitignored)           |
+| `perf-results.gitignore`                       | copied into the results repo by CI to exclude gen/ and derived HTML |
 
 ---
 
