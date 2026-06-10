@@ -146,6 +146,36 @@ def _parse_args(argv):
 
 
 # ---------------------------------------------------------------------------
+# API pre-flight check
+# ---------------------------------------------------------------------------
+
+_REQUIRED_SYMBOLS = [
+    ("TraceCoverageCounterByteWidth", "CompilerOptionName::TraceCoverageCounterByteWidth", "PR #11451 (feature/coverage-64bit-counters)"),
+    ("TraceCoverageHitMiss",          "CompilerOptionName::TraceCoverageHitMiss",          "PR #11509"),
+    ("elementByteWidth",              "CoverageBufferInfo::elementByteWidth",              "PR #11451 (feature/coverage-64bit-counters)"),
+]
+
+
+def _check_api_requirements(slang_root: Path):
+    slang_h = slang_root / "include" / "slang.h"
+    if not slang_h.exists():
+        sys.exit(f"error: cannot find {slang_h}")
+    text = slang_h.read_text(encoding="utf-8", errors="ignore")
+    missing = [
+        f"  {symbol} — needs {pr}"
+        for token, symbol, pr in _REQUIRED_SYMBOLS
+        if token not in text
+    ]
+    if missing:
+        sys.exit(
+            "error: required Slang API not present in include/slang.h.\n"
+            "This demo requires:\n" + "\n".join(missing) + "\n\n"
+            "Rebase this branch onto feature/coverage-64bit-counters (#11451)\n"
+            "and ensure #11509 is also merged before building."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Open browser cross-platform
 # ---------------------------------------------------------------------------
 
@@ -176,6 +206,7 @@ def main(argv=None):
 
     script_dir = Path(__file__).resolve().parent
     slang_root = _find_slang_root(Path(known.slang_root) if known.slang_root else None)
+    _check_api_requirements(slang_root)
     binary = _ensure_demo_binary(slang_root)
 
     mode = known.mode
