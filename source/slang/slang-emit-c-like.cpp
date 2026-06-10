@@ -3817,7 +3817,7 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
         }
     }
 
-    // Emit mesh-output/payload qualifiers unconditionally: they key off the parameter's
+    // Emit mesh-output qualifiers unconditionally: they key off the parameter's
     // decoration, not its varying-IO layout (which an SV-only output never registers).
     emitMeshShaderModifiers(param);
 
