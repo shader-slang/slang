@@ -27,8 +27,9 @@ int useResult() { return freeFunc(); }
 [nodiscard]
 bool check() { return true; }
 
-// `[nodiscard]` is accepted on any `FunctionDeclBase`, so it should also error when the
-// discarded result comes from a constructor, a user-defined operator, or a generic function.
+// `[nodiscard]` is accepted on any `FunctionDeclBase`. A discarded result from a user-defined
+// operator or a generic function errors; a bare constructor call is a documented exception
+// (see the `Widget(7);` case in `main` below).
 struct Widget
 {
     int v;
