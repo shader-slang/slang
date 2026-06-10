@@ -5194,6 +5194,13 @@ err(
 )
 
 err(
+    "abort-argument-type-not-supported",
+    55211,
+    "unsupported abort argument type",
+    span { loc = "location", message = "argument of type '~type:IRInst' is not supported in an abort message; only scalar and vector arguments are allowed." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",

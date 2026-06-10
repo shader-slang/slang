@@ -15,6 +15,8 @@
 // - mixed-type varargs (uint, int, float, bool): format is 19 chars + null ->
 //   5 words = 20 bytes; member offsets 20/24/28/32; bool widens to uint since
 //   OpTypeBool has no physical layout
+// - vector varargs (bool3, float3): format is 21 chars + null -> 6 words = 24
+//   bytes; bool3 widens to uint3 (12 bytes) at offset 24, float3 at offset 36
 
 // CHECK_SPIRV: OpCapability AbortKHR
 // CHECK_SPIRV: OpExtension "SPV_KHR_shader_abort"
@@ -29,22 +31,27 @@
 // CHECK_SPIRV: OpMemberDecorate %AbortMessage_2 2 Offset 24
 // CHECK_SPIRV: OpMemberDecorate %AbortMessage_2 3 Offset 28
 // CHECK_SPIRV: OpMemberDecorate %AbortMessage_2 4 Offset 32
+// CHECK_SPIRV: OpMemberDecorate %AbortMessage_3 1 Offset 24
+// CHECK_SPIRV: OpMemberDecorate %AbortMessage_3 2 Offset 36
 
 // CHECK_SPIRV: %AbortMessage = OpTypeStruct %_arr_uint_int_7 %uint
 // CHECK_SPIRV: %AbortMessage_0 = OpTypeStruct %_arr_uint_int_1
 // CHECK_SPIRV: %AbortMessage_1 = OpTypeStruct %_arr_uint_int_4
 // CHECK_SPIRV: %AbortMessage_2 = OpTypeStruct %_arr_uint_int_5 %uint %int %float %uint
+// CHECK_SPIRV: %AbortMessage_3 = OpTypeStruct %_arr_uint_int_6 %v3uint %v3float
 
 // CHECK_SPIRV: OpAbortKHR %AbortMessage %
 // CHECK_SPIRV: OpAbortKHR %AbortMessage_0 %
 // CHECK_SPIRV: OpAbortKHR %AbortMessage_1 %
 // CHECK_SPIRV: OpAbortKHR %AbortMessage_2 %
+// CHECK_SPIRV: OpAbortKHR %AbortMessage_3 %
 
 // CHECK_GLSL: #extension GL_EXT_shader_abort
 // CHECK_GLSL: abortEXT("thread id out of range: %u", {{.*}})
 // CHECK_GLSL: abortEXT("")
 // CHECK_GLSL: abortEXT("just a message")
 // CHECK_GLSL: abortEXT("u=%u i=%d f=%f b=%d", {{.*}})
+// CHECK_GLSL: abortEXT("b=%d %d %d v=%f %f %f", {{.*}})
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
@@ -64,5 +71,9 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     if (dispatchThreadID.x == 99)
     {
         abort("u=%u i=%d f=%f b=%d", dispatchThreadID.x, -1, 1.5f, dispatchThreadID.y > 5);
+    }
+    if (dispatchThreadID.z == 99)
+    {
+        abort("b=%d %d %d v=%f %f %f", dispatchThreadID > uint3(100), float3(1, 2, 3));
     }
 }

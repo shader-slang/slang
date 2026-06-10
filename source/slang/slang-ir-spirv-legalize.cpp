@@ -2137,12 +2137,42 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
 
         // The message struct uses explicit layout, and `OpTypeBool` has no
-        // physical size in SPIRV, so widen bool arguments to uint (matching
-        // C variadic promotion for printf-style "%d").
+        // physical size in SPIRV, so widen bool arguments (scalar or vector)
+        // to uint, matching C variadic promotion for printf-style "%d". Any
+        // other non-scalar, non-vector argument (struct, array, resource, ...)
+        // has no printf-style format specifier and cannot be given a correct
+        // explicit layout here, so diagnose it instead of emitting an
+        // invalidly laid out payload.
         for (auto& arg : args)
         {
-            if (as<IRBoolType>(arg->getDataType()))
+            auto argType = arg->getDataType();
+            if (as<IRBoolType>(argType))
+            {
                 arg = builder.emitCast(uintType, arg);
+                continue;
+            }
+            auto elementType = argType;
+            if (auto vectorType = as<IRVectorType>(argType))
+            {
+                elementType = vectorType->getElementType();
+                if (as<IRBoolType>(elementType))
+                {
+                    arg = builder.emitCast(
+                        builder.getVectorType(uintType, vectorType->getElementCount()),
+                        arg);
+                    continue;
+                }
+            }
+            if (!as<IRBasicType>(elementType))
+            {
+                m_sharedContext->m_sink->diagnose(
+                    Diagnostics::AbortArgumentTypeNotSupported{
+                        .type = argType,
+                        .location = inst->sourceLoc});
+                inst->replaceUsesWith(builder.getVoidValue());
+                inst->removeAndDeallocate();
+                return;
+            }
         }
 
         // Build the message struct type `{ uint format[]; args... }` and value,
