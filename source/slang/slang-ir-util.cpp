@@ -5,6 +5,7 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-type-system-shared.h"
 
 namespace Slang
 {
@@ -58,6 +59,31 @@ IRInst* getBarrierFlagValueInst(IRInst* inst)
     while (inst->getOp() == kIROp_InOutImplicitCast || inst->getOp() == kIROp_OutImplicitCast)
         inst = inst->getOperand(0);
     return inst;
+}
+
+uint32_t getKnownBarrierMemoryTypeFlags()
+{
+    return BarrierMemoryTypeFlags::UavMemory | BarrierMemoryTypeFlags::GroupSharedMemory |
+           BarrierMemoryTypeFlags::NodeInputMemory | BarrierMemoryTypeFlags::NodeOutputMemory;
+}
+
+uint32_t getKnownBarrierSemanticFlags()
+{
+    return BarrierSemanticFlags::GroupSync | BarrierSemanticFlags::GroupScope |
+           BarrierSemanticFlags::DeviceScope;
+}
+
+bool isValidBarrierMemoryTypeFlags(uint32_t flagVal)
+{
+    auto knownFlags = getKnownBarrierMemoryTypeFlags();
+    return flagVal == BarrierMemoryTypeFlags::AllMemory ||
+           (flagVal != 0 && (flagVal & ~knownFlags) == 0);
+}
+
+bool isValidBarrierSemanticFlags(uint32_t flagVal)
+{
+    auto knownFlags = getKnownBarrierSemanticFlags();
+    return flagVal == BarrierSemanticFlags::Reorder || (flagVal & ~knownFlags) == 0;
 }
 
 bool isBarrierFlagValueCast(IRInst* castInst, IRType* fromType, IRType* toType)

@@ -43,22 +43,6 @@ static String getBarrierFlagValueString(uint32_t flagVal)
     return sb.produceString();
 }
 
-static bool isValidBarrierMemoryTypeFlags(uint32_t flagVal)
-{
-    const uint32_t knownFlags =
-        BarrierMemoryTypeFlags::UavMemory | BarrierMemoryTypeFlags::GroupSharedMemory |
-        BarrierMemoryTypeFlags::NodeInputMemory | BarrierMemoryTypeFlags::NodeOutputMemory;
-    return flagVal == BarrierMemoryTypeFlags::AllMemory ||
-           (flagVal != 0 && (flagVal & ~knownFlags) == 0);
-}
-
-static bool isValidBarrierSemanticFlags(uint32_t flagVal)
-{
-    const uint32_t knownFlags = BarrierSemanticFlags::GroupSync | BarrierSemanticFlags::GroupScope |
-                                BarrierSemanticFlags::DeviceScope;
-    return flagVal == BarrierSemanticFlags::Reorder || (flagVal & ~knownFlags) == 0;
-}
-
 static void validateBarrierFlagsForHLSLInst(IRInst* inst, DiagnosticSink* sink)
 {
     switch (inst->getOp())

@@ -90,6 +90,14 @@ protected:
         IRInst* inputInterpretationPackingFactor = nullptr);
     static const char* getBarrierMemoryTypeFlagName(uint32_t flag);
     static const char* getBarrierSemanticFlagName(uint32_t flag);
+    void emitNamedBitFlagSet(
+        uint32_t flagVal,
+        uint32_t knownFlags,
+        uint32_t specialValue,
+        char const* specialName,
+        uint32_t const* flagBits,
+        Count flagBitCount,
+        char const* (*getFlagName)(uint32_t));
     void emitMatrixLayoutEnum_sm609(IRInst* operand);
     void emitMatrixLayoutEnum_sm610(IRInst* memoryLayout, bool isTranspose);
     void emitCoopVecMatMulBufferType(IRInst* bufferPtrInst);

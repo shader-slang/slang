@@ -184,7 +184,7 @@ struct LValueCastLoweringContext
         auto toPtrType = as<IRPtrTypeBase>(toType);
         auto fromPtrType = as<IRPtrTypeBase>(fromType);
 
-        SLANG_ASSERT(toPtrType && fromPtrType);
+        SLANG_RELEASE_ASSERT(toPtrType && fromPtrType);
 
         IRType* toValueType = toPtrType->getValueType();
         IRType* fromValueType = fromPtrType->getValueType();

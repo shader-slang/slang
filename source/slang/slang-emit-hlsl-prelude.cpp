@@ -459,6 +459,46 @@ __slang_cm_muladd(
     }
 }
 
+void HLSLSourceEmitter::emitNamedBitFlagSet(
+    uint32_t flagVal,
+    uint32_t knownFlags,
+    uint32_t specialValue,
+    char const* specialName,
+    uint32_t const* flagBits,
+    Count flagBitCount,
+    char const* (*getFlagName)(uint32_t))
+{
+    m_writer->emit("(");
+    if (flagVal == specialValue)
+    {
+        m_writer->emit(specialName);
+    }
+    else if (flagVal & ~knownFlags)
+    {
+        m_writer->emit("0");
+    }
+    else
+    {
+        bool first = true;
+        for (Count ii = 0; ii < flagBitCount; ++ii)
+        {
+            auto bit = flagBits[ii];
+            if (!(flagVal & bit))
+                continue;
+
+            if (!first)
+                m_writer->emit(" | ");
+            auto name = getFlagName(bit);
+            SLANG_ASSERT(name);
+            m_writer->emit(name);
+            first = false;
+        }
+        if (first)
+            m_writer->emit("0");
+    }
+    m_writer->emit(")");
+}
+
 /* static */ UnownedStringSlice HLSLSourceEmitter::getInterpolationModifier_keyword(
     IRInterpolationMode mode)
 {

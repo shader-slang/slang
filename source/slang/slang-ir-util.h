@@ -127,6 +127,11 @@ bool isAddressInst(IRInst* inst);
 // operand of `getEnumBarrierMemoryTypeFlags(intLiteral)`.
 IRInst* getBarrierFlagValueInst(IRInst* inst);
 
+uint32_t getKnownBarrierMemoryTypeFlags();
+uint32_t getKnownBarrierSemanticFlags();
+bool isValidBarrierMemoryTypeFlags(uint32_t flagVal);
+bool isValidBarrierSemanticFlags(uint32_t flagVal);
+
 // Returns true if an l-value cast only wraps a workgraph barrier flag value. For example, HLSL
 // barrier diagnostics may leave an enum-to-int cast around `getEnumBarrierSemanticFlags(...)`.
 bool isBarrierFlagValueCast(IRInst* castInst, IRType* fromType, IRType* toType);

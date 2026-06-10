@@ -615,9 +615,9 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
             }
             if (auto decor = irFunc->findDecoration<IRNodeIDDecoration>())
             {
-                m_writer->emit("[NodeID(\"");
-                m_writer->emit(decor->getName()->getStringSlice());
-                m_writer->emit("\", ");
+                m_writer->emit("[NodeID(");
+                emitStringLiteral(String(decor->getName()->getStringSlice()));
+                m_writer->emit(", ");
                 m_writer->emit(getIntVal(decor->getArrayIndex()));
                 m_writer->emit(")]\n");
             }
@@ -1177,44 +1177,20 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto flagLit = as<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
             SLANG_RELEASE_ASSERT(flagLit);
             auto flagVal = (uint32_t)getIntVal(flagLit);
-            const uint32_t knownFlags =
-                BarrierMemoryTypeFlags::UavMemory | BarrierMemoryTypeFlags::GroupSharedMemory |
-                BarrierMemoryTypeFlags::NodeInputMemory | BarrierMemoryTypeFlags::NodeOutputMemory;
-            m_writer->emit("(");
-            // ALL_MEMORY has its own named constant; otherwise decompose into individual flags.
-            if (flagVal == BarrierMemoryTypeFlags::AllMemory)
-            {
-                m_writer->emit("ALL_MEMORY");
-            }
-            else if (flagVal & ~knownFlags)
-            {
-                m_writer->emit("0");
-            }
-            else
-            {
-                bool first = true;
-                auto emitFlag = [&](uint32_t bit)
-                {
-                    if (flagVal & bit)
-                    {
-                        if (!first)
-                            m_writer->emit(" | ");
-                        auto name = getBarrierMemoryTypeFlagName(bit);
-                        SLANG_ASSERT(name);
-                        m_writer->emit(name);
-                        first = false;
-                    }
-                };
-                emitFlag(BarrierMemoryTypeFlags::UavMemory);
-                emitFlag(BarrierMemoryTypeFlags::GroupSharedMemory);
-                emitFlag(BarrierMemoryTypeFlags::NodeInputMemory);
-                emitFlag(BarrierMemoryTypeFlags::NodeOutputMemory);
-                if (first)
-                {
-                    m_writer->emit("0");
-                }
-            }
-            m_writer->emit(")");
+            uint32_t const flagBits[] = {
+                BarrierMemoryTypeFlags::UavMemory,
+                BarrierMemoryTypeFlags::GroupSharedMemory,
+                BarrierMemoryTypeFlags::NodeInputMemory,
+                BarrierMemoryTypeFlags::NodeOutputMemory,
+            };
+            emitNamedBitFlagSet(
+                flagVal,
+                getKnownBarrierMemoryTypeFlags(),
+                BarrierMemoryTypeFlags::AllMemory,
+                "ALL_MEMORY",
+                flagBits,
+                SLANG_COUNT_OF(flagBits),
+                getBarrierMemoryTypeFlagName);
             return true;
         }
 
@@ -1224,38 +1200,19 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto flagLit = as<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
             SLANG_RELEASE_ASSERT(flagLit);
             auto flagVal = (uint32_t)getIntVal(flagLit);
-            const uint32_t knownFlags = BarrierSemanticFlags::GroupSync |
-                                        BarrierSemanticFlags::GroupScope |
-                                        BarrierSemanticFlags::DeviceScope;
-            m_writer->emit("(");
-            if (flagVal == BarrierSemanticFlags::Reorder)
-            {
-                m_writer->emit("REORDER");
-            }
-            else if (flagVal & ~knownFlags)
-            {
-                m_writer->emit("0");
-            }
-            else
-            {
-                bool first = true;
-                auto emitFlag = [&](uint32_t bit)
-                {
-                    if (flagVal & bit)
-                    {
-                        if (!first)
-                            m_writer->emit(" | ");
-                        auto name = getBarrierSemanticFlagName(bit);
-                        SLANG_ASSERT(name);
-                        m_writer->emit(name);
-                        first = false;
-                    }
-                };
-                emitFlag(BarrierSemanticFlags::GroupSync);
-                emitFlag(BarrierSemanticFlags::GroupScope);
-                emitFlag(BarrierSemanticFlags::DeviceScope);
-            }
-            m_writer->emit(")");
+            uint32_t const flagBits[] = {
+                BarrierSemanticFlags::GroupSync,
+                BarrierSemanticFlags::GroupScope,
+                BarrierSemanticFlags::DeviceScope,
+            };
+            emitNamedBitFlagSet(
+                flagVal,
+                getKnownBarrierSemanticFlags(),
+                BarrierSemanticFlags::Reorder,
+                "REORDER",
+                flagBits,
+                SLANG_COUNT_OF(flagBits),
+                getBarrierSemanticFlagName);
             return true;
         }
     case kIROp_MakeCoopVector:
@@ -2485,9 +2442,9 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     }
     if (auto decor = param->findDecoration<IRNodeIDDecoration>())
     {
-        m_writer->emit("[NodeID(\"");
-        m_writer->emit(decor->getName()->getStringSlice());
-        m_writer->emit("\", ");
+        m_writer->emit("[NodeID(");
+        emitStringLiteral(String(decor->getName()->getStringSlice()));
+        m_writer->emit(", ");
         m_writer->emit(getIntVal(decor->getArrayIndex()));
         m_writer->emit(")] ");
     }
