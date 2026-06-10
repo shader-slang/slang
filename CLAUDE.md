@@ -71,18 +71,15 @@ cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
 
 ### Commenting
 
-Comments are expected, not optional polish. Write them as teaching notes for a reader who knows
-C++ but is new to this subsystem.
+Write comments as teaching notes for a reader who knows C++ but is new to this subsystem.
 
-- Every new function or helper must have a leading comment explaining what it does and why it
-  exists. For callbacks, overrides, tiny accessors, or functions matching a strong local pattern,
-  the comment can be brief, but do not leave a new function unexplained.
-- Inside a function body, if new or changed logic runs for more than about 10 lines without a
-  comment, stop and ask whether the purpose and control flow are obvious to a new reader. If not,
-  add a comment explaining why that block exists before explaining what it does mechanically.
-- For every new function and every dense block, state the assumptions or preconditions it expects
-  and the invariant it is maintaining. Comments should document the implicit contract of the
-  system, not merely restate the code. A reviewer should be able to read the comment, inspect the
+- Comments are required for new functions/helpers and for dense or non-obvious function-body
+  logic. As a rule of thumb, if new or changed logic runs for more than about 10 lines without a
+  comment, stop and check whether a reader new to this subsystem can still follow its purpose.
+  Brief comments are fine for tiny accessors, callbacks, overrides, or code following an obvious
+  local pattern, but do not leave new behavior unexplained.
+- State the implicit contract: assumptions or preconditions, the invariant being maintained, and
+  why the code sits at this layer. A reviewer should be able to read the comment, inspect the
   following code, and conclude that the code maintains the stated invariant without assuming more
   than the comment declared.
 - Explain the source of truth, invariant, or existing mechanism the code relies on. For example,
