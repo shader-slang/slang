@@ -18,16 +18,6 @@ static IRInst* getBarrierFlagValueInst(IRInst* inst)
     return inst;
 }
 
-static bool tryGetBarrierFlagValueInst(IRInst* inst, IRIntegerValue& outValue)
-{
-    if (auto intLit = as<IRIntLit>(getBarrierFlagValueInst(inst)))
-    {
-        outValue = getIntVal(intLit);
-        return true;
-    }
-    return false;
-}
-
 bool HLSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
     switch (inst->getOp())
@@ -1191,14 +1181,14 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_GetEnumBarrierMemoryTypeFlags:
         {
             SLANG_UNUSED(inOuterPrec);
-            IRIntegerValue rawFlagVal = 0;
-            if (!tryGetBarrierFlagValueInst(inst->getOperand(0), rawFlagVal))
+            auto flagLit = as<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
+            if (!flagLit)
             {
                 SLANG_ASSERT(!"expected validated BarrierMemoryTypeFlags constant");
                 m_writer->emit("(0)");
                 return true;
             }
-            auto flagVal = (uint32_t)rawFlagVal;
+            auto flagVal = (uint32_t)getIntVal(flagLit);
             const uint32_t knownFlags =
                 BarrierMemoryTypeFlags::UavMemory | BarrierMemoryTypeFlags::GroupSharedMemory |
                 BarrierMemoryTypeFlags::NodeInputMemory | BarrierMemoryTypeFlags::NodeOutputMemory;
@@ -1243,14 +1233,14 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_GetEnumBarrierSemanticFlags:
         {
             SLANG_UNUSED(inOuterPrec);
-            IRIntegerValue rawFlagVal = 0;
-            if (!tryGetBarrierFlagValueInst(inst->getOperand(0), rawFlagVal))
+            auto flagLit = as<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
+            if (!flagLit)
             {
                 SLANG_ASSERT(!"expected validated BarrierSemanticFlags constant");
                 m_writer->emit("(0)");
                 return true;
             }
-            auto flagVal = (uint32_t)rawFlagVal;
+            auto flagVal = (uint32_t)getIntVal(flagLit);
             const uint32_t knownFlags = BarrierSemanticFlags::GroupSync |
                                         BarrierSemanticFlags::GroupScope |
                                         BarrierSemanticFlags::DeviceScope;
