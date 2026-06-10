@@ -282,17 +282,8 @@ struct AnyValueMarshallingContext
             {
                 auto structType = cast<IRStructType>(dataType);
 
-                // The packed payload layout must match the natural layout of
-                // the packed type exactly: AnyValue sizes are computed from
-                // natural layout (`getAnyValueSize`), and payload bytes are
-                // produced and consumed at natural offsets by host code and
-                // by `reinterpret`. Leaf values already align themselves to
-                // their natural alignment (which equals their size), and
-                // natural layout adds no trailing padding to structs or
-                // arrays, so the only place this sequential walk can drift
-                // from natural layout is a struct boundary: align the
-                // struct's start to its natural alignment, and pad its end
-                // out to its natural size.
+                // Align the struct's start to its natural alignment, 
+                // and pad its end out to its natural size.
                 IRSizeAndAlignment structLayout;
                 bool hasStructLayout =
                     SLANG_SUCCEEDED(getNaturalSizeAndAlignment(
