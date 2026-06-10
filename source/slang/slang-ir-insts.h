@@ -4869,6 +4869,16 @@ $(type_info.return_type) $(type_info.method_name)(
 
     void addSPIRVNonUniformResourceDecoration(IRInst* value)
     {
+        // A constant is dynamically uniform by definition, so it can never be
+        // NonUniform; never decorate one. This matters beyond tidiness: integer
+        // literals are deduplicated module-wide, so decorating a shared literal
+        // (e.g. a fixed [0] access-chain index reached via a non-uniform base)
+        // would make NonUniform propagation see every other uniform access chain
+        // that reuses that literal as "already NonUniform" and spuriously
+        // decorate it -- potentially pulling in an unrelated
+        // *ArrayNonUniformIndexing capability the shader does not need.
+        if (as<IRConstant>(value))
+            return;
         addDecoration(value, kIROp_SPIRVNonUniformResourceDecoration);
     }
 
