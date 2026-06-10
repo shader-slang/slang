@@ -1,3 +1,4 @@
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_NODE_LAUNCH,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DNODE_LAUNCH
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MAX_RECORDS,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DMAX_RECORDS
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_NODE_ID,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DNODE_ID
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_NODE_IS_PROGRAM_ENTRY,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DNODE_IS_PROGRAM_ENTRY
@@ -16,7 +17,13 @@ struct Record
 };
 
 [shader("node")]
+#if defined(NODE_LAUNCH)
 [NodeLaunch("broadcasting")]
+[NodeLaunch("thread")]
+//CHECK_NODE_LAUNCH: duplicate modifier
+#else
+[NodeLaunch("broadcasting")]
+#endif
 [NodeDispatchGrid(1, 1, 1)]
 #if defined(NODE_ID)
 [NodeID("A")]

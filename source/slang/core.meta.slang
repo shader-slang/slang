@@ -4933,9 +4933,6 @@ attribute_syntax [QuadDerivatives] : QuadDerivativesAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
-__generic<T>
-typealias NodePayloadPtr = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::NodePayloadAMDX)>;
-
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;
 
