@@ -33,9 +33,11 @@ env:
 
 jobs:
   nightly:
-    # The quiesced benchmark machine — the SAME runner the release history is
-    # swept on, so absolute timings stay comparable.
-    runs-on: [Windows, self-hosted, benchmark]
+    # The quiesced NVIDIA RGFX perf pool (runner group nvrgfx) — the SAME runner
+    # the release history is swept on, so absolute timings stay comparable.
+    runs-on:
+      group: nvrgfx
+      labels: [Windows, X64, nvrgfx-perf]
     steps:
       - uses: actions/checkout@v4
         with:

@@ -34,7 +34,11 @@ env:
 
 jobs:
   release-sweep:
-    runs-on: [Windows, self-hosted, benchmark]
+    # NVIDIA RGFX perf pool (runner group nvrgfx) — same machines as the nightly
+    # + PR-gate jobs, so release-history timings stay comparable.
+    runs-on:
+      group: nvrgfx
+      labels: [Windows, X64, nvrgfx-perf]
     steps:
       # No Slang build here — we sweep prebuilt RELEASE binaries. fetch-depth 0
       # is needed so fetch_releases.py can read release tags + dates from git.

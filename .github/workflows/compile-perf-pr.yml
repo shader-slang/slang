@@ -52,9 +52,12 @@ jobs:
     # running their code on a self-hosted runner is a security risk. The nightly
     # trend job still covers anything that lands on master.
     if: github.event.pull_request.draft != true && github.event.pull_request.head.repo.fork != true
-    # The same dedicated, quiesced machine the MDL benchmark uses — required for
-    # trustworthy timing.
-    runs-on: [Windows, self-hosted, benchmark]
+    # The dedicated, quiesced NVIDIA RGFX perf pool (runner group nvrgfx, the same
+    # machines slangpy's benchmark uses) — required for trustworthy timing. The
+    # shader-slang/slang repo must be granted access to the nvrgfx runner group.
+    runs-on:
+      group: nvrgfx
+      labels: [Windows, X64, nvrgfx-perf]
     steps:
       - uses: actions/checkout@v4
         with:

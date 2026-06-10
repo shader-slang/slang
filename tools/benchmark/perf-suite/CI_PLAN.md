@@ -41,7 +41,7 @@ the real constraints are **timing noise** and **runner contention**, not runtime
 > by design) and is unproven on the runner until the benchmark machine picks it up.
 
 **Trigger:** `pull_request` to `master`, `paths-ignore` docs, skip drafts.
-**Runner:** `[self-hosted, benchmark]` (same dedicated machine).
+**Runner:** runner group `nvrgfx`, labels `[Windows, X64, nvrgfx-perf]` (the dedicated NVIDIA RGFX perf pool, shared with slangpy; requires the slang repo to be granted access to the group).
 **Behavior on regression:** the perf job **fails (visible red X)** but is **NOT a
 required check**, so it never blocks merge; it also posts a PR comment table.
 (Implementation: the compare script exits non-zero on regression; leave the job
@@ -74,7 +74,7 @@ figures, not user-facing slowdowns; `mdl_dxr` is the realistic one.
 ## Tier 2 — nightly full suite
 
 **Trigger:** `schedule` (nightly cron) + `workflow_dispatch`.
-**Runner:** `[self-hosted, benchmark]`.
+**Runner:** runner group `nvrgfx`, labels `[Windows, X64, nvrgfx-perf]` (same pool as Tier 1).
 
 **Steps:**
 
