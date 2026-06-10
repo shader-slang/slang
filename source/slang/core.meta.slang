@@ -4530,7 +4530,7 @@ attribute_syntax [nonmutating] : NonmutatingAttribute;
 /// discarded — an expression statement, or a `for` loop's side-effect expression,
 /// including through transparent wrappers (parentheses, casts) and pass-through
 /// operands (comma, ternary arms, the right-hand side of `&&`/`||`) — the compiler
-/// emits a warning.
+/// emits an error.
 /// @remarks
 /// This is useful for functions that look like they mutate the object they are called
 /// on, but instead return a result. For example, a member function `load` that returns
@@ -4542,7 +4542,7 @@ attribute_syntax [nonmutating] : NonmutatingAttribute;
 ///    MyType load() { ... }
 /// }
 /// MyType t;
-/// t.load(); // warning: result of '[nodiscard]' function is discarded.
+/// t.load(); // error: result of '[nodiscard]' function is discarded.
 /// let loaded = t.load(); // OK
 /// ```
 ///

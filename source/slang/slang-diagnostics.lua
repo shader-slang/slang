@@ -1293,7 +1293,7 @@ warning(
     span { loc = "expr:Expr", message = "result of '==' not used, did you intend '='?" }
 )
 
-warning(
+err(
     "discarded-nodiscard-result",
     30059,
     "result of '[nodiscard]' function is discarded",

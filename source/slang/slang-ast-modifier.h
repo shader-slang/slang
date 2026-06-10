@@ -1390,7 +1390,7 @@ class NonmutatingAttribute : public Attribute
 // marked with this attribute is made in a context where its result is
 // discarded — an expression statement, or a `for` loop's side-effect
 // expression, including through transparent wrappers and pass-through
-// operands — the compiler emits a warning.
+// operands — the compiler emits an error.
 //
 FIDDLE()
 class NoDiscardAttribute : public Attribute

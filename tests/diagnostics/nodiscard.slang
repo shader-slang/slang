@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIAG):
 
 // Test the `[nodiscard]` attribute: calling a function marked `[nodiscard]`
-// and discarding its result produces a warning.
+// and discarding its result produces an error.
 
 struct MyType
 {
@@ -21,13 +21,13 @@ int freeFunc() { return 1; }
 
 void consume(int x) {}
 
-// Returning the result is using it, not discarding it, so no warning.
+// Returning the result is using it, not discarding it, so no error.
 int useResult() { return freeFunc(); }
 
 [nodiscard]
 bool check() { return true; }
 
-// `[nodiscard]` is accepted on any `FunctionDeclBase`, so it should also warn when the
+// `[nodiscard]` is accepted on any `FunctionDeclBase`, so it should also error when the
 // discarded result comes from a constructor, a user-defined operator, or a generic function.
 struct Widget
 {
@@ -57,19 +57,19 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     MyType t;
     t.val = 0;
 
-    t.load(); // warn
+    t.load(); // error
 /*DIAG:
           ^ result of '[nodiscard]' function is discarded
           ^ the result of calling 'load' is discarded; this function is marked '[nodiscard]'.
 */
 
-    t.compute(); // warn
+    t.compute(); // error
 /*DIAG:
              ^ result of '[nodiscard]' function is discarded
              ^ the result of calling 'compute' is discarded; this function is marked '[nodiscard]'.
 */
 
-    freeFunc(); // warn
+    freeFunc(); // error
 /*DIAG:
             ^ result of '[nodiscard]' function is discarded
             ^ the result of calling 'freeFunc' is discarded; this function is marked '[nodiscard]'.
@@ -94,14 +94,14 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
     }
 
-    // Parentheses are transparent: a parenthesized discarded call still warns.
+    // Parentheses are transparent: a parenthesized discarded call still errors.
     (t.load());
 /*DIAG:
            ^ result of '[nodiscard]' function is discarded
            ^ the result of calling 'load' is discarded; this function is marked '[nodiscard]'.
 */
 
-    // A ternary discards whichever arm is selected, so both `[nodiscard]` arms warn.
+    // A ternary discards whichever arm is selected, so both `[nodiscard]` arms error.
     // (`?:` itself is deprecated in Slang, hence the extra deprecation diagnostic.)
     bool cond = t.val > 0;
     cond ? t.compute() : freeFunc();
@@ -112,7 +112,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
                                  ^ the result of calling 'freeFunc' is discarded; this function is marked '[nodiscard]'.
 */
 
-    // A cast is a transparent wrapper, so a cast-wrapped discarded call still warns.
+    // A cast is a transparent wrapper, so a cast-wrapped discarded call still errors.
     (uint)freeFunc();
 /*DIAG:
                   ^ result of '[nodiscard]' function is discarded
@@ -120,7 +120,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 */
 
     // Short-circuit `&&`/`||` pass their right operand through as the expression's result, so a
-    // discarded `[nodiscard]` call in that position warns. Storing the result does not warn.
+    // discarded `[nodiscard]` call in that position errors. Storing the result does not.
     bool stored = cond && check();
     cond && check();
 /*DIAG:
@@ -133,7 +133,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
                  ^ the result of calling 'check' is discarded; this function is marked '[nodiscard]'.
 */
 
-    // A discarded user-defined operator result and a discarded generic-function result both warn.
+    // A discarded user-defined operator result and a discarded generic-function result both error.
     Widget w1 = Widget(1);
     Widget w2 = Widget(2);
     w1 + w2;
@@ -152,25 +152,25 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     // here. (A discarded constructor call is already an obvious no-op.)
     Widget(7);
 
-    // Storing the result is fine, no warning.
+    // Storing the result is fine, no error.
     let loaded = t.load();
     int c = t.compute();
 
-    // A function not marked `[nodiscard]` does not warn even when discarded.
+    // A function not marked `[nodiscard]` does not error even when discarded.
     t.regular();
 
-    // Using the result in a sub-expression is not discarding it, so none of these warn:
+    // Using the result in a sub-expression is not discarding it, so none of these error:
     // as a call argument, ...
     consume(t.compute());
     // ... and as an operand of a larger, non-`[nodiscard]` expression whose own result is
     // then discarded (the `[nodiscard]` call's result is consumed by `+`, not discarded).
     t.compute() + c;
 
-    // The motivating case: a method with an `out` parameter that also returns a value warns when
+    // The motivating case: a method with an `out` parameter that also returns a value errors when
     // the returned value is discarded, but not when it is used.
     OutWidget ow;
     int side;
-    ow.loadWith(side); // warn
+    ow.loadWith(side); // error
 /*DIAG:
                ^ result of '[nodiscard]' function is discarded
                ^ the result of calling 'loadWith' is discarded; this function is marked '[nodiscard]'.
@@ -178,7 +178,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     int used = ow.loadWith(side);
 
     // Used as a control-flow predicate, the result is consumed by the condition, not discarded,
-    // so none of these warn.
+    // so none of these error.
     if (check()) {}
     while (check()) break;
     do {} while (check());

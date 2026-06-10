@@ -757,7 +757,7 @@ void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
         return;
     }
 
-    // If the discarded expression is a call to a function marked `[nodiscard]`, warn that
+    // If the discarded expression is a call to a function marked `[nodiscard]`, report that
     // the result is being ignored.
     auto invokeExpr = as<InvokeExpr>(expr);
     if (!invokeExpr)
@@ -766,7 +766,7 @@ void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
     // `[nodiscard]` on a `void`-returning function is already rejected at the declaration
     // (see `NodiscardOnVoidFunction` in `checkCallableDeclCommon`). That diagnostic is an
     // error but not fatal, so checking continues and calls to such a function still reach
-    // here; this guard suppresses an additional, nonsensical "result is discarded" warning
+    // here; this guard suppresses an additional, nonsensical "result is discarded" error
     // at every call site on top of the declaration error.
     if (invokeExpr->type.type && invokeExpr->type.type->equals(m_astBuilder->getVoidType()))
         return;
