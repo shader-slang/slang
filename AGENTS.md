@@ -124,6 +124,20 @@ Conventions:
 - Use `SLANG_`-prefixed `SCREAMING_SNAKE_CASE` for macros.
 - Prefer comments that explain why code exists.
 
+Commenting practice:
+
+- Write comments for a new reader who understands C++ but not the local subsystem. Explain the
+  reason for the code, the source of truth it relies on, and why the code sits at this layer.
+- Use precise names for real mechanisms, files, and functions instead of vague shorthand. For
+  example, say a conversion cost comes from `getBaseTypeConversionCost` and is exposed through
+  `core.meta.slang` constructors; do not call it a "table" unless there is actually a table.
+- Ground abstract rationale in one or two concrete examples, such as `float(int)` or `float3(int)`,
+  so the reader can connect the prose to the control flow.
+- When a fast path, guard, or special case preserves existing behavior, say what general path it is
+  bypassing, why that is safe, and what still falls back to the general path.
+- Keep comments synchronized with nearby control flow. If a new block now runs before the old
+  fallback, update the surrounding comments so they describe the order the reader sees in the code.
+
 ## Shell Scripts
 
 Scripts under `extras/` (and other repository shell scripts) must run on bash 3.2, the version

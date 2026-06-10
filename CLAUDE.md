@@ -69,6 +69,22 @@ cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
 
 **Run `./extras/formatting.sh` before committing changes.** PRs must conform to the project's coding style. Use `./extras/formatting.sh --check-only` to verify without modifying files.
 
+### Commenting
+
+Write comments for a new reader who understands C++ but not the local subsystem. Good comments
+explain why the code exists, what source of truth or invariant it relies on, and why the code sits
+at this layer.
+
+- Use precise names for real mechanisms, files, and functions instead of vague shorthand. For
+  example, say a conversion cost comes from `getBaseTypeConversionCost` and is exposed through
+  `core.meta.slang` constructors; do not call it a "table" unless there is actually a table.
+- Ground abstract rationale in one or two concrete examples, such as `float(int)` or `float3(int)`,
+  so the reader can connect the prose to the control flow.
+- When a fast path, guard, or special case preserves existing behavior, say what general path it is
+  bypassing, why that is safe, and what still falls back to the general path.
+- Keep comments synchronized with nearby control flow. If a new block now runs before the old
+  fallback, update the surrounding comments so they describe the order the reader sees in the code.
+
 ### Suppressing Unused Variable Warnings
 
 When a variable declared in an `if` condition is unused inside the body (the condition exists only for its type-check side-effect), use the **C++17 if-init-statement** pattern instead of `SLANG_UNUSED`:
