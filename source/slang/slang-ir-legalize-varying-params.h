@@ -102,8 +102,7 @@ bool isRayTracingHitStage(Stage stage);
 bool tryLegalizeRayTracingPrimitiveIDParam(
     IRModule* module,
     IRBuilder& builder,
-    IRParam* param,
-    bool removeParam);
+    IRParam* param);
 
 void legalizeRayTracingPrimitiveIDParamsForHLSL(IRModule* module);
 

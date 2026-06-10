@@ -519,8 +519,7 @@ static void replacePrimitiveIDParamUses(
 bool tryLegalizeRayTracingPrimitiveIDParam(
     IRModule* module,
     IRBuilder& builder,
-    IRParam* param,
-    bool removeParam)
+    IRParam* param)
 {
     if (!isPrimitiveIDSystemValueParam(param))
         return false;
@@ -556,8 +555,7 @@ bool tryLegalizeRayTracingPrimitiveIDParam(
             needsAddressReplacement);
     }
 
-    if (removeParam)
-        param->removeAndDeallocate();
+    param->removeAndDeallocate();
 
     return true;
 }
@@ -1340,11 +1338,7 @@ struct HLSLRayTracingPrimitiveIDParamLegalizeContext : EntryPointVaryingParamLeg
     {
         IRBuilder builder(m_module);
         builder.setInsertBefore(m_firstOrdinaryInst);
-        if (tryLegalizeRayTracingPrimitiveIDParam(
-                m_module,
-                builder,
-                param,
-                /* removeParam */ true))
+        if (tryLegalizeRayTracingPrimitiveIDParam(m_module, builder, param))
         {
             modifiedFuncType = true;
         }

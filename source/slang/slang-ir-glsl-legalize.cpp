@@ -4822,8 +4822,7 @@ void legalizeEntryPointForGLSL(
     SLANG_ASSERT(entryPointDecor);
 
     auto stage = entryPointDecor->getProfile().getStage();
-    const bool shouldEmitSPIRVDirectly =
-        codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly();
+    const bool isViaGLSL = !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly();
 
     auto layoutDecoration = func->findDecoration<IRLayoutDecoration>();
     SLANG_ASSERT(layoutDecoration);
@@ -4913,7 +4912,7 @@ void legalizeEntryPointForGLSL(
         invokePathConstantFuncInHullShader(&context, codeGenContext, scalarizedGlobalOutput);
     }
 
-    if (isRayTracingHitStage(stage) && !shouldEmitSPIRVDirectly)
+    if (isRayTracingHitStage(stage) && isViaGLSL)
     {
         // Canonicalize hit-stage SV_PrimitiveID before ray-tracing parameter
         // consolidation rewrites entry-point parameters. For SPIR-V via GLSL,
@@ -4933,11 +4932,7 @@ void legalizeEntryPointForGLSL(
             {
                 auto next = pp->getNextParam();
                 builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
-                tryLegalizeRayTracingPrimitiveIDParam(
-                    module,
-                    builder,
-                    pp,
-                    /* removeParam */ true);
+                tryLegalizeRayTracingPrimitiveIDParam(module, builder, pp);
                 pp = next;
             }
         }
