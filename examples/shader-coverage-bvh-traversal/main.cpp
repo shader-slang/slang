@@ -4,9 +4,9 @@
 // 4096×4096 rays through it via compute shader, read back coverage.
 // Smoke mode uses a clean icosphere with one material; full mode adds
 // extra material kinds + degenerate triangles + a packed cluster.
-// Rays are dispatched in fixed-size batches (kBatchRays) to keep each
-// GPU submission short and avoid OS watchdog resets (Windows TDR /
-// VK_ERROR_DEVICE_LOST) under coverage instrumentation.
+// Pass `--batch-size=N` to split the dispatch into fixed-size batches
+// to keep each GPU submission short and avoid OS watchdog resets
+// (Windows TDR / VK_ERROR_DEVICE_LOST) under coverage instrumentation.
 //
 // All GPU-runtime calls go through `vk_compute_demo.h`. See its
 // file-level comment for the swap procedure when slang-rhi PR #739
