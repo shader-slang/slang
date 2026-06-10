@@ -281,6 +281,31 @@ struct AnyValueMarshallingContext
         case kIROp_StructType:
             {
                 auto structType = cast<IRStructType>(dataType);
+
+                // The packed payload layout must match the natural layout of
+                // the packed type exactly: AnyValue sizes are computed from
+                // natural layout (`getAnyValueSize`), and payload bytes are
+                // produced and consumed at natural offsets by host code and
+                // by `reinterpret`. Leaf values already align themselves to
+                // their natural alignment (which equals their size), and
+                // natural layout adds no trailing padding to structs or
+                // arrays, so the only place this sequential walk can drift
+                // from natural layout is a struct boundary: align the
+                // struct's start to its natural alignment, and pad its end
+                // out to its natural size.
+                IRSizeAndAlignment structLayout;
+                bool hasStructLayout =
+                    SLANG_SUCCEEDED(getNaturalSizeAndAlignment(
+                        context->targetRequest,
+                        dataType,
+                        &structLayout)) &&
+                    structLayout.size != IRSizeAndAlignment::kIndeterminateSize &&
+                    structLayout.size >= 0;
+                if (hasStructLayout)
+                    context->ensureOffsetAtNByteBoundary((int)structLayout.alignment);
+                uint32_t startFieldOffset = context->fieldOffset;
+                uint32_t startIntraFieldOffset = context->intraFieldOffset;
+
                 for (auto field : structType->getFields())
                 {
                     auto fieldAddr = builder->emitFieldAddress(
@@ -288,6 +313,15 @@ struct AnyValueMarshallingContext
                         concreteTypedVar,
                         field->getKey());
                     emitMarshallingCode(builder, context, fieldAddr);
+                }
+
+                if (hasStructLayout)
+                {
+                    auto packedSize =
+                        (int64_t)(context->fieldOffset - startFieldOffset) * 4 +
+                        (int64_t)context->intraFieldOffset - startIntraFieldOffset;
+                    if (packedSize < structLayout.size)
+                        context->advanceOffset(uint32_t(structLayout.size - packedSize));
                 }
                 break;
             }
