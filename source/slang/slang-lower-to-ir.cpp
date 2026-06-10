@@ -6933,9 +6933,38 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitBuiltinCastExpr(BuiltinCastExpr* expr)
     {
+        auto builder = context->irBuilder;
         auto irType = lowerType(context, expr->type);
         auto irVal = getSimpleVal(context, lowerRValueExpr(context, expr->base));
-        return LoweredValInfo::simple(context->irBuilder->emitCast(irType, irVal));
+        auto irValType = irVal->getDataType();
+
+        // Builtin coercion fast paths can now create `BuiltinCastExpr` for conversions
+        // that used to lower through core-module constructors. Recreate those constructor
+        // intrinsics here so scalar splats and vector1-to-scalar casts keep their IR shape.
+        if (auto targetVectorType = as<IRVectorType>(irType))
+        {
+            if (!as<IRVectorType>(irValType))
+            {
+                auto scalarVal = builder->emitCast(targetVectorType->getElementType(), irVal);
+                return LoweredValInfo::simple(builder->emitMakeVectorFromScalar(irType, scalarVal));
+            }
+        }
+        else if (auto targetMatrixType = as<IRMatrixType>(irType))
+        {
+            if (!as<IRMatrixType>(irValType))
+            {
+                auto scalarVal = builder->emitCast(targetMatrixType->getElementType(), irVal);
+                return LoweredValInfo::simple(builder->emitMakeMatrixFromScalar(irType, scalarVal));
+            }
+        }
+        else if (auto sourceVectorType = as<IRVectorType>(irValType))
+        {
+            auto elementCount = as<IRIntLit>(sourceVectorType->getElementCount());
+            if (elementCount && elementCount->getValue() == 1)
+                return LoweredValInfo::simple(builder->emitVectorReshape(irType, irVal));
+        }
+
+        return LoweredValInfo::simple(builder->emitCast(irType, irVal));
     }
 
     /// Emit code for a `try` invoke.

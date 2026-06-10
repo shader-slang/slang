@@ -4436,17 +4436,17 @@ bool SemanticsExprVisitor::isGLSLOperatorScope()
     return getShared()->isGLSLOperatorScope();
 }
 
-// Decompose a builtin numeric type into (base element type, shape). `outRows`/`outCols`
-// describe the shape: both null => scalar, rows set & cols null => vector<rows>, both set =>
-// matrix<rows,cols>. Returns false if `type` is not a builtin scalar/vector/matrix.
-static bool _getBuiltinCompositeTypeShape(
+bool getBuiltinCompositeTypeShape(
     Type* type,
     BaseType& outBase,
     IntVal*& outRows,
-    IntVal*& outCols)
+    IntVal*& outCols,
+    IntVal** outLayout)
 {
     outRows = nullptr;
     outCols = nullptr;
+    if (outLayout)
+        *outLayout = nullptr;
     Type* elementType = type;
     if (auto vecType = as<VectorExpressionType>(type))
     {
@@ -4457,6 +4457,8 @@ static bool _getBuiltinCompositeTypeShape(
     {
         outRows = matType->getRowCount();
         outCols = matType->getColumnCount();
+        if (outLayout)
+            *outLayout = matType->getLayout();
         elementType = matType->getElementType();
     }
     auto basic = as<BasicExpressionType>(elementType);
@@ -4530,7 +4532,7 @@ Type* SemanticsExprVisitor::coerceOperandsOfBuiltinBinaryExpr(
         return nullptr;
     BaseType commonBase;
     IntVal *cRows, *cCols;
-    _getBuiltinCompositeTypeShape(commonType, commonBase, cRows, cCols);
+    getBuiltinCompositeTypeShape(commonType, commonBase, cRows, cCols);
     Type* commonElementType = m_astBuilder->getBuiltinType(commonBase);
 
     // Coerce each operand to its *own* shape with the common element base, converting only the
@@ -4782,9 +4784,9 @@ Type* SemanticsExprVisitor::getBuiltinArithmeticCommonType(Type* left, Type* rig
 {
     BaseType leftBase, rightBase;
     IntVal *leftRows, *leftCols, *rightRows, *rightCols;
-    if (!_getBuiltinCompositeTypeShape(left, leftBase, leftRows, leftCols))
+    if (!getBuiltinCompositeTypeShape(left, leftBase, leftRows, leftCols))
         return nullptr;
-    if (!_getBuiltinCompositeTypeShape(right, rightBase, rightRows, rightCols))
+    if (!getBuiltinCompositeTypeShape(right, rightBase, rightRows, rightCols))
         return nullptr;
 
     // Only well-known numeric base types are handled here; anything else (Void and other

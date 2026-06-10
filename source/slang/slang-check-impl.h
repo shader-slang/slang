@@ -88,6 +88,17 @@ inline int getIntValueBitSize(IntegerLiteralValue val)
 // the maximum supported value of 64 is returned instead.
 int getMaximumTypeBitSize(Type* t);
 
+// Decompose a builtin scalar/vector/matrix type into its element base type and shape.
+// A scalar reports null rows/cols; a vector reports rows only; a matrix reports rows,
+// columns, and layout. Returns false for non-builtin arithmetic shapes so callers can
+// fall back to normal semantic checking.
+bool getBuiltinCompositeTypeShape(
+    Type* type,
+    BaseType& outBase,
+    IntVal*& outRows,
+    IntVal*& outCols,
+    IntVal** outLayout = nullptr);
+
 // A flat representation of basic types (scalars, vectors and matrices)
 // that can be used as lookup key in caches
 struct BasicTypeKey

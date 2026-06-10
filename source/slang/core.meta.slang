@@ -1183,12 +1183,12 @@ ${
         // layer will know it can use these operations for implicit
         // conversion.
         ConversionCost conversionCost = getBaseTypeConversionCost(
-            kBaseTypes[tt],
-            kBaseTypes[ss]);
+            kBaseTypes[tt].tag,
+            kBaseTypes[ss].tag);
 
         IROp intrinsicOpCode = getBaseTypeConversionOp(
-            kBaseTypes[tt],
-            kBaseTypes[ss]);
+            kBaseTypes[tt].tag,
+            kBaseTypes[ss].tag);
 
         BuiltinConversionKind builtinConversionKind = kBuiltinConversion_Unknown;
         if (kBaseTypes[tt].tag == BaseType::Double &&

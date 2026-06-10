@@ -15,6 +15,7 @@
 
 namespace Slang
 {
+typedef unsigned int ConversionCost;
 
 // Information about BaseType that's useful for checking literals
 struct BaseTypeInfo
@@ -46,5 +47,9 @@ struct BaseTypeInfo
 private:
     static const BaseTypeInfo s_info[Index(BaseType::CountOfPrimitives)];
 };
+
+/// Get the implicit conversion cost for the scalar base-type constructors
+/// generated into `core.meta.slang`.
+ConversionCost getBaseTypeConversionCost(BaseType toType, BaseType fromType);
 
 } // namespace Slang
