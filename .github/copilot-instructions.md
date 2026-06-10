@@ -56,6 +56,11 @@ C++ but is new to this subsystem.
 - Inside a function body, if new or changed logic runs for more than about 10 lines without a
   comment, stop and ask whether the purpose and control flow are obvious to a new reader. If not,
   add a comment explaining why that block exists before explaining what it does mechanically.
+- For every new function and every dense block, state the assumptions or preconditions it expects
+  and the invariant it is maintaining. Comments should document the implicit contract of the
+  system, not merely restate the code. A reviewer should be able to read the comment, inspect the
+  following code, and conclude that the code maintains the stated invariant without assuming more
+  than the comment declared.
 - Explain the source of truth, invariant, or existing mechanism the code relies on. For example,
   say a conversion cost comes from `getBaseTypeConversionCost` and is exposed through
   `core.meta.slang` constructors; do not call it a "table" unless there is actually a table.
