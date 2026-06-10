@@ -78,8 +78,15 @@ IRType* getAtomicOperationValueType(IRInst* inst)
     // SPIR-V legalization rewrites those operations so the IR instruction itself returns
     // `void`, but later validation and capability emission still need the atomic element type.
     // Recover that type from the pointer operand instead of treating the operation as void.
+    if (inst->getOperandCount() == 0)
+        return nullptr;
+
     IRBuilder builder(inst);
-    auto ptrValueType = tryGetPointedToType(&builder, inst->getOperand(0)->getDataType());
+    auto ptrOperand = inst->getOperand(0);
+    if (!ptrOperand)
+        return nullptr;
+
+    auto ptrValueType = tryGetPointedToType(&builder, ptrOperand->getDataType());
     if (auto atomicType = as<IRAtomicType>(ptrValueType))
         return atomicType->getElementType();
     return ptrValueType;
