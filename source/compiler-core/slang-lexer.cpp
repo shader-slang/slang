@@ -12,7 +12,11 @@
 #include "slang-name.h"
 #include "slang-source-loc.h"
 
-#include <charconv>
+#include <algorithm>
+#include <bit>
+#include <cmath>
+#include <cstdint>
+#include <limits>
 
 namespace Slang
 {
@@ -777,32 +781,187 @@ IntegerLiteralValue getIntegerLiteralValue(
     return value;
 }
 
+// Converts a literal in hexadecimal format to double
+//
+// Params:
+//
+//   start           - literal (after 0x)
+//   end             - end of literal; start + strlen(literal)
+//   suffix          - pointer to receive the first unhandled character
+//   outIsOutOfRange - Whether the value is out of range. Return value is
+//                     either 0 for subnormal underflow or INFINITY for overflow.
+//
+// Return:             Parsed value.
+//
+// Limitations:
+//
+// - If the given significand is more than 64 significant bits (from leading one
+//   to trailing one), it may not be rounded correctly. The significand of double
+//   is 53 bits, so this shouldn't matter in practice.
+// - Rounding of subnormals may not be exactly correct.
+//
+// The minor rounding inaccuracies shouldn't be a problem, since hex floats can
+// represent all finite double values precisely.
+//
+static double _hexFloatLiteralToDouble(
+    const char* start,
+    const char* end,
+    const char*& suffix,
+    bool& outIsOutOfRange)
+{
+    const char* cursor{start};
+    int64_t exponent{};
+    uint64_t significand{};
+    int64_t exponentBias{};
+    bool significandDotSeen{};
+    double ret{};
+    bool isOutOfRange{};
+
+    suffix = start;
+
+    while (cursor != end)
+    {
+        uint64_t digit{};
+        char c = *cursor;
+
+        if ((c >= '0') && (c <= '9'))
+            digit = static_cast<uint64_t>(c - '0');
+        else if ((c >= 'A') && (c <= 'F'))
+            digit = 10U + static_cast<uint64_t>(c - 'A');
+        else if ((c >= 'a') && (c <= 'f'))
+            digit = 10U + static_cast<uint64_t>(c - 'a');
+        else if (!significandDotSeen && (c == '.'))
+        {
+            significandDotSeen = true;
+            ++cursor;
+            continue;
+        }
+        else
+            break;
+
+        // check whether the significand has room for this digit
+        if ((significand & 0xF000000000000000U) == 0U)
+        {
+            significand <<= 4U;
+            significand |= digit;
+
+            if (significandDotSeen)
+                exponentBias -= 4;
+        }
+        else
+        {
+            // No more room, so just update the exponent if we're on the left
+            // side of the dot.
+            if (!significandDotSeen)
+                exponentBias += 4;
+        }
+
+        ++cursor;
+    }
+
+    if (cursor != start)
+        suffix = cursor;
+
+    // do/while for breakable exit
+    do
+    {
+        // significand parsed?
+        if (cursor == start)
+            break;
+
+        // read 'p'/'P'
+        if ((cursor == end) || ((*cursor != 'p') && (*cursor != 'P')))
+            break;
+        ++cursor;
+
+        bool sign{};
+
+        // read optional sign
+        if ((cursor != end) && ((*cursor == '+') || (*cursor == '-')))
+        {
+            sign = (*cursor == '-');
+            ++cursor;
+        }
+
+        while (cursor != end)
+        {
+            int64_t digit{};
+            char c = *cursor;
+            if ((c >= '0') && (c <= '9'))
+                digit = static_cast<int64_t>(c - '0');
+            else
+                break;
+
+            exponent *= 10;
+            exponent += digit;
+            exponent = std::min(exponent, std::numeric_limits<int64_t>::max() / 100);
+
+            ++cursor;
+            suffix = cursor;
+        }
+
+        if (sign)
+            exponent = -exponent;
+
+    } while (false);
+
+    // was something parsed?
+    if (suffix != start)
+    {
+        // start by applying exponent bias
+        exponent += exponentBias;
+
+        if (significand != 0U)
+        {
+            // normalize significand
+            int leadingZeroes = std::countl_zero(significand);
+            significand <<= leadingZeroes;
+            exponent -= leadingZeroes;
+
+            // now calculate the actual value
+            ret = static_cast<double>(significand);
+            ret *= std::exp2(-63);      // note: now the value is 1.xxxxxP0
+            exponent += 63;             // adjust exponent as per the above
+            ret *= std::exp2(exponent); // final exponent adjustment
+
+            // detect underflow/overflow
+            isOutOfRange = (ret == 0.0 || (!std::isfinite(ret)));
+        }
+        else
+        {
+            // if significand is 0, then the value is 0 no matter the exponent
+            ret = 0.0;
+            isOutOfRange = false;
+        }
+    }
+
+    outIsOutOfRange = isOutOfRange;
+    return ret;
+}
+
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
     UnownedStringSlice* outSuffix,
     bool* outIsOutOfRange)
 {
     FloatingPointLiteralValue value{};
+    bool isOutOfRange{}; // underflow/overflow detection
 
     const UnownedStringSlice content = token.getContent();
 
     char const* cursor = content.begin();
     char const* end = content.end();
 
-    std::errc ec{};
-    bool isOutOfRange{};
-
     if (UnownedStringSlice(cursor, end).startsWith("0x") ||
         UnownedStringSlice(cursor, end).startsWith("0X"))
     {
-        // Note: fast_float handles only decimal float formats. Since hex floats
-        // are much simpler (no base-10 to base-2 conversion with rounding
-        // issues), the toolchain-provided std::from_chars should be ok.
+        // Manual implementation for hex-to-double
+        // translation. std::from_chars() does not work reliably on Mac and
+        // fast_float only supports decimal floats. Fortunately, hex-to-double
+        // is reasonably straightforward.
 
-        value = INFINITY; // default in case of errors
-        auto result = std::from_chars(cursor + 2U, end, value, std::chars_format::hex);
-        ec = result.ec;
-        cursor = result.ptr;
+        cursor += 2U;
+        value = _hexFloatLiteralToDouble(cursor, end, cursor, isOutOfRange);
     }
     else
     {
@@ -813,25 +972,21 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         value = 0.0; // default in case of errors. fast_float sets the value
                      // appropriately in case of result_out_of_range
         auto result = fast_float::from_chars(cursor, end, value);
-        ec = result.ec;
         cursor = result.ptr;
-    }
 
-    switch (ec)
-    {
-    case std::errc{}:
-        break;
-
-    case std::errc::result_out_of_range:
-        isOutOfRange = true;
-        break;
-
-    default:
-        // We can still fail to parse literals here, since our accepted
-        // floating point format is narrower than the tokenizer general
-        // literal format
-        value = 0.0;
-        break;
+        if (result.ec == std::errc::result_out_of_range)
+        {
+            // overflow-to-infinity or underflow-to-zero
+            isOutOfRange = true;
+        }
+        else if (result.ec != std::errc{})
+        {
+            // We can still fail to parse literals here, since our accepted
+            // floating point format is narrower than the tokenizer general
+            // literal format. This should trigger an invalid suffix error later
+            // on.
+            value = 0.0;
+        }
     }
 
     // check for special exponent for infinity
@@ -842,6 +997,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         if (UnownedStringSlice(cursor, end).startsWith(inf))
         {
             value = INFINITY;
+            isOutOfRange = false;
             cursor += inf.getLength();
         }
     }
