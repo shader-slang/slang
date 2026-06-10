@@ -2521,15 +2521,17 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    // Most implicit conversions are handled by the general constructor lookup path below: find
-    // suitable marked initializer declarations on the target type and run overload resolution.
+    // The general conversion path below finds suitable initializer ("constructor") declarations
+    // on the target type and runs overload resolution to pick one.
     //
-    // Builtin scalar/vector/matrix conversions also exist as generated core-module constructors,
-    // but their accepted shapes and costs come from fixed tables. Re-running lookup and overload
-    // resolution for every `float(int)`, `float3(int)`, or `float2x2(int)` coercion just
-    // rediscovers those tables. When both sides have fully-known builtin shapes, mirror the
-    // generated constructors directly here, then fall through to constructor lookup for anything
-    // not covered so user-defined and less common conversions keep the normal semantics.
+    // Builtin scalar/vector/matrix conversions have a simpler source of truth: scalar element
+    // conversion costs come from `getBaseTypeConversionCost`, and `core.meta.slang` exposes those
+    // builtin conversions to user code as meta-programmed constructor declarations. We could let
+    // the general path resolve constructor calls like `float(int)`, `float3(int)`, or
+    // `float2x2(int)` to recover the same answer, but doing so spends a lot of compile time on
+    // lookup and overload resolution for facts the compiler already knows. For better compile-time
+    // performance, handle fully-known builtin conversions directly here and fall back to the
+    // general path for user-defined conversions and builtin shapes this fast path does not cover.
 
     BaseType toBase, fromBase;
     IntVal *toRows, *toCols, *fromRows, *fromCols;
