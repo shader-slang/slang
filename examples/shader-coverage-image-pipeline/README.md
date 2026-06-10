@@ -6,7 +6,7 @@ instrumentation across recognizable kernel shapes. Demonstrates how
 **branch and function coverage surface unexercised code paths that
 line coverage alone marks "covered."**
 
-## What it shows
+## Coverage scenarios
 
 The kernel chain has several many-armed switches whose default test
 inputs only hit one arm:
@@ -59,7 +59,7 @@ The wall-clock time is printed for the dispatch loop so you can
 measure the coverage instrumentation overhead by comparing
 `--coverage` vs `--no-coverage` runs at the same `--mode=`.
 
-## Picking a coverage mode
+## Counter modes
 
 `--coverage-mode=count` (default) records exact execution counts via
 atomic add. The bilateral filter's inner loop contends heavily on a
@@ -81,7 +81,7 @@ preserves). Pick `count` when you need exact execution counts; pick
 ./shader-coverage-image-pipeline --mode=full --coverage-mode=hit-miss
 ```
 
-## Why the dispatch is tiled (and how to turn it off)
+## Tiled dispatch
 
 `--dispatch=tiled` (default) splits each config into horizontal bands
 (`kTileRows` rows at a time) and passes the band's row offset to the
@@ -118,7 +118,7 @@ risk doesn't apply:
 - demonstrating the TDR symptom directly under count mode (don't
   use this on workloads you actually need to finish).
 
-## Generate an HTML report
+## HTML report
 
 The `run_coverage.py` wrapper does all steps automatically and opens
 the report. To run the steps manually:
@@ -174,7 +174,7 @@ The five stages `main.cpp` walks through for each run:
 | **4. Dispatch** | Submit compute dispatches (tiled by default to avoid GPU watchdog). The shader atomically increments counters as branches/lines execute. | `vkCmdDispatch` |
 | **5. Readback** | Download the raw counter bytes, widen each slot to `uint64_t`, call `getEntryInfo` per counter to map slot → file/line, write manifest + LCOV + binary. | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
 
-### Why raw Vulkan instead of slang-rhi
+### Raw Vulkan host
 
 This example uses raw Vulkan rather than the standard slang-rhi helper
 because `__slang_coverage` is synthesized at **IR time** — after
@@ -189,7 +189,7 @@ PR #739 merges and the submodule is bumped, the migration replaces that
 header and its callers in `main.cpp`; the Slang shader sources stay
 unchanged.
 
-### Metadata-derived binding (this demo)
+### Metadata-derived binding
 
 This demo uses the **metadata-derived** binding approach: it does not
 tell the compiler where to place `__slang_coverage`; the compiler

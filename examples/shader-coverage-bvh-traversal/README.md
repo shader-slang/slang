@@ -7,7 +7,7 @@ code paths (degenerate triangles, unusual materials, deep traversals)
 are precisely the ones not exercised by the default test scene, and
 branch coverage points them out by file:line.
 
-## What it shows
+## Coverage scenarios
 
 The traversal kernel has several rarely-fired branches:
 
@@ -78,7 +78,7 @@ python3 run_coverage.py --mode=smoke
 python3 run_coverage.py --mode=full --coverage-mode=hit-miss
 ```
 
-## Generate an HTML report (manual)
+## HTML report
 
 ```bash
 # 1. Convert raw counters to rich LCOV (adds branch + function records):
@@ -108,7 +108,7 @@ The five stages `main.cpp` walks through for each run:
 | **4. Dispatch** | Submit 64 batches of 512×512 rays. Each batch re-uploads `globals.rayBatchOffset`; the shader adds it to `tid.x` to recover the true ray index. Counters accumulate across all batches. Batching caps per-submission GPU time to avoid TDR. | `vkCmdDispatch` (×64) |
 | **5. Readback** | Download the raw counter bytes, widen each slot to `uint64_t`, call `getEntryInfo` per counter to map slot → file/line, write manifest + LCOV + binary. | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
 
-### Why raw Vulkan instead of slang-rhi
+### Raw Vulkan host
 
 Same reason as `shader-coverage-image-pipeline`: Slang's
 `__slang_coverage` buffer is synthesized at IR time, after the
@@ -118,7 +118,7 @@ reflection-driven paths without additional support (slang-rhi PR
 #739). All raw-Vulkan code is isolated in `vk_compute_demo.h`; see
 the image-pipeline README for the full rationale and migration plan.
 
-### Explicit / raw binding (this demo)
+### Explicit binding
 
 This demo uses the **explicit / raw-binding** approach: the host
 dictates where `__slang_coverage` lives before compilation using the
