@@ -2519,13 +2519,15 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    // The main general-purpose approach for conversion is
-    // using suitable marked initializer ("constructor")
-    // declarations on the target type.
+    // Most implicit conversions are handled by the general constructor lookup path below: find
+    // suitable marked initializer declarations on the target type and run overload resolution.
     //
-    // This is treated as a form of overload resolution,
-    // since we are effectively forming an overloaded
-    // call to one of the initializers in the target type.
+    // Builtin scalar/vector/matrix conversions also exist as generated core-module constructors,
+    // but their accepted shapes and costs come from fixed tables. Re-running lookup and overload
+    // resolution for every `float(int)`, `float3(int)`, or `float2x2(int)` coercion just
+    // rediscovers those tables. When both sides have fully-known builtin shapes, mirror the
+    // generated constructors directly here, then fall through to constructor lookup for anything
+    // not covered so user-defined and less common conversions keep the normal semantics.
 
     BaseType toBase, fromBase;
     IntVal *toRows, *toCols, *fromRows, *fromCols;
@@ -2534,6 +2536,9 @@ bool SemanticsVisitor::_coerce(
     if (getBuiltinCompositeTypeShape(toType, toBase, toRows, toCols, &toLayout) &&
         getBuiltinCompositeTypeShape(fromType.type, fromBase, fromRows, fromCols, &fromLayout))
     {
+        // `getBuiltinCompositeTypeShape` reports scalars as no rows, vectors as rows only, and
+        // matrices as rows plus columns. The flags below make the conversion-cost cases line up
+        // with the constructor families generated in `core.meta.slang`.
         bool toIsScalar = !toRows;
         bool fromIsScalar = !fromRows;
         bool toIsVector = toRows && !toCols;
@@ -2547,6 +2552,9 @@ bool SemanticsVisitor::_coerce(
                          (toIsMatrix && fromIsMatrix && toRows->equals(fromRows) &&
                           toCols->equals(fromCols) && sameLayout);
 
+        // Start at impossible and opt in only when we can name the exact generated constructor
+        // family being mirrored. That keeps this as a performance shortcut, not a new conversion
+        // rule, because unsupported builtin shapes still use the general fallback below.
         ConversionCost builtinCoercionCost = kConversionCost_Impossible;
         bool isScalarFloatToDoubleCoercion = false;
         if (toIsScalar && fromIsScalar)
@@ -2592,6 +2600,9 @@ bool SemanticsVisitor::_coerce(
         }
         else if (fromIsVector && toIsScalar)
         {
+            // The generated vector1-to-scalar constructor is a shape coercion only: extract the
+            // sole element without changing its base type. Other vector-to-scalar forms either
+            // discard lanes or require an element conversion, so leave them to the normal path.
             if (auto constElementCount = as<ConstantIntVal>(fromRows))
             {
                 if (constElementCount->getValue() == 1 && toBase == fromBase)
@@ -2602,7 +2613,9 @@ bool SemanticsVisitor::_coerce(
         {
             // Mirror the scalar matrix constructors in core.meta.slang: same-element
             // splats, integer/float splats to floating-point matrices, and the special
-            // int -> int16_t matrix truncation constructor.
+            // int -> int16_t matrix truncation constructor. Matrix splats are intentionally
+            // narrower than vector splats, so they spell out the supported cases instead of
+            // blindly reusing the scalar base-type conversion table.
             auto toInfo = BaseTypeInfo::getInfo(toBase);
             bool toFloat = (toInfo.flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
             if (toBase == fromBase)
@@ -2634,8 +2647,8 @@ bool SemanticsVisitor::_coerce(
                 *outCost = builtinCoercionCost;
             if (outToExpr)
             {
-                // Represent the chosen builtin conversion directly. IR lowering recreates
-                // the scalar splat and vector1-to-scalar forms that used to be introduced
+                // Represent the chosen builtin conversion directly. `IRBuilder::emitCast`
+                // recreates scalar splats and vector1-to-scalar forms that used to be introduced
                 // through generated core-module constructors.
                 auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
                 castExpr->type = toType;
@@ -2651,6 +2664,10 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
+    // General fallback: use initializer ("constructor") declarations on the target type. This is
+    // treated as overload resolution because a coercion effectively forms a call to one of the
+    // target type's initializers, including user-defined conversions and builtin constructor shapes
+    // that the direct path above deliberately did not recognize.
     OverloadResolveContext overloadContext;
     overloadContext.disallowNestedConversions = (site != CoercionSite::ExplicitCoercion);
     overloadContext.argCount = 1;
