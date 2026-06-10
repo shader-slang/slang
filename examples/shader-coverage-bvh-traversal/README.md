@@ -93,6 +93,18 @@ python3 path/to/slang/tools/coverage-html/slang-coverage-html.py \
 
 ## Architecture
 
+### Coverage instrumentation pipeline
+
+The five stages `main.cpp` walks through for each run:
+
+| Stage | What happens | Key API |
+|---|---|---|
+| **1. Compile** | `compileShader()` creates a Slang session with `-trace-coverage`, `-trace-coverage-function`, `-trace-coverage-branch`, and `-trace-coverage-binding 0 1`. The compiler places `__slang_coverage` at the declared slot and emits SPIR-V with `OpAtomicIAdd` (count mode) or plain stores (hit-miss mode) at every instrumented point. | `slang::ISession::loadModule`, `IComponentType::link`, `getEntryPointCode` |
+| **2. Fix binding** | No runtime discovery step — the slot was dictated by `TraceCoverageBinding` at compile time. The host uses the same constants (`kCoverageBinding`, `kCoverageSet`) on the Vulkan side. | `CompilerOptionName::TraceCoverageBinding` |
+| **3. Allocate & bind** | Allocate a zeroed `counterCount × counterByteWidth` storage buffer. Build a Vulkan descriptor layout with app resources (rays/tris/nodes/globals/output) on set 0 and the coverage buffer at `(kCoverageSet, kCoverageBinding)` on set 1. | `vkCreateDescriptorSetLayout`, `vkUpdateDescriptorSets` |
+| **4. Dispatch** | Submit a single compute dispatch. The shader atomically increments counters as branches/lines execute. | `vkCmdDispatch` |
+| **5. Readback** | Download the raw counter bytes, widen each slot to `uint64_t`, call `getEntryInfo` per counter to map slot → file/line, write manifest + LCOV + binary. | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
+
 ### Why raw Vulkan instead of slang-rhi
 
 Same reason as `shader-coverage-image-pipeline`: Slang's

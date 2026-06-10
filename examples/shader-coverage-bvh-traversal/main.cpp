@@ -826,6 +826,11 @@ int main(int argc, char** argv)
         const bool needsInt64Atomics = enableCoverage && counterByteWidth == 8;
         ctx.init(needsInt64Atomics);
 
+        // Set 0: application resources (5 bindings in shader order —
+        // rays, tris, nodes, globals, output). Set 1: coverage buffer
+        // at kCoverageBinding, present only when coverage is enabled.
+        // The coverage set is fixed by the TraceCoverageBinding option
+        // passed at compile time; both sides must use the same constants.
         std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings;
         setBindings.resize(2);
         auto pushBinding = [](std::vector<VkDescriptorSetLayoutBinding>& v, uint32_t b)
@@ -838,11 +843,11 @@ int main(int argc, char** argv)
             v.push_back(lb);
         };
         for (uint32_t i = 0; i < 5; ++i)
-            pushBinding(setBindings[0], i);
+            pushBinding(setBindings[0], i);  // rays=0, tris=1, nodes=2, globals=3, output=4
         if (enableCoverage)
             pushBinding(setBindings[1], kCoverageBinding);
         else
-            setBindings.pop_back();
+            setBindings.pop_back();  // no coverage set when instrumentation is off
 
         // Slang's SPIR-V emit renames the entry point to "main" by default.
         auto pipe = ctx.createComputePipeline(
@@ -851,6 +856,7 @@ int main(int argc, char** argv)
             setBindings,
             "main");
 
+        // Application buffers — must match the binding order in bvh_traverse.slang.
         auto rayBuf =
             ctx.createBuffer(rays.size() * sizeof(Ray), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
         ctx.upload(rayBuf, rays.data(), rayBuf.size);
@@ -865,6 +871,9 @@ int main(int argc, char** argv)
         auto outputBuf =
             ctx.createBuffer(rays.size() * 4 * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
+        // Coverage counter buffer: counterCount slots × counterByteWidth bytes each,
+        // zero-initialised. The GPU atomically increments each slot for every
+        // covered source location reached during the dispatch.
         vkdemo::Buffer coverageBuf = {};
         if (enableCoverage)
         {
@@ -875,6 +884,7 @@ int main(int argc, char** argv)
             ctx.upload(coverageBuf, zero.data(), coverageBuf.size);
         }
 
+        // Bind application buffers to set 0 in shader binding order.
         VkDescriptorSet set0 = ctx.allocateDescriptorSet(pipe.setLayouts[0]);
         ctx.writeStorageBuffer(set0, 0, rayBuf);
         ctx.writeStorageBuffer(set0, 1, triBuf);
@@ -906,6 +916,11 @@ int main(int argc, char** argv)
 
         if (enableCoverage)
         {
+            // Read the raw counter buffer back from the GPU, then widen each
+            // slot to uint64_t so the summary and LCOV writers are width-agnostic.
+            // The on-disk .counters.bin is written at the original byte width so
+            // downstream tools that read the manifest's element_stride field see
+            // a consistent layout (matches image-pipeline's readback convention).
             std::vector<uint8_t> rawBytes((size_t)counterCount * counterByteWidth);
             ctx.download(coverageBuf, rawBytes.data(), coverageBuf.size);
             std::vector<uint64_t> hits(counterCount, 0);
@@ -914,7 +929,7 @@ int main(int argc, char** argv)
                 uint64_t value = 0;
                 const uint8_t* slot = rawBytes.data() + (size_t)i * counterByteWidth;
                 for (uint32_t b = 0; b < counterByteWidth; ++b)
-                    value |= (uint64_t)slot[b] << (b * 8);
+                    value |= (uint64_t)slot[b] << (b * 8);  // little-endian reassembly
                 hits[i] = value;
             }
 

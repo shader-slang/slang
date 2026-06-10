@@ -162,6 +162,18 @@ to locate the renderer and converter.
 
 ## Architecture
 
+### Coverage instrumentation pipeline
+
+The five stages `main.cpp` walks through for each run:
+
+| Stage | What happens | Key API |
+|---|---|---|
+| **1. Compile** | `compileShader()` creates a Slang session with `-trace-coverage`, `-trace-coverage-function`, `-trace-coverage-branch`. The compiler injects `__slang_coverage` at IR time and emits SPIR-V with `OpAtomicIAdd` (count mode) or plain stores (hit-miss mode) at every instrumented point. | `slang::ISession::loadModule`, `IComponentType::link`, `getEntryPointCode` |
+| **2. Discover binding** | Query `ISyntheticResourceMetadata::getResourceInfo(0)` on the post-link metadata object to read back `(space, binding)` — the slot the compiler auto-assigned for `__slang_coverage`. | `IMetadata::castAs<ISyntheticResourceMetadata>` |
+| **3. Allocate & bind** | Allocate a zeroed `counterCount × counterByteWidth` storage buffer. Build a Vulkan descriptor layout with app resources on set 0 and the coverage buffer at the discovered `(space, binding)`. | `vkCreateDescriptorSetLayout`, `vkUpdateDescriptorSets` |
+| **4. Dispatch** | Submit compute dispatches (tiled by default to avoid GPU watchdog). The shader atomically increments counters as branches/lines execute. | `vkCmdDispatch` |
+| **5. Readback** | Download the raw counter bytes, widen each slot to `uint64_t`, call `getEntryInfo` per counter to map slot → file/line, write manifest + LCOV + binary. | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
+
 ### Why raw Vulkan instead of slang-rhi
 
 This example uses raw Vulkan rather than the standard slang-rhi helper
