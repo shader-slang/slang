@@ -15,12 +15,10 @@ void* DebugShaderProgram::getInterface(const Slang::Guid& guid)
 
     if (guid == GfxGUID::IID_IShaderProgramD3D12)
     {
-        IShaderProgramD3D12* baseD3D12Program = nullptr;
-        if (SLANG_SUCCEEDED(baseObject->queryInterface(guid, (void**)&baseD3D12Program)))
-        {
-            baseD3D12Program->release();
+        if (!m_baseD3D12Program)
+            baseObject->queryInterface(guid, (void**)m_baseD3D12Program.writeRef());
+        if (m_baseD3D12Program)
             return static_cast<IShaderProgramD3D12*>(this);
-        }
     }
 
     return nullptr;
@@ -32,12 +30,13 @@ Result DebugShaderProgram::getRootSignature(void** outRootSignature)
         return SLANG_E_INVALID_ARG;
 
     *outRootSignature = nullptr;
-    IShaderProgramD3D12* baseD3D12Program = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        baseObject->queryInterface(GfxGUID::IID_IShaderProgramD3D12, (void**)&baseD3D12Program));
-    Result result = baseD3D12Program->getRootSignature(outRootSignature);
-    baseD3D12Program->release();
-    return result;
+    if (!m_baseD3D12Program)
+    {
+        SLANG_RETURN_ON_FAIL(baseObject->queryInterface(
+            GfxGUID::IID_IShaderProgramD3D12,
+            (void**)m_baseD3D12Program.writeRef()));
+    }
+    return m_baseD3D12Program->getRootSignature(outRootSignature);
 }
 
 slang::TypeReflection* DebugShaderProgram::findTypeByName(const char* name)

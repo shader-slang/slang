@@ -1813,10 +1813,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // NumThreadsAttribute.
     // Node shaders in thread-launch mode do not require [numthreads].
     bool isThreadLaunchNode = false;
+    bool hasUncheckedNodeLaunchAttr = false;
     if (stage == Stage::Node)
     {
         auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
-        bool hasUncheckedNodeLaunchAttr = false;
         for (auto modifier = entryPointFuncDecl->modifiers.first; modifier;
              modifier = modifier->next)
         {
@@ -1848,7 +1848,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     bool needsNumThreads = stage == Stage::Compute || stage == Stage::Mesh ||
                            stage == Stage::Amplification || stage == Stage::Node;
-    if (needsNumThreads && !isThreadLaunchNode &&
+    if (needsNumThreads && !isThreadLaunchNode && !hasUncheckedNodeLaunchAttr &&
         !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
     {
         auto parentDecl = entryPointFuncDecl->parentDecl;
@@ -1950,8 +1950,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         if (auto allowSparseNodesAttr = param->findModifier<AllowSparseNodesAttribute>())
         {
             // `[AllowSparseNodes]` is valid on node output arrays, e.g.
-            // `[AllowSparseNodes] NodeOutputArray<MyRecord> outputs`.
-            if (!isIntrinsicTypeWithOp(param->getType(), kIROp_NodeOutputArrayType))
+            // `[AllowSparseNodes] NodeOutputArray<MyRecord> outputs` or
+            // `[AllowSparseNodes] EmptyNodeOutputArray outputs`.
+            auto paramType = param->getType();
+            if (!isIntrinsicTypeWithOp(paramType, kIROp_NodeOutputArrayType) &&
+                !isIntrinsicTypeWithOp(paramType, kIROp_EmptyNodeOutputArrayType))
             {
                 sink->diagnose(Diagnostics::AllowSparseNodesRequiresNodeOutputArray{
                     .attr = allowSparseNodesAttr});

@@ -298,16 +298,16 @@ public enum BarrierSemanticFlags : uint
 /// (e.g. "(UAV_MEMORY)" or "(UAV_MEMORY | NODE_INPUT_MEMORY)"). Handled by the
 /// HLSL emitter via kIROp_GetEnumBarrierMemoryTypeFlags; must only be called for HLSL.
 __intrinsic_op(getEnumBarrierMemoryTypeFlags)
-int GetEnumBarrierMemoryTypeFlags(constexpr BarrierMemoryTypeFlags f);
+internal int GetEnumBarrierMemoryTypeFlags(constexpr BarrierMemoryTypeFlags f);
 
 /// Maps a compile-time BarrierSemanticFlags value to its target named-constant expression
 /// (e.g. "(GROUP_SYNC)" or "(DEVICE_SCOPE | GROUP_SCOPE)"). Handled by the
 /// HLSL emitter via kIROp_GetEnumBarrierSemanticFlags; must only be called for HLSL.
 __intrinsic_op(getEnumBarrierSemanticFlags)
-int GetEnumBarrierSemanticFlags(constexpr BarrierSemanticFlags f);
+internal int GetEnumBarrierSemanticFlags(constexpr BarrierSemanticFlags f);
 
 [require(hlsl, sm_6_8)]
-void __Barrier_hlsl(int memoryTypeFlags, int semanticFlags)
+internal void __Barrier_hlsl(int memoryTypeFlags, int semanticFlags)
 {
     __target_switch
     {

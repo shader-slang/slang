@@ -22,6 +22,7 @@ public:
 
 public:
     Slang::ComPtr<slang::IComponentType> m_slangProgram;
+    Slang::ComPtr<IShaderProgramD3D12> m_baseD3D12Program;
 };
 
 } // namespace debug

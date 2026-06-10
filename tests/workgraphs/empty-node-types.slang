@@ -13,7 +13,7 @@ import experimental.workgraph;
 void main(
     EmptyNodeInput input,
     EmptyNodeOutput outputA,
-    EmptyNodeOutputArray outputArr)
+    [AllowSparseNodes] EmptyNodeOutputArray outputArr)
 {
     uint count = input.Count();
     if (outputA.IsValid())
@@ -30,7 +30,7 @@ void main(
 //CHK_DXIL: dx.op.incrementOutputCount
 //CHK_HLSL: EmptyNodeInput input_0
 //CHK_HLSL: EmptyNodeOutput outputA_0
-//CHK_HLSL: EmptyNodeOutputArray outputArr_0
+//CHK_HLSL: [AllowSparseNodes] EmptyNodeOutputArray outputArr_0
 //CHK_HLSL: input_0.Count()
 //CHK_HLSL: outputA_0.ThreadIncrementOutputCount(1U);
 //CHK_HLSL: outputA_0.GroupIncrementOutputCount(1U);
