@@ -4530,7 +4530,8 @@ attribute_syntax [nonmutating] : NonmutatingAttribute;
 /// discarded — an expression statement, or a `for` loop's side-effect expression,
 /// including through transparent wrappers (parentheses, casts) and pass-through
 /// operands (comma, ternary arms, the right-hand side of `&&`/`||`) — the compiler
-/// emits an error.
+/// emits an error. Applying `[nodiscard]` to a function that returns `void` is itself an
+/// error, reported at the declaration, since such a function has no result to discard.
 /// @remarks
 /// This is useful for functions that look like they mutate the object they are called
 /// on, but instead return a result. For example, a member function `load` that returns
