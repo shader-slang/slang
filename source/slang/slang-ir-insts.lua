@@ -814,6 +814,23 @@ local insts = {
 	-- for linkage).
 	--
 	{ key = { struct_name = "StructKey", global = true } },
+	-- A requirement key for a recognized built-in interface requirement (e.g. an
+	-- `IDifferentiable` requirement identified by `BuiltinRequirementKind`).
+	-- Unlike an ordinary struct key -- which is a distinct `global` symbol per
+	-- field/requirement decl, unified across modules by its `key_<mangled>`
+	-- linkage name -- a built-in requirement key is `hoistable`, so it is
+	-- deduplicated *by construction* from its `kind` operand. This guarantees the
+	-- same logical built-in requirement always resolves to a single key inst,
+	-- even when referenced from several decls (the canonical interface constraint
+	-- and a constraint synthesized while building a type's `Differential`) or
+	-- across the precompiled-core-module boundary.
+	{
+		builtinRequirementKey = {
+			struct_name = "BuiltinRequirementKey",
+			operands = { { "kindOperand", "IRIntLit" } },
+			hoistable = true,
+		},
+	},
 	{ global_generic_param = { global = true } },
 	{ witness_table = { hoistable = true } },
 	{ indexedFieldKey = { operands = { { "baseType" }, { "index" } }, hoistable = true } },
@@ -890,7 +907,7 @@ local insts = {
 		--
 		-- Corresponds to the LLVM `poison` instruction.
 		--
-		{ Poison = {} },
+		{ Poison = { hoistable = true } },
 	}},
 
 	-- A `defaultConstruct` operation creates an initialized
@@ -1186,6 +1203,8 @@ local insts = {
 	},
 	-- Store into an Image.
 	{ imageStore = { operands = { { "image" }, { "coord" }, { "value" } } } },
+	-- Form a pointer to a texel of an image for atomic operations.
+	{ ImageTexelPointer = { operands = { { "image" }, { "coord" }, { "sample" } } } },
 	-- Load from a SubpassInput.
 	{ SubpassLoad = { operands = { { "subpassInput" }, { "sample", optional = true } } } },
 	-- Load (almost) arbitrary-type data from a byte-address buffer
@@ -2091,6 +2110,16 @@ local insts = {
 				},
 			},
 			{
+				BuiltinRequirementDecoration = {
+					-- Marks an interface requirement key with the `BuiltinRequirementKind`
+					-- (stored as its integer value) of the built-in requirement it
+					-- represents. This lets consumers (e.g. autodiff) identify a built-in
+					-- requirement entry by its role rather than by its position in the
+					-- interface's requirement list, which is not semantically meaningful.
+					operands = { { "kindOperand", "IRIntLit" } },
+				},
+			},
+			{
 				RTTI_typeSize = {
 					-- Decorations for RTTI objects
 					struct_name = "RTTITypeSizeDecoration",
@@ -2989,7 +3018,10 @@ local insts = {
 		--         discriminate which witness table to use, and the rest of the parameters.
 		--
 		hoistable = true,
-		operands = {{"witnessTableSet", "IRWitnessTableSet"}, {"lookupKey", "IRStructKey"}}
+		-- `lookupKey` is an `IRInst` (not `IRStructKey`) because a built-in interface
+		-- requirement reached through dynamic dispatch uses the hoistable
+		-- `IRBuiltinRequirementKey`, which is not an `IRStructKey`.
+		operands = {{"witnessTableSet", "IRWitnessTableSet"}, {"lookupKey", "IRInst"}}
 	} },
 	{ GetSpecializedDispatcher = {
 		-- Get a specialized dispatcher function for a given witness table set + key, where

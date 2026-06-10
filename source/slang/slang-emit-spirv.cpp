@@ -5088,14 +5088,63 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 break;
             }
         case kIROp_MakeCombinedTextureSampler:
+            {
+                // Derive the OpTypeSampledImage from the texture operand so the
+                // image type matches (e.g. depth flag, format).
+                IRBuilder builder(m_irModule);
+                auto texType = as<IRTextureTypeBase>(inst->getOperand(0)->getDataType());
+                SLANG_ASSERT(texType);
+                auto combinedType = builder.getTextureType(
+                    texType->getElementType(),
+                    texType->getShapeInst(),
+                    texType->getIsArrayInst(),
+                    texType->getIsMultisampleInst(),
+                    texType->getSampleCountInst(),
+                    texType->getAccessInst(),
+                    texType->getIsShadowInst(),
+                    builder.getIntValue(builder.getIntType(), 1),
+                    texType->getFormatInst());
+                result = emitInst(
+                    parent,
+                    inst,
+                    SpvOpSampledImage,
+                    combinedType,
+                    kResultID,
+                    inst->getOperand(0),
+                    inst->getOperand(1));
+            }
+            break;
+        case kIROp_CombinedTextureSamplerGetTexture:
+            {
+                // Derive the result OpTypeImage from the operand's sampled-image
+                // type so the format matches (e.g. Rgba32ui vs Unknown).
+                IRBuilder builder(m_irModule);
+                auto operandType = as<IRTextureTypeBase>(inst->getOperand(0)->getDataType());
+                SLANG_ASSERT(operandType);
+                auto imageType = builder.getTextureType(
+                    operandType->getElementType(),
+                    operandType->getShapeInst(),
+                    operandType->getIsArrayInst(),
+                    operandType->getIsMultisampleInst(),
+                    operandType->getSampleCountInst(),
+                    operandType->getAccessInst(),
+                    operandType->getIsShadowInst(),
+                    builder.getIntValue(builder.getIntType(), 0),
+                    operandType->getFormatInst());
+                result =
+                    emitInst(parent, inst, SpvOpImage, imageType, kResultID, inst->getOperand(0));
+            }
+            break;
+        case kIROp_ImageTexelPointer:
             result = emitInst(
                 parent,
                 inst,
-                SpvOpSampledImage,
+                SpvOpImageTexelPointer,
                 inst->getDataType(),
                 kResultID,
                 inst->getOperand(0),
-                inst->getOperand(1));
+                inst->getOperand(1),
+                inst->getOperand(2));
             break;
         case kIROp_Add:
         case kIROp_Sub:
@@ -6436,6 +6485,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 ensureExtensionDeclarationBeforeSpv15(toSlice("SPV_EXT_descriptor_indexing"));
 
                 requireSPIRVCapability(SpvCapabilityShaderNonUniform);
+                // The decoration's parent is the instruction being decorated
+                // NonUniform; its result type tells us which resource kind is
+                // indexed non-uniformly, and therefore which per-kind
+                // *ArrayNonUniformIndexing capability Vulkan also requires.
+                requireNonUniformIndexingCapabilityForInst(decoration->getParent());
                 emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
@@ -11408,6 +11462,100 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, capability);
         }
+    }
+
+    // Given a NonUniform-decorated instruction, emit the resource-kind-specific
+    // *ArrayNonUniformIndexing capability that Vulkan requires in addition to the
+    // base ShaderNonUniform capability. Vulkan defines one such capability per
+    // descriptor kind (sampled image, storage image, storage/uniform buffer,
+    // texel buffer, input attachment); the cascade below maps each Slang resource
+    // type to its corresponding capability following that taxonomy.
+    void requireNonUniformIndexingCapabilityForInst(IRInst* inst)
+    {
+        if (!inst)
+            return;
+        auto type = inst->getDataType();
+        if (!type)
+            return;
+
+        // StorageBuffer address space unambiguously identifies SSBOs even after
+        // type lowering. Uniform address space is NOT checked here because
+        // pre-SPIR-V-1.4 targets lower SSBOs to Uniform as well; fall through
+        // to the type-based checks to distinguish UBOs from SSBOs.
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            if (ptrType->getAddressSpace() == AddressSpace::StorageBuffer)
+            {
+                requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
+                return;
+            }
+        }
+
+        type = unwrapArrayAndPointers(type);
+
+        if (auto texType = as<IRTextureTypeBase>(type))
+        {
+            auto access = texType->getAccess();
+            bool isStorageAccess = access == SLANG_RESOURCE_ACCESS_READ_WRITE ||
+                                   access == SLANG_RESOURCE_ACCESS_WRITE ||
+                                   access == SLANG_RESOURCE_ACCESS_RASTER_ORDERED;
+            if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER)
+            {
+                if (isStorageAccess)
+                    requireSPIRVCapability(SpvCapabilityStorageTexelBufferArrayNonUniformIndexing);
+                else
+                    requireSPIRVCapability(SpvCapabilityUniformTexelBufferArrayNonUniformIndexing);
+            }
+            else
+            {
+                if (isStorageAccess)
+                    requireSPIRVCapability(SpvCapabilityStorageImageArrayNonUniformIndexing);
+                else
+                    requireSPIRVCapability(SpvCapabilitySampledImageArrayNonUniformIndexing);
+            }
+        }
+        else if (as<IRSamplerStateTypeBase>(type))
+        {
+            // Vulkan has no SamplerArrayNonUniformIndexing; samplers are always
+            // consumed via OpSampledImage, so the sampled-image capability covers them.
+            requireSPIRVCapability(SpvCapabilitySampledImageArrayNonUniformIndexing);
+        }
+        else if (as<IRHLSLStructuredBufferTypeBase>(type))
+        {
+            requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
+        }
+        else if (as<IRSubpassInputType>(type))
+        {
+            requireSPIRVCapability(SpvCapabilityInputAttachmentArrayNonUniformIndexing);
+        }
+        else if (as<IRUniformParameterGroupType>(type))
+        {
+            requireSPIRVCapability(SpvCapabilityUniformBufferArrayNonUniformIndexing);
+        }
+        else if (as<IRGLSLShaderStorageBufferType>(type))
+        {
+            requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
+        }
+        // By the time NonUniform is emitted, ConstantBuffer/ParameterBlock (UBO) and
+        // structured/storage buffers (SSBO) have been lowered to plain structs, so
+        // the type-based checks above no longer match them. Global-param
+        // legalization tags the lowered struct to record which it is: a UBO gets
+        // SPIRVBlockDecoration, a pre-SPIR-V-1.4 SSBO gets SPIRVBufferBlockDecoration
+        // (a SPIR-V 1.4+ SSBO instead uses the StorageBuffer address space and was
+        // already handled by the early return above). Reading those decorations
+        // here recovers the correct capability after lowering.
+        else if (type->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+        {
+            requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
+        }
+        else if (type->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+        {
+            requireSPIRVCapability(SpvCapabilityUniformBufferArrayNonUniformIndexing);
+        }
+        // Implicit fall-through: no capability emitted. This is expected for
+        // non-resource types that carry NonUniform (e.g., integer indices,
+        // plain struct values extracted from a non-uniform access chain).
+        // Only descriptor-backed resource types require a per-kind capability.
     }
 
     List<List<SpvCapability>> m_anyCapability;
