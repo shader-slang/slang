@@ -115,11 +115,15 @@ void barrierTestImpl(IDevice* device, UnitTestContext* context)
     compareComputeResult(device, outputBuffer, makeArray<float>(11.0f, 12.0f, 13.0f, 14.0f));
 }
 
+static void barrierTestFunc(ComPtr<IDevice> device, UnitTestContext* context)
+{
+    barrierTestImpl(device.get(), context);
+}
+
 SLANG_UNIT_TEST(bufferBarrierVulkan)
 {
     runTestImpl(
-        [](ComPtr<IDevice> device, UnitTestContext* context)
-        { barrierTestImpl(device.get(), context); },
+        barrierTestFunc,
         unitTestContext,
         DeviceType::Vulkan,
         {"", "../../tools/gfx-unit-test", "tools/gfx-unit-test"});
