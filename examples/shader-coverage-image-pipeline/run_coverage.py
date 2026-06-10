@@ -92,24 +92,18 @@ def _ensure_demo_binary(slang_root: Path) -> Path:
                 break
             return c
 
-    # Slow path: trigger a CMake build.
-    build_dir = slang_root / "build"
-    if not (build_dir / "CMakeCache.txt").exists():
-        print(f"[build] no configured build found — running: cmake --preset default")
-        result = subprocess.run(
-            ["cmake", "--preset", "default"],
-            cwd=slang_root,
-        )
-        if result.returncode != 0:
-            sys.exit("error: cmake configure failed")
-
-    print(f"[build] building target '{_TARGET}' (release) …")
+    # Slow path: build only the demo target. Assumes Slang itself is already
+    # built (cmake --build --preset release was run by the user).
+    print(f"[build] building target '{_TARGET}' …")
     result = subprocess.run(
         ["cmake", "--build", "--preset", "release", "--target", _TARGET],
         cwd=slang_root,
     )
     if result.returncode != 0:
-        sys.exit(f"error: cmake build failed for target '{_TARGET}'")
+        sys.exit(
+            f"error: cmake build failed for target '{_TARGET}'.\n"
+            "Build Slang first:  cmake --build --preset release"
+        )
 
     for c in _candidate_paths(slang_root):
         if c.exists():
@@ -117,7 +111,7 @@ def _ensure_demo_binary(slang_root: Path) -> Path:
 
     sys.exit(
         f"error: build succeeded but '{_TARGET}' binary not found in expected paths.\n"
-        f"Searched under: {build_dir}"
+        f"Searched under: {slang_root / 'build'}"
     )
 
 
@@ -146,39 +140,6 @@ def _parse_args(argv):
 
     known, demo_args = p.parse_known_args(argv)
     return known, demo_args
-
-
-# ---------------------------------------------------------------------------
-# API pre-flight check
-# ---------------------------------------------------------------------------
-
-# Symbols added by in-flight PRs that this demo requires.  If any are absent
-# from include/slang.h the build will fail ~470 steps in with a cryptic error.
-# Catch that up front with a clear message.
-_REQUIRED_SYMBOLS = [
-    ("TraceCoverageCounterByteWidth", "CompilerOptionName::TraceCoverageCounterByteWidth", "PR #11451 (feature/coverage-64bit-counters)"),
-    ("TraceCoverageHitMiss",          "CompilerOptionName::TraceCoverageHitMiss",          "PR #11509"),
-    ("elementByteWidth",              "CoverageBufferInfo::elementByteWidth",              "PR #11451 (feature/coverage-64bit-counters)"),
-]
-
-
-def _check_api_requirements(slang_root: Path):
-    slang_h = slang_root / "include" / "slang.h"
-    if not slang_h.exists():
-        sys.exit(f"error: cannot find {slang_h}")
-    text = slang_h.read_text(encoding="utf-8", errors="ignore")
-    missing = [
-        f"  {symbol} — needs {pr}"
-        for token, symbol, pr in _REQUIRED_SYMBOLS
-        if token not in text
-    ]
-    if missing:
-        sys.exit(
-            "error: required Slang API not present in include/slang.h.\n"
-            "This demo requires:\n" + "\n".join(missing) + "\n\n"
-            "Rebase this branch onto feature/coverage-64bit-counters (#11451)\n"
-            "and ensure #11509 is also merged before building."
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +174,6 @@ def main(argv=None):
 
     script_dir = Path(__file__).resolve().parent
     slang_root = _find_slang_root(Path(known.slang_root) if known.slang_root else None)
-    _check_api_requirements(slang_root)
     binary = _ensure_demo_binary(slang_root)
 
     mode = known.mode
