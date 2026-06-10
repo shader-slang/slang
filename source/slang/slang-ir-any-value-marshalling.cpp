@@ -284,6 +284,10 @@ struct AnyValueMarshallingContext
                 {
                     auto packedSize = (int64_t)(context->fieldOffset - startFieldOffset) * 4 +
                                       (int64_t)context->intraFieldOffset - startIntraFieldOffset;
+                    // A struct that starts at its natural alignment packs
+                    // within its natural size; a violation means the walk
+                    // and the natural layout have diverged.
+                    SLANG_ASSERT(packedSize <= structLayout.size);
                     if (packedSize < structLayout.size)
                         context->advanceOffset(uint32_t(structLayout.size - packedSize));
                 }
