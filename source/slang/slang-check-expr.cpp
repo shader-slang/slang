@@ -4616,7 +4616,12 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         node->arguments.add(arg);
         node->type = QualType(uOperandType);
         node->loc = expr->loc;
-        if (m_parentDifferentiableAttr && isNeg)
+        // Register the operand/result types in a differentiable scope regardless of the operator
+        // (matching the breadth of the pre-fast-path `visitInvokeExpr`): the operand of a `!`/`~`
+        // is not itself differentiable, but `maybeRegisterDifferentiableType` is a no-op for
+        // non-differentiable types, so registering unconditionally just preserves the prior
+        // behavior for any differentiable operand without special-casing the operator.
+        if (m_parentDifferentiableAttr)
         {
             maybeRegisterDifferentiableType(m_astBuilder, arg->type.type, arg->loc);
             maybeRegisterDifferentiableType(m_astBuilder, uOperandType, expr->loc);
@@ -4753,9 +4758,14 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     node->type = resultType;
     node->loc = expr->loc;
 
-    // Match visitInvokeExpr's differentiable-type registration for arithmetic (the IR
-    // op it lowers to is differentiable). Comparison results are boolean (non-diff).
-    if (m_parentDifferentiableAttr && isArithmetic)
+    // Register the operand/result types in a differentiable scope, regardless of the operator
+    // family, matching the breadth of the pre-fast-path `visitInvokeExpr` (which walked all
+    // operands for every operator). A comparison's boolean result and an integer bitwise
+    // operand are not differentiable, but `maybeRegisterDifferentiableType` is a no-op for
+    // non-differentiable types, so registering unconditionally just ensures a differentiable
+    // operand type (e.g. comparing two `IDifferentiable` values to gate a branch) still has its
+    // conformance registered, without special-casing the operator family.
+    if (m_parentDifferentiableAttr)
     {
         maybeRegisterDifferentiableType(m_astBuilder, leftArg->type.type, leftArg->loc);
         maybeRegisterDifferentiableType(m_astBuilder, rightArg->type.type, rightArg->loc);
