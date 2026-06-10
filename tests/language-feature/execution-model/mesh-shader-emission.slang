@@ -8,6 +8,9 @@
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -stage mesh -entry meshMain
 //TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv-asm -stage mesh -entry meshMain -emit-spirv-directly
+// Compile the emitted HLSL through DXC: the pre-fix doubled `out` is invalid HLSL
+// that DXC rejects, so a successful dxil compile is itself a regression check.
+//TEST:SIMPLE(filecheck=CHECK_DXIL): -target dxil-assembly -stage mesh -entry meshMain -profile sm_6_6
 
 struct MeshVertex
 {
@@ -65,3 +68,7 @@ void meshMain(
 // CHECK_SPIRV-DAG: BuiltIn Position
 // CHECK_SPIRV-DAG: BuiltIn PrimitiveTriangleIndicesEXT
 // CHECK_SPIRV-DAG: OpSetMeshOutputsEXT
+
+// DXIL: DXC accepts the emitted HLSL (the mesh entry compiles to DXIL).
+// CHECK_DXIL: call void @dx.op.setMeshOutputCounts
+// CHECK_DXIL: @dx.op.emitIndices
