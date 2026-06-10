@@ -1,7 +1,7 @@
 // Image pipeline entry point. One compute thread per pixel; each
 // thread runs the full denoise → tonemap → gamma sequence. Mode
 // parameters select the branch arms inside each stage; the host
-// driver dispatches the kernel twice (smoke + exhaustive) and the
+// driver dispatches the kernel twice (smoke + full) and the
 // coverage delta is the demo's headline.
 
 import denoise;

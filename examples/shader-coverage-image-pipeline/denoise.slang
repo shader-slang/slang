@@ -85,7 +85,7 @@ float rangeWeight(float dl, float sigma)
 
 // Fast 3x3 separable path triggers only when sigmaS < 1.5; the wider
 // kernel (general path) is exercised otherwise. Demo input deliberately
-// covers both regimes when --mode=exhaustive.
+// covers both regimes when --mode=full.
 public float3 bilateralDenoisePixel(
     RWStructuredBuffer<float4> input,
     int x,

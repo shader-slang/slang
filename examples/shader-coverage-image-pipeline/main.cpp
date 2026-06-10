@@ -2,7 +2,7 @@
 //
 // Single-dispatch compute pipeline: denoise → tonemap → gamma applied
 // to a synthetic 1080p test image. Runs in "smoke" mode (single
-// operator/boundary/gamma) or "exhaustive" mode (full sweep). The
+// operator/boundary/gamma) or "full" mode (full parameter sweep). The
 // coverage delta between the two runs is the demo's headline.
 //
 // All GPU-runtime calls go through `vk_compute_demo.h` so the entire
@@ -142,7 +142,7 @@ struct CompiledShader
 //       `0` if the entry never executed, non-zero otherwise. This
 //       removes all atomic contention (the dominant cost on hot
 //       loops like the bilateral filter), at the price of losing
-//       exact counts. The exhaustive sweep in this demo runs roughly
+//       exact counts. The full sweep in this demo runs roughly
 //       an order of magnitude faster in hit/miss mode; LCOV output
 //       is identical because the converter treats any positive count
 //       as "covered" either way.
@@ -370,7 +370,7 @@ std::vector<DispatchConfig> buildSmokeConfigs()
     return {c};
 }
 
-std::vector<DispatchConfig> buildExhaustiveConfigs()
+std::vector<DispatchConfig> buildFullConfigs()
 {
     std::vector<DispatchConfig> configs;
     for (uint32_t op = 0; op < 4; ++op)
@@ -524,7 +524,7 @@ int main(int argc, char** argv)
         // all atomic contention. Bilateral filter dispatches in this
         // demo have thousands of weighted samples per pixel — atomic
         // counters become the dominant cost, and hit/miss runs ~15×
-        // faster on the exhaustive sweep at the price of losing
+        // faster on the full sweep at the price of losing
         // exact counts. The LCOV report is identical either way (any
         // positive count is "covered").
         bool coverageHitMiss = false;
@@ -560,8 +560,8 @@ int main(int argc, char** argv)
             std::string_view a = argv[i];
             if (a == "--mode=smoke")
                 mode = "smoke";
-            else if (a == "--mode=exhaustive")
-                mode = "exhaustive";
+            else if (a == "--mode=full")
+                mode = "full";
             else if (a == "--no-coverage")
                 enableCoverage = false;
             else if (a == "--coverage")
@@ -711,7 +711,7 @@ int main(int argc, char** argv)
             ctx.upload(coverageBuf, zero.data(), coverageBuf.size);
         }
 
-        auto configs = (mode == "smoke") ? buildSmokeConfigs() : buildExhaustiveConfigs();
+        auto configs = (mode == "smoke") ? buildSmokeConfigs() : buildFullConfigs();
 
         // Allocate the descriptor sets once and reuse them for every
         // dispatch. The bound buffers never change; only the contents of

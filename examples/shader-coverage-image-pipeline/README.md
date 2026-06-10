@@ -19,31 +19,31 @@ inputs only hit one arm:
 - Bilateral filter fast-path vs general path (radius-dependent)
 
 A **smoke** run dispatches one operator/boundary/gamma combination;
-an **exhaustive** run sweeps the full 4×4×3 = 48 configuration matrix.
+a **full** run sweeps the full 4×4×3 = 48 configuration matrix.
 The coverage delta between the two runs is the demo's headline.
 
 ## Run
 
 ```bash
 ./shader-coverage-image-pipeline --mode=smoke
-./shader-coverage-image-pipeline --mode=exhaustive
+./shader-coverage-image-pipeline --mode=full
 
 # Compile-time disable coverage instrumentation (baseline for overhead
 # measurement):
-./shader-coverage-image-pipeline --mode=exhaustive --no-coverage
+./shader-coverage-image-pipeline --mode=full --no-coverage
 
 # Single whole-image dispatch per config instead of horizontal tiles
 # (see "Why the dispatch is tiled" below for what tiling buys you):
-./shader-coverage-image-pipeline --mode=exhaustive --dispatch=whole
+./shader-coverage-image-pipeline --mode=full --dispatch=whole
 
 # Write the coverage artifacts somewhere other than the demo's source
 # directory (the default). `--output-dir` creates the directory if
 # needed:
-./shader-coverage-image-pipeline --mode=exhaustive --output-dir=./out
+./shader-coverage-image-pipeline --mode=full --output-dir=./out
 
 # Point the demo at a different copy of the `.slang` files (useful
 # when the binary has been moved away from the source tree):
-./shader-coverage-image-pipeline --mode=exhaustive \
+./shader-coverage-image-pipeline --mode=full \
     --demo-dir=/path/to/shader-coverage-image-pipeline
 ```
 
@@ -70,15 +70,15 @@ mitigation for the resulting wall-time blow-up).
 `--coverage-mode=hit-miss` records covered-or-not instead — each slot
 is written non-atomically with `1` the first time it executes.
 Concurrent same-value stores are a benign race. This removes all
-atomic contention, so the exhaustive sweep runs roughly an order of
+atomic contention, so the full sweep runs roughly an order of
 magnitude faster while still producing the same LCOV report (any
 positive count is "covered", which is exactly what hit-miss
 preserves). Pick `count` when you need exact execution counts; pick
 `hit-miss` when you just want to know which paths fired.
 
 ```bash
-# Same coverage map, much faster on the exhaustive sweep:
-./shader-coverage-image-pipeline --mode=exhaustive --coverage-mode=hit-miss
+# Same coverage map, much faster on the full sweep:
+./shader-coverage-image-pipeline --mode=full --coverage-mode=hit-miss
 ```
 
 ## Why the dispatch is tiled (and how to turn it off)
@@ -98,7 +98,7 @@ the instrumented shader far slower than the uninstrumented one
 (20–30× on the GPUs we measured). A single whole-image dispatch of
 that instrumented kernel can run long enough to trip the GPU's
 watchdog timeout (Windows TDR / `VK_ERROR_DEVICE_LOST`) and abort
-the run — especially the 48-config `--mode=exhaustive` sweep.
+the run — especially the 48-config `--mode=full` sweep.
 
 Tiling caps how long any single GPU submission runs, keeping each
 one well under the watchdog limit. It does **not** change the
@@ -126,20 +126,20 @@ the report. To run the steps manually:
 ```bash
 # 1. Convert raw counters to rich LCOV (adds branch + function records):
 python3 path/to/slang/tools/shader-coverage/slang-coverage-to-lcov.py \
-    --manifest exhaustive.coverage-manifest.json \
-    --counters exhaustive.counters.bin \
-    --output exhaustive.full.lcov
+    --manifest full.coverage-manifest.json \
+    --counters full.counters.bin \
+    --output full.full.lcov
 
 # 2. Render HTML:
 python3 path/to/slang/tools/coverage-html/slang-coverage-html.py \
-    exhaustive.full.lcov \
-    --output-dir exhaustive-html \
-    --title "image-pipeline exhaustive"
+    full.full.lcov \
+    --output-dir full-html \
+    --title "image-pipeline full"
 ```
 
-Open `exhaustive-html/index.html` and look at `tonemap.slang.*.html`
+Open `full-html/index.html` and look at `tonemap.slang.*.html`
 — each `case TonemapOperator::*` line shows a coloured `(1/1)` or
-`(0/1)` branch indicator. The smoke vs exhaustive diff turns three
+`(0/1)` branch indicator. The smoke vs full diff turns three
 of the four operator branches from red to green.
 
 ## End-to-end wrapper
@@ -153,7 +153,7 @@ an HTML report and opens it — all in one command:
 python3 run_coverage.py --mode=smoke
 
 # Exhaustive sweep, hit/miss mode, custom output dir:
-python3 run_coverage.py --mode=exhaustive --coverage-mode=hit-miss --output-dir=./out
+python3 run_coverage.py --mode=full --coverage-mode=hit-miss --output-dir=./out
 ```
 
 All flags accepted by the demo binary are forwarded verbatim; the

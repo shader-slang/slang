@@ -13,12 +13,12 @@ The traversal kernel has several rarely-fired branches:
 
 - **Material dispatch** (`evaluateMaterial`): 4-way switch over
   Diffuse / Emissive / Metallic / Debug. The default mesh uses one
-  material; the stress scene uses all four.
+  material; the full scene uses all four.
 - **Degenerate-triangle skip** (`isDegenerate`): only fires on meshes
   with zero-area triangles, which production meshes occasionally
   contain but typical test meshes don't.
 - **Stack-overflow fallback** (`linearScanRemaining`): only fires
-  when the BVH traversal stack exceeds 24 entries. The stress scene
+  when the BVH traversal stack exceeds 24 entries. The full scene
   brings the stack closer but doesn't exceed it — a known gap in the
   current scene generator that branch coverage surfaces clearly.
 - **Ray-AABB / ray-triangle edge cases**: parallel-ray rejection,
@@ -32,22 +32,22 @@ uploads, and dispatches 512×512 = 262144 rays from a synthetic camera.
 
 ```bash
 ./shader-coverage-bvh-traversal --mode=smoke    # clean icosphere, Diffuse only
-./shader-coverage-bvh-traversal --mode=stress   # +materials, +degenerates, +cluster
+./shader-coverage-bvh-traversal --mode=full   # +materials, +degenerates, +cluster
 
 # Compile-time disable coverage instrumentation (baseline):
-./shader-coverage-bvh-traversal --mode=stress --no-coverage
+./shader-coverage-bvh-traversal --mode=full --no-coverage
 
 # Hit/miss mode — non-atomic, no execution counts but same coverage map:
-./shader-coverage-bvh-traversal --mode=stress --coverage-mode=hit-miss
+./shader-coverage-bvh-traversal --mode=full --coverage-mode=hit-miss
 
 # Write the coverage artifacts somewhere other than the demo's source
 # directory (the default). `--output-dir` creates the directory if
 # needed:
-./shader-coverage-bvh-traversal --mode=stress --output-dir=./out
+./shader-coverage-bvh-traversal --mode=full --output-dir=./out
 
 # Point the demo at a different copy of the `.slang` files (useful
 # when the binary has been moved away from the source tree):
-./shader-coverage-bvh-traversal --mode=stress \
+./shader-coverage-bvh-traversal --mode=full \
     --demo-dir=/path/to/shader-coverage-bvh-traversal
 ```
 
@@ -72,7 +72,7 @@ renders, and opens the HTML report in one step:
 
 ```bash
 python3 run_coverage.py --mode=smoke
-python3 run_coverage.py --mode=stress --coverage-mode=hit-miss
+python3 run_coverage.py --mode=full --coverage-mode=hit-miss
 ```
 
 ## Generate an HTML report (manual)
@@ -80,15 +80,15 @@ python3 run_coverage.py --mode=stress --coverage-mode=hit-miss
 ```bash
 # 1. Convert raw counters to rich LCOV (adds branch + function records):
 python3 path/to/slang/tools/shader-coverage/slang-coverage-to-lcov.py \
-    --manifest stress.coverage-manifest.json \
-    --counters stress.counters.bin \
-    --output stress.full.lcov
+    --manifest full.coverage-manifest.json \
+    --counters full.counters.bin \
+    --output full.full.lcov
 
 # 2. Render HTML:
 python3 path/to/slang/tools/coverage-html/slang-coverage-html.py \
-    stress.full.lcov \
-    --output-dir stress-html \
-    --title "bvh-traversal stress"
+    full.full.lcov \
+    --output-dir full-html \
+    --title "bvh-traversal full"
 ```
 
 ## Architecture

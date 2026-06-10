@@ -8,7 +8,7 @@ and opens it in the default browser.
 
 Usage:
     python3 run_coverage.py [DEMO FLAGS]
-    python3 run_coverage.py --mode=stress --coverage-mode=hit-miss
+    python3 run_coverage.py --mode=full --coverage-mode=hit-miss
     python3 run_coverage.py --mode=smoke --output-dir=./out
 
 All flags are forwarded verbatim to the demo binary.  Extra flags:

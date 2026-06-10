@@ -2,7 +2,7 @@
 //
 // Build a BVH over a procedural mesh on CPU, upload to GPU, trace
 // rays through it via compute shader, read back coverage. Smoke mode
-// uses a clean icosphere with one material; stress mode adds extra
+// uses a clean icosphere with one material; full mode adds extra
 // material kinds + degenerate triangles + a packed cluster.
 //
 // All GPU-runtime calls go through `vk_compute_demo.h`. See its
@@ -254,7 +254,7 @@ std::vector<Triangle> buildSmokeMesh()
     return buildIcosphere(1, 0);
 }
 
-std::vector<Triangle> buildStressMesh()
+std::vector<Triangle> buildFullMesh()
 {
     auto tris = buildIcosphere(2, 0);
     addQuad(tris, {1.5f, -0.5f, 0}, {2.5f, -0.5f, 0}, {2.5f, 0.5f, 0}, {1.5f, 0.5f, 0}, 1);
@@ -740,8 +740,8 @@ int main(int argc, char** argv)
             std::string_view a = argv[i];
             if (a == "--mode=smoke")
                 mode = "smoke";
-            else if (a == "--mode=stress")
-                mode = "stress";
+            else if (a == "--mode=full")
+                mode = "full";
             else if (a == "--no-coverage")
                 enableCoverage = false;
             else if (a == "--coverage")
@@ -807,7 +807,7 @@ int main(int argc, char** argv)
                       << (counterByteWidth * 8) << "-bit slots)\n";
         }
 
-        auto tris = (mode == "smoke") ? buildSmokeMesh() : buildStressMesh();
+        auto tris = (mode == "smoke") ? buildSmokeMesh() : buildFullMesh();
         std::cout << "mesh: " << tris.size() << " triangles (" << mode << ")\n";
         auto nodes = buildBVH(tris);
         std::cout << "BVH: " << nodes.size() << " nodes\n";
