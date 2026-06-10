@@ -4219,11 +4219,47 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
 
 IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinCast)
 {
-    if (isTypeEqual(type, value->getDataType()))
+    auto valueType = value->getDataType();
+    if (isTypeEqual(type, valueType))
         return value;
 
+    auto sourceVectorType = as<IRVectorType>(valueType);
+    auto sourceMatrixType = as<IRMatrixType>(valueType);
+
+    // Some semantic builtin casts represent constructor-shaped coercions, not just element type
+    // casts. Lower those shapes here so every caller of emitCast gets the same scalar splat and
+    // vector1-to-scalar behavior that the core-module constructors used to provide.
+    if (auto targetVectorType = as<IRVectorType>(type))
+    {
+        if (!sourceVectorType && !sourceMatrixType)
+        {
+            auto scalarVal =
+                emitCast(targetVectorType->getElementType(), value, fallbackToBuiltinCast);
+            if (!scalarVal)
+                return nullptr;
+            return emitMakeVectorFromScalar(type, scalarVal);
+        }
+    }
+    else if (auto targetMatrixType = as<IRMatrixType>(type))
+    {
+        if (!sourceVectorType && !sourceMatrixType)
+        {
+            auto scalarVal =
+                emitCast(targetMatrixType->getElementType(), value, fallbackToBuiltinCast);
+            if (!scalarVal)
+                return nullptr;
+            return emitMakeMatrixFromScalar(type, scalarVal);
+        }
+    }
+    else if (sourceVectorType)
+    {
+        auto elementCount = as<IRIntLit>(sourceVectorType->getElementCount());
+        if (elementCount && elementCount->getValue() == 1)
+            return emitVectorReshape(type, value);
+    }
+
     auto toStyle = _getTypeStyleId(type);
-    auto fromStyle = _getTypeStyleId(value->getDataType());
+    auto fromStyle = _getTypeStyleId(valueType);
 
     if (fromStyle == TypeCastStyle::Void)
     {

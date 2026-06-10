@@ -1611,6 +1611,151 @@ int getMaximumTypeBitSize(Type* t)
     }
 }
 
+/// Emit diagnostics for an implicit conversion once the caller has decided to build the converted
+/// expression.
+///
+/// Conversion-cost probes run while overload resolution is still exploring candidates, so
+/// `shouldDiagnose` mirrors the old `outToExpr != nullptr` check and keeps those probes silent.
+static void _diagnoseImplicitConversion(
+    SemanticsVisitor* visitor,
+    bool shouldDiagnose,
+    CoercionSite site,
+    Type* toType,
+    QualType fromType,
+    Expr* fromExpr,
+    DiagnosticSink* sink,
+    ConversionCost cost,
+    bool isScalarFloatToDouble)
+{
+    if (!shouldDiagnose || site == CoercionSite::ExplicitCoercion || !fromExpr)
+        return;
+
+    bool overflowWarningDetected = false;
+    bool isCoreModule = false;
+    if (auto module = visitor->getShared()->getModule())
+        if (auto moduleDecl = module->getModuleDecl())
+            isCoreModule = moduleDecl->hasModifier<FromCoreModuleModifier>();
+
+    // Cache the constant-fold result so both the overflow check and
+    // the UnrecommendedImplicitConversion check can reuse it.
+    ConstantIntVal* cachedFoldedVal = nullptr;
+    bool hasFolded = false;
+    auto getFoldedIntVal = [&]() -> ConstantIntVal*
+    {
+        if (!hasFolded)
+        {
+            cachedFoldedVal = as<ConstantIntVal>(visitor->tryFoldIntegerConstantExpression(
+                fromExpr,
+                SemanticsVisitor::ConstantFoldingKind::CompileTime,
+                nullptr));
+            hasFolded = true;
+        }
+        return cachedFoldedVal;
+    };
+
+    int maxBitSize = getMaximumTypeBitSize(toType);
+    if (!isCoreModule && maxBitSize > 0 && cost < kConversionCost_Explicit)
+    {
+        if (auto val = getFoldedIntVal())
+        {
+            IntegerLiteralValue v = val->getValue();
+            bool overflow = false;
+            if (v < 0)
+            {
+                // Two's complement minimum for N bits is -(2^(N-1)).
+                // For 64-bit targets, any int64_t value fits by definition.
+                if (maxBitSize < 64)
+                {
+                    int64_t minValue = -(INT64_C(1) << (maxBitSize - 1));
+                    overflow = v < minValue;
+                }
+            }
+            else
+            {
+                // Positive: bit-width comparison to avoid false positives
+                // on hex bit-pattern idioms like int x = 0xFF030206.
+                overflow = getIntValueBitSize(v) > maxBitSize;
+            }
+
+            if (overflow)
+            {
+                // Set even when sink is null so that the UnrecommendedImplicitConversion
+                // path below is consistently suppressed for overflow cases.
+                overflowWarningDetected = true;
+                if (sink)
+                {
+                    sink->diagnose(Diagnostics::IntegerConstantOverflow{
+                        .value = String(val->getValue()),
+                        .toType = toType,
+                        .expr = fromExpr});
+                }
+            }
+        }
+    }
+
+    if (cost >= kConversionCost_Explicit)
+    {
+        if (sink)
+        {
+            sink->diagnose(Diagnostics::TypeMismatch{
+                .expectedType = toType,
+                .actualType = fromType,
+                .expr = fromExpr});
+            sink->diagnose(Diagnostics::NoteExplicitConversionPossible{
+                .fromType = fromType.type,
+                .toType = toType,
+                .location = fromExpr->loc});
+
+            if (auto fromPtrType = as<PtrType>(fromType.type))
+            {
+                if (auto toPtrType = as<PtrType>(toType))
+                {
+                    auto fromVal = fromPtrType->getValueType();
+                    auto toVal = toPtrType->getValueType();
+                    if (!isInterfaceType(fromVal) && isInterfaceType(toVal) &&
+                        visitor->tryGetSubtypeWitness(fromVal, toVal))
+                    {
+                        sink->diagnose(Diagnostics::NoteConcreteToInterfacePtrUnsafe{
+                            .from = fromVal,
+                            .to = toVal,
+                            .location = fromExpr->loc});
+                    }
+                }
+            }
+        }
+    }
+    // For general implicit conversions with high cost, emit a warning unless the value is a known
+    // constant within the target type's range. Skip if the overflow check already covered this
+    // case.
+    else if (cost >= kConversionCost_Default && !overflowWarningDetected)
+    {
+        bool shouldEmitGeneralWarning = true;
+        if (visitor->isScalarIntegerType(toType) || visitor->isHalfType(toType))
+        {
+            if (auto val = getFoldedIntVal())
+            {
+                if (visitor->isIntValueInRangeOfType(val->getValue(), toType))
+                {
+                    shouldEmitGeneralWarning = false;
+                }
+            }
+        }
+        if (shouldEmitGeneralWarning && sink)
+        {
+            sink->diagnose(Diagnostics::UnrecommendedImplicitConversion{
+                .fromType = fromType.type,
+                .toType = toType,
+                .expr = fromExpr});
+        }
+    }
+
+    if (site == CoercionSite::Argument && isScalarFloatToDouble && sink)
+    {
+        if (!as<FloatingPointLiteralExpr>(fromExpr))
+            sink->diagnose(Diagnostics::ImplicitConversionToDouble{.expr = fromExpr});
+    }
+}
+
 ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
     DeclRef<Decl> decl,
     Type* toType,
@@ -1671,138 +1816,6 @@ bool SemanticsVisitor::_coerce(
         if (outWitnessOfConversion)
             *outWitnessOfConversion =
                 getASTBuilder()->getBuiltinTypeCoercionWitness(fromType, toType);
-    };
-
-    auto diagnoseImplicitConversion = [&](ConversionCost cost, bool isScalarFloatToDouble)
-    {
-        if (!outToExpr || site == CoercionSite::ExplicitCoercion || !fromExpr)
-            return;
-
-        bool overflowWarningDetected = false;
-        bool isCoreModule = false;
-        if (auto module = getShared()->getModule())
-            if (auto moduleDecl = module->getModuleDecl())
-                isCoreModule = moduleDecl->hasModifier<FromCoreModuleModifier>();
-
-        // Cache the constant-fold result so both the overflow check and
-        // the UnrecommendedImplicitConversion check can reuse it.
-        ConstantIntVal* cachedFoldedVal = nullptr;
-        bool hasFolded = false;
-        auto getFoldedIntVal = [&]() -> ConstantIntVal*
-        {
-            if (!hasFolded)
-            {
-                cachedFoldedVal = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
-                    fromExpr,
-                    ConstantFoldingKind::CompileTime,
-                    nullptr));
-                hasFolded = true;
-            }
-            return cachedFoldedVal;
-        };
-
-        int maxBitSize = getMaximumTypeBitSize(toType);
-        if (!isCoreModule && maxBitSize > 0 && cost < kConversionCost_Explicit)
-        {
-            if (auto val = getFoldedIntVal())
-            {
-                IntegerLiteralValue v = val->getValue();
-                bool overflow = false;
-                if (v < 0)
-                {
-                    // Two's complement minimum for N bits is -(2^(N-1)).
-                    // For 64-bit targets, any int64_t value fits by definition.
-                    if (maxBitSize < 64)
-                    {
-                        int64_t minValue = -(INT64_C(1) << (maxBitSize - 1));
-                        overflow = v < minValue;
-                    }
-                }
-                else
-                {
-                    // Positive: bit-width comparison to avoid false positives
-                    // on hex bit-pattern idioms like int x = 0xFF030206.
-                    overflow = getIntValueBitSize(v) > maxBitSize;
-                }
-
-                if (overflow)
-                {
-                    // Set even when sink is null so that the
-                    // UnrecommendedImplicitConversion path below is
-                    // consistently suppressed for overflow cases.
-                    overflowWarningDetected = true;
-                    if (sink)
-                    {
-                        sink->diagnose(Diagnostics::IntegerConstantOverflow{
-                            .value = String(val->getValue()),
-                            .toType = toType,
-                            .expr = fromExpr});
-                    }
-                }
-            }
-        }
-
-        if (cost >= kConversionCost_Explicit)
-        {
-            if (sink)
-            {
-                sink->diagnose(Diagnostics::TypeMismatch{
-                    .expectedType = toType,
-                    .actualType = fromType,
-                    .expr = fromExpr});
-                sink->diagnose(Diagnostics::NoteExplicitConversionPossible{
-                    .fromType = fromType.type,
-                    .toType = toType,
-                    .location = fromExpr->loc});
-
-                if (auto fromPtrType = as<PtrType>(fromType.type))
-                {
-                    if (auto toPtrType = as<PtrType>(toType))
-                    {
-                        auto fromVal = fromPtrType->getValueType();
-                        auto toVal = toPtrType->getValueType();
-                        if (!isInterfaceType(fromVal) && isInterfaceType(toVal) &&
-                            tryGetSubtypeWitness(fromVal, toVal))
-                        {
-                            sink->diagnose(Diagnostics::NoteConcreteToInterfacePtrUnsafe{
-                                .from = fromVal,
-                                .to = toVal,
-                                .location = fromExpr->loc});
-                        }
-                    }
-                }
-            }
-        }
-        // For general implicit conversions with high cost, emit a warning
-        // unless the value is a known constant within the target type's
-        // range. Skip if the overflow check already covered this case.
-        else if (cost >= kConversionCost_Default && !overflowWarningDetected)
-        {
-            bool shouldEmitGeneralWarning = true;
-            if (isScalarIntegerType(toType) || isHalfType(toType))
-            {
-                if (auto val = getFoldedIntVal())
-                {
-                    if (isIntValueInRangeOfType(val->getValue(), toType))
-                    {
-                        shouldEmitGeneralWarning = false;
-                    }
-                }
-            }
-            if (shouldEmitGeneralWarning && sink)
-            {
-                sink->diagnose(Diagnostics::UnrecommendedImplicitConversion{
-                    .fromType = fromType.type,
-                    .toType = toType,
-                    .expr = fromExpr});
-            }
-        }
-
-        if (site == CoercionSite::Argument && isScalarFloatToDouble && sink)
-        {
-            if (!as<FloatingPointLiteralExpr>(fromExpr))
-                sink->diagnose(Diagnostics::ImplicitConversionToDouble{.expr = fromExpr});
-        }
     };
 
 
@@ -2604,7 +2617,16 @@ bool SemanticsVisitor::_coerce(
 
         if (builtinCoercionCost != kConversionCost_Impossible)
         {
-            diagnoseImplicitConversion(builtinCoercionCost, isScalarFloatToDoubleCoercion);
+            _diagnoseImplicitConversion(
+                this,
+                outToExpr != nullptr,
+                site,
+                toType,
+                fromType,
+                fromExpr,
+                sink,
+                builtinCoercionCost,
+                isScalarFloatToDoubleCoercion);
 
             if (fromType.isLeftValue)
                 builtinCoercionCost += kConversionCost_LValueCast;
@@ -2803,7 +2825,16 @@ bool SemanticsVisitor::_coerce(
             isScalarFloatToDoubleConversion =
                 builtinConversionKind == kBuiltinConversion_FloatToDouble;
         }
-        diagnoseImplicitConversion(cost, isScalarFloatToDoubleConversion);
+        _diagnoseImplicitConversion(
+            this,
+            outToExpr != nullptr,
+            site,
+            toType,
+            fromType,
+            fromExpr,
+            sink,
+            cost,
+            isScalarFloatToDoubleConversion);
 
         if (fromType.isLeftValue)
         {
