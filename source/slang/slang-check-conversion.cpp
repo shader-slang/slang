@@ -1611,14 +1611,16 @@ int getMaximumTypeBitSize(Type* t)
     }
 }
 
-/// Emit diagnostics for an implicit conversion once the caller has decided to build the converted
-/// expression.
+/// Emit diagnostics for an implicit conversion once `_coerce` is building the converted
+/// expression, rather than only checking whether a conversion is possible.
 ///
-/// Conversion-cost probes run while overload resolution is still exploring candidates, so
-/// `shouldDiagnose` mirrors the old `outToExpr != nullptr` check and keeps those probes silent.
+/// `_coerce` is also used by overload resolution to ask "could this candidate convert, and what
+/// would it cost?" Those exploratory calls may examine candidates that will be rejected later, so
+/// they must not produce warnings or errors. Only expression-building calls, represented here by
+/// `isBuildingCoercedExpr`, should report diagnostics.
 static void _diagnoseImplicitConversion(
     SemanticsVisitor* visitor,
-    bool shouldDiagnose,
+    bool isBuildingCoercedExpr,
     CoercionSite site,
     Type* toType,
     QualType fromType,
@@ -1627,7 +1629,7 @@ static void _diagnoseImplicitConversion(
     ConversionCost cost,
     bool isScalarFloatToDouble)
 {
-    if (!shouldDiagnose || site == CoercionSite::ExplicitCoercion || !fromExpr)
+    if (!isBuildingCoercedExpr || site == CoercionSite::ExplicitCoercion || !fromExpr)
         return;
 
     bool overflowWarningDetected = false;
