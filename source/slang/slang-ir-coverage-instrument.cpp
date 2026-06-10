@@ -1055,16 +1055,25 @@ struct CoverageInstrumenter
 
         if (hitMiss)
         {
-            // Hit/miss recording: a plain, non-atomic store of `1`. Every lane
-            // that reaches this marker writes the same value, so the concurrent
-            // writes are a benign race — the slot ends up `1` iff the entry
-            // executed at least once. The store being non-atomic is the whole
-            // point: a *relaxed atomic* store would be memory-model-clean but
-            // still serializes on the hot counter address — measured just as
-            // slow as the atomic-add counting path (~15x slower than this plain
-            // store), defeating the purpose. The trade-off vs `Count` mode is
-            // that no exact execution count is recorded
-            // (`CoverageCounterMode::Boolean`).
+            // Hit/miss recording: a plain, non-atomic store of `1`. Every
+            // lane that reaches this marker writes the same value, so
+            // concurrent same-value writes are a benign race for 32-bit
+            // counters — 32-bit StorageBuffer stores are single-copy atomic
+            // under the Vulkan memory model, so a reader always observes a
+            // complete 0 or 1 and the slot is 1 iff the entry executed.
+            //
+            // For 64-bit counters: a 64-bit StorageBuffer store is not
+            // guaranteed single-copy atomic unless shaderBufferInt64Atomics
+            // is enabled. In practice the host already requires that feature
+            // for 64-bit coverage, which implies single-copy atomic plain
+            // stores on all known drivers. If exact hit-miss semantics under
+            // 64-bit are required, prefer 32-bit counters
+            // (`-trace-coverage-counter-width 32`).
+            //
+            // Non-atomic is the whole point: a relaxed atomic store still
+            // serializes on the hot counter address (measured ~15x slower),
+            // defeating the purpose. Trade-off: no exact execution count
+            // (`CoverageCounterMode::Boolean`, not `Count`).
             builder.emitStore(slotPtr, builder.getIntValue(counterElementType, 1));
         }
         else

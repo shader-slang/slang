@@ -27,5 +27,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // Count mode increments counters atomically.
 //COUNT: OpAtomicIAdd
 
-// Hit/miss mode must not emit any atomic add for the counters.
+// Hit/miss mode emits a plain store of 1 (not an atomic add).
+// The positive OpStore check ensures the instrumentation actually ran and
+// emitted something — preventing the NOT check from passing vacuously if
+// the instrumentation were silently dropped.
+//HITMISS: OpStore
 //HITMISS-NOT: OpAtomicIAdd
