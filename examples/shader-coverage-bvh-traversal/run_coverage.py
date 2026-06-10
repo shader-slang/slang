@@ -48,30 +48,61 @@ def _find_slang_root(hint: Path | None) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Demo binary discovery
+# Demo binary discovery + auto-build
 # ---------------------------------------------------------------------------
 
-def _find_demo_binary(script_dir: Path) -> Path:
-    """Look for the demo binary in common build-output locations."""
-    candidates = [
-        # In-tree build (most common during development)
-        script_dir / "shader-coverage-bvh-traversal",
-        script_dir / "shader-coverage-bvh-traversal.exe",
-        # CMake multi-config: Debug / Release / RelWithDebInfo
-        *(script_dir.parent.parent.parent / "build" / config / "examples" /
-          "shader-coverage-bvh-traversal" / "shader-coverage-bvh-traversal"
+_TARGET = "shader-coverage-bvh-traversal"
+
+
+def _candidate_paths(slang_root: Path) -> list:
+    """All plausible output locations for the demo binary."""
+    return [
+        # CMake multi-config (Ninja Multi-Config / Visual Studio)
+        *(slang_root / "build" / "examples" / _TARGET / config / _TARGET
           for config in ("Release", "Debug", "RelWithDebInfo")),
-        *(script_dir.parent.parent.parent / "build" / "examples" /
-          "shader-coverage-bvh-traversal" / config / "shader-coverage-bvh-traversal"
+        # Single-config generators
+        *(slang_root / "build" / config / "examples" / _TARGET / _TARGET
+          for config in ("Release", "Debug", "RelWithDebInfo")),
+        slang_root / "build" / "examples" / _TARGET / _TARGET,
+        # Windows .exe variants
+        *(slang_root / "build" / "examples" / _TARGET / config / (_TARGET + ".exe")
           for config in ("Release", "Debug", "RelWithDebInfo")),
     ]
-    for c in candidates:
+
+
+def _ensure_demo_binary(slang_root: Path) -> Path:
+    """Return the demo binary path, building it first if necessary."""
+    # Fast path: already built.
+    for c in _candidate_paths(slang_root):
         if c.exists():
             return c
+
+    # Slow path: trigger a CMake build.
+    build_dir = slang_root / "build"
+    if not (build_dir / "CMakeCache.txt").exists():
+        print(f"[build] no configured build found — running: cmake --preset default")
+        result = subprocess.run(
+            ["cmake", "--preset", "default"],
+            cwd=slang_root,
+        )
+        if result.returncode != 0:
+            sys.exit("error: cmake configure failed")
+
+    print(f"[build] building target '{_TARGET}' (release) …")
+    result = subprocess.run(
+        ["cmake", "--build", "--preset", "release", "--target", _TARGET],
+        cwd=slang_root,
+    )
+    if result.returncode != 0:
+        sys.exit(f"error: cmake build failed for target '{_TARGET}'")
+
+    for c in _candidate_paths(slang_root):
+        if c.exists():
+            return c
+
     sys.exit(
-        "error: cannot find the shader-coverage-bvh-traversal binary.\n"
-        "Build it first:  cmake --build --preset release "
-        "--target shader-coverage-bvh-traversal"
+        f"error: build succeeded but '{_TARGET}' binary not found in expected paths.\n"
+        f"Searched under: {build_dir}"
     )
 
 
@@ -131,7 +162,7 @@ def main(argv=None):
 
     script_dir = Path(__file__).resolve().parent
     slang_root = _find_slang_root(Path(known.slang_root) if known.slang_root else None)
-    binary = _find_demo_binary(script_dir)
+    binary = _ensure_demo_binary(slang_root)
 
     mode = known.mode
     output_dir = Path(known.output_dir).resolve() if known.output_dir else script_dir
