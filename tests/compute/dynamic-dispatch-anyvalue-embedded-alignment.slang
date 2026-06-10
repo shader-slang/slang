@@ -3,24 +3,19 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -shaderobj -xslang -force-glsl-scalar-layout
 
-// The offsets used by the generated AnyValue packing and
-// unpacking functions must match the natural layout of the packed type
-// exactly, and the AnyValue size computed for an implementation type must
-// match those offsets.
+// AnyValue payloads must be packed at the *natural* layout offsets of the
+// packed type: host code, `reinterpret`, and `getAnyValueSize` all assume
+// them.
 //
-// The shape below used to break: a `float3` leaves the packing cursor at a
-// 4-mod-8 byte offset, and the old sequential packing walk then placed the
-// following struct (which natural layout aligns to 8 bytes for its
-// `uint64_t` member) at compacted offsets, so every packed field of
-// `Profile` disagreed with its natural-layout offset. The `reinterpret`
-// check observes the packed bytes directly and fails in that case. The
-// `anyValueSize` is an exact natural-layout fit for `Impl`, so a packing
-// walk that needs more bytes than natural layout would silently drop the
-// trailing fields and fail the dynamic-dispatch checks as well.
+// This shape used to break that: the packing walk did not align struct
+// starts, so `Profile` was packed at byte 12 instead of its natural
+// offset 16 (8-aligned for `handle`), shifting every `Profile` field and
+// reading back garbage. (Declaring `profile` before `color` made the
+// layouts coincide and hid the bug.)
 //
-// The packing offsets are defined by the *natural* layout of the packed
-// type and must not change when the target's buffer layout rules change,
-// so the same checks must also hold with `-force-glsl-scalar-layout`
+// The `reinterpret` block fails if any field is packed off its natural
+// offset; the exact-fit `anyValueSize(40)` fails if the size side
+// disagrees with the packing walk.
 
 [anyValueSize(40)]
 interface IInterface

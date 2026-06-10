@@ -140,45 +140,19 @@ struct AnyValueMarshallingContext
             bool isBindless,
             IRIntegerValue sizeInBytes) = 0;
 
-        void ensureOffsetAt4ByteBoundary()
-        {
-            if (intraFieldOffset)
-            {
-                fieldOffset++;
-                intraFieldOffset = 0;
-            }
-        }
-        void ensureOffsetAt8ByteBoundary()
-        {
-            ensureOffsetAt4ByteBoundary();
-            if ((fieldOffset & 1) != 0)
-                fieldOffset++;
-        }
-        void ensureOffsetAt2ByteBoundary()
-        {
-            if (intraFieldOffset == 0)
-                return;
-            if (intraFieldOffset <= 2)
-            {
-                intraFieldOffset = 2;
-                return;
-            }
-            fieldOffset++;
-            intraFieldOffset = 0;
-            return;
-        }
-
+        // Round the cursor up to the next multiple of `n` bytes, skipping
+        // the padding bytes the payload layout has at this position. The
+        // fixed-size variants are convenience wrappers.
         void ensureOffsetAtNByteBoundary(int n)
         {
-            if (n == 1)
-                return;
-            else if (n == 2)
-                ensureOffsetAt2ByteBoundary();
-            else if (n == 4)
-                ensureOffsetAt4ByteBoundary();
-            else if (n == 8)
-                ensureOffsetAt8ByteBoundary();
+            SLANG_ASSERT(n > 0);
+            auto alignedByteOffset = (uint32_t)align(fieldOffset * 4 + intraFieldOffset, n);
+            fieldOffset = alignedByteOffset / 4;
+            intraFieldOffset = alignedByteOffset % 4;
         }
+        void ensureOffsetAt2ByteBoundary() { ensureOffsetAtNByteBoundary(2); }
+        void ensureOffsetAt4ByteBoundary() { ensureOffsetAtNByteBoundary(4); }
+        void ensureOffsetAt8ByteBoundary() { ensureOffsetAtNByteBoundary(8); }
 
         void advanceOffset(uint32_t bytes)
         {
