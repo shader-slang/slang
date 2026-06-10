@@ -601,7 +601,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
         else
         {
-            nodeIDAttr->arrayIndex = nullptr;
+            nodeIDAttr->arrayIndex = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 0);
         }
     }
     else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(attr))

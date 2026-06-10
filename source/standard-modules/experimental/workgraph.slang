@@ -24,8 +24,10 @@ attribute_syntax [NodeMaxDispatchGrid(x: int, y: int, z: int)] : NodeMaxDispatch
 __attributeTarget(FuncDecl)
 attribute_syntax [NodeDispatchGrid(x: int, y: int, z: int)] : NodeDispatchGridAttribute;
 
-/// Maximum number of output records for a node output parameter, or maximum input records
-/// for a coalescing node input parameter.
+/// Specifies the maximum record count for a work-graph node.
+/// On a node output parameter, this is the maximum number of output records.
+/// On a coalescing node input parameter, this is the maximum number of input records.
+/// On a node function, this sets the node-level max-records contract.
 __attributeTarget(FuncDecl)
 __attributeTarget(ParamDecl)
 attribute_syntax [MaxRecords(count: int)] : MaxRecordsAttribute;

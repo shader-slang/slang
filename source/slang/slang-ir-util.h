@@ -123,6 +123,10 @@ bool isUserPointerType(IRInst* type);
 // True if inst produces a derived address from another base address.
 bool isAddressInst(IRInst* inst);
 
+IRInst* getBarrierFlagValueInst(IRInst* inst);
+
+bool isBarrierFlagValueCast(IRInst* castInst, IRType* fromType, IRType* toType);
+
 // Builds a dictionary that maps from requirement key to requirement value for `interfaceType`.
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType);
 

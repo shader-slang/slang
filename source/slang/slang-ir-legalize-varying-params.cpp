@@ -2891,8 +2891,7 @@ private:
         List<IRParam*> paramsToProcess;
         for (auto param : func->getParams())
         {
-            auto paramType = as<IRStructType>(param->getDataType());
-            if (paramType)
+            if (as<IRStructType>(param->getDataType()))
             {
                 paramsToProcess.add(param);
             }

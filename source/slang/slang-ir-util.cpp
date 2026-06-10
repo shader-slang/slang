@@ -34,10 +34,47 @@ bool isAddressInst(IRInst* inst)
     case kIROp_GetElementPtr:
     case kIROp_GetOffsetPtr:
     case kIROp_RWStructuredBufferGetElementPtr:
+    case kIROp_NodeOutputRecordGetElementPtr:
         return true;
     default:
         return false;
     }
+}
+
+static bool isBarrierFlagGetterOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+    case kIROp_GetEnumBarrierSemanticFlags:
+        return true;
+    default:
+        return false;
+    }
+}
+
+IRInst* getBarrierFlagValueInst(IRInst* inst)
+{
+    while (inst->getOp() == kIROp_InOutImplicitCast || inst->getOp() == kIROp_OutImplicitCast)
+        inst = inst->getOperand(0);
+    return inst;
+}
+
+bool isBarrierFlagValueCast(IRInst* castInst, IRType* fromType, IRType* toType)
+{
+    SLANG_ASSERT(castInst);
+
+    if (as<IRPtrTypeBase>(fromType) || as<IRPtrTypeBase>(toType))
+        return false;
+
+    bool hasUse = false;
+    for (auto use = castInst->firstUse; use; use = use->nextUse)
+    {
+        hasUse = true;
+        if (!isBarrierFlagGetterOp(use->getUser()->getOp()))
+            return false;
+    }
+    return hasUse;
 }
 
 IRType* getVectorElementType(IRType* type)
@@ -940,6 +977,7 @@ IRInst* getRootAddr(IRInst* addr)
         {
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
+        case kIROp_NodeOutputRecordGetElementPtr:
             addr = addr->getOperand(0);
             continue;
         default:
@@ -958,6 +996,7 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
         {
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
+        case kIROp_NodeOutputRecordGetElementPtr:
             outAccessChain.add(addr->getOperand(1));
             if (outTypes)
                 outTypes->add(addr->getFullType());
@@ -1487,6 +1526,8 @@ IRInst* tryFindBasePtr(IRInst* inst, IRInst* parentFunc)
         return tryFindBasePtr(as<IRGetElementPtr>(inst)->getBase(), parentFunc);
     case kIROp_FieldAddress:
         return tryFindBasePtr(as<IRFieldAddress>(inst)->getBase(), parentFunc);
+    case kIROp_NodeOutputRecordGetElementPtr:
+        return tryFindBasePtr(inst->getOperand(0), parentFunc);
     default:
         return nullptr;
     }
@@ -3329,13 +3370,8 @@ IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> eleme
 
 bool isWorkGraphRecordType(IRType* type)
 {
-    if (!type)
-        return false;
-
-    if (getWorkGraphRecordTypeName(type->getOp()))
-        return true;
-
-    return false;
+    SLANG_ASSERT(type);
+    return getWorkGraphRecordTypeName(type->getOp()) != nullptr;
 }
 
 char const* getWorkGraphRecordTypeName(IROp op)

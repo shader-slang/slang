@@ -14,13 +14,6 @@
 namespace Slang
 {
 
-static IRInst* getBarrierFlagValueInst(IRInst* inst)
-{
-    while (inst->getOp() == kIROp_InOutImplicitCast || inst->getOp() == kIROp_OutImplicitCast)
-        inst = inst->getOperand(0);
-    return inst;
-}
-
 static bool tryGetBarrierFlagValue(IRInst* inst, IRIntegerValue& outValue)
 {
     if (auto intLit = as<IRIntLit>(getBarrierFlagValueInst(inst)))

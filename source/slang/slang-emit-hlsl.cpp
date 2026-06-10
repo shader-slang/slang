@@ -11,13 +11,6 @@
 namespace Slang
 {
 
-static IRInst* getBarrierFlagValueInst(IRInst* inst)
-{
-    while (inst->getOp() == kIROp_InOutImplicitCast || inst->getOp() == kIROp_OutImplicitCast)
-        inst = inst->getOperand(0);
-    return inst;
-}
-
 bool HLSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
     switch (inst->getOp())
@@ -1182,12 +1175,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             SLANG_UNUSED(inOuterPrec);
             auto flagLit = as<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
-            if (!flagLit)
-            {
-                SLANG_ASSERT(!"expected validated BarrierMemoryTypeFlags constant");
-                m_writer->emit("(0)");
-                return true;
-            }
+            SLANG_RELEASE_ASSERT(flagLit);
             auto flagVal = (uint32_t)getIntVal(flagLit);
             const uint32_t knownFlags =
                 BarrierMemoryTypeFlags::UavMemory | BarrierMemoryTypeFlags::GroupSharedMemory |
@@ -1234,12 +1222,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             SLANG_UNUSED(inOuterPrec);
             auto flagLit = as<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
-            if (!flagLit)
-            {
-                SLANG_ASSERT(!"expected validated BarrierSemanticFlags constant");
-                m_writer->emit("(0)");
-                return true;
-            }
+            SLANG_RELEASE_ASSERT(flagLit);
             auto flagVal = (uint32_t)getIntVal(flagLit);
             const uint32_t knownFlags = BarrierSemanticFlags::GroupSync |
                                         BarrierSemanticFlags::GroupScope |
