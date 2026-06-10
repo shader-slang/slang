@@ -17,17 +17,13 @@ if [[ -z "${GITHUB_ACTIONS:-}" ]]; then
   exit 0
 fi
 
-# Check for required tools
-if ! command -v gh &>/dev/null; then
-  echo "Error: GitHub CLI (gh) is not installed"
-  exit 1
-fi
-
-# Verify GitHub authentication
-if ! gh auth status &>/dev/null; then
-  echo "Error: Not authenticated with GitHub CLI"
-  exit 1
-fi
+# Note: this script makes no GitHub API calls — it only inspects the diff with
+# `git` and writes an artifact (pr-number.txt + comment-body.txt) for the
+# privileged `comment-ir-version-check.yml` workflow_run job to consume and post
+# (via SLANGBOT_PAT). It therefore must not require `gh` or an authenticated
+# token. Requiring `gh auth status` here used to hard-fail on fork PRs, which
+# only get a restricted GITHUB_TOKEN with no `gh` auth — exactly the PRs this
+# check is meant to run on.
 
 # Function to check if module ir version constants were modified
 check_module_versions_modified() {
