@@ -3817,13 +3817,8 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
         }
     }
 
-    // Mesh-shader output/payload qualifiers (`out vertices`/`out indices`/
-    // `out primitives`/`in payload`) are driven by the parameter's mesh-output/payload
-    // decoration, not by its varying-IO var-layout, so emit them unconditionally
-    // (`emitMeshShaderModifiersImpl` is a no-op for non-mesh parameters). Gating this on
-    // a VaryingOutput layout dropped the qualifier for a mesh output whose element struct
-    // is driven only by system-value semantics (e.g. `{ float4 pos : SV_Position; }`),
-    // which never registers VaryingOutput.
+    // Emit mesh-output/payload qualifiers unconditionally: they key off the parameter's
+    // decoration, not its varying-IO layout (which an SV-only output never registers).
     emitMeshShaderModifiers(param);
 
     emitParamType(paramType, paramName);
