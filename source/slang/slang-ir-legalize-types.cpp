@@ -846,6 +846,32 @@ static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<Leg
         legalArgs.getArrayView().getBuffer()));
 }
 
+static LegalVal legalizeAbortShader(IRTypeLegalizationContext* context, ArrayView<LegalVal> args)
+{
+    ShortList<IRInst*> legalArgs;
+    for (auto arg : args)
+    {
+        switch (arg.flavor)
+        {
+        case LegalVal::Flavor::none:
+            break;
+        case LegalVal::Flavor::simple:
+            legalArgs.add(arg.getSimple());
+            break;
+        case LegalVal::Flavor::pair:
+            legalArgs.add(arg.getPair()->ordinaryVal.getSimple());
+            break;
+        default:
+            SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor for abortShader operand");
+        }
+    }
+    return LegalVal::simple(context->builder->emitIntrinsicInst(
+        context->builder->getVoidType(),
+        kIROp_AbortShader,
+        (UInt)legalArgs.getCount(),
+        legalArgs.getArrayView().getBuffer()));
+}
+
 static LegalVal legalizeDebugVar(
     IRTypeLegalizationContext* context,
     LegalType type,
@@ -2080,6 +2106,9 @@ static LegalVal legalizeInst(
         break;
     case kIROp_Printf:
         result = legalizePrintf(context, args);
+        break;
+    case kIROp_AbortShader:
+        result = legalizeAbortShader(context, args);
         break;
     case kIROp_LoadFromUninitializedMemory:
     case kIROp_Poison:

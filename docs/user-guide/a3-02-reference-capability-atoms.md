@@ -474,6 +474,8 @@ Extensions
 `GL_EXT_samplerless_texture_functions`
 > Represents the GL_EXT_samplerless_texture_functions extension.
 
+`GL_EXT_shader_abort`
+
 `GL_EXT_shader_atomic_float`
 > Represents the GL_EXT_shader_atomic_float extension.
 
@@ -667,6 +669,9 @@ Extensions
 `SPV_KHR_ray_tracing_position_fetch`
 > Represents the SPIR-V extension for ray tracing position fetch.
 > Should be used with either SPV_KHR_ray_query or SPV_KHR_ray_tracing.
+
+`SPV_KHR_shader_abort`
+> Represents the SPIR-V extension for shader abort (VK_KHR_shader_abort).
 
 `SPV_KHR_shader_clock`
 > Represents the SPIR-V extension for shader clock.
@@ -1433,6 +1438,9 @@ Compound Capabilities
 
 `shader5_sm_5_0`
 > Capabilities required to use sm_5_0 features apart of GL_ARB_gpu_shader5
+
+`shader_abort`
+> Capabilities required to use 'abortShader' (VK_KHR_shader_abort)
 
 `shaderclock`
 > Capabilities needed for realtime clocks

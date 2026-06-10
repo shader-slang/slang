@@ -4277,6 +4277,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     // after this inst in the block, because OpKill is a terminator inst.
                     break;
                 }
+                if (irInst->getOp() == kIROp_AbortShader)
+                {
+                    // OpAbortKHR is a terminator inst; stop emitting further instructions.
+                    break;
+                }
             }
         }
 
@@ -4774,6 +4779,156 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+
+    // Returns the scalar byte size of an IR type for the VK_KHR_shader_abort message struct.
+    uint32_t getAbortArgByteSize(IRType* type)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_Int8Type:
+        case kIROp_UInt8Type:
+            return 1;
+        case kIROp_Int16Type:
+        case kIROp_UInt16Type:
+        case kIROp_HalfType:
+            return 2;
+        case kIROp_BoolType:
+        case kIROp_IntType:
+        case kIROp_UIntType:
+        case kIROp_FloatType:
+            return 4;
+        case kIROp_Int64Type:
+        case kIROp_UInt64Type:
+        case kIROp_DoubleType:
+            return 8;
+        case kIROp_VectorType:
+            {
+                auto vecType = as<IRVectorType>(type);
+                auto count = (uint32_t)getIntVal(vecType->getElementCount());
+                return getAbortArgByteSize(vecType->getElementType()) * count;
+            }
+        default:
+            return 4;
+        }
+    }
+
+    // Returns the scalar alignment for an IR type (scalar layout rules).
+    uint32_t getAbortArgAlignment(IRType* type)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_VectorType:
+            return getAbortArgAlignment(as<IRVectorType>(type)->getElementType());
+        default:
+            return getAbortArgByteSize(type);
+        }
+    }
+
+    /// Emit OpAbortKHR for a kIROp_AbortShader instruction.
+    /// Packs the format string (as uint32 array) and variadic args into a struct with
+    /// scalar layout, then emits OpAbortKHR with that struct.
+    SpvInst* emitAbortShader(SpvInstParent* parent, IRInst* inst)
+    {
+        ensureExtensionDeclaration(toSlice("SPV_KHR_shader_abort"));
+        requireSPIRVCapability(SpvCapabilityAbortKHR);
+
+        IRBuilder irBuilder(m_irModule);
+        auto uint32IRType = irBuilder.getUIntType();
+        auto uint32SpvType = ensureInst(uint32IRType);
+
+        // Get the format string bytes from the first operand (must be a string literal).
+        UnownedStringSlice formatStr;
+        if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
+            formatStr = strLit->getStringSlice();
+
+        // Pack the format string as an array of uint32 values (little-endian, null-terminated).
+        UInt strLen = formatStr.getLength() + 1; // include null terminator
+        UInt numU32 = (strLen + 3) / 4;          // ceil(strLen / 4)
+
+        // Create or reuse a uint32[numU32] array type.
+        auto arrLenIRConst = irBuilder.getIntValue(uint32IRType, (IRIntegerValue)numU32);
+        auto arrLenSpvConst = ensureInst(arrLenIRConst);
+        // Pass nullptr as the IRInst key to avoid conflicting with the arrLenIRConst mapping.
+        auto arrSpvType = emitOpTypeArray(nullptr, uint32SpvType, arrLenSpvConst);
+
+        // The array requires an ArrayStride decoration for explicit layout.
+        auto annotSection = getSection(SpvLogicalSectionID::Annotations);
+        emitOpDecorateArrayStride(annotSection, nullptr, arrSpvType, SpvLiteralInteger::from32(4));
+
+        // Build the string constant as OpConstantComposite of uint32 values.
+        List<SpvInst*> strElems;
+        for (UInt i = 0; i < numU32; i++)
+        {
+            uint32_t word = 0;
+            for (int b = 0; b < 4; b++)
+            {
+                UInt byteIdx = i * 4 + (UInt)b;
+                uint8_t byte = 0;
+                if (byteIdx < formatStr.getLength())
+                    byte = (uint8_t)formatStr[byteIdx];
+                else if (byteIdx == formatStr.getLength())
+                    byte = 0; // null terminator
+                word |= ((uint32_t)byte << (b * 8));
+            }
+            strElems.add(emitIntConstant(IRIntegerValue(word), uint32IRType));
+        }
+        auto strArrConst = emitOpConstantComposite(nullptr, arrSpvType, strElems);
+
+        // Collect struct member types, values, and byte offsets.
+        List<SpvInst*> memberTypes;
+        List<SpvInst*> memberValues;
+        List<uint32_t> memberOffsets;
+
+        memberTypes.add(arrSpvType);
+        memberValues.add(strArrConst);
+        memberOffsets.add(0);
+
+        uint32_t currentOffset = (uint32_t)(numU32 * 4);
+
+        if (inst->getOperandCount() == 2)
+        {
+            auto operand = inst->getOperand(1);
+            if (auto makeStruct = as<IRMakeStruct>(operand))
+            {
+                for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
+                {
+                    auto arg = makeStruct->getOperand(i);
+                    auto argIRType = arg->getDataType();
+                    uint32_t argSize = getAbortArgByteSize(argIRType);
+                    uint32_t argAlign = getAbortArgAlignment(argIRType);
+
+                    // Align currentOffset to the scalar alignment of this member.
+                    currentOffset = (currentOffset + argAlign - 1) & ~(argAlign - 1);
+                    memberOffsets.add(currentOffset);
+                    currentOffset += argSize;
+
+                    memberTypes.add(ensureInst(argIRType));
+                    memberValues.add(ensureInst(arg));
+                }
+            }
+        }
+
+        // Create the struct type. Each call creates a distinct type (valid in SPIR-V).
+        auto structSpvType = emitOpTypeStruct(nullptr, memberTypes);
+        auto structSpvID = getID(structSpvType);
+
+        // Emit Offset decorations for each struct member (required for explicit layout).
+        for (UInt i = 0; i < (UInt)memberOffsets.getCount(); i++)
+        {
+            emitOpMemberDecorateOffset(
+                annotSection,
+                nullptr,
+                structSpvID,
+                SpvLiteralInteger::from32((int32_t)i),
+                SpvLiteralInteger::from32(memberOffsets[i]));
+        }
+
+        // Construct the struct value at runtime using OpCompositeConstruct.
+        auto structValue = emitOpCompositeConstruct(parent, nullptr, structSpvType, memberValues);
+
+        // Emit OpAbortKHR <messageType> <message>.
+        return emitOpAbortKHR(parent, inst, structSpvType, structValue);
+    }
 
     // The instructions that appear inside the basic blocks of
     // functions are what we will call "local" instructions.
@@ -5548,6 +5703,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     SpvLiteralInteger::from32(1),
                     operands.getArrayView());
             }
+            break;
+        case kIROp_AbortShader:
+            result = emitAbortShader(parent, inst);
             break;
         // Debug instructions are now handled by processDebugLocalInst()
         case kIROp_DebugLine:

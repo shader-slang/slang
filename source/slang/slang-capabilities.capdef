@@ -575,6 +575,10 @@ def SPV_KHR_fragment_shader_barycentric : _spirv_1_0;
 /// [EXT]
 def SPV_KHR_non_semantic_info : _spirv_1_0;
 
+/// Represents the SPIR-V extension for shader abort (VK_KHR_shader_abort).
+/// [EXT]
+def SPV_KHR_shader_abort : _spirv_1_0;
+
 /// Represents the SPIR-V extension for device-group information.
 /// [EXT]
 def SPV_KHR_device_group : _spirv_1_0;
@@ -1041,6 +1045,12 @@ alias GL_EXT_buffer_reference_uvec2 = _GL_EXT_buffer_reference_uvec2 | _spirv_1_
 /// Represents the GL_EXT_debug_printf extension.
 /// [EXT]
 alias GL_EXT_debug_printf = _GL_EXT_debug_printf | SPV_KHR_non_semantic_info;
+
+/// Represents the GL_EXT_shader_abort extension (VK_KHR_shader_abort).
+/// [EXT]
+def _GL_EXT_shader_abort : glsl;
+/// [EXT]
+alias GL_EXT_shader_abort = _GL_EXT_shader_abort | SPV_KHR_shader_abort;
 
 /// Represents the GL_EXT_demote_to_helper_invocation extension.
 /// [EXT]
@@ -2402,6 +2412,9 @@ alias nonuniformqualifier = sm_5_1;
 /// Capabilities required to use 'printf'
 /// [Compound]
 alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp | llvm;
+/// Capabilities required to use 'abortShader' (VK_KHR_shader_abort)
+/// [Compound]
+alias shader_abort = GL_EXT_shader_abort;
 /// Capabilities required to use basic TextureFootprint operations
 /// [Compound]
 alias texturefootprint = GL_NV_shader_texture_footprint + GLSL_450 | hlsl_nvapi + _sm_4_0;

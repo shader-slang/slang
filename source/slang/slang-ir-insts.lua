@@ -1413,6 +1413,7 @@ local insts = {
 	{ RequireComputeDerivative = {} },
 	{ StaticAssert = { operands = { { "condition" }, { "message" } } } },
 	{ Printf = { operands = { { "format" } } } },
+	{ AbortShader = { operands = { { "format" } } } },
 	-- Quad control execution modes.
 	{ RequireMaximallyReconverges = {} },
 	{ RequireQuadDerivatives = {} },
