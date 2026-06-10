@@ -4951,6 +4951,26 @@ void discoverExtensionDecls(List<ExtensionDecl*>& decls, Decl* parent)
     }
 }
 
+// Collect every `namespace` declaration rooted at `parent`, recursing through containers (including
+// `FileDecl`s, so namespaces from `__include`d/`implementing` module fragments are found) and
+// generic wrappers. Mirrors `discoverExtensionDecls`. (Phase-order rationale at the call site.)
+void discoverNamespaceDecls(List<NamespaceDecl*>& decls, Decl* parent)
+{
+    if (auto namespaceDecl = as<NamespaceDecl>(parent))
+        decls.add(namespaceDecl);
+    if (auto containerDecl = as<ContainerDecl>(parent))
+    {
+        for (auto child : containerDecl->getDirectMemberDecls())
+        {
+            discoverNamespaceDecls(decls, child);
+        }
+    }
+    if (auto genericDecl = as<GenericDecl>(parent))
+    {
+        discoverNamespaceDecls(decls, genericDecl->inner);
+    }
+}
+
 void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
 {
     // When we are dealing with code from the core modules,
@@ -5097,47 +5117,40 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
         DeclCheckState::CapabilityChecked,
     };
 
+    // Drive every namespace in the module to `ScopesWired` before the extension-first pass below.
+    // That pass resolves each extension's target type (and generic signature) by unqualified name
+    // lookup, which reads only the already-wired sibling-scope chain. A `namespace N` reopened across
+    // sibling `__include`/`implementing` fragments is merged into that chain only when its
+    // `NamespaceDecl` reaches `ScopesWired` (SemanticsDeclScopeWiringVisitor::visitNamespaceDecl ->
+    // addSiblingScopeForContainerDecl); driving an extension to `ReadyForLookup` does not advance any
+    // namespace, so without this the header resolves against an unwired scope and unqualified names
+    // fail (30015 -> 30855).
+    //
+    // Every namespace must be wired, not just each extension's lexically-enclosing one: an
+    // extension's target type may live in a *different* namespace fragment than the extension
+    // itself -- e.g. a file-scope `extension N::T` whose `T` is declared in another fragment's
+    // reopened `namespace N` (#11532). Wiring only the enclosing namespace covers the case where the
+    // extension is lexically inside the reopened namespace (#11531) but not the file-scope case, so
+    // this all-namespaces pass subsumes that narrower walk.
+    //
+    // Restricted to namespaces -- NOT `ensureAllDeclsRec(moduleDecl, ScopesWired)` over every decl:
+    // `ensureDecl` here advances only each `NamespaceDecl` itself (and, via `visitNamespaceDecl`, the
+    // direct `using` decls needed for scope wiring), never its ordinary members or extensions.
+    // The broad alternative regressed core-module checking by prematurely advancing the standard
+    // library's non-namespaced texture extensions (`extension _Texture<...>`), resolving their target
+    // types into `error`. `discoverNamespaceDecls` collects only `NamespaceDecl`s (not `ModuleDecl`,
+    // also a `NamespaceDeclBase`), so the global module scope is left to the regular pass.
+    // Fixes shader-slang/slang#11531 and shader-slang/slang#11532.
+    List<NamespaceDecl*> namespaceDecls;
+    discoverNamespaceDecls(namespaceDecls, moduleDecl);
+    for (auto namespaceDecl : namespaceDecls)
+    {
+        ensureDecl(namespaceDecl, DeclCheckState::ScopesWired);
+    }
+
     // Discover and check all extension decls before anything else.
     List<ExtensionDecl*> extensionDecls;
     discoverExtensionDecls(extensionDecls, moduleDecl);
-
-    // Wire up each extension's enclosing `namespace`(s) before resolving extension
-    // headers below. An extension header (target type, generic constraints, `where`
-    // clauses) is resolved by unqualified name and must see declarations from other
-    // `__include`/`implementing` fragments that reopen the same namespace. Cross-file
-    // fragments are linked into one another's sibling scope chain only when the
-    // `NamespaceDecl` reaches `ScopesWired` (visitNamespaceDecl ->
-    // addSiblingScopeForContainerDecl); driving an extension to `ReadyForLookup` does
-    // not advance its enclosing namespace, so without this the header would resolve
-    // against an unwired scope and unqualified names fail (#11531: 30015 -> 30855).
-    //
-    // The `as<NamespaceDecl>` filter is load-bearing -- do not widen it. `ModuleDecl`
-    // is also a `NamespaceDeclBase` and `FileDecl` is a `ContainerDecl`, so matching
-    // `NamespaceDecl` specifically skips the global module/file scope and drives only
-    // genuine namespaces. That narrowing keeps the global-scope core extensions (e.g.
-    // `extension _Texture<...>`) untouched: the rejected broad alternative,
-    // `ensureAllDeclsRec(moduleDecl, ScopesWired)`, regressed core-module checking by
-    // recursively advancing every decl (including `extension _Texture<...>` and its
-    // members); here `ensureDecl` advances only each namespace decl itself, never its
-    // members or extensions. A core-module namespace
-    // that does contain extensions (e.g. `linalg` in hlsl.meta.slang) is therefore
-    // still driven to `ScopesWired` early, but benignly -- only the namespace decl
-    // advances, and it is a single fragment with no sibling fragments to wire.
-    //
-    // `enclosingNamespaces` is collected innermost-first by the parent walk, so the
-    // descending-index loop drives them outermost-first: an inner fragment can find its
-    // siblings only once its outer namespace is wired.
-    for (auto extensionDecl : extensionDecls)
-    {
-        List<NamespaceDecl*> enclosingNamespaces;
-        for (Decl* p = getParentDecl(extensionDecl); p; p = getParentDecl(p))
-        {
-            if (auto ns = as<NamespaceDecl>(p))
-                enclosingNamespaces.add(ns);
-        }
-        for (Index i = enclosingNamespaces.getCount() - 1; i >= 0; --i)
-            ensureDecl(enclosingNamespaces[i], DeclCheckState::ScopesWired);
-    }
 
     for (auto s : states)
     {
