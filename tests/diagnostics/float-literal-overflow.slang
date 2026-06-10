@@ -52,10 +52,29 @@ void main()
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^^^^^^ floating-point literal unrepresentable
 //CHECK:    ^^^^^^^^^^^^^^^^^^^^^^^^^ double literal '1.79769313486231582e308LF' unrepresentable, converted to 'inf'
 
-   // min denormal: ~4.94e-324
-   // half of that: ~2.47e-324, anything below rounds to zero
+    // min denormal: ~4.94e-324
+    // half of that: ~2.47e-324, anything below rounds to zero
     getType(2.48e-324LF);
     getType(2.46e-324LF);
 //CHECK:    ^^^^^^^^^^^ floating-point literal too small
 //CHECK:    ^^^^^^^^^^^ '2.46e-324LF' is smaller than the smallest representable value for type double, converted to '0'
+
+    // overflowing hex double
+    getType(0x1p1023LF);
+    getType(0x1p1024LF);
+//CHECK:    ^^^^^^^^^^ floating-point literal unrepresentable
+//CHECK:    ^^^^^^^^^^ double literal '0x1p1024LF' unrepresentable, converted to 'inf'
+
+    // underflowing hex double
+    getType(0x1p-1074LF);
+    getType(0x1p-1075LF);
+//CHECK:    ^^^^^^^^^^^ floating-point literal too small
+//CHECK:    ^^^^^^^^^^^ '0x1p-1075LF' is smaller than the smallest representable value for type double, converted to '0'
+
+    // precision lost
+    getType(0x1.fffffffffffffp0);
+    getType(0x1.fffffffffffff8p0);
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^ floating-point precision lost
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^ significand of '0x1.fffffffffffff8p0' was truncated, value is now '0x1.fffffffffffffp+0'
+
 }

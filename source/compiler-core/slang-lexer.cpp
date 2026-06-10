@@ -781,33 +781,27 @@ IntegerLiteralValue getIntegerLiteralValue(
     return value;
 }
 
-// Converts a literal in hexadecimal format to double
+// Converts a literal in hexadecimal format to double. The return value is truncated
+// in case the significand in the literal cannot be fit.
 //
 // Params:
 //
-//   start           - literal (after 0x)
-//   end             - end of literal; start + strlen(literal)
-//   suffix          - pointer to receive the first unhandled character
-//   outIsOutOfRange - Whether the value is out of range. Return value is
-//                     either 0 for subnormal underflow or INFINITY for overflow.
+//   start            - literal (after 0x)
+//   end              - end of literal; start + strlen(literal)
+//   suffix           - pointer to receive the first unhandled character
+//   outIsOutOfRange  - Whether the value is out of range. Return value is
+//                      either 0 for subnormal underflow or INFINITY for overflow.
+//   outPrecisionLost - Significand was truncated. Only reported if the value was in range.
 //
-// Return:             Parsed value.
+// Return:              Parsed value.
 //
-// Limitations:
-//
-// - If the given significand is more than 64 significant bits (from leading one
-//   to trailing one), it may not be rounded correctly. The significand of double
-//   is 53 bits, so this shouldn't matter in practice.
-// - Rounding of subnormals may not be exactly correct.
-//
-// The minor rounding inaccuracies shouldn't be a problem, since hex floats can
-// represent all finite double values precisely.
 //
 static double _hexFloatLiteralToDouble(
     const char* start,
     const char* end,
     const char*& suffix,
-    bool& outIsOutOfRange)
+    bool& outIsOutOfRange,
+    bool& outPrecisionLost)
 {
     const char* cursor{start};
     int64_t exponent{};
@@ -816,6 +810,7 @@ static double _hexFloatLiteralToDouble(
     bool significandDotSeen{};
     double ret{};
     bool isOutOfRange{};
+    bool precisionLost{};
 
     suffix = start;
 
@@ -854,6 +849,10 @@ static double _hexFloatLiteralToDouble(
             // side of the dot.
             if (!significandDotSeen)
                 exponentBias += 4;
+
+            // significand is being truncated
+            if (digit != 0U)
+                precisionLost = true;
         }
 
         ++cursor;
@@ -918,11 +917,42 @@ static double _hexFloatLiteralToDouble(
             significand <<= leadingZeroes;
             exponent -= leadingZeroes;
 
+            // truncate significand to 53 bits or less in case of subnormals
+            if (significand & 0x7FFU)
+                precisionLost = true;
+
+            significand >>= 11U;
+            exponent += 11;
+
+            // Note: normal exponent range is [-1022, 1023]. Numbers smaller
+            // than 2^-1022 are expressed as subnormals. In case of smaller
+            // exponents, we'll clamp the final exponent range to the normal
+            // range and shift the significand right. This prevents potential
+            // issues with rounding.
+            if (exponent < (-1022 - 52))
+            {
+                int64_t diff = (-1022 - 52) - exponent;
+                if (diff > 52)
+                {
+                    significand = 0;
+                    precisionLost = true;
+                }
+                else
+                {
+                    uint64_t lostBitsMask = (uint64_t{1U} << diff) - 1U;
+                    if (significand & lostBitsMask)
+                        precisionLost = true;
+                    significand >>= diff;
+                }
+
+                exponent = (-1022 - 52);
+            }
+
             // now calculate the actual value
             ret = static_cast<double>(significand);
-            ret *= std::exp2(-63);      // note: now the value is 1.xxxxxP0
-            exponent += 63;             // adjust exponent as per the above
-            ret *= std::exp2(exponent); // final exponent adjustment
+            ret *= std::exp2(-52);
+            exponent += 52;
+            ret *= std::exp2(exponent);  // apply exponent
 
             // detect underflow/overflow
             isOutOfRange = (ret == 0.0 || (!std::isfinite(ret)));
@@ -936,16 +966,19 @@ static double _hexFloatLiteralToDouble(
     }
 
     outIsOutOfRange = isOutOfRange;
+    outPrecisionLost = precisionLost && !isOutOfRange;
     return ret;
 }
 
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
     UnownedStringSlice* outSuffix,
-    bool* outIsOutOfRange)
+    bool* outIsOutOfRange,
+    bool* outPrecisionLost)
 {
     FloatingPointLiteralValue value{};
     bool isOutOfRange{}; // underflow/overflow detection
+    bool precisionLost{};
 
     const UnownedStringSlice content = token.getContent();
 
@@ -961,7 +994,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         // is reasonably straightforward.
 
         cursor += 2U;
-        value = _hexFloatLiteralToDouble(cursor, end, cursor, isOutOfRange);
+        value = _hexFloatLiteralToDouble(cursor, end, cursor, isOutOfRange, precisionLost);
     }
     else
     {
@@ -1007,6 +1040,9 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
 
     if (outIsOutOfRange)
         *outIsOutOfRange = isOutOfRange;
+
+    if (outPrecisionLost)
+        *outPrecisionLost = precisionLost;
 
     return value;
 }

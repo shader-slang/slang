@@ -7741,6 +7741,7 @@ enum class FloatFixKind
 
 static FloatFixKind _fixFloatLiteralValue(
     BaseType type,
+    bool truncateToFit, // hex literals are truncated if necessary
     IRFloatingPointValue value,
     IRFloatingPointValue& outValue)
 {
@@ -7760,6 +7761,7 @@ static FloatFixKind _fixFloatLiteralValue(
         double nonzeroMin;  // minimum value that we'll still consider rounded to non-zero
         double positiveMax; // maximum value
         double finiteMax;   // maximum value that we'll still consider finite
+        std::uint64_t truncationMask{}; // TODO
 
         switch (type)
         {
@@ -7775,7 +7777,6 @@ static FloatFixKind _fixFloatLiteralValue(
             static_assert(0x0.004p-14 == SLANG_HALF_SUB_NORMAL_MIN);
             positiveMin = 0x0.004p-14;
             nonzeroMin = 0x0.002p-14;
-
             static_assert(0x1.FFC0p15 == SLANG_HALF_MAX);
             positiveMax = 0x1.FFC0p15;
             finiteMax = 0x1.FFE0p15; // this still rounds up to positiveMax
@@ -8570,8 +8571,10 @@ static Expr* parseAtomicExpr(Parser* parser)
 
             UnownedStringSlice suffix{};
             bool isOutOfRange{};
+            bool precisionLost{};
+            bool isHexFloat = token.getContent().startsWith("0x") || token.getContent().startsWith("0X");
             FloatingPointLiteralValue value =
-                getFloatingPointLiteralValue(token, &suffix, &isOutOfRange);
+                getFloatingPointLiteralValue(token, &suffix, &isOutOfRange, &precisionLost);
 
             // Look at any suffix on the value
             char const* suffixCursor = suffix.begin();
@@ -8670,18 +8673,17 @@ static Expr* parseAtomicExpr(Parser* parser)
             // more 'correct'.
 
             FloatingPointLiteralValue fixedValue = value;
-            auto fixType = _fixFloatLiteralValue(suffixBaseType, value, fixedValue);
+            auto fixType = _fixFloatLiteralValue(suffixBaseType, isHexFloat, value, fixedValue);
 
             switch (fixType)
             {
             case FloatFixKind::Truncated:
+                precisionLost = true;
+                break;
+
             case FloatFixKind::None:
-                {
-                    // No warning.
-                    // The truncation allowed must be very small. When Truncated the value *is*
-                    // changed though.
-                    break;
-                }
+                break;
+
             case FloatFixKind::Zeroed:
                 {
                     parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
@@ -8702,6 +8704,15 @@ static Expr* parseAtomicExpr(Parser* parser)
                 }
             }
 
+            if (precisionLost && isHexFloat)
+            {
+                char floatValue[32]{};
+                snprintf(floatValue, sizeof floatValue, "%a", fixedValue);
+                parser->sink->diagnose(Diagnostics::FloatHexLiteralPrecisionLost{
+                    .literal = String(token.getContent()),
+                    .truncatedValue = String(floatValue),
+                    .location = token.loc});
+            }
 
             constExpr->value = fixedValue;
             constExpr->suffixType = suffixBaseType;
