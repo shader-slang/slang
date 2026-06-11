@@ -4951,23 +4951,21 @@ void discoverExtensionDecls(List<ExtensionDecl*>& decls, Decl* parent)
     }
 }
 
-// Collect every `namespace` declaration rooted at `parent`, recursing through containers (including
-// `FileDecl`s, so namespaces from `__include`d/`implementing` module fragments are found) and
-// generic wrappers. Mirrors `discoverExtensionDecls`. (Phase-order rationale at the call site.)
+// Collect every `namespace` declaration rooted at `parent`. Only module, namespace, and file scopes
+// can lexically contain a nested `namespace`, so recursion descends through exactly those
+// (`NamespaceDeclBase` covers `ModuleDecl` + `NamespaceDecl`; a `FileDecl` carries the decls of an
+// `__include`d/`implementing` module fragment) and not into struct/function/etc. bodies or generic
+// wrappers, where a `namespace` can never appear.
 void discoverNamespaceDecls(List<NamespaceDecl*>& decls, Decl* parent)
 {
     if (auto namespaceDecl = as<NamespaceDecl>(parent))
         decls.add(namespaceDecl);
-    if (auto containerDecl = as<ContainerDecl>(parent))
+    if (as<NamespaceDeclBase>(parent) || as<FileDecl>(parent))
     {
-        for (auto child : containerDecl->getDirectMemberDecls())
+        for (auto child : as<ContainerDecl>(parent)->getDirectMemberDecls())
         {
             discoverNamespaceDecls(decls, child);
         }
-    }
-    if (auto genericDecl = as<GenericDecl>(parent))
-    {
-        discoverNamespaceDecls(decls, genericDecl->inner);
     }
 }
 
