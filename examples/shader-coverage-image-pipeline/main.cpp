@@ -401,6 +401,8 @@ void writeManifest(slang::ICoverageTracingMetadata* coverage, const std::filesys
     out.write(
         static_cast<const char*>(manifestBlob->getBufferPointer()),
         (std::streamsize)manifestBlob->getBufferSize());
+    if (!out)
+        fail("write failed: " + path.string());
 }
 
 void writeCountersBinary(const std::vector<uint8_t>& rawBytes, const std::filesystem::path& path)
@@ -416,6 +418,8 @@ void writeCountersBinary(const std::vector<uint8_t>& rawBytes, const std::filesy
     if (!out)
         fail("cannot open for writing: " + path.string());
     out.write(reinterpret_cast<const char*>(rawBytes.data()), (std::streamsize)rawBytes.size());
+    if (!out)
+        fail("write failed: " + path.string());
 }
 
 // Write a full LCOV file with line (DA), function (FN/FNDA), and branch
@@ -537,6 +541,8 @@ void writeLcov(
 
         f << "end_of_record\n";
     }
+    if (!f)
+        fail("write failed: " + path.string());
 }
 
 struct CoverageSummary
