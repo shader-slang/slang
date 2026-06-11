@@ -5284,6 +5284,12 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         auto requirementWitness = RequirementWitness(satisfyingMemberDeclRef);
         witnessTable->m_requirementDictionary[requiredMemberDeclRef.getDecl()] = requirementWitness;
 
+        // doesTypeSatisfyConstraintRequirements adds witnesses for direct
+        // GenericTypeConstraintDecl children of requiredMemberDeclRef. Track the
+        // ones missing before the speculative check so a failed direct match does
+        // not leave partial constraint witnesses for a later synthesized wrapper.
+        // Existing entries are intentionally left alone; WitnessTable::add asserts
+        // rather than overwriting them.
         List<Decl*> speculativeConstraintWitnesses;
         for (auto constraintDeclRef :
              getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, requiredMemberDeclRef))
