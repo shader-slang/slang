@@ -633,7 +633,11 @@ void validateAtomicOperations(
     IRInst* inst,
     bool validateSPIRVFp16VectorAtomics)
 {
-    validateAtomicOperationsImpl(skipFuncParamValidation, validateSPIRVFp16VectorAtomics, sink, inst);
+    validateAtomicOperationsImpl(
+        skipFuncParamValidation,
+        validateSPIRVFp16VectorAtomics,
+        sink,
+        inst);
 }
 
 static void validateVectorOrMatrixElementType(
