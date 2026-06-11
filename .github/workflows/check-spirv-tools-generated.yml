@@ -3,6 +3,9 @@ name: Check SPIRV-Tools Generated Files
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -13,13 +16,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          fetch-depth: 2
           submodules: recursive
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
           python-version: "3.x"
 
@@ -32,8 +35,13 @@ jobs:
         run: |
           # Get the commit hash that spirv-tools expects for spirv-headers from DEPS file
           cd external/spirv-tools
-          EXPECTED_SPIRV_HEADERS_COMMIT=$(grep "'spirv_headers_revision':" DEPS | sed "s/.*'spirv_headers_revision'.*'\\([^']*\\)'.*/\\1/")
+          EXPECTED_SPIRV_HEADERS_COMMIT=$(grep spirv_headers_revision DEPS | grep -o "'[a-f0-9]\{40\}'" | tr -d "'")
           echo "Expected SPIRV-Headers commit (from DEPS): $EXPECTED_SPIRV_HEADERS_COMMIT"
+
+          if [ -z "$EXPECTED_SPIRV_HEADERS_COMMIT" ]; then
+            echo "❌ Could not extract spirv_headers_revision from DEPS"
+            exit 1
+          fi
 
           # Get the current commit hash of our spirv-headers submodule
           cd ../spirv-headers
@@ -59,7 +67,7 @@ jobs:
           cd external/spirv-tools
 
           # Sync dependencies (this might require additional setup for private repos)
-          python3 utils/git-sync-deps || echo "Warning: git-sync-deps failed, continuing anyway"
+          python3 utils/git-sync-deps
 
           # Configure and build
           cmake . -B build -G Ninja
@@ -76,21 +84,33 @@ jobs:
 
           MISMATCH_FOUND=false
 
+          # Enable nullglob to skip unmatched patterns explicitly.
+          shopt -s nullglob
+
           # Compare each generated file with the committed version
           for f in *.h *.inc; do
-            if [ -f "$f" ]; then
-              committed_file="../../spirv-tools-generated/$f"
-              if [ ! -f "$committed_file" ]; then
-                echo "❌ Missing file in spirv-tools-generated/: $f"
-                MISMATCH_FOUND=true
-              elif ! diff -q "$f" "$committed_file" > /dev/null; then
-                echo "❌ File differs: $f"
-                MISMATCH_FOUND=true
-              else
-                echo "✅ File matches: $f"
-              fi
+            committed_file="../../spirv-tools-generated/$f"
+            if [ ! -f "$committed_file" ]; then
+              echo "❌ Missing file in spirv-tools-generated/: $f"
+              MISMATCH_FOUND=true
+            elif ! diff -q "$f" "$committed_file" > /dev/null; then
+              echo "❌ File differs: $f"
+              MISMATCH_FOUND=true
+            else
+              echo "✅ File matches: $f"
             fi
           done
+
+          # Check for orphaned committed files that are no longer generated.
+          for committed in ../../spirv-tools-generated/*.h ../../spirv-tools-generated/*.inc; do
+            filename=$(basename "$committed")
+            if [ ! -f "$filename" ]; then
+              echo "❌ Orphaned file in spirv-tools-generated (should be removed): $filename"
+              MISMATCH_FOUND=true
+            fi
+          done
+
+          shopt -u nullglob
 
           if [ "$MISMATCH_FOUND" = true ]; then
             echo ""
