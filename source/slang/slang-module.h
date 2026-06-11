@@ -307,8 +307,8 @@ public:
 
     /// Set / get a digest of the raw source that produced this module.
     ///
-    /// Currently populated by `Linkage::loadModuleFromBlob` so that subsequent
-    /// load attempts with the same module name can be compared for equivalence.
+    /// Populated for source blobs and source files so that subsequent load
+    /// attempts with the same module name can be compared for equivalence.
     void setSourceDigest(SHA1::Digest const& digest) { m_sourceDigest = digest; }
     SHA1::Digest const& getSourceDigest() const { return m_sourceDigest; }
 

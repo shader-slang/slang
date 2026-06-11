@@ -12,6 +12,7 @@
 //                                      diagnostic complaining about the
 //                                      collision.
 
+#include "core/slang-memory-file-system.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
@@ -33,6 +34,9 @@ SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
     slang::SessionDesc sessionDesc{};
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
+    const char* searchPaths[] = {"."};
+    sessionDesc.searchPathCount = 1;
+    sessionDesc.searchPaths = searchPaths;
 
     ComPtr<slang::ISession> session;
     SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
@@ -71,6 +75,31 @@ SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
     SLANG_CHECK(modAlias != nullptr);
     SLANG_CHECK(modAlias != modA1);
 
+    // A module loaded from a source file should also be comparable against a
+    // later direct source-string load with matching contents.
+    ComPtr<ISlangFileSystemExt> fileSystem = ComPtr<ISlangFileSystemExt>(new MemoryFileSystem());
+    auto& memoryFileSystem = *static_cast<MemoryFileSystem*>(fileSystem.get());
+    SLANG_CHECK_ABORT(memoryFileSystem.saveFile("mod_file.slang", sourceA, strlen(sourceA)) ==
+                      SLANG_OK);
+    sessionDesc.fileSystem = fileSystem;
+
+    ComPtr<slang::ISession> fileSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, fileSession.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagFileLoad;
+    auto modFile = fileSession->loadModule("mod_file", diagFileLoad.writeRef());
+    SLANG_CHECK(modFile != nullptr);
+
+    ComPtr<slang::IBlob> diagFileReload;
+    auto modFileReload = fileSession->loadModuleFromSourceString(
+        "mod_file",
+        "mod_file.slang",
+        sourceA,
+        diagFileReload.writeRef());
+    SLANG_CHECK(modFileReload != nullptr);
+    SLANG_CHECK(modFileReload == modFile);
+
     // Loading "mod" with a *different* source must now fail and emit a
     // diagnostic pointing at the collision, rather than silently returning
     // the previously cached module.
@@ -79,8 +108,8 @@ SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
     SLANG_CHECK(modB == nullptr);
     SLANG_CHECK(diagB != nullptr);
 
-    // The diagnostic should be the new E38204 collision error.
+    // The diagnostic should be the new E38202 collision error.
     const char* diagText = diagB ? (const char*)diagB->getBufferPointer() : "";
-    SLANG_CHECK(strstr(diagText, "38204") != nullptr);
+    SLANG_CHECK(strstr(diagText, "38202") != nullptr);
     SLANG_CHECK(strstr(diagText, "mod") != nullptr);
 }

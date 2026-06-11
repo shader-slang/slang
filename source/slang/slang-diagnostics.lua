@@ -4039,7 +4039,7 @@ err(
 
 err(
     "module-already-loaded-with-different-source",
-    38204,
+    38202,
     "module already loaded with different source",
     span { loc = "location", message = "a module named '~moduleName:Name' is already loaded from different source contents in this session. Use a different module name or drop references to the previous module before reloading." }
 )
@@ -5343,4 +5343,3 @@ if #validation_errors > 0 then
 end
 
 return processed_diagnostics
-

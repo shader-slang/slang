@@ -51,6 +51,13 @@ static String findStandardModulePath(String const& stdModuleDirPath, String cons
     return String();
 }
 
+static SHA1::Digest computeSourceBlobDigest(ISlangBlob* blob)
+{
+    DigestBuilder<SHA1> digestBuilder;
+    digestBuilder.append(blob);
+    return digestBuilder.finalize();
+}
+
 Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage)
     : m_session(session)
     , m_retainedSession(session)
@@ -238,14 +245,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     try
     {
-        auto computeDigest = [](auto x)
-        {
-            DigestBuilder<SHA1> digestBuilder;
-            digestBuilder.append(x);
-            return digestBuilder.finalize();
-        };
-
-        SHA1::Digest sourceDigest = computeDigest(source);
+        SHA1::Digest sourceDigest = computeSourceBlobDigest(source);
         auto digestToString = [](SHA1::Digest const& d) { return d.toString(); };
 
         String moduleNameStr = moduleName;
@@ -1717,7 +1717,11 @@ RefPtr<Module> Linkage::findOrImportModule(
             // out any other options.
             //
             if (module)
+            {
+                if (type == ModuleBlobType::Source)
+                    module->setSourceDigest(computeSourceBlobDigest(fileContents));
                 return module;
+            }
         }
     }
 
