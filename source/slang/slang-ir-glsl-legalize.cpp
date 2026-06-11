@@ -4951,10 +4951,7 @@ void legalizeEntryPointForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        consolidateRayTracingParameters(
-            &context,
-            func,
-            isRayTracingHitStage(stage) && isViaGLSL);
+        consolidateRayTracingParameters(&context, func, isRayTracingHitStage(stage) && isViaGLSL);
         break;
     default:
         break;
