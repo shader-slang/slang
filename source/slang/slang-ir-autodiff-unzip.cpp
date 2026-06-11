@@ -380,9 +380,8 @@ struct UnzippingContext
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
         {
             auto arg = mixedCall->getArg(ii);
-            auto rawParamType = (ii < (UIndex)baseFuncParams.getCount())
-                                    ? baseFuncParams[ii]->getFullType()
-                                    : baseFuncType->getParamType(ii);
+            SLANG_RELEASE_ASSERT(Index(ii) < baseFuncParams.getCount());
+            auto rawParamType = baseFuncParams[ii]->getFullType();
             if (isMixedDifferentialInst(arg))
                 propFuncArgs.add(lookupDiffInst(arg));
             else if (isConstExprRateQualifiedType(rawParamType))
