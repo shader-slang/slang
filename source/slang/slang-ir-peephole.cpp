@@ -1,5 +1,6 @@
 #include "slang-ir-peephole.h"
 
+#include "../core/slang-math.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
@@ -1806,8 +1807,12 @@ struct PeepholeContext : InstPassBase
                     // wide access is still possible; for a 3-component vector (stride
                     // `3 * scalarSize`, never a power of two) it collapses to the scalar
                     // alignment, which is the strongest *valid* (power-of-two) promise.
+                    // The types these accessors accept are concrete and non-empty, so the stride
+                    // is always positive; alignment 0 is the legalizer's "no promise" sentinel and
+                    // must never be produced here.
                     IRIntegerValue stride = sizeAlignment.getStride();
-                    IRIntegerValue alignment = stride & (-stride);
+                    SLANG_ASSERT(stride > 0);
+                    IRIntegerValue alignment = Math::getLowestBit(stride);
 
                     IRBuilder builder(module);
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);

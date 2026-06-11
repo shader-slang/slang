@@ -473,9 +473,10 @@ struct ByteAddressBuffer
     /// and a runtime `location` with the same `alignment` lower identically. When `alignment`
     /// covers the whole `T` a single wide load is emitted; when it only covers part of `T` (for
     /// example 4 for a `half4`) the widest power-of-two-width chunks the alignment permits are
-    /// emitted, with per-component loads for any remainder. On HLSL the value is informational
-    /// and does not change the emitted intrinsic; on other targets it is forwarded to the lowered
-    /// load instruction.
+    /// emitted, with per-component loads for any remainder. This selection applies on every
+    /// target, including HLSL (for example two `.Load<float2>` instead of one `.Load<float4>`):
+    /// `alignment` is not passed as an argument to the HLSL `.Load` intrinsic, but on targets
+    /// whose lowered load takes an alignment operand it is forwarded there.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
@@ -6464,9 +6465,10 @@ struct $(item.name)
     /// and a runtime `location` with the same `alignment` lower identically. When `alignment`
     /// covers the whole `T` a single wide load is emitted; when it only covers part of `T` (for
     /// example 4 for a `half4`) the widest power-of-two-width chunks the alignment permits are
-    /// emitted, with per-component loads for any remainder. On HLSL the value is informational
-    /// and does not change the emitted intrinsic; on other targets it is forwarded to the lowered
-    /// load instruction.
+    /// emitted, with per-component loads for any remainder. This selection applies on every
+    /// target, including HLSL (for example two `.Load<float2>` instead of one `.Load<float4>`):
+    /// `alignment` is not passed as an argument to the HLSL `.Load` intrinsic, but on targets
+    /// whose lowered load takes an alignment operand it is forwarded there.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
@@ -7160,7 +7162,8 @@ $}
     }
 
     /// Store a value of type `T` to the buffer at the specified location, promising that
-    /// `address` is aligned to `alignment` bytes so the compiler can issue a single wide store.
+    /// `address` is aligned to `alignment` bytes so the compiler can issue the widest store(s)
+    /// the alignment permits (a single wide store when `alignment` covers the whole `T`).
     ///@param T The type of the input value.
     ///@param address The input address in bytes, which must be a multiple of `alignment`.
     ///@param value The input value.

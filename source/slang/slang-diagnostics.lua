@@ -4887,7 +4887,7 @@ err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",
-    span { loc = "location", message = "invalid alignment `~alignment:Int` specified for the byte address buffer resource with the element size of `~elementSize:Int`" }
+    span { loc = "location", message = "the alignment `~alignment:Int` of a byte address buffer access must be at least `~requiredAlignment:Int`, the natural alignment of the access type's scalar components" }
 )
 
 err(

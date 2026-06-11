@@ -285,11 +285,12 @@ CUDA requires SM6.0 or higher for int64 support.
 
 ## ByteAddressBuffer Load/Store Alignment
 
-The templated `(RW)ByteAddressBuffer` accessors `Load<T>`, `Store<T>`,
-`LoadAligned<T>(location, alignment)`, and `Store<T>(address, value, alignment)` treat
-`alignment` as a compile-time contract that is validated up front and is the sole input to the
-wide-vs-scalarized code-generation decision. As a result a constant and a runtime `location`
-with the same `alignment` always lower to the same instructions.
+The templated `(RW)ByteAddressBuffer` accessors that take an explicit `alignment` —
+`LoadAligned<T>(location, alignment)` and the three-argument `Store<T>(address, value, alignment)`
+— treat `alignment` as a compile-time contract that is validated up front and is the sole input to
+the wide-vs-scalarized code-generation decision. As a result a constant and a runtime location
+with the same `alignment` always lower to the same instructions. (The plain `Load<T>`/`Store<T>`
+forms make no alignment promise and prove alignment from a constant location instead.)
 
 A non-zero `alignment` must satisfy all of the following, or a compile-time error is reported:
 
@@ -334,10 +335,12 @@ capability of each target (the same requirement the scalar type itself has — s
 [Half Type](#half), [u/int8_t Type](#int8_t), and [u/int16_t Type](#int16_t)); the alignment rules
 above do not make a width newly usable on a target that did not already support it.
 
-On HLSL the `alignment` is informational and does not change the emitted `.Load`/`.Store`
-intrinsic; on other targets it is forwarded to the lowered access. The non-templated
-`Load2`/`Load3`/`Load4` and `Store2`/`Store3`/`Store4` overloads keep their fixed `uint`-based
-behavior and are unaffected.
+The `alignment` drives the wide-vs-chunked selection on every target, including HLSL — for
+example `LoadAligned<float4>(loc, 8)` emits two `.Load<float2>` whereas a natural-alignment load
+emits one `.Load<float4>`. On HLSL it is not passed as an argument to the `.Load`/`.Store`
+intrinsic; on targets whose lowered access takes an alignment operand it is forwarded there. The
+non-templated `Load2`/`Load3`/`Load4` and `Store2`/`Store3`/`Store4` overloads keep their fixed
+`uint`-based behavior and are unaffected.
 
 <a id="mesh-shader"></a>
 

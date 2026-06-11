@@ -245,13 +245,24 @@ struct ByteAddressBufferLegalizationContext
     }
 
     // Validate the `alignment` and `location` operands of a single byte-address load/store
-    // against the `LoadAligned`/`StoreAligned` contract (see issue #11545): a non-zero
-    // alignment promise must be a compile-time constant and a power of two, and a
-    // compile-time-constant location must itself be a multiple of that promise. Diagnostics
-    // are emitted but legalization continues, so an offending access still produces valid
-    // (scalarized) IR for the rest of compilation. Called once per access on the user's
-    // `location`/`alignment` arguments; `alignment == 0` is the "no promise" sentinel used by
-    // the plain `Load`/`Store` accessors and carries no contract to validate.
+    // against the `LoadAligned`/`StoreAligned` contract (see issue #11545): a non-zero alignment
+    // promise must be a compile-time constant (else 41302), a power of two (else 41301), and at
+    // least the access type's scalar-component alignment (else 41300); and a
+    // compile-time-constant location must itself be a multiple of an otherwise-valid promise
+    // (else 41303). The checks short-circuit, so a single offending call reports exactly one
+    // diagnostic: an invalid alignment value is reported on its own, without also running the
+    // now-meaningless location-multiple check against it.
+    //
+    // The diagnostic, not the emitted code, is the contract enforcement: a diagnosed access does
+    // not abort legalization, and the IR subsequently emitted for it is whatever its (now-invalid)
+    // operands imply rather than a forced fallback. For example `LoadAligned<float4>(20, 16)` is
+    // diagnosed (41303) for the location not being a multiple of 16, yet still lowers to a single
+    // wide load, because `isWideAccessAligned` trusts the promise; that is intentional, and
+    // compilation continues so any later errors can surface too.
+    //
+    // Called once per access on the user's `location`/`alignment` arguments; `alignment == 0` is
+    // the "no promise" sentinel used by the plain `Load`/`Store` accessors and carries no contract
+    // to validate.
     void validateExplicitAlignment(IRInst* baseOffset, IRInst* alignment, IRType* accessType)
     {
         auto alignLit = as<IRIntLit>(alignment);
@@ -273,25 +284,29 @@ struct ByteAddressBufferLegalizationContext
                 .alignment = alignmentVal,
                 .location = baseOffset->sourceLoc,
             });
-        }
-        else
-        {
-            // A power-of-two alignment must still be at least the natural alignment of the access
-            // type's scalar components. The natural alignment of a composite is the maximum of its
-            // members' alignments, so checking the whole type here is equivalent to checking each
-            // scalar leaf (and also covers already-legal scalar types that skip the legalizer).
-            IRSizeAndAlignment sizeAlignment;
-            if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(m_target, accessType, &sizeAlignment)) &&
-                sizeAlignment.alignment > 0 && (alignmentVal % sizeAlignment.alignment) != 0)
-            {
-                m_sink->diagnose(Diagnostics::ByteAddressBufferUnaligned{
-                    .alignment = alignmentVal,
-                    .elementSize = sizeAlignment.alignment,
-                    .location = baseOffset->sourceLoc,
-                });
-            }
+            return;
         }
 
+        // A power-of-two alignment must still be at least the natural alignment of the access
+        // type's scalar components. The natural alignment of a composite is the maximum of its
+        // members' alignments, so checking the whole type here is equivalent to checking each
+        // scalar leaf (and also covers already-legal scalar types that skip the legalizer). We
+        // query *natural* (C) layout directly rather than through this file's `getSizeAndAlignment`
+        // wrapper because the alignment contract is defined against natural layout, independent of
+        // the target's buffer layout (e.g. std430 on GL-family targets).
+        IRSizeAndAlignment sizeAlignment;
+        if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(m_target, accessType, &sizeAlignment)) &&
+            sizeAlignment.alignment > 0 && (alignmentVal % sizeAlignment.alignment) != 0)
+        {
+            m_sink->diagnose(Diagnostics::ByteAddressBufferUnaligned{
+                .alignment = alignmentVal,
+                .requiredAlignment = sizeAlignment.alignment,
+                .location = baseOffset->sourceLoc,
+            });
+            return;
+        }
+
+        // The alignment promise is itself valid; a compile-time-constant location must honor it.
         if (auto baseOffsetLit = as<IRIntLit>(baseOffset))
         {
             if ((baseOffsetLit->getValue() % alignmentVal) != 0)
@@ -305,36 +320,37 @@ struct ByteAddressBufferLegalizationContext
         }
     }
 
-    // Returns true if a single wide access of `wideSize` bytes covering
-    // `baseOffset + immediateOffset` provably lands on a `wideSize`-aligned address. This is a
-    // pure query that never diagnoses, so it is safe to call repeatedly (e.g. when probing the
-    // candidate chunk widths).
+    // Returns true if a single access of `accessSize` bytes covering `baseOffset +
+    // immediateOffset` provably lands on an `accessSize`-aligned address. This is a pure query
+    // that never diagnoses, so it is safe to call repeatedly: the whole-vector decision sites
+    // pass the full vector byte size, while the chunkers probe candidate (narrower) chunk sizes
+    // with it.
     //
     // The decision is driven by the promised alignment alone (issue #11545, point 3): the
     // contract requires `location` (the runtime base offset) to be a multiple of the promise,
     // so the access's absolute offset is congruent to `immediateOffset` modulo the promise and
     // a constant and a runtime location with the same promise legalize identically. Only when
-    // there is no promise (`alignment == 0`, the plain `Load`/`Store` accessors) do we fall
-    // back to a compile-time-constant base offset to prove alignment.
+    // there is no promise (`promisedAlignment == 0`, the plain `Load`/`Store` accessors) do we
+    // fall back to a compile-time-constant base offset to prove alignment.
     bool isWideAccessAligned(
         IRInst* baseOffset,
         IRIntegerValue immediateOffset,
-        IRInst* unknownOffsetAlignment,
-        IRIntegerValue wideSize)
+        IRInst* promisedAlignment,
+        IRIntegerValue accessSize)
     {
-        if (wideSize <= 0)
+        if (accessSize <= 0)
             return false;
 
-        if (auto alignLit = as<IRIntLit>(unknownOffsetAlignment))
+        if (auto alignLit = as<IRIntLit>(promisedAlignment))
         {
-            if (auto promisedAlignment = alignLit->getValue())
-                return (promisedAlignment % wideSize) == 0 && (immediateOffset % wideSize) == 0;
+            if (auto promisedValue = alignLit->getValue())
+                return (promisedValue % accessSize) == 0 && (immediateOffset % accessSize) == 0;
         }
 
         // No alignment promise: only a compile-time-constant base offset can prove that a wide
         // access is safe.
         if (auto baseOffsetVal = as<IRIntLit>(baseOffset))
-            return ((baseOffsetVal->getValue() + immediateOffset) % wideSize) == 0;
+            return ((baseOffsetVal->getValue() + immediateOffset) % accessSize) == 0;
 
         return false;
     }
@@ -346,6 +362,29 @@ struct ByteAddressBufferLegalizationContext
         while ((p * 2) <= n)
             p *= 2;
         return p;
+    }
+
+    // Choose the widest power-of-two chunk width whose byte size (`width * elementStride`) is
+    // aligned at `chunkOffset`, capped at `kMaxByteAddressVectorWidth` (the widest single
+    // byte-address vector access). Width 1 is always valid, so the result is in
+    // `[1, min(largestPow2AtMost(remaining), 4)]`. Shared by both chunkers so the load/store
+    // mirrors cannot drift apart under later edits.
+    IRIntegerValue chooseChunkWidth(
+        IRInst* baseOffset,
+        IRIntegerValue chunkOffset,
+        IRInst* alignment,
+        IRIntegerValue elementStride,
+        IRIntegerValue remaining)
+    {
+        static const IRIntegerValue kMaxByteAddressVectorWidth = 4;
+        IRIntegerValue maxWidth =
+            remaining < kMaxByteAddressVectorWidth ? remaining : kMaxByteAddressVectorWidth;
+        for (IRIntegerValue cand = largestPow2AtMost(maxWidth); cand >= 2; cand /= 2)
+        {
+            if (isWideAccessAligned(baseOffset, chunkOffset, alignment, cand * elementStride))
+                return cand;
+        }
+        return 1;
     }
 
     IRType* getDescriptorHandleStorageType()
@@ -802,8 +841,11 @@ struct ByteAddressBufferLegalizationContext
     // (issue #11545, point 5). For example, a `half4` (scalar stride 2) promised alignment 4 can
     // only do 4-byte-aligned accesses, so it is emitted as two `half2` loads; a `float3`
     // promised alignment 8 is emitted as one `float2` plus one scalar `float`. The whole-vector
-    // single-load case is handled by the caller before reaching here, so this routine always
-    // produces at least two accesses.
+    // single-load case is handled by the caller before reaching here, so each chosen `width` is
+    // strictly smaller than the whole-vector width the caller already rejected as unaligned. That
+    // bound gives two guarantees: progress (so this routine emits at least two accesses), and that
+    // the recursive `emitLegalLoad` on the sub-vector re-enters on an aligned chunk and so takes
+    // the single-access fast path rather than recursing back into the chunker.
     IRInst* emitLegalChunkedVectorLoad(
         IRType* vecType,
         IRInst* buffer,
@@ -820,18 +862,8 @@ struct ByteAddressBufferLegalizationContext
             IRIntegerValue remaining = elementCount - done;
             IRIntegerValue chunkOffset = immediateOffset + done * elementStride;
 
-            // Pick the widest power-of-two chunk width (capped at 4, the widest byte-address
-            // vector access) whose byte size is aligned at this offset; width 1 is always valid.
-            IRIntegerValue width = 1;
-            for (IRIntegerValue cand = largestPow2AtMost(remaining < 4 ? remaining : 4); cand >= 2;
-                 cand /= 2)
-            {
-                if (isWideAccessAligned(baseOffset, chunkOffset, alignment, cand * elementStride))
-                {
-                    width = cand;
-                    break;
-                }
-            }
+            IRIntegerValue width =
+                chooseChunkWidth(baseOffset, chunkOffset, alignment, elementStride, remaining);
 
             if (width == 1)
             {
@@ -1948,16 +1980,8 @@ struct ByteAddressBufferLegalizationContext
             IRIntegerValue remaining = elementCount - done;
             IRIntegerValue chunkOffset = immediateOffset + done * elementStride;
 
-            IRIntegerValue width = 1;
-            for (IRIntegerValue cand = largestPow2AtMost(remaining < 4 ? remaining : 4); cand >= 2;
-                 cand /= 2)
-            {
-                if (isWideAccessAligned(baseOffset, chunkOffset, alignment, cand * elementStride))
-                {
-                    width = cand;
-                    break;
-                }
-            }
+            IRIntegerValue width =
+                chooseChunkWidth(baseOffset, chunkOffset, alignment, elementStride, remaining);
 
             if (width == 1)
             {
