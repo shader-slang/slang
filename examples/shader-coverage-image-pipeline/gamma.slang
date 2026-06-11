@@ -49,7 +49,7 @@ public float3 applyGamma(float3 rgb, GammaMode mode)
         return rgb;
     case GammaMode::Rec709:
         return rec709Encode(rgb);
-    default:
+    default: // Defensive fallback for out-of-range host uniform values.
         return rgb;
     }
 }

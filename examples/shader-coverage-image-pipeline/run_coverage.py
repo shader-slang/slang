@@ -65,7 +65,8 @@ def _candidate_paths(slang_root: Path) -> list:
         *(slang_root / "build" / config / "examples" / _TARGET / _TARGET
           for config in ("Release", "Debug", "RelWithDebInfo")),
         slang_root / "build" / "examples" / _TARGET / _TARGET,
-        # Windows .exe variants
+        slang_root / "build" / "examples" / _TARGET / (_TARGET + ".exe"),
+        # Windows .exe variants (multi-config)
         *(slang_root / "build" / "examples" / _TARGET / config / (_TARGET + ".exe")
           for config in ("Release", "Debug", "RelWithDebInfo")),
     ]
@@ -96,7 +97,8 @@ def _ensure_demo_binary(slang_root: Path) -> Path:
     # built (cmake --build --preset release was run by the user).
     print(f"[build] building target '{_TARGET}' …")
     result = subprocess.run(
-        ["cmake", "--build", "--preset", "release", "--target", _TARGET],
+        [shutil.which("cmake.exe") or "cmake",
+         "--build", "--preset", "release", "--target", _TARGET],
         cwd=slang_root,
     )
     if result.returncode != 0:

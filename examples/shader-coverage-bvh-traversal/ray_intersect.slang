@@ -69,12 +69,12 @@ public bool rayTriangleIntersect(Ray ray, Triangle tri, out float t)
 }
 
 // Linear-scan fallback used when traversal stack overflows. Tests
-// every triangle in the scene — slow but bounded. Returns the count
-// of hits considered (for coverage telemetry; the demo doesn't use
-// the return value semantically).
+// every triangle in the scene — slow but bounded. Returns the number
+// of non-degenerate triangles tested (for coverage telemetry; the
+// demo doesn't use the return value semantically).
 public int linearScanRemaining(Ray ray, inout HitInfo hit, uint triCount)
 {
-    int hitsConsidered = 0;
+    int trianglesTested = 0;
     for (uint i = 0; i < triCount; ++i)
     {
         Triangle tri = triangles[i];
@@ -87,7 +87,7 @@ public int linearScanRemaining(Ray ray, inout HitInfo hit, uint triCount)
             hit.triIndex = int(i);
             hit.materialId = tri.materialId;
         }
-        ++hitsConsidered;
+        ++trianglesTested;
     }
-    return hitsConsidered;
+    return trianglesTested;
 }

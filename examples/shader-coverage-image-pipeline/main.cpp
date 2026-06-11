@@ -396,6 +396,8 @@ void writeManifest(slang::ICoverageTracingMetadata* coverage, const std::filesys
         slang_writeCoverageManifestJson(coverage, manifestBlob.writeRef()),
         "slang_writeCoverageManifestJson");
     std::ofstream out(path, std::ios::binary);
+    if (!out)
+        fail("cannot open for writing: " + path.string());
     out.write(
         static_cast<const char*>(manifestBlob->getBufferPointer()),
         (std::streamsize)manifestBlob->getBufferSize());
@@ -411,6 +413,8 @@ void writeCountersBinary(const std::vector<uint8_t>& rawBytes, const std::filesy
     // tools (the LCOV converter, the HTML renderer, slang-rhi consumers)
     // read the manifest and this file as a pair.
     std::ofstream out(path, std::ios::binary);
+    if (!out)
+        fail("cannot open for writing: " + path.string());
     out.write(reinterpret_cast<const char*>(rawBytes.data()), (std::streamsize)rawBytes.size());
 }
 
@@ -432,6 +436,8 @@ void writeLcov(
         byFile[entry.file][entry.line] += hits[i];
     }
     std::ofstream f(path, std::ios::binary);
+    if (!f)
+        fail("cannot open for writing: " + path.string());
     f << "TN:" << testName << "\n";
     for (const auto& fp : byFile)
     {
