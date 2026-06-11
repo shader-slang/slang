@@ -834,5 +834,6 @@ return {
 	["IncrementFunctionCoverageCounter"] = 858,
 	["IncrementBranchCoverageCounter"] = 859,
 	["Decoration.BuiltinRequirementDecoration"] = 860,
-	["builtinRequirementKey"] = 861
+	["builtinRequirementKey"] = 861,
+	["ImageTexelPointer"] = 862
 }
