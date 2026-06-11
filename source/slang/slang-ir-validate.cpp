@@ -627,14 +627,13 @@ static void validateAtomicOperationsImpl(
     }
 }
 
-void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst)
+void validateAtomicOperations(
+    bool skipFuncParamValidation,
+    DiagnosticSink* sink,
+    IRInst* inst,
+    bool validateSPIRVFp16VectorAtomics)
 {
-    validateAtomicOperationsImpl(skipFuncParamValidation, false, sink, inst);
-}
-
-void validateSPIRVAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst)
-{
-    validateAtomicOperationsImpl(skipFuncParamValidation, true, sink, inst);
+    validateAtomicOperationsImpl(skipFuncParamValidation, validateSPIRVFp16VectorAtomics, sink, inst);
 }
 
 static void validateVectorOrMatrixElementType(
