@@ -3078,7 +3078,10 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 }
 
 // Consolidate ray tracing parameters for an entry point function
-void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* func)
+void consolidateRayTracingParameters(
+    GLSLLegalizationContext* context,
+    IRFunc* func,
+    bool legalizePrimitiveIDBeforeConsolidation)
 {
     auto builder = context->getBuilder();
     auto firstBlock = func->getFirstBlock();
@@ -3089,19 +3092,46 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
     List<IRParam*> outParams;
     List<IRParam*> params;
 
-    for (auto param = firstBlock->getFirstParam(); param; param = param->getNextParam())
+    // When requested for SPIR-V via GLSL, canonicalize hit-stage SV_PrimitiveID before
+    // ray-tracing parameter consolidation rewrites entry-point parameters. This changes
+    // a Slang entry point parameter:
+    //
+    //     void main_chit(int primitiveID : SV_PrimitiveID) { use(primitiveID); }
+    //
+    // into GLSL-style body code that reads the builtin:
+    //
+    //     int primitiveID = int(gl_PrimitiveID);
+    //     use(primitiveID);
+    //
+    // and removes the original parameter before consolidation sees payload/attributes.
+    for (auto param = firstBlock->getFirstParam(); param;)
     {
+        auto nextParam = param->getNextParam();
         auto paramLayout = findVarLayout(param);
         if (!isVaryingParameter(paramLayout))
+        {
+            param = nextParam;
             continue;
+        }
 
-        builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
+        if (legalizePrimitiveIDBeforeConsolidation)
+        {
+            builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
+            if (tryLegalizeRayTracingPrimitiveIDParam(builder->getModule(), *builder, param))
+            {
+                param = nextParam;
+                continue;
+            }
+        }
+
         if (as<IROutParamType>(param->getDataType()) ||
             as<IRBorrowInOutParamType>(param->getDataType()))
         {
             outParams.add(param);
         }
         params.add(param);
+
+        param = nextParam;
     }
 
     // We don't need consolidation here.
@@ -4912,32 +4942,6 @@ void legalizeEntryPointForGLSL(
         invokePathConstantFuncInHullShader(&context, codeGenContext, scalarizedGlobalOutput);
     }
 
-    if (isRayTracingHitStage(stage) && isViaGLSL)
-    {
-        // Canonicalize hit-stage SV_PrimitiveID before ray-tracing parameter
-        // consolidation rewrites entry-point parameters. For SPIR-V via GLSL,
-        // this changes a Slang entry point parameter:
-        //
-        //     void main_chit(int primitiveID : SV_PrimitiveID) { use(primitiveID); }
-        //
-        // into GLSL-style body code that reads the builtin:
-        //
-        //     int primitiveID = int(gl_PrimitiveID);
-        //     use(primitiveID);
-        //
-        // and removes the original parameter before consolidation runs.
-        if (auto firstBlock = func->getFirstBlock())
-        {
-            for (auto pp = firstBlock->getFirstParam(); pp;)
-            {
-                auto next = pp->getNextParam();
-                builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
-                tryLegalizeRayTracingPrimitiveIDParam(module, builder, pp);
-                pp = next;
-            }
-        }
-    }
-
     // Special handling for ray tracing shaders
     switch (stage)
     {
@@ -4947,7 +4951,10 @@ void legalizeEntryPointForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        consolidateRayTracingParameters(&context, func);
+        consolidateRayTracingParameters(
+            &context,
+            func,
+            isRayTracingHitStage(stage) && isViaGLSL);
         break;
     default:
         break;
