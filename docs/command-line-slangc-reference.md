@@ -321,7 +321,7 @@ Instrument the shader with per-branch-arm coverage counters for if/else, loop-co
 
 <a id="trace-coverage-boolean"></a>
 ### -trace-coverage-boolean
-Record boolean coverage instead of exact execution counts: each counter slot is set to 1 (via a plain non-atomic store) the first time its entry executes, rather than atomically incremented per execution. This removes all atomic contention, so coverage is dramatically faster and avoids the GPU watchdog timeouts that heavy per-execution counting can trigger, at the cost of exact counts (the counter is 0 or non-zero). Off by default. Ignored when no coverage mode is enabled. 
+Record boolean coverage instead of exact execution counts: each counter slot is written with 1 (via a plain non-atomic store) whenever its entry executes, rather than atomically incremented per execution. This removes all atomic contention, so coverage is dramatically faster and avoids the GPU watchdog timeouts that heavy per-execution counting can trigger, at the cost of exact counts (the counter is 0 or non-zero). Off by default. Ignored when no coverage mode is enabled. 
 
 
 <a id="trace-coverage-binding"></a>
