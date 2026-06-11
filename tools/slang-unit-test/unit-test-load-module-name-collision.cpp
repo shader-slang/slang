@@ -64,7 +64,10 @@ SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
     // The collision check is keyed by module name, not by source contents alone.
     ComPtr<slang::IBlob> diagAlias;
     auto modAlias = session->loadModuleFromSourceString(
-        "mod_alias", "mod-alias.slang", sourceA, diagAlias.writeRef());
+        "mod_alias",
+        "mod-alias.slang",
+        sourceA,
+        diagAlias.writeRef());
     SLANG_CHECK(modAlias != nullptr);
     SLANG_CHECK(modAlias != modA1);
 
