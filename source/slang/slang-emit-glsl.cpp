@@ -2005,6 +2005,82 @@ void GLSLSourceEmitter::_maybeEmitGLSLCast(IRType* castType, IRInst* inst)
     }
 }
 
+static IRType* _getGLSLAbortArgumentElementType(IRType* type, IRVectorType** outVectorType)
+{
+    *outVectorType = nullptr;
+    if (auto vectorType = as<IRVectorType>(type))
+    {
+        *outVectorType = vectorType;
+        return vectorType->getElementType();
+    }
+    return type;
+}
+
+static void _collectGLSLAbortArguments(IRInst* inst, List<IRInst*>& args)
+{
+    if (inst->getOperandCount() == 2)
+    {
+        auto operand = inst->getOperand(1);
+        if (auto makeStruct = as<IRMakeStruct>(operand))
+        {
+            for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
+                args.add(makeStruct->getOperand(i));
+        }
+        else
+        {
+            args.add(operand);
+        }
+    }
+    else
+    {
+        for (UInt i = 1; i < inst->getOperandCount(); i++)
+            args.add(inst->getOperand(i));
+    }
+}
+
+bool GLSLSourceEmitter::_validateGLSLAbortArgument(IRInst* arg, IRInst* abortInst)
+{
+    IRVectorType* vectorType = nullptr;
+    auto elementType = _getGLSLAbortArgumentElementType(arg->getDataType(), &vectorType);
+    SLANG_UNUSED(vectorType);
+
+    if (!as<IRBasicType>(elementType))
+    {
+        getSink()->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
+            .type = arg->getDataType(),
+            .location = abortInst->sourceLoc});
+        return false;
+    }
+    return true;
+}
+
+void GLSLSourceEmitter::_emitGLSLAbortArgument(IRInst* arg)
+{
+    IRVectorType* vectorType = nullptr;
+    auto elementType = _getGLSLAbortArgumentElementType(arg->getDataType(), &vectorType);
+
+    if (as<IRBoolType>(elementType))
+    {
+        if (vectorType)
+        {
+            m_writer->emit("uvec");
+            emitSimpleValue(vectorType->getElementCount());
+            m_writer->emit("(");
+            emitOperand(arg, getInfo(EmitOp::General));
+            m_writer->emit(")");
+        }
+        else
+        {
+            m_writer->emit("uint(");
+            emitOperand(arg, getInfo(EmitOp::General));
+            m_writer->emit(")");
+        }
+        return;
+    }
+
+    emitOperand(arg, getInfo(EmitOp::General));
+}
+
 void GLSLSourceEmitter::_emitLegalizedBoolVectorBinOp(
     IRInst* inst,
     IRVectorType* type,
@@ -2780,34 +2856,21 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 return true;
             }
             m_glslExtensionTracker->requireExtension(toSlice("GL_EXT_shader_abort"));
+
+            List<IRInst*> args;
+            _collectGLSLAbortArguments(inst, args);
+            for (auto arg : args)
+            {
+                if (!_validateGLSLAbortArgument(arg, inst))
+                    return true;
+            }
+
             m_writer->emit("abortEXT(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            UInt abortOperandCount = inst->getOperandCount();
-            if (abortOperandCount == 2)
+            for (auto arg : args)
             {
-                auto operand = inst->getOperand(1);
-                if (auto makeStruct = as<IRMakeStruct>(operand))
-                {
-                    // Flatten the tuple resulting from the variadic pack.
-                    for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
-                    {
-                        m_writer->emit(", ");
-                        emitOperand(makeStruct->getOperand(bb), getInfo(EmitOp::General));
-                    }
-                }
-                else
-                {
-                    m_writer->emit(", ");
-                    emitOperand(operand, getInfo(EmitOp::General));
-                }
-            }
-            else
-            {
-                for (UInt bb = 1; bb < abortOperandCount; ++bb)
-                {
-                    m_writer->emit(", ");
-                    emitOperand(inst->getOperand(bb), getInfo(EmitOp::General));
-                }
+                m_writer->emit(", ");
+                _emitGLSLAbortArgument(arg);
             }
             m_writer->emit(")");
             return true;

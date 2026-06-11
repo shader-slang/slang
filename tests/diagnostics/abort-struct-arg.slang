@@ -5,6 +5,7 @@
 // so only scalar and vector arguments are supported.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -capability abort -skip-spirv-validation
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target glsl -capability abort
 
 struct Pos
 {

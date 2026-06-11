@@ -50,8 +50,8 @@
 // CHECK_GLSL: abortEXT("thread id out of range: %u", {{.*}})
 // CHECK_GLSL: abortEXT("")
 // CHECK_GLSL: abortEXT("just a message")
-// CHECK_GLSL: abortEXT("u=%u i=%d f=%f b=%d", {{.*}})
-// CHECK_GLSL: abortEXT("b=%d %d %d v=%f %f %f", {{.*}})
+// CHECK_GLSL: abortEXT("u=%u i=%d f=%f b=%d", {{.*}}, uint({{.*}}))
+// CHECK_GLSL: abortEXT("b=%d %d %d v=%f %f %f", uvec3({{.*}}), {{.*}})
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
