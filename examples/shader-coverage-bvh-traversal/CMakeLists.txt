@@ -56,10 +56,7 @@ target_link_libraries(
     PRIVATE Vulkan::Vulkan slang core
 )
 target_compile_features(shader-coverage-bvh-traversal PRIVATE cxx_std_17)
-set_target_properties(
-    shader-coverage-bvh-traversal
-    PROPERTIES FOLDER examples
-)
+set_target_properties(shader-coverage-bvh-traversal PROPERTIES FOLDER examples)
 
 # Wire this demo into the `all-examples` meta target so PR CI that
 # builds `all-examples` catches regressions here. The other examples

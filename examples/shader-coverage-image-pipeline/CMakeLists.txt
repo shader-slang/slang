@@ -19,12 +19,7 @@ if(NOT Vulkan_FOUND)
     return()
 endif()
 
-set(_asset_files
-    denoise.slang
-    gamma.slang
-    pipeline.slang
-    tonemap.slang
-)
+set(_asset_files denoise.slang gamma.slang pipeline.slang tonemap.slang)
 
 set(_runtime_dir ${CMAKE_CURRENT_BINARY_DIR})
 set(_copy_target shader-coverage-image-pipeline-copy-assets)
@@ -63,10 +58,7 @@ target_link_libraries(
     PRIVATE Vulkan::Vulkan slang core
 )
 target_compile_features(shader-coverage-image-pipeline PRIVATE cxx_std_17)
-set_target_properties(
-    shader-coverage-image-pipeline
-    PROPERTIES FOLDER examples
-)
+set_target_properties(shader-coverage-image-pipeline PROPERTIES FOLDER examples)
 
 # Wire this demo into the `all-examples` meta target so PR CI that
 # builds `all-examples` catches regressions here. The other examples

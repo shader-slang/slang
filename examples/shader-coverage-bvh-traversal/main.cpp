@@ -123,7 +123,7 @@ static_assert(sizeof(Ray) == 32, "Ray layout mismatch");
 
 struct alignas(16) Globals
 {
-    uint32_t rayCount;       // total rays across all batches
+    uint32_t rayCount; // total rays across all batches
     uint32_t triCount;
     uint32_t nodeCount;
     uint32_t rayBatchOffset; // first ray index of the current batch (was: pad)
@@ -857,11 +857,11 @@ int main(int argc, char** argv)
             v.push_back(lb);
         };
         for (uint32_t i = 0; i < 5; ++i)
-            pushBinding(setBindings[0], i);  // rays=0, tris=1, nodes=2, globals=3, output=4
+            pushBinding(setBindings[0], i); // rays=0, tris=1, nodes=2, globals=3, output=4
         if (enableCoverage)
             pushBinding(setBindings[1], kCoverageBinding);
         else
-            setBindings.pop_back();  // no coverage set when instrumentation is off
+            setBindings.pop_back(); // no coverage set when instrumentation is off
 
         // Slang's SPIR-V emit renames the entry point to "main" by default.
         auto pipe = ctx.createComputePipeline(
@@ -959,8 +959,7 @@ int main(int argc, char** argv)
         const double renderMs =
             std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
         if (batchCount > 1)
-            std::cout << "render wall time: " << renderMs << " ms ("
-                      << batchCount << " batches, "
+            std::cout << "render wall time: " << renderMs << " ms (" << batchCount << " batches, "
                       << (renderMs / batchCount) << " ms/batch)\n";
         else
             std::cout << "render wall time: " << renderMs << " ms\n";
@@ -980,7 +979,7 @@ int main(int argc, char** argv)
                 uint64_t value = 0;
                 const uint8_t* slot = rawBytes.data() + (size_t)i * counterByteWidth;
                 for (uint32_t b = 0; b < counterByteWidth; ++b)
-                    value |= (uint64_t)slot[b] << (b * 8);  // little-endian reassembly
+                    value |= (uint64_t)slot[b] << (b * 8); // little-endian reassembly
                 hits[i] = value;
             }
 
