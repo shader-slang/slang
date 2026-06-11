@@ -2895,7 +2895,7 @@ err(
 warning(
     "constexpr-unsupported",
     31227,
-    "constexpr is not a supported Slang language feature; treating as const",
+    "constexpr on variable declarations is not a supported Slang feature; treating as const",
     span { loc = "modifier:Modifier", message = "constexpr is treated as const" }
 )
 

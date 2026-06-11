@@ -5,7 +5,7 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
 
-// CHECK-NOT: constexpr is not a supported Slang language feature
+// CHECK-NOT: constexpr on variable declarations is not a supported Slang feature
 
 constexpr int add(int a, int b) { return a + b; }
 

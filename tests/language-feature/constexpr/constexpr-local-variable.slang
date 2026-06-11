@@ -3,7 +3,7 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
 
-//CHECK: constexpr is not a supported Slang language feature
+//CHECK: constexpr on variable declarations is not a supported Slang feature
 
 [numthreads(1, 1, 1)]
 void computeMain()

@@ -1821,6 +1821,17 @@ Modifier* SemanticsVisitor::checkModifier(
         // diagnostic with its own discussion.
         if (as<VarDeclBase>(syntaxNode) && !as<ParamDecl>(syntaxNode))
         {
+            // Reject `constexpr T* p;` — C-style pointer const is disallowed
+            // regardless of whether the modifier was written `const` or `constexpr`.
+            if (auto varDeclBase = as<VarDeclBase>(syntaxNode))
+            {
+                if (as<PointerTypeExpr>(varDeclBase->type.exp))
+                {
+                    getSink()->diagnose(
+                        Diagnostics::ConstNotAllowedOnCStylePtrDecl{.location = m->loc});
+                    return nullptr;
+                }
+            }
             getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = m});
             auto constMod = m_astBuilder->create<ConstModifier>();
             constMod->loc = m->loc;
@@ -2273,20 +2284,17 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     // VarDecl, emit the warning for `constexpr` and remove it from the list
     // before the main loop so that the main loop does not see `constexpr` and
     // produce a spurious duplicate-ConstModifier error (E31202).
-    // (The `modifier->next` clobbering in the main loop prevents findModifier
-    // from working there, so this must be done before the loop starts.)
+    // This must be done before the loop because the main loop zeroes
+    // `modifier->next` before each `checkModifier` call, which would defeat
+    // `findModifier` if we tried to do this inside the loop.
     if (as<VarDeclBase>(syntaxNode) && !as<ParamDecl>(syntaxNode))
     {
-        if (syntaxNode->findModifier<ConstExprModifier>() &&
-            syntaxNode->findModifier<ConstModifier>())
+        if (auto ceM = syntaxNode->findModifier<ConstExprModifier>())
         {
-            Modifier** link = &syntaxNode->modifiers.first;
-            while (*link && !as<ConstExprModifier>(*link))
-                link = &(*link)->next;
-            if (auto ceM = *link)
+            if (syntaxNode->findModifier<ConstModifier>())
             {
-                *link = ceM->next;
                 getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = ceM});
+                removeModifier(syntaxNode, ceM);
             }
         }
     }
