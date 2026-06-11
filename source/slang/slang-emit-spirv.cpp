@@ -7961,6 +7961,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else
         {
+            // StorageBuffer pointer operands to an actual OpFunctionCall require
+            // VariablePointersStorageBuffer. Keep this limited to emitted call
+            // sites; declaration-only parameter handling is broader than this PR.
+            for (UInt i = 0; i < inst->getArgCount(); i++)
+            {
+                auto argPtrType = as<IRPtrTypeBase>(inst->getArg(i)->getDataType());
+                if (argPtrType && argPtrType->getAddressSpace() == AddressSpace::StorageBuffer)
+                    requireVariableBufferCapabilityIfNeeded(argPtrType);
+            }
+
             return emitOpFunctionCall(
                 parent,
                 inst,
