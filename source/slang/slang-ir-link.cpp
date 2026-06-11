@@ -216,9 +216,10 @@ static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRI
         return;
 
     auto originalModule = originalInst->getModule();
-    if (originalModule && originalModule->_hasLinkerGlobalCache())
+    auto linkingInfo = originalModule ? originalModule->_getLinkingInfo() : nullptr;
+    if (linkingInfo)
     {
-        auto annotations = originalModule->_getLinkerGlobalAnnotationsForTarget(originalInst);
+        auto annotations = linkingInfo->getAnnotationsForTarget(originalInst);
         for (auto annotation : annotations)
             cloneInst(context, context->builder, annotation, annotation);
         return;
@@ -2147,9 +2148,9 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
 
     // Source/layout/builtin modules are fully built by this point. Build the module-owned linker
     // global acceleration cache once here so the linker can avoid repeated global scans and
-    // high-fanout use-list walks. Earlier prelink/front-end paths keep the old traversal behavior.
+    // high-fanout use-list walks.
     for (auto irModule : irModules)
-        irModule->_buildLinkerGlobalCache();
+        irModule->_getOrCreateLinkingInfo();
 
     // Check if any user module uses auto-diff, if so we will need to link
     // additional witnesses and decorations.
@@ -2282,19 +2283,21 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
 
     for (IRModule* irModule : irModules)
     {
+        auto linkingInfo = irModule->_getOrCreateLinkingInfo();
+
         // We need to copy over exported symbols, any global parameters if preserve-params option
         // is set, and specific known builtins that must be present even when not referenced from
         // the entry-point clone graph.
-        for (auto inst : irModule->_getLinkerGlobalHLSLExports())
+        for (auto inst : linkingInfo->getHLSLExports())
             cloneAndKeepAlive(inst);
 
         if (shouldCopyGlobalParams)
         {
-            for (auto inst : irModule->_getLinkerGlobalParams())
+            for (auto inst : linkingInfo->getGlobalParams())
                 cloneAndKeepAlive(inst);
         }
 
-        for (auto inst : irModule->_getLinkerGlobalKnownBuiltins())
+        for (auto inst : linkingInfo->getKnownBuiltins())
         {
             auto knownBuiltin = inst->findDecoration<IRKnownBuiltinDecoration>();
             if (knownBuiltin && knownBuiltin->getName() == KnownBuiltinDeclName::NullDifferential)
@@ -2534,6 +2537,22 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
     List<IRModule*> builtinModules;
     for (auto& m : globalSession->coreModules)
         builtinModules.add(m->getIRModule());
+
+    // Prelink clones from the modules that own `externalSymbolsToLink`. Build linking info for
+    // those stable input modules before cloning. Do not build it for `irModule` itself here:
+    // prelink will mutate it by replacing declarations with cloned definitions, and linking info
+    // assumes the module does not change after it is built.
+    HashSet<IRModule*> inputModules;
+    for (auto originalInst : externalSymbolsToLink)
+    {
+        if (auto inputModule = originalInst->getModule())
+            inputModules.add(inputModule);
+    }
+    for (auto inputModule : inputModules)
+    {
+        if (inputModule != irModule)
+            inputModule->_getOrCreateLinkingInfo();
+    }
 
     // First, register all external symbols in the current module.
     insertGlobalValueSymbols(&sharedContext, irModule);

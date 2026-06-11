@@ -37,7 +37,7 @@ static void _addGlobalHashedStringLiteralsToPool(
     }
 }
 
-static IRGlobalHashedStringLiterals* _findAndCacheGlobalHashedStringLiterals(IRModule* module)
+static IRGlobalHashedStringLiterals* _findGlobalHashedStringLiterals(IRModule* module)
 {
     IRModuleInst* moduleInst = module->getModuleInst();
     IRGlobalHashedStringLiterals* foundInst = nullptr;
@@ -51,15 +51,12 @@ static IRGlobalHashedStringLiterals* _findAndCacheGlobalHashedStringLiterals(IRM
         }
     }
 
-    module->_setGlobalHashedStringLiterals(foundInst);
     return foundInst;
 }
 
 void findGlobalHashedStringLiterals(IRModule* module, StringSlicePool& pool)
 {
-    auto hashedStringLits = module->_getGlobalHashedStringLiterals();
-    if (!hashedStringLits)
-        hashedStringLits = _findAndCacheGlobalHashedStringLiterals(module);
+    auto hashedStringLits = module->_getOrCreateLinkingInfo()->getGlobalHashedStringLiterals();
 
     if (hashedStringLits)
         _addGlobalHashedStringLiteralsToPool(hashedStringLits, pool);
@@ -73,10 +70,7 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module
         return;
     }
 
-    auto existingGlobalHashedInst = module->_getGlobalHashedStringLiterals();
-    if (!existingGlobalHashedInst)
-        existingGlobalHashedInst = _findAndCacheGlobalHashedStringLiterals(module);
-    SLANG_RELEASE_ASSERT(!existingGlobalHashedInst);
+    SLANG_RELEASE_ASSERT(!_findGlobalHashedStringLiterals(module));
 
     IRBuilder builder(module);
 
@@ -97,7 +91,6 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, IRModule* module
         kIROp_GlobalHashedStringLiterals,
         UInt(slicesCount),
         operandInsts.getArrayView().getBuffer()));
-    module->_setGlobalHashedStringLiterals(globalHashedInst);
 
     // Mark to keep alive
     builder.addKeepAliveDecoration(globalHashedInst);

@@ -4903,34 +4903,39 @@ RefPtr<IRModule> IRModule::create(Session* session)
     return module;
 }
 
-void IRModule::_buildLinkerGlobalCacheImpl()
+ModuleLinkingInfo::ModuleLinkingInfo(IRModule* module)
 {
-    m_linkerGlobalAnnotationsByTarget.clear();
-    m_linkerGlobalHLSLExports.clear();
-    m_linkerGlobalParams.clear();
-    m_linkerGlobalKnownBuiltins.clear();
+    _build(module);
+}
 
-    auto moduleInst = getModuleInst();
+void ModuleLinkingInfo::_build(IRModule* module)
+{
+    auto moduleInst = module->getModuleInst();
     if (!moduleInst)
-    {
-        m_isLinkerGlobalCacheBuilt = true;
         return;
-    }
 
-    for (auto inst : getGlobalInsts())
+    for (auto inst : module->getGlobalInsts())
     {
         auto annotation = as<IRAnnotation>(inst);
         if (annotation)
         {
             if (annotation->getParent() == moduleInst)
-                m_linkerGlobalAnnotationsByTarget[annotation->getTarget()].add(annotation);
+                m_instAnnotationMap[annotation->getTarget()].add(annotation);
             continue;
         }
 
+        if (auto hashedStringLits = as<IRGlobalHashedStringLiterals>(inst))
+        {
+            SLANG_RELEASE_ASSERT(
+                !m_globalHashedStringLiterals || m_globalHashedStringLiterals == hashedStringLits);
+            m_globalHashedStringLiterals = hashedStringLits;
+        }
+
         if (as<IRGlobalParam>(inst))
-            m_linkerGlobalParams.add(inst);
+            m_globalParams.add(inst);
 
         bool isHLSLExported = false;
+        bool isKnownBuiltin = false;
         for (auto decoration : inst->getDecorations())
         {
             switch (decoration->getOp())
@@ -4941,7 +4946,7 @@ void IRModule::_buildLinkerGlobalCacheImpl()
                 break;
 
             case kIROp_KnownBuiltinDecoration:
-                m_linkerGlobalKnownBuiltins.add(inst);
+                isKnownBuiltin = true;
                 break;
 
             default:
@@ -4950,101 +4955,36 @@ void IRModule::_buildLinkerGlobalCacheImpl()
         }
 
         if (isHLSLExported)
-            m_linkerGlobalHLSLExports.add(inst);
+            m_hlslExports.add(inst);
+        if (isKnownBuiltin)
+            m_knownBuiltins.add(inst);
     }
-
-    m_isLinkerGlobalCacheBuilt = true;
 }
 
-void IRModule::_buildLinkerGlobalCache()
-{
-    std::lock_guard<std::mutex> lock(m_linkerGlobalCacheMutex);
-    if (m_isLinkerGlobalCacheBuilt)
-        return;
-
-    _buildLinkerGlobalCacheImpl();
-}
-
-bool IRModule::_hasLinkerGlobalCache()
-{
-    std::lock_guard<std::mutex> lock(m_linkerGlobalCacheMutex);
-    return m_isLinkerGlobalCacheBuilt;
-}
-
-List<IRAnnotation*> IRModule::_getLinkerGlobalAnnotationsForTarget(IRInst* target)
+List<IRAnnotation*> ModuleLinkingInfo::getAnnotationsForTarget(IRInst* target)
 {
     if (!target)
         return {};
 
-    std::lock_guard<std::mutex> lock(m_linkerGlobalCacheMutex);
-    SLANG_ASSERT(m_isLinkerGlobalCacheBuilt);
-
-    auto annotations = m_linkerGlobalAnnotationsByTarget.tryGetValue(target);
+    auto annotations = m_instAnnotationMap.tryGetValue(target);
     if (!annotations)
         return {};
-
-    for (Index i = 0; i < annotations->getCount();)
-    {
-        auto annotation = (*annotations)[i];
-        if (!annotation || annotation->getParent() != getModuleInst() ||
-            annotation->getTarget() != target)
-        {
-            annotations->removeAt(i);
-            continue;
-        }
-        i++;
-    }
-
-    if (annotations->getCount() == 0)
-    {
-        m_linkerGlobalAnnotationsByTarget.remove(target);
-        return {};
-    }
 
     return *annotations;
 }
 
-ArrayView<IRInst*> IRModule::_getLinkerGlobalHLSLExports()
+ModuleLinkingInfo* IRModule::_getOrCreateLinkingInfo()
 {
-    std::lock_guard<std::mutex> lock(m_linkerGlobalCacheMutex);
-    SLANG_ASSERT(m_isLinkerGlobalCacheBuilt);
-    return m_linkerGlobalHLSLExports.getArrayView();
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    if (!m_linkingInfo)
+        m_linkingInfo = new ModuleLinkingInfo(this);
+    return m_linkingInfo;
 }
 
-ArrayView<IRInst*> IRModule::_getLinkerGlobalParams()
+ModuleLinkingInfo* IRModule::_getLinkingInfo()
 {
-    std::lock_guard<std::mutex> lock(m_linkerGlobalCacheMutex);
-    SLANG_ASSERT(m_isLinkerGlobalCacheBuilt);
-    return m_linkerGlobalParams.getArrayView();
-}
-
-ArrayView<IRInst*> IRModule::_getLinkerGlobalKnownBuiltins()
-{
-    std::lock_guard<std::mutex> lock(m_linkerGlobalCacheMutex);
-    SLANG_ASSERT(m_isLinkerGlobalCacheBuilt);
-
-    return m_linkerGlobalKnownBuiltins.getArrayView();
-}
-
-IRGlobalHashedStringLiterals* IRModule::_getGlobalHashedStringLiterals()
-{
-    return m_globalHashedStringLiterals;
-}
-
-void IRModule::_setGlobalHashedStringLiterals(IRGlobalHashedStringLiterals* inst)
-{
-    if (!inst)
-        return;
-
-    SLANG_ASSERT(inst->getModule() == this);
-    SLANG_RELEASE_ASSERT(!m_globalHashedStringLiterals || m_globalHashedStringLiterals == inst);
-    m_globalHashedStringLiterals = inst;
-}
-
-void IRModule::_clearGlobalHashedStringLiterals(IRGlobalHashedStringLiterals* inst)
-{
-    if (m_globalHashedStringLiterals == inst)
-        m_globalHashedStringLiterals = nullptr;
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    return m_linkingInfo;
 }
 
 void IRModule::buildMangledNameToGlobalInstMap()
@@ -9205,9 +9145,6 @@ void IRInst::removeAndDeallocate()
 
     if (auto module = getModule())
     {
-        if (auto hashedStringLits = as<IRGlobalHashedStringLiterals>(this))
-            module->_clearGlobalHashedStringLiterals(hashedStringLits);
-
         if (getIROpInfo(getOp()).isHoistable())
         {
             module->getDeduplicationContext()->removeHoistableInstFromGlobalNumberingMap(this);
