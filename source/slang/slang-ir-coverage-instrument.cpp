@@ -964,7 +964,11 @@ struct CoverageInstrumenter
         SourceManager* sm,
         ArtifactPostEmitMetadata& md,
         bool booleanMode)
-        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md), booleanMode(booleanMode)
+        : module(m)
+        , coverageBuffer(buf)
+        , sourceManager(sm)
+        , outMetadata(md)
+        , booleanMode(booleanMode)
     {
         IRBuilder tmpBuilder(module);
         // The unchecked `cast` is safe: this instrumenter only ever runs

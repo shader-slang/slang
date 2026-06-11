@@ -18,18 +18,22 @@ RWStructuredBuffer<uint> outputBuffer;
 [numthreads(64, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
+    // Use output values 2 and 3 (not 1) so the only OpStore of the constant 1
+    // in the SPIR-V is the coverage counter write, making the HITMISS check
+    // below unambiguous.
     if ((tid.x & 1u) == 0u)
-        outputBuffer[tid.x] = 1;
-    else
         outputBuffer[tid.x] = 2;
+    else
+        outputBuffer[tid.x] = 3;
 }
 
 // Count mode increments counters atomically.
 //COUNT: OpAtomicIAdd
 
-// Hit/miss mode emits a plain store of 1 (not an atomic add).
-// The positive OpStore check ensures the instrumentation actually ran and
-// emitted something — preventing the NOT check from passing vacuously if
-// the instrumentation were silently dropped.
-//HITMISS: OpStore
+// Boolean mode emits a plain store of 1 (not an atomic add). The coverage
+// variable is named __slang_coverage; checking OpName ensures the variable
+// is present and OpStore %uint_1 is unambiguous because the shader writes
+// 2 and 3 to outputBuffer, not 1.
+//HITMISS: OpName {{.*}} "__slang_coverage"
+//HITMISS: OpStore {{.*}} %uint_1
 //HITMISS-NOT: OpAtomicIAdd

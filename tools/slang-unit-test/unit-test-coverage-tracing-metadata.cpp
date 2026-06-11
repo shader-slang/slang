@@ -2655,7 +2655,8 @@ SLANG_UNIT_TEST(coverageTracingBooleanCounterMode)
     ComPtr<ISlangBlob> manifestBlob;
     SLANG_CHECK(slang_writeCoverageManifestJson(coverage, manifestBlob.writeRef()) == SLANG_OK);
     UnownedStringSlice manifestText(
-        (const char*)manifestBlob->getBufferPointer(), manifestBlob->getBufferSize());
+        (const char*)manifestBlob->getBufferPointer(),
+        manifestBlob->getBufferSize());
     SLANG_CHECK(manifestText.indexOf(toSlice("\"boolean\"")) != -1);
     SLANG_CHECK(manifestText.indexOf(toSlice("\"unknown\"")) == -1);
 }
