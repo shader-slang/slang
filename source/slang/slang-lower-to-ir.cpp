@@ -3557,6 +3557,13 @@ ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,
     Type* paramType)
 {
+    // A mesh-shader output's direction is intrinsic to its `MeshOutputType` (carried by
+    // IRMeshOutputDecoration), so the `out` on the `out vertices T[N]` spelling must not
+    // also wrap it in `IROutParamType`: that would diverge from the generic
+    // `OutputVertices<T,N>` spelling and make the HLSL emitter print a doubled `out`.
+    if (as<MeshOutputType>(paramType))
+        originalMode = ParamPassingMode::In;
+
     // If the type is copyable, then the original mode is appropriate to use.
     //
     if (isCopyableType(paramType))

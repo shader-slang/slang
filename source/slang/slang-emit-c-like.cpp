@@ -3814,9 +3814,12 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
         {
             emitInterpolationModifiers(param, paramType, layout);
-            emitMeshShaderModifiers(param);
         }
     }
+
+    // Emit mesh-output qualifiers unconditionally: they key off the parameter's
+    // decoration, not its varying-IO layout (which an SV-only output never registers).
+    emitMeshShaderModifiers(param);
 
     emitParamType(paramType, paramName);
     emitSemantics(param);
