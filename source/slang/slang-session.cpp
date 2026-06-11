@@ -53,6 +53,8 @@ static String findStandardModulePath(String const& stdModuleDirPath, String cons
 
 static SHA1::Digest computeSourceBlobDigest(ISlangBlob* blob)
 {
+    SLANG_RELEASE_ASSERT(blob);
+
     DigestBuilder<SHA1> digestBuilder;
     digestBuilder.append(blob);
     return digestBuilder.finalize();
@@ -258,6 +260,9 @@ slang::IModule* Linkage::loadModuleFromBlob(
         {
             if (!loadedModule)
                 return nullptr;
+
+            if (blobType != ModuleBlobType::Source)
+                return loadedModule;
 
             // Returning the cached module is only safe when the incoming source
             // is identical to whatever produced the cached module; otherwise the
