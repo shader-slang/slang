@@ -3851,7 +3851,7 @@ warning(
 
 warning(
     "float-hex-literal-precision-lost",
-    40017,
+    40018,
     "floating-point precision lost",
     span { loc = "location", message = "significand of '~literal' was truncated, value is now '~truncatedValue'" }
 )
