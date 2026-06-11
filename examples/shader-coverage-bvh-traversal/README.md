@@ -68,10 +68,9 @@ as "covered".
 Each coverage run writes:
 
 - `<mode>.coverage-manifest.json` — counter ↔ source attribution
-- `<mode>.lcov` — line-only LCOV (quick view)
 - `<mode>.counters.bin` — raw counter buffer; feed to
-  `tools/shader-coverage/slang-coverage-to-lcov.py` for the rich LCOV
-  with branch+function records
+  `tools/shader-coverage/slang-coverage-to-lcov.py` to produce a full
+  LCOV with line, function, and branch records
 
 ## End-to-end wrapper
 

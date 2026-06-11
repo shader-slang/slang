@@ -23,7 +23,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <map>
 #include <random>
 #include <slang-com-ptr.h>
 #include <slang.h>
@@ -613,35 +612,6 @@ void writeCountersBinary(const std::vector<uint8_t>& rawBytes, const std::filesy
     out.write(reinterpret_cast<const char*>(rawBytes.data()), (std::streamsize)rawBytes.size());
 }
 
-void writeLcov(
-    slang::ICoverageTracingMetadata* coverage,
-    const std::vector<uint64_t>& hits,
-    const std::filesystem::path& path,
-    const char* testName)
-{
-    const uint32_t counterCount = coverage->getCounterCount();
-    std::map<std::string, std::map<uint32_t, uint64_t>> byFile;
-    for (uint32_t i = 0; i < counterCount; ++i)
-    {
-        slang::CoverageEntryInfo entry = {};
-        if (SLANG_FAILED(coverage->getEntryInfo(i, &entry)))
-            continue;
-        if (!entry.file || !*entry.file || entry.line == 0)
-            continue;
-        byFile[entry.file][entry.line] += hits[i];
-    }
-    std::ofstream f(path, std::ios::binary);
-    if (!f)
-        fail("cannot open for writing: " + path.string());
-    f << "TN:" << testName << "\n";
-    for (const auto& fp : byFile)
-    {
-        f << "SF:" << fp.first << "\n";
-        for (const auto& lp : fp.second)
-            f << "DA:" << lp.first << "," << lp.second << "\n";
-        f << "end_of_record\n";
-    }
-}
 
 struct CoverageSummary
 {
@@ -1009,14 +979,8 @@ int main(int argc, char** argv)
                         ec.message());
             }
             writeManifest(shader.coverageMetadata, outDir / (mode + ".coverage-manifest.json"));
-            writeLcov(
-                shader.coverageMetadata,
-                hits,
-                outDir / (mode + ".lcov"),
-                ("bvh-" + mode).c_str());
             writeCountersBinary(rawBytes, outDir / (mode + ".counters.bin"));
             std::cout << "wrote " << (outDir / (mode + ".coverage-manifest.json")) << "\n";
-            std::cout << "wrote " << (outDir / (mode + ".lcov")) << "\n";
             std::cout << "wrote " << (outDir / (mode + ".counters.bin")) << "\n";
         }
 
