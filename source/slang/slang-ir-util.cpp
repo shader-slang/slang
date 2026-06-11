@@ -68,6 +68,7 @@ IRType* getMatrixElementType(IRType* type)
     return type;
 }
 
+// Returns the value type of the memory location operated on by an atomic instruction.
 IRType* getAtomicOperationValueType(IRInst* inst)
 {
     auto valueType = inst->getDataType();
