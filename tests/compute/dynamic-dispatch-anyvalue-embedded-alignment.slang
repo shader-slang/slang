@@ -27,14 +27,14 @@ struct Profile
 {
     float factor;    // natural offset 16 inside Impl
     uint64_t handle; // natural offset 24 (8-byte aligned)
-    uint width;      // natural offset 32
-    uint height;     // natural offset 36
+    uint value;      // natural offset 32
 };
 
 struct Impl : IInterface
 {
     float3 color;    // natural offset 0
     Profile profile; // natural offset 16: aligned to 8 for `handle`
+    uint extra;      // natural offset 36
 
     uint Compute(int which)
     {
@@ -44,8 +44,8 @@ struct Impl : IInterface
         case 1: return uint(profile.factor);
         case 2: return uint(profile.handle);
         case 3: return uint(profile.handle >> 32);
-        case 4: return profile.width;
-        default: return profile.height;
+        case 4: return profile.value;
+        default: return extra;
         }
     }
 };
@@ -71,8 +71,8 @@ void computeMain()
     obj.color = float3(10.0, 20.0, 30.0);
     obj.profile.factor = 4.0;
     obj.profile.handle = 0x1111111122222222ULL;
-    obj.profile.width = 7777;
-    obj.profile.height = 8888;
+    obj.profile.value = 7777;
+    obj.extra = 8888;
 
     // Dynamic dispatch must round-trip every field through the exact-fit
     // AnyValue payload.
@@ -92,8 +92,8 @@ void computeMain()
     outputBuffer[6] = words.w[4];  // factor at byte 16
     outputBuffer[7] = words.w[6];  // handle low word at byte 24
     outputBuffer[8] = words.w[7];  // handle high word at byte 28
-    outputBuffer[9] = words.w[8];  // width at byte 32
-    outputBuffer[10] = words.w[9]; // height at byte 36
+    outputBuffer[9] = words.w[8];  // value at byte 32
+    outputBuffer[10] = words.w[9]; // extra at byte 36
     // CHECK: 1082130432
     // CHECK: 572662306
     // CHECK: 286331153
