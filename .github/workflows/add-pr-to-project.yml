@@ -24,7 +24,7 @@ jobs:
         with:
           github-token: ${{ secrets.SLANGBOT_MEMBERS_READONLY }}
           script: |
-            const user = context.payload.pull_request.user.login;
+            const user = context.payload.pull_request.user;
             const username = user.login;
 
             let source;
