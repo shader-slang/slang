@@ -950,6 +950,11 @@ struct CoverageInstrumenter
     IRType* counterElementType;
     IRType* counterElementPtrType;
     IRType* intType;
+    // Caller opted in to boolean recording (`-trace-coverage-boolean`): each
+    // counter is written with a plain non-atomic store of 1 instead of an
+    // atomic add, recording whether the entry executed (0 / non-zero) rather
+    // than an exact count.
+    bool booleanMode = false;
     List<BranchSiteRemap> branchSiteRemaps;
     uint32_t nextBranchSiteID = 1;
 
@@ -957,8 +962,13 @@ struct CoverageInstrumenter
         IRModule* m,
         IRGlobalParam* buf,
         SourceManager* sm,
-        ArtifactPostEmitMetadata& md)
-        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md)
+        ArtifactPostEmitMetadata& md,
+        bool booleanMode)
+        : module(m)
+        , coverageBuffer(buf)
+        , sourceManager(sm)
+        , outMetadata(md)
+        , booleanMode(booleanMode)
     {
         IRBuilder tmpBuilder(module);
         // The unchecked `cast` is safe: this instrumenter only ever runs
@@ -997,7 +1007,8 @@ struct CoverageInstrumenter
     void populateEntryForMarker(IRInst* markerOp, UInt slot, CoverageTracingEntry& entry)
     {
         entry.counterIndex = (uint32_t)slot;
-        entry.counterMode = slang::CoverageCounterMode::Count;
+        entry.counterMode =
+            booleanMode ? slang::CoverageCounterMode::Boolean : slang::CoverageCounterMode::Count;
         resolveHumaneLoc(sourceManager, markerOp, entry.file, entry.line, entry.startColumn);
 
         switch (markerOp->getOp())
@@ -1046,19 +1057,45 @@ struct CoverageInstrumenter
             2,
             getElemArgs);
 
-        // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
-        // backend emitter to its native atomic-increment idiom
-        // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
-        // SPIR-V, etc.). The immediate and the result type are typed
-        // against `counterElementType` (uint or uint64), so the same
-        // lowering path produces a 64-bit `OpAtomicIAdd` /
-        // `atomicAdd(ulonglong*)` when the buffer is wide.
-        IRInst* atomicArgs[] = {
-            slotPtr,
-            builder.getIntValue(counterElementType, 1),
-            builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
-        };
-        builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
+        if (booleanMode)
+        {
+            // Hit/miss recording: a plain, non-atomic store of `1`. Every
+            // lane that reaches this marker writes the same value, so
+            // concurrent same-value writes are a benign race for 32-bit
+            // counters — 32-bit StorageBuffer stores are single-copy atomic
+            // under the Vulkan memory model, so a reader always observes a
+            // complete 0 or 1 and the slot is 1 iff the entry executed.
+            //
+            // For 64-bit counters: a 64-bit StorageBuffer store is not
+            // guaranteed single-copy atomic unless shaderBufferInt64Atomics
+            // is enabled. In practice the host already requires that feature
+            // for 64-bit coverage, which implies single-copy atomic plain
+            // stores on all known drivers. If exact boolean semantics under
+            // 64-bit are required, prefer 32-bit counters
+            // (`-trace-coverage-counter-width 32`).
+            //
+            // Non-atomic is the whole point: a relaxed atomic store still
+            // serializes on the hot counter address (measured ~15x slower),
+            // defeating the purpose. Trade-off: no exact execution count
+            // (`CoverageCounterMode::Boolean`, not `Count`).
+            builder.emitStore(slotPtr, builder.getIntValue(counterElementType, 1));
+        }
+        else
+        {
+            // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
+            // backend emitter to its native atomic-increment idiom
+            // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
+            // SPIR-V, etc.). The immediate and the result type are typed
+            // against `counterElementType` (uint or uint64), so the same
+            // lowering path produces a 64-bit `OpAtomicIAdd` /
+            // `atomicAdd(ulonglong*)` when the buffer is wide.
+            IRInst* atomicArgs[] = {
+                slotPtr,
+                builder.getIntValue(counterElementType, 1),
+                builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
+            };
+            builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
+        }
 
         // The marker op has void return type and, by construction, no uses.
         // Catch a future IR transform that takes a use of it before we reach
@@ -1264,6 +1301,7 @@ void instrumentCoverage(
     const int* reservedSpaces,
     int reservedSpaceCount,
     int counterByteWidth,
+    bool booleanMode,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
@@ -1419,7 +1457,8 @@ void instrumentCoverage(
         module,
         buffer,
         sink ? sink->getSourceManager() : nullptr,
-        outMetadata);
+        outMetadata,
+        booleanMode);
     instrumenter.run(markerOps);
 }
 
