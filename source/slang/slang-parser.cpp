@@ -7760,6 +7760,8 @@ static double _truncateDouble(double value, int minNormalExp, int maxExp, unsign
     int exp{};
     double fraction = std::frexp(value, &exp);
 
+    // Note: there is a seeming off-by-one with exponents. This is because frexp() returns
+    // fraction between [0.5, 1). That is, the 1.0 is decomposed as as 0.5 * 2^1.
     if (exp > (maxExp + 1))
     {
         // overflow
@@ -7769,7 +7771,7 @@ static double _truncateDouble(double value, int minNormalExp, int maxExp, unsign
             return -INFINITY;
     }
 
-    // for subnormals
+    // for subnormals - note the exponent off-by-one comment above.
     int precisionLoss = std::max(minNormalExp - (exp - 1), 0);
 
     int exponentShift = static_cast<int>(precisionBits) - precisionLoss;
@@ -8437,6 +8439,110 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
     return constExpr;
 }
 
+static Expr* parseFloatingPointLiteralExpr(Parser* parser)
+{
+    FloatingPointLiteralExpr* constExpr = parser->astBuilder->create<FloatingPointLiteralExpr>();
+    parser->FillPosition(constExpr);
+
+    auto token = parser->tokenReader.advanceToken();
+    constExpr->token = token;
+
+    UnownedStringSlice suffix{};
+    bool isOutOfRange{};
+    bool precisionLost{};
+    bool isHexFloat = token.getContent().startsWith("0x") || token.getContent().startsWith("0X");
+    FloatingPointLiteralValue value =
+        getFloatingPointLiteralValue(token, &suffix, &isOutOfRange, &precisionLost);
+
+    // Look at any suffix on the value, default is Float
+    BaseType suffixBaseType = BaseType::Float;
+    if ((suffix == "") || (suffix == "f") || (suffix == "F"))
+        suffixBaseType = BaseType::Float;
+    else if (
+        (suffix == "h") || (suffix == "H") || (suffix == "hf") || (suffix == "HF") ||
+        (suffix == "fh") || (suffix == "FH"))
+        suffixBaseType = BaseType::Half;
+    else if (
+        (suffix == "l") || (suffix == "L") || (suffix == "lf") || (suffix == "LF") ||
+        (suffix == "fl") || (suffix == "FL"))
+        suffixBaseType = BaseType::Double;
+    else
+        parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
+            .suffix = String(suffix),
+            .location = token.loc});
+
+    if (isOutOfRange)
+    {
+        if (std::isfinite(value))
+        {
+            parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
+                .literal = String(token.getContent()),
+                .type = String(BaseTypeInfo::asText(suffixBaseType)),
+                .convertedValue = String(value),
+                .location = token.loc});
+        }
+        else
+        {
+            parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
+                .type = String(BaseTypeInfo::asText(suffixBaseType)),
+                .literal = String(token.getContent()),
+                .convertedValue = String(value),
+                .location = token.loc});
+        }
+    }
+
+    // TODO(JS):
+    // It is worth noting here that because of the way that the lexer works, that
+    // literals are always handled as if they are positive (a preceding - is taken as a
+    // negate on a positive value). The code in _fixFloatLiteralValue() is designed to
+    // work with positive and negative values, as this behavior might change in the
+    // future, and is arguably more 'correct'.
+
+    FloatingPointLiteralValue fixedValue = value;
+    auto fixType = _fixFloatLiteralValue(suffixBaseType, isHexFloat, value, fixedValue);
+
+    switch (fixType)
+    {
+    case FloatFixKind::Truncated:
+        precisionLost = true;
+        break;
+
+    case FloatFixKind::None:
+        break;
+
+    case FloatFixKind::Zeroed:
+        parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
+            .literal = String(token.getContent()),
+            .type = String(BaseTypeInfo::asText(suffixBaseType)),
+            .convertedValue = String(fixedValue),
+            .location = token.loc});
+        break;
+
+    case FloatFixKind::Unrepresentable:
+        parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
+            .type = String(BaseTypeInfo::asText(suffixBaseType)),
+            .literal = String(token.getContent()),
+            .convertedValue = String(fixedValue),
+            .location = token.loc});
+        break;
+    }
+
+    if (precisionLost && isHexFloat)
+    {
+        char floatValue[32]{};
+        snprintf(floatValue, sizeof floatValue, "%a", fixedValue);
+        parser->sink->diagnose(Diagnostics::FloatHexLiteralPrecisionLost{
+            .literal = String(token.getContent()),
+            .truncatedValue = String(floatValue),
+            .location = token.loc});
+    }
+
+    constExpr->value = fixedValue;
+    constExpr->suffixType = suffixBaseType;
+
+    return constExpr;
+}
+
 static Expr* parseAtomicExpr(Parser* parser)
 {
     switch (peekTokenType(parser))
@@ -8632,165 +8738,7 @@ static Expr* parseAtomicExpr(Parser* parser)
         return parseIntegerLiteralExpr(parser);
 
     case TokenType::FloatingPointLiteral:
-        {
-            FloatingPointLiteralExpr* constExpr =
-                parser->astBuilder->create<FloatingPointLiteralExpr>();
-            parser->FillPosition(constExpr);
-
-            auto token = parser->tokenReader.advanceToken();
-            constExpr->token = token;
-
-            UnownedStringSlice suffix{};
-            bool isOutOfRange{};
-            bool precisionLost{};
-            bool isHexFloat =
-                token.getContent().startsWith("0x") || token.getContent().startsWith("0X");
-            FloatingPointLiteralValue value =
-                getFloatingPointLiteralValue(token, &suffix, &isOutOfRange, &precisionLost);
-
-            // Look at any suffix on the value
-            char const* suffixCursor = suffix.begin();
-            const char* const suffixEnd = suffix.end();
-
-            // Default is Float
-            BaseType suffixBaseType = BaseType::Float;
-            if (suffixCursor < suffixEnd)
-            {
-                int fCount = 0;
-                int lCount = 0;
-                int hCount = 0;
-                int unknownCount = 0;
-                while (suffixCursor < suffixEnd)
-                {
-                    switch (*suffixCursor++)
-                    {
-                    case 'f':
-                    case 'F':
-                        fCount++;
-                        break;
-
-                    case 'l':
-                    case 'L':
-                        lCount++;
-                        break;
-
-                    case 'h':
-                    case 'H':
-                        hCount++;
-                        break;
-
-                    default:
-                        unknownCount++;
-                        break;
-                    }
-                }
-
-                if (unknownCount)
-                {
-                    parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
-                        .suffix = String(suffix),
-                        .location = token.loc});
-                    suffixBaseType = BaseType::Float;
-                }
-                // `f` suffix -> `float`
-                if (fCount == 1 && !lCount && !hCount)
-                {
-                    suffixBaseType = BaseType::Float;
-                }
-                // `l` or `lf` suffix on floating-point literal -> `double`
-                else if (lCount == 1 && (fCount <= 1))
-                {
-                    suffixBaseType = BaseType::Double;
-                }
-                // `h` or `hf` suffix on floating-point literal -> `half`
-                else if (hCount == 1 && (fCount <= 1))
-                {
-                    suffixBaseType = BaseType::Half;
-                }
-                // TODO: are there other suffixes we need to handle?
-                else
-                {
-                    parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
-                        .suffix = String(suffix),
-                        .location = token.loc});
-                    suffixBaseType = BaseType::Float;
-                }
-            }
-
-            if (isOutOfRange)
-            {
-                if (std::isfinite(value))
-                {
-                    parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
-                        .literal = String(token.getContent()),
-                        .type = String(BaseTypeInfo::asText(suffixBaseType)),
-                        .convertedValue = String(value),
-                        .location = token.loc});
-                }
-                else
-                {
-                    parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
-                        .type = String(BaseTypeInfo::asText(suffixBaseType)),
-                        .literal = String(token.getContent()),
-                        .convertedValue = String(value),
-                        .location = token.loc});
-                }
-            }
-
-            // TODO(JS):
-            // It is worth noting here that because of the way that the lexer works, that
-            // literals are always handled as if they are positive (a preceding - is taken as a
-            // negate on a positive value). The code here is designed to work with positive and
-            // negative values, as this behavior might change in the future, and is arguably
-            // more 'correct'.
-
-            FloatingPointLiteralValue fixedValue = value;
-            auto fixType = _fixFloatLiteralValue(suffixBaseType, isHexFloat, value, fixedValue);
-
-            switch (fixType)
-            {
-            case FloatFixKind::Truncated:
-                precisionLost = true;
-                break;
-
-            case FloatFixKind::None:
-                break;
-
-            case FloatFixKind::Zeroed:
-                {
-                    parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
-                        .literal = String(token.getContent()),
-                        .type = String(BaseTypeInfo::asText(suffixBaseType)),
-                        .convertedValue = String(fixedValue),
-                        .location = token.loc});
-                    break;
-                }
-            case FloatFixKind::Unrepresentable:
-                {
-                    parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
-                        .type = String(BaseTypeInfo::asText(suffixBaseType)),
-                        .literal = String(token.getContent()),
-                        .convertedValue = String(fixedValue),
-                        .location = token.loc});
-                    break;
-                }
-            }
-
-            if (precisionLost && isHexFloat)
-            {
-                char floatValue[32]{};
-                snprintf(floatValue, sizeof floatValue, "%a", fixedValue);
-                parser->sink->diagnose(Diagnostics::FloatHexLiteralPrecisionLost{
-                    .literal = String(token.getContent()),
-                    .truncatedValue = String(floatValue),
-                    .location = token.loc});
-            }
-
-            constExpr->value = fixedValue;
-            constExpr->suffixType = suffixBaseType;
-
-            return constExpr;
-        }
+        return parseFloatingPointLiteralExpr(parser);
 
     case TokenType::StringLiteral:
         {
