@@ -79,8 +79,8 @@ SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
     // later direct source-string load with matching contents.
     ComPtr<ISlangFileSystemExt> fileSystem = ComPtr<ISlangFileSystemExt>(new MemoryFileSystem());
     auto& memoryFileSystem = *static_cast<MemoryFileSystem*>(fileSystem.get());
-    SLANG_CHECK_ABORT(memoryFileSystem.saveFile("mod_file.slang", sourceA, strlen(sourceA)) ==
-                      SLANG_OK);
+    SLANG_CHECK_ABORT(
+        memoryFileSystem.saveFile("mod_file.slang", sourceA, strlen(sourceA)) == SLANG_OK);
     sessionDesc.fileSystem = fileSystem;
 
     ComPtr<slang::ISession> fileSession;

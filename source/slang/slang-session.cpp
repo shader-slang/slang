@@ -256,12 +256,15 @@ slang::IModule* Linkage::loadModuleFromBlob(
         RefPtr<LoadedModule> loadedModule;
         if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
         {
+            if (!loadedModule)
+                return nullptr;
+
             // Returning the cached module is only safe when the incoming source
             // is identical to whatever produced the cached module; otherwise the
             // caller expects a module they have never actually loaded, leading
             // to silent wrong-module use (and sometimes crashes) downstream.
             // See #10957.
-            if (loadedModule && loadedModule->getSourceDigest() == sourceDigest)
+            if (loadedModule->getSourceDigest() == sourceDigest)
             {
                 return loadedModule;
             }
