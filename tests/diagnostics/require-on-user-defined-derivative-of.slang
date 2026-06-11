@@ -70,5 +70,43 @@ void computeMainFwd(uint3 dispatchThreadID : SV_DispatchThreadID)
      ^^^^^^^^^^^^^^ error E36107
 */
 {
+    // As in the backward case, using the primal pulls in the `spirv` requirement of
+    // its inverse-placed forward derivative, which is unavailable for `hlsl`.
     outputBuffer[0] = testD(2.0);
+}
+
+// --- Negative case: the [require] gate must NOT propagate when the derivative
+// carries no [require], even if the derivative's body itself needs a capability.
+// This guards the gate that keeps the core module's [require]-free derivative
+// families from imposing requirements on all-targets builtin primals: removing or
+// inverting the gate would let `testE` inherit `spirv` and spuriously raise E36107.
+
+//TEST:SIMPLE(filecheck=CHECKNOREQ): -target hlsl -entry computeMainNoReq -stage compute
+
+[require(spirv)]
+float spirvOnlyHelper(float x)
+{
+    return x;
+}
+
+// No [require] on the derivative itself, although its body transitively needs `spirv`.
+[BackwardDerivativeOf(testE)]
+void testEBwd(inout DifferentialPair<float> x, float dResult)
+{
+    x = diffPair(x.p, spirvOnlyHelper(0.0));
+}
+
+float testE(float x)
+{
+    return x * 2;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMainNoReq(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    // testEBwd has no [require], so its requirements are NOT propagated onto testE;
+    // using testE on `hlsl` must compile without E36107.
+    //CHECKNOREQ-NOT: 36107
+    outputBuffer[0] = testE(2.0);
 }
