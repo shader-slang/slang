@@ -147,7 +147,11 @@ runs:
     # Windows-specific setup: MSVC dev tools
     - name: Set up MSVC dev tools (Windows)
       if: runner.os == 'Windows'
-      uses: ilammy/msvc-dev-cmd@v1
+      uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      # msvc-dev-cmd has no Node 24 release yet (upstream ilammy/msvc-dev-cmd#105);
+      # force its node20 runtime onto node24 to clear the deprecation warning.
+      env:
+        FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     # Install dependencies not present in act/self-hosted (pre-installed on GitHub runners)
     - name: Install Linux dependencies

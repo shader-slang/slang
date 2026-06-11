@@ -37,7 +37,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           submodules: "recursive"
           fetch-depth: "0"
@@ -59,7 +59,7 @@ jobs:
             -DSLANG_ENABLE_CUDA=1
           cmake --workflow --preset "${{matrix.config}}"
 
-      - uses: robinraju/release-downloader@v1.12
+      - uses: robinraju/release-downloader@28fc21f50d76778e7023361aa1f863e717d3d56f # v1.13
         id: download
         with:
           # The source repository path.
