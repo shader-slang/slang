@@ -404,9 +404,12 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     // resolved function parameter still carries it.
     ShortList<IRParam*, 8> primalFuncParams;
     auto funcForNames = as<IRFunc>(getResolvedInstForDecorations(primalFunc));
-    for (auto param : funcForNames->getParams())
+    if (funcForNames)
     {
-        primalFuncParams.add(param);
+        for (auto param : funcForNames->getParams())
+        {
+            primalFuncParams.add(param);
+        }
     }
 
     List<IRInst*> applyForBwdFuncTypeParams;

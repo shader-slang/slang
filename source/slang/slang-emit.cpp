@@ -127,6 +127,7 @@
 #include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
+#include "slang-ir-util.h"
 #include "slang-ir-user-type-hint.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-variable-scope-correction.h"
@@ -895,22 +896,6 @@ void removeWeakUseInsts(IRModule* module)
     }
 }
 
-static bool isLiteralConstExprArg(IRInst* arg)
-{
-    switch (arg->getOp())
-    {
-    case kIROp_BoolLit:
-    case kIROp_FloatLit:
-    case kIROp_IntLit:
-    case kIROp_PtrLit:
-    case kIROp_StringLit:
-    case kIROp_VoidLit:
-        return true;
-    default:
-        return false;
-    }
-}
-
 struct ConstExprFunctionCallSpecializeCondition : FunctionCallSpecializeCondition
 {
     virtual bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRCall* callInst) override
@@ -923,7 +908,7 @@ struct ConstExprFunctionCallSpecializeCondition : FunctionCallSpecializeConditio
     virtual bool isParamSuitableForSpecialization(IRParam* param, IRInst* arg) override
     {
         SLANG_UNUSED(param);
-        return isLiteralConstExprArg(arg);
+        return isLiteralValue(arg);
     }
 };
 
