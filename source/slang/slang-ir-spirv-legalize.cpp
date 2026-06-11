@@ -668,6 +668,41 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             // index).
                             IRBuilder builder(getElement);
                             builder.setInsertBefore(user);
+                            auto index = getElement->getIndex();
+
+                            // The non-uniform-ness of this access can be recorded in
+                            // any of three forms, depending on how far prior passes
+                            // got: (1) the index is still a `NonUniformResourceIndex`
+                            // inst, (2) that inst was already lowered away but left
+                            // its decoration on the index, or (3) the decoration is
+                            // on the getElement itself. All three must be detected
+                            // and carried onto the access chain created below,
+                            // because that rewrite drops the `NonUniformResourceIndex`
+                            // -- so without re-attaching the decoration the NonUniform
+                            // requirement (Vulkan VUID-RuntimeSpirv-None-10148) would
+                            // be silently dropped here.
+                            //
+                            // Completeness: the base array (operand 0 of getElement)
+                            // is not checked because the float pass places NonUniform
+                            // on the getElement or its index, never on the base --
+                            // the base is `inst` (the global param being processed),
+                            // a module-level variable that is uniform by construction.
+                            bool isNonUniform =
+                                (index->getOp() == kIROp_NonUniformResourceIndex) ||
+                                index->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                                    nullptr ||
+                                user->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                                    nullptr;
+                            // Unwrap so the access chain indexes with the raw value.
+                            // We decorate the access chain (`newAddr`) below, which
+                            // is the resource-operand precursor the consuming load/
+                            // store will use; per VUID-RuntimeSpirv-None-10148 it is
+                            // that operand, not the raw index, that must carry
+                            // NonUniform, so the unwrapped index is intentionally
+                            // left undecorated here.
+                            if (index->getOp() == kIROp_NonUniformResourceIndex)
+                                index = index->getOperand(0);
+
                             auto newAddr = builder.emitElementAddress(
                                 builder.getPtrType(
                                     innerElementType,
@@ -675,7 +710,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                     addressSpace,
                                     dataLayout),
                                 inst,
-                                getElement->getIndex());
+                                index);
+                            if (isNonUniform)
+                                builder.addSPIRVNonUniformResourceDecoration(newAddr);
                             IRInst* replacementAddr = newAddr;
                             if (wrappedArrayElementKey)
                             {
@@ -1356,6 +1393,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             else if (auto loadDescriptor = as<IRSPIRVLoadDescriptorFromHeap>(image))
             {
+                // Descriptor heaps and NonUniform:
+                // NonUniform is not propagated onto this heap texel pointer.
+                // SPIRVLoadTexelPointerFromHeap is handled by neither the float
+                // pass nor propagateNonUniformDecorations. Today that is harmless
+                // because image atomics on descriptor-heap resources are rejected
+                // by the atomic-destination validator (E41403, see
+                // validateAtomicOperations in slang-ir-validate.cpp), so this op
+                // never reaches an atomic that would require the decoration. If
+                // heap image atomics are ever enabled, NonUniform handling for
+                // this op must be added in tandem.
                 auto texelPtr = builder.emitSPIRVLoadTexelPointerFromHeap(
                     newPtrType,
                     loadDescriptor->getHeap(),
@@ -2220,58 +2267,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    // Ensure NonUniform decoration is present on both access-chain ops and their index operands.
-    // This fills gaps after legalization where only the access-chain inst was decorated.
-    void propagateNonUniformAccessChainDecorations()
-    {
-        for (auto globalInst : m_module->getGlobalInsts())
-        {
-            auto func = as<IRFunc>(globalInst);
-            if (!func)
-                continue;
-
-            for (auto block : func->getBlocks())
-            {
-                for (auto inst : block->getChildren())
-                {
-                    IRInst* indexOperand = nullptr;
-                    switch (inst->getOp())
-                    {
-                    case kIROp_GetElement:
-                        indexOperand = inst->getOperand(1);
-                        break;
-                    case kIROp_GetElementPtr:
-                        indexOperand = inst->getOperand(1);
-                        break;
-                    case kIROp_RWStructuredBufferGetElementPtr:
-                        indexOperand = inst->getOperand(1);
-                        break;
-                    default:
-                        break;
-                    }
-
-                    if (!indexOperand)
-                        continue;
-
-                    auto indexDecorated =
-                        indexOperand->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
-                        nullptr;
-                    auto instDecorated =
-                        inst->findDecoration<IRSPIRVNonUniformResourceDecoration>() != nullptr;
-                    if (!indexDecorated && !instDecorated)
-                        continue;
-
-                    IRBuilder builder(inst);
-                    builder.setInsertBefore(inst);
-                    if (!indexDecorated)
-                        builder.addSPIRVNonUniformResourceDecoration(indexOperand);
-                    if (!instDecorated)
-                        builder.addSPIRVNonUniformResourceDecoration(inst);
-                }
-            }
-        }
-    }
-
     void determineSpirvVersion()
     {
         // Determine minimum spirv version from target request.
@@ -2770,7 +2765,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // lowering pass.
         performForceInlining(m_module);
 
-        propagateNonUniformAccessChainDecorations();
+        // Phase 2 of NonUniform propagation (defined in
+        // slang-ir-float-non-uniform-resource-index.cpp). Must run here, as the final
+        // legalize step: it decorates the emit-shape access chains / loads / field
+        // accesses / image subscripts produced by the rewrites above (getElementPtr,
+        // buffer-to-pointer lowering, legalizeStructBlocks, force-inlining).
+        propagateNonUniformDecorations(m_module);
 
         // The above step may produce empty struct types, so we need to lower them out of
         // existence.
