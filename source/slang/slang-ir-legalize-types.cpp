@@ -855,6 +855,9 @@ static IRType* getAbortArgumentElementType(IRType* type)
 }
 
 /// Validate abort payload argument types after variadic-pack and pair legalization.
+/// Scalar values and vectors with basic element types are accepted because they
+/// have printf-style format specifiers. Composite, pointer, resource, and other
+/// non-basic payloads are rejected with E55211 before target-specific lowering.
 static bool validateAbortArgumentTypes(
     IRTypeLegalizationContext* context,
     IRInst* abortInst,
