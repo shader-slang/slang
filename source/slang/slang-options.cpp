@@ -657,6 +657,16 @@ void initCommandOptions(CommandOptions& options)
          "is not supported for container outputs, and is valid only when exactly one compiled "
          "artifact carries coverage metadata. The path must not overlap any emitted artifact "
          "path."},
+        {OptionKind::TraceCoverageCounterByteWidth,
+         "-trace-coverage-counter-width",
+         "-trace-coverage-counter-width <bits>",
+         "Per-slot bit width of the synthesized `__slang_coverage` buffer. "
+         "Accepts `64` (default) or `32`. uint64 counters effectively cannot wrap "
+         "within any practical run; uint32 counters wrap silently at 2^32 hits per "
+         "slot. Use `32` when targeting a runtime driver that does not support "
+         "64-bit shader atomic add (notably MoltenVK on Apple Silicon, which "
+         "exposes `shaderBufferInt64Atomics = false`). Implies `-trace-coverage` "
+         "is meaningful; ignored when no coverage mode is enabled."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -3063,6 +3073,39 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 CommandLineArg outputPath;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(outputPath));
                 linkage->m_optionSet.set(OptionKind::CoverageManifestOutput, outputPath.value);
+                break;
+            }
+        case OptionKind::TraceCoverageCounterByteWidth:
+            {
+                // -trace-coverage-counter-width <bits>
+                // Validate up front rather than at IR-pass time: this is a
+                // user-facing CLI flag, not an internal state, so an invalid
+                // value should produce a clear front-end diagnostic instead
+                // of a downstream codegen surprise.
+                Int widthBits;
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, widthBits));
+                if (widthBits != 32 && widthBits != 64)
+                {
+                    // `parsedValue` is intentionally the user's bit value
+                    // (`widthBits`), not the byte width stored below: the
+                    // diagnostic echoes what the user typed (32/64) so its
+                    // "accepts only 32 or 64" message reads correctly. Do
+                    // not "fix" this to the stored stride.
+                    m_sink->diagnose(Diagnostics::CoverageCounterWidthInvalid{
+                        .parsedValue = widthBits,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
+                // Convert the user-facing bit width to the byte width (4 or
+                // 8) stored on the option. This is the one place the unit
+                // changes from bits (CLI) to bytes (option / IR pass /
+                // metadata / `CoverageBufferInfo::elementByteWidth`); every
+                // internal consumer reads bytes. The IR pass and metadata
+                // writer can then treat the value as a stride directly.
+                linkage->m_optionSet.set(
+                    OptionKind::TraceCoverageCounterByteWidth,
+                    (int)(widthBits / 8));
                 break;
             }
         case OptionKind::Profile:
