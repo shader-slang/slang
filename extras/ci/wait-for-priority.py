@@ -37,8 +37,9 @@ from gh_api import gh_api
 
 DEFAULT_REPO = "shader-slang/slang"
 DEFAULT_WORKFLOW = "ci.yml"
-DEFAULT_POLL_SECONDS = 30
-DEFAULT_MAX_WAIT_MINUTES = 120
+DEFAULT_POLL_INITIAL_SECONDS = 15
+DEFAULT_POLL_MAX_SECONDS = 300
+DEFAULT_MAX_WAIT_MINUTES = 300
 
 DEFAULT_BOT_LOGINS = {
     "nv-slang-bot",
@@ -126,7 +127,14 @@ def main():
         "--repo", default=os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPO)
     )
     parser.add_argument("--workflow", default=DEFAULT_WORKFLOW)
-    parser.add_argument("--poll-interval", type=int, default=DEFAULT_POLL_SECONDS)
+    parser.add_argument(
+        "--poll-initial", type=int, default=DEFAULT_POLL_INITIAL_SECONDS,
+        help="Starting poll interval in seconds (doubles each round, capped at --poll-max).",
+    )
+    parser.add_argument(
+        "--poll-max", type=int, default=DEFAULT_POLL_MAX_SECONDS,
+        help="Maximum poll interval in seconds.",
+    )
     parser.add_argument(
         "--max-wait-minutes", type=int, default=DEFAULT_MAX_WAIT_MINUTES
     )
@@ -163,16 +171,18 @@ def main():
     )
 
     deadline = time.monotonic() + args.max_wait_minutes * 60
+    interval = args.poll_initial
     while True:
         try:
             runs = fetch_active_runs(args.repo, args.workflow)
         except RuntimeError as exc:
             # Be conservative: a transient API failure should not let the bot
             # jump the queue, but it also should not hang forever.
-            print(f"::warning::{exc}; retrying after {args.poll_interval}s")
+            print(f"::warning::{exc}; retrying after {interval}s")
             if args.dry_run:
                 return 0
-            time.sleep(args.poll_interval)
+            time.sleep(interval)
+            interval = min(interval * 2, args.poll_max)
             continue
 
         human, older_bot = classify_blockers(
@@ -199,7 +209,9 @@ def main():
             )
             return 0
 
-        time.sleep(args.poll_interval)
+        print(f"Next check in {interval}s.")
+        time.sleep(interval)
+        interval = min(interval * 2, args.poll_max)
 
 
 if __name__ == "__main__":
