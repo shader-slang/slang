@@ -950,11 +950,11 @@ struct CoverageInstrumenter
     IRType* counterElementType;
     IRType* counterElementPtrType;
     IRType* intType;
-    // Caller opted in to hit/miss recording (`-trace-coverage-hit-miss`): each
+    // Caller opted in to boolean recording (`-trace-coverage-boolean`): each
     // counter is written with a plain non-atomic store of 1 instead of an
     // atomic add, recording whether the entry executed (0 / non-zero) rather
     // than an exact count.
-    bool hitMiss = false;
+    bool booleanMode = false;
     List<BranchSiteRemap> branchSiteRemaps;
     uint32_t nextBranchSiteID = 1;
 
@@ -963,8 +963,8 @@ struct CoverageInstrumenter
         IRGlobalParam* buf,
         SourceManager* sm,
         ArtifactPostEmitMetadata& md,
-        bool hitMiss)
-        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md), hitMiss(hitMiss)
+        bool booleanMode)
+        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md), booleanMode(booleanMode)
     {
         IRBuilder tmpBuilder(module);
         // The unchecked `cast` is safe: this instrumenter only ever runs
@@ -1004,7 +1004,7 @@ struct CoverageInstrumenter
     {
         entry.counterIndex = (uint32_t)slot;
         entry.counterMode =
-            hitMiss ? slang::CoverageCounterMode::Boolean : slang::CoverageCounterMode::Count;
+            booleanMode ? slang::CoverageCounterMode::Boolean : slang::CoverageCounterMode::Count;
         resolveHumaneLoc(sourceManager, markerOp, entry.file, entry.line, entry.startColumn);
 
         switch (markerOp->getOp())
@@ -1053,7 +1053,7 @@ struct CoverageInstrumenter
             2,
             getElemArgs);
 
-        if (hitMiss)
+        if (booleanMode)
         {
             // Hit/miss recording: a plain, non-atomic store of `1`. Every
             // lane that reaches this marker writes the same value, so
@@ -1066,7 +1066,7 @@ struct CoverageInstrumenter
             // guaranteed single-copy atomic unless shaderBufferInt64Atomics
             // is enabled. In practice the host already requires that feature
             // for 64-bit coverage, which implies single-copy atomic plain
-            // stores on all known drivers. If exact hit-miss semantics under
+            // stores on all known drivers. If exact boolean semantics under
             // 64-bit are required, prefer 32-bit counters
             // (`-trace-coverage-counter-width 32`).
             //
@@ -1297,7 +1297,7 @@ void instrumentCoverage(
     const int* reservedSpaces,
     int reservedSpaceCount,
     int counterByteWidth,
-    bool hitMiss,
+    bool booleanMode,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
@@ -1454,7 +1454,7 @@ void instrumentCoverage(
         buffer,
         sink ? sink->getSourceManager() : nullptr,
         outMetadata,
-        hitMiss);
+        booleanMode);
     instrumenter.run(markerOps);
 }
 

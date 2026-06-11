@@ -1106,13 +1106,13 @@ Result linkAndOptimizeIR(
             });
             return SLANG_FAIL;
         }
-        // Opt-in hit/miss mode (off by default): record whether each entry
+        // Opt-in boolean mode (off by default): record whether each entry
         // executed (non-atomic store of 1) instead of an exact count.
-        bool coverageHitMiss = false;
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageHitMiss))
+        bool coverageBoolean = false;
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
         {
             if (values->getCount() > 0)
-                coverageHitMiss = (*values)[0].intValue != 0;
+                coverageBoolean = (*values)[0].intValue != 0;
         }
         SLANG_PASS(
             instrumentCoverage,
@@ -1123,7 +1123,7 @@ Result linkAndOptimizeIR(
             reservedSpaces.getBuffer(),
             (int)reservedSpaces.getCount(),
             counterByteWidth,
-            coverageHitMiss,
+            coverageBoolean,
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);

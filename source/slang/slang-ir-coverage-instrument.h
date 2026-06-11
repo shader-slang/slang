@@ -65,7 +65,7 @@ static constexpr int kDefaultCoverageCounterByteWidth = 8;
 // buffer is synthesized, and `outMetadata` and `globalScopeVarLayout`
 // are left untouched.
 //
-// `hitMiss` opts in to hit/miss recording (`CoverageCounterMode::Boolean`):
+// `booleanMode` opts in to boolean recording (`CoverageCounterMode::Boolean`):
 // each counter is written with a plain non-atomic store of `1` instead of
 // an atomic add, so it records whether the entry executed (0 / non-zero)
 // rather than an exact count. This removes all atomic contention. Off by
@@ -79,7 +79,7 @@ void instrumentCoverage(
     const int* reservedSpaces,
     int reservedSpaceCount,
     int counterByteWidth,
-    bool hitMiss,
+    bool booleanMode,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);

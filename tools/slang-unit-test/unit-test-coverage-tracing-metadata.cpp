@@ -2567,12 +2567,12 @@ SLANG_UNIT_TEST(coverageTracingInvalidCounterWidthFailsCodegen)
     SLANG_CHECK(code64.indexOf(toSlice("_slang_atomic_add_u32((")) == -1);
 }
 
-// Verify that compiling with `-trace-coverage-hit-miss` produces
+// Verify that compiling with `-trace-coverage-boolean` produces
 // `CoverageCounterMode::Boolean` in the metadata for every entry, and
 // that the manifest serializes it as "boolean" rather than "unknown".
 // This is a regression test for the case where _getCoverageCounterModeName
 // lacked a case for Boolean and silently returned "unknown".
-SLANG_UNIT_TEST(coverageTracingHitMissCounterMode)
+SLANG_UNIT_TEST(coverageTracingBooleanCounterMode)
 {
     const char* shaderSource = R"(
         RWStructuredBuffer<uint> outputBuffer;
@@ -2599,7 +2599,7 @@ SLANG_UNIT_TEST(coverageTracingHitMissCounterMode)
     options[0].name = slang::CompilerOptionName::TraceCoverage;
     options[0].value.kind = slang::CompilerOptionValueKind::Int;
     options[0].value.intValue0 = 1;
-    options[1].name = slang::CompilerOptionName::TraceCoverageHitMiss;
+    options[1].name = slang::CompilerOptionName::TraceCoverageBoolean;
     options[1].value.kind = slang::CompilerOptionValueKind::Int;
     options[1].value.intValue0 = 1;
 
@@ -2614,8 +2614,8 @@ SLANG_UNIT_TEST(coverageTracingHitMissCounterMode)
 
     ComPtr<slang::IBlob> diagnostics;
     ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
-        "hitMissTest",
-        "hitMissTest.slang",
+        "booleanTest",
+        "booleanTest.slang",
         shaderSource,
         diagnostics.writeRef()));
     SLANG_CHECK(module != nullptr);
@@ -2641,7 +2641,7 @@ SLANG_UNIT_TEST(coverageTracingHitMissCounterMode)
         slang::ICoverageTracingMetadata::getTypeGuid());
     SLANG_CHECK(coverage != nullptr);
 
-    // Every entry produced in hit-miss mode must carry Boolean mode.
+    // Every entry produced in boolean mode must carry Boolean mode.
     uint32_t count = coverage->getEntryCount();
     SLANG_CHECK(count > 0);
     for (uint32_t i = 0; i < count; ++i)

@@ -1,6 +1,6 @@
-// Verifies hit/miss coverage mode (`-trace-coverage-hit-miss`, #11509).
+// Verifies boolean coverage mode (`-trace-coverage-boolean`, #11509).
 //
-// In hit/miss mode each coverage counter is written with a plain non-atomic
+// In boolean mode each coverage counter is written with a plain non-atomic
 // store of 1 (CoverageCounterMode::Boolean) instead of an atomic add, so it
 // records whether an entry executed (0 / non-zero) rather than an exact count.
 // This removes all atomic contention. Off by default — the default count mode
@@ -10,7 +10,7 @@
 //TEST:SIMPLE(filecheck=COUNT):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage
 
 // Hit/miss mode: no atomics at all.
-//TEST:SIMPLE(filecheck=HITMISS):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage -trace-coverage-hit-miss
+//TEST:SIMPLE(filecheck=HITMISS):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage -trace-coverage-boolean
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;

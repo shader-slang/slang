@@ -632,10 +632,10 @@ void initCommandOptions(CommandOptions& options)
          "default paths. Expression-level short-circuit and ternary branches are "
          "not instrumented by this mode yet. "
          "Shares the synthesized `__slang_coverage` buffer and coverage metadata path."},
-        {OptionKind::TraceCoverageHitMiss,
-         "-trace-coverage-hit-miss",
+        {OptionKind::TraceCoverageBoolean,
+         "-trace-coverage-boolean",
          nullptr,
-         "Record hit/miss coverage instead of exact execution counts: each counter slot "
+         "Record boolean coverage instead of exact execution counts: each counter slot "
          "is set to 1 (via a plain non-atomic store) the first time its entry executes, "
          "rather than atomically incremented per execution. This removes all atomic "
          "contention, so coverage is dramatically faster and avoids the GPU watchdog "
@@ -2617,7 +2617,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::TraceCoverage:
         case OptionKind::TraceFunctionCoverage:
         case OptionKind::TraceBranchCoverage:
-        case OptionKind::TraceCoverageHitMiss:
+        case OptionKind::TraceCoverageBoolean:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:

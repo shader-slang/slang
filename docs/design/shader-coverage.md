@@ -478,7 +478,7 @@ direct counters, shared counters, derived counter expressions, or
 counterless metadata entries represented through tail-extended fields
 or a derived metadata interface. `CoverageCounterMode` currently defines `Count` (exact execution counts
 via atomic add, the default) and `Boolean` (hit/not-hit via a plain
-non-atomic store of 1, selected by `-trace-coverage-hit-miss`).
+non-atomic store of 1, selected by `-trace-coverage-boolean`).
 Warp/group-aggregated and other modes may be appended in future
 extensions. LCOV remains a
 compatibility export (`DA:`, `FN/FNDA:`, `BRDA:`), not the only

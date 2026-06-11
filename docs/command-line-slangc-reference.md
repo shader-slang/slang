@@ -319,9 +319,9 @@ Instrument the shader with per-function-entry coverage counters. Shares the synt
 Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths. Expression-level short-circuit and ternary branches are not instrumented by this mode yet. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
 
 
-<a id="trace-coverage-hit-miss"></a>
-### -trace-coverage-hit-miss
-Record hit/miss coverage instead of exact execution counts: each counter slot is set to 1 (via a plain non-atomic store) the first time its entry executes, rather than atomically incremented per execution. This removes all atomic contention, so coverage is dramatically faster and avoids the GPU watchdog timeouts that heavy per-execution counting can trigger, at the cost of exact counts (the counter is 0 or non-zero). Off by default. Ignored when no coverage mode is enabled. 
+<a id="trace-coverage-boolean"></a>
+### -trace-coverage-boolean
+Record boolean coverage instead of exact execution counts: each counter slot is set to 1 (via a plain non-atomic store) the first time its entry executes, rather than atomically incremented per execution. This removes all atomic contention, so coverage is dramatically faster and avoids the GPU watchdog timeouts that heavy per-execution counting can trigger, at the cost of exact counts (the counter is 0 or non-zero). Off by default. Ignored when no coverage mode is enabled. 
 
 
 <a id="trace-coverage-binding"></a>
