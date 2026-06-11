@@ -207,9 +207,9 @@ static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRI
     SLANG_UNUSED(clonedInst);
 
     // Local annotations will be cloned normally as part of cloning their parent function/generic
-    // body. For module-scope annotations, we need to look them up since they won't get automatically 
-    // pulled in.
-    
+    // body. For module-scope annotations, we need to look them up since they won't get
+    // automatically pulled in.
+
     if (!originalInst->getParent() || originalInst->getParent()->getOp() != kIROp_ModuleInst)
         return;
 
