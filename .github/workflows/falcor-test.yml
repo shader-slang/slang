@@ -63,7 +63,7 @@ jobs:
           name: slang-falcor-build-windows-release
           path: build/Release/bin/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
   test:
     name: Test (Falcor)
     needs: build
