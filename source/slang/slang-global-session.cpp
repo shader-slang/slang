@@ -293,9 +293,11 @@ SlangResult Session::getDownstreamCompilerVersion(
     if (!compiler)
         return SLANG_E_NOT_FOUND;
 
-    // The version is captured when the compiler is loaded (e.g. NVRTC via nvrtcVersion in its
-    // init), and is the only place it is reliably exposed: NVRTC does not implement
-    // getVersionString. Read it from the desc rather than the version string.
+    // Read the version from the loaded compiler's descriptor: it is the uniform numeric source
+    // across pass-throughs, populated at load (e.g. NVRTC via nvrtcVersion in its init). For some
+    // compilers it is the only place the version is exposed — NVRTC, for one, never implements
+    // getVersionString — while others (glslang, Tint) leave it at (0,0). Hence the desc, not the
+    // version string.
     const SemanticVersion& version = compiler->getDesc().version;
     if (outMajor)
         *outMajor = version.m_major;

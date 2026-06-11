@@ -15,13 +15,20 @@ SLANG_UNIT_TEST(getDownstreamCompilerVersion)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
-    // SLANG_PASS_THROUGH_NONE is never a loadable compiler.
+    // SLANG_PASS_THROUGH_NONE is never a loadable compiler. Also verify null out-params are
+    // tolerated on this always-reachable path (the NVRTC null-out check below only runs where
+    // NVRTC is installed).
     {
         int major = -1;
         int minor = -1;
         SLANG_CHECK(
             globalSession->getDownstreamCompilerVersion(SLANG_PASS_THROUGH_NONE, &major, &minor) ==
             SLANG_E_NOT_FOUND);
+        SLANG_CHECK(
+            globalSession->getDownstreamCompilerVersion(
+                SLANG_PASS_THROUGH_NONE,
+                nullptr,
+                nullptr) == SLANG_E_NOT_FOUND);
     }
 
     // An out-of-range pass-through value must be rejected at the boundary, not used to index the
@@ -64,5 +71,21 @@ SLANG_UNIT_TEST(getDownstreamCompilerVersion)
     else
     {
         SLANG_CHECK(result == SLANG_E_NOT_FOUND);
+    }
+
+    // Exercise the documented "loaded but versionless" clause: a bundled, GPU-independent compiler
+    // that loads but exposes no numeric version must still succeed with (0,0) — it must NOT be
+    // conflated with SLANG_E_NOT_FOUND. glslang leaves getDesc().version at (0,0) and is loadable
+    // on CI runners without a device.
+    if (SLANG_SUCCEEDED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_GLSLANG)))
+    {
+        int gMajor = -1;
+        int gMinor = -1;
+        SLANG_CHECK(
+            globalSession->getDownstreamCompilerVersion(
+                SLANG_PASS_THROUGH_GLSLANG,
+                &gMajor,
+                &gMinor) == SLANG_OK);
+        SLANG_CHECK(gMajor == 0 && gMinor == 0);
     }
 }

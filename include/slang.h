@@ -4198,11 +4198,21 @@ struct IGlobalSession : public ISlangUnknown
     compilation. This lets a client key its behavior off the exact library Slang selected (for
     example, the specific NVRTC that will compile CUDA), which can differ from a version the client
     might discover on its own.
+
+    This is not a cheap accessor: the first call for a given `passThrough` performs discovery and
+    loads the downstream library into the process (then memoizes it for subsequent calls).
+
+    Only some downstream compilers report a numeric version (e.g. NVRTC, DXC, the C/C++ toolchains);
+    others (e.g. the glslang family and Tint) always report `(0,0)`. The version is read uniformly
+    from the loaded compiler's descriptor, so a versionless-but-loaded compiler still returns
+    SLANG_OK with major/minor 0 — which the result alone does not distinguish from a genuine 0.0.
     @param passThrough The downstream compiler to query (e.g. SLANG_PASS_THROUGH_NVRTC).
     @param outMajor Receives the major version number. May be null.
     @param outMinor Receives the minor version number. May be null.
-    @return SLANG_OK if the compiler was located and loaded (a loaded compiler that reports no
-    version yields major and minor 0); SLANG_E_NOT_FOUND if it could not be located or loaded. */
+    @return SLANG_OK if the compiler was located and loaded (see the versionless note above).
+    SLANG_E_NOT_FOUND if the compiler could not be located or loaded, and likewise for
+    SLANG_PASS_THROUGH_NONE or an out-of-range value — the result code alone does not distinguish an
+    invalid argument from a compiler that is simply not installed. */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getDownstreamCompilerVersion(SlangPassThrough passThrough, int* outMajor, int* outMinor) = 0;
 };
