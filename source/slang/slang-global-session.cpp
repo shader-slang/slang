@@ -274,6 +274,36 @@ SlangResult Session::checkPassThroughSupport(SlangPassThrough inPassThrough)
     return checkExternalCompilerSupport(this, PassThroughMode(inPassThrough));
 }
 
+SlangResult Session::getDownstreamCompilerVersion(
+    SlangPassThrough inPassThrough,
+    int* outMajor,
+    int* outMinor)
+{
+    // Validate at the public boundary: only a real (non-None), in-range pass-through can name a
+    // loadable compiler. getOrLoadDownstreamCompiler indexes per-type arrays by the enum value, so
+    // reject out-of-range values here rather than indexing out of bounds.
+    if (inPassThrough <= SLANG_PASS_THROUGH_NONE || inPassThrough >= SLANG_PASS_THROUGH_COUNT_OF)
+        return SLANG_E_NOT_FOUND;
+
+    // Route through the same lazy-discovery funnel that compilation uses, so the reported version
+    // is guaranteed to be the library that will actually be used for this pass-through (it shares
+    // the memoized cache and honors setDownstreamCompilerPath + the standard search order).
+    IDownstreamCompiler* compiler =
+        getOrLoadDownstreamCompiler(PassThroughMode(inPassThrough), nullptr);
+    if (!compiler)
+        return SLANG_E_NOT_FOUND;
+
+    // The version is captured when the compiler is loaded (e.g. NVRTC via nvrtcVersion in its
+    // init), and is the only place it is reliably exposed: NVRTC does not implement
+    // getVersionString. Read it from the desc rather than the version string.
+    const SemanticVersion& version = compiler->getDesc().version;
+    if (outMajor)
+        *outMajor = version.m_major;
+    if (outMinor)
+        *outMinor = version.m_minor;
+    return SLANG_OK;
+}
+
 void Session::writeCoreModuleDoc(String config)
 {
     ASTBuilder* astBuilder = getBuiltinLinkage()->getASTBuilder();

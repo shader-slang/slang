@@ -4192,6 +4192,19 @@ struct IGlobalSession : public ISlangUnknown
         BuiltinModuleName module,
         SlangArchiveType archiveType,
         ISlangBlob** outBlob) = 0;
+
+    /** Get the version of the downstream/pass-through compiler that Slang will actually load and
+    use for `passThrough`, applying the same lazy discovery and library search order used during
+    compilation. This lets a client key its behavior off the exact library Slang selected (for
+    example, the specific NVRTC that will compile CUDA), which can differ from a version the client
+    might discover on its own.
+    @param passThrough The downstream compiler to query (e.g. SLANG_PASS_THROUGH_NVRTC).
+    @param outMajor Receives the major version number. May be null.
+    @param outMinor Receives the minor version number. May be null.
+    @return SLANG_OK if the compiler was located and loaded;
+    SLANG_E_NOT_FOUND if it could not be located or loaded. */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDownstreamCompilerVersion(SlangPassThrough passThrough, int* outMajor, int* outMinor) = 0;
 };
 
     #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()

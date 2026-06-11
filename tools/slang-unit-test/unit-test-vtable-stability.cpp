@@ -841,6 +841,12 @@ struct IGlobalSessionProbe : IGlobalSession
         lastSlot = 31;
         return SLANG_OK;
     }
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDownstreamCompilerVersion(SlangPassThrough, int*, int*) SLANG_OVERRIDE
+    {
+        lastSlot = 32;
+        return SLANG_OK;
+    }
 };
 
 SLANG_UNIT_TEST(vtableIGlobalSession)
@@ -862,6 +868,8 @@ SLANG_UNIT_TEST(vtableIGlobalSession)
     SLANG_CHECK(p.lastSlot == 26); // setSPIRVCoreGrammar
     callSlot(&p, 31);
     SLANG_CHECK(p.lastSlot == 31); // saveBuiltinModule
+    callSlot(&p, 32);
+    SLANG_CHECK(p.lastSlot == 32); // getDownstreamCompilerVersion
 }
 
 // ---------------------------------------------------------------------------
