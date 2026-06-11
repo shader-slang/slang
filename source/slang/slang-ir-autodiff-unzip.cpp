@@ -778,9 +778,14 @@ struct UnzippingContext
             {
                 // Move to primal block.
                 fwdParam->insertAtEnd(primalBlock);
-                auto diffParam = diffBuilder.emitParam(diffBuilder.getVoidType());
+                auto isConstExprParam = isConstExprRateQualifiedType(fwdParam->getFullType());
+                auto diffParamType =
+                    isConstExprParam ? fwdParam->getFullType() : diffBuilder.getVoidType();
+                auto diffParam = diffBuilder.emitParam(diffParamType);
                 diffParam->sourceLoc = fwdParam->sourceLoc;
                 primalMap[fwdParam] = fwdParam;
+                if (isConstExprParam)
+                    diffMap[fwdParam] = diffParam;
             }
         }
 
