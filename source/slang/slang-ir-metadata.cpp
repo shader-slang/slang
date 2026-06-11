@@ -158,6 +158,8 @@ static bool _instUsesBindlessResourceHeap(IRInst* inst, SlangInt bindlessSpaceIn
 {
     SLANG_ASSERT(bindlessSpaceIndex >= 0);
 
+    // Dynamic-resource-heap lowering can replace the heap intrinsic with a synthetic global
+    // parameter, so check for that lowered form before looking at opcode uses.
     if (_isBindlessResourceHeapGlobalParam(inst, bindlessSpaceIndex))
         return true;
 
@@ -179,26 +181,22 @@ static bool _instUsesBindlessResourceHeap(IRInst* inst, SlangInt bindlessSpaceIn
     case kIROp_CastDescriptorHandleToUInt2:
     case kIROp_CastUInt64ToDescriptorHandle:
     case kIROp_CastDescriptorHandleToUInt64:
+        // These casts can survive into target IR and still indicate a descriptor-handle path that
+        // needs the bindless resource heap.
         return true;
     default:
         return false;
     }
 }
 
-static bool _subtreeUsesBindlessResourceHeap(IRInst* root, SlangInt bindlessSpaceIndex)
+static bool doesInstAndChildrenUseBindlessResourceHeap(IRInst* inst, SlangInt bindlessSpaceIndex)
 {
-    List<IRInst*> workList;
-    workList.add(root);
+    if (_instUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
+        return true;
 
-    for (Index i = 0; i < workList.getCount(); ++i)
-    {
-        auto inst = workList[i];
-        if (_instUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
+    for (auto child : inst->getChildren())
+        if (doesInstAndChildrenUseBindlessResourceHeap(child, bindlessSpaceIndex))
             return true;
-
-        for (auto child : inst->getChildren())
-            workList.add(child);
-    }
 
     return false;
 }
@@ -295,7 +293,7 @@ void collectMetadata(
     {
         if (bindlessSpaceIndex >= 0 && !usesBindlessResourceHeap)
         {
-            if (_subtreeUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
+            if (doesInstAndChildrenUseBindlessResourceHeap(inst, bindlessSpaceIndex))
                 usesBindlessResourceHeap = true;
         }
 
