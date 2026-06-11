@@ -7,6 +7,7 @@
 //
 // Expected behaviour after the fix:
 //   - Same name, same source        -> returns the cached module (no-op).
+//   - Different name, same source   -> creates a separate module.
 //   - Same name, different source   -> returns nullptr and produces a
 //                                      diagnostic complaining about the
 //                                      collision.
@@ -58,6 +59,14 @@ SLANG_UNIT_TEST(loadModuleFromSourceNameCollision)
         session->loadModuleFromSourceString("mod", "mod.slang", sourceA, diagA2.writeRef());
     SLANG_CHECK(modA2 != nullptr);
     SLANG_CHECK(modA2 == modA1);
+
+    // Loading the same source under a different module name is still allowed.
+    // The collision check is keyed by module name, not by source contents alone.
+    ComPtr<slang::IBlob> diagAlias;
+    auto modAlias = session->loadModuleFromSourceString(
+        "mod_alias", "mod-alias.slang", sourceA, diagAlias.writeRef());
+    SLANG_CHECK(modAlias != nullptr);
+    SLANG_CHECK(modAlias != modA1);
 
     // Loading "mod" with a *different* source must now fail and emit a
     // diagnostic pointing at the collision, rather than silently returning
