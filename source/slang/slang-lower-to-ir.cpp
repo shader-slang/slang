@@ -9500,6 +9500,19 @@ static HumaneSourceLoc _getDebugHumaneLoc(
 // slang-check-decl.cpp). Emitting source-level debug info for it would let a
 // debugger step into the compiler-generated initializer and walk the struct/member
 // declaration lines, so callers suppress debug info for these functions (#11550).
+//
+// Discriminating by flavor (not by the `$init` name) is required: a user-written
+// `__init` is also mangled to `<Type>.$init`, but carries `UserDefined` flavor and
+// must keep its debug info. The IR `IRConstructorDecoration` is attached only after
+// the function's `IRDebugLocationDecoration`, so the AST flavor is what is available in time.
+//
+// The two call sites below (`maybeAddDebugLocationDecoration` on the IRFunc and
+// `maybeEmitDebugLine` on the body) are BOTH load-bearing and non-redundant: a
+// function's `IRDebugLocationDecoration` and its body's `DebugLine`s are produced
+// independently, so neither gate subsumes the other. Both key on `context->funcDecl`,
+// which is the function currently being lowered (the ctor's own IRFunc for the
+// decoration, and the ctor again for the statements lowered under its sub-context);
+// module-level lowering runs with `funcDecl == nullptr`, so the gate is a no-op there.
 static bool isSynthesizedConstructorDecl(FunctionDeclBase* funcDecl)
 {
     auto ctorDecl = as<ConstructorDecl>(funcDecl);
