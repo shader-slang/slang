@@ -58,7 +58,7 @@ jobs:
             -DSLANG_ENABLE_SLANG_RHI=0
           cmake --workflow --preset release
       - name: Upload Slang build
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: slang-falcor-build-windows-release
           path: build/Release/bin/
@@ -80,13 +80,13 @@ jobs:
         run: |
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
           submodules: "false"
           fetch-depth: "1"
       - name: Download Slang build
-        uses: actions/download-artifact@81eafdc926c95ab3a46553696557fe28c599a41a # v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: slang-falcor-build-windows-release
           path: slang-bin
