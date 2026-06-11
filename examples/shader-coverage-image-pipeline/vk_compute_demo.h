@@ -83,6 +83,8 @@ public:
     // (or with coverage off entirely) leave it false.
     void init(bool requireInt64Atomics = false);
     ~Context();
+    Context(const Context&) = delete;
+    Context& operator=(const Context&) = delete;
 
     Buffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage);
     void destroyBuffer(Buffer& b);
