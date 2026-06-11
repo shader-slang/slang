@@ -39,11 +39,15 @@ The following integer types are provided:
 
 All targets support the 32-bit `int` and `uint` types, but support for the other types depends on the capabilities of each target platform.
 
-Integer literals can be both decimal and hexadecimal. An integer literal can be explicitly made unsigned
-with a `u` suffix, and explicitly made 64-bit with the `ll` suffix. The type of a decimal non-suffixed integer literal is the first integer type from
+Integer literals can be decimal, hexadecimal, or binary. An integer literal can be explicitly made unsigned
+with the `u` suffix, and explicitly made 64-bit with the `ll` suffix. The type of a decimal non-suffixed integer literal is the first integer type from
 the list [`int`, `int64_t`] which can represent the specified literal value. If the value cannot fit, the literal is represented as
 a `uint64_t` and a warning is given. The type of a hexadecimal non-suffixed integer literal is the first type from the list
 [`int`, `uint`, `int64_t`, `uint64_t`] that can represent the specified literal value. For more information on 64-bit integer literals, see the documentation on [64-bit type support](../64bit-type-support.md).
+
+See also [Literal Expressions](../language-reference/expressions-literal.md) in the language reference manual for details.
+
+#### Floating-Point Types
 
 The following floating-point types are provided:
 
@@ -54,6 +58,15 @@ The following floating-point types are provided:
 | `double`      | 64-bit floating-point number |
 
 All targets support the 32-bit `float`, but support for the other types depends on the capabilities of each target platform.
+
+Floating-point literals can be decimal or hexadecimal. The default literal type is `float`, with an
+optional `f` suffix. The `h`/`hf`/`fh` suffixes denote `half` literals, and the `l`/`lf`/`fl` suffixes
+denote `double` literals.
+
+Use hexadecimal literals when precise values are desired. If a hexadecimal literal cannot be precisely
+represented, a warning is given. Decimal literals do not trigger rounding warnings.
+
+See also [Literal Expressions](../language-reference/expressions-literal.md) in the language reference manual for details.
 
 ### Boolean Type
 
