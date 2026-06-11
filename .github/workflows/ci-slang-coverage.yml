@@ -660,7 +660,7 @@ jobs:
 
       - name: Report Coverage in PR
         if: ${{ inputs.pr-comment }}
-        uses: zgosalvez/github-actions-report-lcov@v4
+        uses: zgosalvez/github-actions-report-lcov@eda775f552bfb2bffbdedea26f19dfb8c24a1648 # v4
         with:
           coverage-files: coverage.lcov
           minimum-coverage: 0

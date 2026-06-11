@@ -134,7 +134,7 @@ jobs:
       - name: Success notification
         id: slack-notify-success
         if: ${{ github.event_name == 'schedule' && success() }}
-        uses: slackapi/slack-github-action@v1.26.0
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
         with:
           payload: |
             {
@@ -146,7 +146,7 @@ jobs:
       - name: Failure notification
         id: slack-notify-failure
         if: ${{ github.event_name == 'schedule' && !success() }}
-        uses: slackapi/slack-github-action@v1.26.0
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
         with:
           payload: |
             {
