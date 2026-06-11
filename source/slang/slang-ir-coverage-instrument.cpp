@@ -511,6 +511,29 @@ static bool isCoverageInstrumentationTargetSupported(TargetRequest* targetReques
     return !isWGPUTarget(targetRequest) && !isCPUTargetViaLLVM(targetRequest);
 }
 
+// Maps the per-slot byte-width selector (`counterByteWidth`, in bytes)
+// to the counter buffer's element `IRType`: `8` -> `uint64_t`, `4` ->
+// `uint`. Both entry paths (the `-trace-coverage-counter-width` CLI
+// parser and the `TraceCoverageCounterByteWidth` API option) validate
+// the value to `{4, 8}` before reaching this helper, so any other
+// width indicates a compiler-internal bug rather than a user input
+// error — assert rather than coerce, so the bug surfaces at the
+// broken caller. For the uint32-vs-uint64 tradeoff and why the choice
+// is the caller's, see the `-trace-coverage-counter-width` flag docs
+// and `docs/design/shader-coverage.md`.
+static IRType* getCoverageCounterElementType(IRBuilder& builder, int counterByteWidth)
+{
+    switch (counterByteWidth)
+    {
+    case 4:
+        return builder.getUIntType();
+    case 8:
+        return builder.getUInt64Type();
+    default:
+        SLANG_UNEXPECTED("coverage counter byte width must be 4 or 8");
+    }
+}
+
 static void addReservedCoverageSpaces(
     List<UsedBindingRange>& ranges,
     const int* reservedSpaces,
@@ -650,6 +673,7 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     int explicitSpace,
     const int* reservedSpaces,
     int reservedSpaceCount,
+    int counterByteWidth,
     int& outSpace,
     int& outBinding)
 {
@@ -681,8 +705,12 @@ static IRGlobalParam* synthesizeCoverageBuffer(
             return nullptr;
     }
 
-    IRType* uintType = builder.getUIntType();
-    IRInst* typeOperands[2] = {uintType, builder.getType(kIROp_DefaultBufferLayoutType)};
+    // Counter element width is a caller choice (`-trace-coverage-counter-width`),
+    // not derived from the target — the compiler can't see the runtime
+    // driver that ultimately runs the SPIR-V/PTX, and that's the only
+    // thing that decides whether 64-bit shader atomics are usable.
+    IRType* counterElementType = getCoverageCounterElementType(builder, counterByteWidth);
+    IRInst* typeOperands[2] = {counterElementType, builder.getType(kIROp_DefaultBufferLayoutType)};
     auto bufferType = (IRType*)builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
 
     auto param = builder.createGlobalParam(bufferType);
@@ -911,8 +939,16 @@ struct CoverageInstrumenter
     IRGlobalParam* coverageBuffer;
     SourceManager* sourceManager;
     ArtifactPostEmitMetadata& outMetadata;
-    IRType* uintType;
-    IRType* uintPtrType;
+    // The counter element type comes from the synthesized buffer's
+    // own element type rather than re-querying the target, so the
+    // atomic op's operand width can never drift out of sync with the
+    // buffer's storage width even if a future change moves the type
+    // decision elsewhere. `intType` is the IR scalar type used for
+    // small integer literals threaded into the atomic op (slot
+    // index, memory-order constant) and is independent of the
+    // counter slot's storage width.
+    IRType* counterElementType;
+    IRType* counterElementPtrType;
     IRType* intType;
     List<BranchSiteRemap> branchSiteRemaps;
     uint32_t nextBranchSiteID = 1;
@@ -925,8 +961,13 @@ struct CoverageInstrumenter
         : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md)
     {
         IRBuilder tmpBuilder(module);
-        uintType = tmpBuilder.getUIntType();
-        uintPtrType = tmpBuilder.getPtrType(uintType);
+        // The unchecked `cast` is safe: this instrumenter only ever runs
+        // on the buffer synthesized by `synthesizeCoverageBuffer`, which
+        // creates it as a structured-buffer type. We never construct a
+        // `CoverageInstrumenter` over a caller-provided buffer.
+        auto bufferType = cast<IRHLSLStructuredBufferTypeBase>(coverageBuffer->getDataType());
+        counterElementType = bufferType->getElementType();
+        counterElementPtrType = tmpBuilder.getPtrType(counterElementType);
         intType = tmpBuilder.getIntType();
     }
 
@@ -1000,7 +1041,7 @@ struct CoverageInstrumenter
             builder.getIntValue(intType, (IRIntegerValue)slot),
         };
         IRInst* slotPtr = builder.emitIntrinsicInst(
-            uintPtrType,
+            counterElementPtrType,
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             getElemArgs);
@@ -1008,13 +1049,16 @@ struct CoverageInstrumenter
         // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
         // backend emitter to its native atomic-increment idiom
         // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
-        // SPIR-V, etc.). Correct under GPU concurrency.
+        // SPIR-V, etc.). The immediate and the result type are typed
+        // against `counterElementType` (uint or uint64), so the same
+        // lowering path produces a 64-bit `OpAtomicIAdd` /
+        // `atomicAdd(ulonglong*)` when the buffer is wide.
         IRInst* atomicArgs[] = {
             slotPtr,
-            builder.getIntValue(uintType, 1),
+            builder.getIntValue(counterElementType, 1),
             builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
         };
-        builder.emitIntrinsicInst(uintType, kIROp_AtomicAdd, 3, atomicArgs);
+        builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
 
         // The marker op has void return type and, by construction, no uses.
         // Catch a future IR transform that takes a use of it before we reach
@@ -1026,13 +1070,40 @@ struct CoverageInstrumenter
     void run(List<IRInst*> const& markerOps)
     {
         const auto counterCount = markerOps.getCount();
-        // Public coverage metadata stores counter indices as uint32_t
-        // because the runtime buffer is indexed by 32-bit elements in
-        // the generated shader code.
+        // This concerns the counter *index* type, which is independent of
+        // the per-slot storage width recorded just below: the public
+        // metadata stores counter indices as uint32_t because the
+        // generated shader code indexes the buffer with a 32-bit index,
+        // regardless of whether each slot is a uint (4 bytes) or uint64_t
+        // (8 bytes).
         SLANG_RELEASE_ASSERT(counterCount >= 0);
         SLANG_RELEASE_ASSERT(
             uint64_t(counterCount) <= uint64_t(std::numeric_limits<uint32_t>::max()));
         outMetadata.m_coverageCounterCount = (uint32_t)counterCount;
+        // Record the per-slot byte width so the manifest writer and
+        // every host that reads back the buffer can pick the right
+        // element type without re-deriving it from the target. The
+        // value is sourced from the IR type of the synthesized buffer
+        // (rather than from the original `counterByteWidth` selector
+        // passed in) so the recorded width cannot drift from the
+        // actually-emitted storage if a future change moves the type
+        // decision elsewhere. `getCoverageCounterElementType`
+        // produces exactly `uint` or `uint64_t`; the release-mode
+        // assertion below enforces that invariant even when debug
+        // assertions are compiled out, so an unexpected element type
+        // in release surfaces as a crash at the broken producer
+        // instead of silently writing `4` into the manifest.
+        switch (counterElementType->getOp())
+        {
+        case kIROp_UIntType:
+            outMetadata.m_coverageCounterByteWidth = 4;
+            break;
+        case kIROp_UInt64Type:
+            outMetadata.m_coverageCounterByteWidth = 8;
+            break;
+        default:
+            SLANG_UNEXPECTED("coverage counter element type must be uint or uint64_t");
+        }
         outMetadata.m_coverageEntries.reserve(counterCount);
         // Each marker op gets its own slot: the op's identity IS the
         // UID, and we assign a consecutive index in traversal order.
@@ -1192,6 +1263,7 @@ void instrumentCoverage(
     int explicitSpace,
     const int* reservedSpaces,
     int reservedSpaceCount,
+    int counterByteWidth,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
@@ -1292,6 +1364,7 @@ void instrumentCoverage(
         explicitSpace,
         reservedSpaces,
         reservedSpaceCount,
+        counterByteWidth,
         chosenSpace,
         chosenBinding);
 

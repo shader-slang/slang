@@ -4840,6 +4840,19 @@ err(
     "`-coverage-manifest-output` path '~path' was requested, but the selected target did not produce coverage metadata"
 )
 
+err(
+    "coverage-counter-width-invalid",
+    45113,
+    "`-trace-coverage-counter-width` value is invalid",
+    span { loc = "location", message = "option `-trace-coverage-counter-width` accepts only `32` or `64`, but got `~parsedValue:Int`. uint64 (the default) effectively cannot wrap; uint32 wraps silently at 2^32 hits per slot but is needed when the runtime driver does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon)." }
+)
+
+err(
+    "coverage-counter-width-bytes-invalid",
+    45114,
+    "coverage counter width API option value is invalid: the `CompilerOptionName::TraceCoverageCounterByteWidth` API option accepts only `4` (uint32) or `8` (uint64), but got `~byteWidth:Int`. This is the API-path counterpart to `E45113` (the CLI parser, which validates bits 32/64 before storing the byte width here); a host setting the API option directly must pass the byte width (divide bits by 8), not the bit width."
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(
