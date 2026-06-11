@@ -12,6 +12,6 @@ void main()
     foo(5.0f, b);
 }
 
-// CHECK-NOT: warning 15615
+// CHECK-NOT: warning[E15615]
 // This verifies that pragma warning directives are accepted in all modules
 // regardless of the length of code or comments in other modules.

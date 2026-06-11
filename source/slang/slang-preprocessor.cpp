@@ -1191,6 +1191,13 @@ struct WarningStateTracker : SourceWarningStateTrackerBase
     Dictionary<int, WarningTimeline> mapDiagnosticIdToTimeline = {};
     List<SourceLoc> stack = {};
 
+    // Running absolute-location counter, persisted across the separate `preprocessSource`
+    // passes that share this tracker (each `__include`d file is preprocessed in its own
+    // pass with a fresh `Preprocessor`). Persisting it keeps the timeline's absolute-location
+    // axis globally monotonic across files, instead of every pass restarting from 0 and
+    // colliding in the shared timeline (shader-slang/slang#11473).
+    SourceLoc::RawValue persistedAbsoluteSourceLocCounter = 0;
+
     WarningStateTracker(SourceManager* sourceManager = nullptr)
         : sourceManager(sourceManager)
     {
@@ -5028,6 +5035,24 @@ TokenList preprocessSource(
     preprocessor.warningStateTracker =
         dynamicCast<preprocessor::WarningStateTracker>(desc.sink->getSourceWarningStateTracker());
 
+    // Continue the absolute-location axis from the previous pass that shared this tracker.
+    //
+    // Correctness relies on a pass-ordering invariant the timeline depends on but cannot check:
+    // `preprocessSource` runs once per file, in include order, so the seeded ranges are disjoint
+    // and absolute-location order matches include/program order. That is exactly what keeps
+    // `WarningTimeline::addEntry`'s strictly-increasing insert guard (`location >
+    // maxKnownLocation`) satisfied across files. Each file is preprocessed at most once per
+    // tracker: `Linkage::findAndIncludeFile` de-dupes via the module's included-source-file map. If
+    // a pass ever ran out of include order, or a file were re-preprocessed against the same
+    // tracker, the seeded range could overlap a prior file's range and `#pragma warning` state
+    // would be mis-resolved *silently* (entries dropped on the `PragmaWarningCannotInsertHere`
+    // path, or a wrong suppression).
+    if (preprocessor.warningStateTracker)
+    {
+        preprocessor.absoluteSourceLocCounter =
+            preprocessor.warningStateTracker->persistedAbsoluteSourceLocCounter;
+    }
+
     // Add builtin macros
     {
         auto namePool = desc.namePool;
@@ -5087,6 +5112,25 @@ TokenList preprocessSource(
     }
 
     finalCheckPragmaWarnings(&preprocessor);
+
+    // Hand the advanced counter back so the next `__include` pass continues the axis. The counter
+    // only ever advances within a pass (pushInputFile/popInputFile add non-negative offsets), so
+    // the value handed back must not be below the value seeded above.
+    //
+    // Use a release assert (not `SLANG_ASSERT`, which is elided / becomes `SLANG_ASSUME` in release
+    // builds): violating monotonicity silently corrupts pragma-warning state in shipping
+    // slangc/slangd. This also guards against `SourceLoc::RawValue` (a `uint32_t`) wrapping once
+    // the counter accumulates across every `__include`d file of a very large translation unit -- on
+    // wrap the new value would be smaller than the persisted one, so the assert fires loudly
+    // instead of re-introducing the cross-file location aliasing this fix removes.
+    if (preprocessor.warningStateTracker)
+    {
+        SLANG_RELEASE_ASSERT(
+            preprocessor.absoluteSourceLocCounter >=
+            preprocessor.warningStateTracker->persistedAbsoluteSourceLocCounter);
+        preprocessor.warningStateTracker->persistedAbsoluteSourceLocCounter =
+            preprocessor.absoluteSourceLocCounter;
+    }
 
     // debugging: build the pre-processed source back together
 #if 0
