@@ -10,8 +10,8 @@ typedef int Arr2[2];
 // Leading-array form (already supported) — pinned to confirm identical handling.
 typedef int[3] Arr3;
 
-// Multi-dimensional trailing-array form.
-typedef int Mat2x2[2][2];
+// Multi-dimensional trailing-array form (non-square, to pin dimension order).
+typedef int Mat2x3[2][3];
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -28,12 +28,12 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     b[1] = 2;
     b[2] = 3;
 
-    Mat2x2 m;
+    Mat2x3 m;
     m[0][0] = 4;
-    m[1][1] = 5;
+    m[1][2] = 5; // last element of a [2][3] array — out of range if dims were swapped
 
     // CHECK: 1
     outputBuffer[0] = true && (a[0] + a[1] == 30) // trailing-array alias
                       && (b[0] + b[1] + b[2] == 6) // leading-array alias
-                      && (m[0][0] + m[1][1] == 9); // multi-dim trailing alias
+                      && (m[0][0] + m[1][2] == 9); // multi-dim trailing alias
 }
