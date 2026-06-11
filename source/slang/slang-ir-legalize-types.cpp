@@ -846,11 +846,63 @@ static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<Leg
         legalArgs.getArrayView().getBuffer()));
 }
 
+/// Return the scalar element type used to classify an abort payload argument.
+static IRType* getAbortArgumentElementType(IRType* type)
+{
+    if (auto vectorType = as<IRVectorType>(type))
+        return vectorType->getElementType();
+    return type;
+}
+
+/// Validate abort payload argument types after variadic-pack and pair legalization.
+static bool validateAbortArgumentTypes(
+    IRTypeLegalizationContext* context,
+    IRInst* abortInst,
+    ArrayView<IRInst*> args)
+{
+    ShortList<IRInst*> payloadArgs;
+    if (args.getCount() == 2)
+    {
+        auto operand = args[1];
+        if (auto makeStruct = as<IRMakeStruct>(operand))
+        {
+            for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
+                payloadArgs.add(makeStruct->getOperand(i));
+        }
+        else
+        {
+            payloadArgs.add(operand);
+        }
+    }
+    else
+    {
+        for (Index i = 1; i < args.getCount(); i++)
+            payloadArgs.add(args[i]);
+    }
+
+    for (auto arg : payloadArgs)
+    {
+        auto argType = arg->getDataType();
+        auto elementType = getAbortArgumentElementType(argType);
+        if (as<IRBasicType>(elementType))
+            continue;
+
+        context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
+            .type = argType,
+            .location = abortInst->sourceLoc});
+        return false;
+    }
+    return true;
+}
+
 /// Legalize an `Abort` instruction by rebuilding it from its legalized operands.
 /// Operands that legalized to nothing (`none`) are dropped, `simple` operands are
 /// forwarded unchanged, and `pair` operands contribute only their ordinary
 /// (non-resource) side, since only ordinary data can be carried in an abort message.
-static LegalVal legalizeAbort(IRTypeLegalizationContext* context, ArrayView<LegalVal> args)
+static LegalVal legalizeAbort(
+    IRTypeLegalizationContext* context,
+    IRInst* originalInst,
+    ArrayView<LegalVal> args)
 {
     ShortList<IRInst*> legalArgs;
     for (auto arg : args)
@@ -869,6 +921,9 @@ static LegalVal legalizeAbort(IRTypeLegalizationContext* context, ArrayView<Lega
             SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor for abort operand");
         }
     }
+    if (!validateAbortArgumentTypes(context, originalInst, legalArgs.getArrayView().arrayView))
+        return LegalVal::simple(context->builder->getVoidValue());
+
     return LegalVal::simple(context->builder->emitIntrinsicInst(
         context->builder->getVoidType(),
         kIROp_Abort,
@@ -2112,7 +2167,7 @@ static LegalVal legalizeInst(
         result = legalizePrintf(context, args);
         break;
     case kIROp_Abort:
-        result = legalizeAbort(context, args);
+        result = legalizeAbort(context, inst, args);
         break;
     case kIROp_LoadFromUninitializedMemory:
     case kIROp_Poison:
@@ -2390,6 +2445,10 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
         if (legalArg.flavor != LegalVal::Flavor::simple)
             anyComplex = true;
     }
+    // Always rebuild abort so its variadic payload is validated before
+    // target-specific legalization or emission.
+    if (inst->getOp() == kIROp_Abort)
+        anyComplex = true;
 
     // We must also legalize the type of the instruction, since that
     // is implicitly one of its operands.

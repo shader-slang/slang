@@ -2005,17 +2005,6 @@ void GLSLSourceEmitter::_maybeEmitGLSLCast(IRType* castType, IRInst* inst)
     }
 }
 
-static IRType* _getGLSLAbortArgumentElementType(IRType* type, IRVectorType** outVectorType)
-{
-    *outVectorType = nullptr;
-    if (auto vectorType = as<IRVectorType>(type))
-    {
-        *outVectorType = vectorType;
-        return vectorType->getElementType();
-    }
-    return type;
-}
-
 static void _collectGLSLAbortArguments(IRInst* inst, List<IRInst*>& args)
 {
     if (inst->getOperandCount() == 2)
@@ -2038,26 +2027,11 @@ static void _collectGLSLAbortArguments(IRInst* inst, List<IRInst*>& args)
     }
 }
 
-bool GLSLSourceEmitter::_validateGLSLAbortArgument(IRInst* arg, IRInst* abortInst)
-{
-    IRVectorType* vectorType = nullptr;
-    auto elementType = _getGLSLAbortArgumentElementType(arg->getDataType(), &vectorType);
-    SLANG_UNUSED(vectorType);
-
-    if (!as<IRBasicType>(elementType))
-    {
-        getSink()->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
-            .type = arg->getDataType(),
-            .location = abortInst->sourceLoc});
-        return false;
-    }
-    return true;
-}
-
 void GLSLSourceEmitter::_emitGLSLAbortArgument(IRInst* arg)
 {
-    IRVectorType* vectorType = nullptr;
-    auto elementType = _getGLSLAbortArgumentElementType(arg->getDataType(), &vectorType);
+    IRVectorType* vectorType = as<IRVectorType>(arg->getDataType());
+    auto elementType = vectorType ? vectorType->getElementType() : arg->getDataType();
+    SLANG_RELEASE_ASSERT(as<IRBasicType>(elementType));
 
     if (as<IRBoolType>(elementType))
     {
@@ -2859,11 +2833,6 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             List<IRInst*> args;
             _collectGLSLAbortArguments(inst, args);
-            for (auto arg : args)
-            {
-                if (!_validateGLSLAbortArgument(arg, inst))
-                    return true;
-            }
 
             m_writer->emit("abortEXT(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));

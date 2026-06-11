@@ -2165,12 +2165,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             if (!as<IRBasicType>(elementType))
             {
-                m_sharedContext->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
-                    .type = argType,
-                    .location = inst->sourceLoc});
-                inst->replaceUsesWith(builder.getVoidValue());
-                inst->removeAndDeallocate();
-                return;
+                SLANG_RELEASE_ASSERT(
+                    !"abort argument type should be validated during type legalization");
             }
         }
 
