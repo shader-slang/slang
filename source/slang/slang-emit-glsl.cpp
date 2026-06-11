@@ -201,31 +201,62 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
     }
 }
 
+void GLSLSourceEmitter::_emitMemoryQualifierFlags(IRIntegerValue flags)
+{
+    if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+    {
+        m_writer->emit("coherent ");
+    }
+    if (flags & MemoryQualifierSetModifier::Flags::kVolatile)
+    {
+        m_writer->emit("volatile ");
+    }
+    if (flags & MemoryQualifierSetModifier::Flags::kRestrict)
+    {
+        m_writer->emit("restrict ");
+    }
+    if (flags & MemoryQualifierSetModifier::Flags::kReadOnly)
+    {
+        m_writer->emit("readonly ");
+    }
+    if (flags & MemoryQualifierSetModifier::Flags::kWriteOnly)
+    {
+        m_writer->emit("writeonly ");
+    }
+}
+
 void GLSLSourceEmitter::_emitMemoryQualifierDecorations(IRInst* varDecl)
 {
     if (auto collection = varDecl->findDecoration<IRMemoryQualifierSetDecoration>())
     {
         IRIntegerValue flags = collection->getMemoryQualifierBit();
-        if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+        _emitMemoryQualifierFlags(flags);
+    }
+}
+
+void GLSLSourceEmitter::_emitMemoryQualifierTypeAttrs(IRType* type)
+{
+    while (type)
+    {
+        if (auto attributedType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
         {
-            m_writer->emit("coherent ");
+            for (auto attr : attributedType->getAllAttrs())
+            {
+                if (auto memoryQualifierAttr = as<IRMemoryQualifierSetAttr>(attr))
+                {
+                    _emitMemoryQualifierFlags(
+                        getIntVal(memoryQualifierAttr->getMemoryQualifierBit()));
+                }
+            }
+            type = attributedType->getBaseType();
+            continue;
         }
-        if (flags & MemoryQualifierSetModifier::Flags::kVolatile)
+        if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
         {
-            m_writer->emit("volatile ");
+            type = arrayType->getElementType();
+            continue;
         }
-        if (flags & MemoryQualifierSetModifier::Flags::kRestrict)
-        {
-            m_writer->emit("restrict ");
-        }
-        if (flags & MemoryQualifierSetModifier::Flags::kReadOnly)
-        {
-            m_writer->emit("readonly ");
-        }
-        if (flags & MemoryQualifierSetModifier::Flags::kWriteOnly)
-        {
-            m_writer->emit("writeonly ");
-        }
+        break;
     }
 }
 
@@ -234,6 +265,22 @@ void GLSLSourceEmitter::emitMemoryQualifiers(IRInst* varDecl)
     _emitMemoryQualifierDecorations(varDecl);
 }
 
+void GLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
+{
+    switch (attr->getOp())
+    {
+    default:
+        Super::_emitPrefixTypeAttr(attr);
+        break;
+
+    case kIROp_MemoryQualifierSetAttr:
+        {
+            auto memoryQualifierAttr = cast<IRMemoryQualifierSetAttr>(attr);
+            _emitMemoryQualifierFlags(getIntVal(memoryQualifierAttr->getMemoryQualifierBit()));
+        }
+        break;
+    }
+}
 
 void GLSLSourceEmitter::emitStructFieldAttributes(
     IRStructType* structType,
@@ -314,6 +361,9 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(
     }
 
     m_writer->emit(") ");
+
+    _emitMemoryQualifierDecorations(varDecl);
+    _emitMemoryQualifierTypeAttrs(varDecl->getDataType());
 
     /*
     If the output type is a buffer, and we can determine it is only readonly we can prefix

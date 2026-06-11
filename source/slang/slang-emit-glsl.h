@@ -67,6 +67,7 @@ protected:
     virtual void emitParamTypeImpl(IRType* type, String const& name) SLANG_OVERRIDE;
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) SLANG_OVERRIDE;
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* decl) SLANG_OVERRIDE;
+    virtual void _emitPrefixTypeAttr(IRAttr* attr) SLANG_OVERRIDE;
 
     virtual void emitBitfieldExtractImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitBitfieldInsertImpl(IRInst* inst) SLANG_OVERRIDE;
@@ -83,7 +84,9 @@ protected:
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
 
+    void _emitMemoryQualifierFlags(IRIntegerValue flags);
     void _emitMemoryQualifierDecorations(IRInst* varDecl);
+    void _emitMemoryQualifierTypeAttrs(IRType* type);
     void _emitGLSLSubpassInputType(IRSubpassInputType* type);
     void _emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName);
     void _emitGLSLStructuredBuffer(
