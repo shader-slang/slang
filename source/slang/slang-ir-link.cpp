@@ -207,31 +207,19 @@ static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRI
     SLANG_UNUSED(clonedInst);
 
     // Local annotations will be cloned normally as part of cloning their parent function/generic
-    // body. Only explicitly chase use-list annotations for module-scope instructions, where the
-    // annotations are not children of the cloned instruction itself.
+    // body. For module-scope annotations, we need to look them up since they won't get automatically 
+    // pulled in.
+    
     if (!originalInst->getParent() || originalInst->getParent()->getOp() != kIROp_ModuleInst)
         return;
 
     if (!context->globalsWithClonedAnnotations.add(originalInst))
         return;
 
-    auto originalModule = originalInst->getModule();
-    auto linkingInfo = originalModule ? originalModule->_getLinkingInfo() : nullptr;
-    if (linkingInfo)
-    {
-        auto annotations = linkingInfo->getAnnotationsForTarget(originalInst);
-        for (auto annotation : annotations)
-            cloneInst(context, context->builder, annotation, annotation);
-        return;
-    }
-
-    traverseUsers<IRAnnotation>(
-        originalInst,
-        [&](IRAnnotation* annotation)
-        {
-            if (annotation->getTarget() == originalInst)
-                cloneInst(context, context->builder, annotation, annotation);
-        });
+    auto annotations =
+        originalInst->getModule()->_getLinkingInfo()->getAnnotationsForTarget(originalInst);
+    for (auto annotation : annotations)
+        cloneInst(context, context->builder, annotation, annotation);
 }
 
 IRInst* cloneInst(IRSpecContextBase* context, IRBuilder* builder, IRInst* originalInst)

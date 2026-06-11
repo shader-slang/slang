@@ -2073,7 +2073,7 @@ struct ModuleLinkingInfo : RefObject
 
     /// Query the acceleration cache for module-scope annotations on `target`.
     /// The result is only valid while the module is unchanged from when this info was built.
-    List<IRAnnotation*> getAnnotationsForTarget(IRInst* target);
+    ArrayView<IRAnnotation*> getAnnotationsForTarget(IRInst* target);
 
     /// Query the acceleration cache for global HLSL/downstream exports.
     /// The result is only valid while the module is unchanged from when this info was built.

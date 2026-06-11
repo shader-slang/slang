@@ -4961,7 +4961,7 @@ void ModuleLinkingInfo::_build(IRModule* module)
     }
 }
 
-List<IRAnnotation*> ModuleLinkingInfo::getAnnotationsForTarget(IRInst* target)
+ArrayView<IRAnnotation*> ModuleLinkingInfo::getAnnotationsForTarget(IRInst* target)
 {
     if (!target)
         return {};
@@ -4970,7 +4970,7 @@ List<IRAnnotation*> ModuleLinkingInfo::getAnnotationsForTarget(IRInst* target)
     if (!annotations)
         return {};
 
-    return *annotations;
+    return annotations->getArrayView();
 }
 
 ModuleLinkingInfo* IRModule::_getOrCreateLinkingInfo()
