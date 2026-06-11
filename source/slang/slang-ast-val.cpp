@@ -2209,7 +2209,8 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
     Type* resultType,
     BuiltinOperationKind op,
     List<IntVal*>& newArgs,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    SourceLoc loc)
 {
     List<ConstantIntVal*> constArgs;
     for (auto arg : newArgs)
@@ -2292,7 +2293,7 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         if (a1 == 0)
         {
             if (sink)
-                sink->diagnose(Diagnostics::DivideByZero{});
+                sink->diagnose(Diagnostics::DivideByZero{.location = loc});
             return nullptr;
         }
         // `INT64_MIN / -1` overflows and traps (SIGFPE) on real hardware, so handle the

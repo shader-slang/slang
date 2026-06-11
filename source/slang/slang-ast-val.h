@@ -250,12 +250,16 @@ class BuiltinOperationIntVal : public IntVal
             m_operands.add(ValNodeOperand(arg));
     }
 
+    // `loc` is the source location of the operator expression being folded; it is used only to
+    // locate a divide-by-zero diagnostic. The sink-less substitute/resolve callers leave it
+    // defaulted (they never diagnose).
     static Val* tryFoldImpl(
         ASTBuilder* astBuilder,
         Type* resultType,
         BuiltinOperationKind op,
         List<IntVal*>& newArgs,
-        DiagnosticSink* sink);
+        DiagnosticSink* sink,
+        SourceLoc loc = SourceLoc());
 
     bool _isLinkTimeValOverride()
     {
