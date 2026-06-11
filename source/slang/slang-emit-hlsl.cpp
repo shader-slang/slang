@@ -1179,16 +1179,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto flagLit = as<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
             SLANG_RELEASE_ASSERT(flagLit);
             auto flagVal = (uint32_t)getIntVal(flagLit);
-            Count flagBitCount = 0;
-            auto flagBits = getBarrierMemoryTypeFlagBits(flagBitCount);
-            emitNamedBitFlagSet(
-                flagVal,
-                getKnownBarrierMemoryTypeFlags(),
-                BarrierMemoryTypeFlags::AllMemory,
-                "ALL_MEMORY",
-                flagBits,
-                flagBitCount,
-                getBarrierMemoryTypeFlagName);
+            emitNamedMemoryTypeFlagSet(flagVal);
             return true;
         }
 
@@ -1198,16 +1189,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto flagLit = as<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
             SLANG_RELEASE_ASSERT(flagLit);
             auto flagVal = (uint32_t)getIntVal(flagLit);
-            Count flagBitCount = 0;
-            auto flagBits = getBarrierSemanticFlagBits(flagBitCount);
-            emitNamedBitFlagSet(
-                flagVal,
-                getKnownBarrierSemanticFlags(),
-                BarrierSemanticFlags::Reorder,
-                "REORDER",
-                flagBits,
-                flagBitCount,
-                getBarrierSemanticFlagName);
+            emitNamedSemanticFlagSet(flagVal);
             return true;
         }
     case kIROp_MakeCoopVector:

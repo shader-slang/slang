@@ -3431,8 +3431,7 @@ char const* getWorkGraphRecordTypeName(IROp op)
 
 IRType* getWorkGraphRecordElementType(IRType* type)
 {
-    if (!type)
-        return nullptr;
+    SLANG_ASSERT(type);
 
     switch (type->getOp())
     {

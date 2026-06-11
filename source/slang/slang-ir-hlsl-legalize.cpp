@@ -9,32 +9,8 @@
 #include "slang-rich-diagnostics.h"
 #include "slang-type-system-shared.h"
 
-#include <functional>
-
 namespace Slang
 {
-
-static bool tryGetBarrierFlagValue(IRInst* inst, IRIntegerValue& outValue)
-{
-    if (auto intLit = as<IRIntLit>(getBarrierFlagValueInst(inst)))
-    {
-        outValue = getIntVal(intLit);
-        return true;
-    }
-    return false;
-}
-
-static bool tryGetBarrierFlagValueOrDiagnose(
-    IRInst* inst,
-    DiagnosticSink* sink,
-    IRIntegerValue& outValue)
-{
-    if (tryGetBarrierFlagValue(inst->getOperand(0), outValue))
-        return true;
-
-    sink->diagnose(Diagnostics::NeedCompileTimeConstant{.location = inst->sourceLoc});
-    return false;
-}
 
 static String getBarrierFlagValueString(uint32_t flagVal)
 {
@@ -49,10 +25,8 @@ static void validateBarrierFlagsForHLSLInst(IRInst* inst, DiagnosticSink* sink)
     {
     case kIROp_GetEnumBarrierMemoryTypeFlags:
         {
-            IRIntegerValue rawFlagVal = 0;
-            if (!tryGetBarrierFlagValueOrDiagnose(inst, sink, rawFlagVal))
-                break;
-
+            auto intLit = cast<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
+            auto rawFlagVal = getIntVal(intLit);
             auto flagVal = (uint32_t)rawFlagVal;
             if (!isValidBarrierMemoryTypeFlags(flagVal))
             {
@@ -64,10 +38,8 @@ static void validateBarrierFlagsForHLSLInst(IRInst* inst, DiagnosticSink* sink)
         }
     case kIROp_GetEnumBarrierSemanticFlags:
         {
-            IRIntegerValue rawFlagVal = 0;
-            if (!tryGetBarrierFlagValueOrDiagnose(inst, sink, rawFlagVal))
-                break;
-
+            auto intLit = cast<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
+            auto rawFlagVal = getIntVal(intLit);
             auto flagVal = (uint32_t)rawFlagVal;
             if (!isValidBarrierSemanticFlags(flagVal))
             {

@@ -482,26 +482,21 @@ __slang_cm_muladd(
     return flagBits;
 }
 
-void HLSLSourceEmitter::emitNamedBitFlagSet(
-    uint32_t flagVal,
-    uint32_t knownFlags,
-    uint32_t specialValue,
-    char const* specialName,
-    uint32_t const* flagBits,
-    Count flagBitCount,
-    char const* (*getFlagName)(uint32_t))
+void HLSLSourceEmitter::emitNamedMemoryTypeFlagSet(uint32_t flagVal)
 {
     m_writer->emit("(");
-    if (flagVal == specialValue)
+    if (flagVal == BarrierMemoryTypeFlags::AllMemory)
     {
-        m_writer->emit(specialName);
+        m_writer->emit("ALL_MEMORY");
     }
-    else if (flagVal & ~knownFlags)
+    else if (flagVal & ~getKnownBarrierMemoryTypeFlags())
     {
         m_writer->emit("0");
     }
     else
     {
+        Count flagBitCount = 0;
+        auto flagBits = getBarrierMemoryTypeFlagBits(flagBitCount);
         bool first = true;
         for (Count ii = 0; ii < flagBitCount; ++ii)
         {
@@ -511,7 +506,42 @@ void HLSLSourceEmitter::emitNamedBitFlagSet(
 
             if (!first)
                 m_writer->emit(" | ");
-            auto name = getFlagName(bit);
+            auto name = getBarrierMemoryTypeFlagName(bit);
+            SLANG_ASSERT(name);
+            m_writer->emit(name);
+            first = false;
+        }
+        if (first)
+            m_writer->emit("0");
+    }
+    m_writer->emit(")");
+}
+
+void HLSLSourceEmitter::emitNamedSemanticFlagSet(uint32_t flagVal)
+{
+    m_writer->emit("(");
+    if (flagVal == BarrierSemanticFlags::Reorder)
+    {
+        m_writer->emit("REORDER");
+    }
+    else if (flagVal & ~getKnownBarrierSemanticFlags())
+    {
+        m_writer->emit("0");
+    }
+    else
+    {
+        Count flagBitCount = 0;
+        auto flagBits = getBarrierSemanticFlagBits(flagBitCount);
+        bool first = true;
+        for (Count ii = 0; ii < flagBitCount; ++ii)
+        {
+            auto bit = flagBits[ii];
+            if (!(flagVal & bit))
+                continue;
+
+            if (!first)
+                m_writer->emit(" | ");
+            auto name = getBarrierSemanticFlagName(bit);
             SLANG_ASSERT(name);
             m_writer->emit(name);
             first = false;

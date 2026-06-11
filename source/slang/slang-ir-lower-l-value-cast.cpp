@@ -57,6 +57,7 @@ struct LValueCastLoweringContext
         auto ptrA = as<IRPtrTypeBase>(a);
         auto ptrB = as<IRPtrTypeBase>(b);
 
+        // They must both be pointers...
         SLANG_ASSERT(ptrA && ptrB);
 
         a = ptrA->getValueType();
@@ -184,7 +185,11 @@ struct LValueCastLoweringContext
         auto toPtrType = as<IRPtrTypeBase>(toType);
         auto fromPtrType = as<IRPtrTypeBase>(fromType);
 
-        SLANG_RELEASE_ASSERT(toPtrType && fromPtrType);
+        if (!toPtrType || !fromPtrType)
+        {
+            // If either type is not a pointer type, we cannot process this L-value cast
+            return;
+        }
 
         IRType* toValueType = toPtrType->getValueType();
         IRType* fromValueType = fromPtrType->getValueType();
