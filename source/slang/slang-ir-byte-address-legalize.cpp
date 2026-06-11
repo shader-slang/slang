@@ -129,6 +129,10 @@ struct ByteAddressBufferLegalizationContext
         //
         auto type = load->getDataType();
 
+        // Validate the load's `location`/`alignment` contract up front so the diagnostic
+        // fires regardless of whether the loaded type happens to need legalization.
+        validateExplicitAlignment(load->getOperand(1), load->getOperand(2), type);
+
         // We start by looking at the type being loaded so
         // that we can opt out if it is legal.
         //
@@ -240,48 +244,108 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    // Returns true if a vectorized load or store of `alignmentVal` bytes at
-    // `baseOffset + immediateOffset` is known to be sufficiently aligned.
-    bool isAligned(
-        IRInst* baseOffset,
-        IRIntegerValue immediateOffset,
-        IRInst* unknownOffsetAlignment,
-        IRIntegerValue alignmentVal)
+    // Validate the `alignment` and `location` operands of a single byte-address load/store
+    // against the `LoadAligned`/`StoreAligned` contract (see issue #11545): a non-zero
+    // alignment promise must be a compile-time constant and a power of two, and a
+    // compile-time-constant location must itself be a multiple of that promise. Diagnostics
+    // are emitted but legalization continues, so an offending access still produces valid
+    // (scalarized) IR for the rest of compilation. Called once per access on the user's
+    // `location`/`alignment` arguments; `alignment == 0` is the "no promise" sentinel used by
+    // the plain `Load`/`Store` accessors and carries no contract to validate.
+    void validateExplicitAlignment(IRInst* baseOffset, IRInst* alignment, IRType* accessType)
     {
-        if (alignmentVal <= 0)
-            return false;
-
-        if (auto baseOffsetVal = as<IRIntLit>(baseOffset))
+        auto alignLit = as<IRIntLit>(alignment);
+        if (!alignLit)
         {
-            // If the offset is a constant known at compile time, simply check if it aligned to
-            // the elementsize of the underlying resource.
-            return ((baseOffsetVal->getValue() + immediateOffset) % alignmentVal) == 0;
+            m_sink->diagnose(Diagnostics::ByteAddressBufferAlignmentNotConstant{
+                .location = baseOffset->sourceLoc,
+            });
+            return;
         }
-        else if (auto alignInst = as<IRIntLit>(unknownOffsetAlignment))
+
+        auto alignmentVal = alignLit->getValue();
+        if (alignmentVal == 0)
+            return;
+
+        if ((alignmentVal & (alignmentVal - 1)) != 0)
         {
-            // If the offset is not known during compile time, use the explicit align
-            // field of the overloaded `Load` or `Store` operation or via `LoadAligned`
-            // or `StoreAligned` function.
-            //
-            // Unaligned `Load`s or `Store`s are identified with 0 alignment, to prevent
-            // accidentally issuing a wide vectorized operations.
-            if (!alignInst->getValue())
-                return false;
-
-            if ((immediateOffset % alignmentVal) != 0)
-                return false;
-
-            if ((alignInst->getValue() % alignmentVal) == 0)
-            {
-                return true;
-            }
-            m_sink->diagnose(Diagnostics::ByteAddressBufferUnaligned{
-                .alignment = alignInst->getValue(),
-                .elementSize = alignmentVal,
+            m_sink->diagnose(Diagnostics::ByteAddressBufferAlignmentNotPowerOfTwo{
+                .alignment = alignmentVal,
                 .location = baseOffset->sourceLoc,
             });
         }
+        else
+        {
+            // A power-of-two alignment must still be at least the natural alignment of the access
+            // type's scalar components. The natural alignment of a composite is the maximum of its
+            // members' alignments, so checking the whole type here is equivalent to checking each
+            // scalar leaf (and also covers already-legal scalar types that skip the legalizer).
+            IRSizeAndAlignment sizeAlignment;
+            if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(m_target, accessType, &sizeAlignment)) &&
+                sizeAlignment.alignment > 0 && (alignmentVal % sizeAlignment.alignment) != 0)
+            {
+                m_sink->diagnose(Diagnostics::ByteAddressBufferUnaligned{
+                    .alignment = alignmentVal,
+                    .elementSize = sizeAlignment.alignment,
+                    .location = baseOffset->sourceLoc,
+                });
+            }
+        }
+
+        if (auto baseOffsetLit = as<IRIntLit>(baseOffset))
+        {
+            if ((baseOffsetLit->getValue() % alignmentVal) != 0)
+            {
+                m_sink->diagnose(Diagnostics::ByteAddressBufferLocationNotAligned{
+                    .offset = baseOffsetLit->getValue(),
+                    .alignment = alignmentVal,
+                    .location = baseOffset->sourceLoc,
+                });
+            }
+        }
+    }
+
+    // Returns true if a single wide access of `wideSize` bytes covering
+    // `baseOffset + immediateOffset` provably lands on a `wideSize`-aligned address. This is a
+    // pure query that never diagnoses, so it is safe to call repeatedly (e.g. when probing the
+    // candidate chunk widths).
+    //
+    // The decision is driven by the promised alignment alone (issue #11545, point 3): the
+    // contract requires `location` (the runtime base offset) to be a multiple of the promise,
+    // so the access's absolute offset is congruent to `immediateOffset` modulo the promise and
+    // a constant and a runtime location with the same promise legalize identically. Only when
+    // there is no promise (`alignment == 0`, the plain `Load`/`Store` accessors) do we fall
+    // back to a compile-time-constant base offset to prove alignment.
+    bool isWideAccessAligned(
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* unknownOffsetAlignment,
+        IRIntegerValue wideSize)
+    {
+        if (wideSize <= 0)
+            return false;
+
+        if (auto alignLit = as<IRIntLit>(unknownOffsetAlignment))
+        {
+            if (auto promisedAlignment = alignLit->getValue())
+                return (promisedAlignment % wideSize) == 0 && (immediateOffset % wideSize) == 0;
+        }
+
+        // No alignment promise: only a compile-time-constant base offset can prove that a wide
+        // access is safe.
+        if (auto baseOffsetVal = as<IRIntLit>(baseOffset))
+            return ((baseOffsetVal->getValue() + immediateOffset) % wideSize) == 0;
+
         return false;
+    }
+
+    // Return the largest power of two that is not greater than `n` (for n >= 1).
+    static IRIntegerValue largestPow2AtMost(IRIntegerValue n)
+    {
+        IRIntegerValue p = 1;
+        while ((p * 2) <= n)
+            p *= 2;
+        return p;
     }
 
     IRType* getDescriptorHandleStorageType()
@@ -442,7 +506,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -553,8 +617,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (m_options.scalarizeVectorLoadStore ||
-                    !isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (m_options.scalarizeVectorLoadStore)
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -566,10 +629,23 @@ struct ByteAddressBufferLegalizationContext
                         elementCountInst->getValue(),
                         alignment);
                 }
-                else
+                if (isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
                 }
+                // The whole vector is not aligned for a single wide load, but a narrower
+                // power-of-two-width access may still be: emit the widest chunks the alignment
+                // permits and fall back to per-component loads for the remainder (issue
+                // #11545, point 5 — e.g. a `half4` at alignment 4 becomes two `half2` loads).
+                return emitLegalChunkedVectorLoad(
+                    vecType,
+                    buffer,
+                    baseOffset,
+                    immediateOffset,
+                    alignment,
+                    vecType->getElementType(),
+                    elementStride,
+                    elementCountInst->getValue());
             }
 
             // If we aren't scalarizing a vetor load then we next need
@@ -627,8 +703,11 @@ struct ByteAddressBufferLegalizationContext
                 IRSizeAndAlignment sizeAlignment;
                 SLANG_RETURN_NULL_ON_FAIL(
                     getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
-                if (sizeAlignment.size == 8 &&
-                    !isAligned(baseOffset, immediateOffset, alignment, sizeAlignment.getStride()))
+                if (sizeAlignment.size == 8 && !isWideAccessAligned(
+                                                   baseOffset,
+                                                   immediateOffset,
+                                                   alignment,
+                                                   sizeAlignment.getStride()))
                 {
                     return emitLegalUnaligned64BitLoadFromTwoUInts(
                         type,
@@ -713,6 +792,70 @@ struct ByteAddressBufferLegalizationContext
         //
         return m_builder
             .emitIntrinsicInst(type, op, elementVals.getCount(), elementVals.getBuffer());
+    }
+
+    // Load a vector of `elementCount` elements of `elementType` from `buffer` by emitting the
+    // widest power-of-two-width sub-vector load the alignment permits at each step, falling back
+    // to per-component loads for any remainder, then reassembling the full vector.
+    //
+    // This realizes the "widest access the alignment permits, chunked when necessary" rule
+    // (issue #11545, point 5). For example, a `half4` (scalar stride 2) promised alignment 4 can
+    // only do 4-byte-aligned accesses, so it is emitted as two `half2` loads; a `float3`
+    // promised alignment 8 is emitted as one `float2` plus one scalar `float`. The whole-vector
+    // single-load case is handled by the caller before reaching here, so this routine always
+    // produces at least two accesses.
+    IRInst* emitLegalChunkedVectorLoad(
+        IRType* vecType,
+        IRInst* buffer,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* alignment,
+        IRType* elementType,
+        IRIntegerValue elementStride,
+        IRIntegerValue elementCount)
+    {
+        List<IRInst*> components;
+        for (IRIntegerValue done = 0; done < elementCount;)
+        {
+            IRIntegerValue remaining = elementCount - done;
+            IRIntegerValue chunkOffset = immediateOffset + done * elementStride;
+
+            // Pick the widest power-of-two chunk width (capped at 4, the widest byte-address
+            // vector access) whose byte size is aligned at this offset; width 1 is always valid.
+            IRIntegerValue width = 1;
+            for (IRIntegerValue cand = largestPow2AtMost(remaining < 4 ? remaining : 4); cand >= 2;
+                 cand /= 2)
+            {
+                if (isWideAccessAligned(baseOffset, chunkOffset, alignment, cand * elementStride))
+                {
+                    width = cand;
+                    break;
+                }
+            }
+
+            if (width == 1)
+            {
+                auto elementVal =
+                    emitLegalLoad(elementType, buffer, baseOffset, chunkOffset, alignment);
+                if (!elementVal)
+                    return nullptr;
+                components.add(elementVal);
+            }
+            else
+            {
+                auto chunkType = m_builder.getVectorType(elementType, width);
+                auto chunkVal =
+                    emitLegalLoad(chunkType, buffer, baseOffset, chunkOffset, alignment);
+                if (!chunkVal)
+                    return nullptr;
+                for (IRIntegerValue i = 0; i < width; ++i)
+                    components.add(m_builder.emitElementExtract(chunkVal, i));
+            }
+
+            done += width;
+        }
+
+        return m_builder.emitMakeVector(vecType, components);
     }
 
     IRInst* emitLegalUnaligned64BitLoadFromTwoUInts(
@@ -1316,6 +1459,10 @@ struct ByteAddressBufferLegalizationContext
         auto value = store->getOperand(3);
         auto type = value->getDataType();
 
+        // Validate the store's `location`/`alignment` contract up front so the diagnostic
+        // fires regardless of whether the stored type happens to need legalization.
+        validateExplicitAlignment(store->getOperand(1), store->getOperand(2), type);
+
         // Types that are already legal to use don't require any processing.
         //
         if (isTypeLegalForByteAddressLoadStore(type))
@@ -1396,7 +1543,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1505,8 +1652,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (m_options.scalarizeVectorLoadStore ||
-                    !isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (m_options.scalarizeVectorLoadStore)
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1517,7 +1663,7 @@ struct ByteAddressBufferLegalizationContext
                         elementCountInst->getValue(),
                         alignment);
                 }
-                else
+                if (isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitSimpleStore(
                         value->getDataType(),
@@ -1526,6 +1672,19 @@ struct ByteAddressBufferLegalizationContext
                         immediateOffset,
                         value);
                 }
+                // The whole vector is not aligned for a single wide store, but a narrower
+                // power-of-two-width access may still be: store the widest chunks the alignment
+                // permits and fall back to per-component stores for the remainder (issue
+                // #11545, point 5 — the store mirror of `emitLegalChunkedVectorLoad`).
+                return emitLegalChunkedVectorStore(
+                    buffer,
+                    baseOffset,
+                    immediateOffset,
+                    alignment,
+                    value,
+                    vecType->getElementType(),
+                    elementStride,
+                    elementCountInst->getValue());
             }
 
             if (m_options.useBitCastFromUInt)
@@ -1557,8 +1716,11 @@ struct ByteAddressBufferLegalizationContext
             {
                 IRSizeAndAlignment sizeAlignment;
                 SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
-                if (sizeAlignment.size == 8 &&
-                    !isAligned(baseOffset, immediateOffset, alignment, sizeAlignment.getStride()))
+                if (sizeAlignment.size == 8 && !isWideAccessAligned(
+                                                   baseOffset,
+                                                   immediateOffset,
+                                                   alignment,
+                                                   sizeAlignment.getStride()))
                 {
                     return emitLegalUnaligned64BitStoreAsTwoUInts(
                         buffer,
@@ -1762,6 +1924,69 @@ struct ByteAddressBufferLegalizationContext
                 immediateOffset + ii * elementStride,
                 alignment,
                 elementVal));
+        }
+
+        return SLANG_OK;
+    }
+
+    // Store a vector `value` by emitting the widest power-of-two-width sub-vector store the
+    // alignment permits at each step, falling back to per-component stores for any remainder.
+    // This is the store mirror of `emitLegalChunkedVectorLoad` (issue #11545, point 5); the
+    // whole-vector single-store case is handled by the caller before reaching here.
+    Result emitLegalChunkedVectorStore(
+        IRInst* buffer,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* alignment,
+        IRInst* value,
+        IRType* elementType,
+        IRIntegerValue elementStride,
+        IRIntegerValue elementCount)
+    {
+        for (IRIntegerValue done = 0; done < elementCount;)
+        {
+            IRIntegerValue remaining = elementCount - done;
+            IRIntegerValue chunkOffset = immediateOffset + done * elementStride;
+
+            IRIntegerValue width = 1;
+            for (IRIntegerValue cand = largestPow2AtMost(remaining < 4 ? remaining : 4); cand >= 2;
+                 cand /= 2)
+            {
+                if (isWideAccessAligned(baseOffset, chunkOffset, alignment, cand * elementStride))
+                {
+                    width = cand;
+                    break;
+                }
+            }
+
+            if (width == 1)
+            {
+                auto elementVal = m_builder.emitElementExtract(value, done);
+                SLANG_RETURN_ON_FAIL(emitLegalStore(
+                    elementType,
+                    buffer,
+                    baseOffset,
+                    chunkOffset,
+                    alignment,
+                    elementVal));
+            }
+            else
+            {
+                auto chunkType = m_builder.getVectorType(elementType, width);
+                List<IRInst*> chunkComponents;
+                for (IRIntegerValue i = 0; i < width; ++i)
+                    chunkComponents.add(m_builder.emitElementExtract(value, done + i));
+                auto chunkVal = m_builder.emitMakeVector(chunkType, chunkComponents);
+                SLANG_RETURN_ON_FAIL(emitLegalStore(
+                    chunkType,
+                    buffer,
+                    baseOffset,
+                    chunkOffset,
+                    alignment,
+                    chunkVal));
+            }
+
+            done += width;
         }
 
         return SLANG_OK;

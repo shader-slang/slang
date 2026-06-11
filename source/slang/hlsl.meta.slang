@@ -288,7 +288,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, __naturalStrideOf<uint2>());
+            return __byteAddressBufferLoad<uint2>(this, location, __naturalAlignmentOf<uint2>());
         }
     }
 
@@ -354,7 +354,7 @@ struct ByteAddressBuffer
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location with natural alignment.
-    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@param location The input address in bytes, which must be a multiple of 4 (the natural alignment of `uint3`).
     ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -365,7 +365,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, __naturalStrideOf<uint3>());
+            return __byteAddressBufferLoad<uint3>(this, location, __naturalAlignmentOf<uint3>());
         }
     }
 
@@ -442,7 +442,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
+            return __byteAddressBufferLoad<uint4>(this, location, __naturalAlignmentOf<uint4>());
         }
     }
 
@@ -463,12 +463,19 @@ struct ByteAddressBuffer
 
     /// Load a value with type `T` from the buffer at the specified location with a known alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@param location The input address in bytes, which must be a multiple of `alignment`.
+    ///@param alignment The known alignment of `location` in bytes. It must be a compile-time
+    /// constant, a power of two, and at least the alignment of `T`'s scalar components; otherwise
+    /// a compile-time error is reported.
     ///@return The value loaded from the buffer.
     ///@remarks
-    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
-    /// On other targets, `alignment` is forwarded to the lowered load instruction.
+    /// `alignment` is the sole input to the wide-vs-scalarized codegen decision, so a constant
+    /// and a runtime `location` with the same `alignment` lower identically. When `alignment`
+    /// covers the whole `T` a single wide load is emitted; when it only covers part of `T` (for
+    /// example 4 for a `half4`) the widest power-of-two-width chunks the alignment permits are
+    /// emitted, with per-component loads for any remainder. On HLSL the value is informational
+    /// and does not change the emitted intrinsic; on other targets it is forwarded to the lowered
+    /// load instruction.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
@@ -479,16 +486,21 @@ struct ByteAddressBuffer
 
     /// Load a value with type `T` from the buffer at the specified location with natural alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of the natural stride of `T`.
+    ///@param location The input address in bytes, which must be a multiple of `T`'s natural
+    /// alignment (the largest power of two dividing `T`'s natural stride, e.g. 16 for `float4`,
+    /// 8 for `float2`, and 4 for `float3`).
     ///@return The value loaded from the buffer.
     ///@remarks
     /// Currently, this function only supports when `T` is scalar, vector or matrix type.
+    /// Equivalent to `LoadAligned<T>(location, alignment)` with `alignment` set to `T`'s natural
+    /// alignment; for a 3-component vector that alignment cannot cover the whole vector, so the
+    /// load is lowered to per-component loads.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     T LoadAligned<T>(uint location)
     {
-        return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
+        return __byteAddressBufferLoad<T>(this, location, __naturalAlignmentOf<T>());
     }
 };
 
@@ -6244,7 +6256,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, __naturalStrideOf<uint2>());
+            return __byteAddressBufferLoad<uint2>(this, location, __naturalAlignmentOf<uint2>());
         }
     }
 
@@ -6310,7 +6322,7 @@ struct $(item.name)
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location with natural alignment.
-    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@param location The input address in bytes, which must be a multiple of 4 (the natural alignment of `uint3`).
     ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -6321,7 +6333,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, __naturalStrideOf<uint3>());
+            return __byteAddressBufferLoad<uint3>(this, location, __naturalAlignmentOf<uint3>());
         }
     }
 
@@ -6398,7 +6410,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
+            return __byteAddressBufferLoad<uint4>(this, location, __naturalAlignmentOf<uint4>());
         }
     }
 
@@ -6442,12 +6454,19 @@ struct $(item.name)
 
     /// Load a value with type `T` from the buffer at the specified location with a known alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@param location The input address in bytes, which must be a multiple of `alignment`.
+    ///@param alignment The known alignment of `location` in bytes. It must be a compile-time
+    /// constant, a power of two, and at least the alignment of `T`'s scalar components; otherwise
+    /// a compile-time error is reported.
     ///@return The value loaded from the buffer.
     ///@remarks
-    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
-    /// On other targets, `alignment` is forwarded to the lowered load instruction.
+    /// `alignment` is the sole input to the wide-vs-scalarized codegen decision, so a constant
+    /// and a runtime `location` with the same `alignment` lower identically. When `alignment`
+    /// covers the whole `T` a single wide load is emitted; when it only covers part of `T` (for
+    /// example 4 for a `half4`) the widest power-of-two-width chunks the alignment permits are
+    /// emitted, with per-component loads for any remainder. On HLSL the value is informational
+    /// and does not change the emitted intrinsic; on other targets it is forwarded to the lowered
+    /// load instruction.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
@@ -6467,7 +6486,7 @@ struct $(item.name)
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     T LoadAligned<T>(uint location)
     {
-        return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
+        return __byteAddressBufferLoad<T>(this, location, __naturalAlignmentOf<T>());
     }
 
 ${
@@ -7040,7 +7059,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".Store2";
         default:
-            __byteAddressBufferStore(this, address, __naturalStrideOf<uint2>(), value);
+            __byteAddressBufferStore(this, address, __naturalAlignmentOf<uint2>(), value);
         }
     }
 
@@ -7073,8 +7092,8 @@ $}
     }
 
     /// Set three values to the buffer at the specified location, the address will be aligned
-    /// to the alignment of `uint3`, which is 12.
-    ///@param address The input address in bytes, which must be a multiple of 12.
+    /// to the natural alignment of `uint3`, which is 4.
+    ///@param address The input address in bytes, which must be a multiple of 4.
     ///@param value Three input values.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
@@ -7084,7 +7103,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".Store3";
         default:
-            __byteAddressBufferStore(this, address, __naturalStrideOf<uint3>(), value);
+            __byteAddressBufferStore(this, address, __naturalAlignmentOf<uint3>(), value);
         }
     }
 
@@ -7129,7 +7148,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".Store4";
         default:
-            __byteAddressBufferStore(this, address, __naturalStrideOf<uint4>(), value);
+            __byteAddressBufferStore(this, address, __naturalAlignmentOf<uint4>(), value);
         }
     }
 
@@ -7140,6 +7159,15 @@ $}
         __byteAddressBufferStore(this, address, 0, value);
     }
 
+    /// Store a value of type `T` to the buffer at the specified location, promising that
+    /// `address` is aligned to `alignment` bytes so the compiler can issue a single wide store.
+    ///@param T The type of the input value.
+    ///@param address The input address in bytes, which must be a multiple of `alignment`.
+    ///@param value The input value.
+    ///@param alignment The known alignment of `address` in bytes. It must be a compile-time
+    /// constant, a power of two, and at least the alignment of `T`'s scalar components; otherwise
+    /// a compile-time error is reported. The same wide-vs-chunked lowering as `LoadAligned`
+    /// applies.
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store<T>(uint address, T value, uint alignment)
@@ -7147,16 +7175,16 @@ $}
         __byteAddressBufferStore(this, address, alignment, value);
     }
 
-    /// Set four values to the buffer at the specified location, the address will be aligned
-    /// to the alignment of `T`.
+    /// Store a value of type `T` to the buffer at the specified location with natural alignment.
     ///@param T The type of the input value.
-    ///@param address The input address in bytes, which must be a multiple of size of `T`.
+    ///@param address The input address in bytes, which must be a multiple of `T`'s natural
+    /// alignment (the largest power of two dividing `T`'s natural stride).
     ///@param value The input value.
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void StoreAligned<T>(uint address, T value)
     {
-        __byteAddressBufferStore(this, address, __naturalStrideOf<T>(), value);
+        __byteAddressBufferStore(this, address, __naturalAlignmentOf<T>(), value);
     }
 };
 

@@ -4891,6 +4891,27 @@ err(
 )
 
 err(
+    "byte-address-buffer-alignment-not-power-of-two",
+    41301,
+    "byte address buffer alignment must be a power of two",
+    span { loc = "location", message = "the alignment `~alignment:Int` of a byte address buffer access must be a power of two" }
+)
+
+err(
+    "byte-address-buffer-alignment-not-constant",
+    41302,
+    "byte address buffer alignment must be a compile-time constant",
+    span { loc = "location", message = "the alignment of a byte address buffer access must be a compile-time constant" }
+)
+
+err(
+    "byte-address-buffer-location-not-aligned",
+    41303,
+    "byte address buffer location is not a multiple of the specified alignment",
+    span { loc = "location", message = "the byte address buffer location `~offset:Int` is not a multiple of the specified alignment `~alignment:Int`" }
+)
+
+err(
     "static-assertion-failure",
     41400,
     "static assertion failed",
