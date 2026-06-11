@@ -952,7 +952,7 @@ static double _hexFloatLiteralToDouble(
             ret = static_cast<double>(significand);
             ret *= std::exp2(-52);
             exponent += 52;
-            ret *= std::exp2(exponent);  // apply exponent
+            ret *= std::exp2(exponent); // apply exponent
 
             // detect underflow/overflow
             isOutOfRange = (ret == 0.0 || (!std::isfinite(ret)));

@@ -7739,6 +7739,51 @@ enum class FloatFixKind
     Truncated,       ///< Truncated to a non zero value
 };
 
+// Truncates double to a narrower float type
+//
+// Parameters:
+//
+//   value           - Value to truncate. May be 0, infinity, NaN
+//   minNormalExp    - Minimum normal exponent before subnormal
+//   maxExp          - Maximum exponent. Anything above that is INFINITY or -INFINITY
+//   precisionBits   - Precision in number of bits
+//
+// Note:
+// - float:  -126, +127, 24
+// - half:   -14,  +15,  11
+static double _truncateDouble(double value, int minNormalExp, int maxExp, unsigned precisionBits)
+{
+    // NaNs and INFs are passed as is
+    if (!std::isfinite(value))
+        return value;
+
+    int exp{};
+    double fraction = std::frexp(value, &exp);
+
+    if (exp > (maxExp + 1))
+    {
+        // overflow
+        if (value >= 0.0)
+            return INFINITY;
+        else
+            return -INFINITY;
+    }
+
+    // for subnormals
+    int precisionLoss = std::max(minNormalExp - (exp - 1), 0);
+
+    int exponentShift = static_cast<int>(precisionBits) - precisionLoss;
+
+    // truncate fraction
+    fraction = ldexp(fraction, exponentShift);
+    fraction = trunc(fraction);
+    fraction = ldexp(fraction, -exponentShift);
+
+    // return truncated double
+    return ldexp(fraction, exp);
+}
+
+
 static FloatFixKind _fixFloatLiteralValue(
     BaseType type,
     bool truncateToFit, // hex literals are truncated if necessary
@@ -7761,7 +7806,11 @@ static FloatFixKind _fixFloatLiteralValue(
         double nonzeroMin;  // minimum value that we'll still consider rounded to non-zero
         double positiveMax; // maximum value
         double finiteMax;   // maximum value that we'll still consider finite
-        std::uint64_t truncationMask{}; // TODO
+
+        // truncation control
+        int minNormalExp;
+        int maxExp;
+        unsigned precisionBits;
 
         switch (type)
         {
@@ -7771,6 +7820,9 @@ static FloatFixKind _fixFloatLiteralValue(
             static_assert(0x1.FFFFFE0p127 == double{std::numeric_limits<float>::max()});
             positiveMax = 0x1.FFFFFE0p127;
             finiteMax = 0x1.FFFFFFp127; // this still rounds down to positiveMax
+            minNormalExp = -126;
+            maxExp = 127;
+            precisionBits = 24;
             break;
 
         case BaseType::Half:
@@ -7780,6 +7832,9 @@ static FloatFixKind _fixFloatLiteralValue(
             static_assert(0x1.FFC0p15 == SLANG_HALF_MAX);
             positiveMax = 0x1.FFC0p15;
             finiteMax = 0x1.FFE0p15; // this still rounds up to positiveMax
+            minNormalExp = -14;
+            maxExp = 15;
+            precisionBits = 11;
             break;
 
         default:
@@ -7804,8 +7859,16 @@ static FloatFixKind _fixFloatLiteralValue(
 
             if (value >= positiveMin)
             {
-                outValue = value;
-                return FloatFixKind::None;
+                if (truncateToFit)
+                {
+                    outValue = _truncateDouble(value, minNormalExp, maxExp, precisionBits);
+                    return value == outValue ? FloatFixKind::None : FloatFixKind::Truncated;
+                }
+                else
+                {
+                    outValue = value;
+                    return FloatFixKind::None;
+                }
             }
 
             if (value >= nonzeroMin)
@@ -7840,8 +7903,16 @@ static FloatFixKind _fixFloatLiteralValue(
 
             if (value <= -positiveMin)
             {
-                outValue = value;
-                return FloatFixKind::None;
+                if (truncateToFit)
+                {
+                    outValue = _truncateDouble(value, minNormalExp, maxExp, precisionBits);
+                    return value == outValue ? FloatFixKind::None : FloatFixKind::Truncated;
+                }
+                else
+                {
+                    outValue = value;
+                    return FloatFixKind::None;
+                }
             }
 
             if (value <= -nonzeroMin)
@@ -8572,7 +8643,8 @@ static Expr* parseAtomicExpr(Parser* parser)
             UnownedStringSlice suffix{};
             bool isOutOfRange{};
             bool precisionLost{};
-            bool isHexFloat = token.getContent().startsWith("0x") || token.getContent().startsWith("0X");
+            bool isHexFloat =
+                token.getContent().startsWith("0x") || token.getContent().startsWith("0X");
             FloatingPointLiteralValue value =
                 getFloatingPointLiteralValue(token, &suffix, &isOutOfRange, &precisionLost);
 

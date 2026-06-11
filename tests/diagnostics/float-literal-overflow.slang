@@ -71,10 +71,43 @@ void main()
 //CHECK:    ^^^^^^^^^^^ floating-point literal too small
 //CHECK:    ^^^^^^^^^^^ '0x1p-1075LF' is smaller than the smallest representable value for type double, converted to '0'
 
-    // precision lost
-    getType(0x1.fffffffffffffp0);
-    getType(0x1.fffffffffffff8p0);
-//CHECK:    ^^^^^^^^^^^^^^^^^^^^ floating-point precision lost
-//CHECK:    ^^^^^^^^^^^^^^^^^^^^ significand of '0x1.fffffffffffff8p0' was truncated, value is now '0x1.fffffffffffffp+0'
+    // precision loss (hex double)
+    getType(0x1.fffffffffffffp0LF);
+    getType(0x1.fffffffffffff8p0LF);
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^^^ floating-point precision lost
+//CHECK:    ^^^^^^^^^^^^^^^^^^^^^^ significand of '0x1.fffffffffffff8p0LF' was truncated, value is now '0x1.fffffffffffffp+0'
+
+    // precision loss (hex float)
+    getType(0x1.fffffep0);
+    getType(0x1.ffffffp0);
+//CHECK:    ^^^^^^^^^^^^ floating-point precision lost
+//CHECK:    ^^^^^^^^^^^^ significand of '0x1.ffffffp0' was truncated, value is now '0x1.fffffep+0'
+
+    // precision loss (hex half)
+    getType(0x1.ffcp0hf);
+    getType(0x1.ffdp0hf);
+//CHECK:    ^^^^^^^^^^^ floating-point precision lost
+//CHECK:    ^^^^^^^^^^^ significand of '0x1.ffdp0hf' was truncated, value is now '0x1.ffcp+0'
+
+    // precision loss (hex double, subnormal)
+    // subnormals step by 2^-1074; 0x3p-1074 is exact, 0x3.8p-1074 is not
+    getType(0x3p-1074LF);
+    getType(0x3.8p-1074LF);
+//CHECK:    ^^^^^^^^^^^^^ floating-point precision lost
+//CHECK:    ^^^^^^^^^^^^^ significand of '0x3.8p-1074LF' was truncated, value is now '0x0.0000000000003p-1022'
+
+    // precision loss (hex float, subnormal)
+    // subnormals step by 2^-149; 0x3p-149 is exact, 0x3.8p-149 is not
+    getType(0x3p-149);
+    getType(0x3.8p-149);
+//CHECK:    ^^^^^^^^^^ floating-point precision lost
+//CHECK:    ^^^^^^^^^^ significand of '0x3.8p-149' was truncated, value is now '0x1.8p-148'
+
+    // precision loss (hex half, subnormal)
+    // subnormals step by 2^-24; 0x3p-24 is exact, 0x3.8p-24 is not
+    getType(0x3p-24hf);
+    getType(0x3.8p-24hf);
+//CHECK:    ^^^^^^^^^^^ floating-point precision lost
+//CHECK:    ^^^^^^^^^^^ significand of '0x3.8p-24hf' was truncated, value is now '0x1.8p-23'
 
 }
