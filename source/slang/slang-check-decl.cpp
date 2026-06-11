@@ -19732,6 +19732,42 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         [this, funcDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, funcDecl, category); });
 
+    // A user-defined derivative declared with the inverse placement
+    // `[ForwardDerivativeOf(primal)]` / `[BackwardDerivativeOf(primal)]` records a
+    // derivative *association* on the primal (see `checkDerivativeOfAttributeImpl`,
+    // which calls `registerAssociatedDecl`) rather than a `[ForwardDerivative]` /
+    // `[BackwardDerivative]` modifier on the primal. Such a derivative is invoked when
+    // the primal is differentiated, so propagate its capability requirements onto the
+    // primal — otherwise a `[require]` on the derivative is silently dropped and using
+    // the primal on an unsupported target is never diagnosed.
+    for (auto assoc : getShared()->getAssociatedDeclsForDecl(funcDecl))
+    {
+        if (assoc->kind != DeclAssociationKind::ForwardDerivativeFunc &&
+            assoc->kind != DeclAssociationKind::BackwardDerivativeFunc)
+            continue;
+        auto derivativeFuncDecl = assoc->decl;
+        // Gate on the derivative carrying an explicit `[require]`. The core module
+        // attaches target-specialized derivative families to all-targets builtins
+        // through inverse placement (e.g. the `[ForwardDerivativeOf]` /
+        // `[BackwardDerivativeOf]` overloads in diff.meta.slang whose bodies use
+        // target-specific intrinsics); those derivatives carry no `[require]`, so
+        // unconditionally joining their inferred requirements onto the builtin primal
+        // would impose conflicting target requirements on it. Restricting to an
+        // explicit `[require]` limits propagation to deliberate user declarations.
+        if (!derivativeFuncDecl->findModifier<RequireCapabilityAttribute>())
+            continue;
+        ensureDecl(derivativeFuncDecl, DeclCheckState::CapabilityChecked);
+        // Point the provenance note at the derivative function, which is where the
+        // user declared both the `[require]` and the `[*DerivativeOf]` linkage.
+        _propagateRequirement(
+            this,
+            mutableFuncDeclCapSet,
+            funcDecl,
+            derivativeFuncDecl,
+            derivativeFuncDecl->inferredCapabilityRequirements,
+            derivativeFuncDecl->loc);
+    }
+
     // non-static function join's capabilities with parent
     // to become a superset of the parent.
     if (!isEffectivelyStatic(funcDecl))
