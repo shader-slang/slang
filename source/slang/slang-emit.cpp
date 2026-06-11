@@ -35,7 +35,6 @@
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-com-interface.h"
 #include "slang-ir-coverage-instrument.h"
-#include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-cuda-immutable-load.h"
 #include "slang-ir-dce.h"
