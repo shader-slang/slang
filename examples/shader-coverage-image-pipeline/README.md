@@ -105,30 +105,6 @@ counters accumulate across all bands and configs.
   stores of `1`), so whole-image dispatch is safe without tiling.
 - `--no-coverage`: baseline timing with no instrumentation overhead.
 
-## HTML report
-
-The `run_coverage.py` wrapper does all steps automatically and opens
-the report. To run the steps manually:
-
-```bash
-# 1. Convert raw counters to rich LCOV (adds branch + function records):
-python3 path/to/slang/tools/shader-coverage/slang-coverage-to-lcov.py \
-    --manifest full.coverage-manifest.json \
-    --counters full.counters.bin \
-    --output full.full.lcov
-
-# 2. Render HTML:
-python3 path/to/slang/tools/coverage-html/slang-coverage-html.py \
-    full.full.lcov \
-    --output-dir full-html \
-    --title "image-pipeline full"
-```
-
-Open `full-html/index.html` and look at `tonemap.slang.*.html`
-— each `case TonemapOperator::*` line shows a coloured `(1/1)` or
-`(0/1)` branch indicator. The smoke vs full diff turns three
-of the four operator branches from red to green.
-
 ## End-to-end wrapper
 
 `run_coverage.py` (in this directory) is a convenience wrapper that
@@ -146,6 +122,22 @@ python3 run_coverage.py --mode=full --coverage-mode=boolean --output-dir=./out
 All flags accepted by the demo binary are forwarded verbatim; the
 script adds `--slang-root` (default: auto-discovered from its own path)
 to locate the renderer and converter.
+
+## HTML report
+
+The demo writes a full LCOV directly, so only the renderer is needed:
+
+```bash
+python3 path/to/slang/tools/coverage-html/slang-coverage-html.py \
+    full.lcov \
+    --output-dir full-html \
+    --title "image-pipeline full"
+```
+
+Open `full-html/index.html` and look at `tonemap.slang.*.html`
+— each `case TonemapOperator::*` line shows a coloured `(1/1)` or
+`(0/1)` branch indicator. The smoke vs full diff turns three
+of the four operator branches from red to green.
 
 ## Architecture
 

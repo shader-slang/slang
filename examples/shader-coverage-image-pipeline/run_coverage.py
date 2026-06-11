@@ -183,51 +183,37 @@ def main(argv=None):
 
     # ------------------------------------------------------------------
     # Step 1 — run the demo binary
+    # The image-pipeline demo writes a full LCOV directly via the Slang
+    # C++ API (ICoverageTracingMetadata::getEntryInfo), including line,
+    # function (FN/FNDA), and branch (BRDA) records. No external
+    # converter is needed — contrast the BVH-traversal demo which writes
+    # line-only LCOV and calls slang-coverage-to-lcov.py for the full
+    # conversion.
     # ------------------------------------------------------------------
     binary_cmd = [str(binary), f"--mode={mode}",
                   f"--output-dir={output_dir}", *demo_args]
-    print(f"[1/3] running demo: {' '.join(str(a) for a in binary_cmd)}")
+    print(f"[1/2] running demo: {' '.join(str(a) for a in binary_cmd)}")
     result = subprocess.run(binary_cmd)
     if result.returncode != 0:
         sys.exit(f"error: demo exited with code {result.returncode}")
 
-    # ------------------------------------------------------------------
-    # Step 2 — convert raw counters to rich LCOV
-    # (the demo writes a line-only .lcov; the converter adds branch +
-    # function records from the manifest)
-    # ------------------------------------------------------------------
-    manifest = output_dir / f"{mode}.coverage-manifest.json"
-    counters = output_dir / f"{mode}.counters.bin"
-    rich_lcov = output_dir / f"{mode}.full.lcov"
-
-    if not manifest.exists():
-        sys.exit(f"error: expected manifest at {manifest} — was coverage disabled?")
-
-    converter = slang_root / "tools" / "shader-coverage" / "slang-coverage-to-lcov.py"
-    conv_cmd = [
-        sys.executable, str(converter),
-        "--manifest", str(manifest),
-        "--counters", str(counters),
-        "--output", str(rich_lcov),
-    ]
-    print(f"[2/3] converting to rich LCOV: {rich_lcov.name}")
-    result = subprocess.run(conv_cmd)
-    if result.returncode != 0:
-        sys.exit(f"error: converter exited with code {result.returncode}")
+    lcov = output_dir / f"{mode}.lcov"
+    if not lcov.exists():
+        sys.exit(f"error: expected LCOV at {lcov} — was coverage disabled?")
 
     # ------------------------------------------------------------------
-    # Step 3 — render HTML report
+    # Step 2 — render HTML report directly from the full LCOV
     # ------------------------------------------------------------------
     html_dir = output_dir / f"{mode}-html"
     renderer = slang_root / "tools" / "coverage-html" / "slang-coverage-html.py"
     render_cmd = [
         sys.executable, str(renderer),
-        str(rich_lcov),
+        str(lcov),
         "--output-dir", str(html_dir),
         "--title", f"image-pipeline {mode}",
         "--source-root", str(slang_root),
     ]
-    print(f"[3/3] rendering HTML report → {html_dir}")
+    print(f"[2/2] rendering HTML report → {html_dir}")
     result = subprocess.run(render_cmd)
     if result.returncode != 0:
         sys.exit(f"error: renderer exited with code {result.returncode}")

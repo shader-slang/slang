@@ -418,32 +418,123 @@ void writeCountersBinary(const std::vector<uint8_t>& rawBytes, const std::filesy
     out.write(reinterpret_cast<const char*>(rawBytes.data()), (std::streamsize)rawBytes.size());
 }
 
+// Write a full LCOV file with line (DA), function (FN/FNDA), and branch
+// (BRDA) records directly from the Slang coverage metadata API. This is the
+// in-process conversion path: no external tool is required because
+// ICoverageTracingMetadata::getEntryInfo() exposes the kind, source location,
+// function name, and branch site/arm for every counter slot.
+//
+// Contrast the BVH-traversal demo, which writes a line-only LCOV and uses
+// tools/shader-coverage/slang-coverage-to-lcov.py for the full conversion.
 void writeLcov(
     slang::ICoverageTracingMetadata* coverage,
     const std::vector<uint64_t>& hits,
     const std::filesystem::path& path,
     const char* testName)
 {
-    const uint32_t counterCount = coverage->getCounterCount();
-    std::map<std::string, std::map<uint32_t, uint64_t>> byFile;
-    for (uint32_t i = 0; i < counterCount; ++i)
+    // Collect entries grouped by source file, separated by kind.
+    struct FuncRecord
+    {
+        uint32_t line;
+        std::string name;
+        uint64_t count;
+    };
+    struct BranchRecord
+    {
+        uint32_t line;
+        uint32_t siteId; // identifies the branch point; groups its arms
+        uint32_t armId;  // arm index within the site (0, 1, …)
+        uint64_t count;
+    };
+    struct FileRecords
+    {
+        std::map<uint32_t, uint64_t> lines; // line → accumulated count
+        std::vector<FuncRecord> funcs;
+        std::vector<BranchRecord> branches;
+    };
+    std::map<std::string, FileRecords> byFile;
+
+    const uint32_t entryCount = coverage->getEntryCount();
+    for (uint32_t i = 0; i < entryCount; ++i)
     {
         slang::CoverageEntryInfo entry = {};
         if (SLANG_FAILED(coverage->getEntryInfo(i, &entry)))
             continue;
         if (!entry.file || !*entry.file || entry.line == 0)
             continue;
-        byFile[entry.file][entry.line] += hits[i];
+        // Each entry's counter slot is identified by counterIndex; use it to
+        // look up the actual hit count. kInvalidCoverageCounterIndex marks
+        // metadata-only entries that have no runtime counter.
+        const uint64_t count = (entry.counterIndex != slang::kInvalidCoverageCounterIndex)
+                                   ? hits[entry.counterIndex]
+                                   : 0;
+        auto& rec = byFile[entry.file];
+        switch (entry.kind)
+        {
+        case slang::CoverageEntryKind::Line:
+            rec.lines[entry.line] += count;
+            break;
+        case slang::CoverageEntryKind::Function:
+            rec.funcs.push_back({entry.line, entry.functionName ? entry.functionName : "", count});
+            break;
+        case slang::CoverageEntryKind::Branch:
+            rec.branches.push_back({entry.line, entry.branchSiteID, entry.branchArmID, count});
+            break;
+        default:
+            break;
+        }
     }
+
     std::ofstream f(path, std::ios::binary);
     if (!f)
         fail("cannot open for writing: " + path.string());
     f << "TN:" << testName << "\n";
     for (const auto& fp : byFile)
     {
+        const auto& rec = fp.second;
         f << "SF:" << fp.first << "\n";
-        for (const auto& lp : fp.second)
+
+        // Function records: declaration line then per-function hit count.
+        for (const auto& fn : rec.funcs)
+            f << "FN:" << fn.line << "," << fn.name << "\n";
+        for (const auto& fn : rec.funcs)
+            f << "FNDA:" << fn.count << "," << fn.name << "\n";
+        if (!rec.funcs.empty())
+        {
+            uint32_t fnHit = 0;
+            for (const auto& fn : rec.funcs)
+                if (fn.count > 0)
+                    ++fnHit;
+            f << "FNF:" << rec.funcs.size() << "\n";
+            f << "FNH:" << fnHit << "\n";
+        }
+
+        // Line records.
+        uint32_t lHit = 0;
+        for (const auto& lp : rec.lines)
+        {
             f << "DA:" << lp.first << "," << lp.second << "\n";
+            if (lp.second > 0)
+                ++lHit;
+        }
+        f << "LF:" << rec.lines.size() << "\n";
+        f << "LH:" << lHit << "\n";
+
+        // Branch records: siteId groups arms of the same branch point.
+        if (!rec.branches.empty())
+        {
+            uint32_t bHit = 0;
+            for (const auto& br : rec.branches)
+            {
+                f << "BRDA:" << br.line << "," << br.siteId << "," << br.armId << "," << br.count
+                  << "\n";
+                if (br.count > 0)
+                    ++bHit;
+            }
+            f << "BRF:" << rec.branches.size() << "\n";
+            f << "BRH:" << bHit << "\n";
+        }
+
         f << "end_of_record\n";
     }
 }
