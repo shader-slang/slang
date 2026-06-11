@@ -4853,14 +4853,26 @@ NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
 {
     TypeDefDecl* typeDefDecl = parser->astBuilder->create<TypeDefDecl>();
 
-    // TODO(tfoley): parse an actual declarator
+    // Parse the base type. `ParseTypeExpAllowDecl` already consumes any leading
+    // array suffix, so the leading-array form `typedef int[2] arr;` arrives here
+    // with `type` fully formed.
     auto type = parser->ParseTypeExpAllowDecl();
 
-    auto nameToken = parser->ReadToken(TokenType::Identifier);
-    typeDefDecl->loc = nameToken.loc;
+    // Parse the alias name through the shared declarator machinery rather than a
+    // bare identifier read, so a C-style trailing declarator (`typedef int arr[2];`)
+    // folds its trailing `[N]`/pointer suffixes onto the alias type, exactly as
+    // variable declarators do (see ParseDeclaratorDecl / UnwrapDeclarator). Both the
+    // trailing and leading array forms therefore produce the same array-typed alias.
+    // We use the bare declarator, not parseInitDeclarator, because a typedef takes no
+    // initializer or semantics.
+    DeclaratorInfo declaratorInfo;
+    declaratorInfo.typeSpec = type.exp;
+    auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);
+    UnwrapDeclarator(parser->astBuilder, declarator, &declaratorInfo);
 
-    typeDefDecl->nameAndLoc = NameLoc(nameToken);
-    typeDefDecl->type = type;
+    typeDefDecl->loc = declaratorInfo.nameAndLoc.loc;
+    typeDefDecl->nameAndLoc = declaratorInfo.nameAndLoc;
+    typeDefDecl->type = TypeExp(declaratorInfo.typeSpec);
 
     AdvanceIf(parser, TokenType::Semicolon);
 
