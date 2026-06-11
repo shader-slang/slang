@@ -128,7 +128,6 @@ struct AutoDiffSharedContext
     AutoDiffSharedContext(TargetProgram* targetProgram, IRModuleInst* inModuleInst);
 };
 
-
 struct DifferentiableTypeConformanceContext
 {
     AutoDiffSharedContext* sharedContext;
@@ -227,6 +226,12 @@ struct DifferentiableTypeConformanceContext
                 List<IRType*> paramTypes;
                 for (auto origParamType : origParamTypes)
                 {
+                    if (isConstExprRateQualifiedType(origParamType))
+                    {
+                        paramTypes.add(origParamType);
+                        continue;
+                    }
+
                     const auto& [paramDirection, paramType] =
                         splitParameterDirectionAndType(origParamType);
 

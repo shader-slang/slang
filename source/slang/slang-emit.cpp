@@ -758,6 +758,27 @@ static void addDenormalModeDecorations(IRModule* irModule, CodeGenContext* codeG
     }
 }
 
+static void forceInlineConstExprParamFuncs(IRModule* irModule)
+{
+    IRBuilder builder(irModule);
+
+    for (auto globalInst : irModule->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func || func->findDecoration<IRForceInlineDecoration>())
+            continue;
+
+        for (auto param : func->getParams())
+        {
+            if (isConstExprRateQualifiedType(param->getFullType()))
+            {
+                builder.addForceInlineDecoration(func);
+                break;
+            }
+        }
+    }
+}
+
 // Helper function to convert a 20 byte SHA1 to a hexadecimal string,
 // needed for the build identifier instruction.
 String getBuildIdentifierString(ComponentType* component)
@@ -1317,21 +1338,20 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(finalizeAutoDiffPass, targetProgram);
 
-    // Re-run constexpr propagation for newly generated autodiff wrapper functions.
-    // These didn't exist when propagateConstExpr ran during IR lowering, so
-    // static_assert on constexpr params in backward derivatives requires a second pass.
-    //
-    // The gate on `requiredLoweringPassSet.autodiff` is intentional: this pass exists
-    // to handle constexpr-param calls that appear *inside synthesized autodiff wrappers*
-    // (which are created during finalizeAutoDiffPass).  Non-autodiff code with constexpr
-    // params is handled earlier by specializeHigherOrderParameters; running this pass
-    // unconditionally on non-autodiff modules would be harmless but wasteful.
+    // Re-run force inlining and constexpr propagation for newly generated autodiff
+    // wrapper functions. Functions with constexpr parameters are already marked
+    // [ForceInline] during lowering; autodiff can introduce new calls to those
+    // functions after the earlier inlining/constexpr propagation has run. It can
+    // also synthesize new constexpr-param helpers, so mark those helpers the same
+    // way, inline them, and remove dead originals before checking static_assert.
     if (requiredLoweringPassSet.autodiff)
     {
+        forceInlineConstExprParamFuncs(irModule);
+        SLANG_PASS(performForceInlining);
+        SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
         SLANG_PASS(propagateConstExpr, sink);
         if (sink->getErrorCount() != 0)
             return SLANG_FAIL;
-        SLANG_PASS(specializeConstExprFunctionCalls, codeGenContext);
     }
 
     if (requiredLoweringPassSet.matrixSwizzleStore)

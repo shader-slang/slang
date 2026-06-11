@@ -398,9 +398,8 @@ struct UnzippingContext
         fwdPropFuncParamTypes.add(fullContextVal->getDataType());
         for (UIndex ii = 0; ii < baseFuncType->getParamCount(); ii++)
         {
-            auto rawParamType = (ii < (UIndex)baseFuncParams.getCount())
-                                    ? baseFuncParams[ii]->getFullType()
-                                    : baseFuncType->getParamType(ii);
+            SLANG_RELEASE_ASSERT(Index(ii) < baseFuncParams.getCount());
+            auto rawParamType = baseFuncParams[ii]->getFullType();
             if (isConstExprRateQualifiedType(rawParamType))
             {
                 fwdPropFuncParamTypes.add(rawParamType);

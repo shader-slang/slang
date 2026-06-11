@@ -281,9 +281,8 @@ struct BackwardDiffTranslationContext
 
         for (UInt i = 0; i < targetFunc->getParamCount(); i++)
         {
-            IRType* rawParamType = (Index(i) < targetFuncParams.getCount())
-                                       ? targetFuncParams[i]->getFullType()
-                                       : targetFunc->getParamType(i);
+            SLANG_RELEASE_ASSERT(Index(i) < targetFuncParams.getCount());
+            IRType* rawParamType = targetFuncParams[i]->getFullType();
             // Constexpr params are compile-time constants with no differential counterpart.
             // Preserve them unchanged so the propagate func can forward them to the derivative.
             if (isConstExprRateQualifiedType(rawParamType))
@@ -473,6 +472,8 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     // location tagging.
     //
     ShortList<IRParam*, 8> primalFuncParams;
+    // Some specialized/generic primals do not resolve directly to an IRFunc here.
+    // Names/source locations are best-effort only; type construction does not rely on them.
     if (auto funcForNames = as<IRFunc>(getResolvedInstForDecorations(primalFunc)))
     {
         for (auto param : funcForNames->getParams())

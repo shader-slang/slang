@@ -566,14 +566,14 @@ struct DiffTransposePass
 
         for (auto param : paramsToProcess)
         {
-            const auto& [direction, type] = splitParameterDirectionAndType(param->getDataType());
-
             if (as<IRVoidType>(param->getDataType()) ||
                 isConstExprRateQualifiedType(param->getFullType()))
             {
                 transposedParams.add(param, param);
                 continue;
             }
+
+            const auto& [direction, type] = splitParameterDirectionAndType(param->getDataType());
 
             switch (direction.kind)
             {
