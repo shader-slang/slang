@@ -4201,8 +4201,8 @@ struct IGlobalSession : public ISlangUnknown
     @param passThrough The downstream compiler to query (e.g. SLANG_PASS_THROUGH_NVRTC).
     @param outMajor Receives the major version number. May be null.
     @param outMinor Receives the minor version number. May be null.
-    @return SLANG_OK if the compiler was located and loaded;
-    SLANG_E_NOT_FOUND if it could not be located or loaded. */
+    @return SLANG_OK if the compiler was located and loaded (a loaded compiler that reports no
+    version yields major and minor 0); SLANG_E_NOT_FOUND if it could not be located or loaded. */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getDownstreamCompilerVersion(SlangPassThrough passThrough, int* outMajor, int* outMinor) = 0;
 };

@@ -665,7 +665,7 @@ SLANG_UNIT_TEST(vtableISlangProfiler)
 }
 
 // ---------------------------------------------------------------------------
-// IGlobalSession : ISlangUnknown  (own slots 3-31)
+// IGlobalSession : ISlangUnknown  (own slots 3-32)
 // ---------------------------------------------------------------------------
 struct IGlobalSessionProbe : IGlobalSession
 {

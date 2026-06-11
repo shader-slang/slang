@@ -24,6 +24,18 @@ SLANG_UNIT_TEST(getDownstreamCompilerVersion)
             SLANG_E_NOT_FOUND);
     }
 
+    // An out-of-range pass-through value must be rejected at the boundary, not used to index the
+    // per-type compiler arrays.
+    {
+        int major = -1;
+        int minor = -1;
+        SLANG_CHECK(
+            globalSession->getDownstreamCompilerVersion(
+                SlangPassThrough(SLANG_PASS_THROUGH_COUNT_OF),
+                &major,
+                &minor) == SLANG_E_NOT_FOUND);
+    }
+
     // Gate the NVRTC path on availability the same way the CUDA codegen tests do, so this test
     // passes both on machines that have NVRTC and those that do not (no GPU is required merely to
     // load the NVRTC library and read its version).
