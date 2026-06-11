@@ -192,6 +192,38 @@ without a source change.
 Compare the BVH-traversal demo (`shader-coverage-bvh-traversal`) which
 demonstrates the **explicit / raw-binding** approach instead.
 
+### Counter readback and LCOV
+
+After dispatch the host downloads the raw counter buffer and uses
+`ICoverageTracingMetadata::getEntryInfo()` to convert it directly to a
+**full LCOV** file — with line (`DA`), function (`FN`/`FNDA`), and branch
+(`BRDA`) records — without any external tool:
+
+```
+GPU counter buffer (uint32/uint64 × N slots)
+    │  ctx.download()
+    ▼
+host: std::vector<uint64_t> hits   ← one entry per counter slot
+    │  ICoverageTracingMetadata::getEntryInfo(i, &entry)
+    │    entry.kind  → DA / FN+FNDA / BRDA record
+    │    entry.file, entry.line, entry.functionName, entry.branchSiteID …
+    │    hits[entry.counterIndex] → count
+    ▼
+<mode>.lcov  (full: DA + FN/FNDA + BRDA)
+    │  slang-coverage-html.py
+    ▼
+HTML report
+```
+
+This is the **in-process conversion path**: the counters and the source
+attribution are both available in the same process, so the full LCOV can
+be produced with one loop over the metadata entries. No intermediate
+manifest file or external converter is needed for the HTML step.
+
+Compare the BVH-traversal demo which uses the **out-of-process converter**
+path instead: it writes the manifest JSON and raw counter binary separately,
+then calls `slang-coverage-to-lcov.py` to produce the full LCOV.
+
 ## Build dependencies
 
 - Slang compiler library (linked from this repository's build).

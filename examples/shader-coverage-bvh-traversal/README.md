@@ -154,6 +154,37 @@ which demonstrates the **metadata-derived** binding approach instead,
 where the compiler picks the slot and the host discovers it after
 compilation via `ISyntheticResourceMetadata`.
 
+### Counter readback and LCOV
+
+After dispatch the host downloads the raw counter buffer and writes two
+artifact files: a coverage manifest JSON and the raw counters binary.
+`run_coverage.py` then calls `slang-coverage-to-lcov.py` to produce the
+full LCOV — the **out-of-process converter** path:
+
+```
+GPU counter buffer (uint32/uint64 × N slots)
+    │  ctx.download()
+    ▼
+<mode>.counters.bin  (raw little-endian slots)
+<mode>.coverage-manifest.json  (counter ↔ source attribution)
+    │  slang-coverage-to-lcov.py
+    │    --manifest  --counters  --output
+    ▼
+<mode>.full.lcov  (full: DA + FN/FNDA + BRDA)
+    │  slang-coverage-html.py
+    ▼
+HTML report
+```
+
+This is the canonical workflow for hosts that want to separate data
+collection (C++ app) from reporting (offline Python tooling): the app
+writes the manifest and counters, and the converter can be run later,
+on a different machine, or integrated into a CI pipeline.
+
+Compare the image-pipeline demo which uses the **in-process conversion**
+path instead: it calls `ICoverageTracingMetadata::getEntryInfo()` in C++
+to build the full LCOV directly, skipping the manifest+converter step.
+
 ## Build dependencies
 
 - Slang compiler library (linked from this repository's build).
