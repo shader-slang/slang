@@ -636,7 +636,7 @@ void initCommandOptions(CommandOptions& options)
          "-trace-coverage-boolean",
          nullptr,
          "Record boolean coverage instead of exact execution counts: each counter slot "
-         "is set to 1 (via a plain non-atomic store) the first time its entry executes, "
+         "is written with 1 (via a plain non-atomic store) whenever its entry executes, "
          "rather than atomically incremented per execution. This removes all atomic "
          "contention, so coverage is dramatically faster and avoids the GPU watchdog "
          "timeouts that heavy per-execution counting can trigger, at the cost of exact "

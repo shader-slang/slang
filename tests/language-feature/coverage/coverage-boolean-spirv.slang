@@ -9,8 +9,10 @@
 // Default (count) mode: coverage uses atomic adds.
 //TEST:SIMPLE(filecheck=COUNT):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage
 
-// Hit/miss mode: no atomics at all.
-//TEST:SIMPLE(filecheck=HITMISS):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage -trace-coverage-boolean
+// Boolean mode: 32-bit counters, no atomics.
+// Pin counter width to 32-bit so the stored constant is %uint_1 (not %ulong_1
+// which the 64-bit default would produce), making the HITMISS check below exact.
+//TEST:SIMPLE(filecheck=HITMISS):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-branch-coverage -trace-coverage-boolean -trace-coverage-counter-width 32
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
