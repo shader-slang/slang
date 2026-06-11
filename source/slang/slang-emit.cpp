@@ -1077,6 +1077,12 @@ Result linkAndOptimizeIR(
                 reservedSpaces.add((int)value.intValue);
             }
         }
+        // Gate read from the MERGED TargetProgram profile (see the
+        // `isCoverageWaveAggregationSupported` declaration in
+        // slang-ir-coverage-instrument.h for the canonical rationale).
+        const bool coverageWaveAggregationSupported = isCoverageWaveAggregationSupported(
+            targetRequest,
+            targetProgram->getOptionSet().getProfileVersion());
         SLANG_PASS(
             instrumentCoverage,
             sink,
@@ -1086,6 +1092,7 @@ Result linkAndOptimizeIR(
             reservedSpaces.getBuffer(),
             (int)reservedSpaces.getCount(),
             targetRequest,
+            coverageWaveAggregationSupported,
             outLinkedIR.globalScopeVarLayout,
             *metadata);
         validateIRModuleIfEnabled(codeGenContext, irModule);

@@ -8,6 +8,7 @@ struct IRVarLayout;
 class DiagnosticSink;
 class TargetRequest;
 class ArtifactPostEmitMetadata;
+enum class ProfileVersion;
 
 // Shader coverage instrumentation pass.
 //
@@ -44,6 +45,13 @@ class ArtifactPostEmitMetadata;
 // from cached modules are dropped so the backend never sees them, no
 // buffer is synthesized, and `outMetadata` and `globalScopeVarLayout`
 // are left untouched.
+//
+// `waveAggregationSupported` is the caller-computed result of
+// `isCoverageWaveAggregationSupported` (computed at the call site so the
+// merged `TargetProgram` profile is in scope). When true the pass emits the
+// wave-aggregated increment; when false it emits the per-lane atomic add. The
+// caller and the linker compute it identically so the force-kept wave
+// intrinsics are present iff the pass will call them.
 void instrumentCoverage(
     IRModule* module,
     DiagnosticSink* sink,
@@ -53,6 +61,7 @@ void instrumentCoverage(
     const int* reservedSpaces,
     int reservedSpaceCount,
     TargetRequest* targetRequest,
+    bool waveAggregationSupported,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);
 
@@ -67,6 +76,23 @@ void finalizeCoverageInstrumentationMetadata(
     IRVarLayout* globalScopeVarLayout,
     TargetRequest* targetRequest,
     ArtifactPostEmitMetadata& outMetadata);
+
+// True when `targetRequest` can lower the wave intrinsics that coverage
+// instrumentation uses to aggregate counter increments per wave (issue
+// #11509): SPIR-V, CUDA, Metal, and HLSL shader-model 6.0+. CPU/cpp-source,
+// WGSL, sub-SM6.0 HLSL, and GLSL stay on the per-lane path. Shared by the
+// coverage pass (to pick the lowering) and the linker (to force-keep the wave
+// intrinsics only where they will actually be used) so the two stay aligned.
+//
+// `profileVersion` gates the HLSL shader-model 6.0 boundary and must be the
+// MERGED `TargetProgram` profile (`getTargetProgram()->getOptionSet()
+// .getProfileVersion()`), not `targetRequest->getOptionSet()`: a profile
+// supplied through the API at the program/component level lands on the merged
+// set, and reading the per-target set alone would leave it `Unknown` and
+// silently disable aggregation for those callers.
+bool isCoverageWaveAggregationSupported(
+    TargetRequest* targetRequest,
+    ProfileVersion profileVersion);
 
 } // namespace Slang
 

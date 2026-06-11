@@ -17146,6 +17146,10 @@ uint4 WaveActiveBallot(bool condition)
 }
 
 /// @category wave
+// Tagged [KnownBuiltin] solely so the shader-coverage wave-aggregation pass can
+// locate this intrinsic and the linker can force-keep it; see
+// slang-ir-coverage-instrument.cpp (issue #11509).
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveActiveCountBits))]
 [require(cuda_glsl_hlsl_metal_spirv, subgroup_basic_ballot)]
 uint WaveActiveCountBits(bool value)
 {
@@ -17511,6 +17515,10 @@ __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [NonUniformReturn]
+// Tagged [KnownBuiltin] solely so the shader-coverage wave-aggregation pass can
+// locate this intrinsic and the linker can force-keep it; see
+// slang-ir-coverage-instrument.cpp (issue #11509).
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveIsFirstLane))]
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
 bool WaveIsFirstLane()
 {
