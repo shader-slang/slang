@@ -1,10 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort -skip-spirv-validation
 
-// Regression test for the `pair`-flavor branch of legalizeAbort in
-// slang-ir-legalize-types.cpp: an interface-typed (existential) value splits
-// into resource + ordinary halves during type legalization, and the abort
-// must forward only the ordinary half. Primitive-scalar arguments only ever
-// exercise the `simple` flavor.
+// End-to-end coverage for abort() inside code using an interface-typed
+// (existential) value: the call goes through existential specialization
+// before the abort is lowered, and the scalar `t.val()` payload must still
+// reach OpAbortKHR. (The `pair`-flavor branch of legalizeAbort is exercised
+// separately by tests/diagnostics/abort-pair-arg.slang, which passes a
+// resource-containing struct so the argument actually legalizes as a pair.)
 
 interface IThing
 {
