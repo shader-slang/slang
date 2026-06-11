@@ -4987,6 +4987,12 @@ ModuleLinkingInfo* IRModule::_getLinkingInfo()
     return m_linkingInfo;
 }
 
+void IRModule::_invalidateLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    m_linkingInfo = nullptr;
+}
+
 void IRModule::buildMangledNameToGlobalInstMap()
 {
     m_mapMangledNameToGlobalInst.clear();

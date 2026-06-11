@@ -2163,6 +2163,10 @@ public:
     /// A built cache assumes the module has not changed since `_getOrCreateLinkingInfo()`.
     ModuleLinkingInfo* _getLinkingInfo();
 
+    /// Drop the module-owned linker acceleration cache after mutating module-scope state that
+    /// it records. The cache will be rebuilt by the next `_getOrCreateLinkingInfo()` call.
+    void _invalidateLinkingInfo();
+
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
     {
         IRAnalysis* analysis = m_mapInstToAnalysis.tryGetValue(func);

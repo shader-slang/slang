@@ -178,6 +178,11 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
         return SLANG_OK;
     }
 
+    // The linker acceleration cache snapshots module-scope export decorations. We have just
+    // added transient DownstreamModuleExport decorations, so force the embedded downstream IR
+    // compile to rebuild the cache and see those exports.
+    module->_invalidateLinkingInfo();
+
     ComPtr<IArtifact> outArtifact;
     SlangResult res = codeGenContext.emitPrecompiledDownstreamIR(outArtifact);
 
@@ -224,6 +229,7 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
     builder.setInsertInto(module);
 
     builder.emitEmbeddedDownstreamIR(targetReq->getTarget(), blob);
+    module->_invalidateLinkingInfo();
     return SLANG_OK;
 }
 
