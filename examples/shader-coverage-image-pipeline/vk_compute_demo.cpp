@@ -184,7 +184,7 @@ void Context::init(bool requireInt64Atomics)
     //   them.
     //                     Skipping the chain keeps the device-create surface minimal.
     //   - (false, false): caller did not request and device does not support; skip the chain.
-    dci.pNext = haveBufferInt64Atomics ? &featuresEnable : nullptr;
+    dci.pNext = requireInt64Atomics ? &featuresEnable : nullptr;
     check(vkCreateDevice(physical, &dci, nullptr, &device), "vkCreateDevice");
 
     vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
