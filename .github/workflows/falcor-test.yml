@@ -63,6 +63,7 @@ jobs:
           name: slang-falcor-build-windows-release
           path: build/Release/bin/
           if-no-files-found: error
+          retention-days: 7
   test:
     name: Test (Falcor)
     needs: build
@@ -107,16 +108,22 @@ jobs:
       - name: falcor-unit-test
         shell: pwsh
         run: |
-          $ErrorActionPreference = "SilentlyContinue"
+          $ErrorActionPreference = "Stop"
           cd .\FalcorBin\tests
           python ./testing/run_unit_tests.py --config windows-vs2022-Release -t "-slow"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
           cd ../../
           #Get-ChildItem .\FalcorBin\build\windows-vs2022\bin\Release\FalcorTest*.log -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "=== $($_.FullName) ===" ; Get-Content $_ }
       - name: falcor-image-test
         shell: pwsh
         run: |
-          $ErrorActionPreference = "SilentlyContinue"
+          $ErrorActionPreference = "Stop"
           cd .\FalcorBin\tests
           python ./testing/run_image_tests.py --config windows-vs2022-Release --run-only
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
           cd ../../
           #Get-ChildItem .\FalcorBin\build\windows-vs2022\bin\Release\FalcorTest*.log -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "=== $($_.FullName) ===" ; Get-Content $_ }
