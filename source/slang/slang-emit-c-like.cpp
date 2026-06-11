@@ -3814,9 +3814,12 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
         {
             emitInterpolationModifiers(param, paramType, layout);
-            emitMeshShaderModifiers(param);
         }
     }
+
+    // Emit mesh-output qualifiers unconditionally: they key off the parameter's
+    // decoration, not its varying-IO layout (which an SV-only output never registers).
+    emitMeshShaderModifiers(param);
 
     emitParamType(paramType, paramName);
     emitSemantics(param);
@@ -5224,6 +5227,12 @@ void CLikeSourceEmitter::ensureGlobalInst(
     case kIROp_Generic:
         return;
     case kIROp_ThisType:
+        return;
+    case kIROp_BuiltinRequirementKey:
+        // A built-in interface requirement key is metadata (like an interface
+        // requirement entry); it never corresponds to emitted code. Unlike an
+        // ordinary `StructKey`, this key is hoistable and so may survive as an
+        // (unreferenced) global inst after specialization, so skip it explicitly.
         return;
     case kIROp_DebugInlinedAt:
     case kIROp_DebugScope:

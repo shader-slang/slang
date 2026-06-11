@@ -39,13 +39,19 @@ void writeSerializedModuleIR(
 // of the stream to make deserialization slightly faster
 const bool kReorderInstructionsForSerialization = true;
 
+// Recursive IR tree traversal is used on both write and read. This matches the
+// existing IR specialization depth budget and is shared so round-trips stay symmetric.
+const Int64 kMaxIRSerializationDepth = 512;
+
 // We expose this function here as it's used by the verifyIRSerialize function in
 // slang-serialize-container.cpp
 template<typename Func>
 static void traverseInstsInSerializationOrder(IRInst* moduleInst, Func&& processInst)
 {
-    const auto go = [&](auto& go, IRInst* inst) -> void
+    const auto go = [&](auto& go, IRInst* inst, Int64 depth) -> void
     {
+        SLANG_RELEASE_ASSERT(depth < kMaxIRSerializationDepth);
+
         // Process the current instruction
         processInst(inst);
 
@@ -76,27 +82,27 @@ static void traverseInstsInSerializationOrder(IRInst* moduleInst, Func&& process
                 }
                 else
                 {
-                    go(go, c);
+                    go(go, c, depth + 1);
                 }
             }
             for (const auto c : lits)
             {
-                go(go, c);
+                go(go, c, depth + 1);
             }
             for (const auto c : strings)
             {
-                go(go, c);
+                go(go, c, depth + 1);
             }
         }
         else
         {
             for (const auto c : inst->m_decorationsAndChildren)
             {
-                go(go, c);
+                go(go, c, depth + 1);
             }
         }
     };
-    go(go, moduleInst);
+    go(go, moduleInst, 0);
 }
 
 } // namespace Slang
