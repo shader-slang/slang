@@ -40,14 +40,9 @@ DEFAULT_WORKFLOW = "ci.yml"
 DEFAULT_POLL_SECONDS = 30
 DEFAULT_MAX_WAIT_MINUTES = 120
 
-# Logins treated as low-priority bots in addition to anything ending in "[bot]".
 DEFAULT_BOT_LOGINS = {
     "nv-slang-bot",
     "nv-slang-bot[bot]",
-    "claude",
-    "claude[bot]",
-    "github-actions",
-    "github-actions[bot]",
 }
 
 # Run statuses that mean a run still holds (or is waiting for) runners.
