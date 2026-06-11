@@ -3114,9 +3114,10 @@ void consolidateRayTracingParameters(
             continue;
         }
 
+        builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
+
         if (legalizePrimitiveIDBeforeConsolidation)
         {
-            builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
             if (tryLegalizeRayTracingPrimitiveIDParam(builder->getModule(), *builder, param))
             {
                 param = nextParam;
