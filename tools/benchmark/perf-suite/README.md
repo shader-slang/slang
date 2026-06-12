@@ -123,7 +123,7 @@ never appeared in the suite. All scale by breadth (number of constructs).
 | Test                   | What it generates                                                                                                                                 | Targets (compiler stage)                                                                                                                                                                                                                    | Primary timer                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | **resource_aggregate** | `N` structs bundling textures + a sampler + a `StructuredBuffer`, all read live                                                                   | **resource-type legalization**: nesting resources in an aggregate forces `legalizeResourceTypes` to flatten them into bindings (every other workload's only resource is a bare `RWStructuredBuffer`); the timer grows super-linearly in `N` | `legalizeResourceTypes`                                |
-| **reflection_layout**  | `N` constant buffers with rich payloads (vectors, matrices, nested `Light[]`/`Material` structs, scalar arrays), compiled with `-reflection-json` | the **parameter binding / layout engine** + reflection serializer — the only large, deeply-typed shader **parameter interface** in the suite (layout/reflection was deferred in PLAN.md)                                                    | `compileInner` (+ `frontEndExecute`, `generateOutput`) |
+| **reflection_layout**  | `N` constant buffers with rich payloads (vectors, matrices, nested `Light[]`/`Material` structs, scalar arrays), compiled with `-reflection-json` | the **parameter binding / layout engine** + reflection serializer — the only large, deeply-typed shader **parameter interface** in the suite (the layout/reflection path no other workload covers)                                          | `compileInner` (+ `frontEndExecute`, `generateOutput`) |
 | **control_flow_ssa**   | one entry point with `N` stacked control-flow blocks (nested if/else + bounded loop with break/continue + switch) mutating carried locals         | **SSA construction / CFG simplify**: reassigning locals across branches and back-edges forces phi insertion (`constructSSA` inside `simplifyIR`) — the axis `complexity_ladder` only touches as one of several                              | `simplifyIR`, `frontEndExecute`                        |
 
 ### Complexity-scaling test
@@ -218,11 +218,10 @@ python3 compare.py base head                # primary-timer Δ%, flags regressio
 
 ### Documents
 
-| Document     | What it contains                                                           |
-| ------------ | -------------------------------------------------------------------------- |
-| `README.md`  | this file — overview, the tests and what they target, quickstart           |
-| `PLAN.md`    | origin, locked decisions, storage layout, workload expansion history       |
-| `CI_PLAN.md` | deployment plan for **per-PR** (soft-fail gate) and **nightly** (trend) CI |
+| Document    | What it contains                                                       |
+| ----------- | ---------------------------------------------------------------------- |
+| `README.md` | this file — overview, the tests and what they target, quickstart       |
+| `DESIGN.md` | design decisions, local use cases, CI workflows, and the result layout |
 
 ### Generated outputs (gitignored)
 

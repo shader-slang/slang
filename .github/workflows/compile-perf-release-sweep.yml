@@ -6,7 +6,7 @@ name: Compile Perf — Release Sweep (history resync)
 # daily ToT points to stay comparable — run this with force=true to do that.
 # Downloads prebuilt slangc for each release (matching the runner's platform),
 # sweeps them into the perf-results repo, stamps the runner fingerprint, and
-# rebuilds the tracking series. See tools/benchmark/perf-suite/CI_PLAN.md.
+# rebuilds the tracking series. See tools/benchmark/perf-suite/DESIGN.md.
 
 on:
   workflow_dispatch:

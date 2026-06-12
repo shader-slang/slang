@@ -310,7 +310,7 @@ def gen_reflection_layout(n):
     RWStructuredBuffer), so it is the one stressor for the parameter binding /
     layout-assignment engine and — with `-reflection-json` (see the spec's
     reflection_json flag) — the reflection serializer, the layout/reflection path
-    PLAN.md deferred and nothing else covers. Scales by breadth = number of
+    no other workload covers. Scales by breadth = number of
     parameter blocks the layout engine must place and reflect. Note: layout is
     computed during compileInner regardless of the flag (so compileInner is the
     holistic signal); -reflection-json additionally runs the serializer, which is

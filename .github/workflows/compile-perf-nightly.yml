@@ -4,7 +4,7 @@ name: Compile Perf — Nightly ToT
 # benchmark runner, runs the perf suite, stores the day's results in the
 # perf-results repo under daily/<date>-<sha>/, and rebuilds the tracking series
 # (per-release history ++ post-release daily points). See
-# tools/benchmark/perf-suite/CI_PLAN.md.
+# tools/benchmark/perf-suite/DESIGN.md.
 
 on:
   # The daily schedule is intentionally DISABLED for now — do not enable it in
