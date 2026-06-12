@@ -962,6 +962,27 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
     }
 };
 
+// When scalar layout is requested (`-force-glsl-scalar-layout`), Metal
+// structured buffer elements use natural (scalar-aligned, tightly packed)
+// vector and matrix layout to match the physical layout used by other
+// targets. `MetalBufferElementTypeLoweringPolicy` lowers vectors/matrices in
+// such buffers to scalar arrays so the emitted MSL agrees with this layout.
+struct MetalScalarStructuredBufferLayoutRulesImpl : MetalLayoutRulesImpl
+{
+    SimpleLayoutInfo GetVectorLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t elementCount) override
+    {
+        SLANG_UNUSED(elementType);
+        SimpleLayoutInfo vectorInfo;
+        vectorInfo.kind = elementInfo.kind;
+        vectorInfo.size = elementInfo.size * elementCount;
+        vectorInfo.alignment = elementInfo.alignment;
+        return vectorInfo;
+    }
+};
+
 struct HLSLStructuredBufferLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     // HLSL structured buffers drop the restrictions added for constant buffers,
@@ -2703,12 +2724,7 @@ static MetalObjectLayoutRulesImpl kMetalObjectLayoutRulesImpl;
 static MetalArgumentBufferElementLayoutRulesImpl kMetalArgumentBufferElementLayoutRulesImpl;
 static MetalTier2ObjectLayoutRulesImpl kMetalTier2ObjectLayoutRulesImpl;
 static MetalLayoutRulesImpl kMetalLayoutRulesImpl;
-
-LayoutRulesImpl kMetalAnyValueLayoutRulesImpl_ = {
-    &kMetalLayoutRulesFamilyImpl,
-    &kDefaultLayoutRulesImpl,
-    &kMetalObjectLayoutRulesImpl,
-};
+static MetalScalarStructuredBufferLayoutRulesImpl kMetalScalarStructuredBufferLayoutRulesImpl;
 
 LayoutRulesImpl kMetalConstantBufferLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
@@ -2737,6 +2753,12 @@ LayoutRulesImpl kMetalTier2ParameterBlockLayoutRulesImpl_ = {
 LayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
     &kMetalLayoutRulesImpl,
+    &kMetalObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kMetalScalarStructuredBufferLayoutRulesImpl_ = {
+    &kMetalLayoutRulesFamilyImpl,
+    &kMetalScalarStructuredBufferLayoutRulesImpl,
     &kMetalObjectLayoutRulesImpl,
 };
 
@@ -2782,8 +2804,11 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getEntryPointParameterRules()
     return &kMetalConstantBufferLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
+LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getStructuredBufferRules(
+    CompilerOptionSet& compilerOptions)
 {
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kMetalScalarStructuredBufferLayoutRulesImpl_;
     return &kMetalStructuredBufferLayoutRulesImpl_;
 }
 

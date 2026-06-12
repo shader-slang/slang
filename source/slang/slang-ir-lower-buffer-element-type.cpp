@@ -2258,6 +2258,12 @@ struct LoweredElementTypeContext
             return;
         auto matrixType = as<IRMatrixType>(matrixTypeInfo->originalType);
         auto colCount = getIntVal(matrixType->getColumnCount());
+        // On Metal, matrices are stored as arrays of scalar arrays rather than
+        // arrays of vectors, so whole-row loads/stores need an extra conversion
+        // between the row vector and its scalar-array storage.
+        IRArrayType* minorStorageArrayType = nullptr;
+        if (auto innerArrayType = as<IRArrayTypeBase>(matrixTypeInfo->loweredInnerArrayType))
+            minorStorageArrayType = as<IRArrayType>(innerArrayType->getElementType());
         traverseUses(
             majorAddr,
             [&](IRUse* use)
@@ -2297,6 +2303,16 @@ struct LoweredElementTypeContext
                             auto element =
                                 builder.emitElementAddress(dataPtr, majorGEP->getIndex());
                             resultInst = builder.emitLoad(element);
+                            if (minorStorageArrayType)
+                            {
+                                auto vectorType = as<IRVectorType>(user->getDataType());
+                                SLANG_ASSERT(vectorType);
+                                List<IRInst*> args;
+                                auto count = getIntVal(minorStorageArrayType->getElementCount());
+                                for (IRIntegerValue i = 0; i < count; i++)
+                                    args.add(builder.emitElementExtract(resultInst, i));
+                                resultInst = builder.emitMakeVector(vectorType, args);
+                            }
                         }
                         user->replaceUsesWith(resultInst);
                         user->removeAndDeallocate();
@@ -2324,12 +2340,25 @@ struct LoweredElementTypeContext
                                     elementAddr,
                                     builder.emitElementExtract(storeInst->getVal(), i));
                             }
+                            user->removeAndDeallocate();
                         }
                         else
                         {
                             auto rowAddr =
                                 builder.emitElementAddress(dataPtr, majorGEP->getIndex());
-                            builder.emitStore(rowAddr, storeInst->getVal());
+                            IRInst* value = storeInst->getVal();
+                            if (minorStorageArrayType)
+                            {
+                                List<IRInst*> args;
+                                auto count = getIntVal(minorStorageArrayType->getElementCount());
+                                for (IRIntegerValue i = 0; i < count; i++)
+                                    args.add(builder.emitElementExtract(value, i));
+                                value = builder.emitMakeArray(
+                                    minorStorageArrayType,
+                                    (UInt)args.getCount(),
+                                    args.getBuffer());
+                            }
+                            builder.emitStore(rowAddr, value);
                             user->removeAndDeallocate();
                         }
                         break;
@@ -2559,7 +2588,6 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
             break;
         }
     }
-
     auto rules = getTypeLayoutRuleNameForBuffer(target, bufferType);
     return TypeLoweringConfig{addrSpace, rules};
 }
@@ -2925,6 +2953,293 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
     }
 };
 
+// MSL vector types are aligned to a power-of-two multiple of their element
+// alignment (e.g. `float3` has size and alignment 16), so vectors stored in
+// device buffers do not match Slang's natural (scalar-aligned, tightly packed)
+// layout. When scalar layout is requested (`-force-glsl-scalar-layout`), this
+// policy lowers vectors and matrices in such buffers to scalar arrays, whose
+// MSL layout is exactly the natural layout. Without that option, and for
+// constant buffers and argument buffers (Uniform address space) always, the
+// native Metal layout is kept, which is what reflection reports for them.
+struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
+{
+    MetalBufferElementTypeLoweringPolicy(
+        TargetProgram* inTarget,
+        BufferElementTypeLoweringOptions inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
+    {
+    }
+
+    bool needsElementLowering(IRType* elementType) override
+    {
+        if (auto vectorType = as<IRVectorType>(elementType))
+        {
+            if (target->getOptionSet().shouldUseScalarLayout() &&
+                !as<IRBoolType>(vectorType->getElementType()))
+            {
+                if (auto countInst = as<IRIntLit>(vectorType->getElementCount()))
+                {
+                    auto count = getIntVal(countInst);
+                    return (count & (count - 1)) != 0;
+                }
+            }
+            return false;
+        }
+        return DefaultBufferElementTypeLoweringPolicy::needsElementLowering(elementType);
+    }
+
+    bool usesScalarVectorStorage(TypeLoweringConfig config)
+    {
+        if (!target->getOptionSet().shouldUseScalarLayout())
+            return false;
+        if (config.layoutRuleName != IRTypeLayoutRuleName::Natural)
+            return false;
+        switch (config.addressSpace)
+        {
+        case AddressSpace::StorageBuffer:
+        case AddressSpace::UserPointer:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    static bool needsScalarVectorStorage(IRVectorType* vectorType)
+    {
+        // `bool` vectors keep their native MSL emission, consistent with how
+        // scalar `bool` is stored on this target.
+        if (as<IRBoolType>(vectorType->getElementType()))
+            return false;
+        auto countInst = as<IRIntLit>(vectorType->getElementCount());
+        if (!countInst)
+            return false;
+        return getIntVal(countInst) > 1;
+    }
+
+    IRFunc* createVectorUnpackFunc(IRVectorType* vectorType, IRArrayType* arrayType)
+    {
+        IRBuilder builder(arrayType);
+        builder.setInsertAfter(arrayType);
+        auto func = builder.createFunc();
+        auto refArrayType = builder.getRefParamType(arrayType, AddressSpace::Generic);
+        auto funcType = builder.getFuncType(1, (IRType**)&refArrayType, vectorType);
+        func->setFullType(funcType);
+        builder.addNameHintDecoration(func, UnownedStringSlice("unpackVector"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+
+        auto arrayParamRef = builder.emitParam(refArrayType);
+        auto arrayParam = builder.emitLoad(arrayParamRef);
+        List<IRInst*> args;
+        auto elementCount = getIntVal(vectorType->getElementCount());
+        for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+            args.add(builder.emitElementExtract(arrayParam, ii));
+        auto result = builder.emitMakeVector(vectorType, (UInt)args.getCount(), args.getBuffer());
+        builder.emitReturn(result);
+        return func;
+    }
+
+    IRFunc* createVectorPackFunc(IRVectorType* vectorType, IRArrayType* arrayType)
+    {
+        IRBuilder builder(arrayType);
+        builder.setInsertAfter(arrayType);
+        auto func = builder.createFunc();
+        auto outArrayType = builder.getRefParamType(arrayType, AddressSpace::Generic);
+        IRType* paramTypes[] = {outArrayType, vectorType};
+        auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
+        func->setFullType(funcType);
+        builder.addNameHintDecoration(func, UnownedStringSlice("packVector"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+
+        auto outParam = builder.emitParam(outArrayType);
+        auto originalParam = builder.emitParam(vectorType);
+        List<IRInst*> args;
+        auto elementCount = getIntVal(vectorType->getElementCount());
+        for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+            args.add(builder.emitElementExtract(originalParam, ii));
+        auto arrayVal = builder.emitMakeArray(arrayType, (UInt)args.getCount(), args.getBuffer());
+        builder.emitStore(outParam, arrayVal);
+        builder.emitReturn();
+        return func;
+    }
+
+    IRFunc* createMatrixPackFuncForScalarArrays(
+        IRMatrixType* matrixType,
+        IRStructType* structType,
+        IRArrayType* minorArrayType,
+        IRArrayType* majorArrayType)
+    {
+        IRBuilder builder(structType);
+        builder.setInsertAfter(structType);
+        auto func = builder.createFunc();
+        auto outStructType = builder.getRefParamType(structType, AddressSpace::Generic);
+        IRType* paramTypes[] = {outStructType, matrixType};
+        auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
+        func->setFullType(funcType);
+        builder.addNameHintDecoration(func, UnownedStringSlice("packMatrix"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+        auto rowCount = getIntVal(matrixType->getRowCount());
+        auto colCount = getIntVal(matrixType->getColumnCount());
+        auto outParam = builder.emitParam(outStructType);
+        auto originalParam = builder.emitParam(matrixType);
+        List<IRInst*> elements;
+        elements.setCount((Index)(rowCount * colCount));
+        for (IRIntegerValue r = 0; r < rowCount; r++)
+        {
+            auto vector = builder.emitElementExtract(originalParam, r);
+            for (IRIntegerValue c = 0; c < colCount; c++)
+                elements[(Index)(r * colCount + c)] = builder.emitElementExtract(vector, c);
+        }
+        bool isColMajor = getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+        auto majorCount = isColMajor ? colCount : rowCount;
+        auto minorCount = isColMajor ? rowCount : colCount;
+        List<IRInst*> minorArrays;
+        for (IRIntegerValue i = 0; i < majorCount; i++)
+        {
+            List<IRInst*> minorArgs;
+            for (IRIntegerValue j = 0; j < minorCount; j++)
+            {
+                auto element = isColMajor ? elements[(Index)(j * colCount + i)]
+                                          : elements[(Index)(i * colCount + j)];
+                minorArgs.add(element);
+            }
+            minorArrays.add(builder.emitMakeArray(
+                minorArrayType,
+                (UInt)minorArgs.getCount(),
+                minorArgs.getBuffer()));
+        }
+        auto majorArray = builder.emitMakeArray(
+            majorArrayType,
+            (UInt)minorArrays.getCount(),
+            minorArrays.getBuffer());
+        auto result = builder.emitMakeStruct(structType, 1, &majorArray);
+        builder.emitStore(outParam, result);
+        builder.emitReturn();
+        return func;
+    }
+
+    LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
+    {
+        if (usesScalarVectorStorage(config))
+        {
+            bool needExplicitLayout = config.lowerToPhysicalType;
+            if (auto vectorType = as<IRVectorType>(type))
+            {
+                if (needsScalarVectorStorage(vectorType))
+                {
+                    IRBuilder builder(type);
+                    builder.setInsertAfter(type);
+                    LoweredElementTypeInfo info = {};
+                    info.originalType = type;
+
+                    IRSizeAndAlignment elementSizeAlignment;
+                    getSizeAndAlignment(
+                        target->getTargetReq(),
+                        config.getLayoutRule(),
+                        vectorType->getElementType(),
+                        &elementSizeAlignment);
+                    auto arrayType = builder.getArrayType(
+                        vectorType->getElementType(),
+                        vectorType->getElementCount(),
+                        needExplicitLayout ? builder.getIntValue(
+                                                 builder.getIntType(),
+                                                 elementSizeAlignment.getStride())
+                                           : nullptr);
+                    maybeAddPhysicalTypeDecoration(builder, arrayType, config);
+
+                    info.loweredType = arrayType;
+                    info.loweredInnerArrayType = arrayType;
+                    info.convertLoweredToOriginal = createVectorUnpackFunc(vectorType, arrayType);
+                    info.convertOriginalToLowered = createVectorPackFunc(vectorType, arrayType);
+                    return info;
+                }
+            }
+            else if (auto matrixType = as<IRMatrixType>(type))
+            {
+                bool isColMajor =
+                    getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+                auto minorCount = isColMajor ? getIntVal(matrixType->getRowCount())
+                                             : getIntVal(matrixType->getColumnCount());
+                auto majorCount = isColMajor ? getIntVal(matrixType->getColumnCount())
+                                             : getIntVal(matrixType->getRowCount());
+                if (minorCount > 1)
+                {
+                    IRBuilder builder(type);
+                    builder.setInsertAfter(type);
+                    LoweredElementTypeInfo info = {};
+                    info.originalType = type;
+
+                    auto loweredType = builder.createStructType();
+                    maybeAddPhysicalTypeDecoration(builder, loweredType, config);
+
+                    StringBuilder nameSB;
+                    nameSB << "_MatrixStorage_";
+                    getTypeNameHint(nameSB, matrixType->getElementType());
+                    nameSB << getIntVal(matrixType->getRowCount()) << "x"
+                           << getIntVal(matrixType->getColumnCount());
+                    if (isColMajor)
+                        nameSB << "_ColMajor";
+                    if (!needExplicitLayout)
+                        nameSB << "_logical";
+                    nameSB << getLayoutName(config.layoutRuleName);
+                    builder.addNameHintDecoration(
+                        loweredType,
+                        nameSB.produceString().getUnownedSlice());
+                    auto structKey = builder.createStructKey();
+                    builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
+
+                    IRSizeAndAlignment elementSizeAlignment;
+                    getSizeAndAlignment(
+                        target->getTargetReq(),
+                        config.getLayoutRule(),
+                        matrixType->getElementType(),
+                        &elementSizeAlignment);
+                    auto minorArrayType = builder.getArrayType(
+                        matrixType->getElementType(),
+                        builder.getIntValue(builder.getIntType(), minorCount),
+                        needExplicitLayout ? builder.getIntValue(
+                                                 builder.getIntType(),
+                                                 elementSizeAlignment.getStride())
+                                           : nullptr);
+                    IRSizeAndAlignment minorArraySizeAlignment;
+                    getSizeAndAlignment(
+                        target->getTargetReq(),
+                        config.getLayoutRule(),
+                        minorArrayType,
+                        &minorArraySizeAlignment);
+                    auto majorArrayType = builder.getArrayType(
+                        minorArrayType,
+                        builder.getIntValue(builder.getIntType(), majorCount),
+                        needExplicitLayout ? builder.getIntValue(
+                                                 builder.getIntType(),
+                                                 minorArraySizeAlignment.getStride())
+                                           : nullptr);
+                    builder.createStructField(loweredType, structKey, majorArrayType);
+
+                    info.loweredType = loweredType;
+                    info.loweredInnerArrayType = majorArrayType;
+                    info.loweredInnerStructKey = structKey;
+                    info.convertLoweredToOriginal =
+                        createMatrixUnpackFunc(matrixType, loweredType, structKey);
+                    info.convertOriginalToLowered = createMatrixPackFuncForScalarArrays(
+                        matrixType,
+                        loweredType,
+                        minorArrayType,
+                        majorArrayType);
+                    return info;
+                }
+            }
+        }
+
+        return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
+    }
+};
+
 struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
 {
     MetalParameterBlockElementTypeLoweringPolicy(
@@ -3140,6 +3455,8 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
         return new DefaultBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::KhronosTarget:
         return new KhronosTargetBufferElementTypeLoweringPolicy(target, options);
+    case BufferElementTypeLoweringPolicyKind::Metal:
+        return new MetalBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::MetalParameterBlock:
         return new MetalParameterBlockElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::MetalPointerLowering:
