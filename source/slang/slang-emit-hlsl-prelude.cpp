@@ -457,6 +457,17 @@ static uint32_t const* getBarrierMemoryTypeFlagBits(Count& outCount)
     return flagBits;
 }
 
+static uint32_t getBarrierMemoryTypeEmitMask()
+{
+    Count flagBitCount = 0;
+    auto flagBits = getBarrierMemoryTypeFlagBits(flagBitCount);
+
+    uint32_t mask = 0;
+    for (Count ii = 0; ii < flagBitCount; ++ii)
+        mask |= flagBits[ii];
+    return mask;
+}
+
 static const char* getBarrierSemanticFlagName(uint32_t flag)
 {
     switch (flag)
@@ -481,6 +492,17 @@ static uint32_t const* getBarrierSemanticFlagBits(Count& outCount)
     };
     outCount = SLANG_COUNT_OF(flagBits);
     return flagBits;
+}
+
+static uint32_t getBarrierSemanticEmitMask()
+{
+    Count flagBitCount = 0;
+    auto flagBits = getBarrierSemanticFlagBits(flagBitCount);
+
+    uint32_t mask = 0;
+    for (Count ii = 0; ii < flagBitCount; ++ii)
+        mask |= flagBits[ii];
+    return mask;
 }
 
 static char const* getWorkGraphRecordTypeName(IROp op)
@@ -528,6 +550,7 @@ void HLSLSourceEmitter::emitWorkGraphRecordType(IRType* type)
 
 void HLSLSourceEmitter::emitNamedMemoryTypeFlagSet(uint32_t flagVal)
 {
+    SLANG_RELEASE_ASSERT(getBarrierMemoryTypeEmitMask() == getKnownBarrierMemoryTypeFlags());
     SLANG_RELEASE_ASSERT(isValidBarrierMemoryTypeFlags(flagVal));
 
     m_writer->emit("(");
@@ -561,6 +584,7 @@ void HLSLSourceEmitter::emitNamedMemoryTypeFlagSet(uint32_t flagVal)
 
 void HLSLSourceEmitter::emitNamedSemanticFlagSet(uint32_t flagVal)
 {
+    SLANG_RELEASE_ASSERT(getBarrierSemanticEmitMask() == getKnownBarrierSemanticFlags());
     SLANG_RELEASE_ASSERT(isValidBarrierSemanticFlags(flagVal));
 
     m_writer->emit("(");
