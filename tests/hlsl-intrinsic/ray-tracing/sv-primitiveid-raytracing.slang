@@ -21,8 +21,13 @@
 //TEST:SIMPLE(filecheck=NAME_COLLISION_CUDA):-target cuda -entry main_chit_name_collision -stage closesthit
 //TEST:SIMPLE(filecheck=ADDRESS_HLSL):-target hlsl -entry main_chit_inout -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=ADDRESS_DXIL):-target dxil-assembly -entry main_chit_inout -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=ADDRESS_SPIRV):-target spirv-assembly -entry main_chit_inout -stage closesthit
+//TEST:SIMPLE(filecheck=ADDRESS_GLSL):-target glsl -entry main_chit_inout -stage closesthit
+//TEST:SIMPLE(filecheck=ADDRESS_CUDA):-target cuda -entry main_chit_inout -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_HLSL):-target hlsl -entry main_chit_struct -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_DXIL):-target dxil-assembly -entry main_chit_struct -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=STRUCT_MIXED_HLSL):-target hlsl -entry main_chit_struct_mixed -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=STRUCT_MIXED_DXIL):-target dxil-assembly -entry main_chit_struct_mixed -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=ISECT_CUDA):-target cuda -entry main_isect_cuda -stage intersection
 //TEST:SIMPLE(filecheck=AHIT_CUDA):-target cuda -entry main_ahit -stage anyhit
 //TEST:SIMPLE(filecheck=CHIT_CUDA):-target cuda -entry main_chit -stage closesthit
@@ -210,6 +215,21 @@ void main_chit_inout(
 
 // ADDRESS_DXIL: call i32 @dx.op.primitiveIndex.i32
 
+// ADDRESS_SPIRV: OpEntryPoint ClosestHitKHR
+// ADDRESS_SPIRV: BuiltIn PrimitiveId
+// ADDRESS_SPIRV: OpLoad %uint %gl_PrimitiveID
+// ADDRESS_SPIRV: OpIAdd %uint {{.*}} %uint_3
+// ADDRESS_SPIRV: OpConvertUToF %float
+
+// ADDRESS_GLSL: gl_PrimitiveID
+// ADDRESS_GLSL: adjustPrimitiveID_0
+// ADDRESS_GLSL: payload_0.val_0 = float(
+
+// ADDRESS_CUDA: __global__ void __closesthit__main_chit_inout
+// ADDRESS_CUDA: optixGetPrimitiveIndex()
+// ADDRESS_CUDA: adjustPrimitiveID_0(&
+// ADDRESS_CUDA: float(
+
 struct ChitPrimitiveInput
 {
     int pid : SV_PrimitiveID;
@@ -230,3 +250,24 @@ void main_chit_struct(
 // STRUCT_HLSL: float(int([[PRIMITIVE_ID]]))
 
 // STRUCT_DXIL: call i32 @dx.op.primitiveIndex.i32
+
+struct ChitMixedPrimitiveInput
+{
+    int pid : SV_PrimitiveID;
+    float weight;
+};
+
+[shader("closesthit")]
+void main_chit_struct_mixed(inout Payload payload, in ChitMixedPrimitiveInput input)
+{
+    payload.val = float(input.pid) + input.weight;
+}
+
+// STRUCT_MIXED_HLSL: struct ChitMixedPrimitiveInput
+// STRUCT_MIXED_HLSL-NOT: SV_PrimitiveID
+// STRUCT_MIXED_HLSL: float weight
+// STRUCT_MIXED_HLSL: [shader("closesthit")]void main_chit_struct_mixed
+// STRUCT_MIXED_HLSL: uint [[PRIMITIVE_ID:[A-Za-z_][A-Za-z_0-9]*]] = PrimitiveIndex()
+// STRUCT_MIXED_HLSL: float(int([[PRIMITIVE_ID]])) + {{.*}}.weight
+
+// STRUCT_MIXED_DXIL: call i32 @dx.op.primitiveIndex.i32

@@ -563,10 +563,10 @@ static IRStructField* findFieldForKey(List<IRStructField*>& fields, IRInst* fiel
     return nullptr;
 }
 
-static IRStructField* findPrimitiveIDFieldAccess(
+static IRStructField* findFieldAccess(
     IRInst* inst,
     IRParam* param,
-    List<IRStructField*>& primitiveIDFields)
+    List<IRStructField*>& fields)
 {
     IRInst* base = nullptr;
     IRInst* fieldKey = nullptr;
@@ -589,7 +589,15 @@ static IRStructField* findPrimitiveIDFieldAccess(
     if (base != param)
         return nullptr;
 
-    return findFieldForKey(primitiveIDFields, fieldKey);
+    return findFieldForKey(fields, fieldKey);
+}
+
+static IRType* replaceParamValueType(IRBuilder& builder, IRType* paramType, IRType* valueType)
+{
+    if (auto ptrType = as<IRPtrTypeBase>(paramType))
+        return builder.getPtrTypeWithAddressSpace(valueType, ptrType);
+
+    return valueType;
 }
 
 bool tryLegalizeRayTracingPrimitiveIDParam(IRModule* module, IRBuilder& builder, IRParam* param)
@@ -655,16 +663,23 @@ static bool tryLegalizeRayTracingPrimitiveIDStructParam(
         return false;
 
     List<IRStructField*> primitiveIDFields;
+    List<IRStructField*> ordinaryFields;
+    List<IRVarLayout*> ordinaryFieldLayouts;
     UInt fieldIndex = 0;
     for (auto field : structType->getFields())
     {
         auto fieldLayout = fieldIndex < structTypeLayout->getFieldCount()
                                ? structTypeLayout->getFieldLayout(fieldIndex)
                                : nullptr;
-        if (!isPrimitiveIDSystemValueStructField(field, fieldLayout))
-            return false;
-
-        primitiveIDFields.add(field);
+        if (isPrimitiveIDSystemValueStructField(field, fieldLayout))
+        {
+            primitiveIDFields.add(field);
+        }
+        else
+        {
+            ordinaryFields.add(field);
+            ordinaryFieldLayouts.add(fieldLayout);
+        }
         fieldIndex++;
     }
 
@@ -678,11 +693,14 @@ static bool tryLegalizeRayTracingPrimitiveIDStructParam(
         [&](IRUse* use)
         {
             auto user = use->getUser();
-            if (findPrimitiveIDFieldAccess(user, param, primitiveIDFields))
+            if (findFieldAccess(user, param, primitiveIDFields))
             {
                 fieldAccesses.add(user);
                 return;
             }
+
+            if (findFieldAccess(user, param, ordinaryFields))
+                return;
 
             hasUnhandledUse = true;
         });
@@ -696,7 +714,7 @@ static bool tryLegalizeRayTracingPrimitiveIDStructParam(
 
         for (auto fieldAccess : fieldAccesses)
         {
-            if (findPrimitiveIDFieldAccess(fieldAccess, param, primitiveIDFields) != field)
+            if (findFieldAccess(fieldAccess, param, primitiveIDFields) != field)
                 continue;
 
             if (!valueReplacement)
@@ -718,6 +736,46 @@ static bool tryLegalizeRayTracingPrimitiveIDStructParam(
             if (!fieldAccess->hasUses())
                 fieldAccess->removeAndDeallocate();
         }
+    }
+
+    if (ordinaryFields.getCount() != 0)
+    {
+        auto ordinaryStructType = builder.createStructType();
+        copyNameHintAndDebugDecorations(ordinaryStructType, structType);
+
+        IRStructTypeLayout::Builder typeLayoutBuilder(&builder);
+        for (Index i = 0; i < ordinaryFields.getCount(); i++)
+        {
+            auto oldField = ordinaryFields[i];
+            auto oldFieldLayout = ordinaryFieldLayouts[i];
+            builder.createStructField(
+                ordinaryStructType,
+                oldField->getKey(),
+                oldField->getFieldType());
+
+            if (oldFieldLayout)
+            {
+                typeLayoutBuilder.addField(oldField->getKey(), oldFieldLayout);
+                typeLayoutBuilder.addResourceUsageFrom(oldFieldLayout->getTypeLayout());
+            }
+        }
+
+        auto ordinaryStructLayout = typeLayoutBuilder.build();
+
+        IRVarLayout::Builder varLayoutBuilder(&builder, ordinaryStructLayout);
+        varLayoutBuilder.cloneEverythingButOffsetsFrom(paramLayout);
+        for (auto offsetAttr : paramLayout->getOffsetAttrs())
+        {
+            auto resInfo = varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
+            resInfo->offset = offsetAttr->getOffset();
+            resInfo->space = offsetAttr->getSpace();
+        }
+
+        auto ordinaryParamLayout = varLayoutBuilder.build();
+        layoutDecor->setOperand(0, ordinaryParamLayout);
+        param->setFullType(
+            replaceParamValueType(builder, param->getFullType(), ordinaryStructType));
+        return true;
     }
 
     if (param->hasUses())
