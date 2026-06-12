@@ -2954,16 +2954,16 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
     }
 };
 
-// MSL vector types are aligned to a power-of-two multiple of their element
-// alignment (e.g. `float3` has size and alignment 16), so vectors stored in
-// device buffers do not match Slang's natural (scalar-aligned, tightly packed)
-// layout. When scalar layout is requested (`-force-glsl-scalar-layout`), this
-// policy lowers vectors in such buffers to packed vectors (MSL `packed_T<N>`,
-// e.g. `packed_float3`: 12 bytes with 4-byte alignment) and matrices to
-// structs of packed-vector arrays — both have exactly the natural layout.
-// Without that option, and for constant buffers and argument buffers (Uniform
-// address space) always, the native Metal layout is kept, which is what
-// reflection reports for them.
+// Metal device buffers use natural (scalar-aligned, tightly packed) layout —
+// the layout `getTypeLayoutRuleNameForBuffer` already declares for them.
+// MSL default vector types are aligned to a
+// power-of-two multiple of their element alignment (e.g. `float3` has size
+// and alignment 16) and so cannot express natural layout, so this policy
+// lowers vectors in such buffers to packed vectors (MSL `packed_T<N>`, e.g.
+// `packed_float3`: 12 bytes with 4-byte alignment) and matrices to structs
+// of packed-vector arrays — both have exactly the natural layout. Constant
+// buffers and argument buffers (Uniform address space) keep the native Metal
+// layout, which is what reflection reports for them.
 struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
 {
     MetalBufferElementTypeLoweringPolicy(
@@ -2975,7 +2975,7 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
 
     // Decide whether a *top-level* buffer element type needs lowering at all.
     // Vector elements use the same classification as vectors nested inside
-    // lowered composites (`needsScalarVectorStorage`): under scalar layout a
+    // lowered composites (`needsScalarVectorStorage`): under natural layout a
     // vector is only guaranteed its element's alignment, so even a `float4`
     // buffer may be bound at a merely 4-byte-aligned offset — which the
     // native (16-byte-aligned) MSL vector type cannot express, and which is
@@ -2984,16 +2984,13 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
     {
         if (auto vectorType = as<IRVectorType>(elementType))
         {
-            return target->getOptionSet().shouldUseScalarLayout() &&
-                   needsScalarVectorStorage(vectorType);
+            return needsScalarVectorStorage(vectorType);
         }
         return DefaultBufferElementTypeLoweringPolicy::needsElementLowering(elementType);
     }
 
     bool usesScalarVectorStorage(TypeLoweringConfig config)
     {
-        if (!target->getOptionSet().shouldUseScalarLayout())
-            return false;
         if (config.layoutRuleName != IRTypeLayoutRuleName::Natural)
             return false;
         switch (config.addressSpace)

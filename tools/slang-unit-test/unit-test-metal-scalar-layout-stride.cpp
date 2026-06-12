@@ -9,14 +9,12 @@
 using namespace Slang;
 
 // Test that on Metal, reflection reports the element stride of a structured
-// buffer according to the layout the generated MSL actually uses:
-//
-// - With `forceGLSLScalarBufferLayout`, buffer elements use natural
-//   (scalar-aligned, tightly packed) layout, so a `float3` element has
-//   stride 12. (`MetalBufferElementTypeLoweringPolicy` lowers such elements
-//   to scalar arrays so the MSL layout matches.)
-// - Without it, the native MSL layout is kept, where `float3` has a 16-byte
-//   size and alignment.
+// buffer according to the layout the generated MSL actually uses: natural
+// (scalar-aligned, tightly packed) layout, so a `float3` element has
+// stride 12. (`MetalBufferElementTypeLoweringPolicy` lowers such elements to
+// MSL packed vectors so the MSL layout matches.) This is the default and is
+// unaffected by `forceGLSLScalarBufferLayout`, which requests the same
+// layout explicitly.
 static size_t _getMetalStructuredBufferFloat3Stride(bool forceScalarLayout)
 {
     const char* userSourceBody = R"(
@@ -98,5 +96,5 @@ static size_t _getMetalStructuredBufferFloat3Stride(bool forceScalarLayout)
 SLANG_UNIT_TEST(metalScalarLayoutStructuredBufferStride)
 {
     SLANG_CHECK(_getMetalStructuredBufferFloat3Stride(true) == 12);
-    SLANG_CHECK(_getMetalStructuredBufferFloat3Stride(false) == 16);
+    SLANG_CHECK(_getMetalStructuredBufferFloat3Stride(false) == 12);
 }

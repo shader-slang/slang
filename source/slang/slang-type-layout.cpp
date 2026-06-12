@@ -962,11 +962,10 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
     }
 };
 
-// When scalar layout is requested (`-force-glsl-scalar-layout`), Metal
-// structured buffer elements use natural (scalar-aligned, tightly packed)
-// vector and matrix layout to match the physical layout used by other
-// targets. `MetalBufferElementTypeLoweringPolicy` lowers vectors/matrices in
-// such buffers to scalar arrays so the emitted MSL agrees with this layout.
+// Metal structured buffer elements use natural (scalar-aligned, tightly
+// packed) vector and matrix layout. `MetalBufferElementTypeLoweringPolicy`
+// lowers vectors/matrices in such buffers to MSL packed vectors so the
+// emitted MSL agrees with this layout.
 struct MetalScalarStructuredBufferLayoutRulesImpl : MetalLayoutRulesImpl
 {
     SimpleLayoutInfo GetVectorLayout(
@@ -2750,12 +2749,6 @@ LayoutRulesImpl kMetalTier2ParameterBlockLayoutRulesImpl_ = {
     &kMetalTier2ObjectLayoutRulesImpl,
 };
 
-LayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl_ = {
-    &kMetalLayoutRulesFamilyImpl,
-    &kMetalLayoutRulesImpl,
-    &kMetalObjectLayoutRulesImpl,
-};
-
 LayoutRulesImpl kMetalScalarStructuredBufferLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
     &kMetalScalarStructuredBufferLayoutRulesImpl,
@@ -2804,12 +2797,9 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getEntryPointParameterRules()
     return &kMetalConstantBufferLayoutRulesImpl_;
 }
 
-LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getStructuredBufferRules(
-    CompilerOptionSet& compilerOptions)
+LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
 {
-    if (compilerOptions.shouldUseScalarLayout())
-        return &kMetalScalarStructuredBufferLayoutRulesImpl_;
-    return &kMetalStructuredBufferLayoutRulesImpl_;
+    return &kMetalScalarStructuredBufferLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)

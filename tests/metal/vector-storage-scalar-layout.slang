@@ -1,16 +1,16 @@
-//TEST:SIMPLE(filecheck=SCALAR): -target metal -stage compute -entry computeMain -force-glsl-scalar-layout
-//TEST:SIMPLE(filecheck=DEFAULT): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain -force-glsl-scalar-layout
 
-// With `-force-glsl-scalar-layout`, vectors in device buffers use natural
-// (scalar-aligned, tightly packed) layout and are lowered to MSL packed
-// vectors (e.g. `packed_float3`: 12-byte stride, 4-byte alignment). This
-// also applies to `float2`/`float4` elements whose native stride already
-// matches natural layout: scalar layout (and the reflection built on it)
-// only guarantees the *element's* alignment for the buffer contents, which
-// the native (size-aligned) MSL vector types cannot express.
+// Vectors in Metal device buffers use natural (scalar-aligned, tightly
+// packed) layout by default and are lowered to MSL packed vectors (e.g.
+// `packed_float3`: 12-byte stride, 4-byte alignment). This also applies to
+// `float2`/`float4` elements whose native stride already matches natural
+// layout: natural layout (and the reflection built on it) only guarantees
+// the *element's* alignment for the buffer contents, which the native
+// (size-aligned) MSL vector types cannot express.
 //
-// Without the option, buffers keep the native MSL layout that reflection
-// reports, so no lowering takes place.
+// `-force-glsl-scalar-layout` requests the same layout explicitly, so both
+// commands above must produce identical output.
 
 struct Wrapped
 {
@@ -34,23 +34,14 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output[tid.x] = p.x + p.y + p.z + c.w + uv.y + w.scale + w.v.x;
 }
 
-// Struct fields with alignment-sensitive vectors are lowered to packed
-// vectors, which have element alignment and no padding.
-// SCALAR: struct Wrapped_natural
-// SCALAR: float scale
-// SCALAR: packed_float4 v
+// Struct fields with vectors are lowered to packed vectors, which have
+// element alignment and no padding.
+// METAL: struct Wrapped_natural
+// METAL: float scale
+// METAL: packed_float4 v
 
-// SCALAR-NOT: {{\bfloat3 device\* positions}}
-// SCALAR-DAG: packed_float3 device* positions
-// SCALAR-DAG: packed_float4 device* colors
-// SCALAR-DAG: packed_float2 device* uvs
-// SCALAR-NOT: {{\bfloat3 device\* positions}}
-
-// DEFAULT-NOT: packed_
-// DEFAULT: struct Wrapped
-// DEFAULT: float scale
-// DEFAULT: float4 v
-// DEFAULT-DAG: float3 device* positions
-// DEFAULT-DAG: float4 device* colors
-// DEFAULT-DAG: float2 device* uvs
-// DEFAULT-NOT: packed_
+// METAL-NOT: {{[ (,]float3 device\* positions}}
+// METAL-DAG: packed_float3 device* positions
+// METAL-DAG: packed_float4 device* colors
+// METAL-DAG: packed_float2 device* uvs
+// METAL-NOT: {{[ (,]float3 device\* positions}}
