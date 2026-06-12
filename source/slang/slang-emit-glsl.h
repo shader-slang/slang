@@ -137,9 +137,6 @@ protected:
 
     void _maybeEmitGLSLCast(IRType* castType, IRInst* inst);
 
-    /// Emit `arg` as a GLSL `abortEXT` payload argument.
-    void _emitGLSLAbortArgument(IRInst* arg);
-
     /// Emit the legalized form of a bitwise or logical operation on a vector of `bool`.
     ///
     /// This emits GLSL code that converts the operands of `inst` into vectors of

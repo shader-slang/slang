@@ -2005,56 +2005,6 @@ void GLSLSourceEmitter::_maybeEmitGLSLCast(IRType* castType, IRInst* inst)
     }
 }
 
-static void _collectGLSLAbortArguments(IRInst* inst, List<IRInst*>& args)
-{
-    if (inst->getOperandCount() == 2)
-    {
-        auto operand = inst->getOperand(1);
-        if (auto makeStruct = as<IRMakeStruct>(operand))
-        {
-            for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
-                args.add(makeStruct->getOperand(i));
-        }
-        else
-        {
-            args.add(operand);
-        }
-    }
-    else
-    {
-        for (UInt i = 1; i < inst->getOperandCount(); i++)
-            args.add(inst->getOperand(i));
-    }
-}
-
-void GLSLSourceEmitter::_emitGLSLAbortArgument(IRInst* arg)
-{
-    IRVectorType* vectorType = as<IRVectorType>(arg->getDataType());
-    auto elementType = vectorType ? vectorType->getElementType() : arg->getDataType();
-    SLANG_RELEASE_ASSERT(as<IRBasicType>(elementType));
-
-    if (as<IRBoolType>(elementType))
-    {
-        if (vectorType)
-        {
-            m_writer->emit("uvec");
-            emitSimpleValue(vectorType->getElementCount());
-            m_writer->emit("(");
-            emitOperand(arg, getInfo(EmitOp::General));
-            m_writer->emit(")");
-        }
-        else
-        {
-            m_writer->emit("uint(");
-            emitOperand(arg, getInfo(EmitOp::General));
-            m_writer->emit(")");
-        }
-        return;
-    }
-
-    emitOperand(arg, getInfo(EmitOp::General));
-}
-
 void GLSLSourceEmitter::_emitLegalizedBoolVectorBinOp(
     IRInst* inst,
     IRVectorType* type,
@@ -2821,8 +2771,9 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     case kIROp_Abort:
         {
-            // abortEXT() requires a literal format string, matching the
-            // SPIRV path (see processAbort in slang-ir-spirv-legalize.cpp).
+            // abortEXT() requires a literal format string. GLSL emission does
+            // not run the SPIR-V processAbort path, so keep this user-facing
+            // diagnostic here for GLSL targets.
             if (!as<IRStringLit>(inst->getOperand(0)))
             {
                 getSink()->diagnose(
@@ -2832,14 +2783,55 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_glslExtensionTracker->requireExtension(toSlice("GL_EXT_shader_abort"));
 
             List<IRInst*> args;
-            _collectGLSLAbortArguments(inst, args);
+            if (inst->getOperandCount() == 2)
+            {
+                auto operand = inst->getOperand(1);
+                if (auto makeStruct = as<IRMakeStruct>(operand))
+                {
+                    for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
+                        args.add(makeStruct->getOperand(i));
+                }
+                else
+                {
+                    args.add(operand);
+                }
+            }
+            else
+            {
+                for (UInt i = 1; i < inst->getOperandCount(); i++)
+                    args.add(inst->getOperand(i));
+            }
 
             m_writer->emit("abortEXT(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             for (auto arg : args)
             {
                 m_writer->emit(", ");
-                _emitGLSLAbortArgument(arg);
+
+                IRVectorType* vectorType = as<IRVectorType>(arg->getDataType());
+                auto elementType = vectorType ? vectorType->getElementType() : arg->getDataType();
+                SLANG_RELEASE_ASSERT(as<IRBasicType>(elementType));
+
+                if (as<IRBoolType>(elementType))
+                {
+                    if (vectorType)
+                    {
+                        m_writer->emit("uvec");
+                        emitSimpleValue(vectorType->getElementCount());
+                        m_writer->emit("(");
+                        emitOperand(arg, getInfo(EmitOp::General));
+                        m_writer->emit(")");
+                    }
+                    else
+                    {
+                        m_writer->emit("uint(");
+                        emitOperand(arg, getInfo(EmitOp::General));
+                        m_writer->emit(")");
+                    }
+                    continue;
+                }
+
+                emitOperand(arg, getInfo(EmitOp::General));
             }
             m_writer->emit(")");
             return true;
