@@ -73,7 +73,7 @@ def main():
     # charts (generate SVGs, embed inline)
     outdir = os.path.join(args.results, "_analysis")
     os.makedirs(outdir, exist_ok=True)
-    _, cseries = plot.load(args.index, args.results, "compileInner")
+    _, cseries = plot.load(args.index, args.results, "compileInner", args.metric)
     svg_norm = plot.render(tags, cseries, "compileInner — normalized to first release",
                            "x baseline", False, True, "mdl_dxr",
                            os.path.join(outdir, "perf_normalized.svg"))

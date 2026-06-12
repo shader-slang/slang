@@ -30,6 +30,7 @@ Notes:
 """
 import argparse
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -37,6 +38,12 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXE = ".exe" if os.name == "nt" else ""
+# Under WSL-on-Windows the repo guidance is to use the Windows-native tools so
+# git worktrees and the VS toolchain/presets resolve correctly (bare `git`/`cmake`
+# would pick the Linux binaries). Native Windows/Linux/macOS use the plain names.
+_WSL = os.name == "posix" and "microsoft" in platform.uname().release.lower()
+GIT = "git.exe" if _WSL else "git"
+CMAKE = "cmake.exe" if _WSL else "cmake"
 PR_SUBSET = ("minimal,autodiff,dynamic_dispatch,diagnostics_errors,"
              "diagnostics_clean,specialization,inlining,mdl_dxr")
 
@@ -51,27 +58,35 @@ def run(cmd, cwd=None, check=True):
 
 
 def git_out(args, cwd):
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True,
+    return subprocess.run([GIT, *args], cwd=cwd, capture_output=True,
                           encoding="utf-8", errors="replace").stdout.strip()
 
 
-def find_slangc(build_root):
-    """Locate slangc[.exe] under a build tree; the config subdir (Release/Debug/…)
-    varies by platform and preset, so search rather than hard-code the path."""
+def find_slangc(build_root, config=None):
+    """Locate slangc[.exe] under a build tree. Multi-config generators (Ninja
+    Multi-Config / VS) put it in build/<Config>/bin, so prefer the requested
+    config — otherwise a newer binary from the *other* config could be picked and
+    the comparison would no longer be head-vs-base on equivalent builds."""
     target = "slangc" + EXE
-    best = None
+    matches = []  # (config_dir_name, path)
     for dirpath, _, files in os.walk(build_root):
-        if os.path.basename(dirpath) == "bin" and target in files:
-            cand = os.path.join(dirpath, target)
-            if best is None or os.path.getmtime(cand) > os.path.getmtime(best):
-                best = cand
-    return best
+        if os.path.basename(dirpath) != "bin" or target not in files:
+            continue
+        matches.append((os.path.basename(os.path.dirname(dirpath)),
+                        os.path.join(dirpath, target)))
+    if not matches:
+        return None
+    if config:
+        scoped = [p for cfg, p in matches if cfg.lower() == config.lower()]
+        if scoped:
+            return max(scoped, key=os.path.getmtime)
+    return max((p for _, p in matches), key=os.path.getmtime)
 
 
-def build_slangc(checkout, configure_preset, build_preset):
-    run(["cmake", "--preset", configure_preset], cwd=checkout)
-    run(["cmake", "--build", "--preset", build_preset, "--target", "slangc"], cwd=checkout)
-    slangc = find_slangc(os.path.join(checkout, "build"))
+def build_slangc(checkout, configure_preset, build_preset, config):
+    run([CMAKE, "--preset", configure_preset], cwd=checkout)
+    run([CMAKE, "--build", "--preset", build_preset, "--target", "slangc"], cwd=checkout)
+    slangc = find_slangc(os.path.join(checkout, "build"), config)
     if not slangc:
         sys.exit(f"build succeeded but slangc{EXE} not found under {checkout}{os.sep}build")
     return slangc
@@ -100,6 +115,7 @@ def main():
     args = ap.parse_args()
 
     build_preset = args.build_preset or args.config
+    config = args.config.capitalize()  # CMake config dir name (Release / Debug)
     repo = args.repo or git_out(["rev-parse", "--show-toplevel"], HERE) \
         or os.path.abspath(os.path.join(HERE, "..", "..", ".."))
     py = sys.executable
@@ -113,7 +129,7 @@ def main():
           f"config={args.config} ==\n")
 
     # HEAD = the current working tree.
-    head_slangc = args.head_slangc or build_slangc(repo, args.configure_preset, build_preset)
+    head_slangc = args.head_slangc or build_slangc(repo, args.configure_preset, build_preset, config)
 
     # BASE = a throwaway worktree at the baseline ref (your checkout stays untouched).
     tmp_parent = None
@@ -123,16 +139,20 @@ def main():
         tmp_parent = tempfile.mkdtemp(prefix="slang-perf-")
         worktree = os.path.join(tmp_parent, "base")  # git worktree add creates it
         try:
-            run(["git", "worktree", "add", "--detach", worktree, args.base], cwd=repo)
-            run(["git", "submodule", "update", "--init", "--recursive"], cwd=worktree)
-            base_slangc = build_slangc(worktree, args.configure_preset, build_preset)
+            run([GIT, "worktree", "add", "--detach", worktree, args.base], cwd=repo)
+            run([GIT, "submodule", "update", "--init", "--recursive"], cwd=worktree)
+            base_slangc = build_slangc(worktree, args.configure_preset, build_preset, config)
         except BaseException:
-            subprocess.run(["git", "worktree", "remove", "--force", worktree], cwd=repo)
+            subprocess.run([GIT, "worktree", "remove", "--force", worktree], cwd=repo)
             shutil.rmtree(tmp_parent, ignore_errors=True)
             raise
 
     try:
         for label, slangc in (("base", base_slangc), ("head", head_slangc)):
+            # bench.py merges into an existing results.json, so start each side from
+            # a clean dir — otherwise stale workloads from a prior run get diffed as
+            # if produced now.
+            shutil.rmtree(os.path.join(results_dir, label), ignore_errors=True)
             run([py, os.path.join(HERE, "bench.py"), "--slangc", slangc, "--label", label,
                  "--out", results_dir, "--only", args.only,
                  "--samples", str(args.samples), "--warmup", str(args.warmup)])
@@ -140,7 +160,7 @@ def main():
                   "--results", results_dir, "--threshold", str(args.threshold)], check=False)
     finally:
         if tmp_parent:
-            subprocess.run(["git", "worktree", "remove", "--force",
+            subprocess.run([GIT, "worktree", "remove", "--force",
                             os.path.join(tmp_parent, "base")], cwd=repo)
             shutil.rmtree(tmp_parent, ignore_errors=True)
     sys.exit(rc)

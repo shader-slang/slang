@@ -35,14 +35,24 @@ def gh_json(url):
 def fetch_corpus(name, spec, outroot):
     base = f"https://api.github.com/repos/{spec['repo']}/contents/{spec['path']}"
     listing = gh_json(base)
+    if not isinstance(listing, list):  # API error / rate-limit returns a dict
+        msg = listing.get("message") if isinstance(listing, dict) else listing
+        raise SystemExit(f"unexpected GitHub API response for {base}: {msg}")
     outdir = os.path.join(outroot, name)
     os.makedirs(outdir, exist_ok=True)
     got = []
     for f in listing:
-        if not f["name"].endswith(spec["exts"]):
+        if not f.get("name", "").endswith(spec["exts"]):
             continue
         meta = gh_json(f["url"])  # file endpoint returns inline base64 content
-        data = base64.b64decode(meta["content"])
+        if not isinstance(meta, dict) or "content" not in meta:
+            print(f"  WARNING: skipping {f['name']} (no content in API response)")
+            continue
+        try:
+            data = base64.b64decode(meta["content"])
+        except ValueError as e:  # binascii.Error subclasses ValueError
+            print(f"  WARNING: skipping {f['name']} (base64 decode failed: {e})")
+            continue
         with open(os.path.join(outdir, f["name"]), "wb") as fh:
             fh.write(data)
         got.append((f["name"], len(data)))

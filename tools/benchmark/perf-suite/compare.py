@@ -67,11 +67,17 @@ def main():
     print(f"Δ% = head/base − 1 ({args.metric}); flag at ±{args.threshold:.0f}% and ≥{args.abs} ms\n")
 
     rows = []
+    broken = []  # head records that failed to compile or dropped a required timer
     for key in sorted(base.keys() & head.keys()):
         wl, size = key
         b, h = base[key], head[key]
         timers = (set(b["timers"]) if args.all_timers
                   else set(b.get("primary_timers", [])) | {"compileInner"})
+        # A head build that crashed (ok=false) or lost a timer the base produced is
+        # a regression, not something to silently skip.
+        missing = [t for t in sorted(timers) if b["timers"].get(t) and not h["timers"].get(t)]
+        if not h.get("ok", True) or missing:
+            broken.append((wl, size, missing, h.get("error")))
         for t in sorted(timers):
             bt, ht = b["timers"].get(t), h["timers"].get(t)
             if not bt or not ht:
@@ -119,12 +125,19 @@ def main():
                   f"({dpct:+.1f}%)")
             break
 
+    if broken:
+        print(f"\n{RED}BROKEN on head{RST} — failed compile / missing required timers "
+              f"(treated as a regression):")
+        for wl, size, miss, err in broken:
+            detail = ("missing " + ", ".join(miss)) if miss else (err or "compile failed")
+            print(f"  {wl}@{size}: {detail}")
+
     print(f"\n{len(regress)} regression(s), {len(improve)} improvement(s) "
-          f"past ±{args.threshold:.0f}%.")
+          f"past ±{args.threshold:.0f}%; {len(broken)} broken head run(s).")
     if regress:
         print(f"{RED}REGRESSED:{RST} " + ", ".join(
             f"{wl}/{t}@{n} {d:+.0f}%" for wl, n, t, _, _, d, _ in regress))
-    if regress and not args.no_fail:
+    if (regress or broken) and not args.no_fail:
         sys.exit(1)
 
 

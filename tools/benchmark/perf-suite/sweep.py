@@ -13,10 +13,11 @@ Typical:
 import argparse
 import json
 import os
-
-import analyze
 import subprocess
 import sys
+
+import analyze
+import manifest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -43,16 +44,37 @@ def main():
           f"({args.samples} samples + {args.warmup} warmup each)\n")
 
     want = set(args.only.split(",")) if args.only else None
+    all_wls = {w.name for w in manifest.WORKLOADS}
     failures = []
     for i, rec in enumerate(ready, 1):
         tag = rec["tag"]
         done = analyze.results_path(args.results, tag)
         if os.path.exists(done) and not args.force:
-            # skip only if the requested workloads are already present (a bare
-            # results.json from a different --only run must NOT mask new work)
-            have = {r["workload"] for r in json.load(open(done))}
-            need = want or {w.name for w in __import__("manifest").WORKLOADS}
-            if need <= have:
+            # Skip only if the requested workloads are already present AND — when
+            # --sweep is requested — already have multi-size scaling data; a plain
+            # (non-swept) results.json from a prior run must not mask a pending
+            # sweep. Tolerate an unreadable/partial file by re-running.
+            try:
+                prev = json.load(open(done))
+            except (json.JSONDecodeError, OSError) as e:
+                prev = []
+                print(f"  (note: unreadable {done} ({e}); re-running)")
+            sizes = {}
+            for r in prev if isinstance(prev, list) else []:
+                if isinstance(r, dict) and "workload" in r:
+                    sizes.setdefault(r["workload"], set()).add(r.get("size"))
+            need = want or all_wls
+
+            def complete(wl):
+                szs = sizes.get(wl)
+                if not szs:
+                    return False
+                spec = manifest.BY_NAME.get(wl)
+                if args.sweep and spec and spec.sweep_sizes:
+                    return len(szs) > 1  # need the scaling curve, not one point
+                return True
+
+            if all(complete(wl) for wl in need):
                 print(f"[{i}/{len(ready)}] {tag}: already has {sorted(need)}, skipping")
                 continue
         print(f"[{i}/{len(ready)}] {tag} ({rec.get('date','?')})")
@@ -64,7 +86,11 @@ def main():
             cmd += ["--only", args.only]
         if args.sweep:
             cmd.append("--sweep")
-        rc = subprocess.run(cmd).returncode
+        try:
+            rc = subprocess.run(cmd, timeout=3600).returncode
+        except subprocess.TimeoutExpired:
+            rc = 1
+            print(f"  (note: {tag} timed out after 1h)")
         if rc != 0:
             # bench.py exits 1 if any workload failed; results are still written
             failures.append(tag)
@@ -72,7 +98,9 @@ def main():
 
     print(f"\nsweep complete. results in {args.results}/")
     if failures:
-        print(f"releases with partial results: {', '.join(failures)}")
+        # Non-zero so CI (release-sweep) won't stamp/push a partial baseline as success.
+        print(f"releases with partial/failed results: {', '.join(failures)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

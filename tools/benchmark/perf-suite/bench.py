@@ -2,10 +2,11 @@
 """Slang compile-time perf-suite runner.
 
 Drives a given slangc over the workloads in manifest.py, parses the per-phase
-timers emitted by -report-detailed-perf-benchmark, and writes tidy JSON + CSV.
+timers emitted by -report-perf-benchmark, and writes tidy per-run JSON
+(median/min/mean/stdev per timer; merge-on-write).
 
 Stdlib only (no prettytable / numpy) so it runs unchanged against any release's
-slangc during the Phase 3 sweep.
+slangc.
 
 Examples:
     # Run the whole suite at default sizes with the local build:
@@ -184,8 +185,13 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
             fh.write(src)
 
     cmds = build_commands(slangc, spec, gen_dir, files)
+    # A failed setup step (e.g. a module that didn't precompile in link mode) must
+    # fail the workload — otherwise the timed compile runs against missing inputs.
+    setup_ok = True
     for c in cmds["setup"]:
-        subprocess.run(c, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if subprocess.run(c, stdout=subprocess.DEVNULL,
+                          stderr=subprocess.DEVNULL).returncode != 0:
+            setup_ok = False
 
     timed = cmds["timed"]
     for _ in range(warmup):
@@ -195,22 +201,22 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
     walls = []
     rsses = []
     last_text = ""
-    rc = 0
+    sample_ok = []  # validate EVERY sample, not just the last one
     for _ in range(samples):
-        rc, wall, text, rss = run_once(timed)
+        _, wall, text, rss = run_once(timed)
         last_text = text
         walls.append(wall)
         if rss is not None:
             rsses.append(rss)
+        err = real_error(text)
+        # expect_fail workloads *want* a real compile error on every run.
+        sample_ok.append(err is not None if spec.expect_fail else err is None)
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
 
     err = real_error(last_text)
-    if spec.expect_fail:
-        ok = err is not None  # we *want* compile errors
-    else:
-        ok = err is None
     got_timers = bool(per_timer)
+    ok = setup_ok and got_timers and all(sample_ok)
 
     return {
         "workload": spec.name,
@@ -218,7 +224,8 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
         "size": size,
         "mode": spec.mode,
         "expected_fail": spec.expect_fail,
-        "ok": ok and got_timers,
+        "ok": ok,
+        "setup_ok": setup_ok,
         "got_timers": got_timers,
         "samples": samples,
         "warmup": warmup,

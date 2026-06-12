@@ -45,6 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           submodules: "recursive"
           fetch-depth: "0"
 
@@ -67,9 +68,12 @@ jobs:
         with:
           repository: "shader-slang/MDL-SDK"
           path: "external/MDL-SDK"
+          persist-credentials: false
           sparse-checkout: |
             ./examples/mdl_sdk/dxr/content/slangified
 
+      # NB: persist-credentials stays on (default) here — the "Push results" step
+      # below relies on the PAT credential this checkout persists in .git/config.
       - name: Checkout perf results repo
         uses: actions/checkout@v4
         with:
@@ -79,6 +83,12 @@ jobs:
 
       - name: Run nightly sweep + update tracking
         shell: bash
+        # Inputs arrive via env and are never interpolated into the script, so a
+        # value with shell metacharacters can't break out — it's just an argv item.
+        env:
+          SAMPLES: ${{ github.event.inputs.samples || '5' }}
+          SWEEP_ENABLED: ${{ github.event.inputs.sweep || 'true' }}
+          ONLY: ${{ github.event.inputs.only }}
         run: |
           set -euo pipefail
           SUITE="$GITHUB_WORKSPACE/tools/benchmark/perf-suite"
@@ -92,11 +102,11 @@ jobs:
           cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang "$SUITE/corpus/mdl/"
 
           cd "$SUITE"
-          SWEEP=""; [ "${{ github.event.inputs.sweep || 'true' }}" = "true" ] && SWEEP="--sweep"
-          ONLY=""; [ -n "${{ github.event.inputs.only }}" ] && ONLY="--only ${{ github.event.inputs.only }}"
+          args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1)
+          [ "$SWEEP_ENABLED" = "true" ] && args+=(--sweep)
+          [ -n "$ONLY" ] && args+=(--only "$ONLY")
           # Daily ToT sweep -> perf-results/daily/<label>/results.json
-          python bench.py --slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" \
-            --samples "${{ github.event.inputs.samples || '5' }}" --warmup 1 $SWEEP $ONLY
+          python bench.py "${args[@]}"
           # Stamp meta + rebuild perf-results/_tracking/tracking.json
           python track.py register --results "$RESULTS" --index "$RESULTS/index.json" \
             --label "$LABEL" --commit "$COMMIT"

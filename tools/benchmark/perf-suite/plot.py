@@ -26,7 +26,7 @@ def vkey(tag):
     return (int(m[1]), int(m[2]), int(m[3] or 0)) if m else (0, 0, 0)
 
 
-def load(index_path, results_dir, timer):
+def load(index_path, results_dir, timer, metric="median"):
     with open(index_path) as fh:
         index = json.load(fh)
     order = []
@@ -49,7 +49,7 @@ def load(index_path, results_dir, timer):
         for wl, r in runs.items():
             st = r["timers"].get(timer)
             series.setdefault(wl, [None] * len(recs))
-            series[wl][i] = st["median"] if st else None
+            series[wl][i] = st[metric] if st else None
     return order, series
 
 
@@ -234,12 +234,13 @@ def main():
     ap.add_argument("--index", default=os.path.join(HERE, "releases", "index.json"))
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
     ap.add_argument("--timer", default="compileInner")
+    ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])
     ap.add_argument("--highlight", default="mdl_dxr", help="workload to emphasize")
     args = ap.parse_args()
 
     outdir = os.path.join(args.results, "_analysis")
     os.makedirs(outdir, exist_ok=True)
-    order, series = load(args.index, args.results, args.timer)
+    order, series = load(args.index, args.results, args.timer, args.metric)
 
     p1 = render(order, series,
                 f"Slang compile time per release — {args.timer}, normalized to first release",

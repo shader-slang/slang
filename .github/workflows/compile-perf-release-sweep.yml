@@ -44,6 +44,7 @@ jobs:
       # is needed so fetch_releases.py can read release tags + dates from git.
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           fetch-depth: "0"
 
       - name: Checkout MDL-SDK corpus
@@ -51,9 +52,12 @@ jobs:
         with:
           repository: "shader-slang/MDL-SDK"
           path: "external/MDL-SDK"
+          persist-credentials: false
           sparse-checkout: |
             ./examples/mdl_sdk/dxr/content/slangified
 
+      # NB: persist-credentials stays on (default) here — the "Push results" step
+      # below relies on the PAT credential this checkout persists in .git/config.
       - name: Checkout perf results repo
         uses: actions/checkout@v4
         with:
@@ -63,8 +67,14 @@ jobs:
 
       - name: Fetch release binaries + sweep on this runner
         shell: bash
+        # Inputs arrive via env and are never interpolated into the script, so a
+        # value with shell metacharacters can't break out — it's just an argv item.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # API rate limit for asset downloads
+          SINCE: ${{ github.event.inputs.since || '2025-08-01' }}
+          UNTIL: ${{ github.event.inputs.until || '2026-12-31' }}
+          SAMPLES: ${{ github.event.inputs.samples || '5' }}
+          FORCE_ENABLED: ${{ github.event.inputs.force || 'false' }}
         run: |
           set -euo pipefail
           SUITE="$GITHUB_WORKSPACE/tools/benchmark/perf-suite"
@@ -74,14 +84,13 @@ jobs:
           cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang "$SUITE/corpus/mdl/"
 
           cd "$SUITE"
-          FORCE=""; [ "${{ github.event.inputs.force || 'false' }}" = "true" ] && FORCE="--force"
+          force=(); [ "$FORCE_ENABLED" = "true" ] && force=(--force)
           # Prebuilt slangc for each release, matching THIS runner's platform.
           python fetch_releases.py --repo "$GITHUB_WORKSPACE" \
-            --since "${{ github.event.inputs.since || '2025-08-01' }}" \
-            --until "${{ github.event.inputs.until || '2026-12-31' }}" $FORCE
+            --since "$SINCE" --until "$UNTIL" "${force[@]}"
           # Sweep every release into the results repo (history baseline).
           python sweep.py --index releases/index.json --results "$RESULTS" \
-            --samples "${{ github.event.inputs.samples || '5' }}" --sweep $FORCE
+            --samples "$SAMPLES" --sweep "${force[@]}"
           # Store the release manifest, stamp the runner the history was built on,
           # and rebuild the tracking series.
           cp releases/index.json "$RESULTS/index.json"

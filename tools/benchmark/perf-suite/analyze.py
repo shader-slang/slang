@@ -5,8 +5,9 @@ Loads releases/<tag>/results.json for every release in the index
 (chronological order), then for each (workload, timer):
   - builds a release-ordered series of the chosen metric (median by default —
     reflects the typical run; --metric min/mean also available),
-  - flags release-over-release step-changes that exceed both a relative and an
-    absolute threshold (the latter scaled by sample noise),
+  - flags release-over-release step-changes that exceed both a relative and a
+    fixed absolute threshold (`--abs`; the median metric already rejects most
+    run-to-run noise, so the floor is a flat constant rather than per-timer),
   - for a flagged compileInner jump, attributes it to the child stage timer with
     the largest concurrent delta.
 Also derives the diagnostics path-cost series (errors - clean).
@@ -277,7 +278,7 @@ def main():
             continue
         if len(vals) < 2:
             continue
-        # noise floor: use a small constant; min metric already rejects most noise
+        # noise floor: a flat constant (--abs); the median metric already rejects most noise
         for ptag, tag, pv, cv, rel, delta in flag_steps(vals, args.rel, args.abs):
             is_primary = timer in primary.get(wl, set())
             attribution = ""

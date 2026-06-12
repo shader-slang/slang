@@ -1,0 +1,6 @@
+self-hosted-runner:
+  # Custom self-hosted runner labels used by the compile-perf workflows
+  # (the dedicated NVIDIA RGFX perf pool). Listing them here documents the
+  # labels and stops actionlint flagging them as unknown.
+  labels:
+    - nvrgfx-perf

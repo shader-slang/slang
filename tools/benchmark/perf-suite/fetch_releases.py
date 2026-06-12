@@ -107,6 +107,16 @@ def find_slangc(root):
     return None
 
 
+def _safe_extract(archive, names, dest):
+    """extractall, but reject any member that would escape `dest` (zip/tar-slip)."""
+    base = os.path.realpath(dest)
+    for name in names:
+        target = os.path.realpath(os.path.join(dest, name))
+        if target != base and not target.startswith(base + os.sep):
+            raise SystemExit(f"refusing unsafe archive member '{name}' (escapes {dest})")
+    archive.extractall(dest)
+
+
 def fetch_one(tag, date, outdir, suffixes, force):
     tagdir = os.path.join(outdir, tag)
     existing = find_slangc(tagdir) if os.path.isdir(tagdir) else None
@@ -125,10 +135,10 @@ def fetch_one(tag, date, outdir, suffixes, force):
     download_asset(asset, arpath)
     if asset["name"].endswith(".zip"):
         with zipfile.ZipFile(arpath) as z:
-            z.extractall(tagdir)
+            _safe_extract(z, z.namelist(), tagdir)
     else:
         with tarfile.open(arpath, "r:gz") as t:
-            t.extractall(tagdir)
+            _safe_extract(t, t.getnames(), tagdir)
     os.remove(arpath)
     slangc = find_slangc(tagdir)
     if not slangc:
@@ -160,7 +170,11 @@ def main():
                     choices=sorted(ASSET_SUFFIXES), help="release asset platform (default: host)")
     ap.add_argument("--force", action="store_true", help="re-download even if cached")
     args = ap.parse_args()
-    suffixes = ASSET_SUFFIXES[args.platform]
+    suffixes = list(ASSET_SUFFIXES[args.platform])
+    # macOS ships both arches; the table lists aarch64 first, so on an Intel host
+    # prefer the x86_64 asset rather than downloading the ARM build.
+    if args.platform == "macos" and platform.machine().lower() in ("x86_64", "amd64"):
+        suffixes.sort(key=lambda s: "x86_64" not in s)
 
     if args.tags:
         # keep chronological order from git where possible
