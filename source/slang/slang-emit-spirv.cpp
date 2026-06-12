@@ -1734,9 +1734,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         if (auto irType = as<IRType, IRDynamicCastBehavior::NoUnwrap>(type))
         {
-            return (
-                getMemoryQualifierSetAttrFlags(irType) &
-                MemoryQualifierSetModifier::Flags::kCoherent) != 0;
+            return (getMemoryQualifierSetAttrFlags(irType) &
+                    MemoryQualifierSetModifier::Flags::kCoherent) != 0;
         }
         return false;
     }
