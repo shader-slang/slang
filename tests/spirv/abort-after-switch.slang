@@ -37,4 +37,4 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // CHECK: OpAbortKHR
 // CHECK-NEXT: [[CASE0]] = OpLabel
 // CHECK: [[DEFAULT]] = OpLabel
-// CHECK: OpPhi %float %float_3 [[DEFAULT]] %float_1 [[CASE0]]
+// CHECK: OpPhi %float %float_3 [[DEFAULT]] %float_1 [[CASE0]]{{$}}
