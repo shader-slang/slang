@@ -4951,6 +4951,30 @@ void discoverExtensionDecls(List<ExtensionDecl*>& decls, Decl* parent)
     }
 }
 
+// Collect every `namespace` declaration rooted at `parent`. Only module, namespace, and file scopes
+// can lexically contain a nested `namespace`, so recursion descends through exactly those
+// (`NamespaceDeclBase` covers `ModuleDecl` + `NamespaceDecl`; a `FileDecl` carries the decls of an
+// `__include`d/`implementing` module fragment) and not into struct/function/etc. bodies or generic
+// wrappers, where a `namespace` can never appear.
+void discoverNamespaceDecls(List<NamespaceDecl*>& decls, Decl* parent)
+{
+    if (auto namespaceDecl = as<NamespaceDecl>(parent))
+        decls.add(namespaceDecl);
+    // Only recurse into the scopes that can lexically contain a `namespace`:
+    // module/namespace scopes (`NamespaceDeclBase`) and the decls of an
+    // `__include`d/`implementing` fragment (`FileDecl`) -- not struct/function
+    // bodies (also `ContainerDecl`s) or generic wrappers, where a `namespace`
+    // never appears. Both of those gating types derive from `ContainerDecl`, so
+    // the cast is total here.
+    if (as<NamespaceDeclBase>(parent) || as<FileDecl>(parent))
+    {
+        for (auto child : as<ContainerDecl>(parent)->getDirectMemberDecls())
+        {
+            discoverNamespaceDecls(decls, child);
+        }
+    }
+}
+
 void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
 {
     // When we are dealing with code from the core modules,
@@ -5097,9 +5121,44 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
         DeclCheckState::CapabilityChecked,
     };
 
-    // Discover and check all extension decls before anything else.
+    // Drive every namespace in the module to `ScopesWired` before the extension-first pass below.
+    // That pass resolves each extension's target type (and generic signature) by unqualified name
+    // lookup, which reads only the already-wired sibling-scope chain. A `namespace N` reopened
+    // across sibling `__include`/`implementing` fragments is merged into that chain only when its
+    // `NamespaceDecl` reaches `ScopesWired` (SemanticsDeclScopeWiringVisitor::visitNamespaceDecl ->
+    // addSiblingScopeForContainerDecl); driving an extension to `ReadyForLookup` does not advance
+    // any namespace, so without this the header resolves against an unwired scope: the unqualified
+    // name fails to resolve (E30015 "undefined identifier"), which then cascades into E30855
+    // ("generic parameter not referenced by extension target type") because the extension's target
+    // type became `error`.
+    //
+    // Every namespace must be wired, not just each extension's lexically-enclosing one: an
+    // extension's target type may live in a *different* namespace fragment than the extension
+    // itself -- e.g. a file-scope `extension N::T` whose `T` is declared in another fragment's
+    // reopened `namespace N` (#11532). Wiring only the enclosing namespace covers the case where
+    // the extension is lexically inside the reopened namespace (#11531) but not the file-scope
+    // case, so this all-namespaces pass subsumes that narrower walk.
+    //
+    // Restricted to namespaces -- NOT `ensureAllDeclsRec(moduleDecl, ScopesWired)` over every decl:
+    // `ensureDecl` here advances only each `NamespaceDecl` itself (and, via `visitNamespaceDecl`,
+    // the direct `using` decls needed for scope wiring), never its ordinary members or extensions.
+    // The broad alternative regressed core-module checking by prematurely advancing the standard
+    // library's non-namespaced texture extensions (`extension _Texture<...>`), resolving their
+    // target types into `error`. `discoverNamespaceDecls` collects only `NamespaceDecl`s (not
+    // `ModuleDecl`, also a `NamespaceDeclBase`), so the global module scope is left to the regular
+    // pass. Fixes shader-slang/slang#11531 and shader-slang/slang#11532.
+    List<NamespaceDecl*> namespaceDecls;
+    discoverNamespaceDecls(namespaceDecls, moduleDecl);
+    for (auto namespaceDecl : namespaceDecls)
+    {
+        ensureDecl(namespaceDecl, DeclCheckState::ScopesWired);
+    }
+
+    // Discover and check all extension decls (after the namespace pre-pass above, but before
+    // general member checking).
     List<ExtensionDecl*> extensionDecls;
     discoverExtensionDecls(extensionDecls, moduleDecl);
+
     for (auto s : states)
     {
         for (auto extensionDecl : extensionDecls)
