@@ -3772,6 +3772,13 @@ standalone_note(
     span { loc = "location" }
 )
 
+standalone_note(
+    "overload-candidate-argument-type-mismatch",
+    40018,
+    "argument ~argIndex:Int does not match: expected '~expectedType:Type', got '~actualType:Type'",
+    span { loc = "location" }
+)
+
 err(
     "case-outside-switch",
     39999,
