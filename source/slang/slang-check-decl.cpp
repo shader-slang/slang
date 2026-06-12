@@ -11421,8 +11421,11 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
             continue;
         }
 
+        // `visitLambdaExpr` synthesizes `LambdaDecl` closure structs and constructs them with
+        // captured values. Forcing `IDefaultInitializable` onto those implementation-detail structs
+        // makes the closure construction resolve against the zero-argument default constructor.
         if (this->getOptionSet().getBoolOption(CompilerOptionName::ZeroInitialize) &&
-            !isFromCoreModule(decl))
+            !isFromCoreModule(decl) && !as<LambdaDecl>(decl))
         {
             // Force add IDefaultInitializable to any struct missing (transitively)
             // `IDefaultInitializable`.
