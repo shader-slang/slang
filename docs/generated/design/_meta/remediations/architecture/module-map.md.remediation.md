@@ -1,35 +1,26 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-05T15:45:00Z
+remediated_at: 2026-06-12T14:13:59Z
 target_doc: architecture/module-map.md
 review_report: ../../reviews/architecture/module-map.md.review.md
-target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
-actions:
-  fixed: 1
-  rejected_bogus: 0
-  rejected_out_of_scope: 0
-  deferred: 0
-  escalated: 0
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+actions: { fixed: 0, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 1, escalated: 0 }
 ---
 
 # Remediation report for architecture/module-map.md
 
 ## Summary
 
-The single major finding was fixed (fixed=1; no rejections, deferrals,
-or escalations). F-001 reported that seven `source/` subdirectories were
-collapsed into one two-column catch-all table instead of receiving their
-own level-2 sections with the prompt-required `Logical unit | Files |
-Responsibility` columns. The catch-all section was split into one
-level-2 section per subdirectory, matching the per-subdirectory heading
-convention already used by the rest of the page; each new section has a
-single-row three-column table citing representative files that resolve
-at the source commit.
+The review contained one major finding (F-001). It is factually correct
+and in-contract, so it is neither rejected-bogus nor rejected-out-of-scope;
+however, a clean resolution requires expanding the manifest watched paths,
+which is beyond this remediation cycle. The finding is therefore deferred,
+and the target document was not edited.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | The module-map prompt (`docs/generated/design/_meta/prompts/architecture-module-map.md:23-31,66-67`) requires each overview logical-unit group its own level-2 section with the three-column table; the catch-all used a two-column Subdirectory/Role table. | Replaced `## Other source/ subdirectories` with seven level-2 sections (`slang-llvm`, `slang-glslang`, `slang-dispatcher`, `slang-rt`, `slang-record-replay`, `slang-wasm`, `slangc`), each with a Logical unit / Files / Responsibility table. |
+| F-001 | deferred | Verified correct: the rows in `## source/slang-llvm/` through `## source/slangc/` link concrete `.cpp`/`.h` files (e.g. `source/slang-llvm/slang-llvm.cpp`, `source/slangc/main.cpp`) that exist on disk but are NOT in the resolved watched set — `regenerate.py show` resolves only each sibling subproject's `CMakeLists.txt` (via `source/*/CMakeLists.txt`), and the module-map prompt checklist (`prompts/architecture-module-map.md:60`) requires every table file path to be in the watched paths. The recommendation's primary option is manifest watched-paths expansion, an explicit deferred trigger. Its alternative (revise rows to cite only watched files) cannot fully resolve the finding: `source/slang-llvm/` and `source/slang-record-replay/` have NO `CMakeLists.txt` at HEAD (confirmed via `git ls-files`), so no file under them is in the watched set, yet prompt checklist line 67 still requires a level-2 section per overview logical-unit group; a partial in-doc rewrite would degrade those sections without satisfying the checklist. Blocker: the manifest `watched_paths` for `architecture/module-map.md` must add the sibling-subproject `.cpp`/`.h` sources, then regenerate. Follow-up: expand `manifest.yaml:37-46` and re-run the generation stage. | — |
