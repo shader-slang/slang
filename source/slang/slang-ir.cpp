@@ -4973,6 +4973,13 @@ ArrayView<IRAnnotation*> ModuleLinkingInfo::getAnnotationsForTarget(IRInst* targ
     return annotations->getArrayView();
 }
 
+void IRModule::_ensureLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    if (!m_linkingInfo)
+        m_linkingInfo = new ModuleLinkingInfo(this);
+}
+
 ModuleLinkingInfo* IRModule::_getOrCreateLinkingInfo()
 {
     std::lock_guard<std::mutex> lock(m_linkingInfoMutex);

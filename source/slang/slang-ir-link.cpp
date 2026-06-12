@@ -2138,7 +2138,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // global acceleration cache once here so the linker can avoid repeated global scans and
     // high-fanout use-list walks.
     for (auto irModule : irModules)
-        irModule->_getOrCreateLinkingInfo();
+        irModule->_ensureLinkingInfo();
 
     // Check if any user module uses auto-diff, if so we will need to link
     // additional witnesses and decorations.
@@ -2526,20 +2526,26 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
     for (auto& m : globalSession->coreModules)
         builtinModules.add(m->getIRModule());
 
-    // Prelink clones from the modules that own `externalSymbolsToLink`. Build linking info for
-    // those stable input modules before cloning. Do not build it for `irModule` itself here:
-    // prelink will mutate it by replacing declarations with cloned definitions, and linking info
-    // assumes the module does not change after it is built.
+    // Prelink can pull in dependencies from any available input module, not only the modules
+    // that directly own `externalSymbolsToLink`. Build linking info for all stable input modules
+    // before cloning. Do not build it for `irModule` itself here: prelink will mutate it by
+    // replacing declarations with cloned definitions, and linking info assumes the module does
+    // not change after it is built.
     HashSet<IRModule*> inputModules;
-    for (auto originalInst : externalSymbolsToLink)
+    for (auto inputModule : specContext.irModules)
     {
-        if (auto inputModule = originalInst->getModule())
+        if (inputModule)
+            inputModules.add(inputModule);
+    }
+    for (auto inputModule : builtinModules)
+    {
+        if (inputModule)
             inputModules.add(inputModule);
     }
     for (auto inputModule : inputModules)
     {
         if (inputModule != irModule)
-            inputModule->_getOrCreateLinkingInfo();
+            inputModule->_ensureLinkingInfo();
     }
 
     // First, register all external symbols in the current module.

@@ -2153,18 +2153,24 @@ public:
         return &m_annotationLookupCache;
     }
 
-    /// Build or return the module-owned acceleration cache used by linker global handling.
-    /// The returned info assumes the module will not change after it is built; callers must
+    /// Ensure the module-owned acceleration cache used by linker global handling is built.
+    /// A built cache assumes the module will not change after it is built; callers must
     /// manually rebuild it if module-scope annotations, global params, exports, known builtins,
     /// or global hashed string literals change.
+    void _ensureLinkingInfo();
+
+    /// Build or return the module-owned acceleration cache used by linker global handling.
+    /// The returned info has the same lifetime and invalidation assumptions as
+    /// `_ensureLinkingInfo()`.
     ModuleLinkingInfo* _getOrCreateLinkingInfo();
 
     /// Return the module-owned linker acceleration cache if it has already been built.
-    /// A built cache assumes the module has not changed since `_getOrCreateLinkingInfo()`.
+    /// A built cache assumes the module has not changed since `_ensureLinkingInfo()`.
     ModuleLinkingInfo* _getLinkingInfo();
 
     /// Drop the module-owned linker acceleration cache after mutating module-scope state that
-    /// it records. The cache will be rebuilt by the next `_getOrCreateLinkingInfo()` call.
+    /// it records. The cache will be rebuilt by the next `_ensureLinkingInfo()` or
+    /// `_getOrCreateLinkingInfo()` call.
     void _invalidateLinkingInfo();
 
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
