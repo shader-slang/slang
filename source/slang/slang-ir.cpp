@@ -4991,6 +4991,7 @@ ModuleLinkingInfo* IRModule::_getOrCreateLinkingInfo()
 ModuleLinkingInfo* IRModule::_getLinkingInfo()
 {
     std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    SLANG_RELEASE_ASSERT(m_linkingInfo);
     return m_linkingInfo;
 }
 

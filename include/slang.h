@@ -5485,6 +5485,14 @@ struct IModulePrecompileService_Experimental : public ISlangUnknown
         0x433e,
         {0xaf, 0xcb, 0x13, 0xa0, 0x88, 0xbc, 0x5e, 0xe5})
 
+    /// Precompile this module for a target and embed the resulting target library in the module.
+    ///
+    /// This function is experimental and not thread-safe. It mutates the module by adding
+    /// precompiled target IR and temporary export metadata. Mutating an existing module is not
+    /// generally well supported, and this operation must invalidate the module linker cache so
+    /// subsequent linking observes the mutated module state. Callers must externally synchronize
+    /// access to the module and must not use this API concurrently with other operations on the
+    /// same module or session.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     precompileForTarget(SlangCompileTarget target, ISlangBlob** outDiagnostics) = 0;
 

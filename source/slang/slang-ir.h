@@ -2171,6 +2171,8 @@ public:
     /// Drop the module-owned linker acceleration cache after mutating module-scope state that
     /// it records. The cache will be rebuilt by the next `_ensureLinkingInfo()` or
     /// `_getOrCreateLinkingInfo()` call.
+    /// This is not thread-safe and should only be used by experimental APIs that mutate an
+    /// existing module.
     void _invalidateLinkingInfo();
 
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
