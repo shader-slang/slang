@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type -cpu
 
 // A generic interface can provide a default implementation for a generic
 // subscript requirement. The conforming type supplies only `getVal`, so both

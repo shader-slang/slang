@@ -9840,8 +9840,6 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
     // match here, then something went wrong well before this.
     SLANG_ASSERT(doesSignatureMatch);
     return doesSignatureMatch;
-
-    return true;
 }
 
 Type* SemanticsVisitor::getForwardDiffFuncInterfaceType(Type* baseType)
