@@ -64,6 +64,12 @@ static constexpr int kDefaultCoverageCounterByteWidth = 8;
 // from cached modules are dropped so the backend never sees them, no
 // buffer is synthesized, and `outMetadata` and `globalScopeVarLayout`
 // are left untouched.
+//
+// `booleanMode` opts in to boolean recording (`CoverageCounterMode::Boolean`):
+// each counter is written with a plain non-atomic store of `1` instead of
+// an atomic add, so it records whether the entry executed (0 / non-zero)
+// rather than an exact count. This removes all atomic contention. Off by
+// default.
 void instrumentCoverage(
     IRModule* module,
     DiagnosticSink* sink,
@@ -73,6 +79,7 @@ void instrumentCoverage(
     const int* reservedSpaces,
     int reservedSpaceCount,
     int counterByteWidth,
+    bool booleanMode,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);

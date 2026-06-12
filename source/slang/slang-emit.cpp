@@ -1106,6 +1106,14 @@ Result linkAndOptimizeIR(
             });
             return SLANG_FAIL;
         }
+        // Opt-in boolean mode (off by default): record whether each entry
+        // executed (non-atomic store of 1) instead of an exact count.
+        bool coverageBoolean = false;
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
+        {
+            if (values->getCount() > 0)
+                coverageBoolean = (*values)[0].intValue != 0;
+        }
         SLANG_PASS(
             instrumentCoverage,
             sink,
@@ -1115,6 +1123,7 @@ Result linkAndOptimizeIR(
             reservedSpaces.getBuffer(),
             (int)reservedSpaces.getCount(),
             counterByteWidth,
+            coverageBoolean,
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);

@@ -25,7 +25,7 @@ jobs:
     steps:
       - name: Success notification
         if: needs.sanitizer-nightly.result == 'success'
-        uses: slackapi/slack-github-action@v1.26.0
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
         with:
           payload: |
             {
@@ -36,7 +36,7 @@ jobs:
 
       - name: Failure notification
         if: needs.sanitizer-nightly.result != 'success'
-        uses: slackapi/slack-github-action@v1.26.0
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
         with:
           payload: |
             {

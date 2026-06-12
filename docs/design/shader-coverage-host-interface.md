@@ -243,10 +243,10 @@ creation is rejected and no counters are written:
   capability) and `shaderBufferInt64Atomics` (`VK_KHR_shader_atomic_int64`,
   core in Vulkan 1.2). The 64-bit path emits SPIR-V 1.5, so the instance
   must target Vulkan 1.2 (a 1.1 instance, max SPIR-V 1.3, rejects it).
-  Note that some drivers (e.g. NVIDIA) report `shaderBufferInt64Atomics`
-  only through the standalone `VkPhysicalDeviceShaderAtomicInt64Features`
-  struct and return 0 for the same bit in the aggregated
-  `VkPhysicalDeviceVulkan12Features`; query the standalone struct.
+  Query `shaderBufferInt64Atomics` via `VkPhysicalDeviceShaderAtomicInt64Features`
+  in the `vkGetPhysicalDeviceFeatures2` pNext chain — this is the canonical
+  struct for this feature and is the reliable path regardless of what the
+  aggregated `VkPhysicalDeviceVulkan12Features` reports.
   Integrated GPUs frequently expose a compute queue but not
   `shaderBufferInt64Atomics`, so a host that enumerates devices should
   select one that advertises the feature (or fall back to

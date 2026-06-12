@@ -1165,6 +1165,8 @@ static const char* _getCoverageCounterModeName(slang::CoverageCounterMode mode)
     {
     case slang::CoverageCounterMode::Count:
         return "count";
+    case slang::CoverageCounterMode::Boolean:
+        return "boolean";
     default:
         return "unknown";
     }

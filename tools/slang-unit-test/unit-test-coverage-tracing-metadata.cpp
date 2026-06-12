@@ -2566,3 +2566,97 @@ SLANG_UNIT_TEST(coverageTracingInvalidCounterWidthFailsCodegen)
     SLANG_CHECK(code64.indexOf(toSlice("_slang_atomic_add_u64((")) != -1);
     SLANG_CHECK(code64.indexOf(toSlice("_slang_atomic_add_u32((")) == -1);
 }
+
+// Verify that compiling with `-trace-coverage-boolean` produces
+// `CoverageCounterMode::Boolean` in the metadata for every entry, and
+// that the manifest serializes it as "boolean" rather than "unknown".
+// This is a regression test for the case where _getCoverageCounterModeName
+// lacked a case for Boolean and silently returned "unknown".
+SLANG_UNIT_TEST(coverageTracingBooleanCounterMode)
+{
+    const char* shaderSource = R"(
+        RWStructuredBuffer<uint> outputBuffer;
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void computeMain(uint3 tid : SV_DispatchThreadID)
+        {
+            if (tid.x > 0)
+                outputBuffer[0] = tid.x;
+            else
+                outputBuffer[0] = 0;
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+
+    slang::CompilerOptionEntry options[2] = {};
+    options[0].name = slang::CompilerOptionName::TraceCoverage;
+    options[0].value.kind = slang::CompilerOptionValueKind::Int;
+    options[0].value.intValue0 = 1;
+    options[1].name = slang::CompilerOptionName::TraceCoverageBoolean;
+    options[1].value.kind = slang::CompilerOptionValueKind::Int;
+    options[1].value.intValue0 = 1;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntries = options;
+    sessionDesc.compilerOptionEntryCount = SLANG_COUNT_OF(options);
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+        "booleanTest",
+        "booleanTest.slang",
+        shaderSource,
+        diagnostics.writeRef()));
+    SLANG_CHECK(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK(module->findEntryPointByName("computeMain", entryPoint.writeRef()) == SLANG_OK);
+
+    slang::IComponentType* parts[] = {module, entryPoint};
+    ComPtr<slang::IComponentType> composed;
+    SLANG_CHECK(
+        session->createCompositeComponentType(parts, 2, composed.writeRef(), nullptr) == SLANG_OK);
+
+    ComPtr<slang::IComponentType> linked;
+    SLANG_CHECK(composed->link(linked.writeRef(), nullptr) == SLANG_OK);
+
+    ComPtr<slang::IBlob> code;
+    SLANG_CHECK(linked->getEntryPointCode(0, 0, code.writeRef(), nullptr) == SLANG_OK);
+
+    ComPtr<slang::IMetadata> metadata;
+    SLANG_CHECK(linked->getEntryPointMetadata(0, 0, metadata.writeRef(), nullptr) == SLANG_OK);
+
+    auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
+        slang::ICoverageTracingMetadata::getTypeGuid());
+    SLANG_CHECK(coverage != nullptr);
+
+    // Every entry produced in boolean mode must carry Boolean mode.
+    uint32_t count = coverage->getEntryCount();
+    SLANG_CHECK(count > 0);
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        slang::CoverageEntryInfo entry = {};
+        SLANG_CHECK(coverage->getEntryInfo(i, &entry) == SLANG_OK);
+        SLANG_CHECK(entry.counterMode == slang::CoverageCounterMode::Boolean);
+    }
+
+    // The manifest must serialize Boolean as "boolean", not "unknown".
+    ComPtr<ISlangBlob> manifestBlob;
+    SLANG_CHECK(slang_writeCoverageManifestJson(coverage, manifestBlob.writeRef()) == SLANG_OK);
+    UnownedStringSlice manifestText(
+        (const char*)manifestBlob->getBufferPointer(),
+        manifestBlob->getBufferSize());
+    SLANG_CHECK(manifestText.indexOf(toSlice("\"boolean\"")) != -1);
+    SLANG_CHECK(manifestText.indexOf(toSlice("\"unknown\"")) == -1);
+}

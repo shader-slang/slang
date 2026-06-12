@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Slash Command Dispatch
         id: scd
-        uses: peter-evans/slash-command-dispatch@v4
+        uses: peter-evans/slash-command-dispatch@9bdcd7914ec1b75590b790b844aa3b8eee7c683a # v5.0.2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           reaction-token: ${{ secrets.SLANGBOT_PAT }}
@@ -39,7 +39,7 @@ jobs:
 
       - name: Edit comment with error message
         if: steps.scd.outputs.error-message
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
           comment-id: ${{ github.event.comment.id }}
