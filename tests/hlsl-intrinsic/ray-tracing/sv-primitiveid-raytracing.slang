@@ -222,13 +222,15 @@ void main_chit_inout(
 // ADDRESS_SPIRV: OpConvertUToF %float
 
 // ADDRESS_GLSL: gl_PrimitiveID
-// ADDRESS_GLSL: adjustPrimitiveID_0
-// ADDRESS_GLSL: payload_0.val_0 = float(
+// ADDRESS_GLSL: uint [[MUTABLE_PID:[A-Za-z_][A-Za-z_0-9]*]] =
+// ADDRESS_GLSL: adjustPrimitiveID_0([[MUTABLE_PID]])
+// ADDRESS_GLSL: payload_0.val_0 = float([[MUTABLE_PID]])
 
 // ADDRESS_CUDA: __global__ void __closesthit__main_chit_inout
 // ADDRESS_CUDA: optixGetPrimitiveIndex()
-// ADDRESS_CUDA: adjustPrimitiveID_0(&
-// ADDRESS_CUDA: float(
+// ADDRESS_CUDA: uint [[MUTABLE_PID:[A-Za-z_][A-Za-z_0-9]*]] =
+// ADDRESS_CUDA: adjustPrimitiveID_0(&[[MUTABLE_PID]])
+// ADDRESS_CUDA: float([[MUTABLE_PID]])
 
 struct ChitPrimitiveInput
 {

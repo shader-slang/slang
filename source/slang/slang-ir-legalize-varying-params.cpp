@@ -594,6 +594,9 @@ static IRStructField* findFieldAccess(
 
 static IRType* replaceParamValueType(IRBuilder& builder, IRType* paramType, IRType* valueType)
 {
+    if (auto borrowInParamType = as<IRBorrowInParamType>(paramType))
+        return builder.getBorrowInParamType(valueType, borrowInParamType->getAddressSpace());
+
     if (auto ptrType = as<IRPtrTypeBase>(paramType))
         return builder.getPtrTypeWithAddressSpace(valueType, ptrType);
 
