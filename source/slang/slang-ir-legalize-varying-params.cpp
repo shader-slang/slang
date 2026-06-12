@@ -2702,10 +2702,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     // We will instead synthesize those values on
     // entry to each kernel.
 
+    bool modifiedFuncType = false;
     IRInst* groupThreadIndex = nullptr;
     IRInst* dispatchThreadID = nullptr;
     void beginEntryPointImpl() SLANG_OVERRIDE
     {
+        modifiedFuncType = false;
+
         IRBuilder builder(m_module);
         builder.setInsertBefore(m_firstOrdinaryInst);
 
@@ -2748,6 +2751,9 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
     void endEntryPointImpl() SLANG_OVERRIDE
     {
+        if (modifiedFuncType)
+            fixUpFuncType(m_entryPointFunc);
+
         // After all parameters have been processed, emit write-backs
         // for any inline payload registers before return statements.
         emitPayloadWritebacks();
@@ -2766,6 +2772,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             bool paramRemoved = false;
             if (tryLegalizeRayTracingPrimitiveIDParam(m_module, builder, param, &paramRemoved))
             {
+                modifiedFuncType = true;
                 if (paramRemoved)
                     return;
 
@@ -2780,6 +2787,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     param,
                     &paramRemoved))
             {
+                modifiedFuncType = true;
                 if (paramRemoved)
                     return;
 
