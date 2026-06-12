@@ -978,13 +978,15 @@ Index getGenericParamIndex(Decl* genericParamDecl)
     return -1;
 }
 
-static bool isVariadicPackCountWitness(Val* witness)
+static bool isDeferredValidationWitness(Val* witness)
 {
-    // Declared and concrete pack-count witnesses are proof placeholders whose
-    // validity is checked by the generic solver after ordinary arguments have
-    // settled. Unification only needs to recognize the witness class so it can
-    // defer validation, following the same pattern as `TypeCoercionWitness`.
-    return as<DeclaredVariadicPackCountWitness>(witness) ||
+    // These witness values do not contribute ordinary-argument inference facts
+    // from their operands. `trySolveWitness` rebuilds and validates them after
+    // ordinary generic arguments settle, so `TryUnifyVals` should recognize the
+    // witness class and defer validation instead of comparing provisional proof
+    // objects.
+    return as<TypeCoercionWitness>(witness) || as<NonEmptyPackWitness>(witness) ||
+           as<DeclaredVariadicPackCountWitness>(witness) ||
            as<ConcreteVariadicPackCountWitness>(witness);
 }
 
@@ -3421,19 +3423,6 @@ bool SemanticsVisitor::TryUnifyVals(
         }
     }
 
-    if (auto fstWit = as<TypeCoercionWitness>(fst); fstWit)
-    {
-        if (auto sndWit = as<TypeCoercionWitness>(snd); sndWit)
-        {
-            // Coercion-witness comparison is an inference hint only. The
-            // generic solver later substitutes the final source/destination
-            // types and asks the coercion checker to build the real witness, so
-            // this path must not reject a candidate just because the provisional
-            // witness values do not expose useful ordinary-argument facts.
-            return true;
-        }
-    }
-
     if (as<TypeEqualityWitness>(fst) && as<DeclaredSubtypeWitness>(snd))
     {
         if (as<DeclaredSubtypeWitness>(snd)->isEquality())
@@ -3482,13 +3471,13 @@ bool SemanticsVisitor::TryUnifyVals(
         }
     }
 
-    if (isVariadicPackCountWitness(fst) && isVariadicPackCountWitness(snd))
+    if (isDeferredValidationWitness(fst) && isDeferredValidationWitness(snd))
     {
-        // Pack-count witnesses are validation proofs, like type-coercion
-        // witnesses above. `countof(T) == N` and `countof(U) == N` may both hold
-        // for different packs, and the proof can only be validated after the
-        // generic solver has substituted final ordinary arguments, so unification
-        // neither rejects provisional witnesses nor derives `T == U` here.
+        // Validation-only witnesses use the same control flow as ordinary
+        // constraints: unification may solve their operands elsewhere, and the
+        // generic solver later rebuilds the witness for the substituted
+        // constraint. Comparing the provisional witness values here would
+        // reject valid candidates without adding useful constraints.
         return true;
     }
 
