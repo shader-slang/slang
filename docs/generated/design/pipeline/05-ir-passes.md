@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: c7ceb8f7138b0d1f8d9559d2e33d3bfbcf92dade0e6bafe75a6e9dd8ace9f07f
+generated_at: 2026-06-12T10:17:30Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 3c3b5585e80344fff65833edfb71495cd9350eddefb45844496574bcd283e01a
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -24,9 +24,9 @@ headings are approximate (precise at `source_commit`).
 The orchestrator is `linkAndOptimizeIR` in
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (declared
 around line 895 at `source_commit`). It is called by
-`emitEntryPointsSourceFromIR` (defined at line 2487; the call is at
-line 2631) and by the variants used when emitting LLVM, VM, or other
-non-textual targets (calls visible near lines 3206, 3247, 3301). The
+`emitEntryPointsSourceFromIR` (defined at line 2526; the call is at
+line 2670) and by the variants used when emitting LLVM, VM, or other
+non-textual targets (calls visible near lines 3245, 3286, 3340). The
 function:
 
 1. Links the per-translation-unit IR modules together (using
@@ -298,7 +298,7 @@ These passes run only for their named target.
 
 | Pass | File | Purpose |
 | --- | --- | --- |
-| Coverage instrument | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | Instruments shaders for coverage tracking; honors `-trace-coverage-binding` and `-trace-coverage-reserved-space` for explicit / reserved binding-slot control |
+| Coverage instrument | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | Synthesizes a `__slang_coverage` buffer (`RWStructuredBuffer<uint64_t>` by default, `uint` when the caller opts down via the validated `counterByteWidth` of `{4, 8}`) and rewrites marker ops into atomic adds; honors `-trace-coverage-binding` / `-trace-coverage-reserved-space` for binding-slot control, and `-trace-coverage-boolean` to record execution as a non-atomic store of `1` instead of an exact count |
 | Finalize coverage metadata | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `finalizeCoverageInstrumentationMetadata`; runs after global / entry-point uniform packing to fill in CPU/CUDA uniform-marshaling fields determined by the final post-packing layout |
 | Insert debug value store | [slang-ir-insert-debug-value-store.cpp](../../../../source/slang/slang-ir-insert-debug-value-store.cpp) | Debug-info preservation across optimization |
 | Liveness | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | Liveness analysis used by debug info |

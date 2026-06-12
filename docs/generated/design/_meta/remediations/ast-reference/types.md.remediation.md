@@ -1,30 +1,21 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T18:00:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-12T14:12:58Z
 target_doc: ast-reference/types.md
 review_report: ../../reviews/ast-reference/types.md.review.md
-target_doc_source_commit_before: 12bdd912949ee692a11a757b5829fe3ef819bebc
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
-actions:
-  fixed: 1
-  rejected_bogus: 0
-  rejected_out_of_scope: 0
-  deferred: 0
-  escalated: 0
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+actions: { fixed: 1, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
 ---
 
 # Remediation report for ast-reference/types.md
 
 ## Summary
-
-One major finding addressed by removing the `Fp8Type` row from the
-Nodes table. The abstract-intermediates paragraph at line 103
-already lists `Fp8Type` and the hierarchy diagram still shows
-`DeclRefType --> Fp8Type` so the parent role remains visible.
+The review reported a single minor finding, which was fixed. The hierarchy diagram incorrectly parented `ThisType` under `Type`; the source declares it as a `DeclRefType` subclass and the Nodes table already lists `DeclRefType` as its parent. No findings were rejected, deferred, or escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-ast-type.h:113-114` declares `class Fp8Type : public DeclRefType` with `FIDDLE(abstract)`; per the page's stated rule abstract intermediates do not appear as table rows. | Removed the `Fp8Type` row from `## Nodes`. The abstract-intermediates listing at line 103 already calls it out and the hierarchy diagram still shows `DeclRefType --> Fp8Type --> FloatE4M3Type / FloatE5M2Type`. |
+| F-001 | fixed | Confirmed correct against source: `source/slang/slang-ast-type.h:1310` declares `class ThisType : public DeclRefType`, and the Nodes table row already uses `DeclRefType` as the parent, so the `Type --> ThisType` diagram edge was both source-inaccurate and internally inconsistent. | Moved the `ThisType` hierarchy edge from `Type --> ThisType` to `DeclRefType --> ThisType`. |

@@ -1,23 +1,23 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:54:00+00:00
+reviewed_at: 2026-06-12T12:04:49+00:00
 target_doc: pipeline/05-ir-passes.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: c7ceb8f7138b0d1f8d9559d2e33d3bfbcf92dade0e6bafe75a6e9dd8ace9f07f
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 3c3b5585e80344fff65833edfb71495cd9350eddefb45844496574bcd283e01a
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
   factual_accuracy: pass
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
   source_alignment: pass
   front_matter_validity: pass
-finding_count: 1
+finding_count: 0
 severity_breakdown:
   critical: 0
   major: 0
-  minor: 1
+  minor: 0
   nit: 0
 ---
 
@@ -25,25 +25,23 @@ severity_breakdown:
 
 ## Summary
 
-Overall the page is source-aligned and its pass inventory links resolve at the target source commit. The only issue I found is structural: the `## Pass utilities` section appears before `## Adding a new pass`, while the per-document prompt requires the opposite order.
+The IR-pass catalog satisfies the representative inventory prompt and matched sampled source files and orchestrator calls. I found no findings.
 
 ## Items checked
 
-- Ran `python3 docs/generated/design/_meta/regenerate.py show pipeline/05-ir-passes.md` and reviewed the resolved watched-file scope plus dependency `pipeline/04-ast-to-ir.md`.
-- Verified required front matter keys and confirmed `target_doc_source_commit` and `target_doc_watched_paths_digest` match the target document.
-- Resolved all 185 relative Markdown links at `52339028a2aa703271533454c6b9528a534bac31` with no missing targets.
-- Verified all line-number citations in the body against `source/slang/slang-emit.cpp`, including `linkAndOptimizeIR`, `emitEntryPointsSourceFromIR`, and the cited non-textual emit call sites.
-- Spot-checked 18 factual/source-alignment claims covering link/import ordering, target-sensitive pass ordering, pre-link versus post-link separation, representative pass files, coverage metadata finalization, and shared IR utility files.
-- Checked required sections, table columns, no-emoji style, workspace-relative links, and source-file existence for representative rows in every pass category.
+- Ran `regenerate.py show pipeline/05-ir-passes.md` and read the target page, `_common.md`, `pipeline-05-ir-passes.md`, and dependency `pipeline/04-ast-to-ir.md`.
+- Verified front matter keys, recorded source commit, and 64-character hex watched-path digest.
+- Spot-checked more than 25 table rows against actual `source/slang/slang-ir-*.cpp` files, including legalization, autodiff, target-specific, coverage, layout, loop, utility, and validation entries.
+- Checked the `linkAndOptimizeIR` ordering overview against `source/slang/slang-emit.cpp`, including the `SLANG_PASS` wrapper, coverage instrumentation/finalization, uniform collection, specialization, optional type/result lowering, target-specific legalization, and emit handoff.
+- Confirmed the document treats 04b and per-target pipeline pages as the authoritative ordered references while keeping this page categorical, as required by the prompt.
+- Resolved relative links with `regenerate.py lint` for this assigned doc group; lint reported no issues.
 
 ## Findings
 
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Pass utilities`, lines 316-329 | The document has `## Pass utilities` before `## Adding a new pass`, but the prompt's required structure lists `## Adding a new pass` first and `## Pass utilities` second. | `docs/generated/design/_meta/prompts/pipeline-05-ir-passes.md` lines 55-60 list `## Adding a new pass` as item 4 and `## Pass utilities` as item 5. | Move `## Pass utilities` below `## Adding a new pass` so the section order matches the prompt contract. |
+(no findings)
 
 ## No-issues notes
 
-- The generated front matter contains all required keys, and the digest is a valid 64-character hex value.
-- Every linked `slang-ir-*.cpp` file sampled from the category tables exists at the target source commit.
-- The document correctly distinguishes the unordered category inventory from target-specific ordered pipeline pages.
+- Representative pass rows point to files that exist in the watched-path expansion.
+- The page correctly distinguishes pre-link ordering from post-link target-sensitive ordering.
+- The coverage instrumentation row matches the current `instrumentCoverage` option handling in `linkAndOptimizeIR`.
