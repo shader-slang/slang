@@ -225,17 +225,18 @@ void GLSLSourceEmitter::_emitMemoryQualifierFlags(IRIntegerValue flags)
     }
 }
 
-void GLSLSourceEmitter::_emitMemoryQualifierDecorations(IRInst* varDecl)
+IRIntegerValue GLSLSourceEmitter::_getMemoryQualifierDecorationFlags(IRInst* varDecl)
 {
     if (auto collection = varDecl->findDecoration<IRMemoryQualifierSetDecoration>())
     {
-        IRIntegerValue flags = collection->getMemoryQualifierBit();
-        _emitMemoryQualifierFlags(flags);
+        return collection->getMemoryQualifierBit();
     }
+    return 0;
 }
 
-void GLSLSourceEmitter::_emitMemoryQualifierTypeAttrs(IRType* type)
+IRIntegerValue GLSLSourceEmitter::_getMemoryQualifierTypeAttrFlags(IRType* type)
 {
+    IRIntegerValue flags = 0;
     while (type)
     {
         if (auto attributedType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
@@ -244,8 +245,7 @@ void GLSLSourceEmitter::_emitMemoryQualifierTypeAttrs(IRType* type)
             {
                 if (auto memoryQualifierAttr = as<IRMemoryQualifierSetAttr>(attr))
                 {
-                    _emitMemoryQualifierFlags(
-                        getIntVal(memoryQualifierAttr->getMemoryQualifierBit()));
+                    flags |= getIntVal(memoryQualifierAttr->getMemoryQualifierBit());
                 }
             }
             type = attributedType->getBaseType();
@@ -258,6 +258,17 @@ void GLSLSourceEmitter::_emitMemoryQualifierTypeAttrs(IRType* type)
         }
         break;
     }
+    return flags;
+}
+
+void GLSLSourceEmitter::_emitMemoryQualifierDecorations(IRInst* varDecl)
+{
+    _emitMemoryQualifierFlags(_getMemoryQualifierDecorationFlags(varDecl));
+}
+
+void GLSLSourceEmitter::_emitMemoryQualifierTypeAttrs(IRType* type)
+{
+    _emitMemoryQualifierFlags(_getMemoryQualifierTypeAttrFlags(type));
 }
 
 void GLSLSourceEmitter::emitMemoryQualifiers(IRInst* varDecl)
@@ -362,8 +373,9 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(
 
     m_writer->emit(") ");
 
-    _emitMemoryQualifierDecorations(varDecl);
-    _emitMemoryQualifierTypeAttrs(varDecl->getDataType());
+    _emitMemoryQualifierFlags(
+        _getMemoryQualifierDecorationFlags(varDecl) |
+        _getMemoryQualifierTypeAttrFlags(varDecl->getDataType()));
 
     /*
     If the output type is a buffer, and we can determine it is only readonly we can prefix

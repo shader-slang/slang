@@ -84,6 +84,8 @@ protected:
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
 
+    IRIntegerValue _getMemoryQualifierDecorationFlags(IRInst* varDecl);
+    IRIntegerValue _getMemoryQualifierTypeAttrFlags(IRType* type);
     void _emitMemoryQualifierFlags(IRIntegerValue flags);
     void _emitMemoryQualifierDecorations(IRInst* varDecl);
     void _emitMemoryQualifierTypeAttrs(IRType* type);
