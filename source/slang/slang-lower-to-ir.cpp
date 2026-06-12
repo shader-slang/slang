@@ -1568,6 +1568,21 @@ static String getNameForNameHint(IRGenContext* context, Decl* decl)
     if (auto moduleParentDecl = as<ModuleDecl>(parentDecl))
         parentDecl = moduleParentDecl->parentDecl;
 
+    // An `extension` declaration is anonymous, so its recursive name hint would
+    // be empty; without special handling a method in `extension Example { ... }`
+    // would get the bare hint `extensionMethod` rather than the qualified
+    // `Example.extensionMethod` that struct-body methods receive. Base the
+    // qualifier on the extended type instead, mirroring the mangling convention
+    // for `ExtensionDecl` (see the `ExtensionDecl` case in `emitQualifiedName`,
+    // slang-mangle.cpp). Fall back to the unqualified leaf name if the target
+    // type is not a simple `DeclRefType` (e.g. an extension on a builtin or
+    // array type), where there is no extended-type decl to recurse into.
+    if (auto extensionParentDecl = as<ExtensionDecl>(parentDecl))
+    {
+        if (auto targetDeclRefType = as<DeclRefType>(extensionParentDecl->targetType))
+            parentDecl = as<ContainerDecl>(targetDeclRefType->getDeclRef().getDecl());
+    }
+
     if (!parentDecl)
     {
         return leafName->text;
