@@ -1165,6 +1165,8 @@ static const char* _getCoverageCounterModeName(slang::CoverageCounterMode mode)
     {
     case slang::CoverageCounterMode::Count:
         return "count";
+    case slang::CoverageCounterMode::Boolean:
+        return "boolean";
     default:
         return "unknown";
     }
@@ -1200,10 +1202,35 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
     uint32_t counterCount = metadata->getCounterCount();
     uint32_t entryCount = metadata->getEntryCount();
     out << "  \"counter_count\": " << (int64_t)counterCount << ",\n";
+    // Resolve the per-slot byte width from the metadata's
+    // `CoverageBufferInfo`. The IR coverage pass restricts the
+    // synthesized element type to `{4, 8}` and the API path
+    // validates the option with `E45114`, so only those two widths
+    // should ever reach this writer. A `0` would only arise from a
+    // sufficiently old metadata object that pre-dates the field; we
+    // mirror the historical layout (uint32) for that legacy case.
+    // Anything else means an upstream invariant has been broken —
+    // assert rather than ship a malformed manifest.
+    slang::CoverageBufferInfo bufferInfo;
+    if (SLANG_FAILED(metadata->getBufferInfo(&bufferInfo)))
+        return SLANG_FAIL;
+    uint32_t elementByteWidth = bufferInfo.elementByteWidth == 0 ? 4 : bufferInfo.elementByteWidth;
+    const char* elementTypeName = nullptr;
+    switch (elementByteWidth)
+    {
+    case 4:
+        elementTypeName = "uint32";
+        break;
+    case 8:
+        elementTypeName = "uint64";
+        break;
+    default:
+        SLANG_RELEASE_ASSERT(!"coverage manifest writer: unexpected elementByteWidth");
+    }
     out << "  \"buffer\": {\n";
     out << "    \"name\": \"__slang_coverage\",\n";
-    out << "    \"element_type\": \"uint32\",\n";
-    out << "    \"element_stride\": 4";
+    out << "    \"element_type\": \"" << elementTypeName << "\",\n";
+    out << "    \"element_stride\": " << (int64_t)elementByteWidth;
     if (auto syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
             slang::ISyntheticResourceMetadata::getTypeGuid()))
     {

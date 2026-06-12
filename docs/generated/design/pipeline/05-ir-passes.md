@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T14:30:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 8749b5a60327ef9aea96c0b02a10d643c2d39d04195e7cbd40904b69dabc7f6e
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: c7ceb8f7138b0d1f8d9559d2e33d3bfbcf92dade0e6bafe75a6e9dd8ace9f07f
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -23,10 +23,11 @@ headings are approximate (precise at `source_commit`).
 
 The orchestrator is `linkAndOptimizeIR` in
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (declared
-around line 892 at `source_commit`). It is called by
-`emitEntryPointsSourceFromIR` (line 2365) and by the variants used
-when emitting LLVM, VM, or other non-textual targets (calls visible
-near lines 2508, 3083, 3124, 3178). The function:
+around line 895 at `source_commit`). It is called by
+`emitEntryPointsSourceFromIR` (defined at line 2487; the call is at
+line 2631) and by the variants used when emitting LLVM, VM, or other
+non-textual targets (calls visible near lines 3206, 3247, 3301). The
+function:
 
 1. Links the per-translation-unit IR modules together (using
    [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp)).
@@ -312,20 +313,6 @@ listed for completeness.
 | --- | --- | --- |
 | SPIR-V opcode info / snippet | [slang-ir-spirv-snippet.cpp](../../../../source/slang/slang-ir-spirv-snippet.cpp) | SPIR-V code-snippet helpers used by SPIR-V passes |
 
-## Pass utilities
-
-These files do not implement transformations but are linked into
-many passes. They provide IR walking, instruction-info lookup, and
-cloning support that the categorized passes above rely on.
-
-| Module | File | Purpose |
-| --- | --- | --- |
-| Clone | [slang-ir-clone.cpp](../../../../source/slang/slang-ir-clone.cpp) | Generic IR clone helpers (used by inlining, specialization, generics) |
-| Dominators | [slang-ir-dominators.cpp](../../../../source/slang/slang-ir-dominators.cpp) | Dominator-tree construction; used by SSA construction, loop and SCCP passes |
-| Util | [slang-ir-util.cpp](../../../../source/slang/slang-ir-util.cpp) | Common IR walking / mutation primitives |
-| Insts info | [slang-ir-insts-info.cpp](../../../../source/slang/slang-ir-insts-info.cpp) | Opcode tables, name lookup, and per-opcode metadata used by the pretty printer and passes that switch on opcode |
-| Insts stable names | [slang-ir-insts-stable-names.cpp](../../../../source/slang/slang-ir-insts-stable-names.cpp) | Maps between opcode enum values and serialization-stable string names |
-
 ## Adding a new pass
 
 When adding a pass:
@@ -350,6 +337,20 @@ When adding a pass:
    `COMPARE_COMPUTE` or `INTERPRET` test, plus a `DIAGNOSTIC_TEST` if
    the pass emits errors.
 6. Run `./extras/formatting.sh` before committing.
+
+## Pass utilities
+
+These files do not implement transformations but are linked into
+many passes. They provide IR walking, instruction-info lookup, and
+cloning support that the categorized passes above rely on.
+
+| Module | File | Purpose |
+| --- | --- | --- |
+| Clone | [slang-ir-clone.cpp](../../../../source/slang/slang-ir-clone.cpp) | Generic IR clone helpers (used by inlining, specialization, generics) |
+| Dominators | [slang-ir-dominators.cpp](../../../../source/slang/slang-ir-dominators.cpp) | Dominator-tree construction; used by SSA construction, loop and SCCP passes |
+| Util | [slang-ir-util.cpp](../../../../source/slang/slang-ir-util.cpp) | Common IR walking / mutation primitives |
+| Insts info | [slang-ir-insts-info.cpp](../../../../source/slang/slang-ir-insts-info.cpp) | Opcode tables, name lookup, and per-opcode metadata used by the pretty printer and passes that switch on opcode |
+| Insts stable names | [slang-ir-insts-stable-names.cpp](../../../../source/slang/slang-ir-insts-stable-names.cpp) | Maps between opcode enum values and serialization-stable string names |
 
 ## What is not in this document
 

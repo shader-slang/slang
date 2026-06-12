@@ -3817,9 +3817,8 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
         }
     }
 
-    // Mesh output decorations do not always come with a varying-output layout kind
-    // (for example, OutputVertices can lower to a plain array layout), so gate on the
-    // decoration itself instead of the layout classification.
+    // Emit mesh-output qualifiers unconditionally: they key off the parameter's
+    // decoration, not its varying-IO layout (which an SV-only output never registers).
     emitMeshShaderModifiers(param);
 
     emitParamType(paramType, paramName);
@@ -5232,6 +5231,12 @@ void CLikeSourceEmitter::ensureGlobalInst(
     case kIROp_Generic:
         return;
     case kIROp_ThisType:
+        return;
+    case kIROp_BuiltinRequirementKey:
+        // A built-in interface requirement key is metadata (like an interface
+        // requirement entry); it never corresponds to emitted code. Unlike an
+        // ordinary `StructKey`, this key is hoistable and so may survive as an
+        // (unreferenced) global inst after specialization, so skip it explicitly.
         return;
     case kIROp_DebugInlinedAt:
     case kIROp_DebugScope:
