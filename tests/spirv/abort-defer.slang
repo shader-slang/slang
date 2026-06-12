@@ -19,5 +19,6 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     outputBuffer[1] = 2;
 }
 
-// CHECK: OpStore
-// CHECK: OpAbortKHR
+// CHECK: [[DEFER_ADDR:%[A-Za-z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_uint %outputBuffer %int_0 %int_0
+// CHECK-NEXT: OpStore [[DEFER_ADDR]] %uint_1
+// CHECK-NEXT: OpAbortKHR
