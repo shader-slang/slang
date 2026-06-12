@@ -42,7 +42,7 @@ bool isAddressInst(IRInst* inst)
     }
 }
 
-static bool isBarrierFlagGetterOp(IROp op)
+bool isBarrierFlagGetterOp(IROp op)
 {
     switch (op)
     {
@@ -3397,35 +3397,21 @@ IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> eleme
 bool isWorkGraphRecordType(IRType* type)
 {
     SLANG_ASSERT(type);
-    return getWorkGraphRecordTypeName(type->getOp()) != nullptr;
-}
-
-char const* getWorkGraphRecordTypeName(IROp op)
-{
-    switch (op)
+    switch (type->getOp())
     {
     case kIROp_DispatchNodeInputRecordType:
-        return "DispatchNodeInputRecord";
     case kIROp_ThreadNodeInputRecordType:
-        return "ThreadNodeInputRecord";
     case kIROp_GroupNodeInputRecordsType:
-        return "GroupNodeInputRecords";
     case kIROp_EmptyNodeInputType:
-        return "EmptyNodeInput";
     case kIROp_ThreadNodeOutputRecordsType:
-        return "ThreadNodeOutputRecords";
     case kIROp_GroupNodeOutputRecordsType:
-        return "GroupNodeOutputRecords";
     case kIROp_NodeOutputType:
-        return "NodeOutput";
     case kIROp_NodeOutputArrayType:
-        return "NodeOutputArray";
     case kIROp_EmptyNodeOutputType:
-        return "EmptyNodeOutput";
     case kIROp_EmptyNodeOutputArrayType:
-        return "EmptyNodeOutputArray";
+        return true;
     default:
-        return nullptr;
+        return false;
     }
 }
 

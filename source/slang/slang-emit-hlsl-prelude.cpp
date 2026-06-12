@@ -428,7 +428,7 @@ __slang_cm_muladd(
     }
 }
 
-/* static */ const char* HLSLSourceEmitter::getBarrierMemoryTypeFlagName(uint32_t flag)
+static const char* getBarrierMemoryTypeFlagName(uint32_t flag)
 {
     switch (flag)
     {
@@ -445,7 +445,7 @@ __slang_cm_muladd(
     }
 }
 
-/* static */ uint32_t const* HLSLSourceEmitter::getBarrierMemoryTypeFlagBits(Count& outCount)
+static uint32_t const* getBarrierMemoryTypeFlagBits(Count& outCount)
 {
     static const uint32_t flagBits[] = {
         BarrierMemoryTypeFlags::UavMemory,
@@ -457,7 +457,7 @@ __slang_cm_muladd(
     return flagBits;
 }
 
-/* static */ const char* HLSLSourceEmitter::getBarrierSemanticFlagName(uint32_t flag)
+static const char* getBarrierSemanticFlagName(uint32_t flag)
 {
     switch (flag)
     {
@@ -472,7 +472,7 @@ __slang_cm_muladd(
     }
 }
 
-/* static */ uint32_t const* HLSLSourceEmitter::getBarrierSemanticFlagBits(Count& outCount)
+static uint32_t const* getBarrierSemanticFlagBits(Count& outCount)
 {
     static const uint32_t flagBits[] = {
         BarrierSemanticFlags::GroupSync,
@@ -481,6 +481,49 @@ __slang_cm_muladd(
     };
     outCount = SLANG_COUNT_OF(flagBits);
     return flagBits;
+}
+
+static char const* getWorkGraphRecordTypeName(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_DispatchNodeInputRecordType:
+        return "DispatchNodeInputRecord";
+    case kIROp_ThreadNodeInputRecordType:
+        return "ThreadNodeInputRecord";
+    case kIROp_GroupNodeInputRecordsType:
+        return "GroupNodeInputRecords";
+    case kIROp_EmptyNodeInputType:
+        return "EmptyNodeInput";
+    case kIROp_ThreadNodeOutputRecordsType:
+        return "ThreadNodeOutputRecords";
+    case kIROp_GroupNodeOutputRecordsType:
+        return "GroupNodeOutputRecords";
+    case kIROp_NodeOutputType:
+        return "NodeOutput";
+    case kIROp_NodeOutputArrayType:
+        return "NodeOutputArray";
+    case kIROp_EmptyNodeOutputType:
+        return "EmptyNodeOutput";
+    case kIROp_EmptyNodeOutputArrayType:
+        return "EmptyNodeOutputArray";
+    default:
+        return nullptr;
+    }
+}
+
+void HLSLSourceEmitter::emitWorkGraphRecordType(IRType* type)
+{
+    auto typeName = getWorkGraphRecordTypeName(type->getOp());
+    SLANG_ASSERT(typeName);
+
+    m_writer->emit(typeName);
+    if (auto elementType = getWorkGraphRecordElementType(type))
+    {
+        m_writer->emit("<");
+        emitType(elementType);
+        m_writer->emit(">");
+    }
 }
 
 void HLSLSourceEmitter::emitNamedMemoryTypeFlagSet(uint32_t flagVal)

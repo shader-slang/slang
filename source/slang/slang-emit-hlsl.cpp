@@ -13,16 +13,12 @@ namespace Slang
 
 bool HLSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
-    switch (inst->getOp())
-    {
     // Barrier flag conversion ops do not have a standalone HLSL temporary form. The
     // use-site emitter expands their folded integer operand to DXC barrier flag tokens.
-    case kIROp_GetEnumBarrierMemoryTypeFlags:
-    case kIROp_GetEnumBarrierSemanticFlags:
+    if (isBarrierFlagGetterOp(inst->getOp()))
         return true;
-    default:
-        return Super::shouldFoldInstIntoUseSites(inst);
-    }
+
+    return Super::shouldFoldInstIntoUseSites(inst);
 }
 
 
@@ -1876,13 +1872,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_EmptyNodeOutputType:
     case kIROp_EmptyNodeOutputArrayType:
         {
-            m_writer->emit(getWorkGraphRecordTypeName(type->getOp()));
-            if (auto elementType = getWorkGraphRecordElementType(type))
-            {
-                m_writer->emit("<");
-                emitType(elementType);
-                m_writer->emit(">");
-            }
+            emitWorkGraphRecordType(type);
             return;
         }
 

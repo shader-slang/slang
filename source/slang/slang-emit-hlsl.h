@@ -88,10 +88,7 @@ protected:
     void emitMappedCoopVecComponentType(
         IRInst* operand,
         IRInst* inputInterpretationPackingFactor = nullptr);
-    static const char* getBarrierMemoryTypeFlagName(uint32_t flag);
-    static const char* getBarrierSemanticFlagName(uint32_t flag);
-    static uint32_t const* getBarrierMemoryTypeFlagBits(Count& outCount);
-    static uint32_t const* getBarrierSemanticFlagBits(Count& outCount);
+    void emitWorkGraphRecordType(IRType* type);
     /// Emits a parenthesized HLSL BarrierMemoryTypeFlags expression for a validated enum value.
     void emitNamedMemoryTypeFlagSet(uint32_t flagVal);
     /// Emits a parenthesized HLSL BarrierSemanticFlags expression for a validated enum value.

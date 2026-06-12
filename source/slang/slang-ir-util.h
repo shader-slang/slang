@@ -123,6 +123,9 @@ bool isUserPointerType(IRInst* type);
 // True if inst produces a derived address from another base address.
 bool isAddressInst(IRInst* inst);
 
+// True if op converts a workgraph Barrier enum value to an HLSL barrier flag set.
+bool isBarrierFlagGetterOp(IROp op);
+
 // Returns the underlying integer value for a workgraph barrier flag expression, such as the
 // operand of `getEnumBarrierMemoryTypeFlags(intLiteral)`.
 IRInst* getBarrierFlagValueInst(IRInst* inst);
@@ -631,10 +634,6 @@ IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> eleme
 /// DispatchNodeInputRecord<T>, ThreadNodeInputRecord<T>, NodeOutput<T>, etc.).
 /// These types are opaque ABI objects that must survive type legalization unchanged.
 bool isWorkGraphRecordType(IRType* type);
-
-/// Returns the native source-language type name for a work-graph record IR opcode,
-/// or null if `op` is not a work-graph record type.
-char const* getWorkGraphRecordTypeName(IROp op);
 
 /// Returns the element type operand for generic work-graph record types, or null
 /// for non-generic record types. Empty record types such as `EmptyNodeOutput`
