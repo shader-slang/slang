@@ -4441,9 +4441,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         auto vectorType = as<IRVectorType>(valueType);
         auto elementCountInst = as<IRIntLit>(vectorType->getElementCount());
-        SLANG_ASSERT(elementCountInst);
-        if (!elementCountInst)
-            return;
+        SLANG_RELEASE_ASSERT(elementCountInst);
 
         auto elementCount = elementCountInst->getValue();
         if (elementCount != 2 && elementCount != 4)
