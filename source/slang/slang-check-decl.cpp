@@ -14847,13 +14847,13 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
         }
     }
 
-    // `[nodiscard]` is meaningless on a function with no result to discard, so reject it
+    // `[NoDiscard]` is meaningless on a function with no result to discard, so reject it
     // on a `void`-returning function.
     if (decl->findModifier<NoDiscardAttribute>())
     {
         if (decl->returnType.type && decl->returnType.type->equals(m_astBuilder->getVoidType()))
         {
-            getSink()->diagnose(Diagnostics::NodiscardOnVoidFunction{.decl = decl});
+            getSink()->diagnose(Diagnostics::NoDiscardOnVoidFunction{.decl = decl});
         }
     }
 

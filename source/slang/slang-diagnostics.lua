@@ -1294,17 +1294,17 @@ warning(
 )
 
 err(
-    "discarded-nodiscard-result",
+    "discarded-no-discard-result",
     30059,
-    "result of '[nodiscard]' function is discarded",
-    span { loc = "expr:Expr", message = "the result of calling '~name:Name' is discarded; this function is marked '[nodiscard]'." }
+    "result of '[NoDiscard]' function is discarded",
+    span { loc = "expr:Expr", message = "the result of calling '~name:Name' is discarded; this function is marked '[NoDiscard]'." }
 )
 
 err(
-    "nodiscard-on-void-function",
+    "no-discard-on-void-function",
     30069,
-    "'[nodiscard]' applied to a function returning 'void'",
-    span { loc = "decl:Decl", message = "'[nodiscard]' is not allowed on a function that returns 'void'; there is no result to discard." }
+    "'[NoDiscard]' applied to a function returning 'void'",
+    span { loc = "decl:Decl", message = "'[NoDiscard]' is not allowed on a function that returns 'void'; there is no result to discard." }
 )
 
 err(

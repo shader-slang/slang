@@ -297,7 +297,7 @@ void SemanticsStmtVisitor::visitForStmt(ForStmt* stmt)
         stmt->sideEffectExpression = subExprVisitor.CheckExpr(stmt->sideEffectExpression);
 
         // A `for` loop's side-effect expression also discards its result.
-        maybeDiagnoseDiscardedNodiscardResult(stmt->sideEffectExpression);
+        maybeDiagnoseDiscardedNoDiscardResult(stmt->sideEffectExpression);
     }
     subContext.checkStmt(stmt->statement);
 
@@ -694,29 +694,16 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
     if (isDanglingEquality)
         getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = stmt->expression});
 
-    maybeDiagnoseDiscardedNodiscardResult(stmt->expression);
+    maybeDiagnoseDiscardedNoDiscardResult(stmt->expression);
 }
 
-void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
+void SemanticsStmtVisitor::maybeDiagnoseDiscardedNoDiscardResult(Expr* expr)
 {
     // Peel transparent wrappers that don't change whether the result is discarded: a call
-    // wrapped in parentheses (`(t.load());`) or a cast (`(uint)t.load();`) still discards the
-    // call's result. A cast is a `TypeCastExpr`, which derives from `InvokeExpr`, so it must be
-    // peeled before the `InvokeExpr` check below; otherwise that check would inspect the cast's
-    // conversion decl instead of the underlying call.
-    for (;;)
+    // wrapped in parentheses (`(t.load());`) still discards the call's result.
+    while (auto paren = as<ParenExpr>(expr))
     {
-        if (auto paren = as<ParenExpr>(expr))
-        {
-            expr = paren->base;
-            continue;
-        }
-        if (auto cast = as<TypeCastExpr>(expr); cast && cast->arguments.getCount() >= 1)
-        {
-            expr = cast->arguments[0];
-            continue;
-        }
-        break;
+        expr = paren->base;
     }
 
     // A comma operator in a discarded context discards each of its operands, so recurse
@@ -725,10 +712,10 @@ void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
     {
         if (auto func = as<VarExpr>(operatorExpr->functionExpr))
         {
-            if (func->name && func->name->text == ",")
+            if (getText(func->name) == ",")
             {
                 for (auto arg : operatorExpr->arguments)
-                    maybeDiagnoseDiscardedNodiscardResult(arg);
+                    maybeDiagnoseDiscardedNoDiscardResult(arg);
                 return;
             }
         }
@@ -745,26 +732,26 @@ void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
     {
         if (select->arguments.getCount() == 3)
         {
-            maybeDiagnoseDiscardedNodiscardResult(select->arguments[1]);
-            maybeDiagnoseDiscardedNodiscardResult(select->arguments[2]);
+            maybeDiagnoseDiscardedNoDiscardResult(select->arguments[1]);
+            maybeDiagnoseDiscardedNoDiscardResult(select->arguments[2]);
         }
         return;
     }
     if (auto shortCircuit = as<LogicOperatorShortCircuitExpr>(expr))
     {
         if (shortCircuit->arguments.getCount() == 2)
-            maybeDiagnoseDiscardedNodiscardResult(shortCircuit->arguments[1]);
+            maybeDiagnoseDiscardedNoDiscardResult(shortCircuit->arguments[1]);
         return;
     }
 
-    // If the discarded expression is a call to a function marked `[nodiscard]`, report that
+    // If the discarded expression is a call to a function marked `[NoDiscard]`, report that
     // the result is being ignored.
     auto invokeExpr = as<InvokeExpr>(expr);
     if (!invokeExpr)
         return;
 
-    // `[nodiscard]` on a `void`-returning function is already rejected at the declaration
-    // (see `NodiscardOnVoidFunction` in `checkCallableDeclCommon`). That diagnostic is an
+    // `[NoDiscard]` on a `void`-returning function is already rejected at the declaration
+    // (see `NoDiscardOnVoidFunction` in `checkCallableDeclCommon`). That diagnostic is an
     // error but not fatal, so checking continues and calls to such a function still reach
     // here; this guard suppresses an additional, nonsensical "result is discarded" error
     // at every call site on top of the declaration error.
@@ -779,9 +766,13 @@ void SemanticsStmtVisitor::maybeDiagnoseDiscardedNodiscardResult(Expr* expr)
     if (!calleeDecl)
         return;
 
+    // Bare discarded construction is intentionally outside this diagnostic.
+    if (as<ConstructorDecl>(calleeDecl))
+        return;
+
     if (calleeDecl->findModifier<NoDiscardAttribute>())
     {
-        getSink()->diagnose(Diagnostics::DiscardedNodiscardResult{
+        getSink()->diagnose(Diagnostics::DiscardedNoDiscardResult{
             .name = calleeDecl->getName(),
             .expr = invokeExpr});
     }

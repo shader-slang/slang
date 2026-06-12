@@ -3848,10 +3848,10 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt);
 
-    // If `expr` is the discarded result of a call to a `[nodiscard]` function,
+    // If `expr` is the discarded result of a call to a `[NoDiscard]` function,
     // emit an error. Used for any context where an expression's result is
     // ignored (an expression statement, or a `for` loop's side-effect expression).
-    void maybeDiagnoseDiscardedNodiscardResult(Expr* expr);
+    void maybeDiagnoseDiscardedNoDiscardResult(Expr* expr);
 
     // Try to infer the max number of iterations the loop will run.
     void tryInferLoopMaxIterations(ForStmt* stmt);

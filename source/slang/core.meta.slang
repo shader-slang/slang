@@ -4526,11 +4526,11 @@ __attributeTarget(AccessorDecl)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
 
 /// Marks a function whose return value should not be discarded. When a call to a
-/// function marked with `[nodiscard]` is made in a context where its result is
+/// function marked with `[NoDiscard]` is made in a context where its result is
 /// discarded — an expression statement, or a `for` loop's side-effect expression,
-/// including through transparent wrappers (parentheses, casts) and pass-through
-/// operands (comma, ternary arms, the right-hand side of `&&`/`||`) — the compiler
-/// emits an error. Applying `[nodiscard]` to a function that returns `void` is itself an
+/// including through transparent wrappers (parentheses) and pass-through operands
+/// (comma, ternary arms, the right-hand side of `&&`/`||`) — the compiler emits an
+/// error. Applying `[NoDiscard]` to a function that returns `void` is itself an
 /// error, reported at the declaration, since such a function has no result to discard.
 /// @remarks
 /// This is useful for functions that look like they mutate the object they are called
@@ -4539,16 +4539,16 @@ attribute_syntax [nonmutating] : NonmutatingAttribute;
 /// ```
 /// struct MyType
 /// {
-///    [nodiscard]
+///    [NoDiscard]
 ///    MyType load() { ... }
 /// }
 /// MyType t;
-/// t.load(); // error: result of '[nodiscard]' function is discarded.
+/// t.load(); // error: result of '[NoDiscard]' function is discarded.
 /// let loaded = t.load(); // OK
 /// ```
 ///
 __attributeTarget(FunctionDeclBase)
-attribute_syntax [nodiscard] : NoDiscardAttribute;
+attribute_syntax [NoDiscard] : NoDiscardAttribute;
 
 /// @internal
 /// Marks a member function to make `this` argument passed by const reference.
