@@ -1,0 +1,12 @@
+self-hosted-runner:
+  labels:
+    - arc
+    - benchmark
+    - build
+    - falcor
+    - GCP-T4
+    - GPU
+    - perf
+    - regression-test
+    - SM80Plus
+    - vulkancts
