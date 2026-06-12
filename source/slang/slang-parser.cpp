@@ -4860,11 +4860,11 @@ NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
 
     // Parse the alias name through the shared declarator machinery rather than a
     // bare identifier read, so a C-style trailing declarator (`typedef int arr[2];`)
-    // folds its trailing `[N]`/pointer suffixes onto the alias type, exactly as
-    // variable declarators do (see ParseDeclaratorDecl / UnwrapDeclarator). Both the
-    // trailing and leading array forms therefore produce the same array-typed alias.
-    // We use the bare declarator, not parseInitDeclarator, because a typedef takes no
-    // initializer or semantics.
+    // folds its trailing `[N]` array suffixes onto the alias type, exactly as variable
+    // declarators do (see ParseDeclaratorDecl / UnwrapDeclarator). Both the trailing and
+    // leading array forms therefore produce the same array-typed alias. We use the bare
+    // declarator, not parseInitDeclarator, because a typedef takes no initializer or
+    // semantics.
     DeclaratorInfo declaratorInfo;
     declaratorInfo.typeSpec = type.exp;
     auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);
