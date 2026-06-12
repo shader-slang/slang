@@ -19,6 +19,8 @@
 //   bytes; bool3 widens to uint3 (12 bytes) at offset 24, float3 at offset 36
 // - repeated one-word no-arg payloads reuse the same message struct type
 // - a four-character format string needs a second word for the null terminator
+// - field type order is part of the payload signature cache key
+// - packed format words are emitted little-endian and include the null terminator
 
 // CHECK_SPIRV: OpCapability AbortKHR
 // CHECK_SPIRV: OpExtension "SPV_KHR_shader_abort"
@@ -42,7 +44,10 @@
 // CHECK_SPIRV: %AbortMessage_1 = OpTypeStruct %_arr_uint_int_4
 // CHECK_SPIRV: %AbortMessage_2 = OpTypeStruct %_arr_uint_int_5 %uint %int %float %uint
 // CHECK_SPIRV: %AbortMessage_3 = OpTypeStruct %_arr_uint_int_6 %v3uint %v3float
+// CHECK_SPIRV: %uint_8026488 = OpConstant %uint 8026488
 // CHECK_SPIRV: %AbortMessage_4 = OpTypeStruct %_arr_uint_int_2
+// CHECK_SPIRV: %AbortMessage_5 = OpTypeStruct %_arr_uint_int_3 %uint %float
+// CHECK_SPIRV: %AbortMessage_6 = OpTypeStruct %_arr_uint_int_3 %float %uint
 
 // CHECK_SPIRV: OpAbortKHR %AbortMessage %
 // CHECK_SPIRV: OpAbortKHR %AbortMessage_0 %
@@ -51,6 +56,8 @@
 // CHECK_SPIRV: OpAbortKHR %AbortMessage_3 %
 // CHECK_SPIRV: OpAbortKHR %AbortMessage_0 %
 // CHECK_SPIRV: OpAbortKHR %AbortMessage_4 %
+// CHECK_SPIRV: OpAbortKHR %AbortMessage_5 %
+// CHECK_SPIRV: OpAbortKHR %AbortMessage_6 %
 
 // CHECK_GLSL: #extension GL_EXT_shader_abort
 // CHECK_GLSL: abortEXT("thread id out of range: %u", {{.*}})
@@ -60,6 +67,8 @@
 // CHECK_GLSL: abortEXT("b=%d %d %d v=%f %f %f", uvec3({{.*}}), {{.*}})
 // CHECK_GLSL: abortEXT("xyz")
 // CHECK_GLSL: abortEXT("xyzw")
+// CHECK_GLSL: abortEXT("a=%u b=%f", {{.*}}, {{.*}})
+// CHECK_GLSL: abortEXT("a=%f b=%u", {{.*}}, {{.*}})
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
@@ -91,5 +100,15 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     if (dispatchThreadID.y == 42)
     {
         abort("xyzw");
+    }
+    if (dispatchThreadID.z == 42)
+    {
+        float fy = float(dispatchThreadID.y);
+        abort("a=%u b=%f", dispatchThreadID.x, fy);
+    }
+    if (dispatchThreadID.z == 43)
+    {
+        float fy = float(dispatchThreadID.y);
+        abort("a=%f b=%u", fy, dispatchThreadID.x);
     }
 }

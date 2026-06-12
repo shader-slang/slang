@@ -2154,7 +2154,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // The message struct uses explicit layout, and `OpTypeBool` has no
         // physical size in SPIRV, so widen bool arguments (scalar or vector)
-        // to uint, matching C variadic promotion for printf-style "%d". Any
+        // to uint before they are added to the physical message payload. Any
         // other non-scalar, non-vector argument (struct, array, resource, ...)
         // has no printf-style format specifier and cannot be given a correct
         // explicit layout here, so diagnose it instead of emitting an

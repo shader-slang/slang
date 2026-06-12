@@ -918,7 +918,7 @@ Compound Capabilities
 *Capabilities to specify capabilities created by other capabilities (`raytracing`, `meshshading`...)*
 
 `abort`
-> Capabilities required to use 'abort' (VK_KHR_shader_abort)
+> Capabilities required to use 'abort'
 
 `amplification_mesh`
 > Collection of shader stages
