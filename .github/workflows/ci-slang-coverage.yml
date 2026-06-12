@@ -64,7 +64,7 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           submodules: "recursive"
           fetch-depth: "0"
@@ -132,7 +132,7 @@ jobs:
       # Authenticate to Google Cloud (skip for fork PRs - no id-token available)
       - name: Authenticate to Google Cloud
         if: env.IS_FORK_PR != 'true'
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
@@ -272,16 +272,17 @@ jobs:
 
           # --with-synthesis runs a second pass with -only-synthesized to
           # exercise backend emit paths without a GPU.
-          # `run-coverage.sh` also supports `--with-agentic-tests`, which
-          # rolls the doc-anchored bundles under docs/generated/tests/
-          # into the merged coverage report. We deliberately do NOT pass
-          # it here yet — the suite is still being stabilized under
-          # ci-agentic-tests-nightly.yml; flip the switch once the
-          # nightly is green steady-state.
+          # --with-agentic-tests rolls the doc-anchored bundles under
+          # docs/generated/tests/ into the merged coverage report.
+          # run-coverage.sh passes -expected-failure-list pointing at
+          # docs/generated/tests/_meta/expected-failures.txt, so the
+          # agentic pass uses the same gate as ci-agentic-tests-nightly
+          # (only unexpected failures surface, and they're tolerated
+          # here so coverage data is collected either way).
           # Retry once on failure to handle intermittent test failures.
-          if ! ./tools/coverage/run-coverage.sh --with-synthesis "${test_args[@]}"; then
+          if ! ./tools/coverage/run-coverage.sh --with-synthesis --with-agentic-tests "${test_args[@]}"; then
             echo "::warning::First coverage run failed. Retrying..."
-            ./tools/coverage/run-coverage.sh --with-synthesis "${test_args[@]}"
+            ./tools/coverage/run-coverage.sh --with-synthesis --with-agentic-tests "${test_args[@]}"
           fi
 
       - name: Run Tests with Coverage (Windows)
@@ -560,7 +561,7 @@ jobs:
 
       - name: Upload Coverage Artifacts for Merging
         if: ${{ !inputs.deploy-pages }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: coverage-${{ inputs.os }}-${{ inputs.platform }}
           # coverage-html-slangc/ and libslang.* are Linux/macOS-only; the
@@ -583,7 +584,7 @@ jobs:
 
       - name: Checkout Coverage Reports Repository
         if: ${{ inputs.deploy-pages }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: "shader-slang/slang-coverage-reports"
           path: "coverage-repo"
@@ -659,7 +660,7 @@ jobs:
 
       - name: Report Coverage in PR
         if: ${{ inputs.pr-comment }}
-        uses: zgosalvez/github-actions-report-lcov@v4
+        uses: zgosalvez/github-actions-report-lcov@eda775f552bfb2bffbdedea26f19dfb8c24a1648 # v4
         with:
           coverage-files: coverage.lcov
           minimum-coverage: 0
@@ -675,7 +676,7 @@ jobs:
           ls -lh coverage.lcov.gz
 
       - name: Upload LCOV Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: coverage-lcov-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}
           path: coverage.lcov.gz
@@ -713,7 +714,7 @@ jobs:
 
       - name: Upload llvm-cov JSON Export (Linux/macOS only)
         if: inputs.os != 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: coverage-json-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}
           path: coverage.json.gz

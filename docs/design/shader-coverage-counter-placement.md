@@ -411,7 +411,7 @@ ops in the final linked-program IR.
 Preprocessor variants and specialization-heavy builds are separate
 compiles. Each compile gets its own counter buffer layout and metadata
 mapping. Hosts and report converters should aggregate by the source
-attribution fields in `CoverageEntryInfo` or `.coverage-mapping.json`,
+attribution fields in `CoverageEntryInfo` or `.coverage-manifest.json`,
 not by assuming that counter slot `K` means the same source location
 in two different compiles.
 

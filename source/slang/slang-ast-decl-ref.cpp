@@ -394,10 +394,39 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
     bool isConstraint = false;
     if (!builtinReq)
     {
+        // The requirement key is a constraint, not the associated type itself.
+        // Determine which associated type the constraint constrains. This must
+        // be answered from the constraint's *subject*, not from where the
+        // constraint happens to be declared: a constraint may be nested inside
+        // the associated-type declaration (`associatedtype Differential : ...`)
+        // or declared as a sibling requirement of the enclosing interface
+        // (`__constraint`); both forms denote a constraint on the same
+        // associated type.
         if (auto parentAssocType = as<AssocTypeDecl>(requirementKey->parentDecl))
         {
             builtinReq = parentAssocType->findModifier<BuiltinRequirementModifier>();
             isConstraint = true;
+        }
+        else if (auto constraintDecl = as<GenericTypeConstraintDecl>(requirementKey))
+        {
+            // Look for the built-in requirement modifier on *either* endpoint of the
+            // constraint. We search both sides for the modifier itself rather than
+            // committing to the first side that happens to be an associated type: a
+            // constraint such as `A == Differential` pairs a (non-built-in) assoc on
+            // one side with the built-in `Differential` assoc on the other, and `==`
+            // is symmetric, so `A == Differential` and `Differential == A` must
+            // resolve identically.
+            auto builtinReqFromExp = [](TypeExp const& exp) -> BuiltinRequirementModifier*
+            {
+                if (auto assoc = isDeclRefTypeOf<AssocTypeDecl>(exp.type))
+                    return assoc.getDecl()->findModifier<BuiltinRequirementModifier>();
+                return nullptr;
+            };
+            builtinReq = builtinReqFromExp(constraintDecl->sub);
+            if (!builtinReq)
+                builtinReq = builtinReqFromExp(constraintDecl->sup);
+            if (builtinReq)
+                isConstraint = true;
         }
         if (!builtinReq)
             return nullptr;

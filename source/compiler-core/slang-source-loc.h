@@ -65,8 +65,7 @@ struct PathInfo
                     ///< taken as to map to a loaded file)
         TokenPaste, ///< No paths, just created to do a macro expansion
         TypeParse,  ///< No path, just created to do a type parse
-        CommandLine,    ///< A macro constructed from the command line
-        MacroExpansion, ///< A specific invocation of a macro; foundPath holds the macro name
+        CommandLine, ///< A macro constructed from the command line
     };
 
     /// True if has a canonical path
@@ -121,10 +120,6 @@ struct PathInfo
     static PathInfo makeFromString(const String& userPath)
     {
         return PathInfo{Type::FromString, userPath, String()};
-    }
-    static PathInfo makeFromMacroExpansion(const String& macroName)
-    {
-        return PathInfo{Type::MacroExpansion, macroName, String()};
     }
 
     Type type;             ///< The type of path

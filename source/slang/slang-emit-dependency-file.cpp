@@ -38,19 +38,29 @@ static void _escapeDependencyString(const char* string, StringBuilder& outBuilde
     }
 }
 
-// Writes a line to the file stream, formatted like this:
-//   <output-file>: <dependency-file> <dependency-file...>
+// Writes a "<output-file>: <dep> <dep...>" line to the stream.
+// When outputPath is empty (output to stdout), "-" is used as the make target placeholder.
+// writtenStdoutSentinel prevents duplicate "-: ..." lines across multiple call sites.
 static void _writeDependencyStatement(
     Stream& stream,
     EndToEndCompileRequest* compileRequest,
-    const String& outputPath)
+    const String& outputPath,
+    bool& writtenStdoutSentinel)
 {
-    if (outputPath.getLength() == 0)
-        return;
-
     StringBuilder builder;
-    _escapeDependencyString(outputPath.begin(), builder);
-    _writeString(stream, builder.begin());
+    if (outputPath.getLength() == 0)
+    {
+        if (writtenStdoutSentinel)
+            return;
+        writtenStdoutSentinel = true;
+        _writeString(stream, "-");
+    }
+    else
+    {
+        _escapeDependencyString(outputPath.begin(), builder);
+        _writeString(stream, builder.begin());
+        builder.clear();
+    }
     _writeString(stream, ": ");
 
     int dependencyCount = compileRequest->getDependencyFileCount();
@@ -79,6 +89,8 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
     auto linkage = compileRequest->getLinkage();
     auto program = compileRequest->getSpecializedGlobalAndEntryPointsComponentType();
 
+    bool writtenStdoutSentinel = false;
+
     // Iterate over all the targets and their outputs
     for (const auto& targetReq : linkage->targets)
     {
@@ -91,7 +103,8 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
                 _writeDependencyStatement(
                     stream,
                     compileRequest,
-                    targetInfo->wholeTargetOutputPath);
+                    targetInfo->wholeTargetOutputPath,
+                    writtenStdoutSentinel);
             }
         }
         else
@@ -105,7 +118,11 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
                     String outputPath;
                     if (targetInfo->entryPointOutputPaths.tryGetValue(entryPointIndex, outputPath))
                     {
-                        _writeDependencyStatement(stream, compileRequest, outputPath);
+                        _writeDependencyStatement(
+                            stream,
+                            compileRequest,
+                            outputPath,
+                            writtenStdoutSentinel);
                     }
                 }
             }
@@ -116,7 +133,11 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
     // we need to do their dependencies separately.
     if (compileRequest->m_containerFormat == ContainerFormat::SlangModule)
     {
-        _writeDependencyStatement(stream, compileRequest, compileRequest->m_containerOutputPath);
+        _writeDependencyStatement(
+            stream,
+            compileRequest,
+            compileRequest->m_containerOutputPath,
+            writtenStdoutSentinel);
     }
 
     return SLANG_OK;

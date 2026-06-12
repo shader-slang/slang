@@ -460,7 +460,9 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::DepFile,
          "-depfile",
          "-depfile <path>",
-         "Save the source file dependency list in a file."},
+         "Save the source file dependency list in a file.\n"
+         "Uses Makefile dependency syntax: <output>: <dep> <dep...>\n"
+         "When no -o is given, - is used as the make target (output goes to stdout)."},
         {OptionKind::EntryPointName,
          "-entry",
          "-entry <name>",
@@ -616,7 +618,7 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Instrument the shader with per-statement line coverage counters. "
          "When writing compiled output to a file, slangc also emits "
-         "`<output>.coverage-mapping.json` mapping source coverage entries to counters."},
+         "`<output>.coverage-manifest.json` mapping source coverage entries to counters."},
         {OptionKind::TraceFunctionCoverage,
          "-trace-function-coverage",
          nullptr,
@@ -630,6 +632,16 @@ void initCommandOptions(CommandOptions& options)
          "default paths. Expression-level short-circuit and ternary branches are "
          "not instrumented by this mode yet. "
          "Shares the synthesized `__slang_coverage` buffer and coverage metadata path."},
+        {OptionKind::TraceCoverageBoolean,
+         "-trace-coverage-boolean",
+         nullptr,
+         "Record boolean coverage instead of exact execution counts: each counter slot "
+         "is written with 1 (via a plain non-atomic store) whenever its entry executes, "
+         "rather than atomically incremented per execution. This removes all atomic "
+         "contention, so coverage is dramatically faster and avoids the GPU watchdog "
+         "timeouts that heavy per-execution counting can trigger, at the cost of exact "
+         "counts (the counter is 0 or non-zero). Off by default. Ignored when no coverage "
+         "mode is enabled."},
         {OptionKind::TraceCoverageBinding,
          "-trace-coverage-binding",
          "-trace-coverage-binding <index> <space>",
@@ -645,6 +657,26 @@ void initCommandOptions(CommandOptions& options)
          "pipeline layout owns descriptor sets that are "
          "not visible in the compiled shader IR. Repeat for multiple spaces; "
          "duplicates are idempotent. Applies to Khronos descriptor-set targets."},
+        {OptionKind::CoverageManifestOutput,
+         "-coverage-manifest-output",
+         "-coverage-manifest-output <path>",
+         "Write shader coverage manifest metadata to an explicit JSON sidecar path. "
+         "Use this when compiled output is written to stdout or when the build needs "
+         "a stable manifest path instead of the default "
+         "`<output>.coverage-manifest.json` sidecar. Requires at least one coverage tracing mode, "
+         "is not supported for container outputs, and is valid only when exactly one compiled "
+         "artifact carries coverage metadata. The path must not overlap any emitted artifact "
+         "path."},
+        {OptionKind::TraceCoverageCounterByteWidth,
+         "-trace-coverage-counter-width",
+         "-trace-coverage-counter-width <bits>",
+         "Per-slot bit width of the synthesized `__slang_coverage` buffer. "
+         "Accepts `64` (default) or `32`. uint64 counters effectively cannot wrap "
+         "within any practical run; uint32 counters wrap silently at 2^32 hits per "
+         "slot. Use `32` when targeting a runtime driver that does not support "
+         "64-bit shader atomic add (notably MoltenVK on Apple Silicon, which "
+         "exposes `shaderBufferInt64Atomics = false`). Implies `-trace-coverage` "
+         "is meaningful; ignored when no coverage mode is enabled."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -2585,6 +2617,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::TraceCoverage:
         case OptionKind::TraceFunctionCoverage:
         case OptionKind::TraceBranchCoverage:
+        case OptionKind::TraceCoverageBoolean:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
@@ -3046,6 +3079,46 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 linkage->m_optionSet.add(OptionKind::TraceCoverageReservedSpace, (int)bindingSpace);
                 break;
             }
+        case OptionKind::CoverageManifestOutput:
+            {
+                CommandLineArg outputPath;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(outputPath));
+                linkage->m_optionSet.set(OptionKind::CoverageManifestOutput, outputPath.value);
+                break;
+            }
+        case OptionKind::TraceCoverageCounterByteWidth:
+            {
+                // -trace-coverage-counter-width <bits>
+                // Validate up front rather than at IR-pass time: this is a
+                // user-facing CLI flag, not an internal state, so an invalid
+                // value should produce a clear front-end diagnostic instead
+                // of a downstream codegen surprise.
+                Int widthBits;
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, widthBits));
+                if (widthBits != 32 && widthBits != 64)
+                {
+                    // `parsedValue` is intentionally the user's bit value
+                    // (`widthBits`), not the byte width stored below: the
+                    // diagnostic echoes what the user typed (32/64) so its
+                    // "accepts only 32 or 64" message reads correctly. Do
+                    // not "fix" this to the stored stride.
+                    m_sink->diagnose(Diagnostics::CoverageCounterWidthInvalid{
+                        .parsedValue = widthBits,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
+                // Convert the user-facing bit width to the byte width (4 or
+                // 8) stored on the option. This is the one place the unit
+                // changes from bits (CLI) to bytes (option / IR pass /
+                // metadata / `CoverageBufferInfo::elementByteWidth`); every
+                // internal consumer reads bytes. The IR pass and metadata
+                // writer can then treat the value as a stride directly.
+                linkage->m_optionSet.set(
+                    OptionKind::TraceCoverageCounterByteWidth,
+                    (int)(widthBits / 8));
+                break;
+            }
         case OptionKind::Profile:
             SLANG_RETURN_ON_FAIL(_parseProfile(arg));
             break;
@@ -3496,7 +3569,33 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     if (SLANG_SUCCEEDED(
                             TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
                     {
-                        m_session->setDownstreamCompilerPath(passThrough, name.value.getBuffer());
+                        // Executable-based downstream compilers (Metal, GCC,
+                        // Clang) locate the tool by combining the user-supplied
+                        // directory with a fixed executable name.  Users often
+                        // pass the full path to the executable instead (e.g.
+                        // `-metal-path "C:\...\bin\metal.exe"`), which produces
+                        // a doubled path.  Normalize to the parent directory for
+                        // these compilers only.  Shared-library backends (DXC,
+                        // FXC, NVRTC, etc.) already handle file-vs-directory
+                        // disambiguation in their own locators and rely on the
+                        // exact filename the user supplied.
+                        String compilerPath = name.value;
+                        if (passThrough == SLANG_PASS_THROUGH_METAL ||
+                            passThrough == SLANG_PASS_THROUGH_CLANG ||
+                            passThrough == SLANG_PASS_THROUGH_GCC ||
+                            passThrough == SLANG_PASS_THROUGH_GENERIC_C_CPP)
+                        {
+                            SlangPathType pathType;
+                            if (compilerPath.getLength() &&
+                                SLANG_SUCCEEDED(Path::getPathType(compilerPath, &pathType)) &&
+                                pathType == SLANG_PATH_TYPE_FILE)
+                            {
+                                String parentDir = Path::getParentDirectory(compilerPath);
+                                if (parentDir.getLength())
+                                    compilerPath = parentDir;
+                            }
+                        }
+                        m_session->setDownstreamCompilerPath(passThrough, compilerPath.getBuffer());
                         continue;
                     }
                     else
@@ -4303,6 +4402,16 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                         .format = TypeTextUtil::getCompileTargetName(
                             SlangCompileTarget(rawOutput.impliedFormat))});
                 }
+            }
+
+            if (rawOutput.targetIndex != -1 &&
+                m_rawTargets[rawOutput.targetIndex].optionSet.getBoolOption(
+                    CompilerOptionName::GenerateWholeProgram))
+            {
+                // `-whole-program` emits one target-level artifact, even when the command line
+                // names a single entry point. Keep `-o` aligned with the artifact that
+                // `generateOutput()` will actually write.
+                rawOutput.isWholeProgram = true;
             }
 
             // We won't do any searching to match an output file

@@ -4301,6 +4301,24 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
 
     if (!decl->sub.type)
         decl->sub = TranslateTypeNodeForced(decl->sub);
+
+    // The subject of an interface `__constraint` must be one of the interface's
+    // (possibly nested) associated types, e.g. `This.A` -- never the bare `This`
+    // type. A constraint on `This` itself is what an inheritance clause expresses
+    // (`interface IFoo : IBar`); written as a `__constraint` it is a checked
+    // predicate over the very base set being computed, which is ill-formed (it
+    // would otherwise surface as a cyclic-reference error). Reject it here, before
+    // that cyclic inheritance query is ever attempted, and error the constraint so
+    // it contributes nothing downstream.
+    if (as<InterfaceDecl>(decl->parentDecl) && as<ThisType>(decl->sub.type))
+    {
+        getSink()->diagnose(
+            Diagnostics::ConstraintSubjectCannotBeThisType{.typeExp = decl->sub.exp});
+        decl->sub.type = m_astBuilder->getErrorType();
+        decl->sup = TypeExp(m_astBuilder->getErrorType());
+        return;
+    }
+
     if (!decl->sup.type)
     {
         if (as<CallableDecl>(decl->parentDecl))
@@ -6110,6 +6128,14 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
 {
     // We will enumerate the type constraints placed on the
     // associated type and see if they can be satisfied.
+    //
+    // In the unified representation a constraint on an associated type `A` is
+    // recorded as a requirement of the enclosing interface (a sibling of `A`),
+    // regardless of whether it was written `associatedtype A : IBar`,
+    // `associatedtype A where A : IBar`, or `__constraint A : IBar`. Those
+    // relocated interface-level constraints are validated by the main
+    // conformance loop (`findWitnessForInterfaceRequirement`); here we only
+    // enumerate any constraints nested directly under `requirementDeclRef`.
     //
     bool conformance = true;
     Val* witness = nullptr;
@@ -9231,6 +9257,17 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
     default:
         SLANG_UNEXPECTED("unknown builtin requirement kind for diff func synthesis.");
     }
+
+    // Match the synthesized function's visibility to the target function's visibility.
+    DeclVisibility targetVis = getDeclVisibility(context->parentDecl);
+    if (auto extDecl = as<ExtensionDecl>(context->parentDecl))
+    {
+        if (auto drt = as<DeclRefType>(extDecl->targetType))
+            if (auto callable = drt->getDeclRef().as<FunctionDeclBase>())
+                targetVis = getDeclVisibility(callable.getDecl());
+    }
+    addVisibilityModifier(synFunc, getSynthesizedExtensionVisibility(targetVis).memberVisibility);
+
     synFunc->parentDecl = context->parentDecl;
 
     List<Expr*> synArgs;
@@ -9912,9 +9949,17 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // If `requiredMemberDeclRef` is a lookup decl ref for an interface requirement
     // we attempt to do the loopkup through witness tables.
     //
-    // As a first pass, lets check if we already have a
-    // witness in the table for the requirement, so
-    // that we can bail out early.
+    // As a first pass, check whether the witness table already provides a
+    // witness for this requirement, and if so reuse it and bail out early.
+    //
+    // This applies to *every* kind of requirement (methods, associated types,
+    // constraints, ...). In particular it covers the cases where conformance
+    // synthesis deliberately supplied a witness that a fresh re-derivation below
+    // would reject -- e.g. an `enum`'s automatic `__EnumType` conformance
+    // supplies the `__Tag : __BuiltinIntegerType` witness directly, including for
+    // a `bool`-tagged `enum` where `bool` is a permitted tag type yet does not
+    // actually conform to `__BuiltinIntegerType`. Respecting a synthesis-provided
+    // witness here is therefore the contract, not a constraint-specific quirk.
     //
     if (witnessTable->getRequirementDictionary().containsKey(requiredMemberDeclRef.getDecl()))
     {
@@ -9924,6 +9969,51 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // The ThisType requirement is always satisfied.
     if (as<ThisTypeDecl>(requiredMemberDeclRef.getDecl()))
     {
+        return true;
+    }
+
+    // An interface-level constraint requirement (declared in an interface body
+    // as `__constraint <type> == <type>` or `__constraint <type> : <type>`)
+    // refines the implicit `This` type and/or its inherited associated types.
+    // Such a requirement is not satisfied by a member of the conforming type;
+    // instead, it is satisfied by verifying that the constraint holds once
+    // `This` has been replaced by the conforming type (which the surrounding
+    // `LookupDeclRef` substitution has already done in `requiredMemberDeclRef`).
+    //
+    if (auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
+    {
+        // Note: a witness already provided by conformance synthesis (e.g. an
+        // `enum`'s `__Tag : __BuiltinIntegerType`, including the `bool`-tagged
+        // case) is handled uniformly by the early-out at the top of this function
+        // and never reaches here.
+        auto constraintSub = getSub(m_astBuilder, requiredConstraintDeclRef);
+        auto constraintSup = getSup(m_astBuilder, requiredConstraintDeclRef);
+
+        SubtypeWitness* constraintWitness = nullptr;
+        if (constraintSub && constraintSup)
+            constraintWitness = isSubtype(constraintSub, constraintSup, IsSubTypeOptions::None);
+
+        // An equality constraint (`==`) must be satisfied by a type-equality
+        // witness, not merely by a subtype relationship.
+        if (constraintWitness && requiredConstraintDeclRef.getDecl()->isEqualityConstraint &&
+            !isTypeEqualityWitness(constraintWitness))
+        {
+            constraintWitness = nullptr;
+        }
+
+        if (!constraintWitness)
+        {
+            getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                .typeArg = subType,
+                .interface = superInterfaceType,
+                .location = inheritanceDecl ? inheritanceDecl->loc
+                                            : requiredConstraintDeclRef.getDecl()->loc});
+            return false;
+        }
+
+        witnessTable->add(
+            requiredConstraintDeclRef.getDecl(),
+            RequirementWitness(constraintWitness));
         return true;
     }
 
@@ -11752,9 +11842,32 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
         // Okay, add the conformance witness for `__Tag` being satisfied by `tagType`
         witnessTable->add(tagAssociatedTypeDecl, RequirementWitness(tagType));
 
-        // TODO: we actually also need to synthesize a witness for the conformance of `tagType`
-        // to the `__BuiltinIntegerType` interface, because that is a constraint on the
-        // associated type `__Tag`.
+        // `__EnumType` constrains its `__Tag` associated type with
+        // `__Tag : __BuiltinIntegerType`. In the unified representation that bound is a
+        // constraint requirement of the `__EnumType` interface (a sibling of `__Tag`),
+        // so this compiler-synthesized conformance must supply its witness too --
+        // otherwise the conformance check would re-derive it and reject permitted tag
+        // types. For an integer tag type the witness is the real subtype witness; for
+        // `bool` -- a permitted tag type that does not conform to `__BuiltinIntegerType`
+        // -- no such witness exists, so we record a `NoneWitness` to mark the
+        // (compiler-trusted) constraint as satisfied. (This addresses a long-standing
+        // TODO that became load-bearing once the bound is modeled as a requirement.)
+        if (auto enumInterfaceDecl = as<InterfaceDecl>(tagAssociatedTypeDecl->parentDecl))
+        {
+            for (auto constraintDecl :
+                 enumInterfaceDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+            {
+                auto subDeclRefType = as<DeclRefType>(constraintDecl->sub.type);
+                if (!subDeclRefType ||
+                    subDeclRefType->getDeclRef().getDecl() != tagAssociatedTypeDecl)
+                    continue;
+
+                Val* constraintWitness = tryGetSubtypeWitness(tagType, constraintDecl->sup.type);
+                if (!constraintWitness)
+                    constraintWitness = m_astBuilder->getOrCreate<NoneWitness>();
+                witnessTable->add(constraintDecl, RequirementWitness(constraintWitness));
+            }
+        }
 
         // TODO: eventually we should consider synthesizing other requirements for
         // the min/max tag values, or the total number of tags, so that people don't

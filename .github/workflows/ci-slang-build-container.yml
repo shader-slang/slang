@@ -62,7 +62,7 @@ jobs:
           echo "=== Disk space after cleanup ==="
           df -h /host_root || true
 
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
           submodules: "recursive"
@@ -87,7 +87,7 @@ jobs:
 
       # Restore sccache local cache from master
       - name: Restore sccache cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
           key: sccache-linux-gcc-x86_64-${{ inputs.config }}-${{ github.sha }}
@@ -97,7 +97,7 @@ jobs:
       # Authenticate to Google Cloud for LLVM downloads (skip for fork PRs)
       - name: Authenticate to Google Cloud
         if: env.IS_FORK_PR != 'true'
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
@@ -141,6 +141,7 @@ jobs:
             -DSLANG_ENABLE_CUDA=ON \
             -DSLANG_ENABLE_PCH=OFF \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}"
 
@@ -208,12 +209,12 @@ jobs:
       # Save sccache cache (master only, for populate-sccache workflow)
       - name: Save sccache cache (master only)
         if: github.ref == 'refs/heads/master'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
           key: sccache-linux-gcc-x86_64-${{ inputs.config }}-${{ github.sha }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}
           path: artifacts-staging/
