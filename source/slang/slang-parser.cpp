@@ -5742,6 +5742,36 @@ enum class InterfaceDefaultImplBodyStatus
     Partial,
 };
 
+// Storage declarations such as subscripts and properties represent default bodies on
+// their accessors, so classify the whole accessor set before deciding how to handle it.
+static InterfaceDefaultImplBodyStatus getStorageDeclDefaultImplBodyStatus(
+    ContainerDecl* storageDecl,
+    AccessorDecl** outFirstAccessorWithBody = nullptr)
+{
+    bool hasAccessorBody = false;
+    bool hasAccessorWithoutBody = false;
+    for (auto accessorDecl : storageDecl->getDirectMemberDeclsOfType<AccessorDecl>())
+    {
+        if (accessorDecl->body)
+        {
+            if (!hasAccessorBody && outFirstAccessorWithBody)
+                *outFirstAccessorWithBody = accessorDecl;
+
+            hasAccessorBody = true;
+        }
+        else
+        {
+            hasAccessorWithoutBody = true;
+        }
+    }
+
+    if (hasAccessorBody && hasAccessorWithoutBody)
+        return InterfaceDefaultImplBodyStatus::Partial;
+
+    return hasAccessorBody ? InterfaceDefaultImplBodyStatus::Complete
+                           : InterfaceDefaultImplBodyStatus::None;
+}
+
 static InterfaceDefaultImplBodyStatus getInterfaceDefaultImplBodyStatus(
     CallableDecl* callableDecl,
     AccessorDecl** outFirstAccessorWithBody = nullptr)
@@ -5755,28 +5785,7 @@ static InterfaceDefaultImplBodyStatus getInterfaceDefaultImplBodyStatus(
     if (auto subscriptDecl = as<SubscriptDecl>(callableDecl))
     {
         // A subscript default implementation is represented by accessor bodies.
-        bool hasAccessorBody = false;
-        bool hasAccessorWithoutBody = false;
-        for (auto accessorDecl : subscriptDecl->getDirectMemberDeclsOfType<AccessorDecl>())
-        {
-            if (accessorDecl->body)
-            {
-                if (!hasAccessorBody && outFirstAccessorWithBody)
-                    *outFirstAccessorWithBody = accessorDecl;
-
-                hasAccessorBody = true;
-            }
-            else
-            {
-                hasAccessorWithoutBody = true;
-            }
-        }
-
-        if (hasAccessorBody && hasAccessorWithoutBody)
-            return InterfaceDefaultImplBodyStatus::Partial;
-
-        return hasAccessorBody ? InterfaceDefaultImplBodyStatus::Complete
-                               : InterfaceDefaultImplBodyStatus::None;
+        return getStorageDeclDefaultImplBodyStatus(subscriptDecl, outFirstAccessorWithBody);
     }
 
     return InterfaceDefaultImplBodyStatus::None;

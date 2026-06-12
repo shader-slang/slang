@@ -14625,10 +14625,46 @@ void SemanticsDeclHeaderVisitor::checkCallableConstraints(CallableDecl* decl)
     }
 }
 
+// Return true when a property requirement mixes accessor bodies with body-less accessors.
+// Unlike subscripts, properties do not have an `InterfaceDefaultImplDecl` path here, so
+// semantic checking owns the targeted diagnostic for this partial-default shape.
+static bool isPartialPropertyAccessorDefaultImplementation(AccessorDecl* accessorDecl)
+{
+    auto propertyDecl = as<PropertyDecl>(accessorDecl->parentDecl);
+    if (!propertyDecl)
+        return false;
+
+    bool hasAccessorBody = false;
+    bool hasAccessorWithoutBody = false;
+    for (auto siblingAccessorDecl : propertyDecl->getDirectMemberDeclsOfType<AccessorDecl>())
+    {
+        if (siblingAccessorDecl->body)
+            hasAccessorBody = true;
+        else
+            hasAccessorWithoutBody = true;
+    }
+
+    return hasAccessorBody && hasAccessorWithoutBody;
+}
+
 void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
 {
     if (isInterfaceRequirement(decl))
     {
+        if (auto accessorDecl = as<AccessorDecl>(decl))
+        {
+            // Subscript accessor defaults are handled by the parser's
+            // `InterfaceDefaultImplDecl` path. Properties do not have that
+            // representation, but a mixed `get; set {}` property is still a
+            // partial accessor default and should get the targeted diagnostic
+            // before the generic non-method-body check below.
+            if (accessorDecl->body && isPartialPropertyAccessorDefaultImplementation(accessorDecl))
+            {
+                getSink()->diagnose(
+                    Diagnostics::PartialInterfaceAccessorDefaultImplementation{.decl = decl});
+                return;
+            }
+        }
         if (auto funcBase = as<FunctionDeclBase>(decl))
         {
             if (!as<FuncDecl>(decl) && funcBase->body != nullptr)
