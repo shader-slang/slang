@@ -471,11 +471,10 @@ void writeLcov(
         // metadata-only entries that have no runtime counter. The range guard
         // (`< hits.size()`) is a defensive check against a hypothetical
         // compiler bug returning an out-of-bounds index.
-        const uint64_t count =
-            (entry.counterIndex != slang::kInvalidCoverageCounterIndex &&
-             entry.counterIndex < (uint32_t)hits.size())
-                ? hits[entry.counterIndex]
-                : 0;
+        const uint64_t count = (entry.counterIndex != slang::kInvalidCoverageCounterIndex &&
+                                entry.counterIndex < (uint32_t)hits.size())
+                                   ? hits[entry.counterIndex]
+                                   : 0;
         auto& rec = byFile[entry.file];
         switch (entry.kind)
         {
