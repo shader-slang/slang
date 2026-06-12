@@ -14,6 +14,10 @@ typedef int[3] Arr3;
 // `int m[2][3]` is Array<Array<int,3>,2>, so `m[1][2]` is the last element).
 typedef int Mat2x3[2][3];
 
+// 3-D trailing typedef array, used below to confirm a typedef array and a plain
+// variable array declaration of the same shape have identical element semantics.
+typedef int Cube[2][2][2];
+
 // Routing parseTypeDef through the shared declarator parser also makes the other
 // declarator forms a typedef name can carry parse. Declared (unused) only to pin
 // that they parse and type-check; the trailing unsized form matches the leading
@@ -21,7 +25,7 @@ typedef int Mat2x3[2][3];
 typedef int Unsized[];
 typedef int* IntPtr;
 
-//TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -46,4 +50,19 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     m[1][2] = 5; // last element of a [2][3] array — out of range if dims were swapped
     // CHECK: 9
     outputBuffer[2] = m[0][0] + m[1][2]; // multi-dim trailing alias
+
+    // A typedef array and a plain variable array declaration of the same shape must
+    // have identical element semantics. Initialize both from the same nested list and
+    // compare element-wise: a divergent typedef layout (e.g. transposed dimensions)
+    // would either fail to accept this initializer or mismatch on some element.
+    Cube td = {{{0, 1}, {2, 3}}, {{4, 5}, {6, 7}}};
+    int va[2][2][2] = {{{0, 1}, {2, 3}}, {{4, 5}, {6, 7}}};
+    int eq = 1;
+    for (int i = 0; i < 2; i++)
+        for (int j = 0; j < 2; j++)
+            for (int k = 0; k < 2; k++)
+                if (td[i][j][k] != va[i][j][k])
+                    eq = 0;
+    // CHECK: 1
+    outputBuffer[3] = eq; // typedef array == variable array decl, element-wise
 }
