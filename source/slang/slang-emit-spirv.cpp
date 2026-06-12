@@ -7054,7 +7054,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* getDescriptorRuntimeArrayType(SpvInst* descriptorElementType, int arrayStride = 0)
     {
-        SLANG_ASSERT(
+        SLANG_RELEASE_ASSERT(
             descriptorElementType->opcode != SpvOpTypeAccelerationStructureKHR &&
             "acceleration structure descriptor heaps must use uint64 elements");
 
