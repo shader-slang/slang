@@ -60,7 +60,7 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
@@ -144,10 +144,6 @@ jobs:
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux.txt")
           fi
 
-          # Silence aarch64-only failures (tracked as a separate follow-up issue)
-          if [[ "${{ inputs.platform }}" == "aarch64" ]]; then
-            slang_test_args+=("-expected-failure-list" "tests/expected-failure-aarch64.txt")
-          fi
 
           # T4 runners cannot execute SM 8.0+ cooperative matrix / neural tests
           if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
@@ -218,7 +214,7 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           submodules: "recursive"
           fetch-depth: "1"

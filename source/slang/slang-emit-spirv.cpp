@@ -3955,6 +3955,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     /// Emit the given `irFunc` to SPIR-V
     SpvInst* emitFunc(IRFunc* irFunc)
     {
+        // Declare any capabilities required by pointer types in the function's
+        // signature before emitting it (issue #11518). This covers non-inlined
+        // functions whose signature is the only place a Workgroup/StorageBuffer
+        // pointer appears.
+        requireFunctionTypeCapabilitiesIfNeeded(irFunc);
+
         // [2.4: Logical Layout of a Module]
         //
         // > All function declarations ("declarations" are functions
@@ -11456,6 +11462,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    // Declare the SPV_KHR_variable_pointers extension together with the given
+    // variable-pointers capability (`VariablePointers` for Workgroup pointers,
+    // `VariablePointersStorageBuffer` for StorageBuffer pointers); both come
+    // from the same extension.
+    void requireSPIRVVariablePointersCapability(SpvCapability capability)
+    {
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
+        requireSPIRVCapability(capability);
+    }
+
     void requireVariableBufferCapabilityIfNeeded(IRInst* type)
     {
         if (auto ptrType = as<IRPtrTypeBase>(type))
@@ -11463,15 +11479,62 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             switch (ptrType->getAddressSpace())
             {
             case AddressSpace::StorageBuffer:
-                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
-                requireSPIRVCapability(SpvCapabilityVariablePointersStorageBuffer);
+                requireSPIRVVariablePointersCapability(SpvCapabilityVariablePointersStorageBuffer);
                 break;
             case AddressSpace::GroupShared:
-                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
-                requireSPIRVCapability(SpvCapabilityVariablePointers);
+                requireSPIRVVariablePointersCapability(SpvCapabilityVariablePointers);
                 break;
             }
         }
+    }
+
+    // Variable-pointers capabilities are normally declared from value
+    // materialization sites (variable, phi, call, element-pointer, load). A
+    // pointer that appears only in the signature of a function that is not
+    // inlined (e.g. a `[noinline]` groupshared-pointer helper) never reaches
+    // such a site, so its `SPV_KHR_variable_pointers` requirement would be
+    // silently omitted, producing invalid SPIR-V (see shader-slang/slang#11518).
+    // Walk the signature's result and parameter types so the capability follows
+    // the surviving signature.
+    //
+    // Only declare for a function that survives inlining as a real, separately
+    // emitted SPIR-V function: its signature is the sole site of the pointer
+    // only when the function is genuinely called across a function boundary.
+    // A `[noinline]` helper is exactly that case. A function without the
+    // decoration is folded into its callers, leaving a dead `IRFunc` whose
+    // Workgroup/StorageBuffer-pointer signature no longer backs any emitted
+    // pointer operation. Declaring the capability for such a dead signature is
+    // not merely redundant: for a Workgroup pointer it re-introduces
+    // `VariablePointers` into a module that would otherwise not need it,
+    // re-triggering a graphics-driver miscompile that yields wrong results
+    // (shader-slang/slang#9061; regression caught by
+    // tests/language-feature/pointer/ptr-to-groupshared.slang).
+    //
+    // The discriminator is the no-inline decoration, mirroring the
+    // `SpvFunctionControlDontInlineMask` logic in `emitFuncDeclaration`. Note
+    // `hasUses()` does NOT work here: an inlined-away function can still report
+    // uses (e.g. via its surviving orphan function-type), so liveness does not
+    // distinguish a real callee from a folded-away one.
+    //
+    // Despite the general name, this declares only the variable-pointers
+    // capability: it forwards to `requireVariableBufferCapabilityIfNeeded` and
+    // is not a catch-all for every signature-derived capability. Only the
+    // top-level pointer of each type is inspected, so a Workgroup/StorageBuffer
+    // pointer nested inside a struct parameter or behind a pointer-to-pointer is
+    // not reached; this matches the existing value-site behavior. Requires are
+    // idempotent, so any overlap with value-site declarations is harmless.
+    void requireFunctionTypeCapabilitiesIfNeeded(IRFunc* irFunc)
+    {
+        if (!irFunc)
+            return;
+        if (!irFunc->findDecoration<IRNoInlineDecoration>())
+            return;
+        auto funcType = as<IRFuncType>(irFunc->getDataType());
+        if (!funcType)
+            return;
+        requireVariableBufferCapabilityIfNeeded(funcType->getResultType());
+        for (UInt i = 0; i < funcType->getParamCount(); i++)
+            requireVariableBufferCapabilityIfNeeded(funcType->getParamType(i));
     }
 
     // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
