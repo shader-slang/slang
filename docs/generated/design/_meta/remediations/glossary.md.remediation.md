@@ -1,13 +1,13 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-05T15:45:00Z
+remediated_at: 2026-06-12T14:16:15Z
 target_doc: glossary.md
 review_report: ../reviews/glossary.md.review.md
-target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 actions:
-  fixed: 3
+  fixed: 1
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,12 +18,10 @@ actions:
 
 ## Summary
 
-The review reported three minor findings, all fixed. F-001: the `hoistable instruction` entry overstated module-scope placement; it now states hoisting goes as far toward module scope as operands allow, matching `addHoistableInst` in `source/slang/slang-ir.cpp` (lines 1645-1707). F-002: the `target intrinsic` and `target legalization driver` entries were out of alphabetical order; they were swapped. F-003: the `[Slang]`-tagged `scope` entry carried an `External:` link reserved for `[General]` entries; the line was removed.
+The review reported a single major finding (F-001) and it was fixed. The `## Cross-reference index` table omitted two peer pipeline documents that the manifest's `docs/generated/design/pipeline/*.md` glob includes; two rows were added. No findings were rejected, deferred, or escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `addHoistableInst` starts at module scope but backs off to the innermost parent defining an operand (`source/slang/slang-ir.cpp:1645-1666,1677-1707`); module scope is not guaranteed. | Rephrased the entry to say hoistable insts are hoisted as far toward module scope as operands allow. |
-| F-002 | fixed | Case-insensitive A-Z order puts `target intrinsic` before `target legalization driver` (prompt `glossary.md:7-9`). | Swapped the two entries so `target intrinsic` precedes `target legalization driver`. |
-| F-003 | fixed | Prompt `glossary.md:81` reserves `External:` for `[General]` entries; `scope` is `[Slang]`. | Removed the `External:` Wikipedia line from the `scope` entry. |
+| F-001 | fixed | Verified: `pipeline/04b-pre-link-passes.md` and `pipeline/04c-layout-ir.md` both exist and appear in the resolved file list from `regenerate.py show glossary.md` (matched by the glob at `manifest.yaml:756`). The prompt at `prompts/glossary.md:135` requires the index to cover every peer doc in the manifest entry, yet the table jumped from `pipeline/04-ast-to-ir.md` straight to `pipeline/05-ir-passes.md`. The glossary already defines `layout IR module` (See: 04c) and `mandatory optimization pass` (See: 04b), so both terms exist to populate the rows. | Added two cross-reference index rows after `pipeline/04-ast-to-ir.md`: `04b-pre-link-passes.md` -> `mandatory optimization pass`, and `04c-layout-ir.md` -> `layout IR module`. |

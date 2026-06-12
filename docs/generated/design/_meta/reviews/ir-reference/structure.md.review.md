@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:06:28+00:00
+reviewed_at: 2026-06-12T12:06:22+00:00
 target_doc: ir-reference/structure.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: fail
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: fail
   front_matter_validity: pass
-finding_count: 2
+finding_count: 1
 severity_breakdown:
-  critical: 0
-  major: 2
+  critical: 1
+  major: 0
   minor: 0
   nit: 0
 ---
@@ -24,18 +24,17 @@ severity_breakdown:
 # Review report for ir-reference/structure.md
 
 ## Summary
-The page has valid front matter, required top-level sections, and all relative links resolve at the recorded source commit. Two major findings remain: the `## Source` section cites several lowering symbols that are not present under those names, and the witness-table row omits the concrete-type operand while not providing the prompt-required `witness_table` callout.
+The page has valid front matter, required sections, and resolving links. The central issue is that it describes `interface_req_entry` instances as children of `interface`, but the source builds them as operands on `IRInterfaceType`; that distinction is important for anyone writing an IR traversal.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/structure.md` and verified the prompt, dependency list, watched paths, target source commit, and digest against the document front matter.
-- Read the target doc, `_common.md`, `ir-reference-structure.md`, and the dependency docs `cross-cutting/ir-instructions.md`, `pipeline/04-ast-to-ir.md`, and `ast-reference/declarations.md`.
-- Resolved all 24 relative links in the target document against `52339028a2aa703271533454c6b9528a534bac31`.
-- Checked all required IR-reference sections, the `GlobalValueWithCode` hierarchy, and 22 opcode table rows against `source/slang/slang-ir-insts.lua`.
-- Spot-checked more than 10 factual claims, including `module`, `func`, `generic`, `param`, `call`, `global_var`, `global_param`, `globalConstant`, `StructKey`, `InterfaceRequirementEntry`, `WitnessTableEntry`, `thisTypeWitness`, `TypeEqualityWitness`, `SymbolAlias`, and the named lowering helpers.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/structure.md`.
+- Read `_common.md`, `ir-reference-structure.md`, the target document including front matter, dependency docs, and watched source files.
+- Resolved the document's relative Markdown links and checked peer generated-doc links against the generated-doc tree.
+- Checked required structure, table columns, front matter, `GlobalValueWithCode`, module/global-state rows, struct keys, interface entries, witness tables, symbol aliases, and notable-opcode coverage.
+- Spot-checked more than 10 factual claims against source for `module`, `func`, `generic`, `param`, `call`, `global_var`, `global_param`, `globalConstant`, `field`, `key`, `builtinRequirementKey`, `indexedFieldKey`, `interface`, `interface_req_entry`, `witness_table`, `witness_table_entry`, `thisTypeWitness`, `TypeEqualityWitness`, and `SymbolAlias`.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Source`, lines 41-47 | The source paragraph cites `lowerProgram`, `lowerCallableDecl`, `lowerGenericDecl`, `lowerStructDecl`, `lowerInterfaceDecl`, and `lowerInheritanceDecl`, but the watched implementation does not define those symbols under those names. Related implemented entry points are named differently, such as `lowerFuncDecl`, `visitGenericDecl`, `visitInterfaceDecl`, and `visitInheritanceDecl`. | `source/slang/slang-lower-to-ir.cpp:10671` defines `visitInheritanceDecl`, `source/slang/slang-lower-to-ir.cpp:11520` defines `visitInterfaceDecl`, and `source/slang/slang-lower-to-ir.cpp:14089` defines `lowerFuncDecl`. Struct lowering is handled by aggregate logic that calls `createStructType` at `source/slang/slang-lower-to-ir.cpp:11991`. | Replace the nonexistent helper names with the actual visitor or helper names, or phrase this as declaration lowering handled by the lowering visitor and cite the concrete functions that exist. |
-| F-002 | major | `## Opcodes` and `## Notable opcodes`, lines 134-139 and 147-214 | The `witness_table` row describes only child entries, while source creation records the concrete conforming type as operand 0 and the conformance interface in the result type. The prompt also requires a notable `witness_table` callout, but the notable section only discusses `witness_table_entry` versus `interface_req_entry`. | `source/slang/slang-ir.cpp:4992-4998` creates `kIROp_WitnessTable` with `getWitnessTableType(baseType)` and `subType`; `source/slang/slang-ir-insts.h:2211-2216` exposes `getConformanceType()` and `getConcreteType()`; `source/slang/slang-ir.cpp:5003-5017` inserts `witness_table_entry` children into the table. | Update the row to mention the concrete-type operand and result-type conformance, then add a `### witness_table` notable callout that explains those two pieces plus its owned entries. |
+| F-001 | critical | `### Interface internals` and `### witness_table_entry vs interface_req_entry` | The document says `interface` is a parent container whose `interface_req_entry` values are children, but lowering allocates operand slots on `IRInterfaceType` and writes each requirement entry into those operands. A reader following the doc would walk children and miss interface requirements. | `source/slang/slang-ir-insts.lua:656` declares `interface` as `global = true`, not `parent = true`; `source/slang/slang-lower-to-ir.cpp:11697-11698` creates an `IRInterfaceType` with `operandCount`; `source/slang/slang-lower-to-ir.cpp:11915-11919` stores each `interface_req_entry` with `irInterface->setOperand(entryIndex, constraintEntry)`. | Replace the child/parent wording and operand cell for `interface` with an operand-based description: `interface_req_entry` instances are operands of the `IRInterfaceType`, while witness-table entries are children of `witness_table`. |

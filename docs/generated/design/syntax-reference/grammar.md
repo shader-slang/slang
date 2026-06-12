@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 1084d6ac21281bc1db256e51bd36ad00a4bce0602ec9747f43e80e7a14436e98
+generated_at: 2026-06-12T10:13:30Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: fa970dcce70dd7f3374f9d33120c59e4a2f243c4f0bee9756c52610ae322f450
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -69,12 +69,13 @@ implements it (in
 ## Top-level structure
 
 ```
-SourceFile      ::= ModuleHeader? TopDecl* EOF
-ModuleHeader    ::= ('module' | 'implementing') IDENT ';'?
+SourceFile      ::= ModuleHeader? TopDecl* EOF                -- parseSourceFile (-> parseDecls)
+ModuleHeader    ::= ('module' | 'implementing') IDENT ';'
                                               -- parseModuleDeclarationDecl,
-                                              --   parseImplementingDecl
+                                              --   parseImplementingDecl (both
+                                              --   ReadToken the trailing ';')
 
-TopDecl         ::= ImportDecl
+TopDecl         ::= ImportDecl                                -- parseDecls -> ParseDecl
                   | NamespaceDecl
                   | UsingDecl
                   | FileDecl
@@ -88,7 +89,8 @@ NamespaceDecl   ::= 'namespace' IDENT '{' TopDecl* '}'      -- parseNamespaceDec
 UsingDecl       ::= 'using' QualifiedName ';'                -- parseUsingDecl
 FileDecl        ::= '__file_decl' '{' TopDecl* '}'           -- parseFileDecl
 
-QualifiedName   ::= IDENT ('::' IDENT)*
+QualifiedName   ::= IDENT ('::' IDENT)*                       -- parsed via the expression machinery
+                                                              --   (ParseExpression -> parseStaticMemberType)
 ```
 
 ## Declarations
@@ -133,16 +135,45 @@ EnumCase        ::= IDENT ('=' Expr)?
 InterfaceDecl   ::= 'interface' IDENT GenericParams? Inheritance?
                     '{' InterfaceMember* '}'                  -- parseInterfaceDecl
 InterfaceMember ::= ModifierList? (FuncDecl | AssocTypeDecl | PropertyDecl
-                                  | SubscriptDecl | ConstructorDecl)
+                                  | SubscriptDecl | ConstructorDecl
+                                  | InterfaceConstraintDecl)
 
 ExtensionDecl   ::= ('extension' | '__extension') Type
                     Inheritance? '{' StructMember* '}'        -- parseExtensionDecl
 
-AssocTypeDecl   ::= 'associatedtype' IDENT (':' TypeList)? ';'  -- parseAssocType
+AssocTypeDecl   ::= 'associatedtype' IDENT (':' TypeList)? WhereClause? ';'
+                                                              -- parseAssocType
+                                                              -- the ':' bound and the 'where'
+                                                              -- clause are modeled identically (see below)
+
+InterfaceConstraintDecl
+                ::= '__constraint' Type ('==' | ':') Type ';'  -- parseInterfaceConstraintDecl
+                                                              -- interface-level constraint requirement;
+                                                              -- '==' is an equality constraint,
+                                                              -- ':' a subtype constraint
 
 Inheritance     ::= ':' TypeList
 TypeList        ::= Type (',' Type)*
 ```
+
+An associated type's constraints have two surface forms — the
+inheritance bound `associatedtype A : IBar` and the where-clause
+`associatedtype A where A : IBar`. Both are parsed by `parseAssocType`
+and lowered to the *same* representation: a `GenericTypeConstraintDecl`
+added as a sibling requirement of the enclosing `InterfaceDecl`, not a
+member of the associated type itself (see `parseOptionalGenericConstraints`,
+which takes a separate `constraintTarget`). This is the identical
+representation produced by the explicit `__constraint` form below, so
+the three spellings are equivalent.
+
+The standalone `__constraint` requirement (`parseInterfaceConstraintDecl`)
+declares a `GenericTypeConstraintDecl` directly in an interface body to
+refine the implicit `This` type and/or associated types inherited from
+base interfaces — e.g. `interface IDerived : IBase { __constraint DataType == This; }`.
+It is valid only inside an interface; `isDeclAllowed` permits a
+`GenericTypeConstraintDecl` under an `InterfaceDecl` (interface
+requirement) or a `GenericDecl` (where the same node represents a
+generic parameter's `where` / `<T : I>` bound).
 
 ### Function-style declarations
 
@@ -171,8 +202,14 @@ FuncExtensionDecl
                                                               -- `bwd_diff(foo)`, or `__apply(foo)`;
                                                               -- gated behind -experimental-feature
 
-ParamList       ::= Param (',' Param)*
-Param           ::= ModifierList? Type IDENT ('=' Expr)?       -- context-sensitive (modifiers vs type)
+ParamList       ::= Param (',' Param)*                         -- parseParameterList (traditional)
+                                                              --   / parseModernParamList (modern)
+Param           ::= ModifierList? Type IDENT ('=' Expr)?       -- traditional, type-first
+                                                              --   (ParseParameter / _parseTraditionalParamDeclCommonBase)
+                  | ModifierList? IDENT (':' Type)? ('=' Expr)? -- modern, name-first
+                                                              --   (parseModernParamDecl, chosen when
+                                                              --   _peekModernStyleVarDecl succeeds; the
+                                                              --   ':' Type is optional)
 
 WhereClause     ::= 'where' WhereTerm (',' WhereTerm)*
 WhereTerm       ::= Type ':' Type                              -- conformance constraint
@@ -235,22 +272,23 @@ Stmt            ::= Block
                   | DeclStmt | ExprStmt | EmptyStmt
 
 Block           ::= '{' Stmt* '}'                              -- parseBlockStmt
-IfStmt          ::= 'if' '(' Expr ')' Stmt ('else' Stmt)?      -- around line 6457
+                                                              -- statement dispatch in ParseStatement
+IfStmt          ::= 'if' '(' Expr ')' Stmt ('else' Stmt)?      -- parseIfStatement
 ForStmt         ::= 'for' '(' (DeclStmt | ExprStmt | ';') Expr? ';' Expr? ')' Stmt
-                                                              -- around line 6468
-WhileStmt       ::= 'while' '(' Expr ')' Stmt                  -- around line 6470
-DoWhileStmt     ::= 'do' Stmt 'while' '(' Expr ')' ';'         -- around line 6472
-DoCatchStmt     ::= 'do' Stmt 'catch' ('(' Param ')')? Stmt    -- ParseDoCatchStatement (slang-parser.cpp:7018-7050)
+                                                              -- ParseForStatement
+WhileStmt       ::= 'while' '(' Expr ')' Stmt                  -- ParseWhileStatement
+DoWhileStmt     ::= 'do' Stmt 'while' '(' Expr ')' ';'         -- ParseDoStatement
+DoCatchStmt     ::= 'do' Stmt 'catch' ('(' Param ')')? Stmt    -- ParseDoStatement / ParseDoCatchStatement
 
-SwitchStmt      ::= 'switch' '(' Expr ')' '{' SwitchCase* '}'  -- around line 6487
-SwitchCase      ::= ('case' Expr ':' | 'default' ':') Stmt*
+SwitchStmt      ::= 'switch' '(' Expr ')' '{' SwitchCase* '}'  -- ParseSwitchStmt
+SwitchCase      ::= ('case' Expr ':' | 'default' ':') Stmt*    -- ParseCaseStmt / ParseDefaultStmt
 
-BreakStmt       ::= 'break' IDENT? ';'                          -- around line 6474
-ContinueStmt    ::= 'continue' IDENT? ';'                       -- around line 6476
-ReturnStmt      ::= 'return' Expr? ';'                          -- around line 6478
-DiscardStmt     ::= 'discard' ';'                               -- around line 6480
-DeferStmt       ::= 'defer' Stmt                                -- around line 6505
-ThrowStmt       ::= 'throw' Expr ';'                            -- around line 6513
+BreakStmt       ::= 'break' IDENT? ';'                          -- ParseBreakStatement
+ContinueStmt    ::= 'continue' IDENT? ';'                       -- ParseContinueStatement
+ReturnStmt      ::= 'return' Expr? ';'                          -- ParseReturnStatement
+DiscardStmt     ::= 'discard' ';'                               -- ParseStatement (inline)
+DeferStmt       ::= 'defer' Stmt                                -- ParseDeferStatement
+ThrowStmt       ::= 'throw' Expr ';'                            -- ParseThrowStatement
 
 DeclStmt        ::= Decl
 ExprStmt        ::= Expr ';'
@@ -453,17 +491,16 @@ parameter list — see
 ## Types
 
 ```
-Type            ::= ModifierList? CoreType
-CoreType        ::= QualifiedName GenericArgs?
-                  | Type '[' Expr? ']'                          -- array
-                  | Type '*'                                    -- pointer-to-T (where supported)
-                  | Type '?'                                    -- Optional<T>
-                  | Type '&'                                    -- reference (where supported)
-                  | '(' Type (',' Type)+ ')'                    -- tuple type
-                  | 'func' '(' Type (',' Type)* ')' '->' Type   -- function type
+Type            ::= ModifierList? CoreType                     -- ParseType / _parseSimpleTypeSpec
+CoreType        ::= QualifiedName GenericArgs?                 -- _parseSimpleTypeSpec
+                  | Type '[' Expr? ']'                          -- array (parsePostfixTypeSuffix)
+                  | Type '*'                                    -- pointer-to-T (parsePostfixTypeSuffix)
+                  | 'functype' '(' Type (',' Type)* ')' '->' Type
+                                                              -- function type (parseFuncTypeExpr)
                   | 'each' Type                                 -- pack type
-GenericArgs     ::= '<' GenericArg (',' GenericArg)* '>'        -- context-sensitive
-GenericArg      ::= Type | Expr                                 -- ambiguous; resolved at check time
+GenericArgs     ::= '<' GenericArg (',' GenericArg)* '>'        -- parseGenericApp; context-sensitive
+GenericArg      ::= Type | Expr                                 -- _parseGenericArg; ambiguous,
+                                                              --   resolved at check time
 ```
 
 Built-in concrete type names (`int`, `float`, `vector<T,N>`,

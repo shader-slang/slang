@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 9221d4167460d8aa57ead3a905a1ce4b763de1371a68088ad1f20133ed887720
+generated_at: 2026-06-12T10:25:56Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: f57f85851515cdaf74d296849163598144fd9446405e6588774aac17250d6d39
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -74,14 +74,14 @@ flowchart TD
 | Page | Family | Lua entry root | Approx. opcodes |
 | --- | --- | --- | --- |
 | [types.md](types.md) | Type instructions | `Type` (line ~20) | ~160 |
-| [values.md](values.md) | Constants, arithmetic, conversions, memory, aggregate constructors, constexpr arithmetic/casts, string and native-pointer helpers | `Constant` (line ~838) and top-level value opcodes; constexpr arithmetic cluster ~line 3142 | ~150 |
-| [structure.md](structure.md) | Module structure: functions, generics, globals, structs, interfaces, witness tables | `GlobalValueWithCode` (line ~787), `module` (line ~827) | ~20 |
-| [control-flow.md](control-flow.md) | Block, parameters, branches, function exits, target / quad-execution `Require*` markers | `TerminatorInst` (line ~1294) + `block` / `Param` at top level | ~25 |
-| [generics-and-existentials.md](generics-and-existentials.md) | `specialize`, witness lookup, existential pack/unpack, RTTI, type-flow specialization (sets, tagged unions, dispatchers) | Top-level (e.g. `specialize` ~line 932, `lookupWitness` ~line 933); type-flow cluster ~line 2880 | ~55 |
-| [resources-and-atomics.md](resources-and-atomics.md) | Image/buffer/sampler ops, shader IO, atomics, barriers, fragment-shader interlocks, cooperative matrix/vector, wave intrinsics, raytracing | `AtomicOperation` (line ~1071) + top-level resource opcodes | ~85 |
-| [differentiation.md](differentiation.md) | Autodiff: differential pairs, forward/backward differentiate, reverse-mode contexts, autodiff temporaries, `DiffTypeInfo` | `MakeDifferentialPairBase` (line ~901) + top-level autodiff opcodes | ~35 |
-| [decorations.md](decorations.md) | Decoration family (metadata attached to instructions) | `Decoration` (line ~1594) | ~180 |
-| [metadata.md](metadata.md) | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` | `Layout` (line ~2619), `Attr` (line ~2652), `Debug*` (line ~2716), `SPIRVAsmOperand` (line ~2756) | ~55 |
+| [values.md](values.md) | Constants, arithmetic, conversions, memory, aggregate constructors, constexpr arithmetic/casts, string and native-pointer helpers | `Constant` (line ~855) and top-level value opcodes; constexpr arithmetic cluster ~line 3210 | ~150 |
+| [structure.md](structure.md) | Module structure: functions, generics, globals, structs, interfaces, witness tables | `GlobalValueWithCode` (line ~787), `module` (line ~844) | ~20 |
+| [control-flow.md](control-flow.md) | Block, parameters, branches, function exits, target / quad-execution `Require*` markers | `TerminatorInst` (line ~1342) + `block` / `Param` at top level | ~25 |
+| [generics-and-existentials.md](generics-and-existentials.md) | `specialize`, witness lookup, existential pack/unpack, RTTI, type-flow specialization (sets, tagged unions, dispatchers) | Top-level (e.g. `specialize` ~line 949, `lookupWitness` ~line 950); type-flow cluster ~line 2916 | ~55 |
+| [resources-and-atomics.md](resources-and-atomics.md) | Image/buffer/sampler ops, shader IO, atomics, barriers, fragment-shader interlocks, cooperative matrix/vector, wave intrinsics, raytracing | `AtomicOperation` (line ~1088) + top-level resource opcodes | ~85 |
+| [differentiation.md](differentiation.md) | Autodiff: differential pairs, forward/backward differentiate, reverse-mode contexts, autodiff temporaries, `DiffTypeInfo` | `MakeDifferentialPairBase` (line ~918) + top-level autodiff opcodes | ~35 |
+| [decorations.md](decorations.md) | Decoration family (metadata attached to instructions) | `Decoration` (line ~1642) | ~180 |
+| [metadata.md](metadata.md) | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` | `Layout` (line ~2681), `Attr` (line ~2714), `Debug*` (line ~2776), `SPIRVAsmOperand` (line ~2818) | ~55 |
 | [misc.md](misc.md) | System opcodes (`nop`, `Unrecognized`), pack/expansion, type queries, size/alignment, storage casts, liveness markers, descriptor heaps, tensor / runtime helpers, kernel launch | Top-level miscellaneous opcodes | ~55 |
 
 Counts are approximate, rounded to the nearest ten at the

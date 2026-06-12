@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: a7f01f5c13a93b4962311b4a8303731a575df2231fa88c54d62f0ee4ce433cb4
+generated_at: 2026-06-12T10:13:34Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 21f5dc83dc20f0609dbafd71552d302702cd2815178dac8580c3b871e32d8834
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -110,6 +110,57 @@ The checker implements generic-parameter resolution through:
 - [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp)
   — validates `Val` substitutions after generic resolution.
 
+When resolving a generic application,
+`TryCheckOverloadCandidateConstraints`
+([slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp))
+routes an outermost generic's defaulted and witness arguments through
+the constraint solver's fixpoint (`trySolveGenericArguments`) — the
+same path used for inferred arguments — passing only the explicitly
+supplied ordinary-argument prefix
+(`OverloadCandidate::explicitGenericArgCount` in
+[slang-check-impl.h](../../../../source/slang/slang-check-impl.h)) as
+fixed caller input so a user-written self-reference argument is not
+overwritten by a parameter's default. On solver failure the code
+falls through to a per-constraint linear pass that re-derives the
+failing constraint to emit a precise diagnostic.
+
+A constraint written on an associated type — whether as
+`associatedtype A : IBar`, `associatedtype A where A : IBar`, or
+`__constraint A : IBar` — is recorded uniformly as a
+`GenericTypeConstraintDecl` requirement of the *enclosing interface*
+(a sibling of `A`), not nested under `A`. In that unified
+representation `findWitnessForInterfaceRequirement`
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp))
+satisfies an interface-level constraint requirement by re-checking
+the subtype (or, for an `==` constraint, type-equality) relationship
+after `This` has been replaced by the conforming type, rather than by
+finding a member of that type. A witness already installed by
+conformance synthesis — for example an `enum`'s synthesized
+`__Tag : __BuiltinIntegerType` (including the `bool`-tagged case,
+where no real subtype witness exists and a `NoneWitness` marks the
+compiler-trusted constraint satisfied) — is honored by the
+witness-table early-out at the top of that function.
+
+Linearized inheritance lists are computed by `getInheritanceInfo` /
+`_calcInheritanceInfo` in
+[slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp).
+When computing the inheritance of an associated-type access such as
+`T.D`, the engine surfaces interface-level `__constraint`s of the
+interfaces each anchor type conforms to, re-expresses each through the
+anchor's conformance witness, and adds the opposite endpoint as a base
+of the access. An equality constraint such as `__constraint A == B`
+makes `T.A` and `T.B` mutual bases — a *benevolent* cycle. The engine
+tolerates this by skipping a base whose inheritance info is still being
+computed (`_isInheritanceInfoBeingComputed`), accumulating the skipped
+in-progress ancestor `DeclRef`s through a `HashSet<DeclRef<Decl>>*
+ioSkippedIncompleteFacet` out-parameter; a frame whose skipped set is
+non-empty after subtracting itself is contextual (partial), is not
+cached, and is recomputed by a later root-level query. A bare-`This`
+subject on an interface `__constraint` (which would express inheritance
+rather than a checked predicate) is rejected during checking in
+`visitGenericTypeConstraintDecl`
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)).
+
 The full conceptual model (interfaces, witness tables, existential
 types) is in
 [../../../design/interfaces.md](../../../design/interfaces.md) and
@@ -150,7 +201,12 @@ All semantic-checking errors flow through the `DiagnosticSink`
 threaded into `SemanticsContext`. Check-level recovery is generally
 "continue with a placeholder type" so that one error does not cascade:
 unresolved decls become `ErrorType`-typed, and overload resolution
-returns a synthetic `errorExpr` rather than aborting. The diagnostic
+returns a synthetic `errorExpr` rather than aborting. Diagnostics aim
+to name the offending source construct: when `ExpectATypeRepr`
+([slang-check-type.cpp](../../../../source/slang/slang-check-type.cpp))
+finds an expression that does not denote a type, it builds the
+`Diagnostics::ExpectedAType` message from the expression's actual type
+and, when available, the referenced name. The diagnostic
 infrastructure is described in
 [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md).
 

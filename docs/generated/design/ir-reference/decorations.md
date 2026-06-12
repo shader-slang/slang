@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 156c66694255ff678fb0eaa18abd2bb50bfa9979d070210c7bb229025fcd0b6b
+generated_at: 2026-06-12T10:17:30Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: c993f7837f8ee2af868f6b993bef4697dfae2a5a4522346050a4c431dadfeb19
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -276,6 +276,7 @@ flowchart TD
 | `SequentialIDDecoration` | — | `sequentialIdOperand: IRIntLit` | | (synthesized) | Stable integer ID used by `GetSequentialID`. |
 | `DynamicDispatchWitnessDecoration` | — | — | | (synthesized) | Marks a witness table as participating in dynamic dispatch. |
 | `StaticRequirementDecoration` | — | — | | (synthesized) | Marks an interface requirement as static. |
+| `BuiltinRequirementDecoration` | `BuiltinRequirementDecoration` | `kindOperand: IRIntLit` | | `slang-lower-to-ir.cpp` (requirement-key lowering of a `BuiltinRequirementModifier`) | Marks an interface requirement key with the `BuiltinRequirementKind` role (e.g. `IDifferentiable.Differential`) of the built-in requirement it represents, so consumers identify it by role rather than by position in the requirement list. |
 | `DispatchFuncDecoration` | — | `func` | | (synthesized) | Records the dispatch function for an interface call. |
 | `TypeConstraintDecoration` | — | `constraintType` | | `GenericTypeConstraintDecl` lowering | Records the interface constraint of a generic parameter. |
 | `ResultWitness` | `ResultWitnessDecoration` | `witness` | | (synthesized) | Records the original interface witness when a function used to return an existential. |
@@ -422,6 +423,26 @@ primal and differential outputs (the `pairType` operand is the
 `DifferentialPairType`). The unzip pass uses these markers to
 split a mixed function into its primal-side and propagate-side
 copies.
+
+### `BuiltinRequirementDecoration`
+
+`BuiltinRequirementDecoration` tags an interface *requirement key*
+with the `BuiltinRequirementKind` role (an `IRIntLit` operand) of
+the built-in requirement it stands for — for example the
+`Differential` type or differential-witness requirements of
+`IDifferentiable`. It is attached during requirement-key lowering
+in
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+to the `IRBuiltinRequirementKey` produced for a requirement decl
+that carries an AST `BuiltinRequirementModifier`. Unlike an
+ordinary requirement, a recognized built-in requirement is keyed
+by a hoistable `IRBuiltinRequirementKey` (deduplicated by
+construction from its `kind` operand) rather than a per-decl
+`StructKey`. The decoration lets later passes — notably autodiff
+— locate a requirement entry by its role instead of by its
+position in the interface's (semantically unordered) requirement
+list. See [../glossary.md](../glossary.md) for `witness` and
+requirement-key terminology.
 
 ## See also
 
