@@ -543,8 +543,6 @@ static void validateSPIRVFp16VectorAtomicOperation(DiagnosticSink* sink, IRInst*
 
     switch (inst->getOp())
     {
-    case kIROp_AtomicLoad:
-    case kIROp_AtomicStore:
     case kIROp_AtomicCompareExchange:
         sink->diagnose(
             Diagnostics::SpirvFp16VectorAtomicUnsupportedOperation{.location = inst->sourceLoc});

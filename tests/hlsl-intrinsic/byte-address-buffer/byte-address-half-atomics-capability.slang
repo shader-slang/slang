@@ -1,6 +1,6 @@
 // Scalar/vector fp16 add checks. `NO_FP16_ATOMIC` has no fp16 atomic capability;
 // `VECTOR_F16` has the vector capability, which implies scalar spvAtomicFloat16AddEXT.
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_SCALAR):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16AddEXT -render-feature atomic-half -output-using-type -xslang -DTEST_RUNTIME_SCALAR
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_SCALAR):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16AddEXT -render-features half,atomic-float-2 -output-using-type -xslang -DTEST_RUNTIME_SCALAR
 //TEST:SIMPLE(filecheck=SCALAR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT
 //DIAGNOSTIC_TEST:SIMPLE(diag=NO_FP16_ATOMIC,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spirv_1_5
 //TEST:SIMPLE(filecheck=VECTOR_F16): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV
@@ -25,6 +25,8 @@
 //TEST:SIMPLE(filecheck=BOTH): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT -capability spvAtomicFloat16VectorNV
 //TEST:SIMPLE(filecheck=VECTOR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_ATOMIC
 //TEST:SIMPLE(filecheck=VECTOR_SUB): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR_SUB
+//TEST:SIMPLE(filecheck=SCALAR_FLOAT_SUB): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat32AddEXT -DTEST_DIRECT_SCALAR_FLOAT_SUB
+//TEST:SIMPLE(filecheck=SCALAR_DOUBLE_SUB): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat64AddEXT -DTEST_DIRECT_SCALAR_DOUBLE_SUB
 //TEST:SIMPLE(filecheck=VECTOR4): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR4_ATOMIC
 //TEST:SIMPLE(filecheck=VECTOR4_SUB): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR4_SUB
 //TEST:SIMPLE(filecheck=VECTOR4_MIN_MAX): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV -DTEST_DIRECT_VECTOR4_MIN_MAX
@@ -41,6 +43,10 @@
 RWByteAddressBuffer tmpBuffer;
 //TEST_INPUT:ubuffer(stride=4, count=32):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
+//TEST_INPUT:ubuffer(stride=4, count=2):name=floatBuffer
+RWStructuredBuffer<float> floatBuffer;
+//TEST_INPUT:ubuffer(stride=8, count=2):name=doubleBuffer
+RWStructuredBuffer<double> doubleBuffer;
 //TEST_INPUT:ubuffer(stride=2, count=4):name=halfBuffer
 RWStructuredBuffer<half> halfBuffer;
 //TEST_INPUT:ubuffer(stride=4, count=4):name=vectorBuffer
@@ -143,6 +149,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     __atomic_add(vectorBuffer[0], half2(1.0h, 2.0h));
 #elif defined(TEST_DIRECT_VECTOR_SUB)
     __atomic_sub(vectorBuffer[0], half2(1.0h, 2.0h));
+#elif defined(TEST_DIRECT_SCALAR_FLOAT_SUB)
+    __atomic_sub(floatBuffer[0], floatBuffer[1]);
+#elif defined(TEST_DIRECT_SCALAR_DOUBLE_SUB)
+    __atomic_sub(doubleBuffer[0], doubleBuffer[1]);
 #elif defined(TEST_DIRECT_VECTOR4_ATOMIC)
     __atomic_add(vector4Buffer[0], half4(1.0h, 2.0h, 3.0h, 4.0h));
 #elif defined(TEST_DIRECT_VECTOR4_SUB)
@@ -179,7 +189,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = float(originalValue.x + originalValue.y);
 // Half-vector atomic load/store are not source-expressible today: Atomic<T> requires
 // scalar IAtomicable types, while half2/half4 do not conform to that interface. The
-// validator rejects those IR ops defensively if a later lowering path creates them.
+// validator's default unsupported-operation path rejects those IR ops defensively if
+// a later lowering path creates them.
 #elif defined(TEST_EMULATED)
     half originalValue;
     tmpBuffer.InterlockedAddF16Emulated(0, 1.0h, originalValue);
@@ -266,6 +277,17 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // VECTOR_SUB-DAG: [[VALUE:%[0-9]+]] = OpConstantComposite %v2half {{%[A-Za-z0-9_]+}} {{%[A-Za-z0-9_]+}}
 // VECTOR_SUB: [[NEG_VALUE:%[0-9]+]] = OpFNegate %v2half [[VALUE]]
 // VECTOR_SUB: OpAtomicFAddEXT %v2half {{%[0-9]+}} %uint_1 %uint_0 [[NEG_VALUE]]
+
+// SCALAR_FLOAT_SUB: OpCapability AtomicFloat32AddEXT
+// SCALAR_FLOAT_SUB: OpExtension "SPV_EXT_shader_atomic_float_add"
+// SCALAR_FLOAT_SUB: [[NEG_VALUE:%[0-9]+]] = OpFNegate %float {{%[A-Za-z0-9_]+}}
+// SCALAR_FLOAT_SUB: OpAtomicFAddEXT %float {{%[0-9]+}} %uint_1 %uint_0 [[NEG_VALUE]]
+
+// SCALAR_DOUBLE_SUB: OpCapability Float64
+// SCALAR_DOUBLE_SUB: OpCapability AtomicFloat64AddEXT
+// SCALAR_DOUBLE_SUB: OpExtension "SPV_EXT_shader_atomic_float_add"
+// SCALAR_DOUBLE_SUB: [[NEG_VALUE:%[0-9]+]] = OpFNegate %double {{%[A-Za-z0-9_]+}}
+// SCALAR_DOUBLE_SUB: OpAtomicFAddEXT %double {{%[0-9]+}} %uint_1 %uint_0 [[NEG_VALUE]]
 
 // VECTOR4-NOT: OpCapability AtomicFloat16AddEXT
 // VECTOR4-NOT: OpExtension "SPV_EXT_shader_atomic_float16_add"
