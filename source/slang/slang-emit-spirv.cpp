@@ -4467,7 +4467,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case SpvOpAtomicStore:
         case SpvOpAtomicCompareExchange:
         case SpvOpAtomicCompareExchangeWeak:
-            SLANG_ASSERT(!isFp16VectorAtomicType(atomicValueType));
+            SLANG_RELEASE_ASSERT(!isFp16VectorAtomicType(atomicValueType));
             break;
         case SpvOpAtomicExchange:
             maybeRequireFp16VectorAtomicCapability(atomicValueType);
