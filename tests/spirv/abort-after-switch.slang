@@ -1,8 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort -skip-spirv-validation -O3
 
 // OpAbortKHR is a block terminator. When abort() is called from one switch arm,
 // SPIRV legalization must strip the abort block's original branch so the switch
-// merge phis do not retain a predecessor that never branches.
+// merge phi does not retain a predecessor that never branches.
 
 RWStructuredBuffer<float> outBuf;
 
@@ -32,6 +32,9 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 }
 
 // CHECK: OpSelectionMerge
-// CHECK: OpSwitch
+// CHECK: OpSwitch {{.*}} [[DEFAULT:%[a-zA-Z0-9_]+]] 0 [[CASE0:%[a-zA-Z0-9_]+]] 1 [[ABORT:%[a-zA-Z0-9_]+]]
+// CHECK: [[ABORT]] = OpLabel
 // CHECK: OpAbortKHR
-// CHECK-NEXT: %{{[a-zA-Z0-9_]+}} = OpLabel
+// CHECK-NEXT: [[CASE0]] = OpLabel
+// CHECK: [[DEFAULT]] = OpLabel
+// CHECK: OpPhi %float %float_3 [[DEFAULT]] %float_1 [[CASE0]]

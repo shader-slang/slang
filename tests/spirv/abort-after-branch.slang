@@ -2,11 +2,9 @@
 
 // OpAbortKHR is a block terminator. When abort() is called on one arm of a
 // branch, the SPIRV legalization pass must strip the abort block's original
-// IR branch (replacing it with `unreachable`), so the merge block's phis no
-// longer name the abort block as a predecessor — otherwise the emitted SPIRV
-// would contain an OpPhi whose parent never branches to it. This test pins
+// IR branch (replacing it with `unreachable`). This branch-specific test pins
 // that the abort block ends at OpAbortKHR, immediately followed by the next
-// block's label.
+// block's label; abort-after-switch.slang pins the phi-predecessor case.
 
 RWStructuredBuffer<float> outBuf;
 

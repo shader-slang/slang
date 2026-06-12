@@ -1049,7 +1049,7 @@ alias GL_EXT_debug_printf = _GL_EXT_debug_printf | SPV_KHR_non_semantic_info;
 /// Represents the GL_EXT_shader_abort extension (VK_KHR_shader_abort).
 /// [EXT]
 def _GL_EXT_shader_abort : glsl;
-/// Represents the GL_EXT_shader_abort extension for GLSL targets, and the
+/// Represents the GL_EXT_shader_abort extension for GLSL targets, or the
 /// corresponding SPV_KHR_shader_abort extension for SPIR-V targets.
 /// [EXT]
 alias GL_EXT_shader_abort = _GL_EXT_shader_abort | SPV_KHR_shader_abort;

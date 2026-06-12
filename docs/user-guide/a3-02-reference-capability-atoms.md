@@ -475,7 +475,7 @@ Extensions
 > Represents the GL_EXT_samplerless_texture_functions extension.
 
 `GL_EXT_shader_abort`
-> Represents the GL_EXT_shader_abort extension for GLSL targets, and the
+> Represents the GL_EXT_shader_abort extension for GLSL targets, or the
 > corresponding SPV_KHR_shader_abort extension for SPIR-V targets.
 
 `GL_EXT_shader_atomic_float`

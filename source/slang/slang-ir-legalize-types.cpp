@@ -846,6 +846,17 @@ static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<Leg
         legalArgs.getArrayView().getBuffer()));
 }
 
+/// Diagnose an abort payload value that cannot be represented as scalar/vector message data.
+static void diagnoseUnsupportedAbortArgumentType(
+    IRTypeLegalizationContext* context,
+    IRInst* abortInst,
+    IRType* argType)
+{
+    context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
+        .type = argType,
+        .location = abortInst->sourceLoc});
+}
+
 /// Validate abort payload argument types after variadic-pack and pair legalization.
 /// Scalar values and vectors with basic element types are accepted because they
 /// have printf-style format specifiers. Composite, pointer, resource, and other
@@ -882,9 +893,7 @@ static bool validateAbortArgumentTypes(
         if (as<IRBasicType>(elementType))
             continue;
 
-        context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
-            .type = argType,
-            .location = abortInst->sourceLoc});
+        diagnoseUnsupportedAbortArgumentType(context, abortInst, argType);
         return false;
     }
     return true;
@@ -900,8 +909,9 @@ static LegalVal legalizeAbort(
     ArrayView<LegalVal> args)
 {
     ShortList<IRInst*> legalArgs;
-    for (auto arg : args)
+    for (Index i = 0; i < args.getCount(); i++)
     {
+        auto arg = args[i];
         switch (arg.flavor)
         {
         case LegalVal::Flavor::none:
@@ -910,10 +920,25 @@ static LegalVal legalizeAbort(
             legalArgs.add(arg.getSimple());
             break;
         case LegalVal::Flavor::pair:
-            legalArgs.add(arg.getPair()->ordinaryVal.getSimple());
+            {
+                auto ordinaryVal = arg.getPair()->ordinaryVal;
+                if (ordinaryVal.flavor != LegalVal::Flavor::simple)
+                {
+                    diagnoseUnsupportedAbortArgumentType(
+                        context,
+                        originalInst,
+                        originalInst->getOperand(i)->getDataType());
+                    return LegalVal::simple(context->builder->getVoidValue());
+                }
+                legalArgs.add(ordinaryVal.getSimple());
+            }
             break;
         default:
-            SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor for abort operand");
+            diagnoseUnsupportedAbortArgumentType(
+                context,
+                originalInst,
+                originalInst->getOperand(i)->getDataType());
+            return LegalVal::simple(context->builder->getVoidValue());
         }
     }
     if (!validateAbortArgumentTypes(context, originalInst, legalArgs.getArrayView().arrayView))
