@@ -299,8 +299,9 @@ def main():
     this_run = records  # workloads run this invocation (for the summary/exit)
     merged = {}
     if os.path.exists(jpath):
-        for r in json.load(open(jpath)):
-            merged[(r["workload"], r["size"])] = r
+        with open(jpath) as fh:
+            for r in json.load(fh):
+                merged[(r["workload"], r["size"])] = r
     for r in records:
         merged[(r["workload"], r["size"])] = r
     records = list(merged.values())
