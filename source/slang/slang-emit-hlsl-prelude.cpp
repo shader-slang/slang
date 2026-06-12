@@ -528,14 +528,12 @@ void HLSLSourceEmitter::emitWorkGraphRecordType(IRType* type)
 
 void HLSLSourceEmitter::emitNamedMemoryTypeFlagSet(uint32_t flagVal)
 {
+    SLANG_RELEASE_ASSERT(isValidBarrierMemoryTypeFlags(flagVal));
+
     m_writer->emit("(");
     if (flagVal == BarrierMemoryTypeFlags::AllMemory)
     {
         m_writer->emit("ALL_MEMORY");
-    }
-    else if (flagVal & ~getKnownBarrierMemoryTypeFlags())
-    {
-        m_writer->emit("0");
     }
     else
     {
@@ -563,14 +561,12 @@ void HLSLSourceEmitter::emitNamedMemoryTypeFlagSet(uint32_t flagVal)
 
 void HLSLSourceEmitter::emitNamedSemanticFlagSet(uint32_t flagVal)
 {
+    SLANG_RELEASE_ASSERT(isValidBarrierSemanticFlags(flagVal));
+
     m_writer->emit("(");
     if (flagVal == BarrierSemanticFlags::Reorder)
     {
         m_writer->emit("REORDER");
-    }
-    else if (flagVal & ~getKnownBarrierSemanticFlags())
-    {
-        m_writer->emit("0");
     }
     else
     {
