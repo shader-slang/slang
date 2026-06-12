@@ -2973,6 +2973,18 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
     {
     }
 
+    // Decide whether a *top-level* buffer element type needs lowering at all.
+    // For a top-level vector the deciding question is whether the native MSL
+    // buffer stride differs from the natural stride, which is the case
+    // exactly for non-power-of-two element counts: `float3` has a 16-byte
+    // native stride vs. 12 bytes natural, while `float2`/`float4` strides
+    // already coincide with natural layout, so such buffers are byte-for-byte
+    // identical without lowering and keeping the native vector type avoids
+    // pointless pack/unpack conversions. This is intentionally a different
+    // question from `needsScalarVectorStorage`, which governs vectors nested
+    // inside lowered composites where natural *offsets* also matter. (Vector
+    // fields are not gated here: a struct element is in the base class's
+    // lowerable set, and its fields are handled by `lowerLeafLogicalType`.)
     bool needsElementLowering(IRType* elementType) override
     {
         if (auto vectorType = as<IRVectorType>(elementType))
@@ -3007,6 +3019,13 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
         }
     }
 
+    // Decide whether a vector encountered as a *leaf* while lowering a
+    // composite (e.g. a struct field) must use packed-vector storage. Unlike
+    // the top-level check in `needsElementLowering`, this applies to
+    // power-of-two vectors too: natural layout gives a vector only its
+    // element's alignment, so a field like `float4 v` in
+    // `struct Wrapped { float scale; float4 v; }` sits at natural offset 4,
+    // which the native (16-byte-aligned) MSL vector type cannot express.
     static bool needsScalarVectorStorage(IRVectorType* vectorType)
     {
         // `bool` vectors keep their native MSL emission, consistent with how
