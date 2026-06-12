@@ -14101,8 +14101,8 @@ void printf<each T>(NativeString format, expand each T args);
 /// @remarks The function maps to `abortEXT` for GLSL targets and emits `OpAbortKHR` for SPIR-V
 /// targets. When executed, shader execution terminates and the message is surfaced to the host
 /// through the retrieval mechanism defined by the VK_KHR_shader_abort extension (for example,
-/// the Vulkan device fault mechanism). Struct, matrix, array, pointer, and resource arguments are
-/// rejected with diagnostic E55211.
+/// the Vulkan device fault mechanism). Struct, matrix, array, pointer, resource, cooperative
+/// vector, and cooperative matrix arguments are rejected with diagnostic E55211.
 /// @example
 /// ```cpp
 /// void test(uint val)

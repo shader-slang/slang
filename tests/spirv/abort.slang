@@ -19,6 +19,7 @@
 //   bytes; bool3 widens to uint3 (12 bytes) at offset 24, float3 at offset 36
 // - repeated one-word no-arg payloads reuse the same message struct type
 // - a four-character format string needs a second word for the null terminator
+// - mixed-width half/double payloads check natural alignment after the format words
 // - field type order is part of the payload signature cache key
 // - packed format words are emitted little-endian and include the null terminator
 
@@ -38,6 +39,10 @@
 // CHECK_SPIRV: OpMemberDecorate %AbortMessage_3 1 Offset 24
 // CHECK_SPIRV: OpMemberDecorate %AbortMessage_3 2 Offset 36
 // CHECK_SPIRV: OpMemberDecorate %AbortMessage_4 0 Offset 0
+// CHECK_SPIRV: OpMemberDecorate %AbortMessage_7 1 Offset 12
+// CHECK_SPIRV: OpMemberDecorate %AbortMessage_7 2 Offset 16
+// CHECK_SPIRV: OpMemberDecorate %AbortMessage_8 1 Offset 12
+// CHECK_SPIRV: OpMemberDecorate %AbortMessage_8 2 Offset 16
 
 // CHECK_SPIRV: %AbortMessage = OpTypeStruct %_arr_uint_int_7 %uint
 // CHECK_SPIRV: %AbortMessage_0 = OpTypeStruct %_arr_uint_int_1
@@ -48,6 +53,8 @@
 // CHECK_SPIRV: %AbortMessage_4 = OpTypeStruct %_arr_uint_int_2
 // CHECK_SPIRV: %AbortMessage_5 = OpTypeStruct %_arr_uint_int_3 %uint %float
 // CHECK_SPIRV: %AbortMessage_6 = OpTypeStruct %_arr_uint_int_3 %float %uint
+// CHECK_SPIRV: %AbortMessage_7 = OpTypeStruct %_arr_uint_int_3 %half %double
+// CHECK_SPIRV: %AbortMessage_8 = OpTypeStruct %_arr_uint_int_3 %v2half %v2double
 
 // CHECK_SPIRV: OpAbortKHR %AbortMessage %
 // CHECK_SPIRV: OpAbortKHR %AbortMessage_0 %
@@ -58,6 +65,8 @@
 // CHECK_SPIRV: OpAbortKHR %AbortMessage_4 %
 // CHECK_SPIRV: OpAbortKHR %AbortMessage_5 %
 // CHECK_SPIRV: OpAbortKHR %AbortMessage_6 %
+// CHECK_SPIRV: OpAbortKHR %AbortMessage_7 %
+// CHECK_SPIRV: OpAbortKHR %AbortMessage_8 %
 
 // CHECK_GLSL: #extension GL_EXT_shader_abort
 // CHECK_GLSL: abortEXT("thread id out of range: %u", {{.*}})
@@ -69,6 +78,8 @@
 // CHECK_GLSL: abortEXT("xyzw")
 // CHECK_GLSL: abortEXT("a=%u b=%f", {{.*}}, {{.*}})
 // CHECK_GLSL: abortEXT("a=%f b=%u", {{.*}}, {{.*}})
+// CHECK_GLSL: abortEXT("h=%f d=%f", {{.*}}, {{.*}})
+// CHECK_GLSL: abortEXT("h2=%f d2=%f", {{.*}}, {{.*}})
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
@@ -110,5 +121,13 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     {
         float fy = float(dispatchThreadID.y);
         abort("a=%f b=%u", fy, dispatchThreadID.x);
+    }
+    if (dispatchThreadID.x == 7)
+    {
+        abort("h=%f d=%f", half(1.5f), double(2.5));
+    }
+    if (dispatchThreadID.y == 7)
+    {
+        abort("h2=%f d2=%f", half2(1.0h, 2.0h), double2(3.0, 4.0));
     }
 }

@@ -2753,17 +2753,14 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_glslExtensionTracker->requireExtension(toSlice("GL_EXT_debug_printf"));
             m_writer->emit("debugPrintfEXT(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            if (inst->getOperandCount() == 2)
+            if (inst->getOperandCount() > 1)
             {
-                auto operand = inst->getOperand(1);
-                if (auto makeStruct = as<IRMakeStruct>(operand))
+                List<IRInst*> args;
+                collectFlattenedVariadicOperands(inst, 1, args);
+                for (auto arg : args)
                 {
-                    // Flatten the tuple resulting from the variadic pack.
-                    for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
-                    {
-                        m_writer->emit(", ");
-                        emitOperand(makeStruct->getOperand(bb), getInfo(EmitOp::General));
-                    }
+                    m_writer->emit(", ");
+                    emitOperand(arg, getInfo(EmitOp::General));
                 }
             }
             m_writer->emit(")");
@@ -2783,24 +2780,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_glslExtensionTracker->requireExtension(toSlice("GL_EXT_shader_abort"));
 
             List<IRInst*> args;
-            if (inst->getOperandCount() == 2)
-            {
-                auto operand = inst->getOperand(1);
-                if (auto makeStruct = as<IRMakeStruct>(operand))
-                {
-                    for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
-                        args.add(makeStruct->getOperand(i));
-                }
-                else
-                {
-                    args.add(operand);
-                }
-            }
-            else
-            {
-                for (UInt i = 1; i < inst->getOperandCount(); i++)
-                    args.add(inst->getOperand(i));
-            }
+            collectFlattenedVariadicOperands(inst, 1, args);
 
             m_writer->emit("abortEXT(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));

@@ -878,24 +878,7 @@ static bool validateAbortArgumentTypes(
     ArrayView<IRInst*> args)
 {
     ShortList<IRInst*> payloadArgs;
-    if (args.getCount() == 2)
-    {
-        auto operand = args[1];
-        if (auto makeStruct = as<IRMakeStruct>(operand))
-        {
-            for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
-                payloadArgs.add(makeStruct->getOperand(i));
-        }
-        else
-        {
-            payloadArgs.add(operand);
-        }
-    }
-    else
-    {
-        for (Index i = 1; i < args.getCount(); i++)
-            payloadArgs.add(args[i]);
-    }
+    collectFlattenedVariadicOperands(args, 1, payloadArgs);
 
     for (auto arg : payloadArgs)
     {

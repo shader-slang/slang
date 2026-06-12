@@ -2117,32 +2117,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // Flatten the variadic arguments.
         List<IRInst*> args;
-        if (inst->getOperandCount() == 2)
-        {
-            auto operand = inst->getOperand(1);
-            if (auto makeStruct = as<IRMakeStruct>(operand))
-            {
-                for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
-                    args.add(makeStruct->getOperand(i));
-            }
-            else
-            {
-                args.add(operand);
-            }
-        }
-        else
-        {
-            for (UInt i = 1; i < inst->getOperandCount(); i++)
-                args.add(inst->getOperand(i));
-        }
+        collectFlattenedVariadicOperands(inst, 1, args);
 
         // The message struct uses explicit layout, and `OpTypeBool` has no
         // physical size in SPIRV, so widen bool arguments (scalar or vector)
-        // to uint before they are added to the physical message payload. Any
-        // other non-scalar, non-vector argument (struct, array, resource, ...)
-        // has no printf-style format specifier and cannot be given a correct
-        // explicit layout here, so diagnose it instead of emitting an
-        // invalidly laid out payload.
+        // to uint before they are added to the physical message payload.
+        // `legalizeAbort` has already diagnosed unsupported payload shapes;
+        // the release assert below defends that explicit-layout invariant.
         for (auto& arg : args)
         {
             auto argType = arg->getDataType();

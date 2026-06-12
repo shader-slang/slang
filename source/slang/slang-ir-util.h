@@ -131,6 +131,57 @@ bool isComInterfaceType(IRType* type);
 // If `type` is a vector, returns its element type. Otherwise, return `type`.
 IRType* getVectorElementType(IRType* type);
 
+/// Collects variadic operands, unwrapping the single `MakeStruct` form when present.
+template<typename TList>
+void collectFlattenedVariadicOperands(IRInst* inst, UInt firstOperandIndex, TList& outOperands)
+{
+    auto operandCount = inst->getOperandCount();
+    if (operandCount == firstOperandIndex + 1)
+    {
+        auto operand = inst->getOperand(firstOperandIndex);
+        if (auto makeStruct = as<IRMakeStruct>(operand))
+        {
+            for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
+                outOperands.add(makeStruct->getOperand(i));
+        }
+        else
+        {
+            outOperands.add(operand);
+        }
+        return;
+    }
+
+    for (UInt i = firstOperandIndex; i < operandCount; i++)
+        outOperands.add(inst->getOperand(i));
+}
+
+/// Collects variadic operands from an operand view, unwrapping a single `MakeStruct` when present.
+template<typename TList>
+void collectFlattenedVariadicOperands(
+    ArrayView<IRInst*> operands,
+    Index firstOperandIndex,
+    TList& outOperands)
+{
+    auto operandCount = operands.getCount();
+    if (operandCount == firstOperandIndex + 1)
+    {
+        auto operand = operands[firstOperandIndex];
+        if (auto makeStruct = as<IRMakeStruct>(operand))
+        {
+            for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
+                outOperands.add(makeStruct->getOperand(i));
+        }
+        else
+        {
+            outOperands.add(operand);
+        }
+        return;
+    }
+
+    for (Index i = firstOperandIndex; i < operandCount; i++)
+        outOperands.add(operands[i]);
+}
+
 // If `type` is a vector or a coop matrix, returns its element type. Otherwise, return `type`.
 IRType* getVectorOrCoopMatrixElementType(IRType* type);
 
