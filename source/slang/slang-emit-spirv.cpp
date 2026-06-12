@@ -4935,7 +4935,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto loadDesc = as<IRSPIRVLoadTexelPointerFromHeap>(inst);
                 auto resourceType = loadDesc->getTextureType();
-                auto resourceArrayType = getDescriptorRuntimeArrayType(ensureInst(resourceType));
+                auto descriptorElementType = ensureInst(resourceType);
+                auto resourceArrayType = getDescriptorRuntimeArrayType(
+                    descriptorElementType,
+                    getDescriptorHeapArrayStride(descriptorElementType));
                 auto imagePtr = emitInst(
                     parent,
                     nullptr,
@@ -6877,9 +6880,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
+    struct DescriptorRuntimeArrayKey
+    {
+        SpvInst* descriptorElementType = nullptr;
+        int arrayStride = 0;
+
+        bool operator==(const DescriptorRuntimeArrayKey& other) const
+        {
+            return descriptorElementType == other.descriptorElementType &&
+                   arrayStride == other.arrayStride;
+        }
+
+        HashCode getHashCode() const
+        {
+            return combineHash(
+                Slang::getHashCode(descriptorElementType),
+                Slang::getHashCode(arrayStride));
+        }
+    };
+
     SpvInst* m_descriptorHeapUntypedPointerType = nullptr;
     Dictionary<SpvStorageClass, SpvInst*> m_descriptorHeapBufferDescriptorTypes;
-    Dictionary<SpvInst*, SpvInst*> m_descriptorHeapRuntimeArrayTypes;
+    Dictionary<DescriptorRuntimeArrayKey, SpvInst*> m_descriptorHeapRuntimeArrayTypes;
 
 
     bool isInstUsedInStage(IRInst* inst, Stage s)
@@ -7052,26 +7074,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return type;
     }
 
-    SpvInst* getDescriptorRuntimeArrayType(SpvInst* descriptorElementType, int arrayStride = 0)
+    int getDescriptorHeapArrayStride(SpvInst* descriptorElementType)
+    {
+        if (descriptorElementType->opcode == SpvOpTypeSampler)
+        {
+            return m_targetProgram->getOptionSet().getIntOption(
+                CompilerOptionName::SPIRVSamplerHeapStride);
+        }
+
+        return m_targetProgram->getOptionSet().getIntOption(
+            CompilerOptionName::SPIRVResourceHeapStride);
+    }
+
+    SpvInst* getDescriptorRuntimeArrayType(SpvInst* descriptorElementType, int arrayStride)
     {
         SLANG_RELEASE_ASSERT(
             descriptorElementType->opcode != SpvOpTypeAccelerationStructureKHR &&
             "acceleration structure descriptor heaps must use uint64 elements");
 
-        if (auto found = m_descriptorHeapRuntimeArrayTypes.tryGetValue(descriptorElementType))
+        DescriptorRuntimeArrayKey key;
+        key.descriptorElementType = descriptorElementType;
+        key.arrayStride = arrayStride;
+        if (auto found = m_descriptorHeapRuntimeArrayTypes.tryGetValue(key))
             return *found;
 
         SpvInst* stride = nullptr;
-        if (arrayStride == 0 && descriptorElementType->opcode == SpvOpTypeSampler)
-        {
-            arrayStride = m_targetProgram->getOptionSet().getIntOption(
-                CompilerOptionName::SPIRVSamplerHeapStride);
-        }
-        else if (arrayStride == 0)
-        {
-            arrayStride = m_targetProgram->getOptionSet().getIntOption(
-                CompilerOptionName::SPIRVResourceHeapStride);
-        }
         if (arrayStride == 0)
         {
             IRBuilder builder(m_irModule);
@@ -7081,7 +7108,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
 
         auto runtimeArrayType = emitOpTypeRuntimeArray(nullptr, descriptorElementType);
-        m_descriptorHeapRuntimeArrayTypes[descriptorElementType] = runtimeArrayType;
+        m_descriptorHeapRuntimeArrayTypes[key] = runtimeArrayType;
 
         if (stride)
         {
@@ -7159,7 +7186,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (outIsBufferResource)
             *outIsBufferResource = isBufferResource;
 
-        return getDescriptorRuntimeArrayType(descriptorElementType);
+        auto arrayStride = getDescriptorHeapArrayStride(descriptorElementType);
+        return getDescriptorRuntimeArrayType(descriptorElementType, arrayStride);
     }
 
     SpvInst* emitAccelerationStructureFromDescriptorHeap(

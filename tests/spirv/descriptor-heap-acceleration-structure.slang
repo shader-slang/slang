@@ -2,7 +2,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry computeMain -profile sm_6_6 -capability spvDescriptorHeapEXT -capability spvRayQueryKHR
 //TEST:SIMPLE(filecheck=OVERRIDE): -target spirv-asm -stage compute -entry computeMain -profile sm_6_6 -capability spvDescriptorHeapEXT -capability spvRayQueryKHR -spirv-resource-heap-stride 32
 //TEST:SIMPLE(filecheck=TOO_SMALL): -target spirv-asm -stage compute -entry computeMain -profile sm_6_6 -capability spvDescriptorHeapEXT -capability spvRayQueryKHR -spirv-resource-heap-stride 4
+// TOO_SMALL-NOT: ArrayStride 4
 // TOO_SMALL: error[E57005]: SPIR-V resource heap stride '4' is too small for RaytracingAccelerationStructure descriptor heap entries; expected at least '8' bytes.
+// TOO_SMALL-NOT: ArrayStride 4
 
 struct PushConstants
 {
