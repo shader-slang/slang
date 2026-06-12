@@ -661,11 +661,10 @@ static RefPtr<PrimitiveIDStructInfo> buildPrimitiveIDStructInfo(
         }
         else if (auto nestedStructType = as<IRStructType>(field->getFieldType()))
         {
-            fieldInfo.nestedInfo =
-                buildPrimitiveIDStructInfo(
-                    builder,
-                    nestedStructType,
-                    getStructTypeLayout(fieldInfo.fieldLayout));
+            fieldInfo.nestedInfo = buildPrimitiveIDStructInfo(
+                builder,
+                nestedStructType,
+                getStructTypeLayout(fieldInfo.fieldLayout));
 
             if (fieldInfo.nestedInfo->containsPrimitiveID)
             {
@@ -872,10 +871,8 @@ static IRInst* emitPrimitiveIDStructValue(
     {
         if (fieldInfo.isPrimitiveIDField)
         {
-            auto primitiveIndex = emitRayTracingPrimitiveIndexValue(
-                module,
-                builder,
-                fieldInfo.field->getFieldType());
+            auto primitiveIndex =
+                emitRayTracingPrimitiveIndexValue(module, builder, fieldInfo.field->getFieldType());
             if (!primitiveIndex)
                 return nullptr;
 
@@ -2910,8 +2907,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 if (paramRemoved)
                     return;
 
-                m_firstOrdinaryInst =
-                    m_firstBlock ? m_firstBlock->getFirstOrdinaryInst() : nullptr;
+                m_firstOrdinaryInst = m_firstBlock ? m_firstBlock->getFirstOrdinaryInst() : nullptr;
             }
 
             paramRemoved = false;
@@ -2925,8 +2921,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 if (paramRemoved)
                     return;
 
-                m_firstOrdinaryInst =
-                    m_firstBlock ? m_firstBlock->getFirstOrdinaryInst() : nullptr;
+                m_firstOrdinaryInst = m_firstBlock ? m_firstBlock->getFirstOrdinaryInst() : nullptr;
             }
         }
 
