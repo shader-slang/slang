@@ -23,9 +23,7 @@ interface IDerived : IBase
 
     __subscript(int index)->int
     {
-        get{}
-//diag: ^^^ interface requirement has body
-//diag: ^^^ non-method interface requirement cannot have a body.
+        get;
     }
 
     override int f() {}

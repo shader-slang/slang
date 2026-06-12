@@ -5735,29 +5735,51 @@ static bool parseGLSLGlobalDecl(Parser* parser, ContainerDecl* containerDecl)
     return false;
 }
 
-static bool doesCallableDeclHaveInterfaceDefaultImplBody(CallableDecl* callableDecl)
+enum class InterfaceDefaultImplBodyStatus
+{
+    None,
+    Complete,
+    Partial,
+};
+
+static InterfaceDefaultImplBodyStatus getInterfaceDefaultImplBodyStatus(
+    CallableDecl* callableDecl,
+    AccessorDecl** outFirstAccessorWithBody = nullptr)
 {
     if (auto funcDecl = as<FuncDecl>(callableDecl))
-        return funcDecl->body != nullptr;
+    {
+        return funcDecl->body != nullptr ? InterfaceDefaultImplBodyStatus::Complete
+                                         : InterfaceDefaultImplBodyStatus::None;
+    }
 
     if (auto subscriptDecl = as<SubscriptDecl>(callableDecl))
     {
         // A subscript default implementation is represented by accessor bodies.
-        // Only reparse complete accessor defaults here; mixed forms such as a
-        // default `get` plus required `set` need a more explicit partial-default
-        // representation than the existing whole-callable default stub.
         bool hasAccessorBody = false;
+        bool hasAccessorWithoutBody = false;
         for (auto accessorDecl : subscriptDecl->getDirectMemberDeclsOfType<AccessorDecl>())
         {
-            if (!accessorDecl->body)
-                return false;
+            if (accessorDecl->body)
+            {
+                if (!hasAccessorBody && outFirstAccessorWithBody)
+                    *outFirstAccessorWithBody = accessorDecl;
 
-            hasAccessorBody = true;
+                hasAccessorBody = true;
+            }
+            else
+            {
+                hasAccessorWithoutBody = true;
+            }
         }
-        return hasAccessorBody;
+
+        if (hasAccessorBody && hasAccessorWithoutBody)
+            return InterfaceDefaultImplBodyStatus::Partial;
+
+        return hasAccessorBody ? InterfaceDefaultImplBodyStatus::Complete
+                               : InterfaceDefaultImplBodyStatus::None;
     }
 
-    return false;
+    return InterfaceDefaultImplBodyStatus::None;
 }
 
 static void removeInterfaceDefaultImplBodyFromRequirement(Decl* parsedDecl)
@@ -5769,8 +5791,9 @@ static void removeInterfaceDefaultImplBodyFromRequirement(Decl* parsedDecl)
     }
     else if (auto subscriptDecl = as<SubscriptDecl>(requirementDecl))
     {
-        // The parsed interface member remains the abstract requirement. The
-        // duplicate `InterfaceDefaultImplDecl` owns the accessor bodies.
+        // The parsed interface member remains the abstract requirement. Its accessor
+        // bodies either belong to the duplicate `InterfaceDefaultImplDecl` or have
+        // already been diagnosed as an unsupported partial default implementation.
         for (auto accessorDecl : subscriptDecl->getDirectMemberDeclsOfType<AccessorDecl>())
             accessorDecl->body = nullptr;
     }
@@ -5851,12 +5874,28 @@ static void maybeReparseInterfaceCallableAsExplicitGeneric(
     TokenReader tokenReader)
 {
     auto callableDecl = as<CallableDecl>(maybeGetInner(parsedDecl));
-    if (!callableDecl || !doesCallableDeclHaveInterfaceDefaultImplBody(callableDecl))
+    if (!callableDecl)
+        return;
+
+    AccessorDecl* accessorWithDefaultBody = nullptr;
+    auto defaultImplBodyStatus =
+        getInterfaceDefaultImplBodyStatus(callableDecl, &accessorWithDefaultBody);
+    if (defaultImplBodyStatus == InterfaceDefaultImplBodyStatus::None)
         return;
 
     auto interfaceDecl = as<InterfaceDecl>(containerDecl);
     if (!interfaceDecl)
         return;
+
+    if (defaultImplBodyStatus == InterfaceDefaultImplBodyStatus::Partial)
+    {
+        Decl* diagnosticDecl = accessorWithDefaultBody ? static_cast<Decl*>(accessorWithDefaultBody)
+                                                       : static_cast<Decl*>(callableDecl);
+        parser->sink->diagnose(
+            Diagnostics::PartialInterfaceAccessorDefaultImplementation{.decl = diagnosticDecl});
+        removeInterfaceDefaultImplBodyFromRequirement(parsedDecl);
+        return;
+    }
 
     if (parser->sink->getErrorCount() != 0)
         return;
