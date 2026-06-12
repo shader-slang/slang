@@ -8,7 +8,7 @@ on:
 
 jobs:
   placeholder:
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 5
 
     steps:

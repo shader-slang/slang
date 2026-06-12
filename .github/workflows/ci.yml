@@ -293,7 +293,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: release
-      runs-on: '["windows-latest"]'
+      runs-on: '["windows-2025"]'
 
   check-ci:
     needs:
