@@ -6,6 +6,8 @@
 //TEST:SIMPLE(filecheck=SVPID_DXIL):-target dxil-assembly -entry main_sv_primitiveid_uint -stage closesthit -profile sm_6_5 -DNOMOTION
 //TEST:SIMPLE(filecheck=SVPID_INT_DXIL):-target dxil-assembly -entry main_sv_primitiveid_int -stage closesthit -profile sm_6_5 -DNOMOTION
 //TEST:SIMPLE(filecheck=SVPID_UNUSED_DXIL):-target dxil-assembly -entry main_sv_primitiveid_unused -stage closesthit -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_UNUSED_GLSL):-target glsl -entry main_sv_primitiveid_unused -stage closesthit -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_UNUSED_CUDA):-target cuda -entry main_sv_primitiveid_unused -stage closesthit -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
 // SPIRV-DAG: RayTracingKHR
@@ -79,6 +81,14 @@
 // SVPID_UNUSED_DXIL: define void @{{.*}}main_sv_primitiveid_unused
 // SVPID_UNUSED_DXIL-NOT: dx.op.primitiveIndex.i32
 // SVPID_UNUSED_DXIL: ret void
+
+// SVPID_UNUSED_GLSL: void main()
+// SVPID_UNUSED_GLSL-NOT: gl_PrimitiveID
+// SVPID_UNUSED_GLSL: payload_0.RayHitT_0 = attribs_0.barycentrics_0.x
+
+// SVPID_UNUSED_CUDA: __global__ void __closesthit__main_sv_primitiveid_unused
+// SVPID_UNUSED_CUDA-NOT: optixGetPrimitiveIndex()
+// SVPID_UNUSED_CUDA: optixSetPayload_0
 
 
 [[vk::binding(0)]]

@@ -26,6 +26,12 @@
 //TEST:SIMPLE(filecheck=ADDRESS_CUDA):-target cuda -entry main_chit_inout -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_HLSL):-target hlsl -entry main_chit_struct -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_DXIL):-target dxil-assembly -entry main_chit_struct -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=STRUCT_GLSL):-target glsl -entry main_chit_struct -stage closesthit
+//TEST:SIMPLE(filecheck=STRUCT_CUDA):-target cuda -entry main_chit_struct -stage closesthit
+//TEST:SIMPLE(filecheck=STRUCT_NESTED_HLSL):-target hlsl -entry main_chit_struct_nested -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=STRUCT_NESTED_DXIL):-target dxil-assembly -entry main_chit_struct_nested -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=STRUCT_NESTED_GLSL):-target glsl -entry main_chit_struct_nested -stage closesthit
+//TEST:SIMPLE(filecheck=STRUCT_NESTED_CUDA):-target cuda -entry main_chit_struct_nested -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_HLSL):-target hlsl -entry main_chit_struct_mixed -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_DXIL):-target dxil-assembly -entry main_chit_struct_mixed -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_GLSL):-target glsl -entry main_chit_struct_mixed -stage closesthit
@@ -258,6 +264,49 @@ void main_chit_struct(
 // STRUCT_HLSL: float(int([[PRIMITIVE_ID]]))
 
 // STRUCT_DXIL: call i32 @dx.op.primitiveIndex.i32
+
+// STRUCT_GLSL-NOT: ChitPrimitiveInput
+// STRUCT_GLSL: gl_PrimitiveID
+// STRUCT_GLSL: payload_0.val_0 = float(int({{.*}})) + attribs_0.barycentrics_0.x
+
+// STRUCT_CUDA: __global__ void __closesthit__main_chit_struct
+// STRUCT_CUDA: optixGetPrimitiveIndex()
+// STRUCT_CUDA: float(int({{.*}})) + {{.*}} + {{.*}}
+
+struct ChitPrimitiveInnerInput
+{
+    int pid : SV_PrimitiveID;
+};
+
+struct ChitNestedPrimitiveInput
+{
+    ChitPrimitiveInnerInput inner;
+    float weight;
+};
+
+[shader("closesthit")]
+void main_chit_struct_nested(inout Payload payload, in ChitNestedPrimitiveInput input)
+{
+    payload.val = float(input.inner.pid) + input.weight;
+}
+
+// STRUCT_NESTED_HLSL: struct ChitNestedPrimitiveInput
+// STRUCT_NESTED_HLSL-NOT: inner
+// STRUCT_NESTED_HLSL: float weight
+// STRUCT_NESTED_HLSL: uint [[PRIMITIVE_ID:[A-Za-z_][A-Za-z_0-9]*]] = PrimitiveIndex()
+// STRUCT_NESTED_HLSL: float(int([[PRIMITIVE_ID]])) + {{.*}}.weight
+
+// STRUCT_NESTED_DXIL: call i32 @dx.op.primitiveIndex.i32
+
+// STRUCT_NESTED_GLSL: struct ChitNestedPrimitiveInput
+// STRUCT_NESTED_GLSL-NOT: inner
+// STRUCT_NESTED_GLSL: float weight
+// STRUCT_NESTED_GLSL: gl_PrimitiveID
+// STRUCT_NESTED_GLSL: float(int({{.*}})) + input_0.weight_0
+
+// STRUCT_NESTED_CUDA: __global__ void __closesthit__main_chit_struct_nested
+// STRUCT_NESTED_CUDA: optixGetPrimitiveIndex()
+// STRUCT_NESTED_CUDA: float(int({{.*}})) + {{.*}}
 
 struct ChitMixedPrimitiveInput
 {
