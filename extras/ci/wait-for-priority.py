@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
 """
-Hold a low-priority (bot-authored) CI run until human-authored CI has cleared.
+Yield a low-priority (bot-authored) CI run when human-authored CI is active.
 
 GitHub Actions assigns queued jobs to self-hosted runners roughly FIFO, with no
 native notion of priority. This script is meant to run as the very first job of
-a bot-authored CI run. It blocks (polling the Actions API) until:
+a bot-authored CI run. It checks once whether:
 
   * no human-authored CI run for the same workflow is queued or in progress, and
   * no *older* bot-authored CI run is still queued or in progress.
 
-Once both hold, it exits 0 and the rest of the pipeline proceeds. The effect is:
+If either check fails, it writes `yielded=true` to `$GITHUB_OUTPUT` and exits 0.
+The workflow has a separate marker step that fails only for this intentional
+yield, so a scheduled retry workflow can safely distinguish priority yields from
+script or API failures. The effect is:
 
   * human PRs never wait behind a bot PR's CI (the bot yields the runners), and
   * at most one bot CI consumes the contended runners at a time (older first).
 
-A running bot job is never preempted: this gate only delays bot runs that have
-not yet started consuming runners. If a human PR appears while a bot run is
-already executing, the human simply queues behind it (one job's wait).
-
-To avoid starving the bot forever when humans submit continuously, the gate
-gives up after --max-wait-minutes and proceeds anyway.
+A running bot job is never preempted: this gate only stops bot runs that have
+not yet started consuming the expensive build/test runners.
 
 Usage (in a workflow step):
     python3 extras/ci/wait-for-priority.py --workflow ci.yml
@@ -30,24 +29,27 @@ Requires: gh CLI (authenticated via the workflow token).
 import argparse
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from gh_api import gh_api
+from gh_api import gh_api, gh_api_list
 
 DEFAULT_REPO = "shader-slang/slang"
 DEFAULT_WORKFLOW = "ci.yml"
-DEFAULT_POLL_INITIAL_SECONDS = 15
-DEFAULT_POLL_MAX_SECONDS = 1800
-DEFAULT_MAX_WAIT_MINUTES = 300
 
 DEFAULT_BOT_LOGINS = {
     "nv-slang-bot",
     "nv-slang-bot[bot]",
 }
 
-# Run statuses that mean a run still holds (or is waiting for) runners.
+# Run statuses that mean a run still holds, or is waiting for, runner capacity.
 ACTIVE_STATUSES = {"queued", "in_progress", "waiting", "requested", "pending"}
+
+
+def normalize_bot_logins(extra_logins=None):
+    bot_logins = {login.lower() for login in DEFAULT_BOT_LOGINS}
+    bot_logins.update((login or "").lower() for login in (extra_logins or []))
+    bot_logins.discard("")
+    return bot_logins
 
 
 def is_bot(login, bot_logins):
@@ -68,17 +70,17 @@ def run_actor_login(run):
 
 
 def fetch_active_runs(repo, workflow):
-    """Return active CI runs for the workflow across the relevant statuses."""
+    """Return active CI runs for the workflow across all active statuses."""
     runs = {}
-    for status in ("queued", "in_progress"):
+    for status in sorted(ACTIVE_STATUSES):
         endpoint = (
             f"/repos/{repo}/actions/workflows/{workflow}/runs"
             f"?status={status}&per_page=100"
         )
-        data, err = gh_api(endpoint)
+        items, err = gh_api_list(endpoint, "workflow_runs")
         if err:
             raise RuntimeError(f"Failed to list {status} runs: {err}")
-        for run in (data or {}).get("workflow_runs", []):
+        for run in items or []:
             runs[run["id"]] = run
     return list(runs.values())
 
@@ -119,25 +121,22 @@ def describe(run):
     )
 
 
+def write_output(name, value):
+    output_path = os.environ.get("GITHUB_OUTPUT")
+    if not output_path:
+        return
+    with open(output_path, "a", encoding="utf-8") as output:
+        output.write(f"{name}={value}\n")
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Delay a bot-authored CI run until human CI has cleared."
+        description="Stop a bot-authored CI run when higher-priority CI is active."
     )
     parser.add_argument(
         "--repo", default=os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPO)
     )
     parser.add_argument("--workflow", default=DEFAULT_WORKFLOW)
-    parser.add_argument(
-        "--poll-initial", type=int, default=DEFAULT_POLL_INITIAL_SECONDS,
-        help="Starting poll interval in seconds (doubles each round, capped at --poll-max).",
-    )
-    parser.add_argument(
-        "--poll-max", type=int, default=DEFAULT_POLL_MAX_SECONDS,
-        help="Maximum poll interval in seconds.",
-    )
-    parser.add_argument(
-        "--max-wait-minutes", type=int, default=DEFAULT_MAX_WAIT_MINUTES
-    )
     parser.add_argument(
         "--bot-login",
         action="append",
@@ -147,12 +146,11 @@ def main():
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Report the current decision once and exit without waiting.",
+        help="Report the current decision without writing GITHUB_OUTPUT.",
     )
     args = parser.parse_args()
 
-    bot_logins = {login.lower() for login in DEFAULT_BOT_LOGINS}
-    bot_logins.update(login.lower() for login in args.bot_login)
+    bot_logins = normalize_bot_logins(args.bot_login)
 
     self_run_id = int(os.environ.get("GITHUB_RUN_ID", "0"))
     self_run_number = None
@@ -170,48 +168,25 @@ def main():
         f"on {args.repo} workflow {args.workflow}."
     )
 
-    deadline = time.monotonic() + args.max_wait_minutes * 60
-    interval = args.poll_initial
-    while True:
-        try:
-            runs = fetch_active_runs(args.repo, args.workflow)
-        except RuntimeError as exc:
-            # Be conservative: a transient API failure should not let the bot
-            # jump the queue, but it also should not hang forever.
-            print(f"::warning::{exc}; retrying after {interval}s")
-            if args.dry_run:
-                return 0
-            time.sleep(interval)
-            interval = min(interval * 2, args.poll_max)
-            continue
+    runs = fetch_active_runs(args.repo, args.workflow)
+    human, older_bot = classify_blockers(
+        runs, self_run_id, self_run_number, bot_logins
+    )
 
-        human, older_bot = classify_blockers(
-            runs, self_run_id, self_run_number, bot_logins
-        )
+    yielded = bool(human or older_bot)
+    if not args.dry_run:
+        write_output("yielded", "true" if yielded else "false")
 
-        if not human and not older_bot:
-            print("No higher-priority CI is active. Proceeding.")
-            return 0
+    if not yielded:
+        print("No higher-priority CI is active. Proceeding.")
+        return 0
 
-        for run in human:
-            print(f"Yielding to human/merge CI {describe(run)}")
-        for run in older_bot:
-            print(f"Waiting behind earlier bot CI {describe(run)}")
-
-        if args.dry_run:
-            print("Dry run: would wait.")
-            return 0
-
-        if time.monotonic() >= deadline:
-            print(
-                f"::warning::Waited {args.max_wait_minutes} min; "
-                "proceeding anyway to avoid starvation."
-            )
-            return 0
-
-        print(f"Next check in {interval}s.")
-        time.sleep(interval)
-        interval = min(interval * 2, args.poll_max)
+    for run in human:
+        print(f"Yielding to human/merge CI {describe(run)}")
+    for run in older_bot:
+        print(f"Yielding behind earlier bot CI {describe(run)}")
+    print("Higher-priority CI is active. Marking this bot run for retry.")
+    return 0
 
 
 if __name__ == "__main__":
