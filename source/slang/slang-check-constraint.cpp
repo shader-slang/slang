@@ -978,75 +978,14 @@ Index getGenericParamIndex(Decl* genericParamDecl)
     return -1;
 }
 
-struct VariadicPackCountWitnessKey
+static bool isVariadicPackCountWitness(Val* witness)
 {
-    Val* packArg = nullptr;
-    DeclRef<Decl> packDeclRef;
-    IntVal* expectedCount = nullptr;
-};
-
-static Val* _tryGetSubstitutedPackArgForPackCountConstraint(
-    DeclRef<GenericVariadicPackCountConstraintDecl> const& constraintDeclRef,
-    DeclRef<Decl> const& packDeclRef)
-{
-    auto packDecl = packDeclRef.getDecl();
-    auto genericDecl = packDecl ? as<GenericDecl>(packDecl->parentDecl) : nullptr;
-    if (!genericDecl)
-        return nullptr;
-
-    auto args = tryGetGenericArguments(SubstitutionSet(constraintDeclRef), genericDecl);
-    auto argIndex = getGenericParamIndex(packDecl);
-    if (argIndex >= 0 && argIndex < args.getCount())
-        return args[argIndex];
-    return nullptr;
-}
-
-static bool _tryGetVariadicPackCountWitnessKey(
-    ASTBuilder* astBuilder,
-    Val* witness,
-    VariadicPackCountWitnessKey& outKey)
-{
-    if (auto declaredWitness = as<DeclaredVariadicPackCountWitness>(witness))
-    {
-        auto constraintDeclRef = declaredWitness->getDeclRef();
-        outKey.packDeclRef = _getPackDeclRefForPackCountConstraint(astBuilder, constraintDeclRef);
-        outKey.packArg =
-            _tryGetSubstitutedPackArgForPackCountConstraint(constraintDeclRef, outKey.packDeclRef);
-        outKey.expectedCount = getPackCountConstraintExpectedCount(astBuilder, constraintDeclRef);
-        return outKey.expectedCount && (outKey.packArg || outKey.packDeclRef);
-    }
-
-    if (auto concreteWitness = as<ConcreteVariadicPackCountWitness>(witness))
-    {
-        outKey.packArg = concreteWitness->getPack();
-        outKey.packDeclRef = getDirectGenericPackParamDeclRefFromArg(outKey.packArg);
-        outKey.expectedCount = concreteWitness->getExpectedCount();
-        return outKey.packArg && outKey.expectedCount;
-    }
-
-    return false;
-}
-
-static bool _areVariadicPackCountWitnessKeysEqual(
-    ASTBuilder* astBuilder,
-    VariadicPackCountWitnessKey const& left,
-    VariadicPackCountWitnessKey const& right)
-{
-    // Generic-app decl-ref unification can compare a default declared witness
-    // with a solved concrete witness for the same hidden argument. Treat them
-    // as the same proof only when they describe the same substituted pack and
-    // the same expected count; do not infer or prove new facts here.
-    if (!arePackCountExpectedCountsEqual(astBuilder, left.expectedCount, right.expectedCount))
-        return false;
-
-    if (left.packArg && right.packArg)
-        return areValsEqual(left.packArg, right.packArg);
-
-    auto leftDeclRef =
-        left.packDeclRef ? left.packDeclRef : getDirectGenericPackParamDeclRefFromArg(left.packArg);
-    auto rightDeclRef = right.packDeclRef ? right.packDeclRef
-                                          : getDirectGenericPackParamDeclRefFromArg(right.packArg);
-    return leftDeclRef && rightDeclRef && leftDeclRef.equals(rightDeclRef);
+    // Declared and concrete pack-count witnesses are proof placeholders whose
+    // validity is checked by the generic solver after ordinary arguments have
+    // settled. Unification only needs to recognize the witness class so it can
+    // defer validation, following the same pattern as `TypeCoercionWitness`.
+    return as<DeclaredVariadicPackCountWitness>(witness) ||
+           as<ConcreteVariadicPackCountWitness>(witness);
 }
 
 // Return the outermost generic declaration in a nested generic declaration
@@ -3543,20 +3482,14 @@ bool SemanticsVisitor::TryUnifyVals(
         }
     }
 
-    VariadicPackCountWitnessKey fstPackCountWitnessKey;
-    VariadicPackCountWitnessKey sndPackCountWitnessKey;
-    if (_tryGetVariadicPackCountWitnessKey(m_astBuilder, fst, fstPackCountWitnessKey) &&
-        _tryGetVariadicPackCountWitnessKey(m_astBuilder, snd, sndPackCountWitnessKey))
+    if (isVariadicPackCountWitness(fst) && isVariadicPackCountWitness(snd))
     {
-        // Pack-count witnesses are validation proofs, not sources of new pack
-        // equality constraints. `countof(T) == N` and `countof(U) == N` may both
-        // hold for different packs of the same length, so this branch only
-        // accepts an already-identical proof key and never feeds `T == U` back
-        // into ordinary inference.
-        return _areVariadicPackCountWitnessKeysEqual(
-            m_astBuilder,
-            fstPackCountWitnessKey,
-            sndPackCountWitnessKey);
+        // Pack-count witnesses are validation proofs, like type-coercion
+        // witnesses above. `countof(T) == N` and `countof(U) == N` may both hold
+        // for different packs, and the proof can only be validated after the
+        // generic solver has substituted final ordinary arguments, so unification
+        // neither rejects provisional witnesses nor derives `T == U` here.
+        return true;
     }
 
     // Two subtype witnesses can be unified if they exist (non-null) and
