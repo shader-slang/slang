@@ -1,6 +1,8 @@
 // Scalar/vector fp16 add checks. `NO_FP16_ATOMIC` has no fp16 atomic capability;
 // `VECTOR_F16` has the vector capability, which implies scalar spvAtomicFloat16AddEXT.
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_SCALAR):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16AddEXT -render-features half,atomic-float -output-using-type -xslang -DTEST_RUNTIME_SCALAR
+// The runtime scalar check is disabled because the current Linux T4/NVIDIA 580 CI runner
+// crashes test-server inside libnvidia-glvkspirv for this fp16 ByteAddressBuffer atomic.
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RUNTIME_SCALAR):-vk -compute -entry computeMain -emit-spirv-directly -capability spvAtomicFloat16AddEXT -render-features half,atomic-float -output-using-type -xslang -DTEST_RUNTIME_SCALAR
 //TEST:SIMPLE(filecheck=SCALAR): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16AddEXT
 //DIAGNOSTIC_TEST:SIMPLE(diag=NO_FP16_ATOMIC,non-exhaustive): -target spirv -entry computeMain -stage compute -emit-spirv-directly -restrictive-capability-check -capability spirv_1_5
 //TEST:SIMPLE(filecheck=VECTOR_F16): -target spirv -entry computeMain -stage compute -emit-spirv-directly -capability spvAtomicFloat16VectorNV
