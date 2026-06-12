@@ -5589,6 +5589,10 @@ IRInst* IRBuilder::emitElementExtract(IRInst* base, IRInst* index)
     {
         type = vectorType->getElementType();
     }
+    else if (auto packedVectorType = as<IRMetalPackedVectorType>(base->getDataType()))
+    {
+        type = packedVectorType->getElementType();
+    }
     else if (auto matrixType = as<IRMatrixType>(base->getDataType()))
     {
         type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());

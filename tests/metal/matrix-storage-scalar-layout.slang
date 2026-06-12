@@ -5,13 +5,13 @@
 
 // With `-force-glsl-scalar-layout`, matrices in device buffers use natural
 // (scalar-aligned, tightly packed) layout. MSL `float3` has a 16-byte stride,
-// so matrix storage uses arrays of scalar arrays instead of arrays of native
-// vectors. Without the option, the native vector storage is kept.
+// so matrix storage uses arrays of packed vectors (`packed_float3`: 12-byte
+// stride) instead of arrays of native vectors. Without the option, the native
+// vector storage is kept.
 //
 // The dynamic row index accesses exercise the whole-row load/store paths of
-// `lowerMatrixAddresses`, which with scalar-array storage must convert
-// between the row vector and its `array<float, N>` storage instead of
-// loading/storing the row directly.
+// `lowerMatrixAddresses`, which with packed-vector storage must convert
+// between the row vector and its `packed_float3` storage.
 
 StructuredBuffer<float3x3> mats;
 RWStructuredBuffer<float3x3> outMats;
@@ -40,26 +40,25 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // SCALAR: struct _MatrixStorage_float3x3
 // SCALAR-NOT: array<float3,
-// SCALAR: array<array<float, int(3)>, int(3)> data
+// SCALAR: array<packed_float3, int(3)> data
 // SCALAR-NOT: array<float3,
 
-// The dynamic whole-row store decomposes into per-component stores into the
-// scalar arrays, and the whole-row load reconstructs a `float3` from them —
-// the row vector is never loaded or stored directly.
+// With the (default) column-major layout, the dynamic whole-row store
+// decomposes into per-component stores into the packed columns, and the
+// whole-row load reconstructs a `float3` from them.
 // SCALAR-DAG: = 5.0
 // SCALAR-DAG: = 6.0
 // SCALAR-DAG: = 7.0
 // SCALAR-DAG: float3({{.*}}data
 
-// Same with row-major matrix layout, where the row maps directly onto the
-// inner storage array.
+// With row-major layout the row maps directly onto one packed vector, so the
+// dynamic whole-row store becomes a single packed-vector store and the
+// whole-row load reconstructs a `float3` from the packed row.
 // ROWMAJOR: struct _MatrixStorage_float3x3
 // ROWMAJOR-NOT: array<float3,
-// ROWMAJOR: array<array<float, int(3)>, int(3)> data
+// ROWMAJOR: array<packed_float3, int(3)> data
 // ROWMAJOR-NOT: array<float3,
-// ROWMAJOR-DAG: = 5.0
-// ROWMAJOR-DAG: = 6.0
-// ROWMAJOR-DAG: = 7.0
+// ROWMAJOR-DAG: = packed_float3(5.0, 6.0, 7.0)
 // ROWMAJOR-DAG: float3({{.*}}data
 
 // DEFAULT: struct _MatrixStorage_float3x3

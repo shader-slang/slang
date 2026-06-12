@@ -3,9 +3,10 @@
 
 // With `-force-glsl-scalar-layout`, vectors in device buffers use natural
 // (scalar-aligned, tightly packed) layout. MSL `float3` has a 16-byte stride,
-// so `float3` elements are lowered to scalar arrays. `float2`/`float4` buffer
-// elements already have a stride matching natural layout, so they keep their
-// native MSL vector type.
+// so `float3` elements are lowered to MSL packed vectors (`packed_float3`:
+// 12-byte stride, 4-byte alignment). `float2`/`float4` buffer elements already
+// have a stride matching natural layout, so they keep their native MSL vector
+// type.
 //
 // Without the option, buffers keep the native MSL layout that reflection
 // reports, so no lowering takes place.
@@ -32,22 +33,23 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output[tid.x] = p.x + p.y + p.z + c.w + uv.y + w.scale + w.v.x;
 }
 
-// Struct fields with alignment-sensitive vectors are lowered to scalar arrays.
+// Struct fields with alignment-sensitive vectors are lowered to packed
+// vectors, which have element alignment and no padding.
 // SCALAR: struct Wrapped_natural
 // SCALAR: float scale
-// SCALAR: array<float, int(4)> v
+// SCALAR: packed_float4 v
 
-// SCALAR-NOT: float3 device* positions
-// SCALAR-DAG: array<float, int(3)> device* positions
+// SCALAR-NOT: {{\bfloat3 device\* positions}}
+// SCALAR-DAG: packed_float3 device* positions
 // SCALAR-DAG: float4 device* colors
 // SCALAR-DAG: float2 device* uvs
-// SCALAR-NOT: float3 device* positions
+// SCALAR-NOT: {{\bfloat3 device\* positions}}
 
-// DEFAULT-NOT: array<float,
+// DEFAULT-NOT: packed_
 // DEFAULT: struct Wrapped
 // DEFAULT: float scale
 // DEFAULT: float4 v
 // DEFAULT-DAG: float3 device* positions
 // DEFAULT-DAG: float4 device* colors
 // DEFAULT-DAG: float2 device* uvs
-// DEFAULT-NOT: array<float,
+// DEFAULT-NOT: packed_
