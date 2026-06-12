@@ -4,11 +4,13 @@
 //TEST:SIMPLE(filecheck=TOO_SMALL): -target spirv-asm -stage compute -entry computeMain -profile sm_6_6 -capability spvDescriptorHeapEXT -capability spvRayQueryKHR -spirv-resource-heap-stride 4
 // TOO_SMALL-NOT: ArrayStride 4
 // TOO_SMALL: error[E57005]: SPIR-V resource heap stride '4' is too small for RaytracingAccelerationStructure descriptor heap entries; expected at least '8' bytes.
+// TOO_SMALL-NOT: SPIR-V resource heap stride '4' is too small
 // TOO_SMALL-NOT: ArrayStride 4
 
 struct PushConstants
 {
     DescriptorHandle<RaytracingAccelerationStructure> accelerationStructure;
+    DescriptorHandle<RaytracingAccelerationStructure> secondaryAccelerationStructure;
     DescriptorHandle<RWTexture2D<float4>> outputTexture;
 }
 
@@ -62,6 +64,13 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID, uniform PushConsta
         float3(0.0, 0.0, 1.0),
         t);
 
+    float secondaryT = 0.0;
+    traceRayClosestHit(
+        RaytracingAccelerationStructure(pushConstants.secondaryAccelerationStructure),
+        float3(0.2, 0.2, 0.0),
+        float3(0.0, 0.0, 1.0),
+        secondaryT);
+
     RWTexture2D<float4> outputTexture = pushConstants.outputTexture;
-    outputTexture[dispatchThreadID.xy] = t;
+    outputTexture[dispatchThreadID.xy] = t + secondaryT;
 }

@@ -6902,6 +6902,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     SpvInst* m_descriptorHeapUntypedPointerType = nullptr;
     Dictionary<SpvStorageClass, SpvInst*> m_descriptorHeapBufferDescriptorTypes;
     Dictionary<DescriptorRuntimeArrayKey, SpvInst*> m_descriptorHeapRuntimeArrayTypes;
+    bool m_didDiagnoseAccelerationStructureDescriptorHeapStrideTooSmall = false;
 
 
     bool isInstUsedInStage(IRInst* inst, Stage s)
@@ -7149,10 +7150,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else if (userDefinedStride < kAccelerationStructureDescriptorHeapStride)
         {
-            m_sink->diagnose(Diagnostics::SpirvResourceHeapStrideTooSmall{
-                .stride = userDefinedStride,
-                .minimumStride = kAccelerationStructureDescriptorHeapStride,
-            });
+            if (!m_didDiagnoseAccelerationStructureDescriptorHeapStrideTooSmall)
+            {
+                m_sink->diagnose(Diagnostics::SpirvResourceHeapStrideTooSmall{
+                    .stride = userDefinedStride,
+                    .minimumStride = kAccelerationStructureDescriptorHeapStride,
+                });
+                m_didDiagnoseAccelerationStructureDescriptorHeapStrideTooSmall = true;
+            }
             userDefinedStride = kAccelerationStructureDescriptorHeapStride;
         }
 
