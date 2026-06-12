@@ -67,8 +67,8 @@ static bool diagnoseUnsupportedAbortForBackwardDiff(DiagnosticSink* sink, IRFunc
             if (inst->getOp() != kIROp_Abort)
                 continue;
 
-            sink->diagnose(Diagnostics::AbortNotSupportedInReverseModeAutoDiff{
-                .location = inst->sourceLoc});
+            sink->diagnose(
+                Diagnostics::AbortNotSupportedInReverseModeAutoDiff{.location = inst->sourceLoc});
             foundUnsupportedAbort = true;
         }
     }
