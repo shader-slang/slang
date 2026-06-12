@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Local branch-vs-branch compile-time comparison — the dev-side equivalent of
-the per-PR gate (compile-perf-pr.yml).
+the per-PR gate (CI_PLAN.md Tier 1; the automated workflow is a later phase).
 
 Builds slangc from a baseline ref (default: master) and from your current working
 tree, benchmarks both on THIS machine back-to-back, and runs compare.py — so you
