@@ -552,21 +552,205 @@ static IRType* unwrapParamValueType(IRType* type)
     return type;
 }
 
-static IRStructField* findFieldForKey(List<IRStructField*>& fields, IRInst* fieldKey)
+static IRStructTypeLayout* getStructTypeLayout(IRVarLayout* varLayout)
 {
-    for (auto field : fields)
+    return varLayout ? as<IRStructTypeLayout>(varLayout->getTypeLayout()) : nullptr;
+}
+
+static IRVarLayout* getFieldLayout(IRStructTypeLayout* structTypeLayout, UInt fieldIndex)
+{
+    if (!structTypeLayout)
+        return nullptr;
+
+    return fieldIndex < structTypeLayout->getFieldCount()
+               ? structTypeLayout->getFieldLayout(fieldIndex)
+               : nullptr;
+}
+
+struct PrimitiveIDFieldAccess
+{
+    IRInst* inst;
+    IRStructField* field;
+};
+
+struct PrimitiveIDStructInfo;
+
+struct PrimitiveIDStructFieldInfo
+{
+    IRStructField* field = nullptr;
+    IRVarLayout* fieldLayout = nullptr;
+    RefPtr<PrimitiveIDStructInfo> nestedInfo;
+    bool isPrimitiveIDField = false;
+    bool containsPrimitiveID = false;
+    bool keepField = false;
+    IRType* ordinaryFieldType = nullptr;
+    IRVarLayout* ordinaryFieldLayout = nullptr;
+};
+
+struct PrimitiveIDStructInfo : RefObject
+{
+    IRStructType* structType = nullptr;
+    IRStructTypeLayout* structTypeLayout = nullptr;
+    List<PrimitiveIDStructFieldInfo> fields;
+    bool containsPrimitiveID = false;
+    bool hasOrdinaryFields = false;
+    IRStructType* ordinaryStructType = nullptr;
+    IRStructTypeLayout* ordinaryStructLayout = nullptr;
+};
+
+struct PrimitiveIDStructFieldAccessTypeUpdate
+{
+    IRInst* inst;
+    IRType* valueType;
+};
+
+struct PrimitiveIDWholeStructUse
+{
+    IRUse* use;
+    IRInst* baseInst;
+    PrimitiveIDStructInfo* info;
+};
+
+struct PrimitiveIDWholeStructReplacement
+{
+    IRInst* baseInst;
+    PrimitiveIDStructInfo* info;
+    IRInst* replacement;
+};
+
+static IRVarLayout* cloneVarLayoutWithNewTypeLayout(
+    IRBuilder& builder,
+    IRVarLayout* oldLayout,
+    IRTypeLayout* newTypeLayout)
+{
+    IRVarLayout::Builder varLayoutBuilder(&builder, newTypeLayout);
+    if (oldLayout)
     {
-        if (field->getKey() == fieldKey)
-            return field;
+        varLayoutBuilder.cloneEverythingButOffsetsFrom(oldLayout);
+        for (auto offsetAttr : oldLayout->getOffsetAttrs())
+        {
+            auto resInfo = varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
+            resInfo->offset = offsetAttr->getOffset();
+            resInfo->space = offsetAttr->getSpace();
+        }
+    }
+    return varLayoutBuilder.build();
+}
+
+static RefPtr<PrimitiveIDStructInfo> buildPrimitiveIDStructInfo(
+    IRBuilder& builder,
+    IRStructType* structType,
+    IRStructTypeLayout* structTypeLayout)
+{
+    RefPtr<PrimitiveIDStructInfo> info = new PrimitiveIDStructInfo();
+    info->structType = structType;
+    info->structTypeLayout = structTypeLayout;
+
+    UInt fieldIndex = 0;
+    for (auto field : structType->getFields())
+    {
+        PrimitiveIDStructFieldInfo fieldInfo;
+        fieldInfo.field = field;
+        fieldInfo.fieldLayout = getFieldLayout(structTypeLayout, fieldIndex);
+
+        if (isPrimitiveIDSystemValueStructField(field, fieldInfo.fieldLayout))
+        {
+            fieldInfo.isPrimitiveIDField = true;
+            fieldInfo.containsPrimitiveID = true;
+            info->containsPrimitiveID = true;
+        }
+        else if (auto nestedStructType = as<IRStructType>(field->getFieldType()))
+        {
+            fieldInfo.nestedInfo =
+                buildPrimitiveIDStructInfo(
+                    builder,
+                    nestedStructType,
+                    getStructTypeLayout(fieldInfo.fieldLayout));
+
+            if (fieldInfo.nestedInfo->containsPrimitiveID)
+            {
+                fieldInfo.containsPrimitiveID = true;
+                info->containsPrimitiveID = true;
+
+                if (fieldInfo.nestedInfo->hasOrdinaryFields)
+                {
+                    fieldInfo.keepField = true;
+                    fieldInfo.ordinaryFieldType = fieldInfo.nestedInfo->ordinaryStructType;
+                    fieldInfo.ordinaryFieldLayout = cloneVarLayoutWithNewTypeLayout(
+                        builder,
+                        fieldInfo.fieldLayout,
+                        fieldInfo.nestedInfo->ordinaryStructLayout);
+                    info->hasOrdinaryFields = true;
+                }
+            }
+            else
+            {
+                fieldInfo.keepField = true;
+                fieldInfo.ordinaryFieldType = field->getFieldType();
+                fieldInfo.ordinaryFieldLayout = fieldInfo.fieldLayout;
+                info->hasOrdinaryFields = true;
+            }
+        }
+        else
+        {
+            fieldInfo.keepField = true;
+            fieldInfo.ordinaryFieldType = field->getFieldType();
+            fieldInfo.ordinaryFieldLayout = fieldInfo.fieldLayout;
+            info->hasOrdinaryFields = true;
+        }
+
+        info->fields.add(fieldInfo);
+        fieldIndex++;
+    }
+
+    if (info->containsPrimitiveID && info->hasOrdinaryFields)
+    {
+        info->ordinaryStructType = builder.createStructType();
+        copyNameHintAndDebugDecorations(info->ordinaryStructType, structType);
+
+        IRStructTypeLayout::Builder typeLayoutBuilder(&builder);
+        for (auto fieldInfo : info->fields)
+        {
+            if (!fieldInfo.keepField)
+                continue;
+
+            builder.createStructField(
+                info->ordinaryStructType,
+                fieldInfo.field->getKey(),
+                fieldInfo.ordinaryFieldType);
+
+            if (fieldInfo.ordinaryFieldLayout)
+            {
+                typeLayoutBuilder.addField(
+                    fieldInfo.field->getKey(),
+                    fieldInfo.ordinaryFieldLayout);
+                typeLayoutBuilder.addResourceUsageFrom(
+                    fieldInfo.ordinaryFieldLayout->getTypeLayout());
+            }
+        }
+        info->ordinaryStructLayout = typeLayoutBuilder.build();
+    }
+
+    return info;
+}
+
+static PrimitiveIDStructFieldInfo* findFieldInfoForKey(
+    PrimitiveIDStructInfo* info,
+    IRInst* fieldKey)
+{
+    for (auto& fieldInfo : info->fields)
+    {
+        if (fieldInfo.field->getKey() == fieldKey)
+            return &fieldInfo;
     }
 
     return nullptr;
 }
 
-static IRStructField* findFieldAccess(
+static PrimitiveIDStructFieldInfo* findFieldAccess(
     IRInst* inst,
     IRInst* baseInst,
-    List<IRStructField*>& fields)
+    PrimitiveIDStructInfo* info)
 {
     IRInst* base = nullptr;
     IRInst* fieldKey = nullptr;
@@ -589,142 +773,177 @@ static IRStructField* findFieldAccess(
     if (base != baseInst)
         return nullptr;
 
-    return findFieldForKey(fields, fieldKey);
+    return findFieldInfoForKey(info, fieldKey);
 }
 
-static IRStructTypeLayout* getStructTypeLayout(IRVarLayout* varLayout)
-{
-    return varLayout ? as<IRStructTypeLayout>(varLayout->getTypeLayout()) : nullptr;
-}
-
-static IRVarLayout* getFieldLayout(IRStructTypeLayout* structTypeLayout, UInt fieldIndex)
-{
-    if (!structTypeLayout)
-        return nullptr;
-
-    return fieldIndex < structTypeLayout->getFieldCount()
-               ? structTypeLayout->getFieldLayout(fieldIndex)
-               : nullptr;
-}
-
-static IRVarLayout* findFieldLayout(
-    IRStructType* structType,
-    IRStructTypeLayout* structTypeLayout,
-    IRStructField* targetField)
-{
-    if (!structTypeLayout)
-        return nullptr;
-
-    UInt fieldIndex = 0;
-    for (auto field : structType->getFields())
-    {
-        if (field == targetField)
-            return getFieldLayout(structTypeLayout, fieldIndex);
-        fieldIndex++;
-    }
-
-    return nullptr;
-}
-
-static bool hasOnlyPrimitiveIDSystemValueFields(
-    IRStructType* structType,
-    IRStructTypeLayout* structTypeLayout)
-{
-    bool foundPrimitiveIDField = false;
-    UInt fieldIndex = 0;
-    for (auto field : structType->getFields())
-    {
-        auto fieldLayout = structTypeLayout ? getFieldLayout(structTypeLayout, fieldIndex) : nullptr;
-        if (isPrimitiveIDSystemValueStructField(field, fieldLayout))
-        {
-            foundPrimitiveIDField = true;
-        }
-        else if (auto nestedStructType = as<IRStructType>(field->getFieldType()))
-        {
-            if (!hasOnlyPrimitiveIDSystemValueFields(
-                    nestedStructType,
-                    getStructTypeLayout(fieldLayout)))
-                return false;
-
-            foundPrimitiveIDField = true;
-        }
-        else
-        {
-            return false;
-        }
-        fieldIndex++;
-    }
-
-    return foundPrimitiveIDField;
-}
-
-static bool isPrimitiveIDOnlyStructField(IRStructField* field, IRVarLayout* fieldLayout)
-{
-    auto nestedStructType = as<IRStructType>(field->getFieldType());
-    return nestedStructType &&
-           hasOnlyPrimitiveIDSystemValueFields(nestedStructType, getStructTypeLayout(fieldLayout));
-}
-
-struct PrimitiveIDFieldAccess
-{
-    IRInst* inst;
-    IRStructField* field;
-};
-
-static bool collectPrimitiveIDOnlyStructFieldAccesses(
+static void collectPrimitiveIDStructFieldAccesses(
     IRInst* baseInst,
-    IRStructType* structType,
-    IRStructTypeLayout* structTypeLayout,
+    PrimitiveIDStructInfo* info,
     List<PrimitiveIDFieldAccess>& primitiveIDFieldAccesses,
-    List<IRInst*>& removableStructFieldAccesses)
+    List<IRInst*>& removableStructFieldAccesses,
+    List<PrimitiveIDStructFieldAccessTypeUpdate>& fieldAccessTypeUpdates,
+    List<PrimitiveIDWholeStructUse>& wholeStructUses)
 {
-    List<IRStructField*> primitiveIDFields;
-    List<IRStructField*> primitiveIDOnlyStructFields;
-    UInt fieldIndex = 0;
-    for (auto field : structType->getFields())
-    {
-        auto fieldLayout = structTypeLayout ? getFieldLayout(structTypeLayout, fieldIndex) : nullptr;
-        if (isPrimitiveIDSystemValueStructField(field, fieldLayout))
-        {
-            primitiveIDFields.add(field);
-        }
-        else if (isPrimitiveIDOnlyStructField(field, fieldLayout))
-        {
-            primitiveIDOnlyStructFields.add(field);
-        }
-        fieldIndex++;
-    }
-
-    bool hasUnhandledUse = false;
     traverseUses(
         baseInst,
         [&](IRUse* use)
         {
             auto user = use->getUser();
-            if (auto field = findFieldAccess(user, baseInst, primitiveIDFields))
+            auto fieldInfo = findFieldAccess(user, baseInst, info);
+            if (!fieldInfo)
             {
-                primitiveIDFieldAccesses.add({user, field});
+                wholeStructUses.add({use, baseInst, info});
                 return;
             }
 
-            if (auto field = findFieldAccess(user, baseInst, primitiveIDOnlyStructFields))
+            if (fieldInfo->isPrimitiveIDField)
             {
-                removableStructFieldAccesses.add(user);
-                if (!collectPrimitiveIDOnlyStructFieldAccesses(
-                        user,
-                        as<IRStructType>(field->getFieldType()),
-                        getStructTypeLayout(
-                            findFieldLayout(structType, structTypeLayout, field)),
-                        primitiveIDFieldAccesses,
-                        removableStructFieldAccesses))
-                    hasUnhandledUse = true;
+                primitiveIDFieldAccesses.add({user, fieldInfo->field});
                 return;
             }
 
-            hasUnhandledUse = true;
+            if (fieldInfo->nestedInfo && fieldInfo->nestedInfo->containsPrimitiveID)
+            {
+                if (fieldInfo->nestedInfo->hasOrdinaryFields)
+                {
+                    fieldAccessTypeUpdates.add({user, fieldInfo->ordinaryFieldType});
+                }
+                else
+                {
+                    removableStructFieldAccesses.add(user);
+                }
+
+                collectPrimitiveIDStructFieldAccesses(
+                    user,
+                    fieldInfo->nestedInfo,
+                    primitiveIDFieldAccesses,
+                    removableStructFieldAccesses,
+                    fieldAccessTypeUpdates,
+                    wholeStructUses);
+            }
         });
+}
 
-    return !hasUnhandledUse;
+static IRType* replaceParamValueType(IRBuilder& builder, IRType* paramType, IRType* valueType);
+
+static bool isAddressLikeParamType(IRType* type)
+{
+    return as<IRBorrowInParamType>(type) || as<IRPtrTypeBase>(type);
+}
+
+static IRInst* emitStructFieldValue(IRBuilder& builder, IRInst* baseInst, IRStructField* field)
+{
+    auto baseType = baseInst->getFullType();
+    auto fieldType = field->getFieldType();
+    if (isAddressLikeParamType(baseType))
+    {
+        auto fieldAddressType = replaceParamValueType(builder, baseType, fieldType);
+        auto fieldAddress = builder.emitFieldAddress(fieldAddressType, baseInst, field->getKey());
+        return builder.emitLoad(fieldAddress);
+    }
+
+    return builder.emitFieldExtract(fieldType, baseInst, field->getKey());
+}
+
+static IRInst* emitStructFieldAccess(
+    IRBuilder& builder,
+    IRInst* baseInst,
+    IRStructField* field,
+    IRType* fieldType)
+{
+    auto baseType = baseInst->getFullType();
+    if (isAddressLikeParamType(baseType))
+    {
+        auto fieldAddressType = replaceParamValueType(builder, baseType, fieldType);
+        return builder.emitFieldAddress(fieldAddressType, baseInst, field->getKey());
+    }
+
+    return builder.emitFieldExtract(fieldType, baseInst, field->getKey());
+}
+
+static IRInst* emitPrimitiveIDStructValue(
+    IRModule* module,
+    IRBuilder& builder,
+    IRInst* baseInst,
+    PrimitiveIDStructInfo* info)
+{
+    List<IRInst*> fieldValues;
+    for (auto& fieldInfo : info->fields)
+    {
+        if (fieldInfo.isPrimitiveIDField)
+        {
+            auto primitiveIndex = emitRayTracingPrimitiveIndexValue(
+                module,
+                builder,
+                fieldInfo.field->getFieldType());
+            if (!primitiveIndex)
+                return nullptr;
+
+            fieldValues.add(primitiveIndex);
+            continue;
+        }
+
+        if (fieldInfo.nestedInfo && fieldInfo.nestedInfo->containsPrimitiveID)
+        {
+            IRInst* nestedBase = nullptr;
+            if (fieldInfo.nestedInfo->hasOrdinaryFields)
+            {
+                SLANG_ASSERT(baseInst);
+                nestedBase = emitStructFieldAccess(
+                    builder,
+                    baseInst,
+                    fieldInfo.field,
+                    fieldInfo.ordinaryFieldType);
+            }
+
+            auto nestedValue =
+                emitPrimitiveIDStructValue(module, builder, nestedBase, fieldInfo.nestedInfo);
+            if (!nestedValue)
+                return nullptr;
+
+            fieldValues.add(nestedValue);
+            continue;
+        }
+
+        SLANG_ASSERT(baseInst);
+        fieldValues.add(emitStructFieldValue(builder, baseInst, fieldInfo.field));
+    }
+
+    return builder.emitMakeStruct(info->structType, fieldValues);
+}
+
+static IRInst* getWholeStructReplacement(
+    IRModule* module,
+    IRBuilder& builder,
+    IRInst* baseInst,
+    PrimitiveIDStructInfo* info,
+    List<PrimitiveIDWholeStructReplacement>& replacements)
+{
+    for (auto replacement : replacements)
+    {
+        if (replacement.baseInst == baseInst && replacement.info == info)
+            return replacement.replacement;
+    }
+
+    auto structValue = emitPrimitiveIDStructValue(module, builder, baseInst, info);
+    if (!structValue)
+        return nullptr;
+
+    IRInst* replacement = nullptr;
+    if (isAddressLikeParamType(baseInst->getFullType()))
+    {
+        auto tempVar = builder.emitVar(info->structType);
+        builder.addSimpleDecoration<IRTempCallArgVarDecoration>(tempVar);
+        builder.emitStore(tempVar, structValue);
+        replacement = tempVar;
+    }
+    else
+    {
+        replacement = structValue;
+    }
+
+    replacements.add({baseInst, info, replacement});
+    return replacement;
 }
 
 static IRType* replaceParamValueType(IRBuilder& builder, IRType* paramType, IRType* valueType)
@@ -813,134 +1032,73 @@ bool tryLegalizeRayTracingPrimitiveIDStructParam(
     if (!structTypeLayout)
         return false;
 
-    List<IRStructField*> primitiveIDFields;
-    List<IRStructField*> primitiveIDOnlyStructFields;
-    List<IRStructField*> ordinaryFields;
-    List<IRVarLayout*> ordinaryFieldLayouts;
-    UInt fieldIndex = 0;
-    for (auto field : structType->getFields())
-    {
-        auto fieldLayout = getFieldLayout(structTypeLayout, fieldIndex);
-        if (isPrimitiveIDSystemValueStructField(field, fieldLayout))
-        {
-            primitiveIDFields.add(field);
-        }
-        else if (isPrimitiveIDOnlyStructField(field, fieldLayout))
-        {
-            primitiveIDOnlyStructFields.add(field);
-        }
-        else
-        {
-            ordinaryFields.add(field);
-            ordinaryFieldLayouts.add(fieldLayout);
-        }
-        fieldIndex++;
-    }
-
-    if (primitiveIDFields.getCount() == 0 && primitiveIDOnlyStructFields.getCount() == 0)
+    auto info = buildPrimitiveIDStructInfo(builder, structType, structTypeLayout);
+    if (!info->containsPrimitiveID)
         return false;
 
     List<PrimitiveIDFieldAccess> primitiveIDFieldAccesses;
     List<IRInst*> removableStructFieldAccesses;
-    List<IRUse*> wholeParamUses;
-    bool hasUnhandledNestedPrimitiveIDUse = false;
+    List<PrimitiveIDStructFieldAccessTypeUpdate> fieldAccessTypeUpdates;
+    List<PrimitiveIDWholeStructUse> wholeStructUses;
     traverseUses(
         param,
         [&](IRUse* use)
         {
             auto user = use->getUser();
-            if (auto field = findFieldAccess(user, param, primitiveIDFields))
+            auto fieldInfo = findFieldAccess(user, param, info);
+            if (!fieldInfo)
             {
-                primitiveIDFieldAccesses.add({user, field});
+                wholeStructUses.add({use, param, info});
                 return;
             }
 
-            if (auto field = findFieldAccess(user, param, primitiveIDOnlyStructFields))
+            if (fieldInfo->isPrimitiveIDField)
             {
-                removableStructFieldAccesses.add(user);
-                if (!collectPrimitiveIDOnlyStructFieldAccesses(
-                        user,
-                        as<IRStructType>(field->getFieldType()),
-                        getStructTypeLayout(findFieldLayout(structType, structTypeLayout, field)),
-                        primitiveIDFieldAccesses,
-                        removableStructFieldAccesses))
-                    hasUnhandledNestedPrimitiveIDUse = true;
+                primitiveIDFieldAccesses.add({user, fieldInfo->field});
                 return;
             }
 
-            if (findFieldAccess(user, param, ordinaryFields))
-                return;
+            if (fieldInfo->nestedInfo && fieldInfo->nestedInfo->containsPrimitiveID)
+            {
+                if (fieldInfo->nestedInfo->hasOrdinaryFields)
+                {
+                    fieldAccessTypeUpdates.add({user, fieldInfo->ordinaryFieldType});
+                }
+                else
+                {
+                    removableStructFieldAccesses.add(user);
+                }
 
-            wholeParamUses.add(use);
+                collectPrimitiveIDStructFieldAccesses(
+                    user,
+                    fieldInfo->nestedInfo,
+                    primitiveIDFieldAccesses,
+                    removableStructFieldAccesses,
+                    fieldAccessTypeUpdates,
+                    wholeStructUses);
+                return;
+            }
         });
 
-    if (hasUnhandledNestedPrimitiveIDUse)
-        return false;
-
-    // Rebuilding a whole struct with nested PrimitiveID-only fields would need a recursive
-    // constructor. Keep this pass focused on direct nested field accesses.
-    if (wholeParamUses.getCount() != 0 && primitiveIDOnlyStructFields.getCount() != 0)
-        return false;
-
-    IRInst* wholeParamReplacement = nullptr;
-    auto getWholeParamReplacement = [&]() -> IRInst*
+    List<PrimitiveIDWholeStructReplacement> wholeStructReplacements;
+    for (auto wholeStructUse : wholeStructUses)
     {
-        if (wholeParamReplacement)
-            return wholeParamReplacement;
-
-        List<IRInst*> fieldValues;
-        for (auto field : structType->getFields())
-        {
-            if (findFieldForKey(primitiveIDFields, field->getKey()))
-            {
-                auto primitiveIndex =
-                    emitRayTracingPrimitiveIndexValue(module, builder, field->getFieldType());
-                if (!primitiveIndex)
-                    return nullptr;
-                fieldValues.add(primitiveIndex);
-                continue;
-            }
-
-            IRInst* fieldValue = nullptr;
-            auto paramType = param->getFullType();
-            if (as<IRBorrowInParamType>(paramType) || as<IRPtrTypeBase>(paramType))
-            {
-                auto fieldAddressType =
-                    replaceParamValueType(builder, paramType, field->getFieldType());
-                auto fieldAddress =
-                    builder.emitFieldAddress(fieldAddressType, param, field->getKey());
-                fieldValue = builder.emitLoad(fieldAddress);
-            }
-            else
-            {
-                fieldValue = builder.emitFieldExtract(field->getFieldType(), param, field->getKey());
-            }
-            fieldValues.add(fieldValue);
-        }
-
-        auto structValue = builder.emitMakeStruct(structType, fieldValues);
-        auto paramType = param->getFullType();
-        if (as<IRBorrowInParamType>(paramType) || as<IRPtrTypeBase>(paramType))
-        {
-            auto tempVar = builder.emitVar(structType);
-            builder.addSimpleDecoration<IRTempCallArgVarDecoration>(tempVar);
-            builder.emitStore(tempVar, structValue);
-            wholeParamReplacement = tempVar;
-        }
-        else
-        {
-            wholeParamReplacement = structValue;
-        }
-        return wholeParamReplacement;
-    };
-
-    for (auto use : wholeParamUses)
-    {
-        auto replacement = getWholeParamReplacement();
+        auto replacement = getWholeStructReplacement(
+            module,
+            builder,
+            wholeStructUse.baseInst,
+            wholeStructUse.info,
+            wholeStructReplacements);
         if (!replacement)
             return false;
 
-        builder.replaceOperand(use, replacement);
+        builder.replaceOperand(wholeStructUse.use, replacement);
+    }
+
+    for (auto update : fieldAccessTypeUpdates)
+    {
+        update.inst->setFullType(
+            replaceParamValueType(builder, update.inst->getFullType(), update.valueType));
     }
 
     List<IRStructField*> replacementFields;
@@ -988,43 +1146,13 @@ bool tryLegalizeRayTracingPrimitiveIDStructParam(
             fieldAccess->removeAndDeallocate();
     }
 
-    if (ordinaryFields.getCount() != 0)
+    if (info->hasOrdinaryFields)
     {
-        auto ordinaryStructType = builder.createStructType();
-        copyNameHintAndDebugDecorations(ordinaryStructType, structType);
-
-        IRStructTypeLayout::Builder typeLayoutBuilder(&builder);
-        for (Index i = 0; i < ordinaryFields.getCount(); i++)
-        {
-            auto oldField = ordinaryFields[i];
-            auto oldFieldLayout = ordinaryFieldLayouts[i];
-            builder.createStructField(
-                ordinaryStructType,
-                oldField->getKey(),
-                oldField->getFieldType());
-
-            if (oldFieldLayout)
-            {
-                typeLayoutBuilder.addField(oldField->getKey(), oldFieldLayout);
-                typeLayoutBuilder.addResourceUsageFrom(oldFieldLayout->getTypeLayout());
-            }
-        }
-
-        auto ordinaryStructLayout = typeLayoutBuilder.build();
-
-        IRVarLayout::Builder varLayoutBuilder(&builder, ordinaryStructLayout);
-        varLayoutBuilder.cloneEverythingButOffsetsFrom(paramLayout);
-        for (auto offsetAttr : paramLayout->getOffsetAttrs())
-        {
-            auto resInfo = varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
-            resInfo->offset = offsetAttr->getOffset();
-            resInfo->space = offsetAttr->getSpace();
-        }
-
-        auto ordinaryParamLayout = varLayoutBuilder.build();
+        auto ordinaryParamLayout =
+            cloneVarLayoutWithNewTypeLayout(builder, paramLayout, info->ordinaryStructLayout);
         layoutDecor->setOperand(0, ordinaryParamLayout);
         param->setFullType(
-            replaceParamValueType(builder, param->getFullType(), ordinaryStructType));
+            replaceParamValueType(builder, param->getFullType(), info->ordinaryStructType));
         return true;
     }
 
