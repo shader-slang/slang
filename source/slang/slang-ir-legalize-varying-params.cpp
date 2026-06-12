@@ -603,8 +603,15 @@ static IRType* replaceParamValueType(IRBuilder& builder, IRType* paramType, IRTy
     return valueType;
 }
 
-bool tryLegalizeRayTracingPrimitiveIDParam(IRModule* module, IRBuilder& builder, IRParam* param)
+bool tryLegalizeRayTracingPrimitiveIDParam(
+    IRModule* module,
+    IRBuilder& builder,
+    IRParam* param,
+    bool* outParamRemoved)
 {
+    if (outParamRemoved)
+        *outParamRemoved = false;
+
     if (!isPrimitiveIDSystemValueParam(param))
         return false;
 
@@ -640,15 +647,21 @@ bool tryLegalizeRayTracingPrimitiveIDParam(IRModule* module, IRBuilder& builder,
     }
 
     param->removeAndDeallocate();
+    if (outParamRemoved)
+        *outParamRemoved = true;
 
     return true;
 }
 
-static bool tryLegalizeRayTracingPrimitiveIDStructParam(
+bool tryLegalizeRayTracingPrimitiveIDStructParam(
     IRModule* module,
     IRBuilder& builder,
-    IRParam* param)
+    IRParam* param,
+    bool* outParamRemoved)
 {
+    if (outParamRemoved)
+        *outParamRemoved = false;
+
     auto structType = as<IRStructType>(unwrapParamValueType(param->getFullType()));
     if (!structType)
         return false;
@@ -690,7 +703,7 @@ static bool tryLegalizeRayTracingPrimitiveIDStructParam(
         return false;
 
     List<IRInst*> fieldAccesses;
-    bool hasUnhandledUse = false;
+    List<IRUse*> wholeParamUses;
     traverseUses(
         param,
         [&](IRUse* use)
@@ -705,11 +718,69 @@ static bool tryLegalizeRayTracingPrimitiveIDStructParam(
             if (findFieldAccess(user, param, ordinaryFields))
                 return;
 
-            hasUnhandledUse = true;
+            wholeParamUses.add(use);
         });
 
-    if (hasUnhandledUse)
-        return false;
+    IRInst* wholeParamReplacement = nullptr;
+    auto getWholeParamReplacement = [&]() -> IRInst*
+    {
+        if (wholeParamReplacement)
+            return wholeParamReplacement;
+
+        List<IRInst*> fieldValues;
+        for (auto field : structType->getFields())
+        {
+            if (findFieldForKey(primitiveIDFields, field->getKey()))
+            {
+                auto primitiveIndex =
+                    emitRayTracingPrimitiveIndexValue(module, builder, field->getFieldType());
+                if (!primitiveIndex)
+                    return nullptr;
+                fieldValues.add(primitiveIndex);
+                continue;
+            }
+
+            IRInst* fieldValue = nullptr;
+            auto paramType = param->getFullType();
+            if (as<IRBorrowInParamType>(paramType) || as<IRPtrTypeBase>(paramType))
+            {
+                auto fieldAddressType =
+                    replaceParamValueType(builder, paramType, field->getFieldType());
+                auto fieldAddress =
+                    builder.emitFieldAddress(fieldAddressType, param, field->getKey());
+                fieldValue = builder.emitLoad(fieldAddress);
+            }
+            else
+            {
+                fieldValue = builder.emitFieldExtract(field->getFieldType(), param, field->getKey());
+            }
+            fieldValues.add(fieldValue);
+        }
+
+        auto structValue = builder.emitMakeStruct(structType, fieldValues);
+        auto paramType = param->getFullType();
+        if (as<IRBorrowInParamType>(paramType) || as<IRPtrTypeBase>(paramType))
+        {
+            auto tempVar = builder.emitVar(structType);
+            builder.addSimpleDecoration<IRTempCallArgVarDecoration>(tempVar);
+            builder.emitStore(tempVar, structValue);
+            wholeParamReplacement = tempVar;
+        }
+        else
+        {
+            wholeParamReplacement = structValue;
+        }
+        return wholeParamReplacement;
+    };
+
+    for (auto use : wholeParamUses)
+    {
+        auto replacement = getWholeParamReplacement();
+        if (!replacement)
+            return false;
+
+        builder.replaceOperand(use, replacement);
+    }
 
     for (auto field : primitiveIDFields)
     {
@@ -785,6 +856,8 @@ static bool tryLegalizeRayTracingPrimitiveIDStructParam(
         return false;
 
     param->removeAndDeallocate();
+    if (outParamRemoved)
+        *outParamRemoved = true;
     return true;
 }
 
@@ -2505,6 +2578,31 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
         // Clear the writeback list for the next entry point
         m_payloadWritebacks.clear();
+    }
+
+    void processParam(IRParam* param) SLANG_OVERRIDE
+    {
+        if (isRayTracingHitStage(m_stage))
+        {
+            IRBuilder builder(m_module);
+            builder.setInsertBefore(m_firstOrdinaryInst);
+
+            bool paramRemoved = false;
+            if (tryLegalizeRayTracingPrimitiveIDStructParam(
+                    m_module,
+                    builder,
+                    param,
+                    &paramRemoved))
+            {
+                if (paramRemoved)
+                    return;
+
+                m_firstOrdinaryInst =
+                    m_firstBlock ? m_firstBlock->getFirstOrdinaryInst() : nullptr;
+            }
+        }
+
+        EntryPointVaryingParamLegalizeContext::processParam(param);
     }
 
     LegalizedVaryingVal createLegalSystemVaryingValImpl(VaryingParamInfo const& info) SLANG_OVERRIDE

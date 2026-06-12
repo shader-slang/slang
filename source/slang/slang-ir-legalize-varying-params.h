@@ -104,7 +104,21 @@ bool isRayTracingHitStage(Stage stage);
 /// Replaces an `SV_PrimitiveID` hit-stage parameter with the canonical primitive-index helper.
 /// Returns true only when the parameter was removed, so callers must capture the next parameter
 /// before calling because `param` is invalid after a successful call.
-bool tryLegalizeRayTracingPrimitiveIDParam(IRModule* module, IRBuilder& builder, IRParam* param);
+bool tryLegalizeRayTracingPrimitiveIDParam(
+    IRModule* module,
+    IRBuilder& builder,
+    IRParam* param,
+    bool* outParamRemoved = nullptr);
+
+/// Rewrites `SV_PrimitiveID` fields in a hit-stage struct parameter.
+/// Returns true when primitive-ID fields were rewritten. `outParamRemoved` is set when the
+/// original parameter had no ordinary fields and was removed; otherwise the parameter is narrowed
+/// to the remaining ordinary fields and must still be legalized by the caller.
+bool tryLegalizeRayTracingPrimitiveIDStructParam(
+    IRModule* module,
+    IRBuilder& builder,
+    IRParam* param,
+    bool* outParamRemoved = nullptr);
 
 /// Legalizes hit-stage `SV_PrimitiveID` parameters before HLSL existential-type-layout
 /// lowering removes empty struct parameters that are still needed for this rewrite.

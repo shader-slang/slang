@@ -3081,7 +3081,8 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 void consolidateRayTracingParameters(
     GLSLLegalizationContext* context,
     IRFunc* func,
-    bool legalizePrimitiveIDBeforeConsolidation)
+    bool legalizePrimitiveIDBeforeConsolidation,
+    bool legalizePrimitiveIDStructBeforeConsolidation)
 {
     auto builder = context->getBuilder();
     auto firstBlock = func->getFirstBlock();
@@ -3118,10 +3119,35 @@ void consolidateRayTracingParameters(
 
         if (legalizePrimitiveIDBeforeConsolidation)
         {
-            if (tryLegalizeRayTracingPrimitiveIDParam(builder->getModule(), *builder, param))
+            bool paramRemoved = false;
+            if (tryLegalizeRayTracingPrimitiveIDParam(
+                    builder->getModule(),
+                    *builder,
+                    param,
+                    &paramRemoved))
             {
-                param = nextParam;
-                continue;
+                if (paramRemoved)
+                {
+                    param = nextParam;
+                    continue;
+                }
+            }
+        }
+
+        if (legalizePrimitiveIDStructBeforeConsolidation)
+        {
+            bool paramRemoved = false;
+            if (tryLegalizeRayTracingPrimitiveIDStructParam(
+                    builder->getModule(),
+                    *builder,
+                    param,
+                    &paramRemoved))
+            {
+                if (paramRemoved)
+                {
+                    param = nextParam;
+                    continue;
+                }
             }
         }
 
@@ -4952,7 +4978,11 @@ void legalizeEntryPointForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        consolidateRayTracingParameters(&context, func, isRayTracingHitStage(stage) && isViaGLSL);
+        consolidateRayTracingParameters(
+            &context,
+            func,
+            isRayTracingHitStage(stage) && isViaGLSL,
+            isRayTracingHitStage(stage) && isViaGLSL);
         break;
     default:
         break;

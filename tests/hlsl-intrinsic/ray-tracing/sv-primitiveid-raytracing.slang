@@ -28,6 +28,12 @@
 //TEST:SIMPLE(filecheck=STRUCT_DXIL):-target dxil-assembly -entry main_chit_struct -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_HLSL):-target hlsl -entry main_chit_struct_mixed -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_DXIL):-target dxil-assembly -entry main_chit_struct_mixed -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=STRUCT_MIXED_GLSL):-target glsl -entry main_chit_struct_mixed -stage closesthit
+//TEST:SIMPLE(filecheck=STRUCT_MIXED_CUDA):-target cuda -entry main_chit_struct_mixed -stage closesthit
+//TEST:SIMPLE(filecheck=STRUCT_MIXED_FORWARD_HLSL):-target hlsl -entry main_chit_struct_mixed_forward -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=STRUCT_MIXED_FORWARD_DXIL):-target dxil-assembly -entry main_chit_struct_mixed_forward -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=STRUCT_MIXED_FORWARD_GLSL):-target glsl -entry main_chit_struct_mixed_forward -stage closesthit
+//TEST:SIMPLE(filecheck=STRUCT_MIXED_FORWARD_CUDA):-target cuda -entry main_chit_struct_mixed_forward -stage closesthit
 //TEST:SIMPLE(filecheck=ISECT_CUDA):-target cuda -entry main_isect_cuda -stage intersection
 //TEST:SIMPLE(filecheck=AHIT_CUDA):-target cuda -entry main_ahit -stage anyhit
 //TEST:SIMPLE(filecheck=CHIT_CUDA):-target cuda -entry main_chit -stage closesthit
@@ -273,3 +279,49 @@ void main_chit_struct_mixed(inout Payload payload, in ChitMixedPrimitiveInput in
 // STRUCT_MIXED_HLSL: float(int([[PRIMITIVE_ID]])) + {{.*}}.weight
 
 // STRUCT_MIXED_DXIL: call i32 @dx.op.primitiveIndex.i32
+
+// STRUCT_MIXED_GLSL: struct ChitMixedPrimitiveInput
+// STRUCT_MIXED_GLSL-NOT: pid
+// STRUCT_MIXED_GLSL: float weight
+// STRUCT_MIXED_GLSL: gl_PrimitiveID
+// STRUCT_MIXED_GLSL: float(int({{.*}})) + input_0.weight_0
+
+// STRUCT_MIXED_CUDA: __global__ void __closesthit__main_chit_struct_mixed
+// STRUCT_MIXED_CUDA: optixGetPrimitiveIndex()
+// STRUCT_MIXED_CUDA: float({{.*}}) + {{.*}}
+
+float useMixedPrimitiveInput(in ChitMixedPrimitiveInput input)
+{
+    return float(input.pid) + input.weight;
+}
+
+[shader("closesthit")]
+void main_chit_struct_mixed_forward(inout Payload payload, in ChitMixedPrimitiveInput input)
+{
+    payload.val = useMixedPrimitiveInput(input);
+}
+
+// STRUCT_MIXED_FORWARD_HLSL: struct ChitMixedPrimitiveInput
+// STRUCT_MIXED_FORWARD_HLSL: int pid
+// STRUCT_MIXED_FORWARD_HLSL: float weight
+// STRUCT_MIXED_FORWARD_HLSL: [shader("closesthit")]void main_chit_struct_mixed_forward
+// STRUCT_MIXED_FORWARD_HLSL: uint [[PRIMITIVE_ID:[A-Za-z_][A-Za-z_0-9]*]] = PrimitiveIndex()
+// STRUCT_MIXED_FORWARD_HLSL: ChitMixedPrimitiveInput_0 [[FORWARDED:[A-Za-z_][A-Za-z_0-9]*]] = { int([[PRIMITIVE_ID]]), input_1.weight_0 }
+// STRUCT_MIXED_FORWARD_HLSL: useMixedPrimitiveInput_0([[FORWARDED]])
+
+// STRUCT_MIXED_FORWARD_DXIL: call i32 @dx.op.primitiveIndex.i32
+
+// STRUCT_MIXED_FORWARD_GLSL: ChitMixedPrimitiveInput
+// STRUCT_MIXED_FORWARD_GLSL: int pid
+// STRUCT_MIXED_FORWARD_GLSL: float weight
+// STRUCT_MIXED_FORWARD_GLSL: uint [[PRIMITIVE_ID:[A-Za-z_][A-Za-z_0-9]*]] = ((gl_PrimitiveID))
+// STRUCT_MIXED_FORWARD_GLSL: ChitMixedPrimitiveInput_0 [[FORWARDED:[A-Za-z_][A-Za-z_0-9]*]] = { int([[PRIMITIVE_ID]]), input_1.weight_0 }
+// STRUCT_MIXED_FORWARD_GLSL: useMixedPrimitiveInput_0
+
+// STRUCT_MIXED_FORWARD_CUDA: __global__ void __closesthit__main_chit_struct_mixed_forward
+// STRUCT_MIXED_FORWARD_CUDA: float [[WEIGHT:[A-Za-z_][A-Za-z_0-9]*]] = __int_as_float(optixGetAttribute_0())
+// STRUCT_MIXED_FORWARD_CUDA: uint [[PRIMITIVE_ID:[A-Za-z_][A-Za-z_0-9]*]] = optixGetPrimitiveIndex()
+// STRUCT_MIXED_FORWARD_CUDA: ChitMixedPrimitiveInput_0
+// STRUCT_MIXED_FORWARD_CUDA: (&[[FORWARDED:[A-Za-z_][A-Za-z_0-9]*]])->pid_0 = int([[PRIMITIVE_ID]])
+// STRUCT_MIXED_FORWARD_CUDA: (&[[FORWARDED]])->weight_0 = [[WEIGHT]]
+// STRUCT_MIXED_FORWARD_CUDA: useMixedPrimitiveInput_0(&[[FORWARDED]])
