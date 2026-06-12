@@ -1111,6 +1111,15 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             dispatchIfNotNull(arg);
     }
 
+    // A fast-path builtin operator (e.g. `getClock() + 1`) is a `BuiltinOperatorExpr`, not an
+    // `InvokeExpr`, so it needs its own recursion into the operands -- otherwise decl references
+    // inside an operand (and their inferred capability requirements) would be missed.
+    void visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+    {
+        for (auto arg : expr->arguments)
+            dispatchIfNotNull(arg);
+    }
+
     void visitTypeCastExpr(TypeCastExpr* expr)
     {
         dispatchIfNotNull(expr->functionExpr);
@@ -3282,8 +3291,18 @@ static bool _initExprIsRuntimeValue(Expr* expr)
         }
         return false;
     }
+    if (auto builtinOpExpr = as<BuiltinOperatorExpr>(expr))
+    {
+        // A builtin-operator fast-path node is a pure builtin operation: it is a runtime
+        // value only when one of its operands is.
+        for (auto arg : builtinOpExpr->arguments)
+            if (_initExprIsRuntimeValue(arg))
+                return true;
+        return false;
+    }
     if (auto invokeExpr = as<InvokeExpr>(expr))
     {
+
         // Determine whether the callee is a "pure" callable whose result depends only
         // on its arguments and cannot read or write arbitrary runtime state. For pure
         // callables, the call is a runtime value only when one of its arguments is.
@@ -16177,6 +16196,7 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
     if (getText(moduleDecl->getName()) == "glsl")
     {
         getShared()->glslModuleDecl = moduleDecl;
+        getShared()->m_isGLSLModuleImported = true;
     }
 
     importedModulesList.add(moduleDecl);
