@@ -3000,16 +3000,11 @@ void handleSingleParam(
     builder->addDependsOnDecoration(func, globalParam);
 }
 
-struct DirectSPIRVPrimitiveIDGlobal
-{
-    IRType* valueType = nullptr;
-    IRGlobalParam* globalParam = nullptr;
-};
-
 struct DirectSPIRVPrimitiveIDEmitterContext
 {
     IRFunc* func = nullptr;
-    List<DirectSPIRVPrimitiveIDGlobal> globals;
+    IRType* canonicalValueType = nullptr;
+    IRGlobalParam* globalParam = nullptr;
 };
 
 static IRType* getPrimitiveIDValueTypeForDirectSPIRV(IRType* type)
@@ -3041,10 +3036,12 @@ static IRInst* emitDirectSPIRVPrimitiveIDValue(
 
     auto context = static_cast<DirectSPIRVPrimitiveIDEmitterContext*>(userData);
     auto valueType = getPrimitiveIDValueTypeForDirectSPIRV(type);
-    for (auto global : context->globals)
+    if (context->globalParam)
     {
-        if (global.valueType == valueType)
-            return builder.emitLoad(global.globalParam);
+        auto value = builder.emitLoad(context->globalParam);
+        if (isTypeEqual(context->canonicalValueType, valueType))
+            return value;
+        return builder.emitCast(valueType, value);
     }
 
     auto globalParam = addGlobalParam(
@@ -3063,7 +3060,8 @@ static IRInst* emitDirectSPIRVPrimitiveIDValue(
     moveValueBefore(globalParam, context->func);
     builder.addDependsOnDecoration(context->func, globalParam);
 
-    context->globals.add({valueType, globalParam});
+    context->canonicalValueType = valueType;
+    context->globalParam = globalParam;
     return builder.emitLoad(globalParam);
 }
 

@@ -112,6 +112,10 @@ bool tryLegalizeRayTracingPrimitiveIDParam(
     IRParam* param,
     bool* outParamRemoved = nullptr);
 
+/// Emits the replacement value for an `SV_PrimitiveID` field while rewriting a hit-stage
+/// struct parameter. `type` is the value type required at the use site, `field` and `layout`
+/// identify the source field metadata, and `userData` is backend-owned context.
+/// Return null only when the backend cannot materialize a replacement.
 using RayTracingPrimitiveIDValueEmitterFunc =
     IRInst* (*)(
         IRModule* module,
@@ -123,6 +127,8 @@ using RayTracingPrimitiveIDValueEmitterFunc =
 
 struct RayTracingPrimitiveIDValueEmitter
 {
+    /// Optional target-specific emitter. When null, legalization uses the shared primitive-index
+    /// helper decorated for the active backend.
     RayTracingPrimitiveIDValueEmitterFunc func = nullptr;
     void* userData = nullptr;
 };
