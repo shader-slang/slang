@@ -919,11 +919,14 @@ static LegalVal legalizeAbort(
     if (!validateAbortArgumentTypes(context, originalInst, legalArgs.getArrayView().arrayView))
         return LegalVal::simple(context->builder->getVoidValue());
 
-    return LegalVal::simple(context->builder->emitIntrinsicInst(
+    auto newAbort = context->builder->emitIntrinsicInst(
         context->builder->getVoidType(),
         kIROp_Abort,
         (UInt)legalArgs.getCount(),
-        legalArgs.getArrayView().getBuffer()));
+        legalArgs.getArrayView().getBuffer());
+    newAbort->sourceLoc = originalInst->sourceLoc;
+    originalInst->transferDecorationsTo(newAbort);
+    return LegalVal::simple(newAbort);
 }
 
 static LegalVal legalizeDebugVar(

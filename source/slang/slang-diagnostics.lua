@@ -5201,6 +5201,13 @@ err(
 )
 
 err(
+    "abort-not-supported-in-reverse-mode-auto-diff",
+    55212,
+    "abort is not supported in reverse-mode automatic differentiation",
+    span { loc = "location", message = "'abort' cannot currently be used in a function being reverse-differentiated." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",

@@ -2195,6 +2195,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         IRInst* newAbort =
             builder.emitIntrinsicInst(builder.getVoidType(), kIROp_Abort, 1, &message);
+        newAbort->sourceLoc = inst->sourceLoc;
+        inst->transferDecorationsTo(newAbort);
         inst->replaceUsesWith(newAbort);
         inst->removeAndDeallocate();
 
