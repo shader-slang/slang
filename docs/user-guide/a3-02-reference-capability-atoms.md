@@ -728,9 +728,9 @@ Extensions
 > Represents the SPIR-V capability for atomic float 16 min/max operations.
 
 `spvAtomicFloat16VectorNV`
-> Represents the SPIR-V capability for vector atomic float 16 add/min/max/exchange operations.
-> Vector atomic sub is emitted as a negated vector atomic add.
-> Implies scalar atomic float 16 add support.
+> Represents the SPIR-V capability for vector atomic float 16 add/min/max/exchange operations
+> from `SPV_NV_shader_atomic_fp16_vector`. Vector atomic sub is emitted as a negated
+> vector atomic add. Implies `spvAtomicFloat16AddEXT`.
 
 `spvAtomicFloat32AddEXT`
 > Represents the SPIR-V capability for atomic float 32 add operations.

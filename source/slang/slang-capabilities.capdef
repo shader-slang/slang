@@ -709,9 +709,9 @@ def spvAtomicFloat32AddEXT : SPV_EXT_shader_atomic_float_add;
 /// [EXT]
 def spvAtomicFloat16AddEXT : SPV_EXT_shader_atomic_float16_add;
 
-/// Represents the SPIR-V capability for vector atomic float 16 add/min/max/exchange operations.
-/// Vector atomic sub is emitted as a negated vector atomic add.
-/// Implies scalar atomic float 16 add support.
+/// Represents the SPIR-V capability for vector atomic float 16 add/min/max/exchange operations
+/// from SPV_NV_shader_atomic_fp16_vector. Vector atomic sub is emitted as a negated vector
+/// atomic add. Implies spvAtomicFloat16AddEXT.
 /// [EXT]
 def spvAtomicFloat16VectorNV : SPV_NV_shader_atomic_fp16_vector + spvAtomicFloat16AddEXT;
 

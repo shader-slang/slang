@@ -6578,9 +6578,10 @@ $}
     /// @param byteAddress The address at which to perform the atomic add operation.
     /// @param value The value to add to the value at `byteAddress`.
     /// @param originalValue The original value at `byteAddress` before the add operation.
-    /// @remarks For SPIR-V, this function requires `SPV_EXT_shader_atomic_float16_add`
-    /// and maps to `OpAtomicFAdd` on a `half`. When `SPV_NV_shader_atomic_fp16_vector`
-    /// is available, it uses the half-vector atomic path instead.
+    /// @remarks For SPIR-V, this function requires `spvAtomicFloat16AddEXT`, which
+    /// is also satisfied by `spvAtomicFloat16VectorNV`. It maps to a scalar
+    /// `OpAtomicFAdd` on `half` unless `spvAtomicFloat16VectorNV` selects the
+    /// half-vector atomic path from `SPV_NV_shader_atomic_fp16_vector`.
     ///
     /// For HLSL, this function translates to an NVAPI call
     /// due to lack of native HLSL intrinsic for floating point atomic add. For CUDA, this function
