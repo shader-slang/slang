@@ -890,7 +890,7 @@ bool validateStructuredBufferResourceTypes(
 
 void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, DiagnosticSink* sink)
 {
-    validateAtomicOperations(skipFuncParamValidation, sink, module->getModuleInst());
+    validateAtomicOperations(skipFuncParamValidation, sink, module->getModuleInst(), false);
 }
 
 static void collectAssumeAddressInsts(IRInst* inst, List<IRInst*>& out)

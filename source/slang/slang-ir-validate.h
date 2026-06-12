@@ -82,7 +82,7 @@ void validateAtomicOperations(
     bool skipFuncParamValidation,
     DiagnosticSink* sink,
     IRInst* inst,
-    bool validateSPIRVFp16VectorAtomics = false);
+    bool validateSPIRVFp16VectorAtomics);
 
 // Overload that takes IRModule* first for use with SLANG_PASS macro
 void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, DiagnosticSink* sink);
