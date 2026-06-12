@@ -33144,28 +33144,246 @@ int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 // Work-graphs
 
 //@public:
-/// read-only input to Broadcasting launch node.
+/// Read-only input to a broadcasting-launch node shader.
 __generic<T>
-//TODO: DispatchNodeInputRecord should be available only for broadcasting node shader.
-//[require(broadcasting_node)]
-[require(spirv)]
+[require(hlsl, sm_6_8)]
+[__workGraphRecordType]
 struct DispatchNodeInputRecord
 {
-    /// Provide an access to a record object that only holds a single record.
-    NodePayloadPtr<T> Get()
+    /// Returns the input record value.
+    T Get()
     {
-        int index = 0;
-        __target_switch
-        {
-        case spirv:
-            return spirv_asm
-            {
-                %var : $$NodePayloadPtr<T> = OpVariable NodePayloadAMDX;
-                result : $$NodePayloadPtr<T> = OpAccessChain %var $index;
-            };
-        }
+        __intrinsic_asm ".Get";
     }
 };
+
+/// Read-only input to a thread-launch node shader.
+__generic<T>
+[require(hlsl, sm_6_8)]
+[__workGraphRecordType]
+struct ThreadNodeInputRecord
+{
+    /// Returns the input record payload for this thread-launch node invocation.
+    T Get()
+    {
+        __intrinsic_asm ".Get";
+    }
+};
+
+/// Read-only input array for a coalescing-launch node shader.
+__generic<T>
+[require(hlsl, sm_6_8)]
+[__workGraphRecordType]
+struct GroupNodeInputRecords
+{
+    /// Returns the number of input records visible to this coalescing-launch node invocation.
+    uint Count()
+    {
+        __intrinsic_asm ".Count";
+    }
+    /// Returns the input record payload at the given coalesced-record index.
+    T Get(uint index)
+    {
+        __intrinsic_asm ".Get";
+    }
+    /// Returns the input record payload at the given coalesced-record index.
+    __subscript(uint index) -> T
+    {
+        get { return Get(index); }
+    }
+};
+
+/// Input record collection for a coalescing-launch node that consumes records with no payload data.
+[require(hlsl, sm_6_8)]
+[__workGraphRecordType]
+struct EmptyNodeInput
+{
+    /// Returns the number of empty input records visible to this coalesced node invocation.
+    uint Count() { __intrinsic_asm ".Count"; }
+};
+
+/// Per-thread output records for node shader output; call OutputComplete() when done writing.
+__generic<T>
+[require(hlsl, sm_6_8)]
+[__workGraphRecordType]
+struct ThreadNodeOutputRecords
+{
+    /// Returns a mutable output record payload reference for this thread.
+    Ref<T> Get(uint index = 0)
+    {
+        __intrinsic_asm ".Get";
+    }
+    /// Returns a mutable output record payload reference for this thread.
+    __subscript(uint index) -> T
+    {
+        [nonmutating]
+        __intrinsic_op($(kIROp_NodeOutputRecordGetElementPtr))
+        ref;
+    }
+    /// Marks this thread's output records as complete and ready for dispatch.
+    void OutputComplete()
+    {
+        __intrinsic_asm ".OutputComplete";
+    }
+};
+
+/// Per-group (shared) output records for node shader output; call OutputComplete() when done writing.
+__generic<T>
+[require(hlsl, sm_6_8)]
+[__workGraphRecordType]
+struct GroupNodeOutputRecords
+{
+    /// Returns a mutable shared output record payload reference for the thread group.
+    Ref<T> Get(uint index = 0)
+    {
+        __intrinsic_asm ".Get";
+    }
+
+    /// Returns a mutable shared output record payload reference for the thread group.
+    __subscript(uint index) -> T
+    {
+        [nonmutating]
+        __intrinsic_op($(kIROp_NodeOutputRecordGetElementPtr))
+        ref;
+    }
+    /// Marks this thread group's output records as complete and ready for dispatch.
+    void OutputComplete()
+    {
+        __intrinsic_asm ".OutputComplete";
+    }
+};
+
+/// Output node handle; use to obtain output record objects for the named output node.
+__generic<T>
+[require(hlsl, sm_6_8)]
+[__workGraphRecordType]
+struct NodeOutput
+{
+    /// Returns whether this handle can launch the target node.
+    bool IsValid()
+    {
+        __intrinsic_asm ".IsValid";
+    }
+    /// Allocates per-thread output records for this target node.
+    ThreadNodeOutputRecords<T> GetThreadNodeOutputRecords(uint count)
+    {
+        __intrinsic_asm ".GetThreadNodeOutputRecords";
+    }
+    /// Allocates thread-group-shared output records for this target node.
+    GroupNodeOutputRecords<T> GetGroupNodeOutputRecords(uint count)
+    {
+        __intrinsic_asm ".GetGroupNodeOutputRecords";
+    }
+};
+
+/// Array of output node handles indexed by node array index.
+__generic<T>
+[require(hlsl, sm_6_8)]
+[__workGraphRecordType]
+struct NodeOutputArray
+{
+    /// Returns the output handle for a specific node array element.
+    NodeOutput<T> Get(uint index)
+    {
+        __intrinsic_asm ".operator[]";
+    }
+    /// Returns the output handle for a specific node array element.
+    __subscript(uint index) -> NodeOutput<T>
+    {
+        get { return Get(index); }
+    }
+};
+
+/// Output node handle for downstream nodes that carry no payload data.
+[require(hlsl, sm_6_8)]
+[__workGraphRecordType]
+struct EmptyNodeOutput
+{
+    /// Returns whether this handle can launch the target node.
+    bool IsValid() { __intrinsic_asm ".IsValid"; }
+    /// Adds payload-free output records from a single thread.
+    void ThreadIncrementOutputCount(uint count)
+    {
+        __intrinsic_asm ".ThreadIncrementOutputCount";
+    }
+    /// Adds payload-free output records cooperatively from the whole thread group.
+    void GroupIncrementOutputCount(uint count)
+    {
+        __intrinsic_asm ".GroupIncrementOutputCount";
+    }
+};
+
+/// Array of payload-free output node handles indexed by node array index.
+[require(hlsl, sm_6_8)]
+[__workGraphRecordType]
+struct EmptyNodeOutputArray
+{
+    /// Returns the output handle for a specific node array element.
+    EmptyNodeOutput Get(uint index) { __intrinsic_asm ".operator[]"; }
+    /// Returns the output handle for a specific node array element.
+    __subscript(uint index) -> EmptyNodeOutput
+    {
+        get { return Get(index); }
+    }
+};
+
+/// Memory type flags for the work-graph Barrier() intrinsic (SM 6.8, first argument).
+/// Values are defined as Slang::BarrierMemoryTypeFlags in slang-type-system-shared.h.
+enum BarrierMemoryTypeFlags : uint
+{
+    UAV_MEMORY          = $(BarrierMemoryTypeFlags::UavMemory),
+    GROUP_SHARED_MEMORY = $(BarrierMemoryTypeFlags::GroupSharedMemory),
+    NODE_INPUT_MEMORY   = $(BarrierMemoryTypeFlags::NodeInputMemory),
+    NODE_OUTPUT_MEMORY  = $(BarrierMemoryTypeFlags::NodeOutputMemory),
+    ALL_MEMORY          = $(BarrierMemoryTypeFlags::AllMemory),
+}
+
+/// Semantic flags for the work-graph Barrier() intrinsic (SM 6.8, second argument).
+/// Values are defined as Slang::BarrierSemanticFlags in slang-type-system-shared.h.
+enum BarrierSemanticFlags : uint
+{
+    GROUP_SYNC   = $(BarrierSemanticFlags::GroupSync),
+    GROUP_SCOPE  = $(BarrierSemanticFlags::GroupScope),
+    DEVICE_SCOPE = $(BarrierSemanticFlags::DeviceScope),
+}
+
+/// Maps a compile-time BarrierMemoryTypeFlags value to its target named-constant expression
+/// (e.g. "(UAV_MEMORY)" or "(UAV_MEMORY | NODE_INPUT_MEMORY)"). Handled by the
+/// HLSL emitter via kIROp_GetEnumBarrierMemoryTypeFlags; must only be called for HLSL.
+__intrinsic_op(getEnumBarrierMemoryTypeFlags)
+int GetEnumBarrierMemoryTypeFlags(BarrierMemoryTypeFlags f);
+
+/// Maps a compile-time BarrierSemanticFlags value to its target named-constant expression
+/// (e.g. "(GROUP_SYNC)" or "(DEVICE_SCOPE | GROUP_SCOPE)"). Handled by the
+/// HLSL emitter via kIROp_GetEnumBarrierSemanticFlags; must only be called for HLSL.
+__intrinsic_op(getEnumBarrierSemanticFlags)
+int GetEnumBarrierSemanticFlags(BarrierSemanticFlags f);
+
+[require(hlsl, sm_6_8)]
+void __Barrier_hlsl(int memoryTypeFlags, int semanticFlags)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "Barrier";
+    }
+}
+
+/// Synchronizes memory and/or thread execution using static Barrier flag values.
+/// For example, GroupMemoryBarrierWithGroupSync() maps to
+/// Barrier(GROUP_SHARED_MEMORY, GROUP_SYNC).
+[ForceInline]
+[require(hlsl, sm_6_8)]
+void Barrier(BarrierMemoryTypeFlags memoryTypeFlags, BarrierSemanticFlags semanticFlags)
+{
+    __target_switch
+    {
+    case hlsl:
+        __Barrier_hlsl(
+            GetEnumBarrierMemoryTypeFlags(memoryTypeFlags),
+            GetEnumBarrierSemanticFlags(semanticFlags));
+    }
+}
 
 //
 // Pack/Unpack Intrinsics

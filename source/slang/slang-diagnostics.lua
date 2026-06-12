@@ -2418,6 +2418,76 @@ err(
     span { loc = "attr:Modifier", message = "expected a power of 2 between 4 and 128, inclusive, in 'WaveSize' attribute, got '~value:Int'" }
 )
 
+err(
+    "invalid-node-launch-mode",
+    31401,
+    "invalid 'NodeLaunch' mode",
+    span { loc = "attr:Modifier", message = "invalid NodeLaunch mode '~mode:String'; expected 'broadcasting', 'thread', or 'coalescing'" }
+)
+
+err(
+    "conflicting-node-grid-attributes",
+    31402,
+    "conflicting node grid attributes",
+    span { loc = "decl:Decl", message = "'[NodeDispatchGrid]' and '[NodeMaxDispatchGrid]' cannot both appear on the same node shader" }
+)
+
+err(
+    "node-grid-attribute-requires-broadcasting",
+    31403,
+    "node grid attribute requires broadcasting launch mode",
+    span { loc = "decl:Decl", message = "'[NodeDispatchGrid]' and '[NodeMaxDispatchGrid]' are only valid on broadcasting-launch node shaders" }
+)
+
+err(
+    "invalid-barrier-semantic-flags-value",
+    31404,
+    "invalid 'BarrierSemanticFlags' value",
+    span { loc = "location", message = "unrecognized BarrierSemanticFlags value '~value:String'; expected 0 or a combination of GROUP_SYNC (0x1), GROUP_SCOPE (0x2), and DEVICE_SCOPE (0x4)" }
+)
+
+err(
+    "node-stage-not-supported-on-target",
+    31405,
+    "node stage is not supported on target",
+    span { loc = "location", message = "node shader stage is not supported for '~target:String' output" }
+)
+
+err(
+    "invalid-node-attribute-argument-value",
+    31406,
+    "invalid node attribute argument value",
+    span { loc = "attr:Modifier", message = "'~attribute:String' expects integer arguments in the valid range, got '~value:Int'" }
+)
+
+err(
+    "invalid-barrier-memory-type-flags-value",
+    31407,
+    "invalid 'BarrierMemoryTypeFlags' value",
+    span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected 0, ALL_MEMORY (0xf), or a combination of UAV_MEMORY (0x1), GROUP_SHARED_MEMORY (0x2), NODE_INPUT_MEMORY (0x4), and NODE_OUTPUT_MEMORY (0x8)" }
+)
+
+err(
+    "node-attribute-only-valid-on-node-stage",
+    31408,
+    "node attribute is only valid on node shaders",
+    span { loc = "attr:Modifier", message = "attribute '~attrName:Name' is only valid on node shaders" }
+)
+
+err(
+    "barrier-flags-must-be-compile-time-constant",
+    31409,
+    "Barrier flags must be compile-time constants",
+    span { loc = "location", message = "~flagType:String operand to Barrier must be a compile-time constant" }
+)
+
+err(
+    "node-launch-attribute-required",
+    31410,
+    "NodeLaunch attribute is required on node shaders",
+    span { loc = "decl:Decl", message = "node shader entry point requires a NodeLaunch attribute" }
+)
+
 warning(
     "explicit-uniform-location",
     31104,

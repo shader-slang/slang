@@ -1284,6 +1284,65 @@ Result ComputeCommandEncoderImpl::bindPipelineWithRootObject(
     return bindPipelineWithRootObjectImpl(state, rootObject);
 }
 
+Result ComputeCommandEncoderImpl::bindRootObjectAsCompute(
+    IShaderProgram* program,
+    IShaderObject* rootObject)
+{
+    if (!program || !rootObject)
+        return SLANG_E_INVALID_ARG;
+
+    auto programImpl = dynamic_cast<ShaderProgramImpl*>(program);
+    auto rootObjectImpl = dynamic_cast<RootShaderObjectImpl*>(rootObject);
+    if (!programImpl || !rootObjectImpl)
+        return SLANG_E_INVALID_ARG;
+
+    auto rootLayoutImpl = programImpl->m_rootObjectLayout.Ptr();
+    if (!rootLayoutImpl || !rootLayoutImpl->m_rootSignature)
+        return SLANG_FAIL;
+
+    ComputeSubmitter submitter(m_d3dCmdList);
+    submitter.setRootSignature(rootLayoutImpl->m_rootSignature);
+
+    BindingContext context = {};
+    context.encoder = this;
+    context.submitter = &submitter;
+    context.device = m_renderer;
+    context.transientHeap = m_transientHeap;
+    context.outOfMemoryHeap = (D3D12_DESCRIPTOR_HEAP_TYPE)(-1);
+
+    m_commandBuffer->bindDescriptorHeaps();
+    auto bindResult = rootObjectImpl->bindAsRoot(&context, rootLayoutImpl);
+    if (bindResult == SLANG_E_OUT_OF_MEMORY)
+    {
+        if (!m_transientHeap->canResize())
+            return SLANG_E_OUT_OF_MEMORY;
+
+        m_commandBuffer->invalidateDescriptorHeapBinding();
+        switch (context.outOfMemoryHeap)
+        {
+        case D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV:
+            SLANG_RETURN_ON_FAIL(m_transientHeap->allocateNewViewDescriptorHeap(m_renderer));
+            m_commandBuffer->bindDescriptorHeaps();
+            break;
+        case D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER:
+            SLANG_RETURN_ON_FAIL(m_transientHeap->allocateNewSamplerDescriptorHeap(m_renderer));
+            m_commandBuffer->bindDescriptorHeaps();
+            break;
+        default:
+            assert(!"unexpected descriptor heap type");
+            return SLANG_FAIL;
+        }
+
+        SLANG_RETURN_ON_FAIL(rootObjectImpl->bindAsRoot(&context, rootLayoutImpl));
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(bindResult);
+    }
+
+    return SLANG_OK;
+}
+
 Result ComputeCommandEncoderImpl::dispatchCompute(int x, int y, int z)
 {
     // Submit binding for compute

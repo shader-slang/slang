@@ -94,6 +94,9 @@ Stages
 `miss`
 > Ray-Miss shader stage & ray-tracing capabilities
 
+`node`
+> Work-graph node shader stage & HLSL SM 6.8 capabilities
+
 `pixel`
 > Pixel shader stage
 

@@ -557,6 +557,11 @@ public:
 
 protected:
     virtual bool shouldEmitOnlyHeader() { return false; }
+    virtual bool shouldSuppressWorkGraphRecordTypeEmission(IRStructType* structType)
+    {
+        SLANG_UNUSED(structType);
+        return false;
+    }
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* inst) { SLANG_UNUSED(inst); }
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual String getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltinVarName builtinName);

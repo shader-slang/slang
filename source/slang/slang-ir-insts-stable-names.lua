@@ -835,5 +835,18 @@ return {
 	["IncrementBranchCoverageCounter"] = 859,
 	["Decoration.BuiltinRequirementDecoration"] = 860,
 	["builtinRequirementKey"] = 861,
-	["ImageTexelPointer"] = 862
+	["ImageTexelPointer"] = 862,
+	["Decoration.nodeLaunch"] = 863,
+	["Decoration.nodeMaxDispatchGrid"] = 864,
+	["Decoration.nodeDispatchGrid"] = 865,
+	["Decoration.maxRecords"] = 866,
+	["nodeOutputRecordGetElementPtr"] = 867,
+	["getEnumBarrierMemoryTypeFlags"] = 868,
+	["getEnumBarrierSemanticFlags"] = 869,
+	["Decoration.workGraphRecordType"] = 870,
+	["Decoration.nodeID"] = 871,
+	["Decoration.nodeIsProgramEntry"] = 872,
+	["Decoration.nodeArraySize"] = 873,
+	["Decoration.allowSparseNodes"] = 874,
+	["Decoration.workGraphRecordElementType"] = 875
 }

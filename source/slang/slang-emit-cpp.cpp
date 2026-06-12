@@ -923,7 +923,6 @@ void CPPSourceEmitter::emitEntryPointAttributesImpl(
     IREntryPointDecoration* entryPointDecor)
 {
     SLANG_UNUSED(entryPointDecor);
-
     auto profile = m_effectiveProfile;
     auto stage = profile.getStage();
 
@@ -2090,6 +2089,13 @@ static bool _isFunction(IROp op)
     return op == kIROp_Func;
 }
 
+static bool _isNodeEntryPoint(IRFunc* func)
+{
+    if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
+        return entryPointDecor->getProfile().getStage() == Stage::Node;
+    return false;
+}
+
 void CPPSourceEmitter::_emitEntryPointDefinitionStart(
     IRFunc* func,
     const String& funcName,
@@ -2277,6 +2283,10 @@ void CPPSourceEmitter::_emitForwardDeclarations(const List<EmitAction>& actions)
                 switch (action.inst->getOp())
                 {
                 case kIROp_Func:
+                    if (_isNodeEntryPoint(as<IRFunc>(action.inst)))
+                        break;
+                    emitForwardDeclaration(action.inst);
+                    break;
                 case kIROp_StructType:
                 case kIROp_InterfaceType:
                     emitForwardDeclaration(action.inst);
@@ -2326,6 +2336,8 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
         {
             if (action.level == EmitAction::Level::Definition && _isFunction(action.inst->getOp()))
             {
+                if (_isNodeEntryPoint(as<IRFunc>(action.inst)))
+                    continue;
                 emitGlobalInst(action.inst);
             }
         }
@@ -2355,6 +2367,14 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 
             IREntryPointDecoration* entryPointDecor =
                 func->findDecoration<IREntryPointDecoration>();
+
+            if (_isNodeEntryPoint(func))
+            {
+                getSink()->diagnose(Diagnostics::NodeStageNotSupportedOnTarget{
+                    .target = "C++",
+                    .location = func->sourceLoc});
+                continue;
+            }
 
             if (entryPointDecor && entryPointDecor->getProfile().getStage() == Stage::Compute)
             {

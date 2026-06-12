@@ -68,22 +68,24 @@ enum class StructType
 // TODO: Rename to Stage
 enum class StageType
 {
-    Unknown,
-    Vertex,
-    Hull,
-    Domain,
-    Geometry,
-    Fragment,
-    Compute,
-    RayGeneration,
-    Intersection,
-    AnyHit,
-    ClosestHit,
-    Miss,
-    Callable,
-    Amplification,
-    Mesh,
-    CountOf,
+    Unknown = 0,
+    Vertex = 1,
+    Hull = 2,
+    Domain = 3,
+    Geometry = 4,
+    Fragment = 5,
+    Compute = 6,
+    RayGeneration = 7,
+    Intersection = 8,
+    AnyHit = 9,
+    ClosestHit = 10,
+    Miss = 11,
+    Callable = 12,
+    Amplification = 13,
+    Mesh = 14,
+    Dispatch = 15,
+    Node = 16,
+    CountOf = 17,
 };
 
 // TODO: Implementation or backend or something else?
@@ -212,6 +214,24 @@ public:
         0x9d32d0ad, 0x915c, 0x4ffd,                        \
         {                                                  \
             0x91, 0xe2, 0x50, 0x85, 0x54, 0xa0, 0x4a, 0x76 \
+        }                                                  \
+    }
+
+class IShaderProgramD3D12 : public ISlangUnknown
+{
+    SLANG_COM_INTERFACE(
+        0xa51fb26b,
+        0x92e2,
+        0x4de3,
+        {0xb1, 0x02, 0x4f, 0x0e, 0x8b, 0xa3, 0x45, 0x11})
+public:
+    virtual SLANG_NO_THROW Result SLANG_MCALL getRootSignature(void** outRootSignature) = 0;
+};
+#define SLANG_UUID_IShaderProgramD3D12                     \
+    {                                                      \
+        0xa51fb26b, 0x92e2, 0x4de3,                        \
+        {                                                  \
+            0xb1, 0x02, 0x4f, 0x0e, 0x8b, 0xa3, 0x45, 0x11 \
         }                                                  \
     }
 
@@ -1969,6 +1989,26 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
     dispatchComputeIndirect(IBufferResource* cmdBuffer, Offset offset) = 0;
 };
+
+class IComputeCommandEncoderD3D12 : public ISlangUnknown
+{
+    SLANG_COM_INTERFACE(
+        0x177e20d4,
+        0x6bbd,
+        0x4934,
+        {0x90, 0xab, 0x35, 0x1d, 0x6a, 0x9a, 0x20, 0xc8});
+
+public:
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    bindRootObjectAsCompute(IShaderProgram* program, IShaderObject* rootObject) = 0;
+};
+#define SLANG_UUID_IComputeCommandEncoderD3D12             \
+    {                                                      \
+        0x177e20d4, 0x6bbd, 0x4934,                        \
+        {                                                  \
+            0x90, 0xab, 0x35, 0x1d, 0x6a, 0x9a, 0x20, 0xc8 \
+        }                                                  \
+    }
 
 enum class AccelerationStructureCopyMode
 {

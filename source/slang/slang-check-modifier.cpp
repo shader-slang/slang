@@ -393,6 +393,36 @@ Modifier* SemanticsVisitor::validateAttribute(
     AttributeDecl* attribClassDecl,
     ModifiableSyntaxNode* attrTarget)
 {
+    constexpr IRIntegerValue kMaxNodeArraySize = 65535;
+    constexpr IRIntegerValue kMaxNodeGridDimension = 65535;
+    constexpr IRIntegerValue kMaxNodeRecords = 256;
+
+    const auto checkNodeAttributeArgInRange = [&](Expr* expr,
+                                                  char const* attributeName,
+                                                  IRIntegerValue minValue,
+                                                  IRIntegerValue maxValue) -> ConstantIntVal*
+    {
+        auto value = checkConstantIntVal(expr);
+        if (!value)
+            return nullptr;
+
+        auto integerValue = value->getValue();
+        if (integerValue < minValue || integerValue > maxValue)
+        {
+            getSink()->diagnose(Diagnostics::InvalidNodeAttributeArgumentValue{
+                .attribute = String(attributeName),
+                .value = integerValue,
+                .attr = attr});
+            return nullptr;
+        }
+
+        return value;
+    };
+
+    const auto checkPositiveNodeAttributeArg =
+        [&](Expr* expr, char const* attributeName, IRIntegerValue maxValue) -> ConstantIntVal*
+    { return checkNodeAttributeArgInRange(expr, attributeName, 1, maxValue); };
+
     if (auto numThreadsAttr = as<NumThreadsAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
@@ -487,6 +517,78 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
 
         waveSizeAttr->numLanes = value;
+    }
+    else if (auto nodeLaunchAttr = as<NodeLaunchAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 1);
+        String mode;
+        if (!checkLiteralStringVal(attr->args[0], &mode))
+            return nullptr;
+        if (mode != "broadcasting" && mode != "thread" && mode != "coalescing")
+        {
+            getSink()->diagnose(Diagnostics::InvalidNodeLaunchMode{.mode = mode, .attr = attr});
+            return nullptr;
+        }
+        nodeLaunchAttr->mode = mode;
+    }
+    else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 3);
+        gridAttr->x = checkPositiveNodeAttributeArg(
+            attr->args[0],
+            "NodeMaxDispatchGrid",
+            kMaxNodeGridDimension);
+        gridAttr->y = checkPositiveNodeAttributeArg(
+            attr->args[1],
+            "NodeMaxDispatchGrid",
+            kMaxNodeGridDimension);
+        gridAttr->z = checkPositiveNodeAttributeArg(
+            attr->args[2],
+            "NodeMaxDispatchGrid",
+            kMaxNodeGridDimension);
+        if (!gridAttr->x || !gridAttr->y || !gridAttr->z)
+            return nullptr;
+    }
+    else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 3);
+        fixedGridAttr->x =
+            checkPositiveNodeAttributeArg(attr->args[0], "NodeDispatchGrid", kMaxNodeGridDimension);
+        fixedGridAttr->y =
+            checkPositiveNodeAttributeArg(attr->args[1], "NodeDispatchGrid", kMaxNodeGridDimension);
+        fixedGridAttr->z =
+            checkPositiveNodeAttributeArg(attr->args[2], "NodeDispatchGrid", kMaxNodeGridDimension);
+        if (!fixedGridAttr->x || !fixedGridAttr->y || !fixedGridAttr->z)
+            return nullptr;
+    }
+    else if (auto maxRecAttr = as<MaxRecordsAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 1);
+        auto value = checkPositiveNodeAttributeArg(attr->args[0], "MaxRecords", kMaxNodeRecords);
+        if (!value)
+            return nullptr;
+        maxRecAttr->value = value;
+    }
+    else if (auto nodeIDAttr = as<NodeIDAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 2);
+        String name;
+        if (!checkLiteralStringVal(attr->args[0], &name))
+            return nullptr;
+        nodeIDAttr->name = name;
+        nodeIDAttr->arrayIndex =
+            checkNodeAttributeArgInRange(attr->args[1], "NodeID array index", 0, kMaxNodeArraySize);
+        if (!nodeIDAttr->arrayIndex)
+            return nullptr;
+    }
+    else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 1);
+        auto value =
+            checkPositiveNodeAttributeArg(attr->args[0], "NodeArraySize", kMaxNodeArraySize);
+        if (!value)
+            return nullptr;
+        nodeArraySizeAttr->count = value;
     }
     else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
     {

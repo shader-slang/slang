@@ -42,6 +42,26 @@ namespace Slang
 
 struct SpecializationContext;
 
+static void addWorkGraphRecordElementTypeDecorationIfNeeded(
+    IRBuilder* builder,
+    IRStructType* structType,
+    IRSpecialize* specializeInst)
+{
+    if (!structType)
+        return;
+    if (!structType->findDecoration<IRWorkGraphRecordTypeDecoration>())
+        return;
+    if (structType->findDecoration<IRWorkGraphRecordElementTypeDecoration>())
+        return;
+    if (specializeInst->getArgCount() != 1)
+        return;
+
+    if (auto elemType = as<IRType>(specializeInst->getArg(0)))
+    {
+        builder->addDecoration(structType, kIROp_WorkGraphRecordElementTypeDecoration, elemType);
+    }
+}
+
 IRInst* specializeGenericImpl(
     IRGeneric* genericVal,
     IRSpecialize* specializeInst,
@@ -290,8 +310,6 @@ struct SpecializationContext
         if (workListSet.add(inst))
         {
             workList.add(inst);
-
-
             addUsersToWorkList(inst);
         }
     }
@@ -438,7 +456,18 @@ struct SpecializationContext
             builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), specializeInst);
 
         if (auto existingVal = entry->getValue())
+        {
+            // For work-graph record types (e.g. DispatchNodeInputRecord<T>), the
+            // element type T may not have been recorded yet if the specialization was
+            // completed during module loading (before this compilation unit ran). Add
+            // the decoration here so the HLSL emitter can reconstruct the native
+            // template name.
+            addWorkGraphRecordElementTypeDecorationIfNeeded(
+                &builder,
+                as<IRStructType>(existingVal),
+                specializeInst);
             return existingVal;
+        }
 
         // We want to see if an existing specialization
         // has already been made. To detect recursive specialization,
@@ -619,7 +648,6 @@ struct SpecializationContext
         //
         if (!areAllOperandsFullySpecialized(specInst))
             return false;
-
 
         if (!hasNonTrivialUses(specInst))
             return false;
@@ -3825,6 +3853,14 @@ IRInst* specializeGenericImpl(
                 cloneInstDecorationsAndChildren(&env, module, specializeInst, specializedVal);
                 if (context)
                     context->removeSpecializationDepthDecorations(specializedVal);
+
+                // If the specialized type is a work-graph record type and was given exactly
+                // one type argument (the element type T), record T so the HLSL emitter can
+                // reconstruct the native template name (e.g. DispatchNodeInputRecord<RecordData>).
+                addWorkGraphRecordElementTypeDecorationIfNeeded(
+                    builder,
+                    as<IRStructType>(specializedVal),
+                    specializeInst);
 
                 // Perform IR simplifications to fold constants in this specialized value if it
                 // is a function, so further specializations from the specialized function will

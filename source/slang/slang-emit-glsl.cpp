@@ -125,6 +125,10 @@ SlangResult GLSLSourceEmitter::init()
             _requireSPIRVVersion(SemanticVersion(1, 4));
             break;
         }
+    case Stage::Node:
+        getSink()->diagnose(
+            Diagnostics::NodeStageNotSupportedOnTarget{.target = "GLSL", .location = SourceLoc()});
+        return SLANG_FAIL;
     default:
         break;
     }
@@ -1531,6 +1535,10 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
     case Stage::Mesh:
     case Stage::Amplification:
         emitLocalSizeLayout();
+        break;
+    case Stage::Node:
+        // Node stage is not supported on GLSL; handled above.
+        break;
     default:
         break;
     }

@@ -1,32 +1,31 @@
-//TEST:SIMPLE(filecheck=CHK): -target spirv-asm -stage compute -entry main -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHK_DXIL): -target dxil-asm -stage node -entry main -profile lib_6_8
+//TEST:SIMPLE(filecheck=CHK_HLSL): -target hlsl -stage node -entry main -profile lib_6_8
+
 struct RecordData
 {
     int myData;
 };
 
-[shader("compute")]
-[numthreads(1, 1, 1)]
-void main(uint3 dispatchThreadId : SV_GroupThreadID)
+RWStructuredBuffer<int> output;
+
+[Shader("node")]
+[NodeID("GeneratePath")]
+[NodeIsProgramEntry]
+[NodeLaunch("broadcasting")]
+[NodeDispatchGrid(120, 270, 1)]
+[NumThreads(16, 4, 1)]
+void main(
+    DispatchNodeInputRecord<RecordData> inputData,
+    uint3 dispatchThreadId : SV_GroupThreadID)
 {
-    spirv_asm
-    {
-        OpExecutionMode $main ShaderIndexAMDX $(0);
-        OpExecutionMode $main StaticNumWorkgroupsAMDX $(1) $(1) $(1);
-    };
-
-    DispatchNodeInputRecord<RecordData> inputData;
-
     let recordData = inputData.Get();
-    int myData = recordData.myData;
+    output[0] = recordData.myData;
 }
 
-//CHK: ; Types, variables and constants
-//CHK: [[MemberType:%[a-zA-Z_0-9]+]] = OpTypeInt 32 1
-//CHK: [[StructType:%[a-zA-Z_0-9]+]] = OpTypeStruct [[MemberType]]
-//CHK: [[PayloadType:%[a-zA-Z_0-9]+]] = OpTypeNodePayloadArrayAMDX [[StructType]]
-//CHK: [[PtrType:%[a-zA-Z_0-9]+]] = OpTypePointer NodePayloadAMDX [[PayloadType]]
-
-//CHK: ; Function
-//CHK: [[VarName:%[a-zA-Z_0-9]+]] = OpVariable [[PtrType]] NodePayloadAMDX
-//CHK: = OpAccessChain [[PtrType]] [[VarName]]
-
+//CHK_DXIL: dx.op.createNodeInputRecordHandle
+//CHK_DXIL: dx.op.getNodeRecordPtr
+//CHK_HLSL: [NodeLaunch("broadcasting")]
+//CHK_HLSL: [NodeDispatchGrid(120, 270, 1)]
+//CHK_HLSL: [NodeID("GeneratePath", 0)]
+//CHK_HLSL: [NodeIsProgramEntry]
+//CHK_HLSL: DispatchNodeInputRecord<RecordData

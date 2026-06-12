@@ -1479,6 +1479,12 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_CapabilityDisjunction:
         return true;
 
+    // Work-graph Barrier flag helpers: must be inlined into the call site so the HLSL
+    // emitter can emit named constants directly rather than through a temporary int.
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+    case kIROp_GetEnumBarrierSemanticFlags:
+        return true;
+
     // Always fold these in, because their results
     // cannot be represented in the type system of
     // our current targets.
@@ -4445,6 +4451,12 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
         return;
     }
 
+    // Some targets provide work-graph record types as native built-ins.
+    if (shouldSuppressWorkGraphRecordTypeEmission(structType))
+    {
+        return;
+    }
+
     m_writer->emit("struct ");
 
     emitPostKeywordTypeAttributes(structType);
@@ -5149,6 +5161,16 @@ void CLikeSourceEmitter::ensureInstOperand(
 
 void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, IRInst* inst)
 {
+    // SPIR-V asm blocks and their sub-instructions are opaque to C-like targets.
+    // Their operands may reference the enclosing function (e.g. $main), which
+    // would cause a false circularity in the emit ordering. Preserve the result
+    // type order, then skip asm operands.
+    if (inst->getOp() == kIROp_SPIRVAsm)
+    {
+        ensureInstOperand(ctx, inst->getFullType());
+        return;
+    }
+
     ensureInstOperand(ctx, inst->getFullType());
 
     UInt operandCount = inst->operandCount;
@@ -5405,6 +5427,9 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
         emitFuncDecl(cast<IRFunc>(inst));
         break;
     case kIROp_StructType:
+        // Some targets provide work-graph record types as native built-ins.
+        if (shouldSuppressWorkGraphRecordTypeEmission(cast<IRStructType>(inst)))
+            break;
         m_writer->emit("struct ");
         m_writer->emit(getName(inst));
         m_writer->emit(";\n");
