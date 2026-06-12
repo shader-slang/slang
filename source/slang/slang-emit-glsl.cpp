@@ -1951,9 +1951,8 @@ void GLSLSourceEmitter::emitImageFormatModifierImpl(IRInst* varDecl, IRType* var
     // - Emit a `format` layout qualifier.
     // - Emit `writeonly` memory qualifier for `WTexture*`.
 
-    if (auto resourceType =
-            as<IRTextureType, IRDynamicCastBehavior::NoUnwrap>(
-                _unwrapArrayAndAttributedType(varType)))
+    if (auto resourceType = as<IRTextureType, IRDynamicCastBehavior::NoUnwrap>(
+            _unwrapArrayAndAttributedType(varType)))
     {
         switch (resourceType->getAccess())
         {
