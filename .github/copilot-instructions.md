@@ -73,6 +73,9 @@ Recurring review feedback distilled into rules — following them avoids review 
 govern how code reads and is structured; the Problem-Solving Methodology above governs what to
 change.)
 
+- Function names should reflect the nature of the behavior they implement, including important
+  return-type/reference semantics, rather than the narrow use case that motivated the function.
+
 - **Comment functions as complete sentences: what, then why.** Say what the function does first;
   then, if non-obvious, why it exists. Include a concrete example for non-trivial behavior; avoid
   terse fragment/bullet-only function comments.

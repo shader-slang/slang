@@ -124,6 +124,9 @@ Conventions:
 - Use `SLANG_`-prefixed `SCREAMING_SNAKE_CASE` for macros.
 - Prefer comments that explain why code exists.
 
+- Function names should reflect the nature of the behavior they implement, including important
+  return-type/reference semantics, rather than the narrow use case that motivated the function.
+
 Review conventions (recurring review feedback — following them avoids review round-trips):
 
 - Comment functions in complete sentences: what it does first, then why if non-obvious; include a
