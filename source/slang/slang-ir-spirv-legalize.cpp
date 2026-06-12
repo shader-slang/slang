@@ -2179,11 +2179,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     continue;
                 }
             }
-            if (!as<IRBasicType>(elementType))
-            {
-                SLANG_RELEASE_ASSERT(
-                    !"abort argument type should be validated during type legalization");
-            }
+            SLANG_RELEASE_ASSERT(as<IRBasicType>(elementType));
         }
 
         // Build the message struct type `{ uint format[]; args... }` and value,
