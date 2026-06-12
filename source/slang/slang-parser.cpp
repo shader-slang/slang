@@ -4858,13 +4858,19 @@ NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
     // with `type` fully formed.
     auto type = parser->ParseTypeExpAllowDecl();
 
-    // Parse the alias name through the shared declarator machinery rather than a
-    // bare identifier read, so a C-style trailing declarator (`typedef int arr[2];`)
-    // folds its trailing `[N]` array suffixes onto the alias type, exactly as variable
-    // declarators do (see ParseDeclaratorDecl / UnwrapDeclarator). Both the trailing and
-    // leading array forms therefore produce the same array-typed alias. We use the bare
-    // declarator, not parseInitDeclarator, because a typedef takes no initializer or
-    // semantics.
+    // Parse the alias name through the shared declarator machinery rather than a bare
+    // identifier read. This accepts the full non-abstract declarator that variable
+    // declarations accept -- a name plus trailing `[N]` array suffixes, and the prefix `*`
+    // pointer / parenthesized declarator forms -- so the C-style `typedef int arr[2];` now
+    // parses where the old `ReadToken(Identifier)` rejected it. We use the bare declarator,
+    // not parseInitDeclarator, because a typedef takes no initializer or semantics.
+    //
+    // UnwrapDeclarator folds the declarator suffixes onto the base type with C
+    // array-variable semantics: `typedef int m[A][B];` yields Array<Array<int, B>, A> -- the
+    // same type as the variable `int m[A][B];`. For a single dimension that equals the
+    // leading form `typedef int[N] arr;`; for multiple dimensions the trailing form is the
+    // transpose of the leading form (which wraps left-to-right), so the two are not
+    // interchangeable beyond one dimension.
     DeclaratorInfo declaratorInfo;
     declaratorInfo.typeSpec = type.exp;
     auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);
