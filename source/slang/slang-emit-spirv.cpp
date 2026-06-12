@@ -1732,18 +1732,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     bool hasCoherentMemoryQualifierAttr(IRInst* type)
     {
-        while (auto attributedType = as<IRAttributedType>(type))
+        while (type)
         {
-            for (auto attr : attributedType->getAllAttrs())
+            if (auto attributedType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
             {
-                if (auto collection = as<IRMemoryQualifierSetAttr>(attr))
+                for (auto attr : attributedType->getAllAttrs())
                 {
-                    IRIntegerValue flags = getIntVal(collection->getMemoryQualifierBit());
-                    if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
-                        return true;
+                    if (auto collection = as<IRMemoryQualifierSetAttr>(attr))
+                    {
+                        IRIntegerValue flags = getIntVal(collection->getMemoryQualifierBit());
+                        if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                            return true;
+                    }
                 }
+                type = attributedType->getBaseType();
+                continue;
             }
-            type = attributedType->getBaseType();
+            if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
+            {
+                type = arrayType->getElementType();
+                continue;
+            }
+            break;
         }
         return false;
     }

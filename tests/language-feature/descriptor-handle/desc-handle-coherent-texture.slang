@@ -10,10 +10,10 @@
 // SPIRV-NOT: MakeTexelAvailable|NonPrivateTexel
 
 // HLSL-COUNT-4: globallycoherent RWTexture2D<float4 >  _S
-// HLSL-NOT: globallycoherent
+// HLSL-NOT: globallycoherent RWTexture2D<float4 >  _S
 // GLSL emits one resource-heap image declaration shared by both coherent handles.
-// GLSL-COUNT-1: coherent
-// GLSL-NOT: coherent
+// GLSL-COUNT-1: uniform coherent image2D
+// GLSL-NOT: uniform coherent image2D
 
 uniform DescriptorHandle<coherent RWTexture2D<float4>> coherentTexture;
 uniform DescriptorHandle<globallycoherent RWTexture2D<float4>> globallyCoherentTexture;

@@ -5,6 +5,27 @@
 
 namespace Slang
 {
+// Find the texture resource inside parameter wrappers without relying on implicit cast unwrapping.
+static IRTextureTypeBase* getTextureTypeFromParameterType(IRType* type)
+{
+    while (type)
+    {
+        if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = arrayType->getElementType();
+            continue;
+        }
+        if (auto attributedType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = attributedType->getBaseType();
+            continue;
+        }
+        break;
+    }
+    return as<IRTextureTypeBase, IRDynamicCastBehavior::NoUnwrap>(type);
+}
+
+// Rebuild a parameter type with a new image element type while preserving wrapper attributes.
 static IRType* replaceImageElementType(IRInst* originalType, IRInst* newElementType)
 {
     switch (originalType->getOp())
@@ -30,8 +51,24 @@ static IRType* replaceImageElementType(IRInst* originalType, IRInst* newElementT
             return (IRType*)originalType;
         }
 
+    case kIROp_AttributedType:
+        {
+            auto attributedType = cast<IRAttributedType>(originalType);
+            auto newBaseType =
+                replaceImageElementType(attributedType->getBaseType(), newElementType);
+            if (newBaseType != attributedType->getBaseType())
+            {
+                IRBuilder builder(originalType);
+                builder.setInsertBefore(originalType);
+                IRCloneEnv cloneEnv;
+                cloneEnv.mapOldValToNew.add(attributedType->getBaseType(), newBaseType);
+                return (IRType*)cloneInst(&cloneEnv, &builder, originalType);
+            }
+            return (IRType*)originalType;
+        }
+
     default:
-        if (as<IRResourceTypeBase>(originalType))
+        if (as<IRResourceTypeBase, IRDynamicCastBehavior::NoUnwrap>(originalType))
             return (IRType*)newElementType;
         return (IRType*)originalType;
     }
@@ -130,20 +167,9 @@ void resolveTextureFormat(IRModule* module)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (as<IRTextureTypeBase>(globalInst->getDataType()))
+        if (auto textureType = getTextureTypeFromParameterType(globalInst->getDataType()))
         {
-            resolveTextureFormatForParameter(
-                globalInst,
-                (IRTextureTypeBase*)globalInst->getDataType());
-        }
-        else if (auto arrayType = as<IRArrayTypeBase>(globalInst->getDataType()))
-        {
-            if (as<IRTextureTypeBase>(arrayType->getElementType()))
-            {
-                resolveTextureFormatForParameter(
-                    globalInst,
-                    (IRTextureTypeBase*)arrayType->getElementType());
-            }
+            resolveTextureFormatForParameter(globalInst, textureType);
         }
     }
 }

@@ -3,9 +3,182 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target.h"
 
 namespace Slang
 {
+
+static bool _targetSupportsCoherentMemoryQualifier(TargetRequest* target)
+{
+    return target && (isD3DTarget(target) || isKhronosTarget(target));
+}
+
+static bool _hasCoherentMemoryQualifierAttr(IRAttributedType* attributedType)
+{
+    for (auto attr : attributedType->getAllAttrs())
+    {
+        if (auto memoryQualifierAttr = as<IRMemoryQualifierSetAttr>(attr))
+        {
+            auto flags = getIntVal(memoryQualifierAttr->getMemoryQualifierBit());
+            if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                return true;
+        }
+    }
+    return false;
+}
+
+static bool _hasCoherentMemoryQualifierDecoration(IRInst* inst)
+{
+    if (auto decoration = inst->findDecoration<IRMemoryQualifierSetDecoration>())
+    {
+        auto flags = decoration->getMemoryQualifierBit();
+        return (flags & MemoryQualifierSetModifier::Flags::kCoherent) != 0;
+    }
+    return false;
+}
+
+static void _checkCoherentMemoryQualifierTargetSupport(
+    IRAttributedType* attributedType,
+    TargetRequest* target,
+    DiagnosticSink* sink)
+{
+    if (_targetSupportsCoherentMemoryQualifier(target))
+        return;
+    if (!_hasCoherentMemoryQualifierAttr(attributedType))
+        return;
+
+    sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+        .operation = "coherent memory qualifier",
+        .location = findFirstUseLoc(attributedType)});
+}
+
+static void _checkCoherentMemoryQualifierDecorationTargetSupport(
+    IRInst* inst,
+    TargetRequest* target,
+    DiagnosticSink* sink)
+{
+    if (_targetSupportsCoherentMemoryQualifier(target))
+        return;
+    if (!_hasCoherentMemoryQualifierDecoration(inst))
+        return;
+
+    sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+        .operation = "coherent memory qualifier",
+        .location = findFirstUseLoc(inst)});
+}
+
+static void _checkCoherentMemoryQualifierTargetSupport(
+    IRType* type,
+    TargetRequest* target,
+    DiagnosticSink* sink,
+    HashSet<IRInst*>& checkedTypes)
+{
+    if (_targetSupportsCoherentMemoryQualifier(target))
+        return;
+
+    while (type)
+    {
+        if (!checkedTypes.add(type))
+            return;
+
+        if (auto attributedType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            _checkCoherentMemoryQualifierTargetSupport(attributedType, target, sink);
+            type = attributedType->getBaseType();
+            continue;
+        }
+        if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = arrayType->getElementType();
+            continue;
+        }
+        if (auto ptrType = as<IRPtrTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = ptrType->getValueType();
+            continue;
+        }
+        if (auto rateQualifiedType = as<IRRateQualifiedType, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = rateQualifiedType->getValueType();
+            continue;
+        }
+        return;
+    }
+}
+
+static void _checkCoherentMemoryQualifierTargetSupport(
+    TargetRequest* target,
+    IRFunc* func,
+    DiagnosticSink* sink,
+    HashSet<IRInst*>& checkedTypes)
+{
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            _checkCoherentMemoryQualifierDecorationTargetSupport(inst, target, sink);
+            _checkCoherentMemoryQualifierTargetSupport(
+                inst->getDataType(),
+                target,
+                sink,
+                checkedTypes);
+        }
+    }
+}
+
+void checkUnsupportedCoherentMemoryQualifier(
+    IRModule* module,
+    TargetRequest* target,
+    DiagnosticSink* sink)
+{
+    // Run before source-target legalization can erase coherent decorations or attributed types.
+    HashSet<IRInst*> checkedTypes;
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        _checkCoherentMemoryQualifierDecorationTargetSupport(globalInst, target, sink);
+
+        if (auto type = as<IRType, IRDynamicCastBehavior::NoUnwrap>(globalInst))
+        {
+            _checkCoherentMemoryQualifierTargetSupport(type, target, sink, checkedTypes);
+        }
+        else
+        {
+            _checkCoherentMemoryQualifierTargetSupport(
+                globalInst->getDataType(),
+                target,
+                sink,
+                checkedTypes);
+        }
+
+        switch (globalInst->getOp())
+        {
+        case kIROp_Func:
+            _checkCoherentMemoryQualifierTargetSupport(
+                target,
+                as<IRFunc>(globalInst),
+                sink,
+                checkedTypes);
+            break;
+        case kIROp_Generic:
+            {
+                auto generic = as<IRGeneric>(globalInst);
+                auto innerFunc = as<IRFunc>(findGenericReturnVal(generic));
+                if (innerFunc)
+                {
+                    _checkCoherentMemoryQualifierTargetSupport(
+                        target,
+                        innerFunc,
+                        sink,
+                        checkedTypes);
+                }
+                break;
+            }
+        default:
+            break;
+        }
+    }
+}
 
 void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
 {

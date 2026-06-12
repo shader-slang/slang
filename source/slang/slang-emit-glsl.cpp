@@ -261,6 +261,26 @@ IRIntegerValue GLSLSourceEmitter::_getMemoryQualifierTypeAttrFlags(IRType* type)
     return flags;
 }
 
+// Strip array and type-attribute wrappers for GLSL resource classification.
+static IRType* _unwrapArrayAndAttributedType(IRType* type)
+{
+    while (type)
+    {
+        if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = arrayType->getElementType();
+            continue;
+        }
+        if (auto attributedType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = attributedType->getBaseType();
+            continue;
+        }
+        break;
+    }
+    return type;
+}
+
 void GLSLSourceEmitter::_emitMemoryQualifierDecorations(IRInst* varDecl)
 {
     _emitMemoryQualifierFlags(_getMemoryQualifierDecorationFlags(varDecl));
@@ -1894,7 +1914,7 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
     //
     if (as<IRUnsizedArrayType>(varType))
     {
-        if (isResourceType(unwrapArray(varType)))
+        if (isResourceType(_unwrapArrayAndAttributedType(varType)))
         {
             _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_nonuniform_qualifier"));
         }
@@ -1931,7 +1951,9 @@ void GLSLSourceEmitter::emitImageFormatModifierImpl(IRInst* varDecl, IRType* var
     // - Emit a `format` layout qualifier.
     // - Emit `writeonly` memory qualifier for `WTexture*`.
 
-    if (auto resourceType = as<IRTextureType>(unwrapArray(varType)))
+    if (auto resourceType =
+            as<IRTextureType, IRDynamicCastBehavior::NoUnwrap>(
+                _unwrapArrayAndAttributedType(varType)))
     {
         switch (resourceType->getAccess())
         {

@@ -109,6 +109,7 @@ protected:
 
     virtual void emitPostKeywordTypeAttributesImpl(IRInst* inst) SLANG_OVERRIDE;
 
+    virtual void _emitType(IRType* type, DeclaratorInfo* declarator) SLANG_OVERRIDE;
     virtual void _emitPrefixTypeAttr(IRAttr* attr) SLANG_OVERRIDE;
 
     // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout

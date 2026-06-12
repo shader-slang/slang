@@ -403,9 +403,19 @@ List<IRWitnessTableEntry*> CLikeSourceEmitter::getSortedWitnessTableEntries(
 
 void CLikeSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
 {
-    SLANG_UNUSED(attr);
+    if (auto memoryQualifierAttr = as<IRMemoryQualifierSetAttr>(attr))
+    {
+        auto flags = getIntVal(memoryQualifierAttr->getMemoryQualifierBit());
+        if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+        {
+            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = "coherent memory qualifier",
+                .location = findFirstUseLoc(attr)});
+        }
+        return;
+    }
 
-    // By defualt we will not emit any attributes.
+    // By default we will not emit any attributes.
     //
     // TODO: If `const` ever surfaces as a type attribute in our IR,
     // we may need to handle it here.

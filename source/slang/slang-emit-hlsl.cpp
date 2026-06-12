@@ -11,6 +11,66 @@
 namespace Slang
 {
 
+// Return true when HLSL can legally print `globallycoherent` on this resource declaration.
+static bool _shouldEmitHLSLGloballyCoherentModifier(IRType* type)
+{
+    while (type)
+    {
+        if (auto attributedType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = attributedType->getBaseType();
+            continue;
+        }
+        if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = arrayType->getElementType();
+            continue;
+        }
+        if (auto rateQualifiedType = as<IRRateQualifiedType, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = rateQualifiedType->getValueType();
+            continue;
+        }
+        if (auto descriptorHandleType =
+                as<IRDescriptorHandleType, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = descriptorHandleType->getResourceType();
+            continue;
+        }
+
+        break;
+    }
+
+    if (!type)
+        return false;
+
+    if (auto resourceType = as<IRResourceTypeBase>(type))
+    {
+        switch (resourceType->getAccess())
+        {
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+        case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+        case SLANG_RESOURCE_ACCESS_WRITE:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    switch (type->getOp())
+    {
+    case kIROp_HLSLRWStructuredBufferType:
+    case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+    case kIROp_HLSLAppendStructuredBufferType:
+    case kIROp_HLSLConsumeStructuredBufferType:
+    case kIROp_HLSLRWByteAddressBufferType:
+    case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 
 void HLSLSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
@@ -1722,6 +1782,32 @@ void HLSLSourceEmitter::emitSimpleTypeAndDeclaratorImpl(IRType* type, Declarator
         }
     }
     Super::emitSimpleTypeAndDeclaratorImpl(type, declarator);
+}
+
+void HLSLSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
+{
+    if (auto attributedType = as<IRAttributedType>(type))
+    {
+        for (auto attr : attributedType->getAllAttrs())
+        {
+            if (auto memoryQualifierAttr = as<IRMemoryQualifierSetAttr>(attr))
+            {
+                auto flags = getIntVal(memoryQualifierAttr->getMemoryQualifierBit());
+                if ((flags & MemoryQualifierSetModifier::Flags::kCoherent) &&
+                    !_shouldEmitHLSLGloballyCoherentModifier(attributedType->getBaseType()))
+                {
+                    continue;
+                }
+            }
+
+            _emitPrefixTypeAttr(attr);
+        }
+        AttributedDeclaratorInfo attributedDeclarator(declarator, attributedType);
+        _emitType(attributedType->getBaseType(), &attributedDeclarator);
+        return;
+    }
+
+    Super::_emitType(type, declarator);
 }
 
 void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)

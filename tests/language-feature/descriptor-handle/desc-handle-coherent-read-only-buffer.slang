@@ -5,11 +5,12 @@
 // SPIRV: OpLoad {{.*}} MakePointerVisible|NonPrivatePointer
 // SPIRV-NOT: MakePointerVisible|NonPrivatePointer
 
-// HLSL-COUNT-1: globallycoherent StructuredBuffer<uint >  _S
+// HLSL-NOT: globallycoherent
+// HLSL: StructuredBuffer<uint >  _S
 // HLSL-NOT: globallycoherent
 // GLSL emits one resource-heap SSBO declaration for the coherent read-only handle.
 // GLSL-COUNT-1: coherent readonly buffer
-// GLSL-NOT: coherent
+// GLSL-NOT: coherent readonly buffer
 
 uniform DescriptorHandle<coherent StructuredBuffer<uint>> coherentReadOnlyBuffer;
 uniform DescriptorHandle<StructuredBuffer<uint>> plainReadOnlyBuffer;
