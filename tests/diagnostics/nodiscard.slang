@@ -112,6 +112,9 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
                                  ^ result of '[NoDiscard]' function is discarded
                                  ^ the result of calling 'freeFunc' is discarded; this function is marked '[NoDiscard]'.
 */
+    // The condition of a ternary is consumed to choose an arm, not discarded, so a
+    // `[NoDiscard]` call in that position does not error.
+    check() ? true : false;
 
     // A cast is a use of the result, so a cast-wrapped call does not error.
     (uint)freeFunc();
@@ -129,6 +132,10 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
                  ^ result of '[NoDiscard]' function is discarded
                  ^ the result of calling 'check' is discarded; this function is marked '[NoDiscard]'.
 */
+    // The left operand is consumed to decide whether the right operand is evaluated, so a
+    // `[NoDiscard]` call on the left does not error.
+    check() && cond;
+    check() || cond;
 
     // A discarded user-defined operator result and a discarded generic-function result both error.
     Widget w1 = Widget(1);
