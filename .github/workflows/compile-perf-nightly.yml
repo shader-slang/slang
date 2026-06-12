@@ -7,8 +7,12 @@ name: Compile Perf — Nightly ToT
 # tools/benchmark/perf-suite/CI_PLAN.md.
 
 on:
-  schedule:
-    - cron: "0 6 * * *" # daily 06:00 UTC
+  # The daily schedule is intentionally DISABLED for now — do not enable it in
+  # this phase. Re-enable (uncomment) once the suite is validated on the runner
+  # and the results repo is seeded; until then the job is manual-only via
+  # workflow_dispatch.
+  # schedule:
+  #   - cron: "0 6 * * *" # daily 06:00 UTC
   workflow_dispatch:
     inputs:
       samples:

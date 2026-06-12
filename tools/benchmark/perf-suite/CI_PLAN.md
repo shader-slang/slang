@@ -72,7 +72,7 @@ figures, not user-facing slowdowns; `mdl_dxr` is the realistic one.
 
 ## Tier 2 — nightly full suite
 
-**Trigger:** `schedule` (nightly cron) + `workflow_dispatch`.
+**Trigger:** `workflow_dispatch` (manual) for now — the `schedule` (nightly cron) is **commented out / not enabled in this phase**; uncomment it once the suite is validated on the runner and the results repo is seeded.
 **Runner:** runner group `nvrgfx`, labels `[Windows, X64, nvrgfx-perf]` (same pool as Tier 1).
 
 **Steps:**
@@ -153,8 +153,9 @@ before `git add -A` so this scratch never gets committed.
 
 ## Workflows
 
-- **`.github/workflows/compile-perf-nightly.yml`** — `schedule` (06:00 UTC) +
-  `workflow_dispatch`. Builds ToT, sweeps into `daily/<date>-<sha>/`, runs
+- **`.github/workflows/compile-perf-nightly.yml`** — `workflow_dispatch` now;
+  the `schedule` (06:00 UTC) is **commented out (not enabled this phase)**.
+  Builds ToT, sweeps into `daily/<date>-<sha>/`, runs
   `track.py register`, pushes the results repo, then runs `trend.py`. Inputs:
   `samples`, `sweep`, `only`.
 - **`.github/workflows/compile-perf-release-sweep.yml`** — `workflow_dispatch`
