@@ -1011,7 +1011,7 @@ String StringUtil::makeMinimalHexFloat(double value)
 
             // returned fraction: 0.xxxxxxxx...
 
-            mantissa = fraction * std::exp2(53);
+            mantissa = static_cast<std::uint64_t>(fraction * std::exp2(53));
             // mantissa is now xxxxxxx... (integer number)
 
             // adjust exponent, since we print 1.xxxxx...
