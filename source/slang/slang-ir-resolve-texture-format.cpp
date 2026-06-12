@@ -2,27 +2,15 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
 // Find the texture resource inside parameter wrappers without relying on implicit cast unwrapping.
 static IRTextureTypeBase* getTextureTypeFromParameterType(IRType* type)
 {
-    while (type)
-    {
-        if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
-        {
-            type = arrayType->getElementType();
-            continue;
-        }
-        if (auto attributedType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
-        {
-            type = attributedType->getBaseType();
-            continue;
-        }
-        break;
-    }
-    return as<IRTextureTypeBase, IRDynamicCastBehavior::NoUnwrap>(type);
+    return as<IRTextureTypeBase, IRDynamicCastBehavior::NoUnwrap>(
+        unwrapAttributedTypeAndArray(type));
 }
 
 // Rebuild a parameter type with a new image element type while preserving wrapper attributes.

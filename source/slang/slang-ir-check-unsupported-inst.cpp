@@ -13,20 +13,6 @@ static bool _targetSupportsCoherentMemoryQualifier(TargetRequest* target)
     return target && (isD3DTarget(target) || isKhronosTarget(target));
 }
 
-static bool _hasCoherentMemoryQualifierAttr(IRAttributedType* attributedType)
-{
-    for (auto attr : attributedType->getAllAttrs())
-    {
-        if (auto memoryQualifierAttr = as<IRMemoryQualifierSetAttr>(attr))
-        {
-            auto flags = getIntVal(memoryQualifierAttr->getMemoryQualifierBit());
-            if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
-                return true;
-        }
-    }
-    return false;
-}
-
 static bool _hasCoherentMemoryQualifierDecoration(IRInst* inst)
 {
     if (auto decoration = inst->findDecoration<IRMemoryQualifierSetDecoration>())
@@ -35,21 +21,6 @@ static bool _hasCoherentMemoryQualifierDecoration(IRInst* inst)
         return (flags & MemoryQualifierSetModifier::Flags::kCoherent) != 0;
     }
     return false;
-}
-
-static void _checkCoherentMemoryQualifierTargetSupport(
-    IRAttributedType* attributedType,
-    TargetRequest* target,
-    DiagnosticSink* sink)
-{
-    if (_targetSupportsCoherentMemoryQualifier(target))
-        return;
-    if (!_hasCoherentMemoryQualifierAttr(attributedType))
-        return;
-
-    sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-        .operation = "coherent memory qualifier",
-        .location = findFirstUseLoc(attributedType)});
 }
 
 static void _checkCoherentMemoryQualifierDecorationTargetSupport(
@@ -81,17 +52,21 @@ static void _checkCoherentMemoryQualifierTargetSupport(
         if (!checkedTypes.add(type))
             return;
 
-        if (auto attributedType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
+        if ((getMemoryQualifierSetAttrFlags(type) & MemoryQualifierSetModifier::Flags::kCoherent) !=
+            0)
         {
-            _checkCoherentMemoryQualifierTargetSupport(attributedType, target, sink);
-            type = attributedType->getBaseType();
+            sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = "coherent memory qualifier",
+                .location = findFirstUseLoc(type)});
+        }
+
+        auto unwrappedType = unwrapAttributedTypeAndArray(type);
+        if (unwrappedType != type)
+        {
+            type = unwrappedType;
             continue;
         }
-        if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
-        {
-            type = arrayType->getElementType();
-            continue;
-        }
+
         if (auto ptrType = as<IRPtrTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
         {
             type = ptrType->getValueType();
@@ -100,6 +75,12 @@ static void _checkCoherentMemoryQualifierTargetSupport(
         if (auto rateQualifiedType = as<IRRateQualifiedType, IRDynamicCastBehavior::NoUnwrap>(type))
         {
             type = rateQualifiedType->getValueType();
+            continue;
+        }
+        if (auto descriptorHandleType =
+                as<IRDescriptorHandleType, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = descriptorHandleType->getResourceType();
             continue;
         }
         return;

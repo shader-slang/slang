@@ -16,14 +16,10 @@ static bool _shouldEmitHLSLGloballyCoherentModifier(IRType* type)
 {
     while (type)
     {
-        if (auto attributedType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
+        auto unwrappedType = unwrapAttributedTypeAndArray(type);
+        if (unwrappedType != type)
         {
-            type = attributedType->getBaseType();
-            continue;
-        }
-        if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
-        {
-            type = arrayType->getElementType();
+            type = unwrappedType;
             continue;
         }
         if (auto rateQualifiedType = as<IRRateQualifiedType, IRDynamicCastBehavior::NoUnwrap>(type))

@@ -236,49 +236,7 @@ IRIntegerValue GLSLSourceEmitter::_getMemoryQualifierDecorationFlags(IRInst* var
 
 IRIntegerValue GLSLSourceEmitter::_getMemoryQualifierTypeAttrFlags(IRType* type)
 {
-    IRIntegerValue flags = 0;
-    while (type)
-    {
-        if (auto attributedType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
-        {
-            for (auto attr : attributedType->getAllAttrs())
-            {
-                if (auto memoryQualifierAttr = as<IRMemoryQualifierSetAttr>(attr))
-                {
-                    flags |= getIntVal(memoryQualifierAttr->getMemoryQualifierBit());
-                }
-            }
-            type = attributedType->getBaseType();
-            continue;
-        }
-        if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
-        {
-            type = arrayType->getElementType();
-            continue;
-        }
-        break;
-    }
-    return flags;
-}
-
-// Strip array and type-attribute wrappers for GLSL resource classification.
-static IRType* _unwrapArrayAndAttributedType(IRType* type)
-{
-    while (type)
-    {
-        if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
-        {
-            type = arrayType->getElementType();
-            continue;
-        }
-        if (auto attributedType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
-        {
-            type = attributedType->getBaseType();
-            continue;
-        }
-        break;
-    }
-    return type;
+    return getMemoryQualifierSetAttrFlags(type);
 }
 
 void GLSLSourceEmitter::_emitMemoryQualifierDecorations(IRInst* varDecl)
@@ -1914,7 +1872,7 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
     //
     if (as<IRUnsizedArrayType>(varType))
     {
-        if (isResourceType(_unwrapArrayAndAttributedType(varType)))
+        if (isResourceType(unwrapAttributedTypeAndArray(varType)))
         {
             _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_nonuniform_qualifier"));
         }
@@ -1952,7 +1910,7 @@ void GLSLSourceEmitter::emitImageFormatModifierImpl(IRInst* varDecl, IRType* var
     // - Emit `writeonly` memory qualifier for `WTexture*`.
 
     if (auto resourceType = as<IRTextureType, IRDynamicCastBehavior::NoUnwrap>(
-            _unwrapArrayAndAttributedType(varType)))
+            unwrapAttributedTypeAndArray(varType)))
     {
         switch (resourceType->getAccess())
         {

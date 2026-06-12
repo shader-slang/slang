@@ -245,6 +245,54 @@ inline IRInst* unwrapAttributedType(IRInst* type)
     }
 }
 
+// Returns `type` with type-attribute and array wrappers stripped without implicit cast unwrapping.
+inline IRType* unwrapAttributedTypeAndArray(IRType* type)
+{
+    while (type)
+    {
+        if (auto attrType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = attrType->getBaseType();
+            continue;
+        }
+        if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = arrayType->getElementType();
+            continue;
+        }
+        break;
+    }
+    return type;
+}
+
+// Returns memory-qualifier attribute flags found while walking attributed and array type wrappers.
+inline IRIntegerValue getMemoryQualifierSetAttrFlags(IRType* type)
+{
+    IRIntegerValue flags = 0;
+    while (type)
+    {
+        if (auto attrType = as<IRAttributedType, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            for (auto attr : attrType->getAllAttrs())
+            {
+                if (auto memoryQualifierAttr = as<IRMemoryQualifierSetAttr>(attr))
+                {
+                    flags |= getIntVal(memoryQualifierAttr->getMemoryQualifierBit());
+                }
+            }
+            type = attrType->getBaseType();
+            continue;
+        }
+        if (auto arrayType = as<IRArrayTypeBase, IRDynamicCastBehavior::NoUnwrap>(type))
+        {
+            type = arrayType->getElementType();
+            continue;
+        }
+        break;
+    }
+    return flags;
+}
+
 // Remove hlsl's 'unorm' and 'snorm' modifiers
 IRType* dropNormAttributes(IRType* const t);
 
