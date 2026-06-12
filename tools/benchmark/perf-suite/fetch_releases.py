@@ -147,7 +147,9 @@ def verify(slangc):
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--repo", default=DEFAULT_REPO, help="local slang git checkout")
     ap.add_argument("--since", default="2025-08-01", help="YYYY-MM-DD inclusive")
     ap.add_argument("--until", default="2026-06-30", help="YYYY-MM-DD inclusive")

@@ -232,7 +232,9 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--slangc", required=True, help="path to slangc to benchmark")
     ap.add_argument("--label", required=True, help="version/run label, e.g. v2026.9")
     ap.add_argument("--out", default="results", help="output directory")

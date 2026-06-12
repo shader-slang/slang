@@ -6,27 +6,6 @@ and compare a build against historical releases. Each synthetic workload stresse
 one compiler stage; `mdl_dxr` (a real shader corpus) is the end-to-end signal.
 See `README.md` for the workload list and `manifest.py` for the full spec.
 
-## Design decisions
-
-| Decision                  | Choice                                                                          | Rationale                                                                                                                                                           |
-| ------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Release binaries          | Prebuilt published per tag, platform-matched (Linux `.tar.gz` / Windows `.zip`) | Fast, reproducible, matches shipped artifacts; source builds only for commit-level bisect                                                                           |
-| Measurement flag          | `-report-perf-benchmark`                                                        | Stable across the supported release window; the `detailed` variant only adds sub-timers on newer builds                                                             |
-| Headline metric           | `compileInner`, **median** of N timed runs                                      | Excludes the fixed core-module-load floor, so it is stable across releases. Median over min: reflects the typical run and is steadier when run-to-run spread shifts |
-| Per-compile floor         | the `minimal` workload's `compileInner`                                         | The N→0 limit — a direct measurement of fixed per-compile cost, not a fitted intercept (which can go negative on convex curves)                                     |
-| Timer scope / attribution | all nested phase timers; attribute via **leaf** timers                          | A jump in `compileInner` is traced down `generateOutput → linkAndOptimizeIR → specializeModule`; using leaves avoids double-counting nested timers                  |
-| Phase decomposition       | mutually-exclusive buckets (top-down)                                           | Named leaves + `(self)` residuals; if a child timer overshoots its parent it is scaled proportionally so the buckets always sum to `compileInner`                   |
-| Output                    | `results.json` only                                                             | JSON holds median/min/mean/stdev per timer; generated sources + compiled outputs go to an auto-removed `--gen-dir` tempdir so the results dir stays scratch-free    |
-| Robustness                | 1 warmup + N timed runs (default 5)                                             | The warmup absorbs cold-cache/first-run effects; multiple timed samples + median tame scheduling noise                                                              |
-| Determinism               | generators are deterministic (same N → identical bytes)                         | A release sweep compares like with like, and base/head always compile identical inputs                                                                              |
-| GPU / SDK dependency      | none                                                                            | Every workload is GPU-free and external-SDK-free, so it runs headless in CI                                                                                         |
-| Target                    | `-target spirv -emit-spirv-directly` (text backends use `-target metal`/`wgsl`) | Measures Slang itself, not a downstream `spirv-opt`                                                                                                                 |
-| Comparability             | absolute times are **runner-specific**                                          | Every point in a comparison must come from the same machine (see the tracking model + runner fingerprint below)                                                     |
-
-Benchmarking the whole suite is ~1.5–2.5 min per build; building `slangc` (minutes)
-dominates wall-clock, so the real constraints are timing noise and runner
-contention, not the bench runtime.
-
 ## Local use cases
 
 Every script is runnable directly (`./bench.py …` on macOS/Linux; `python bench.py …`
@@ -139,3 +118,24 @@ gets committed.
   `slang-material-modules-benchmark` + `SLANG_MDL_BENCHMARK_RESULTS_PAT` pattern).
 - Seed the history once via a manual **compile-perf-release-sweep** run, then —
   when ready — uncomment the nightly `schedule`.
+
+## Design decisions
+
+| Decision                  | Choice                                                                          | Rationale                                                                                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Release binaries          | Prebuilt published per tag, platform-matched (Linux `.tar.gz` / Windows `.zip`) | Fast, reproducible, matches shipped artifacts; source builds only for commit-level bisect                                                                           |
+| Measurement flag          | `-report-perf-benchmark`                                                        | Stable across the supported release window; the `detailed` variant only adds sub-timers on newer builds                                                             |
+| Headline metric           | `compileInner`, **median** of N timed runs                                      | Excludes the fixed core-module-load floor, so it is stable across releases. Median over min: reflects the typical run and is steadier when run-to-run spread shifts |
+| Per-compile floor         | the `minimal` workload's `compileInner`                                         | The N→0 limit — a direct measurement of fixed per-compile cost, not a fitted intercept (which can go negative on convex curves)                                     |
+| Timer scope / attribution | all nested phase timers; attribute via **leaf** timers                          | A jump in `compileInner` is traced down `generateOutput → linkAndOptimizeIR → specializeModule`; using leaves avoids double-counting nested timers                  |
+| Phase decomposition       | mutually-exclusive buckets (top-down)                                           | Named leaves + `(self)` residuals; if a child timer overshoots its parent it is scaled proportionally so the buckets always sum to `compileInner`                   |
+| Output                    | `results.json` only                                                             | JSON holds median/min/mean/stdev per timer; generated sources + compiled outputs go to an auto-removed `--gen-dir` tempdir so the results dir stays scratch-free    |
+| Robustness                | 1 warmup + N timed runs (default 5)                                             | The warmup absorbs cold-cache/first-run effects; multiple timed samples + median tame scheduling noise                                                              |
+| Determinism               | generators are deterministic (same N → identical bytes)                         | A release sweep compares like with like, and base/head always compile identical inputs                                                                              |
+| GPU / SDK dependency      | none                                                                            | Every workload is GPU-free and external-SDK-free, so it runs headless in CI                                                                                         |
+| Target                    | `-target spirv -emit-spirv-directly` (text backends use `-target metal`/`wgsl`) | Measures Slang itself, not a downstream `spirv-opt`                                                                                                                 |
+| Comparability             | absolute times are **runner-specific**                                          | Every point in a comparison must come from the same machine (see the tracking model + runner fingerprint above)                                                     |
+
+Benchmarking the whole suite is ~1.5–2.5 min per build; building `slangc` (minutes)
+dominates wall-clock, so the real constraints are timing noise and runner
+contention, not the bench runtime.

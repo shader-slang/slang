@@ -50,7 +50,9 @@ def fetch_corpus(name, spec, outroot):
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--out", default=os.path.join(HERE, "corpus"))
     ap.add_argument("--name", default="mdl", choices=list(CORPORA))
     args = ap.parse_args()

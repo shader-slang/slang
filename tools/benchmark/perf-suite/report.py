@@ -44,7 +44,9 @@ def cls(ratio):
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--index", default=os.path.join(HERE, "releases", "index.json"))
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
     ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])

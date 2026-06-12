@@ -228,7 +228,9 @@ def render_small_multiples(order, series, title, out, cols=4):
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--index", default=os.path.join(HERE, "releases", "index.json"))
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
     ap.add_argument("--timer", default="compileInner")

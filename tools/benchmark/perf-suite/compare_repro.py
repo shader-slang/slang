@@ -37,7 +37,9 @@ def ci(rec, stat):
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--baseline", default="results_baseline_orig")
     ap.add_argument("--new", default="results")
     ap.add_argument("--stat", default="median", choices=["min", "median"],

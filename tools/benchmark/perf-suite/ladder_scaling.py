@@ -22,7 +22,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--index", default=os.path.join(HERE, "releases", "index.json"))
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
     ap.add_argument("--workload", default="complexity_ladder")

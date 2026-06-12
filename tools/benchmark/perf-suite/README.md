@@ -182,8 +182,8 @@ python3 bench.py --slangc /path/to/slangc --label dev --sweep \
     --only resource_aggregate,reflection_layout,control_flow_ssa
 python3 sweep_report.py --label dev         # -> results/dev/_sweep/sweep_report.html
 
-# 6. "did my change slow compilation?" — build your branch vs master and diff,
-#    one command (builds both on the SAME machine via a throwaway git worktree)
+# 6. check a change for a compile-time regression — build your branch vs master
+#    and diff, one command (builds both on the SAME machine via a git worktree)
 python3 compare_branches.py --base master --only minimal,autodiff,mdl_dxr --samples 3
 #    ...or A/B two prebuilt slangc binaries yourself:
 python3 bench.py --slangc /path/to/base-slangc --label base   # baseline (e.g. merge-base)
@@ -205,7 +205,7 @@ python3 compare.py base head                # primary-timer Δ%, flags regressio
 | `fetch_corpus.py`     | downloads the MDL real-shader corpus (GitHub contents API)                                                                                                                                                                                                                                                            |
 | `fetch_releases.py`   | downloads + caches prebuilt `slangc` per release tag                                                                                                                                                                                                                                                                  |
 | `sweep.py`            | **release sweep** — runs `bench.py` against every cached release                                                                                                                                                                                                                                                      |
-| `compare.py`          | **local base-vs-head diff** — "did my change slow compilation?" (bench two slangc on one machine, then diff primary timers)                                                                                                                                                                                           |
+| `compare.py`          | **local base-vs-head diff** — checks a change for a compile-time regression (bench two slangc on one machine, then diff primary timers)                                                                                                                                                                               |
 | `compare_branches.py` | **branch-vs-branch driver** — builds slangc from a base ref (default `master`) + your working tree (throwaway `git worktree`), benches a subset of both, runs `compare.py`; the local one-command form of the per-PR gate                                                                                             |
 | `track.py`            | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint                                                                                                                                                                                                          |
 | `trend.py`            | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression                                                                                                                                                                                              |
