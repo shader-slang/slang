@@ -94,7 +94,7 @@ void main()
     getType(0x3p-1074LF);
     getType(0x3.8p-1074LF);
 //CHECK:    ^^^^^^^^^^^^^ floating-point precision lost
-//CHECK:    ^^^^^^^^^^^^^ significand of '0x3.8p-1074LF' was truncated, value is now '0x0.0000000000003p-1022'
+//CHECK:    ^^^^^^^^^^^^^ significand of '0x3.8p-1074LF' was truncated, value is now '0x1.8p-1073'
 
     // precision loss (hex float, subnormal)
     // subnormals step by 2^-149; 0x3p-149 is exact, 0x3.8p-149 is not

@@ -4,6 +4,12 @@
 #include "slang-char-util.h"
 #include "slang-text-io.h"
 
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <limits>
+
 namespace Slang
 {
 
@@ -977,27 +983,81 @@ int StringUtil::parseIntAndAdvancePos(UnownedStringSlice text, Index& pos)
 
 String StringUtil::makeMinimalHexFloat(double value)
 {
+    static constexpr char hexChars
+        [16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
     char buf[32]{};
-    snprintf(buf, sizeof(buf), "%a", value);
+    std::size_t i{};
 
-    // `%a` output has the shape `[-]0xH[.HHHH]p±D`. Only the fractional part between '.' and the
-    // 'p'/'P' exponent marker can carry the platform-dependent zero padding, so trim it there.
-    char* dot = strchr(buf, '.');
-    char* exp = strpbrk(buf, "pP");
-    if (dot && exp && dot < exp)
+    if (std::signbit(value))
     {
-        // Find the first significant char scanning back from the exponent marker.
-        char* lastSignificant = exp;
-        while (lastSignificant > dot + 1 && lastSignificant[-1] == '0')
-            --lastSignificant;
-
-        // If the whole fraction was zeros, drop the '.' too.
-        if (lastSignificant == dot + 1)
-            --lastSignificant;
-
-        // Close the gap by shifting the exponent (including the terminating null) down.
-        memmove(lastSignificant, exp, strlen(exp) + 1);
+        buf[i++] = '-';
+        value = std::abs(value);
     }
+
+    if (std::isfinite(value))
+    {
+        int exp;
+        std::uint64_t mantissa;
+
+        if (value == 0.0)
+        {
+            exp = 0;
+            mantissa = 0U;
+        }
+        else
+        {
+            double fraction = std::frexp(value, &exp);
+
+            // returned fraction: 0.xxxxxxxx...
+
+            mantissa = fraction * std::exp2(53);
+            // mantissa is now xxxxxxx... (integer number)
+
+            // adjust exponent, since we print 1.xxxxx...
+            --exp;
+
+            // Now the floating point number is adjusted to:
+            //
+            // mantissa[52] '.' mantissa[51] mantissa[50] ... mantissa[0] 'p' <exp>
+        }
+
+        buf[i++] = '0';
+        buf[i++] = 'x';
+        buf[i++] = mantissa & (uint64_t{1} << 52) ? '1' : '0';
+        mantissa &= ~(uint64_t{1} << 52);
+        if (mantissa)
+        {
+            buf[i++] = '.';
+
+            while (mantissa)
+            {
+                // print mantissa nibble bits 48..51
+                uint64_t nibble = (mantissa >> 48U) & uint64_t{0xF};
+                buf[i++] = hexChars[nibble];
+
+                // zap bits 48-63
+                mantissa = mantissa & uint64_t{0xFFFFFFFFFFFF};
+
+                // shift mantissa left by a nibble
+                mantissa <<= 4U;
+            }
+        }
+
+        buf[i++] = 'p';
+        buf[i++] = (exp >= 0) ? '+' : '-';
+
+        snprintf(&buf[i], (sizeof buf) - i, "%d", std::abs(exp));
+    }
+    else
+    {
+        if (value == std::numeric_limits<double>::infinity())
+            snprintf(&buf[i], (sizeof buf) - i, "%s", "inf");
+        else
+            snprintf(&buf[i], (sizeof buf) - i, "%s", "nan");
+    }
+
+    SLANG_ASSERT(i < sizeof buf);
 
     return String(buf);
 }

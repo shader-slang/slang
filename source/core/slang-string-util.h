@@ -199,12 +199,16 @@ struct StringUtil
     /// Returns parsed integer.
     static int parseIntAndAdvancePos(UnownedStringSlice text, Index& pos);
 
-    /// Format `value` as a C99 hexadecimal floating-point literal (as produced by `%a`) with the
-    /// trailing zeros of the fractional part removed. Some libc implementations (notably
-    /// macOS/BSD) pad the fraction out to the full mantissa width of a `double`, whereas glibc
-    /// emits the minimal form; this normalizes the output across platforms so it is deterministic.
-    /// For example `0x1.fffffe0000000p+0` becomes `0x1.fffffep+0`, and a fraction that is entirely
-    /// zeros loses its `.` (`0x1.000000p+0` becomes `0x1p+0`).
+    /// Format `value` as a C99 hexadecimal floating-point literal. The output
+    /// is a minimal string, with the following format:
+    ///
+    /// - value  0.0:  0x0p+0
+    /// - value -0.0: -0x0p+0
+    /// - non-zero finite value: (-)?0x1p[+-]N or (-)?0x1.xxxxxp[+-]N where the last 'x'
+    ///   is non-zero. Examples: 0x1p-100, 0x1.fedcba9876p+54
+    /// - infinite value: (-)?inf
+    /// - not-a-number: nan
+    ///
     static String makeMinimalHexFloat(double value);
 };
 
