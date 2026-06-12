@@ -1095,12 +1095,6 @@ bool tryLegalizeRayTracingPrimitiveIDStructParam(
         builder.replaceOperand(wholeStructUse.use, replacement);
     }
 
-    for (auto update : fieldAccessTypeUpdates)
-    {
-        update.inst->setFullType(
-            replaceParamValueType(builder, update.inst->getFullType(), update.valueType));
-    }
-
     List<IRStructField*> replacementFields;
     List<IRInst*> replacementValues;
     auto getPrimitiveIDValueReplacement = [&](IRStructField* field) -> IRInst*
@@ -1120,6 +1114,18 @@ bool tryLegalizeRayTracingPrimitiveIDStructParam(
         replacementValues.add(valueReplacement);
         return valueReplacement;
     };
+
+    for (auto access : primitiveIDFieldAccesses)
+    {
+        if (!getPrimitiveIDValueReplacement(access.field))
+            return false;
+    }
+
+    for (auto update : fieldAccessTypeUpdates)
+    {
+        update.inst->setFullType(
+            replaceParamValueType(builder, update.inst->getFullType(), update.valueType));
+    }
 
     for (auto access : primitiveIDFieldAccesses)
     {

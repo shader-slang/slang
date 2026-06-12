@@ -357,8 +357,11 @@ void main_chit_struct_nested_mixed(inout Payload payload, in ChitNestedMixedPrim
 // STRUCT_NESTED_MIXED_GLSL: {{.*}} + input_0.weight_0
 
 // STRUCT_NESTED_MIXED_CUDA: __global__ void __closesthit__main_chit_struct_nested_mixed
+// STRUCT_NESTED_MIXED_CUDA: float [[NESTED_WEIGHT:[A-Za-z_][A-Za-z_0-9]*]] = __int_as_float(optixGetAttribute_0())
+// STRUCT_NESTED_MIXED_CUDA: float [[OUTER_WEIGHT:[A-Za-z_][A-Za-z_0-9]*]] = __int_as_float(optixGetAttribute_1())
 // STRUCT_NESTED_MIXED_CUDA: optixGetPrimitiveIndex()
-// STRUCT_NESTED_MIXED_CUDA: float(int({{.*}})) + {{.*}}
+// STRUCT_NESTED_MIXED_CUDA: float(int({{.*}})) + [[NESTED_WEIGHT]]
+// STRUCT_NESTED_MIXED_CUDA: {{.*}} + [[OUTER_WEIGHT]]
 
 float useMixedPrimitiveInnerInput(in ChitMixedPrimitiveInnerInput input)
 {
@@ -384,10 +387,14 @@ void main_chit_struct_nested_mixed_forward(
 // STRUCT_NESTED_MIXED_FORWARD_GLSL: useMixedPrimitiveInnerInput{{.*}}([[FORWARDED]])
 
 // STRUCT_NESTED_MIXED_FORWARD_CUDA: __global__ void __closesthit__main_chit_struct_nested_mixed_forward
+// STRUCT_NESTED_MIXED_FORWARD_CUDA: float [[NESTED_WEIGHT:[A-Za-z_][A-Za-z_0-9]*]] = __int_as_float(optixGetAttribute_0())
+// STRUCT_NESTED_MIXED_FORWARD_CUDA: float [[OUTER_WEIGHT:[A-Za-z_][A-Za-z_0-9]*]] = __int_as_float(optixGetAttribute_1())
 // STRUCT_NESTED_MIXED_FORWARD_CUDA: uint [[PRIMITIVE_ID:[A-Za-z_][A-Za-z_0-9]*]] = optixGetPrimitiveIndex()
 // STRUCT_NESTED_MIXED_FORWARD_CUDA: ChitMixedPrimitiveInnerInput_0
 // STRUCT_NESTED_MIXED_FORWARD_CUDA: (&[[FORWARDED:[A-Za-z_][A-Za-z_0-9]*]])->pid_0 = int([[PRIMITIVE_ID]])
+// STRUCT_NESTED_MIXED_FORWARD_CUDA: (&[[FORWARDED]])->nestedWeight_0 = [[NESTED_WEIGHT]]
 // STRUCT_NESTED_MIXED_FORWARD_CUDA: useMixedPrimitiveInnerInput_0(&[[FORWARDED]])
+// STRUCT_NESTED_MIXED_FORWARD_CUDA: {{.*}} + [[OUTER_WEIGHT]]
 
 struct ChitMixedPrimitiveInput
 {
