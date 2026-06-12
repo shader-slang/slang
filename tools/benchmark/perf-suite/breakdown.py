@@ -29,6 +29,7 @@ import os
 
 import analyze
 import manifest
+import plot
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -351,21 +352,29 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
     n = len(names)
     rows = (n + cols - 1) // cols
     pw, ph = panel
-    ml, mt, mr, mb = 60, 32, 16, 40
+    ml, mt, mr, mb = 60, 32, 16, 56   # taller bottom margin for rotated x labels
     cw, chh = ml + pw + mr, mt + ph + mb
     W = cols * cw + 16
     legend_cols = min(len(bucket_order), 4) or 1
     legend_rows = (len(bucket_order) + legend_cols - 1) // legend_cols
     H = rows * chh + 56 + legend_rows * 18 + 24
     if title is None:
-        title = f"Per-benchmark phase composition across releases ({esc(metric)} ms)"
+        title = (f"Per-benchmark phase composition across releases + daily ToT "
+                 f"({esc(metric)} ms)")
+
+    # release/daily split: daily ToT points (orange) start at `boundary`
+    boundary = next((i for i, t in enumerate(order) if plot.is_daily(t)), nrel)
 
     s = [f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
          f'width="{W}" height="{H}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet" '
          f'font-family="sans-serif" font-size="13">',
          f'<rect width="{W}" height="{H}" fill="white"/>',
          f'<text x="12" y="30" font-size="20" font-weight="bold">{title}</text>']
-    tick_idx = sorted(set([0, nrel // 2, nrel - 1]))
+    # x ticks: label every release (capped) + EVERY daily date; daily in orange.
+    rel_stride = max(1, boundary // 16)
+    tick_idx = sorted(set(range(0, boundary, rel_stride))
+                      | {max(boundary - 1, 0)}
+                      | set(range(boundary, nrel)))
 
     for k, wl in enumerate(names):
         r, c = divmod(k, cols)
@@ -399,11 +408,24 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
             s.append(f'<text x="{ox+ml-4:.1f}" y="{y+3:.1f}" text-anchor="end" fill="#999">{lbl}</text>')
         s.append(f'<line x1="{ox+ml:.1f}" y1="{oy+mt:.1f}" x2="{ox+ml:.1f}" y2="{oy+mt+ph:.1f}" stroke="#333"/>')
         s.append(f'<line x1="{ox+ml:.1f}" y1="{oy+mt+ph:.1f}" x2="{ox+ml+pw:.1f}" y2="{oy+mt+ph:.1f}" stroke="#333"/>')
+
+        # release|daily boundary: dashed divider between last release and first daily
+        if 0 < boundary < nrel:
+            bx = (xmap(boundary - 1) + xmap(boundary)) / 2
+            s.append(f'<line x1="{bx:.1f}" y1="{oy+mt:.1f}" x2="{bx:.1f}" y2="{oy+mt+ph:.1f}" '
+                     f'stroke="#e8731a" stroke-width="1.2" stroke-dasharray="4 3"/>')
+            if k == 0:
+                s.append(f'<text x="{bx+3:.1f}" y="{oy+mt+11:.1f}" fill="#e8731a" '
+                         f'font-size="11">daily →</text>')
+
         for i in tick_idx:
             x = xmap(i)
-            t = order[i].replace("v20", "")
+            t = plot.short_tag(order[i])
+            day = plot.is_daily(order[i])
+            col = "#e8731a" if day else "#666"
             s.append(f'<line x1="{x:.1f}" y1="{oy+mt+ph:.1f}" x2="{x:.1f}" y2="{oy+mt+ph+3:.1f}" stroke="#999"/>')
-            s.append(f'<text x="{x:.1f}" y="{oy+mt+ph+16:.1f}" text-anchor="middle" fill="#666">{esc(t)}</text>')
+            s.append(f'<text x="{x:.1f}" y="{oy+mt+ph+15:.1f}" text-anchor="end" fill="{col}" '
+                     f'transform="rotate(-50 {x:.1f} {oy+mt+ph+15:.1f})">{esc(t)}</text>')
 
         # Stacked AREA: one filled band per bucket, bottom-to-top in bucket_order;
         # each band spans the releases with data; the topmost top edge = compileInner.

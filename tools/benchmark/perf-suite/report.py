@@ -43,6 +43,27 @@ def cls(ratio):
     return "flat"
 
 
+def combined_index(release_index, results_dir):
+    """Release records (from releases/index.json) + synthetic daily records (one
+    per daily/<label>/ with a results.json), date-ordered. Lets the existing
+    release charts/tables span the post-release daily ToT runs too: daily recs
+    carry a placeholder 'slangc' so they pass the loaders' presence filter, and
+    their results resolve via analyze.results_path -> daily/<label>/results.json."""
+    recs = [dict(r, kind="release") for r in release_index]
+    ddir = os.path.join(results_dir, "daily")
+    if os.path.isdir(ddir):
+        for label in sorted(os.listdir(ddir)):
+            if not os.path.exists(os.path.join(ddir, label, "results.json")):
+                continue
+            mp = os.path.join(ddir, label, "meta.json")
+            meta = json.load(open(mp)) if os.path.exists(mp) else {}
+            recs.append({"tag": label, "date": meta.get("date", label[:10]),
+                         "version": meta.get("commit", ""), "slangc": "tot",
+                         "kind": "daily"})
+    recs.sort(key=lambda r: (r.get("date", ""), r.get("kind") == "daily"))
+    return recs
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -56,14 +77,28 @@ def main():
 
     with open(args.index) as fh:
         index = json.load(fh)
-    series, lookup, order = analyze.load_series(index, args.results, args.metric)
+
+    # The charts/tables below operate over this COMBINED index: the per-release
+    # sweep PLUS the daily ToT runs (date-ordered). Written to disk so the
+    # index_path-based loaders (plot.load, breakdown._series) see the daily runs
+    # too — otherwise every chart would be release-only.
+    outdir = os.path.join(args.results, "_analysis")
+    os.makedirs(outdir, exist_ok=True)
+    cindex = combined_index(index, args.results)
+    cindex_path = os.path.join(outdir, "_combined_index.json")
+    with open(cindex_path, "w") as fh:
+        json.dump(cindex, fh, indent=2)
+
+    series, lookup, order = analyze.load_series(cindex, args.results, args.metric)
     if not order:
         raise SystemExit("no results; run sweep.py first")
     tags = [t for t, _ in order]
+    n_rel = sum(1 for r in cindex if r.get("kind") != "daily")
+    n_day = len(cindex) - n_rel
 
     # primary timers per workload
     primary = {}
-    for rec in index:
+    for rec in cindex:
         p = analyze.results_path(args.results, rec.get("tag", ""))
         if rec.get("slangc") and os.path.exists(p):
             for run in json.load(open(p)):
@@ -71,9 +106,7 @@ def main():
             break
 
     # charts (generate SVGs, embed inline)
-    outdir = os.path.join(args.results, "_analysis")
-    os.makedirs(outdir, exist_ok=True)
-    _, cseries = plot.load(args.index, args.results, "compileInner", args.metric)
+    _, cseries = plot.load(cindex_path, args.results, "compileInner", args.metric)
     svg_norm = plot.render(tags, cseries, "compileInner — normalized to first release",
                            "x baseline", False, True, "mdl_dxr",
                            os.path.join(outdir, "perf_normalized.svg"))
@@ -86,9 +119,9 @@ def main():
     # Per-workload detail pages (full sub-counter stacked-area history), plus a
     # coarse index chart (frontEndExecute / generateOutput only) whose panel
     # titles link into those pages.
-    wl_links = breakdown.write_workload_pages(args.results, args.index, args.metric, outdir)
+    wl_links = breakdown.write_workload_pages(args.results, cindex_path, args.metric, outdir)
     svg_pw_coarse = breakdown.render_stacked_multiples(
-        args.results, args.index, args.metric,
+        args.results, cindex_path, args.metric,
         os.path.join(outdir, "perf_per_benchmark_coarse.svg"),
         breakdown.FE_GO_ORDER, breakdown.coarse_buckets, link_for=wl_links)
     inline = {p: open(p).read() for p in (svg_norm, svg_abs, svg_pw, svg_pw_coarse)}
@@ -107,11 +140,14 @@ def main():
          f"<title>Slang compile-perf — release sweep</title><style>{CSS}</style>",
          '<div class="wrap">']
     n_wl = len({wl for (wl, _t) in series})
-    H.append("<h1>Slang compile-time performance — release sweep</h1>")
-    H.append(f'<p class="sub">{len(tags)} releases, <b>{tags[0]}</b> → <b>{tags[-1]}</b> · '
+    H.append("<h1>Slang compile-time performance — release sweep + daily ToT</h1>")
+    H.append(f'<p class="sub">{n_rel} releases + {n_day} daily ToT runs, '
+             f'<b>{plot.short_tag(tags[0])}</b> → <b>{plot.short_tag(tags[-1])}</b> · '
              f'metric: {args.metric} (ms) · {n_wl} workloads (synthetic stressors + '
              f'diagnostics control + real shader). '
-             f'A jump is flagged at ratio ≥ {args.rel} and ≥ {args.abs} ms.</p>')
+             f'A jump is flagged at ratio ≥ {args.rel} and ≥ {args.abs} ms. '
+             f'The {n_day} rightmost points on every chart are daily top-of-tree builds '
+             f'after the last release.</p>')
 
     # charts
     H.append("<h2>Charts</h2>")
@@ -184,7 +220,7 @@ def main():
     H.append("<h2>Per-release series (primary timer per workload)</h2>")
     H.append('<p class="small">Cell = min ms; <span class="reg">red</span> marks a ≥1.4× jump vs the previous release.</p>')
     H.append("<table><tr><th>Workload · timer</th>" +
-             "".join(f"<th class=num>{html.escape(t.replace('v20',''))}</th>" for t in tags) + "</tr>")
+             "".join(f"<th class=num>{html.escape(plot.short_tag(t))}</th>" for t in tags) + "</tr>")
     for (wl, timer), vals in sorted(series.items()):
         if timer not in primary.get(wl, set()):
             continue
@@ -226,7 +262,7 @@ def main():
     out = os.path.join(outdir, "report.html")
     with open(out, "w") as fh:
         fh.write("\n".join(H))
-    print(f"wrote {out}  ({len(tags)} releases)")
+    print(f"wrote {out}  ({n_rel} releases + {n_day} daily)")
 
     # Standalone per-workload page (the per-benchmark linear small-multiples on
     # its own, for direct sharing/upload).
@@ -234,8 +270,10 @@ def main():
           f"<title>Slang compile-perf — per workload</title><style>{CSS}</style>",
           '<div class="wrap">',
           "<h1>Slang compile-time performance — per benchmark</h1>",
-          f'<p class="sub">{len(tags)} releases, <b>{tags[0]}</b> → <b>{tags[-1]}</b> · '
-          f'metric: {args.metric} (ms) · {n_wl} workloads.</p>']
+          f'<p class="sub">{n_rel} releases + {n_day} daily ToT runs, '
+          f'<b>{plot.short_tag(tags[0])}</b> → <b>{plot.short_tag(tags[-1])}</b> · '
+          f'metric: {args.metric} (ms) · {n_wl} workloads. '
+          f'The {n_day} rightmost points per panel are daily top-of-tree builds.</p>']
     # Primary: the sub-counter HISTORY — phase composition across every release.
     PW.append('<h2>Phase composition across releases — main phases</h2>')
     PW.append('<p class="small">One panel per workload; the two top-level phases '

@@ -26,6 +26,20 @@ def vkey(tag):
     return (int(m[1]), int(m[2]), int(m[3] or 0)) if m else (0, 0, 0)
 
 
+def short_tag(tag):
+    """Compact x-axis label: release 'v2026.10' -> '2026.10'; daily ToT label
+    '2026-06-08-<sha>' -> '06-08'."""
+    if re.match(r"v\d", tag):
+        return tag.replace("v20", "")
+    m = re.match(r"\d{4}-(\d{2}-\d{2})-", tag)
+    return m.group(1) if m else tag
+
+
+def is_daily(tag):
+    """True for a daily ToT label '<YYYY-MM-DD>-<sha>' (vs a release 'vX.Y')."""
+    return bool(re.match(r"\d{4}-\d{2}-\d{2}-", tag))
+
+
 def load(index_path, results_dir, timer, metric="median"):
     with open(index_path) as fh:
         index = json.load(fh)
@@ -119,7 +133,7 @@ def render(order, series, title, ylabel, logy, normalize, highlight, out):
     for i, tag in enumerate(order):
         x = xmap(i)
         s.append(f'<line x1="{x:.1f}" y1="{mt+ph}" x2="{x:.1f}" y2="{mt+ph+4}" stroke="#999"/>')
-        t = tag.replace("v20", "")
+        t = short_tag(tag)
         s.append(f'<text x="{x:.1f}" y="{mt+ph+18:.1f}" text-anchor="end" fill="#444" '
                  f'transform="rotate(-55 {x:.1f} {mt+ph+18:.1f})">{esc(t)}</text>')
     s.append(f'<text x="{ml+pw/2:.0f}" y="{H-8}" text-anchor="middle" fill="#444">release</text>')
@@ -209,7 +223,7 @@ def render_small_multiples(order, series, title, out, cols=4):
         # x ticks (sparse, release tags)
         for i in tick_idx:
             x = xmap(i)
-            t = order[i].replace("v20", "")
+            t = short_tag(order[i])
             s.append(f'<line x1="{x:.1f}" y1="{oy+mt+ph:.1f}" x2="{x:.1f}" y2="{oy+mt+ph+3:.1f}" stroke="#999"/>')
             s.append(f'<text x="{x:.1f}" y="{oy+mt+ph+15:.1f}" text-anchor="middle" fill="#666">{esc(t)}</text>')
 
