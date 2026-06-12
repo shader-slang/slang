@@ -5735,13 +5735,54 @@ static bool parseGLSLGlobalDecl(Parser* parser, ContainerDecl* containerDecl)
     return false;
 }
 
-static void parseInterfaceDefaultMethodAsExplicitGeneric(
+static bool doesCallableDeclHaveInterfaceDefaultImplBody(CallableDecl* callableDecl)
+{
+    if (auto funcDecl = as<FuncDecl>(callableDecl))
+        return funcDecl->body != nullptr;
+
+    if (auto subscriptDecl = as<SubscriptDecl>(callableDecl))
+    {
+        // A subscript default implementation is represented by accessor bodies.
+        // Only reparse complete accessor defaults here; mixed forms such as a
+        // default `get` plus required `set` need a more explicit partial-default
+        // representation than the existing whole-callable default stub.
+        bool hasAccessorBody = false;
+        for (auto accessorDecl : subscriptDecl->getDirectMemberDeclsOfType<AccessorDecl>())
+        {
+            if (!accessorDecl->body)
+                return false;
+
+            hasAccessorBody = true;
+        }
+        return hasAccessorBody;
+    }
+
+    return false;
+}
+
+static void removeInterfaceDefaultImplBodyFromRequirement(Decl* parsedDecl)
+{
+    auto requirementDecl = maybeGetInner(parsedDecl);
+    if (auto funcDecl = as<FuncDecl>(requirementDecl))
+    {
+        funcDecl->body = nullptr;
+    }
+    else if (auto subscriptDecl = as<SubscriptDecl>(requirementDecl))
+    {
+        // The parsed interface member remains the abstract requirement. The
+        // duplicate `InterfaceDefaultImplDecl` owns the accessor bodies.
+        for (auto accessorDecl : subscriptDecl->getDirectMemberDeclsOfType<AccessorDecl>())
+            accessorDecl->body = nullptr;
+    }
+}
+
+static void parseInterfaceDefaultCallableAsExplicitGeneric(
     Parser* parser,
     Decl* parsedDecl,
     ContainerDecl* interfaceDecl)
 {
-    // If we parsed an interface method with a body,
-    // parse it again as an explicit generic decl on ThisType.
+    // If we parsed an interface callable with a body, parse it again as an
+    // explicit generic decl on ThisType.
     auto astBuilder = parser->astBuilder;
     InterfaceDefaultImplDecl* genericDecl = astBuilder->create<InterfaceDefaultImplDecl>();
     parser->PushScope(genericDecl);
@@ -5800,19 +5841,17 @@ static void parseInterfaceDefaultMethodAsExplicitGeneric(
     }
 
     // Remove the body from the requirement decl.
-    auto requirementFunc = maybeGetInner(parsedDecl);
-    if (auto funcDecl = as<FuncDecl>(requirementFunc))
-        funcDecl->body = nullptr;
+    removeInterfaceDefaultImplBodyFromRequirement(parsedDecl);
 }
 
-static void maybeReparseInterfaceFuncAsExplicitGeneric(
+static void maybeReparseInterfaceCallableAsExplicitGeneric(
     Parser* parser,
     Decl* parsedDecl,
     ContainerDecl* containerDecl,
     TokenReader tokenReader)
 {
-    auto funcDecl = as<FuncDecl>(maybeGetInner(parsedDecl));
-    if (!funcDecl || !funcDecl->body)
+    auto callableDecl = as<CallableDecl>(maybeGetInner(parsedDecl));
+    if (!callableDecl || !doesCallableDeclHaveInterfaceDefaultImplBody(callableDecl))
         return;
 
     auto interfaceDecl = as<InterfaceDecl>(containerDecl);
@@ -5824,7 +5863,7 @@ static void maybeReparseInterfaceFuncAsExplicitGeneric(
 
     Parser newParser(*parser);
     newParser.tokenReader = tokenReader;
-    parseInterfaceDefaultMethodAsExplicitGeneric(&newParser, parsedDecl, interfaceDecl);
+    parseInterfaceDefaultCallableAsExplicitGeneric(&newParser, parsedDecl, interfaceDecl);
 }
 
 static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedTokenType matchType)
@@ -5885,7 +5924,7 @@ static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedToke
             // as an `UnparsedStmt` at this stage of parsing, which is a relatively simple
             // process. Once we have the functionality to systematically clone AST nodes,
             // we can eliminate this reparsing hack.
-            maybeReparseInterfaceFuncAsExplicitGeneric(
+            maybeReparseInterfaceCallableAsExplicitGeneric(
                 parser,
                 as<Decl>(decl),
                 containerDecl,
