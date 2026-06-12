@@ -15,7 +15,7 @@ struct Wrapped
 {
     float scale;
     float4 v; // natural offset 4 violates MSL float4 alignment, must be lowered
-}
+};
 
 StructuredBuffer<float3> positions;
 StructuredBuffer<float4> colors;

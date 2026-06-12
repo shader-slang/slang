@@ -10,7 +10,7 @@ struct Params
     float3 a;
     float3 b;
     float4x4 m;
-}
+};
 
 ConstantBuffer<Params> params;
 RWStructuredBuffer<float> output;
