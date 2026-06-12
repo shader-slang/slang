@@ -15,4 +15,6 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     }
 }
 
+// CHECK-NOT: E36107
 // CHECK: abort();
+// CHECK-NOT: E36107
