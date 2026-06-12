@@ -28,7 +28,8 @@ COMMITS=(
 
 cd "$REPO" || exit 1
 for entry in "${COMMITS[@]}"; do
-  date=${entry%% *}; sha=${entry##* }
+  date=${entry%% *}
+  sha=${entry##* }
   short=${sha:0:7}
   label="${date}-${short}"
   ddir="$OUT/daily/$label"
@@ -37,12 +38,16 @@ for entry in "${COMMITS[@]}"; do
     continue
   fi
   echo "=== [$label] checkout $sha ==="
-  git -C "$REPO" checkout -q "$sha" || { echo "checkout failed"; continue; }
+  git -C "$REPO" checkout -q "$sha" || {
+    echo "checkout failed"
+    continue
+  }
   git -C "$REPO" submodule update --init --recursive >/dev/null 2>&1
-  printf 'v2026.10\n' > "$REPO/cmake/slang_git_version"
+  printf 'v2026.10\n' >"$REPO/cmake/slang_git_version"
   echo "--- build slangc (incremental) ---"
   if ! cmake --build "$REPO/build" --config Release --target slangc slang-glslang >/tmp/build_$label.log 2>&1; then
-    echo "BUILD FAILED for $label (see /tmp/build_$label.log):"; tail -15 /tmp/build_$label.log
+    echo "BUILD FAILED for $label (see /tmp/build_$label.log):"
+    tail -15 /tmp/build_$label.log
     continue
   fi
   slangc=$(ls "$REPO"/build/Release/bin/slangc 2>/dev/null || ls "$REPO"/build/*/bin/slangc 2>/dev/null | head -1)
