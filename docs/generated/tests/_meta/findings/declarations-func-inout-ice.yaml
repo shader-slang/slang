@@ -1,0 +1,37 @@
+schema_version: 1
+id: declarations-func-inout-ice
+bundle: conformance/declarations
+suspected_kind: wrong-diagnostic
+title: "[declarations] `func` syntax with `inout` param triggers ICE E99999"
+observed_at: "2026-06-02T07:58:38+00:00"
+scope: parser
+evidence:
+  command: "./build/Release/bin/slangc /tmp/test_func_void_elide.slang -target hlsl -entry main -stage compute"
+  source_slang: docs/generated/tests/conformance/declarations/func-void-elide-functional.slang
+  observed_summary: |
+    Using `inout` or `in out` direction modifiers in a `func`-keyword parameter list triggers
+    "internal error[E99999]: unexpected condition encountered in Slang compiler: unknown type
+    modifier in semantic checking". The same `inout` parameter works correctly in traditional
+    C-style syntax. The error fires with both `func modify(x: inout int)` and
+    `func modify(x: in out int)`.
+
+    Minimal repro:
+      func modify(x: inout int) { x++; }
+      void main() {}
+  exit_code: 0
+expected:
+  claim: |
+    The doc (declarations.md#parameters) states that parameters may be marked with directions
+    including `in out` (or `inout`), and the `func` keyword syntax is the primary new-style
+    function declaration syntax. Combining the two must not crash the compiler.
+  citation_kind: doc
+  citation: docs/language-reference/declarations.md
+provenance:
+  agent_model: claude-sonnet-4-6
+  source_commit: a01e79278cf0be9772deb8b2be52ee87687697a3
+  doc_anchor: docs/language-reference/declarations.md#parameters
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — the syntax is directly from the doc example `func add(x: in out int, y : float)`."
+    - "Intentional restriction: unlikely, as the doc gives `in out` in the `func` syntax example explicitly."

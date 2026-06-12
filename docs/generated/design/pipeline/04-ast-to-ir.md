@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:38:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: fcfe91e111a6ac8caf6474a3c896282098f36eaaf23bfc11208dcafc53594873
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 9ab5063bb78269f0497d90eee21d470b180a0ade8c090e36af38aa4c444758ed
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -169,6 +169,8 @@ IR-pass pipeline:
   or `performMandatoryEarlyInlining` run, and what gates them?".
 - [04c-layout-ir.md](04c-layout-ir.md) — `TargetProgram::createIRModuleForLayout`
   builds a separate, per-target IR module whose only contents are
-  `IRLayoutDecoration`s on stub globals and entry points. It does
-  not run the mandatory passes above and is not fed into
-  `linkAndOptimizeIR`.
+  `IRLayoutDecoration`s on stub globals and entry points. It is not
+  the executable per-translation-unit module and does not run the
+  mandatory passes above, but an existing layout module is considered
+  by `linkIR` (`slang-ir-link.cpp` lines 2120-2127) so its
+  layout-decorated global symbols participate in linking.

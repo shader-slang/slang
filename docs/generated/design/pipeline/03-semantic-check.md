@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:25:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 47917e9e7bbd0d4c7cec93d02043b25787343696017d2490659c825a87e68dbe
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: a7f01f5c13a93b4962311b4a8303731a575df2231fa88c54d62f0ee4ce433cb4
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -67,7 +67,6 @@ Every file collaborates through `SemanticsContext` /
 | [slang-check-constraint.cpp](../../../../source/slang/slang-check-constraint.cpp) | Generic constraint solving (`where`-clauses, witness inference) |
 | [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp) | Validates `Val` substitution after generic resolution |
 | [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp) | Entry-point checks: stage-specific signatures, parameter rules |
-| [slang-check-out-of-bound-access.cpp](../../../../source/slang/slang-check-out-of-bound-access.cpp) | Static detection of literal out-of-bound array indexing |
 
 ## Two-pass interaction with the parser
 
@@ -89,6 +88,9 @@ on demand. The deeper rationale is in
 
 Name resolution produces `DeclRef`s — a decl plus a substitution that
 records how its generic and outer-context parameters have been bound.
+The concrete `DeclRefBase` operations (`DirectDeclRef`, `LookupDeclRef`,
+and substitution application) are implemented in
+[slang-ast-decl-ref.cpp](../../../../source/slang/slang-ast-decl-ref.cpp).
 The algorithmic rules — scope construction, the lookup algorithm,
 shadowing, visibility filtering, and overload resolution — live in
 the dedicated [../name-resolution/](../name-resolution) subtree.

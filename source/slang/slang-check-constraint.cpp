@@ -655,12 +655,6 @@ enum class ArgState
     // being checked. Default generic arguments must not replace it.
     CallerProvidedOrdinaryArg,
 
-    // The current ordinary argument is the same parameter that owns the
-    // argument position, such as `T` for the `T` parameter. It is usable in a
-    // dependent substitution, but local inference or a default generic argument
-    // may still provide a more specific value.
-    DependentOrdinaryArg,
-
     // Ordinary solver constraints produced this ordinary argument.
     SolvedOrdinaryArg,
 
@@ -716,8 +710,7 @@ struct ArgInfo
     ShortList<QualType, 8>& getTypeConstraints()
     {
         SLANG_ASSERT(
-            m_state == ArgState::DefaultSubstitutionArg ||
-            m_state == ArgState::DependentOrdinaryArg || m_state == ArgState::SolvedOrdinaryArg ||
+            m_state == ArgState::DefaultSubstitutionArg || m_state == ArgState::SolvedOrdinaryArg ||
             m_state == ArgState::DefaultGenericArg || m_state == ArgState::EmptyPackArg);
         return m_typeConstraints;
     }
@@ -918,18 +911,17 @@ private:
         if (!m_isInitialized || m_hasStartedSolving)
             return false;
 
-        // Some internal callers provide the parameter's own default
-        // substitution arg, such as `T` for the `T` parameter, only to preserve
-        // a dependent declaration shape. That value is ready for substitution,
-        // but it is not fixed user input, so later inference may still replace
-        // it.
-        auto argState = isDefaultSubstitutionArgForParam(paramDecl, arg)
-                            ? ArgState::DependentOrdinaryArg
-                            : ArgState::CallerProvidedOrdinaryArg;
-
+        // Every argument installed here is fixed caller input -- an explicitly
+        // written generic argument, which may legitimately be a self-reference
+        // (e.g. passing an enclosing generic's own parameter). It is therefore a
+        // `CallerProvidedOrdinaryArg` that defaults and inference must not
+        // override. Replaceable placeholders -- abstract self-lookups inside
+        // interface bodies and the like -- are never routed through this method;
+        // the solver seeds those itself as `DefaultSubstitutionArg` during
+        // constraint collection.
         if (!setCurrentArg(paramDecl, arg))
             return false;
-        setArgState(paramDecl, argState);
+        setArgState(paramDecl, ArgState::CallerProvidedOrdinaryArg);
         return true;
     }
 
@@ -2239,25 +2231,6 @@ private:
         return true;
     }
 
-    // Return true if an argument is the default substitution arg for a parameter.
-    bool isDefaultSubstitutionArgForParam(Decl* paramDecl, Val* arg)
-    {
-        // A type parameter's default substitution arg is a direct type reference
-        // to itself, such as `DeclRefType(T)` for `T`.
-        if (auto declRefType = as<DeclRefType>(arg))
-            return declRefType->getDeclRef().getDecl() == paramDecl;
-
-        // A value parameter's default substitution arg is an integer decl-ref to
-        // itself. Casts can be inserted while checking integer expressions, so
-        // peel them before comparing the referenced declaration.
-        if (auto intVal = as<IntVal>(arg))
-        {
-            if (auto declRefIntVal = getDeclRefIntValIgnoringCasts(intVal))
-                return declRefIntVal->getDeclRef().getDecl() == paramDecl;
-        }
-        return false;
-    }
-
     // Return the current state for an argument.
     ArgState getArgState(Decl* argDecl)
     {
@@ -2287,7 +2260,6 @@ private:
         switch (state)
         {
         case ArgState::CallerProvidedOrdinaryArg:
-        case ArgState::DependentOrdinaryArg:
         case ArgState::SolvedOrdinaryArg:
         case ArgState::DefaultGenericArg:
         case ArgState::EmptyPackArg:

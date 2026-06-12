@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:05:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd99452519c5be61ce5cca85589b24210e710c615e711767e7bd28139fcadbd
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 44ece489c777e2db22b80fbab38fd7ce4eb6569d58ded6c76fe63d582db24928
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -91,7 +91,7 @@ From the comments at the top of
   `glsl` is a code-gen-target atom.
 - A *capability name* is a Boolean expression — a disjunction of
   conjunctions of atoms. Example: `raytracing` expands to
-  `glsl + _GL_EXT_ray_tracing | spirv_1_4 + SPV_KHR_ray_tracing | hlsl + _sm_6_4`.
+  `GL_EXT_ray_tracing | _sm_6_3 | cuda`.
 - An *abstract* capability does not introduce an atom; it defines a
   "keyhole" that other atoms populate. `target` and `stage` are
   distinct keyholes; an atom derived directly from an abstract

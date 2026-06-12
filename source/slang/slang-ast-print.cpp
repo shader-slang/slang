@@ -179,10 +179,10 @@ void ASTPrinter::addExpr(Expr* expr)
             sb << "u";
             break;
         case BaseType::Int64:
-            sb << "l";
+            sb << "ll";
             break;
         case BaseType::UInt64:
-            sb << "ul";
+            sb << "ull";
             break;
         case BaseType::Int16:
             sb << "s";
@@ -195,6 +195,12 @@ void ASTPrinter::addExpr(Expr* expr)
             break;
         case BaseType::UInt8:
             sb << "ub";
+            break;
+        case BaseType::IntPtr:
+            sb << "z";
+            break;
+        case BaseType::UIntPtr:
+            sb << "uz";
             break;
         default:
             // Don't add a suffix for other types

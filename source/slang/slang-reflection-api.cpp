@@ -3356,7 +3356,11 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
 SLANG_API SlangResult
 spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t* rs)
 {
-    auto decl = convert(inVar).getDecl();
+    if (!inVar || !rs)
+        return SLANG_E_INVALID_ARG;
+
+    auto var = convert(inVar);
+    auto decl = var.getDecl();
     if (auto varDecl = as<VarDeclBase>(decl))
     {
         if (auto constantVal = as<ConstantIntVal>(varDecl->val))
@@ -3364,7 +3368,30 @@ spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t*
             *rs = constantVal->getValue();
             return 0;
         }
-        else if (auto cexpr = as<IntegerLiteralExpr>(varDecl->initExpr))
+        if (varDecl->val)
+        {
+            // Substitute specialized generic arguments before resolving semantic values that are
+            // not already concrete integer constants.
+            if (auto module = getModule(varDecl))
+            {
+                if (auto linkage = module->getLinkage())
+                {
+                    auto astBuilder = linkage->getASTBuilder();
+                    SLANG_AST_BUILDER_RAII(astBuilder);
+
+                    if (auto val = varDecl->val->substitute(astBuilder, SubstitutionSet(var)))
+                    {
+                        val = val->resolve();
+                        if (auto constantVal = as<ConstantIntVal>(val))
+                        {
+                            *rs = constantVal->getValue();
+                            return 0;
+                        }
+                    }
+                }
+            }
+        }
+        if (auto cexpr = as<IntegerLiteralExpr>(varDecl->initExpr))
         {
             *rs = cexpr->value;
             return 0;

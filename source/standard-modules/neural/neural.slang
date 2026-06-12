@@ -28,6 +28,7 @@ __include "bindless-storage";
 __include "accelerate-vector-coopmat";
 __include "WaveMatrix";
 __include "mma-linear-layout-help";
+__include "network-parameter-layout-converter";
 __include "mma-tiled-cuda";
 __include "mma-tiled-vulkan";
 __include "mma-tiled-metal";

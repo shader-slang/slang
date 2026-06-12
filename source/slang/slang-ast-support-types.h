@@ -1821,6 +1821,14 @@ FIDDLE() namespace Slang
         BwdCallableRematFunc,   ///< The "remat" built-in associated function
         BwdCallablePropFunc,    ///< The "BwdCallable::operator()" built-in associated function
         LegacyBackwardDerivativeFunc, ///< The "bwdDiff" built-in associated function
+
+        DifferentialWitness, ///< The `IDifferentiable.Differential : IDifferentiable` conformance
+                             ///< (the witness that the differential type is itself differentiable)
+        DifferentialPtrWitness,    ///< The `IDifferentiablePtrType.Differential :
+                                   ///< IDifferentiablePtrType` conformance
+        BwdCallableContextWitness, ///< The `IBackwardDifferentiable.BwdCallable : IBwdCallable`
+                                   ///< conformance (witness that the backward-callable context type
+                                   ///< conforms to `IBwdCallable`)
     };
 
     enum class FunctionDifferentiableLevel

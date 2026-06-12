@@ -129,14 +129,43 @@ remediator can act on it without re-reading the source themselves.
 ## Output format
 
 Your single output is a Markdown file matching this contract.
-Filename (informational; the operator decides the path):
+
+### Output path (mandatory, exact)
+
+Write the report to **exactly** this path:
 
 ```
 docs/generated/design/_meta/reviews/<target_doc>.review.md
 ```
 
-Hierarchy under `_meta/reviews/` mirrors the manifest key (e.g.
-`_meta/reviews/pipeline/05-ir-passes.md.review.md`).
+`<target_doc>` is the manifest key of the document being reviewed,
+e.g. `pipeline/05-ir-passes.md`, so the resulting path is e.g.
+`docs/generated/design/_meta/reviews/pipeline/05-ir-passes.md.review.md`.
+The directory hierarchy under `_meta/reviews/` mirrors the
+manifest-key hierarchy under `docs/generated/design/` one-for-one,
+and the `.review.md` suffix is appended to the manifest key.
+
+If a file already exists at that exact path (e.g. from a prior
+review cycle on the same document), **overwrite it in place**.
+The ledger in `review-state.json` references the canonical path
+above; a report at any other location is invisible to the driver.
+
+You **must not**:
+
+- create a new sibling subdirectory under `_meta/reviews/` (e.g.
+  `_meta/reviews/2026-05-29/...`, `_meta/reviews/run-N/...`,
+  `_meta/reviews/<your-model>/...`);
+- write to a date-stamped, run-stamped, or model-stamped variant of
+  the filename (e.g. `<target_doc>.review.2026-05-29.md`);
+- write the report under `docs/generated/design/<target_doc>` or
+  any other location outside `_meta/reviews/`;
+- preserve the prior report by renaming it (e.g. to `.bak`,
+  `.old`, or `.prev`).
+
+Exactly one review report per document exists on disk at any time:
+the most recent one, at the canonical path above. The prior
+report's content lives in git history; the operator does not need
+a copy on disk.
 
 ### Front-matter (mandatory)
 

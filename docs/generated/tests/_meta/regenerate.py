@@ -388,7 +388,6 @@ class _MiniYaml:
 @dataclass
 class BundleSpec:
     key: str
-    prompt: str  # path relative to _meta/
     source_doc: str  # workspace-relative
     watched_paths: list[str]
     depends_on: list[str] = field(default_factory=list)
@@ -399,6 +398,13 @@ class BundleSpec:
     def dir(self) -> str:
         """Workspace-relative bundle directory."""
         return f"docs/generated/tests/{self.key}"
+
+    @property
+    def prompt(self) -> str:
+        """Workspace-relative per-bundle prompt path. Co-located with the
+        bundle as `_prompt.md` (derived from `dir`, not stored in the
+        manifest)."""
+        return f"{self.dir}/_prompt.md"
 
 
 @dataclass
@@ -429,7 +435,6 @@ def load_manifest() -> Manifest:
             raise SystemExit(f"bundle {key!r} has no source_doc")
         spec = BundleSpec(
             key=key,
-            prompt=str(entry["prompt"]),
             source_doc=str(source_doc),
             watched_paths=[str(p) for p in watched],
             depends_on=[str(d) for d in entry.get("depends_on") or []],
@@ -657,6 +662,76 @@ def lint_findings() -> list[LintIssue]:
                     str(p.relative_to(REPO_ROOT)),
                     "error",
                     f"bundle {b!r} not in manifest",
+                )
+            )
+    return issues
+
+
+def lint_expected_failures() -> list[LintIssue]:
+    """Validate `_meta/expected-failures.txt`.
+
+    Every non-comment, non-blank line must:
+    - be a path that resolves under the workspace,
+    - be preceded somewhere above by a comment line containing a
+      tracking-issue URL (or at least `#NNN` / `issues/`) — this
+      enforces that entries are documented with a compiler-bug
+      reference, not silent silencing.
+
+    The file is optional; absence is fine.
+    """
+    issues: list[LintIssue] = []
+    path = (
+        REPO_ROOT
+        / "docs"
+        / "generated"
+        / "tests"
+        / "_meta"
+        / "expected-failures.txt"
+    )
+    if not path.is_file():
+        return issues
+    rel = str(path.relative_to(REPO_ROOT))
+
+    # An "active" link comment covers all paths until either a blank
+    # line or another link comment resets the group. This lets one
+    # tracking-issue cover a block of paths without repeating the link.
+    active_link = False
+    # Accept either a real tracking-issue link (URLs, github.com, #NNN,
+    # issues/...) OR a campaign-mode pending-finding reference (e.g.
+    # "Pending: ..._meta/findings/<id>.yaml"). The latter is converted
+    # to a real URL at human-triage time; see _common.md § Campaign mode.
+    link_re = re.compile(r"(https?://|github\.com|#\d+|issues/|_meta/findings/)")
+
+    for lineno, raw in enumerate(path.read_text().splitlines(), start=1):
+        s = raw.strip()
+        if not s:
+            # Blank line ends the current group.
+            active_link = False
+            continue
+        if s.startswith("#"):
+            if link_re.search(s):
+                active_link = True
+            continue
+        # Non-comment, non-blank → must be a real path.
+        candidate = REPO_ROOT / s
+        if not candidate.exists():
+            issues.append(
+                LintIssue(
+                    f"{rel}:{lineno}",
+                    "error",
+                    f"expected-failure path does not resolve: {s}",
+                )
+            )
+        if not active_link:
+            issues.append(
+                LintIssue(
+                    f"{rel}:{lineno}",
+                    "error",
+                    f"expected-failure entry has no tracking-issue link"
+                    f" comment in its block: {s}. Add a comment like"
+                    f" '# https://github.com/shader-slang/slang/issues/NNNN'"
+                    f" above the entry (or above the group it belongs to)"
+                    f" so the entry is removable when the bug is fixed.",
                 )
             )
     return issues
@@ -1296,6 +1371,19 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
                 f"//META intent={intent!r} not in {list(_ALLOWED_INTENTS)}",
             )
         )
+    requires_tool = meta.get("requires-tool", "").strip()
+    if requires_tool:
+        toks = [t.strip() for t in requires_tool.split(",") if t.strip()]
+        bad = [t for t in toks if t not in _TOOL_BINARY]
+        if bad:
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"//META requires-tool has unknown value(s) {bad!r};"
+                    f" allowed: {sorted(_TOOL_BINARY)}",
+                )
+            )
     doc_ref = meta.get("doc_ref", "")
     if doc_ref:
         target = doc_ref.split("#", 1)[0]
@@ -1322,11 +1410,22 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
             )
         )
     # Diagnostic tests (//DIAGNOSTIC_TEST) must pin the diagnostic
-    # code explicitly. Message-text-only checks would silently pass
-    # if the diagnostic gets renumbered, so the contract is: name
-    # the code in the CHECK output. Accept `E####`, `W####`, etc.
-    # in any CHECK line (single-line or block), or a bare numeric
-    # for catalog tests whose Slang code emits without an `E` prefix.
+    # to source either by error-code substring or by a position-based
+    # caret annotation. A pure message-text substring check would
+    # silently pass through a diagnostic renumbering AND through a
+    # message-text rewording AND through a misattribution to the
+    # wrong source line; we want at least one of those three failure
+    # modes to be caught at lint time.
+    #
+    # Accept any of:
+    #   - `E####` / `W####` / `N####` / `I####` in any CHECK line
+    #     (single-line or block) — pins the code explicitly.
+    #   - A caret-anchored CHECK line containing `^` — pins source
+    #     position. Position-based annotations are more precise than
+    #     substring text and are what slang-test's "Suggested
+    #     annotations" output produces.
+    #   - For diagnostics-catalog bundles, a bare numeric (slang codes
+    #     emit without an `E` prefix in some legacy paths).
     if "//DIAGNOSTIC_TEST" in text:
         has_prefixed_code = bool(
             re.search(r"CHECK[^:]*:\s*[^\n]*\b[EWNI]\d+\b", text)
@@ -1336,20 +1435,35 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
             if re.search(r"\b[EWNI]\d+\b", m.group(1)):
                 has_block_code = True
                 break
+        # Position-anchored CHECK lines (single-line or block) — a
+        # caret `^` inside a CHECK comment ties the annotation to a
+        # specific source column, which catches the line-misattribution
+        # failure mode the code requirement is meant to catch.
+        has_caret_position = bool(
+            re.search(r"(?:^|\n)\s*//CHECK[^:]*:[^\n]*\^", text)
+        ) or bool(
+            re.search(r"/\*\s*CHECK[^:]*:.*?\^.*?\*/", text, re.DOTALL)
+        )
         # Catalog bundle tests use bare numeric for some codes.
         is_catalog = "diagnostics-catalog" in spec.dir
         has_bare_numeric = is_catalog and bool(
             re.search(r"CHECK[^:]*:\s*\d{4,}\b", text)
         )
-        if not (has_prefixed_code or has_block_code or has_bare_numeric):
+        if not (
+            has_prefixed_code
+            or has_block_code
+            or has_caret_position
+            or has_bare_numeric
+        ):
             issues.append(
                 LintIssue(
                     rel,
                     "error",
-                    "DIAGNOSTIC_TEST file does not pin an explicit"
-                    " diagnostic code (E####/W####) in any CHECK pattern;"
-                    " message-text-only checks would silently pass through"
-                    " a code renumbering",
+                    "DIAGNOSTIC_TEST file does not pin the diagnostic to"
+                    " source: needs either an explicit code (E####/W####)"
+                    " or a caret-anchored CHECK line. Pure message-text"
+                    " checks would silently pass through a diagnostic"
+                    " renumbering, rewording, or line-misattribution",
                 )
             )
 
@@ -1465,7 +1579,7 @@ def cmd_show(args: argparse.Namespace) -> int:
         raise SystemExit(f"unknown bundle: {args.bundle}")
     print(f"bundle:          {spec.key}")
     print(f"dir:             {spec.dir}")
-    print(f"prompt:          _meta/{spec.prompt}")
+    print(f"prompt:          {spec.prompt}")
     print(f"source_doc:      {spec.source_doc}")
     doc_path = REPO_ROOT / spec.source_doc
     print(
@@ -1544,17 +1658,17 @@ def cmd_index(args: argparse.Namespace) -> int:
 
     # Section assignment by path prefix.
     section_for = {
-        "architecture/": "Architecture",
-        "pipeline/": "Pipeline",
-        "syntax-reference/": "Syntax reference",
-        "cross-cutting/": "Cross-cutting",
-        "ast-reference/": "AST reference",
-        "name-resolution/": "Name resolution",
-        "ir-reference/": "IR reference",
-        "target-pipelines/": "Target pipelines",
+        "conformance/": "Conformance (language reference)",
+        "design/pipeline/": "Pipeline",
+        "design/syntax-reference/": "Syntax reference",
+        "design/cross-cutting/": "Cross-cutting",
+        "design/ast-reference/": "AST reference",
+        "design/name-resolution/": "Name resolution",
+        "design/ir-reference/": "IR reference",
+        "design/target-pipelines/": "Target pipelines",
     }
     section_order = [
-        "Architecture",
+        "Conformance (language reference)",
         "Pipeline",
         "Syntax reference",
         "Cross-cutting",
@@ -1612,11 +1726,11 @@ def cmd_index(args: argparse.Namespace) -> int:
         out.append("| --- | ---: | --- |")
         for spec in grouped[section]:
             count = bundle_counts.get(spec.key, 0)
-            # Relative link from INDEX.md (at docs/generated/tests/INDEX.md)
-            # to source_doc (workspace-relative path under docs/generated/design/).
-            # Strip the shared `docs/generated/` prefix and prepend `../`:
-            #   docs/generated/tests/INDEX.md -> ../design/<...>.md
-            doc_link = "../" + spec.source_doc.removeprefix("docs/generated/")
+            # Relative link from INDEX.md (in docs/generated/tests/) to the
+            # source_doc (workspace-relative). Handles both source roots:
+            #   docs/generated/design/<...>  -> ../design/<...>
+            #   docs/language-reference/<...> -> ../../language-reference/<...>
+            doc_link = os.path.relpath(spec.source_doc, "docs/generated/tests")
             out.append(
                 f"| [`{spec.key}`]({spec.key}/README.md) | {count} |"
                 f" [`{spec.source_doc}`]({doc_link}) |"
@@ -1672,6 +1786,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
     # set isn't narrowed to a specific list (i.e. global lint runs).
     if not args.bundles:
         issues.extend(lint_findings())
+        issues.extend(lint_expected_failures())
     errors = [i for i in issues if i.severity == "error"]
     warnings = [i for i in issues if i.severity == "warning"]
     for i in issues:
@@ -1681,6 +1796,516 @@ def cmd_lint(args: argparse.Namespace) -> int:
         f" across {len(specs)} bundles"
     )
     return 1 if errors else 0
+
+
+# --------------------------------------------------------------------------
+# verify — run slang-test against bundles and report pass/fail/ignored
+# --------------------------------------------------------------------------
+
+
+def _find_slang_test() -> Path | None:
+    """Locate a slang-test binary the agent can run locally.
+
+    Searches the standard build-output directories in preference order
+    (Release > RelWithDebInfo > Debug — Release matches the nightly
+    invocation in `_common.md`). Returns None if nothing is found; the
+    caller prints a build hint.
+    """
+    repo_root = REPO_ROOT
+    candidates = [
+        repo_root / "build" / "Release" / "bin" / "slang-test",
+        repo_root / "build" / "Release" / "bin" / "slang-test.exe",
+        repo_root / "build" / "RelWithDebInfo" / "bin" / "slang-test",
+        repo_root / "build" / "RelWithDebInfo" / "bin" / "slang-test.exe",
+        repo_root / "build" / "Debug" / "bin" / "slang-test",
+        repo_root / "build" / "Debug" / "bin" / "slang-test.exe",
+    ]
+    for p in candidates:
+        if p.is_file() and os.access(p, os.X_OK):
+            return p
+    return None
+
+
+def _which(tool: str) -> bool:
+    """Return True if `tool` is on PATH and executable."""
+    import shutil as _shutil
+    return _shutil.which(tool) is not None
+
+
+# Mapping from a `requires-tool` value to the binary name to look for
+# on PATH. Keep this in sync with the table in `_common.md` under
+# `### \`requires-tool\``.
+_TOOL_BINARY = {
+    "dxc": "dxc",
+    "fxc": "fxc",
+    "nvrtc": "nvcc",
+    "metal-toolchain": "metal",
+    "spirv-tools": "spirv-val",
+    "tint": "tint",
+}
+
+
+def _missing_required_tools(test_file_meta: dict[str, str]) -> list[str]:
+    """For a parsed //META block, return the list of declared
+    requires-tool values whose backing binary is not on PATH.
+    Empty list when the test has no requires-tool or all tools are
+    present.
+    """
+    raw = test_file_meta.get("requires-tool", "").strip()
+    if not raw:
+        return []
+    out: list[str] = []
+    for tok in [t.strip() for t in raw.split(",") if t.strip()]:
+        bin_name = _TOOL_BINARY.get(tok)
+        if bin_name is None:
+            # Unknown tool name — lint should already have flagged it.
+            # Be conservative: treat as missing so the test gets ignored
+            # rather than spuriously executed.
+            out.append(tok)
+            continue
+        if not _which(bin_name):
+            out.append(tok)
+    return out
+
+
+def _load_expected_failures() -> set[str]:
+    """Read `_meta/expected-failures.txt`. Lines starting with `#` are
+    comments and ignored; blank lines too. Returns a set of test paths
+    (workspace-relative).
+    """
+    path = (
+        REPO_ROOT
+        / "docs"
+        / "generated"
+        / "tests"
+        / "_meta"
+        / "expected-failures.txt"
+    )
+    if not path.is_file():
+        return set()
+    out: set[str] = set()
+    for line in path.read_text().splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        out.add(s)
+    return out
+
+
+def cmd_verify(args: argparse.Namespace) -> int:
+    """Run slang-test against the named bundles (or all of them) and
+    report pass / FAILED / ignored / expected-fail counts.
+
+    This is the local-verify step prompts call out before commit. It
+    surfaces the two failure modes agents miss most often: unnecessary
+    `non-exhaustive` on DIAGNOSTIC_TEST, and CHECK lines that don't
+    match actual compiler output. Tests whose target backend the
+    runner lacks (e.g. `-target dxil` with no DXC) are reported as
+    `ignored` and do not fail this command — CI nightly validates
+    them.
+
+    Tests listed in `_meta/expected-failures.txt` (filed compiler
+    bugs with a tracking issue) are reported as `expected-fail` and
+    excluded from the FAILED count + exit code. Removing the bug fix
+    must be paired with removing the line from that file.
+
+    Tests whose `//META: requires-tool=<tool>` names a binary absent
+    from PATH are filtered out of the slang-test invocation
+    altogether so they appear as `ignored` (missing-tool) rather than
+    failing on the missing prerequisite.
+    """
+    slang_test = _find_slang_test()
+    if slang_test is None:
+        print("ERROR: slang-test not found in any of the standard build dirs.")
+        print("Build it first, e.g.:")
+        print("    cmake --build --preset release --target slang-test")
+        print("Then re-run this command.")
+        return 2
+
+    manifest = load_manifest()
+    if args.bundles:
+        specs = _bundles_arg(manifest, args.bundles)
+        prefixes = [
+            f"docs/generated/tests/{s.key}/" for s in specs
+        ]
+        scope_desc = ", ".join(s.key for s in specs)
+    else:
+        prefixes = []
+        scope_desc = "all bundles"
+
+    # Compute requires-tool exclusion list by scanning every .slang
+    # in the target prefixes for a //META: requires-tool key with a
+    # tool that's not on PATH. slang-test's `-exclude-prefix` filters
+    # by path-prefix, which is exactly what we need to skip whole
+    # files.
+    exclude_prefixes: list[str] = []
+    missing_tool_files: list[tuple[str, list[str]]] = []
+    scan_roots: list[Path]
+    if args.bundles:
+        scan_roots = [
+            REPO_ROOT / "docs" / "generated" / "tests" / s.key
+            for s in specs
+        ]
+    else:
+        scan_roots = [REPO_ROOT / "docs" / "generated" / "tests"]
+    for root in scan_roots:
+        if not root.is_dir():
+            continue
+        for slang_path in root.rglob("*.slang"):
+            try:
+                text = slang_path.read_text()
+            except OSError:
+                continue
+            meta = parse_test_meta(text)
+            missing = _missing_required_tools(meta)
+            if missing:
+                rel = _rel_to_repo(slang_path)
+                exclude_prefixes.append(rel)
+                missing_tool_files.append((rel, missing))
+
+    cmd: list[str] = [str(slang_test), "-test-dir", "docs/generated/tests"]
+    if args.server_count > 1:
+        cmd.extend(["-use-test-server", "-server-count", str(args.server_count)])
+    for ep in exclude_prefixes:
+        cmd.extend(["-exclude-prefix", ep])
+    cmd.extend(prefixes)
+
+    expected_failures = _load_expected_failures()
+
+    print(f"verify: {scope_desc}")
+    print(f"  cmd: {' '.join(cmd)}")
+
+    # slang-test exit code is non-zero when any test fails; that's
+    # expected here — we want the counts, not the exit code.
+    proc = subprocess.run(
+        cmd,
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    out = proc.stdout
+    err = proc.stderr
+
+    failed_all: list[str] = []
+    ignored = 0
+    passed = 0
+    for line in out.splitlines():
+        if line.startswith("FAILED test:"):
+            # Format: FAILED test: 'docs/generated/tests/.../foo.slang'
+            m = re.match(r"^FAILED test:\s*'([^']+)'", line)
+            if m:
+                failed_all.append(m.group(1))
+        elif line.startswith("passed test:"):
+            passed += 1
+        elif line.startswith("ignored test:"):
+            ignored += 1
+
+    # Bucket failures: expected (known compiler bug, tracked) vs
+    # unexpected (must fix). Normalize multi-directive variants
+    # (`foo.slang.1`) to their canonical .slang path for matching.
+    def canonical(p: str) -> str:
+        return re.sub(r"\.slang(\.\d+)$", ".slang", p)
+
+    expected_fail: list[str] = []
+    failed: list[str] = []
+    for p in failed_all:
+        if canonical(p) in expected_failures:
+            expected_fail.append(p)
+        else:
+            failed.append(p)
+
+    # slang-test prints a summary like "98% of tests passed (3413/3482), 47 tests ignored"
+    summary_line = ""
+    for line in out.splitlines():
+        if "of tests passed" in line:
+            summary_line = line.strip()
+            break
+
+    # Tests skipped by `-exclude-prefix` don't appear in slang-test
+    # output at all; surface them as a separate `ignored (missing
+    # tool)` bucket so the operator can see why coverage shrank.
+    skipped_by_tool = len(missing_tool_files)
+
+    print()
+    if summary_line:
+        print(f"  {summary_line}")
+    print(f"  passed:        {passed}")
+    print(f"  ignored:       {ignored}    (backend not available in slang-test — CI validates)")
+    if skipped_by_tool:
+        print(
+            f"  ignored-tool:  {skipped_by_tool}    (//META: requires-tool not on PATH)"
+        )
+    if expected_fail:
+        print(
+            f"  expected-fail: {len(expected_fail)}    (listed in _meta/expected-failures.txt)"
+        )
+    print(f"  FAILED:        {len(failed)}")
+
+    if missing_tool_files and args.verbose:
+        print()
+        print("Tests skipped because their declared requires-tool is missing:")
+        for path, tools in missing_tool_files:
+            print(f"  {path}  (missing: {', '.join(tools)})")
+
+    if expected_fail and args.verbose:
+        print()
+        print("Expected-fail tests (known compiler bugs):")
+        for f in expected_fail:
+            print(f"  {f}")
+
+    if failed:
+        print()
+        print("Failing tests:")
+        for f in failed:
+            print(f"  {f}")
+        print()
+        print(
+            "Fix every FAILED test before commit. Most common causes:"
+        )
+        print(
+            "  - DIAGNOSTIC_TEST with unnecessary 'non-exhaustive' (omit it"
+        )
+        print(
+            "    by default; the runner errors when all diagnostics match)."
+        )
+        print(
+            "  - Ordered CHECK lines against tokens on one emit line — use"
+        )
+        print(
+            "    CHECK-DAG to match unordered."
+        )
+        print(
+            "  - CHECK line does not match actual compiler output (re-read"
+        )
+        print(
+            "    actual-output and either fix the CHECK or rewrite the test)."
+        )
+        print(
+            "  - `-dump-ir` at the wrong observation point — target-specific"
+        )
+        print(
+            "    opcodes synthesized in legalization aren't in that snapshot."
+        )
+        print(
+            "  - The compiler rejects the input the doc proposes — record a"
+        )
+        print(
+            "    `drift-from-source` doc-gap row in the bundle README."
+        )
+        print(
+            "See `## Verify before committing` in"
+            " docs/generated/tests/_meta/prompts/_common.md."
+        )
+
+    if err.strip():
+        print()
+        print("stderr (first 40 lines):")
+        for line in err.splitlines()[:40]:
+            print(f"  {line}")
+
+    return 1 if failed else 0
+
+
+# --------------------------------------------------------------------------
+# lang-ref-coverage — measure how much of docs/language-reference/ is
+# anchored by tests; derive the lang-ref ↔ design-doc mapping
+# --------------------------------------------------------------------------
+
+
+def _gh_slug(heading_text: str) -> str:
+    """Compute a GitHub-flavored markdown heading anchor.
+
+    Approximation of the algorithm GitHub uses to render `## Foo Bar`
+    as `#foo-bar`:
+    - lowercase
+    - replace runs of whitespace with `-`
+    - strip characters outside [a-z0-9-_]
+    - leading hyphens kept, but consecutive hyphens collapsed
+    """
+    s = heading_text.strip().lower()
+    s = re.sub(r"[`*_~]", "", s)  # strip markdown emphasis
+    s = re.sub(r"\s+", "-", s)
+    s = re.sub(r"[^a-z0-9\-_]", "", s)
+    s = re.sub(r"-+", "-", s)
+    return s
+
+
+def _enumerate_lang_ref_anchors() -> dict[str, list[tuple[int, str, str]]]:
+    """Walk docs/language-reference/*.md. For each file, return a list
+    of (lineno, level, anchor_id) tuples — one per heading.
+
+    Returns a dict keyed by workspace-relative path.
+    """
+    lang_ref_dir = REPO_ROOT / "docs" / "language-reference"
+    if not lang_ref_dir.is_dir():
+        return {}
+    out: dict[str, list[tuple[int, str, str]]] = {}
+    for md in sorted(lang_ref_dir.glob("*.md")):
+        rel = _rel_to_repo(md)
+        anchors: list[tuple[int, str, str]] = []
+        text = md.read_text()
+        # Match both ATX headings (## Foo) and Setext (Foo\n----).
+        lines = text.splitlines()
+        i = 0
+        while i < len(lines):
+            ln = lines[i]
+            # ATX heading
+            m = re.match(r"^(#{1,6})\s+(.+?)\s*#*\s*$", ln)
+            if m:
+                level = m.group(1)
+                txt = m.group(2)
+                # Strip an explicit `{#anchor}` extension if present
+                m2 = re.search(r"\{#([\w\-]+)\}\s*$", txt)
+                if m2:
+                    aid = m2.group(1).lower()
+                    txt = re.sub(r"\s*\{#[\w\-]+\}\s*$", "", txt)
+                else:
+                    aid = _gh_slug(txt)
+                anchors.append((i + 1, level, aid))
+            else:
+                # Setext-style: a non-blank line followed by ==== or ----
+                if i + 1 < len(lines):
+                    nxt = lines[i + 1]
+                    if ln.strip() and re.match(r"^=+\s*$", nxt):
+                        anchors.append((i + 1, "#", _gh_slug(ln)))
+                        i += 2
+                        continue
+                    if ln.strip() and re.match(r"^-+\s*$", nxt) and not ln.startswith("-"):
+                        anchors.append((i + 1, "##", _gh_slug(ln)))
+                        i += 2
+                        continue
+            i += 1
+        out[rel] = anchors
+    return out
+
+
+def _collect_test_doc_refs() -> dict[str, list[str]]:
+    """Walk every *.slang under docs/generated/tests/ and collect the
+    `//META: doc_ref=` value. Returns a dict mapping path -> list of
+    workspace-relative test paths that cite it.
+
+    Bundle source_doc values are also collected (as bundle-level
+    citations) so the mapping query can join them.
+    """
+    out: dict[str, list[str]] = {}
+    tests_root = REPO_ROOT / "docs" / "generated" / "tests"
+    for slang in tests_root.rglob("*.slang"):
+        if any(part.startswith("_meta") for part in slang.parts):
+            continue
+        try:
+            head = slang.read_text()
+        except OSError:
+            continue
+        m = re.search(r"//META: doc_ref=(\S+)", head)
+        if m:
+            ref = m.group(1)
+            out.setdefault(ref, []).append(_rel_to_repo(slang))
+    return out
+
+
+def cmd_lang_ref_coverage(args: argparse.Namespace) -> int:
+    """Report how much of docs/language-reference/ has at least one test
+    anchored to it. Each `##` / `###` heading is a "claim slot".
+
+    Outputs:
+    - per-file coverage (covered anchors / total anchors)
+    - the uncovered work queue
+    - implied lang-ref ↔ design-doc mapping (from bundle context)
+    """
+    anchors = _enumerate_lang_ref_anchors()
+    test_refs = _collect_test_doc_refs()
+
+    # `test_refs` maps `path#anchor` strings to test paths. Bucket
+    # citations by lang-ref file and anchor id.
+    cited_anchors_by_file: dict[str, dict[str, list[str]]] = {}
+    for ref, paths in test_refs.items():
+        if not ref.startswith("docs/language-reference/"):
+            continue
+        if "#" in ref:
+            file_part, frag = ref.split("#", 1)
+        else:
+            file_part, frag = ref, ""
+        cited_anchors_by_file.setdefault(file_part, {}).setdefault(frag, []).extend(paths)
+
+    total_anchors = 0
+    total_covered = 0
+    per_file: list[tuple[str, int, int]] = []  # (path, covered, total)
+    uncovered: list[tuple[str, str]] = []  # (path, anchor_id)
+    for path, slots in anchors.items():
+        slot_ids = {aid for _ln, _lv, aid in slots if aid}
+        cited_here = set(cited_anchors_by_file.get(path, {}).keys())
+        covered_here = slot_ids & cited_here
+        n_total = len(slot_ids)
+        n_cov = len(covered_here)
+        total_anchors += n_total
+        total_covered += n_cov
+        per_file.append((path, n_cov, n_total))
+        for aid in sorted(slot_ids - cited_here):
+            uncovered.append((path, aid))
+
+    # Header
+    print(f"language-reference coverage: {total_covered} / {total_anchors}"
+          f" anchors ({100.0 * total_covered / max(1, total_anchors):.1f}%)\n")
+
+    print("Per-file:")
+    for path, n_cov, n_total in per_file:
+        if n_total == 0:
+            print(f"  {n_cov:>3}/{n_total:<3}        {path}")
+        else:
+            pct = 100.0 * n_cov / n_total
+            print(f"  {n_cov:>3}/{n_total:<3}  {pct:5.1f}%  {path}")
+
+    if args.list_uncovered:
+        print()
+        print("Uncovered anchors (work queue):")
+        for path, aid in uncovered:
+            print(f"  {path}#{aid}")
+
+    if args.mapping:
+        print()
+        print("lang-ref → design-doc mapping (from bundle context):")
+        # For each test that cites a lang-ref anchor, look up the
+        # bundle it lives in and that bundle's source_doc. If the
+        # bundle's source_doc is a design-doc, record an edge.
+        manifest = load_manifest()
+        # Build path → source_doc lookup for the bundle a test lives in.
+        # The bundle key is the workspace-relative directory prefix.
+        def bundle_for(test_path: str) -> BundleSpec | None:
+            prefix = "docs/generated/tests/"
+            if not test_path.startswith(prefix):
+                return None
+            rest = test_path[len(prefix):]
+            # Try progressively shorter prefixes against the manifest.
+            parts = rest.split("/")
+            for cut in range(len(parts), 0, -1):
+                key = "/".join(parts[:cut])
+                if key in manifest.bundles:
+                    return manifest.bundles[key]
+            return None
+
+        edges: dict[tuple[str, str], int] = {}
+        for ref, paths in test_refs.items():
+            if not ref.startswith("docs/language-reference/"):
+                continue
+            for tp in paths:
+                spec = bundle_for(tp)
+                if spec is None:
+                    continue
+                bundle_doc = spec.source_doc
+                if bundle_doc.startswith("docs/generated/design/"):
+                    edge = (ref, bundle_doc)
+                    edges[edge] = edges.get(edge, 0) + 1
+
+        if not edges:
+            print("  (no edges yet — no test cites lang-ref from inside a"
+                  " design-doc bundle.)")
+        else:
+            for (lang_ref, design_doc), n in sorted(edges.items()):
+                print(f"  {lang_ref}\n    ↔ {design_doc}  ({n} test(s))")
+
+    # Exit code 0 when called purely informationally; 1 when --gate-on
+    # is set and coverage is below the gate threshold (future expansion).
+    return 0
 
 
 # --------------------------------------------------------------------------
@@ -2299,6 +2924,61 @@ def _build_parser() -> argparse.ArgumentParser:
     p_lint = sub.add_parser("lint", help="structural lint")
     p_lint.add_argument("bundles", nargs="*")
     p_lint.set_defaults(func=cmd_lint)
+
+    p_verify = sub.add_parser(
+        "verify",
+        help=(
+            "run slang-test against bundle(s); report pass/FAILED/ignored."
+            " Local-verify step required before commit (see _common.md)."
+        ),
+    )
+    p_verify.add_argument(
+        "bundles",
+        nargs="*",
+        help="bundle keys to verify (omit for the whole suite)",
+    )
+    p_verify.add_argument(
+        "--server-count",
+        type=int,
+        default=4,
+        help=(
+            "slang-test server count (default 4; pass 1 to disable"
+            " test-server and get more readable single-test errors)"
+        ),
+    )
+    p_verify.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help=(
+            "Also list the tests that were skipped by `requires-tool`"
+            " filtering and the tests that matched the expected-failures"
+            " list."
+        ),
+    )
+    p_verify.set_defaults(func=cmd_verify)
+
+    p_lrc = sub.add_parser(
+        "lang-ref-coverage",
+        help=(
+            "report how many heading-anchors in docs/language-reference/"
+            " have at least one test anchored to them"
+        ),
+    )
+    p_lrc.add_argument(
+        "--list-uncovered",
+        action="store_true",
+        help="dump the full list of uncovered anchors (the work queue)",
+    )
+    p_lrc.add_argument(
+        "--mapping",
+        action="store_true",
+        help=(
+            "show the implied lang-ref ↔ design-doc mapping derived"
+            " from bundle source_doc context"
+        ),
+    )
+    p_lrc.set_defaults(func=cmd_lang_ref_coverage)
 
     p_idx = sub.add_parser(
         "index",

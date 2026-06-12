@@ -1,8 +1,11 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
-//TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites -conformance "Vector:IScalable=0" -conformance "Matrix:IScalable=1" -conformance "Circle:IShape=0" -conformance "Square:IShape=1" -conformance "Circle:IScalable=2" -conformance "Square:IScalable=3"
+//TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites -conformance "ConcreteNS.Vector:IFNS.IScalable=0" -conformance "ConcreteNS.Matrix:IFNS.IScalable=1" -conformance "ConcreteNS.Circle:IFNS.IShape=0" -conformance "ConcreteNS.Square:IFNS.IShape=1" -conformance "ConcreteNS.Circle:IFNS.IScalable=2" -conformance "ConcreteNS.Square:IFNS.IScalable=3"
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
+
+namespace IFNS
+{
 
 interface IScalable
 {
@@ -15,7 +18,12 @@ interface IShape : IScalable
     float getPerimeter();
 }
 
-struct Circle : IShape
+}
+
+namespace ConcreteNS
+{
+
+struct Circle : IFNS.IShape
 {
     float radius;
 
@@ -24,7 +32,7 @@ struct Circle : IShape
     float getPerimeter() { return 2 * 3.14159f * radius; }
 };
 
-struct Square : IShape
+struct Square : IFNS.IShape
 {
     float side;
 
@@ -33,14 +41,14 @@ struct Square : IShape
     float getPerimeter() { return 4 * side; }
 };
 
-struct Vector : IScalable
+struct Vector : IFNS.IScalable
 {
     float x, y;
 
     This scale(float factor) { return {x * factor, y * factor}; }
 };
 
-struct Matrix : IScalable
+struct Matrix : IFNS.IScalable
 {
     float m[4][4];
 
@@ -54,9 +62,11 @@ struct Matrix : IScalable
     }
 };
 
-IShape createShape(uint id, float data)
+}
+
+IFNS.IShape createShape(uint id, float data)
 {
-    return createDynamicObject<IShape>(id, data);
+    return createDynamicObject<IFNS.IShape>(id, data);
 }
 
 float f(uint id, float data, float scale)
@@ -69,13 +79,13 @@ float f(uint id, float data, float scale)
 };
 
 
-//TEST_INPUT: type_conformance Vector:IScalable = 0
-//TEST_INPUT: type_conformance Matrix:IScalable = 1
-//TEST_INPUT: type_conformance Circle:IScalable = 2
-//TEST_INPUT: type_conformance Square:IScalable = 3
+//TEST_INPUT: type_conformance ConcreteNS.Vector:IFNS.IScalable = 0
+//TEST_INPUT: type_conformance ConcreteNS.Matrix:IFNS.IScalable = 1
+//TEST_INPUT: type_conformance ConcreteNS.Circle:IFNS.IScalable = 2
+//TEST_INPUT: type_conformance ConcreteNS.Square:IFNS.IScalable = 3
 
-//TEST_INPUT: type_conformance Circle:IShape = 0
-//TEST_INPUT: type_conformance Square:IShape = 1
+//TEST_INPUT: type_conformance ConcreteNS.Circle:IFNS.IShape = 0
+//TEST_INPUT: type_conformance ConcreteNS.Square:IFNS.IShape = 1
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
