@@ -6217,7 +6217,7 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 specializedRequiredConstraintDeclRef);
             auto satisfyingCount =
                 getPackCountConstraintExpectedCount(m_astBuilder, satisfyingConstraintDeclRef);
-            if (!areIntValsSemanticallyEqual(satisfyingCount, requiredCount))
+            if (!arePackCountExpectedCountsEqual(satisfyingCount, requiredCount))
                 return false;
         }
         else if (
@@ -12820,7 +12820,7 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
 
             auto leftCount = getPackCountConstraintExpectedCount(m_astBuilder, leftConstraintRef);
             auto rightCount = getPackCountConstraintExpectedCount(m_astBuilder, rightConstraint);
-            if (!areIntValsSemanticallyEqual(leftCount, rightCount))
+            if (!arePackCountExpectedCountsEqual(leftCount, rightCount))
                 return false;
         }
         else if (

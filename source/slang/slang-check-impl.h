@@ -313,7 +313,7 @@ struct GenericArgumentInferenceFailure
 };
 
 DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal);
-bool areIntValsSemanticallyEqual(IntVal* left, IntVal* right);
+bool arePackCountExpectedCountsEqual(IntVal* left, IntVal* right);
 
 struct OverloadCandidate
 {

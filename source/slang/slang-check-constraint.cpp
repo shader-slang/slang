@@ -640,20 +640,31 @@ Witness* findNonEmptyPackWitnessForConstraint(
     return astBuilder->getNonEmptyPackWitness(constrainedArg);
 }
 
-static DeclRef<Decl> getDeclRefFromVal(Val* val)
+static DeclRef<Decl> getDirectGenericPackParamDeclRefFromArg(Val* val)
 {
-    // Extract the declaration reference wrapped by a semantic value. This is a
-    // narrow structural helper: it recognizes `DeclRefIntVal`, `DeclRefType`,
-    // and a `DeclRefType` inside `ModifiedType` via `unwrapModifiedType`.
-    // Concrete values intentionally return an empty decl-ref because they have
-    // no declaration identity to compare.
+    // Pack-count witnesses need declaration identity only while checking an
+    // abstract generic body such as `foo<each I>() where countof(I) == N`.
+    // In that path the pack argument for `I` is represented as either a
+    // `DeclRefType` or a `DeclRefIntVal`. Concrete pack values intentionally
+    // return an empty decl-ref because equality for those values is handled by
+    // comparing the pack value itself.
+    auto tryGetPackParamDeclRef = [](DeclRef<Decl> const& declRef) -> DeclRef<Decl>
+    {
+        if (as<GenericTypePackParamDecl>(declRef.getDecl()) ||
+            as<GenericValuePackParamDecl>(declRef.getDecl()))
+        {
+            return declRef;
+        }
+        return DeclRef<Decl>();
+    };
+
     if (auto type = as<Type>(val))
     {
         if (auto declRefType = as<DeclRefType>(unwrapModifiedType(type)))
-            return declRefType->getDeclRef().as<Decl>();
+            return tryGetPackParamDeclRef(declRefType->getDeclRef().as<Decl>());
     }
     if (auto declRefIntVal = as<DeclRefIntVal>(val))
-        return declRefIntVal->getDeclRef().as<Decl>();
+        return tryGetPackParamDeclRef(declRefIntVal->getDeclRef().as<Decl>());
     return DeclRef<Decl>();
 }
 
@@ -681,7 +692,7 @@ static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountCon
     // generic that owns `I`; accept it only when both the pack declaration and
     // substituted count `IntVal` match the callee's requirement exactly, aside
     // from integer casts that semantic normalization may add around `N`.
-    auto constrainedPackDeclRef = getDeclRefFromVal(constrainedArg);
+    auto constrainedPackDeclRef = getDirectGenericPackParamDeclRefFromArg(constrainedArg);
     auto constrainedPackDecl = constrainedPackDeclRef.getDecl();
     auto genericDecl =
         constrainedPackDecl ? as<GenericDecl>(constrainedPackDecl->parentDecl) : nullptr;
@@ -699,7 +710,7 @@ static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountCon
 
         auto declaredExpectedCount =
             getPackCountConstraintExpectedCount(astBuilder, constraintDeclRef);
-        if (areIntValsSemanticallyEqual(declaredExpectedCount, expectedCount))
+        if (arePackCountExpectedCountsEqual(declaredExpectedCount, expectedCount))
             return constraintDeclRef;
     }
 
@@ -901,20 +912,43 @@ DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal)
     return as<DeclRefIntVal>(intVal);
 }
 
-// Compare integer values at the semantic equality level used by generic
-// witness matching. This helper deliberately strips only cast wrappers around
-// generic value parameters, e.g. `int(N)` versus `N`; it does not prove
-// algebraic equalities such as `N - 1` versus `M`.
-bool areIntValsSemanticallyEqual(IntVal* left, IntVal* right)
+static IntVal* getIntValWithoutRedundantCasts(IntVal* intVal)
+{
+    // `TryUnifyIntParam` may store a value as `TypeCastIntVal(paramType, N)` so
+    // it has the exact declared parameter type. For pack-count proof matching,
+    // `int(N)` and `N` are the same expected count only when the cast is
+    // redundant for the base value's type. A real type-changing cast remains in
+    // the structure and must compare normally.
+    while (auto castIntVal = as<TypeCastIntVal>(intVal))
+    {
+        auto base = as<IntVal>(castIntVal->getBase());
+        if (!base || !areValsEqual(castIntVal->getType(), base->getType()))
+            return intVal;
+        intVal = base;
+    }
+    return intVal;
+}
+
+// Compare the expected-count `IntVal`s stored in pack-count witnesses and
+// constraint declarations. The source of truth is structural `Val::equals`;
+// this helper only removes same-type `TypeCastIntVal` wrappers that
+// `TryUnifyIntParam` may add while placing an already-solved integer value into
+// the declared parameter type.
+bool arePackCountExpectedCountsEqual(IntVal* left, IntVal* right)
 {
     if (!left || !right)
         return left == right;
+    left = as<IntVal>(left->resolve());
+    right = as<IntVal>(right->resolve());
+    if (!left || !right)
+        return left == right;
+
     if (left->equals(right))
         return true;
 
-    auto leftParam = getDeclRefIntValIgnoringCasts(left);
-    auto rightParam = getDeclRefIntValIgnoringCasts(right);
-    return leftParam && rightParam && leftParam->getDeclRef().equals(rightParam->getDeclRef());
+    left = getIntValWithoutRedundantCasts(left);
+    right = getIntValWithoutRedundantCasts(right);
+    return left->equals(right);
 }
 
 // Return the ordinary-argument merge mode requested by unification.
@@ -990,7 +1024,7 @@ static bool _tryGetVariadicPackCountWitnessKey(
     if (auto concreteWitness = as<ConcreteVariadicPackCountWitness>(witness))
     {
         outKey.packArg = concreteWitness->getPack();
-        outKey.packDeclRef = getDeclRefFromVal(outKey.packArg);
+        outKey.packDeclRef = getDirectGenericPackParamDeclRefFromArg(outKey.packArg);
         outKey.expectedCount = concreteWitness->getExpectedCount();
         return outKey.packArg && outKey.expectedCount;
     }
@@ -1005,15 +1039,17 @@ static bool _areVariadicPackCountWitnessKeysEqual(
     // Generic-app decl-ref unification can compare a default declared witness
     // with a solved concrete witness for the same hidden argument. Treat them
     // as the same proof only when they describe the same substituted pack and
-    // the same semantic integer count; do not infer or prove new facts here.
-    if (!areIntValsSemanticallyEqual(left.expectedCount, right.expectedCount))
+    // the same expected count; do not infer or prove new facts here.
+    if (!arePackCountExpectedCountsEqual(left.expectedCount, right.expectedCount))
         return false;
 
     if (left.packArg && right.packArg)
         return areValsEqual(left.packArg, right.packArg);
 
-    auto leftDeclRef = left.packDeclRef ? left.packDeclRef : getDeclRefFromVal(left.packArg);
-    auto rightDeclRef = right.packDeclRef ? right.packDeclRef : getDeclRefFromVal(right.packArg);
+    auto leftDeclRef =
+        left.packDeclRef ? left.packDeclRef : getDirectGenericPackParamDeclRefFromArg(left.packArg);
+    auto rightDeclRef = right.packDeclRef ? right.packDeclRef
+                                          : getDirectGenericPackParamDeclRefFromArg(right.packArg);
     return leftDeclRef && rightDeclRef && leftDeclRef.equals(rightDeclRef);
 }
 
@@ -3516,6 +3552,11 @@ bool SemanticsVisitor::TryUnifyVals(
     if (_tryGetVariadicPackCountWitnessKey(m_astBuilder, fst, fstPackCountWitnessKey) &&
         _tryGetVariadicPackCountWitnessKey(m_astBuilder, snd, sndPackCountWitnessKey))
     {
+        // Pack-count witnesses are validation proofs, not sources of new pack
+        // equality constraints. `countof(T) == N` and `countof(U) == N` may both
+        // hold for different packs of the same length, so this branch only
+        // accepts an already-identical proof key and never feeds `T == U` back
+        // into ordinary inference.
         return _areVariadicPackCountWitnessKeysEqual(
             fstPackCountWitnessKey,
             sndPackCountWitnessKey);
