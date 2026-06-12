@@ -115,7 +115,8 @@ bool tryLegalizeRayTracingPrimitiveIDParam(
 /// Emits the replacement value for an `SV_PrimitiveID` field while rewriting a hit-stage
 /// struct parameter. `type` is the value type required at the use site, `field` and `layout`
 /// identify the source field metadata, and `userData` is backend-owned context.
-/// Return null only when the backend cannot materialize a replacement.
+/// Return null only when the backend cannot materialize a replacement; the caller treats this as
+/// rewrite failure and does not fall back to the default helper after invoking a custom emitter.
 using RayTracingPrimitiveIDValueEmitterFunc =
     IRInst* (*)(
         IRModule* module,
