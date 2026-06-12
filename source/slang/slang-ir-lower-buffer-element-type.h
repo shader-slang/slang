@@ -17,11 +17,11 @@ enum class BufferElementTypeLoweringPolicyKind
 {
     Default,
     KhronosTarget,
-    Metal,
     MetalParameterBlock,
     MetalPointerLowering,
     WGSL,
-    LLVM
+    LLVM,
+    Metal
 };
 
 struct BufferElementTypeLoweringOptions
