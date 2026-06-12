@@ -513,13 +513,8 @@ static IRInst* emitRayTracingPrimitiveIDValue(
     RayTracingPrimitiveIDValueEmitter const* valueEmitter)
 {
     if (valueEmitter && valueEmitter->func)
-        return valueEmitter->func(
-            module,
-            builder,
-            paramType,
-            field,
-            varLayout,
-            valueEmitter->userData);
+        return valueEmitter
+            ->func(module, builder, paramType, field, varLayout, valueEmitter->userData);
 
     return emitRayTracingPrimitiveIndexValue(module, builder, paramType);
 }

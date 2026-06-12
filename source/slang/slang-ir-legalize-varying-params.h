@@ -117,14 +117,12 @@ bool tryLegalizeRayTracingPrimitiveIDParam(
 /// identify the source field metadata, and `userData` is backend-owned context.
 /// Return null only when the backend cannot materialize a replacement; the caller treats this as
 /// rewrite failure and does not fall back to the default helper after invoking a custom emitter.
-using RayTracingPrimitiveIDValueEmitterFunc =
-    IRInst* (*)(
-        IRModule* module,
-        IRBuilder& builder,
-        IRType* type,
-        IRStructField* field,
-        IRVarLayout* layout,
-        void* userData);
+using RayTracingPrimitiveIDValueEmitterFunc = IRInst* (*)(IRModule* module,
+                                                          IRBuilder& builder,
+                                                          IRType* type,
+                                                          IRStructField* field,
+                                                          IRVarLayout* layout,
+                                                          void* userData);
 
 struct RayTracingPrimitiveIDValueEmitter
 {
