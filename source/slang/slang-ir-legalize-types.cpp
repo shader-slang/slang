@@ -846,14 +846,6 @@ static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<Leg
         legalArgs.getArrayView().getBuffer()));
 }
 
-/// Return the scalar element type used to classify an abort payload argument.
-static IRType* getAbortArgumentElementType(IRType* type)
-{
-    if (auto vectorType = as<IRVectorType>(type))
-        return vectorType->getElementType();
-    return type;
-}
-
 /// Validate abort payload argument types after variadic-pack and pair legalization.
 /// Scalar values and vectors with basic element types are accepted because they
 /// have printf-style format specifiers. Composite, pointer, resource, and other
@@ -886,7 +878,7 @@ static bool validateAbortArgumentTypes(
     for (auto arg : payloadArgs)
     {
         auto argType = arg->getDataType();
-        auto elementType = getAbortArgumentElementType(argType);
+        auto elementType = getVectorElementType(argType);
         if (as<IRBasicType>(elementType))
             continue;
 

@@ -1161,27 +1161,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     Dictionary<IRInst*, IRInst*> m_mapArrayValueToVar;
 
-    // Cache of `Abort` message struct types, keyed on the field type sequence so
-    // abort sites with identical payload signatures share one struct type instead
-    // of bloating the module with a nominal type per call site.
-    Dictionary<IRInstKey, IRStructType*> m_abortMessageTypes;
-
-    // Build an unlinked, tuple-shaped key instruction for `IRInstKey` without
-    // creating a real tuple type or adding use-list edges from the field types.
-    IRInst* createAbortMessageTypeKey(IRType* keyType, ArrayView<IRType*> fieldTypes)
-    {
-        auto keyInst = m_module->_allocateInst(kIROp_TupleType, (Int)fieldTypes.getCount());
-        keyInst->typeUse.usedValue = keyType;
-
-        auto operand = keyInst->getOperands();
-        for (auto fieldType : fieldTypes)
-        {
-            operand->usedValue = fieldType;
-            operand++;
-        }
-
-        return keyInst;
-    }
+    // Cache of `Abort` message struct types, keyed on a tuple type whose element
+    // sequence matches the message field types. This keeps identical payload
+    // signatures on one nominal struct type instead of bloating the module with
+    // a fresh struct type per call site.
+    Dictionary<IRTupleType*, IRStructType*> m_abortMessageTypes;
 
     // Replace getElement(x, i) with, y = store(x); p = getElementPtr(y, i); load(p),
     // when i is not a constant. SPIR-V has no support for dynamic indexing into values like we do.
@@ -2190,18 +2174,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto arg : args)
             fieldTypes.add(arg->getDataType());
 
-        auto& memoryArena = m_module->getMemoryArena();
-        auto keyType = builder.getTypeKind();
-        void* keyCursor = memoryArena.getCursor();
-        auto typeKeyInst = createAbortMessageTypeKey(keyType, fieldTypes.getArrayView());
-        IRInstKey typeKey = {typeKeyInst};
+        auto typeKey = builder.getTupleType(fieldTypes.getArrayView());
 
         IRStructType* structType = nullptr;
-        if (m_abortMessageTypes.tryGetValue(typeKey, structType))
-        {
-            memoryArena.rewindToCursor(keyCursor);
-        }
-        else
+        if (!m_abortMessageTypes.tryGetValue(typeKey, structType))
         {
             structType = builder.createStructType();
             builder.addNameHintDecoration(structType, toSlice("AbortMessage"));
