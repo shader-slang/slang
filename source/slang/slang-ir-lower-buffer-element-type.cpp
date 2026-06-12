@@ -3040,7 +3040,7 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
         auto refPackedType = builder.getRefParamType(packedVectorType, AddressSpace::Generic);
         auto funcType = builder.getFuncType(1, (IRType**)&refPackedType, vectorType);
         func->setFullType(funcType);
-        builder.addNameHintDecoration(func, UnownedStringSlice("unpackVector"));
+        builder.addNameHintDecoration(func, UnownedStringSlice("__unpackVector"));
         builder.addForceInlineDecoration(func);
         builder.setInsertInto(func);
         builder.emitBlock();
@@ -3071,7 +3071,7 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
         IRType* paramTypes[] = {outPackedType, vectorType};
         auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
         func->setFullType(funcType);
-        builder.addNameHintDecoration(func, UnownedStringSlice("packVector"));
+        builder.addNameHintDecoration(func, UnownedStringSlice("__packVector"));
         builder.addForceInlineDecoration(func);
         builder.setInsertInto(func);
         builder.emitBlock();
@@ -3102,7 +3102,7 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
         IRType* paramTypes[] = {outStructType, matrixType};
         auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
         func->setFullType(funcType);
-        builder.addNameHintDecoration(func, UnownedStringSlice("packMatrix"));
+        builder.addNameHintDecoration(func, UnownedStringSlice("__packMatrix"));
         builder.addForceInlineDecoration(func);
         builder.setInsertInto(func);
         builder.emitBlock();
