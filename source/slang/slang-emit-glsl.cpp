@@ -266,11 +266,6 @@ void GLSLSourceEmitter::_emitMemoryQualifierDecorations(IRInst* varDecl)
     _emitMemoryQualifierFlags(_getMemoryQualifierDecorationFlags(varDecl));
 }
 
-void GLSLSourceEmitter::_emitMemoryQualifierTypeAttrs(IRType* type)
-{
-    _emitMemoryQualifierFlags(_getMemoryQualifierTypeAttrFlags(type));
-}
-
 void GLSLSourceEmitter::emitMemoryQualifiers(IRInst* varDecl)
 {
     _emitMemoryQualifierDecorations(varDecl);

@@ -1214,13 +1214,20 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
                     context->getBuilder()->getAttributedType(legalBaseType.getSimple(), attrs));
             }
         default:
-            // Memory qualifiers affect code generation, so do not silently drop them if an
-            // unsupported type ever decomposes during legalization.
+            // Decomposed legalized types have no single wrapper where a type attribute can be
+            // preserved. NoDiffAttr has historically been allowed to drop in this case, but
+            // memory qualifiers affect code generation and future attributes should opt in here
+            // explicitly instead of being silently discarded.
             for (auto attr : attributedType->getAllAttrs())
             {
                 if (as<IRMemoryQualifierSetAttr>(attr))
                     SLANG_UNEXPECTED(
                         "memory qualifier attributes cannot wrap decomposed legalized types");
+
+                if (as<IRNoDiffAttr>(attr))
+                    continue;
+
+                SLANG_UNEXPECTED("unsupported attributes cannot wrap decomposed legalized types");
             }
             return legalBaseType;
         }

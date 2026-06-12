@@ -10,7 +10,10 @@
 // SPIRV-NOT: MakePointerAvailable|NonPrivatePointer
 
 // HLSL-COUNT-4: globallycoherent RWStructuredBuffer<uint >  _S
+// HLSL-NOT: globallycoherent
+// GLSL emits one resource-heap SSBO declaration shared by both coherent handles.
 // GLSL-COUNT-1: coherent buffer
+// GLSL-NOT: coherent
 
 uniform DescriptorHandle<coherent RWStructuredBuffer<uint>> coherentBuffer;
 uniform DescriptorHandle<globallycoherent RWStructuredBuffer<uint>> globallyCoherentBuffer;

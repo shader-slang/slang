@@ -88,7 +88,6 @@ protected:
     IRIntegerValue _getMemoryQualifierTypeAttrFlags(IRType* type);
     void _emitMemoryQualifierFlags(IRIntegerValue flags);
     void _emitMemoryQualifierDecorations(IRInst* varDecl);
-    void _emitMemoryQualifierTypeAttrs(IRType* type);
     void _emitGLSLSubpassInputType(IRSubpassInputType* type);
     void _emitGLSLTextureOrTextureSamplerType(IRTextureTypeBase* type, char const* baseName);
     void _emitGLSLStructuredBuffer(
