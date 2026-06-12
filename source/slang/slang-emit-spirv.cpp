@@ -7074,6 +7074,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return type;
     }
 
+    // Selects the configured heap stride for a non-acceleration-structure descriptor element.
+    // Keeping this lookup at the call site makes `getDescriptorRuntimeArrayType` consume only a
+    // caller-chosen stride; for example, sampler heaps use `SPIRVSamplerHeapStride`, while
+    // texture and buffer resource heaps use `SPIRVResourceHeapStride`.
     int getDescriptorHeapArrayStride(SpvInst* descriptorElementType)
     {
         if (descriptorElementType->opcode == SpvOpTypeSampler)
@@ -7086,6 +7090,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             CompilerOptionName::SPIRVResourceHeapStride);
     }
 
+    // Builds or reuses the descriptor runtime array for a specific element type and stride.
+    // A zero stride emits an `ArrayStrideIdEXT` from `OpConstantSizeOfEXT` for descriptor-typed
+    // resources, while acceleration-structure heap entries pass the explicit `uint64` stride
+    // computed by `getAccelerationStructureDescriptorHeapStride`.
     SpvInst* getDescriptorRuntimeArrayType(SpvInst* descriptorElementType, int arrayStride)
     {
         SLANG_RELEASE_ASSERT(
