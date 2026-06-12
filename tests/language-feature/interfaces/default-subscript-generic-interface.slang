@@ -1,9 +1,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type -cpu
 
 // A generic interface can provide a default implementation for a generic
-// subscript requirement. The conforming type supplies only `getVal`, so both
-// `run` calls below must use the default `__subscript<TIndex>` body from
-// `IFoo<int, 7>`.
+// subscript requirement. The conforming type supplies only the lower-level
+// `getVal` and `setVal` requirements, so the `run` and `write` calls below
+// must use the default `__subscript<TIndex>` accessors from `IFoo<int, 7>`.
 
 interface IFoo<TValue, int Offset>
 {
