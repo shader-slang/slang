@@ -50,4 +50,11 @@
 # uninstrumented Linux nightly); coverage instrumentation
 # escalates that failure into a SIGSEGV inside the slang-test
 # orchestrator, which kills the rest of the suite.
-docs/generated/tests/ir-reference/metadata/unorm-attr-on-buffer-element.slang
+#
+# Path note: PR #11421 reorganized the agentic suite under
+# `docs/generated/tests/design/...` and `.../conformance/...`. The
+# entry below uses the post-reorg path; the pre-reorg form
+# `docs/generated/tests/ir-reference/...` no longer matches anything
+# and silently disabled the exclude until run 26992984934 reproduced
+# the crash and surfaced the staleness.
+docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-buffer-element.slang

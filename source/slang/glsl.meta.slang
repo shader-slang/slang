@@ -4474,6 +4474,11 @@ __generic<T : __BuiltinType>
 internal typealias __ImagePtr<T> =
     Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::Image)>;
 
+// Form a texel pointer for image atomics at the IR level.
+// Kept outside spirv_asm so NonUniform propagates to the texel pointer.
+__intrinsic_op($(kIROp_ImageTexelPointer))
+__ImagePtr<T> __imageTexelPointer<T, TImage, TCoord>(TImage image, TCoord coord, int sample);
+
 ${
 {
     struct ImageTypeInfo
@@ -4687,11 +4692,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) %ptr Device None $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) $ptr Device None $data
                 };
             }
             }
@@ -4709,11 +4715,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicExchange %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicExchange $ptr Device Relaxed $data
                 };
             }
             }
@@ -4731,11 +4738,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) $ptr Device Relaxed $data
                 };
             }
             }
@@ -4753,11 +4761,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) $ptr Device Relaxed $data
                 };
             }
             }
@@ -4778,11 +4787,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicAnd %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicAnd $ptr Device Relaxed $data
                 };
             }
             }
@@ -4799,11 +4809,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicOr %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicOr $ptr Device Relaxed $data
                 };
             }
             }
@@ -4821,11 +4832,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicXor %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicXor $ptr Device Relaxed $data
                 };
             }
             }
@@ -4842,11 +4854,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device Relaxed Relaxed $data $compare
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicCompareExchange $ptr Device Relaxed Relaxed $data $compare
                 };
             }
             }

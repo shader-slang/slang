@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:55:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 44cc076396b4503f18997a6be579c3163209ab7a24f87f3aae489b26a3963cbd
+model: claude-opus-4.8
+generated_at: 2026-06-05T10:25:25+00:00
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: 9221d4167460d8aa57ead3a905a1ce4b763de1371a68088ad1f20133ed887720
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -127,6 +127,9 @@ column on each family page.
   — how IR modules are serialized.
 - [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md)
   — IR instructions carry `SourceLoc`s through the diagnostic system.
+- [../cross-cutting/targets.md](../cross-cutting/targets.md) — the
+  target backends that consume legalized IR, and the per-target
+  legalization that shapes which opcodes survive to emission.
 - [../glossary.md](../glossary.md) — definitions of `IRInst`, `IROp`,
   `IRBuilder`, `IRModule`, `parent instruction`, `terminator
   instruction`, `block parameter`, `decoration`, `hoistable

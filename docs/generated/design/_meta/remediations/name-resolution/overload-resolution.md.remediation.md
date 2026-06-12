@@ -1,11 +1,11 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T19:00:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-05T15:45:00Z
 target_doc: name-resolution/overload-resolution.md
 review_report: ../../reviews/name-resolution/overload-resolution.md.review.md
-target_doc_source_commit_before: 9be3b6cd58c80ba8c66ce5b6e7f5dadcde2c0c63
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
 actions:
   fixed: 3
   rejected_bogus: 0
@@ -18,15 +18,12 @@ actions:
 
 ## Summary
 
-All three findings addressed: a missing finalize-phase step is now
-listed in the algorithm, the conversion-cost table is rebuilt from
-the source enum, and the "edge cases" entry that conflated per-
-argument and per-candidate cost ceilings is corrected.
+The review reported three findings, all fixed in the target doc. F-001: the IR-lowering/ICE prose for unresolved `PartiallyAppliedGenericExpr` (forbidden by the prompt and citing unwatched `slang-lower-to-ir.cpp`) was replaced, in both the partial-generic section and its edge-case echo, with a resolver-side invariant that defers downstream handling to `pipeline/04-ast-to-ir.md`. F-002: the arity step's source link to unwatched `slang-diagnostics.lua` was dropped while keeping the diagnostic names in prose. F-003: the no-applicable edge case was qualified to distinguish the single-best path (re-run via `CompleteOverloadCandidate`) from the tied non-applicable path, which emits `NoApplicableOverloadForNameWithArgs`/`NoApplicableWithArgs` directly (`source/slang/slang-check-overload.cpp:3216-3232`).
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `TryCheckOverloadCandidateClassNewMatchUp` runs as part of finalize for class-new candidates and was missing from the step list. | Added a seventh step "Finalize / class-new match-up" to the algorithm section, citing `slang-check-overload.cpp` lines 2103-2130. |
-| F-002 | fixed | The previous table omitted several `kConversionCost_*` constants and used out-of-order values; rebuild from source. | Rewrote the "Conversion costs" table to enumerate every `kConversionCost_*` constant in declaration order from `slang-check-overload.cpp`, with one-line descriptions and a citation to the enum block. |
-| F-003 | fixed | The original prose suggested there was no ceiling at all; in fact `canConvertImplicitly` rejects any single argument whose cumulative conversion cost reaches `kConversionCost_GeneralConversion`, while `conversionCostSum` itself is unbounded. | Rewrote the "Argument that needs a chain of conversions" bullet to spell out the two-level structure: per-argument ceiling at 900 (via `canConvertImplicitly`), then unbounded summation into `conversionCostSum` for ranking. Added citations to `slang-check-conversion.cpp` and `slang-check-overload.cpp`. |
+| F-001 | fixed | Prompt `name-resolution-overload-resolution.md:107-114` forbids IR-lowering of resolved overloads; `slang-lower-to-ir.cpp` is unwatched. | Replaced the lowerer/ICE sentence in `## Partial generic application` and the matching edge-case bullet with a resolver-side invariant linking `pipeline/04-ast-to-ir.md`. |
+| F-002 | fixed | `slang-diagnostics.lua` is not in this doc's watched paths; manifest edits are out of remediation scope, so the link was removed. | Removed the `slang-diagnostics.lua` source link from the arity step, keeping the diagnostic identifiers as inline prose. |
+| F-003 | fixed | Tied non-applicable candidates emit `NoApplicableOverloadForNameWithArgs`/`NoApplicableWithArgs` directly (`slang-check-overload.cpp:3216-3232`), not via `CompleteOverloadCandidate`. | Split the no-applicable bullet into single-best (re-run) and tied (direct no-applicable diagnostics) cases with a watched citation. |
