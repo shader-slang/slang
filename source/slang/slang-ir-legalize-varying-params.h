@@ -11,6 +11,8 @@ struct IRModule;
 struct IRInst;
 struct IRFunc;
 struct IRParam;
+struct IRStructField;
+struct IRVarLayout;
 struct IRVectorType;
 struct IRBuilder;
 struct IREntryPointDecoration;
@@ -110,6 +112,21 @@ bool tryLegalizeRayTracingPrimitiveIDParam(
     IRParam* param,
     bool* outParamRemoved = nullptr);
 
+using RayTracingPrimitiveIDValueEmitterFunc =
+    IRInst* (*)(
+        IRModule* module,
+        IRBuilder& builder,
+        IRType* type,
+        IRStructField* field,
+        IRVarLayout* layout,
+        void* userData);
+
+struct RayTracingPrimitiveIDValueEmitter
+{
+    RayTracingPrimitiveIDValueEmitterFunc func = nullptr;
+    void* userData = nullptr;
+};
+
 /// Rewrites `SV_PrimitiveID` fields in a hit-stage struct parameter.
 /// Returns true when primitive-ID fields were rewritten. `outParamRemoved` is set when the
 /// original parameter had no ordinary fields and was removed; otherwise the parameter is narrowed
@@ -118,7 +135,8 @@ bool tryLegalizeRayTracingPrimitiveIDStructParam(
     IRModule* module,
     IRBuilder& builder,
     IRParam* param,
-    bool* outParamRemoved = nullptr);
+    bool* outParamRemoved = nullptr,
+    RayTracingPrimitiveIDValueEmitter const* valueEmitter = nullptr);
 
 /// Legalizes hit-stage `SV_PrimitiveID` parameters before HLSL existential-type-layout
 /// lowering removes empty struct parameters that are still needed for this rewrite.

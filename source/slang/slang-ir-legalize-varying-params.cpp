@@ -504,6 +504,26 @@ static IRInst* emitRayTracingPrimitiveIndexValue(
     return tryConvertValue(builder, primitiveIndexCall, valueType);
 }
 
+static IRInst* emitRayTracingPrimitiveIDValue(
+    IRModule* module,
+    IRBuilder& builder,
+    IRType* paramType,
+    IRStructField* field,
+    IRVarLayout* varLayout,
+    RayTracingPrimitiveIDValueEmitter const* valueEmitter)
+{
+    if (valueEmitter && valueEmitter->func)
+        return valueEmitter->func(
+            module,
+            builder,
+            paramType,
+            field,
+            varLayout,
+            valueEmitter->userData);
+
+    return emitRayTracingPrimitiveIndexValue(module, builder, paramType);
+}
+
 static void replacePrimitiveIDUses(
     IRBuilder& builder,
     IRInst* instToReplace,
@@ -571,6 +591,7 @@ struct PrimitiveIDFieldAccess
 {
     IRInst* inst;
     IRStructField* field;
+    IRVarLayout* fieldLayout;
 };
 
 struct PrimitiveIDStructInfo;
@@ -797,7 +818,7 @@ static void collectPrimitiveIDStructFieldAccesses(
 
             if (fieldInfo->isPrimitiveIDField)
             {
-                primitiveIDFieldAccesses.add({user, fieldInfo->field});
+                primitiveIDFieldAccesses.add({user, fieldInfo->field, fieldInfo->fieldLayout});
                 return;
             }
 
@@ -864,15 +885,21 @@ static IRInst* emitPrimitiveIDStructValue(
     IRModule* module,
     IRBuilder& builder,
     IRInst* baseInst,
-    PrimitiveIDStructInfo* info)
+    PrimitiveIDStructInfo* info,
+    RayTracingPrimitiveIDValueEmitter const* valueEmitter)
 {
     List<IRInst*> fieldValues;
     for (auto& fieldInfo : info->fields)
     {
         if (fieldInfo.isPrimitiveIDField)
         {
-            auto primitiveIndex =
-                emitRayTracingPrimitiveIndexValue(module, builder, fieldInfo.field->getFieldType());
+            auto primitiveIndex = emitRayTracingPrimitiveIDValue(
+                module,
+                builder,
+                fieldInfo.field->getFieldType(),
+                fieldInfo.field,
+                fieldInfo.fieldLayout,
+                valueEmitter);
             if (!primitiveIndex)
                 return nullptr;
 
@@ -893,8 +920,12 @@ static IRInst* emitPrimitiveIDStructValue(
                     fieldInfo.ordinaryFieldType);
             }
 
-            auto nestedValue =
-                emitPrimitiveIDStructValue(module, builder, nestedBase, fieldInfo.nestedInfo);
+            auto nestedValue = emitPrimitiveIDStructValue(
+                module,
+                builder,
+                nestedBase,
+                fieldInfo.nestedInfo,
+                valueEmitter);
             if (!nestedValue)
                 return nullptr;
 
@@ -914,7 +945,8 @@ static IRInst* getWholeStructReplacement(
     IRBuilder& builder,
     IRInst* baseInst,
     PrimitiveIDStructInfo* info,
-    List<PrimitiveIDWholeStructReplacement>& replacements)
+    List<PrimitiveIDWholeStructReplacement>& replacements,
+    RayTracingPrimitiveIDValueEmitter const* valueEmitter)
 {
     for (auto replacement : replacements)
     {
@@ -922,7 +954,7 @@ static IRInst* getWholeStructReplacement(
             return replacement.replacement;
     }
 
-    auto structValue = emitPrimitiveIDStructValue(module, builder, baseInst, info);
+    auto structValue = emitPrimitiveIDStructValue(module, builder, baseInst, info, valueEmitter);
     if (!structValue)
         return nullptr;
 
@@ -1008,7 +1040,8 @@ bool tryLegalizeRayTracingPrimitiveIDStructParam(
     IRModule* module,
     IRBuilder& builder,
     IRParam* param,
-    bool* outParamRemoved)
+    bool* outParamRemoved,
+    RayTracingPrimitiveIDValueEmitter const* valueEmitter)
 {
     if (outParamRemoved)
         *outParamRemoved = false;
@@ -1051,7 +1084,7 @@ bool tryLegalizeRayTracingPrimitiveIDStructParam(
 
             if (fieldInfo->isPrimitiveIDField)
             {
-                primitiveIDFieldAccesses.add({user, fieldInfo->field});
+                primitiveIDFieldAccesses.add({user, fieldInfo->field, fieldInfo->fieldLayout});
                 return;
             }
 
@@ -1080,12 +1113,20 @@ bool tryLegalizeRayTracingPrimitiveIDStructParam(
     List<PrimitiveIDWholeStructReplacement> wholeStructReplacements;
     for (auto wholeStructUse : wholeStructUses)
     {
+        IRBuilderInsertLocScope insertLocScope(&builder);
+        if (wholeStructUse.baseInst && !as<IRParam>(wholeStructUse.baseInst) &&
+            wholeStructUse.baseInst->parent)
+        {
+            builder.setInsertAfter(wholeStructUse.baseInst);
+        }
+
         auto replacement = getWholeStructReplacement(
             module,
             builder,
             wholeStructUse.baseInst,
             wholeStructUse.info,
-            wholeStructReplacements);
+            wholeStructReplacements,
+            valueEmitter);
         if (!replacement)
             return false;
 
@@ -1102,8 +1143,23 @@ bool tryLegalizeRayTracingPrimitiveIDStructParam(
                 return replacementValues[i];
         }
 
-        auto valueReplacement =
-            emitRayTracingPrimitiveIndexValue(module, builder, field->getFieldType());
+        IRVarLayout* fieldLayout = nullptr;
+        for (auto access : primitiveIDFieldAccesses)
+        {
+            if (access.field == field)
+            {
+                fieldLayout = access.fieldLayout;
+                break;
+            }
+        }
+
+        auto valueReplacement = emitRayTracingPrimitiveIDValue(
+            module,
+            builder,
+            field->getFieldType(),
+            field,
+            fieldLayout,
+            valueEmitter);
         if (!valueReplacement)
             return nullptr;
 

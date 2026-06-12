@@ -28,26 +28,32 @@
 //TEST:SIMPLE(filecheck=STRUCT_DXIL):-target dxil-assembly -entry main_chit_struct -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_GLSL):-target glsl -entry main_chit_struct -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_CUDA):-target cuda -entry main_chit_struct -stage closesthit
+//TEST:SIMPLE(filecheck=STRUCT_SPIRV):-target spirv-assembly -entry main_chit_struct -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_NESTED_HLSL):-target hlsl -entry main_chit_struct_nested -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_NESTED_DXIL):-target dxil-assembly -entry main_chit_struct_nested -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_NESTED_GLSL):-target glsl -entry main_chit_struct_nested -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_NESTED_CUDA):-target cuda -entry main_chit_struct_nested -stage closesthit
+//TEST:SIMPLE(filecheck=STRUCT_NESTED_SPIRV):-target spirv-assembly -entry main_chit_struct_nested -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_NESTED_MIXED_HLSL):-target hlsl -entry main_chit_struct_nested_mixed -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_NESTED_MIXED_DXIL):-target dxil-assembly -entry main_chit_struct_nested_mixed -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_NESTED_MIXED_GLSL):-target glsl -entry main_chit_struct_nested_mixed -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_NESTED_MIXED_CUDA):-target cuda -entry main_chit_struct_nested_mixed -stage closesthit
+//TEST:SIMPLE(filecheck=STRUCT_NESTED_MIXED_SPIRV):-target spirv-assembly -entry main_chit_struct_nested_mixed -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_NESTED_MIXED_FORWARD_HLSL):-target hlsl -entry main_chit_struct_nested_mixed_forward -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_NESTED_MIXED_FORWARD_DXIL):-target dxil-assembly -entry main_chit_struct_nested_mixed_forward -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_NESTED_MIXED_FORWARD_GLSL):-target glsl -entry main_chit_struct_nested_mixed_forward -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_NESTED_MIXED_FORWARD_CUDA):-target cuda -entry main_chit_struct_nested_mixed_forward -stage closesthit
+//TEST:SIMPLE(filecheck=STRUCT_NESTED_MIXED_FORWARD_SPIRV):-target spirv-assembly -entry main_chit_struct_nested_mixed_forward -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_HLSL):-target hlsl -entry main_chit_struct_mixed -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_DXIL):-target dxil-assembly -entry main_chit_struct_mixed -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_GLSL):-target glsl -entry main_chit_struct_mixed -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_CUDA):-target cuda -entry main_chit_struct_mixed -stage closesthit
+//TEST:SIMPLE(filecheck=STRUCT_MIXED_SPIRV):-target spirv-assembly -entry main_chit_struct_mixed -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_FORWARD_HLSL):-target hlsl -entry main_chit_struct_mixed_forward -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_FORWARD_DXIL):-target dxil-assembly -entry main_chit_struct_mixed_forward -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_FORWARD_GLSL):-target glsl -entry main_chit_struct_mixed_forward -stage closesthit
 //TEST:SIMPLE(filecheck=STRUCT_MIXED_FORWARD_CUDA):-target cuda -entry main_chit_struct_mixed_forward -stage closesthit
+//TEST:SIMPLE(filecheck=STRUCT_MIXED_FORWARD_SPIRV):-target spirv-assembly -entry main_chit_struct_mixed_forward -stage closesthit
 //TEST:SIMPLE(filecheck=ISECT_CUDA):-target cuda -entry main_isect_cuda -stage intersection
 //TEST:SIMPLE(filecheck=AHIT_CUDA):-target cuda -entry main_ahit -stage anyhit
 //TEST:SIMPLE(filecheck=CHIT_CUDA):-target cuda -entry main_chit -stage closesthit
@@ -281,6 +287,11 @@ void main_chit_struct(
 // STRUCT_CUDA: optixGetPrimitiveIndex()
 // STRUCT_CUDA: float(int({{.*}})) + {{.*}} + {{.*}}
 
+// STRUCT_SPIRV: OpEntryPoint ClosestHitKHR %main_chit_struct "main" %gl_PrimitiveID %payload %attribs
+// STRUCT_SPIRV: BuiltIn PrimitiveId
+// STRUCT_SPIRV: %gl_PrimitiveID = OpVariable %_ptr_Input_int Input
+// STRUCT_SPIRV: OpLoad %int %gl_PrimitiveID
+
 struct ChitPrimitiveInnerInput
 {
     int pid : SV_PrimitiveID;
@@ -315,6 +326,14 @@ void main_chit_struct_nested(inout Payload payload, in ChitNestedPrimitiveInput 
 // STRUCT_NESTED_CUDA: __global__ void __closesthit__main_chit_struct_nested
 // STRUCT_NESTED_CUDA: optixGetPrimitiveIndex()
 // STRUCT_NESTED_CUDA: float(int({{.*}})) + {{.*}}
+
+// STRUCT_NESTED_SPIRV: OpEntryPoint ClosestHitKHR %main_chit_struct_nested "main" %gl_PrimitiveID %payload %input
+// STRUCT_NESTED_SPIRV: OpName %ChitNestedPrimitiveInput "ChitNestedPrimitiveInput"
+// STRUCT_NESTED_SPIRV-NOT: inner
+// STRUCT_NESTED_SPIRV: OpMemberName %ChitNestedPrimitiveInput 0 "weight"
+// STRUCT_NESTED_SPIRV: BuiltIn PrimitiveId
+// STRUCT_NESTED_SPIRV: %ChitNestedPrimitiveInput = OpTypeStruct %float
+// STRUCT_NESTED_SPIRV: OpLoad %int %gl_PrimitiveID
 
 struct ChitMixedPrimitiveInnerInput
 {
@@ -363,6 +382,18 @@ void main_chit_struct_nested_mixed(inout Payload payload, in ChitNestedMixedPrim
 // STRUCT_NESTED_MIXED_CUDA: float(int({{.*}})) + [[NESTED_WEIGHT]]
 // STRUCT_NESTED_MIXED_CUDA: {{.*}} + [[OUTER_WEIGHT]]
 
+// STRUCT_NESTED_MIXED_SPIRV: OpEntryPoint ClosestHitKHR %main_chit_struct_nested_mixed "main" %gl_PrimitiveID %payload %input
+// STRUCT_NESTED_MIXED_SPIRV: OpName %ChitMixedPrimitiveInnerInput "ChitMixedPrimitiveInnerInput"
+// STRUCT_NESTED_MIXED_SPIRV-NOT: pid
+// STRUCT_NESTED_MIXED_SPIRV: OpMemberName %ChitMixedPrimitiveInnerInput 0 "nestedWeight"
+// STRUCT_NESTED_MIXED_SPIRV: OpName %ChitNestedMixedPrimitiveInput "ChitNestedMixedPrimitiveInput"
+// STRUCT_NESTED_MIXED_SPIRV: OpMemberName %ChitNestedMixedPrimitiveInput 0 "inner"
+// STRUCT_NESTED_MIXED_SPIRV: OpMemberName %ChitNestedMixedPrimitiveInput 1 "weight"
+// STRUCT_NESTED_MIXED_SPIRV: BuiltIn PrimitiveId
+// STRUCT_NESTED_MIXED_SPIRV: %ChitMixedPrimitiveInnerInput = OpTypeStruct %float
+// STRUCT_NESTED_MIXED_SPIRV: %ChitNestedMixedPrimitiveInput = OpTypeStruct %ChitMixedPrimitiveInnerInput %float
+// STRUCT_NESTED_MIXED_SPIRV: OpLoad %int %gl_PrimitiveID
+
 float useMixedPrimitiveInnerInput(in ChitMixedPrimitiveInnerInput input)
 {
     return float(input.pid) + input.nestedWeight;
@@ -396,6 +427,18 @@ void main_chit_struct_nested_mixed_forward(
 // STRUCT_NESTED_MIXED_FORWARD_CUDA: useMixedPrimitiveInnerInput_0(&[[FORWARDED]])
 // STRUCT_NESTED_MIXED_FORWARD_CUDA: {{.*}} + [[OUTER_WEIGHT]]
 
+// STRUCT_NESTED_MIXED_FORWARD_SPIRV: OpEntryPoint ClosestHitKHR %main_chit_struct_nested_mixed_forward "main" %gl_PrimitiveID %payload %input
+// STRUCT_NESTED_MIXED_FORWARD_SPIRV: OpName %ChitMixedPrimitiveInnerInput "ChitMixedPrimitiveInnerInput"
+// STRUCT_NESTED_MIXED_FORWARD_SPIRV-NOT: pid
+// STRUCT_NESTED_MIXED_FORWARD_SPIRV: OpMemberName %ChitMixedPrimitiveInnerInput 0 "nestedWeight"
+// STRUCT_NESTED_MIXED_FORWARD_SPIRV: OpName %ChitNestedMixedPrimitiveInput "ChitNestedMixedPrimitiveInput"
+// STRUCT_NESTED_MIXED_FORWARD_SPIRV: OpMemberName %ChitNestedMixedPrimitiveInput 0 "inner"
+// STRUCT_NESTED_MIXED_FORWARD_SPIRV: OpMemberName %ChitNestedMixedPrimitiveInput 1 "weight"
+// STRUCT_NESTED_MIXED_FORWARD_SPIRV: BuiltIn PrimitiveId
+// STRUCT_NESTED_MIXED_FORWARD_SPIRV: %ChitMixedPrimitiveInnerInput = OpTypeStruct %float
+// STRUCT_NESTED_MIXED_FORWARD_SPIRV: %ChitNestedMixedPrimitiveInput = OpTypeStruct %ChitMixedPrimitiveInnerInput %float
+// STRUCT_NESTED_MIXED_FORWARD_SPIRV: OpLoad %int %gl_PrimitiveID
+
 struct ChitMixedPrimitiveInput
 {
     int pid : SV_PrimitiveID;
@@ -426,6 +469,14 @@ void main_chit_struct_mixed(inout Payload payload, in ChitMixedPrimitiveInput in
 // STRUCT_MIXED_CUDA: __global__ void __closesthit__main_chit_struct_mixed
 // STRUCT_MIXED_CUDA: optixGetPrimitiveIndex()
 // STRUCT_MIXED_CUDA: float({{.*}}) + {{.*}}
+
+// STRUCT_MIXED_SPIRV: OpEntryPoint ClosestHitKHR %main_chit_struct_mixed "main" %gl_PrimitiveID %payload %input
+// STRUCT_MIXED_SPIRV: OpName %ChitMixedPrimitiveInput "ChitMixedPrimitiveInput"
+// STRUCT_MIXED_SPIRV-NOT: pid
+// STRUCT_MIXED_SPIRV: OpMemberName %ChitMixedPrimitiveInput 0 "weight"
+// STRUCT_MIXED_SPIRV: BuiltIn PrimitiveId
+// STRUCT_MIXED_SPIRV: %ChitMixedPrimitiveInput = OpTypeStruct %float
+// STRUCT_MIXED_SPIRV: OpLoad %int %gl_PrimitiveID
 
 float useMixedPrimitiveInput(in ChitMixedPrimitiveInput input)
 {
@@ -462,3 +513,11 @@ void main_chit_struct_mixed_forward(inout Payload payload, in ChitMixedPrimitive
 // STRUCT_MIXED_FORWARD_CUDA: (&[[FORWARDED:[A-Za-z_][A-Za-z_0-9]*]])->pid_0 = int([[PRIMITIVE_ID]])
 // STRUCT_MIXED_FORWARD_CUDA: (&[[FORWARDED]])->weight_0 = [[WEIGHT]]
 // STRUCT_MIXED_FORWARD_CUDA: useMixedPrimitiveInput_0(&[[FORWARDED]])
+
+// STRUCT_MIXED_FORWARD_SPIRV: OpEntryPoint ClosestHitKHR %main_chit_struct_mixed_forward "main" %gl_PrimitiveID %payload %input
+// STRUCT_MIXED_FORWARD_SPIRV: OpName %ChitMixedPrimitiveInput "ChitMixedPrimitiveInput"
+// STRUCT_MIXED_FORWARD_SPIRV-NOT: pid
+// STRUCT_MIXED_FORWARD_SPIRV: OpMemberName %ChitMixedPrimitiveInput 0 "weight"
+// STRUCT_MIXED_FORWARD_SPIRV: BuiltIn PrimitiveId
+// STRUCT_MIXED_FORWARD_SPIRV: %ChitMixedPrimitiveInput = OpTypeStruct %float
+// STRUCT_MIXED_FORWARD_SPIRV: OpLoad %int %gl_PrimitiveID

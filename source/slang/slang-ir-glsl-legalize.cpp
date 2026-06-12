@@ -3000,6 +3000,71 @@ void handleSingleParam(
     builder->addDependsOnDecoration(func, globalParam);
 }
 
+struct DirectSPIRVPrimitiveIDGlobal
+{
+    IRType* valueType = nullptr;
+    IRGlobalParam* globalParam = nullptr;
+};
+
+struct DirectSPIRVPrimitiveIDEmitterContext
+{
+    IRFunc* func = nullptr;
+    List<DirectSPIRVPrimitiveIDGlobal> globals;
+};
+
+static IRType* getPrimitiveIDValueTypeForDirectSPIRV(IRType* type)
+{
+    if (auto borrowInParamType = as<IRBorrowInParamType>(type))
+        return borrowInParamType->getValueType();
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+        return ptrType->getValueType();
+    return type;
+}
+
+static IRInst* emitDirectSPIRVPrimitiveIDValue(
+    IRModule* module,
+    IRBuilder& builder,
+    IRType* type,
+    IRStructField* field,
+    IRVarLayout* layout,
+    void* userData)
+{
+    if (!layout)
+        return nullptr;
+
+    auto semanticDecor = field ? field->getKey()->findDecoration<IRSemanticDecoration>() : nullptr;
+    auto systemValueAttr = layout->findSystemValueSemanticAttr();
+    if (!systemValueAttr && !semanticDecor)
+        return nullptr;
+
+    auto context = static_cast<DirectSPIRVPrimitiveIDEmitterContext*>(userData);
+    auto valueType = getPrimitiveIDValueTypeForDirectSPIRV(type);
+    for (auto global : context->globals)
+    {
+        if (global.valueType == valueType)
+            return builder.emitLoad(global.globalParam);
+    }
+
+    auto globalParam = addGlobalParam(
+        module,
+        builder.getPtrType(
+            valueType,
+            AccessQualifier::Immutable,
+            AddressSpace::BuiltinInput,
+            builder.getDefaultBufferLayoutType()));
+
+    IRVarLayout::Builder varLayoutBuilder(&builder, layout->getTypeLayout());
+    varLayoutBuilder.cloneEverythingButOffsetsFrom(layout);
+    if (!systemValueAttr && semanticDecor)
+        varLayoutBuilder.setSystemValueSemantic(semanticDecor->getSemanticName(), 0);
+    builder.addLayoutDecoration(globalParam, varLayoutBuilder.build());
+    moveValueBefore(globalParam, context->func);
+    builder.addDependsOnDecoration(context->func, globalParam);
+
+    context->globals.add({valueType, globalParam});
+    return builder.emitLoad(globalParam);
+}
+
 static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam*>& params)
 {
     auto builder = context->getBuilder();
@@ -3082,7 +3147,8 @@ void consolidateRayTracingParameters(
     GLSLLegalizationContext* context,
     IRFunc* func,
     bool legalizePrimitiveIDBeforeConsolidation,
-    bool legalizePrimitiveIDStructBeforeConsolidation)
+    bool legalizePrimitiveIDStructBeforeConsolidation,
+    RayTracingPrimitiveIDValueEmitter const* primitiveIDStructValueEmitter)
 {
     auto builder = context->getBuilder();
     auto firstBlock = func->getFirstBlock();
@@ -3141,7 +3207,8 @@ void consolidateRayTracingParameters(
                     builder->getModule(),
                     *builder,
                     param,
-                    &paramRemoved))
+                    &paramRemoved,
+                    primitiveIDStructValueEmitter))
             {
                 if (paramRemoved)
                 {
@@ -4978,12 +5045,27 @@ void legalizeEntryPointForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        consolidateRayTracingParameters(
-            &context,
-            func,
-            isRayTracingHitStage(stage) && isViaGLSL,
-            isRayTracingHitStage(stage) && isViaGLSL);
-        break;
+        {
+            DirectSPIRVPrimitiveIDEmitterContext directSPIRVPrimitiveIDEmitterContext;
+            directSPIRVPrimitiveIDEmitterContext.func = func;
+
+            RayTracingPrimitiveIDValueEmitter directSPIRVPrimitiveIDEmitter;
+            RayTracingPrimitiveIDValueEmitter const* primitiveIDStructValueEmitter = nullptr;
+            if (isRayTracingHitStage(stage) && !isViaGLSL)
+            {
+                directSPIRVPrimitiveIDEmitter.func = emitDirectSPIRVPrimitiveIDValue;
+                directSPIRVPrimitiveIDEmitter.userData = &directSPIRVPrimitiveIDEmitterContext;
+                primitiveIDStructValueEmitter = &directSPIRVPrimitiveIDEmitter;
+            }
+
+            consolidateRayTracingParameters(
+                &context,
+                func,
+                isRayTracingHitStage(stage) && isViaGLSL,
+                isRayTracingHitStage(stage),
+                primitiveIDStructValueEmitter);
+            break;
+        }
     default:
         break;
     }
