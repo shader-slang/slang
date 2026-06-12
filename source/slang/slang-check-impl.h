@@ -269,6 +269,52 @@ struct OperatorOverloadCacheKey
     }
 };
 
+// Focused failure data produced while a generic candidate is still being
+// inferred. `inferGenericArguments` fills this optional record, and
+// `CompleteOverloadCandidate` emits it only if overload resolution selects that
+// failed generic candidate.
+struct GenericArgumentInferenceFailure
+{
+    enum class Kind
+    {
+        None,
+        VariadicPackCountMismatch,
+    };
+
+    struct VariadicPackCountMismatch
+    {
+        SourceLoc location = SourceLoc();
+        int64_t expectedCount = 0;
+        int64_t actualCount = 0;
+    };
+
+    Kind kind = Kind::None;
+    union
+    {
+        VariadicPackCountMismatch variadicPackCountMismatch;
+    };
+
+    GenericArgumentInferenceFailure()
+        : variadicPackCountMismatch()
+    {
+    }
+
+    GenericArgumentInferenceFailure(GenericArgumentInferenceFailure const& other)
+        : kind(other.kind), variadicPackCountMismatch(other.variadicPackCountMismatch)
+    {
+    }
+
+    GenericArgumentInferenceFailure& operator=(GenericArgumentInferenceFailure const& other)
+    {
+        kind = other.kind;
+        variadicPackCountMismatch = other.variadicPackCountMismatch;
+        return *this;
+    }
+};
+
+DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal);
+bool areIntValsSemanticallyEqual(IntVal* left, IntVal* right);
+
 struct OverloadCandidate
 {
     enum class Flavor
@@ -334,6 +380,12 @@ struct OverloadCandidate
     // the solver's fixpoint -- the same path used for inferred generic arguments
     // -- rather than a separate linear pass. -1 until computed.
     Index explicitGenericArgCount = -1;
+
+    // When a generic candidate fails before producing a specialized decl-ref,
+    // the solver can record a focused failure reason here. The selected failed
+    // candidate reports this reason instead of falling back to only the generic
+    // "could not specialize" diagnostic.
+    GenericArgumentInferenceFailure genericInferenceFailure;
 };
 
 struct ResolvedOperatorOverload
@@ -2894,6 +2946,13 @@ public:
         // This tracks costs when a type parameter is promoted to satisfy an interface
         // constraint (e.g., int -> float to satisfy __BuiltinFloatingPointType).
         ConversionCost typePromotionCost = kConversionCost_None;
+
+        // Optional channel for a generic-argument solve to explain a focused
+        // failure to overload completion. Solving can run while collecting
+        // speculative candidates, so diagnostics are delayed until overload
+        // resolution selects the failed candidate.
+        GenericArgumentInferenceFailure* failure = nullptr;
+        SourceLoc applicationLoc = SourceLoc();
     };
 
     bool isRelevantGeneric(GenericInferenceContext& system, Decl* generic);
@@ -3383,7 +3442,8 @@ public:
         OverloadResolveContext& context,
         ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost,
-        List<QualType>* innerParameterTypes = nullptr);
+        List<QualType>* innerParameterTypes = nullptr,
+        GenericArgumentInferenceFailure* outFailure = nullptr);
 
     void AddTypeOverloadCandidates(Type* type, OverloadResolveContext& context);
 
@@ -3911,6 +3971,17 @@ Witness* findNonEmptyPackWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
     Val* constrainedArg,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    bool shouldEmitError);
+
+// Return the witness that proves `countof(constrainedArg) == expectedCount`,
+// or `nullptr` if the concrete count or an in-scope declared constraint cannot
+// prove that equality.
+Witness* findVariadicPackCountWitnessForConstraint(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    Val* constrainedArg,
+    IntVal* expectedCount,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);
 

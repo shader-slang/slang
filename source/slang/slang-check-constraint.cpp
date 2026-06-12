@@ -640,6 +640,133 @@ Witness* findNonEmptyPackWitnessForConstraint(
     return astBuilder->getNonEmptyPackWitness(constrainedArg);
 }
 
+static DeclRef<Decl> getDeclRefFromVal(Val* val)
+{
+    // Extract the declaration reference wrapped by a semantic value. This is a
+    // narrow structural helper: it recognizes `DeclRefIntVal`, `DeclRefType`,
+    // and a `DeclRefType` inside `ModifiedType` via `unwrapModifiedType`.
+    // Concrete values intentionally return an empty decl-ref because they have
+    // no declaration identity to compare.
+    if (auto type = as<Type>(val))
+    {
+        if (auto declRefType = as<DeclRefType>(unwrapModifiedType(type)))
+            return declRefType->getDeclRef().as<Decl>();
+    }
+    if (auto declRefIntVal = as<DeclRefIntVal>(val))
+        return declRefIntVal->getDeclRef().as<Decl>();
+    return DeclRef<Decl>();
+}
+
+static DeclRef<Decl> _getPackDeclRefForPackCountConstraint(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& constraintDeclRef)
+{
+    // `visitGenericVariadicPackCountConstraintDecl` accepts only direct pack
+    // parameter references. Keep this helper narrow so witness matching rejects
+    // unsupported symbolic pack expressions instead of treating them as proofs.
+    auto packExpr = getPackCountConstraintPackExpr(astBuilder, constraintDeclRef);
+    if (auto declRefExpr = packExpr.as<DeclRefExpr>())
+        return getDeclRef(astBuilder, declRefExpr);
+    return DeclRef<Decl>();
+}
+
+static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountConstraintForPackAndCount(
+    ASTBuilder* astBuilder,
+    Val* constrainedArg,
+    IntVal* expectedCount)
+{
+    // A nested call such as `foo<let N, each I>() where countof(I) == N`
+    // calling `bar<N, I>() where countof(I) == N` has no concrete pack count
+    // during body checking. The proof is the source constraint declared on the
+    // generic that owns `I`; accept it only when both the pack declaration and
+    // substituted count `IntVal` match the callee's requirement exactly, aside
+    // from integer casts that semantic normalization may add around `N`.
+    auto constrainedPackDeclRef = getDeclRefFromVal(constrainedArg);
+    auto constrainedPackDecl = constrainedPackDeclRef.getDecl();
+    auto genericDecl =
+        constrainedPackDecl ? as<GenericDecl>(constrainedPackDecl->parentDecl) : nullptr;
+    if (!genericDecl || !expectedCount)
+        return DeclRef<GenericVariadicPackCountConstraintDecl>();
+
+    for (auto constraintDecl :
+         genericDecl->getDirectMemberDeclsOfType<GenericVariadicPackCountConstraintDecl>())
+    {
+        auto constraintDeclRef =
+            astBuilder->getDirectDeclRef<GenericVariadicPackCountConstraintDecl>(constraintDecl);
+        auto packDeclRef = _getPackDeclRefForPackCountConstraint(astBuilder, constraintDeclRef);
+        if (packDeclRef.getDecl() != constrainedPackDecl)
+            continue;
+
+        auto declaredExpectedCount =
+            getPackCountConstraintExpectedCount(astBuilder, constraintDeclRef);
+        if (areIntValsSemanticallyEqual(declaredExpectedCount, expectedCount))
+            return constraintDeclRef;
+    }
+
+    return DeclRef<GenericVariadicPackCountConstraintDecl>();
+}
+
+// Find the witness value for a variadic-pack-count generic constraint.
+Witness* findVariadicPackCountWitnessForConstraint(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    Val* constrainedArg,
+    IntVal* expectedCount,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    bool shouldEmitError)
+{
+    SLANG_ASSERT(!shouldEmitError || maybeContext);
+    if (!constrainedArg || !expectedCount)
+        return nullptr;
+
+    // Pack-count constraints are validation constraints. If `load<3>(1, 2, 3)`
+    // reaches this helper, `N` is already solved to `3`; this block may compare
+    // concrete counts or forward an in-scope declared proof, but it must not add
+    // ordinary constraints such as inferring `N` from `countof(TIndex)`.
+    auto resolvedExpectedCount = as<IntVal>(expectedCount->resolve());
+    if (!resolvedExpectedCount)
+        resolvedExpectedCount = expectedCount;
+
+    auto foldedActualCount =
+        CountOfIntVal::tryFold(astBuilder, resolvedExpectedCount->getType(), constrainedArg);
+    auto actualCount = foldedActualCount ? as<IntVal>(foldedActualCount->resolve()) : nullptr;
+    if (actualCount && actualCount->equals(resolvedExpectedCount))
+    {
+        return astBuilder->getConcreteVariadicPackCountWitness(
+            constrainedArg,
+            resolvedExpectedCount);
+    }
+
+    if (auto declaredConstraintDeclRef = _findDeclaredPackCountConstraintForPackAndCount(
+            astBuilder,
+            constrainedArg,
+            resolvedExpectedCount))
+    {
+        return astBuilder->getDeclaredVariadicPackCountWitness(declaredConstraintDeclRef);
+    }
+
+    if (shouldEmitError)
+    {
+        auto actualConstant = as<ConstantIntVal>(actualCount);
+        auto expectedConstant = as<ConstantIntVal>(resolvedExpectedCount);
+        if (actualConstant && expectedConstant)
+        {
+            visitor->getSink()->diagnose(Diagnostics::VariadicPackCountDoesNotMatch{
+                .expectedCount = (int64_t)expectedConstant->getValue(),
+                .actualCount = (int64_t)actualConstant->getValue(),
+                .location = maybeContext->loc});
+        }
+        else
+        {
+            auto diagExpr =
+                maybeContext->originalExpr ? maybeContext->originalExpr : maybeContext->baseExpr;
+            visitor->getSink()->diagnose(
+                Diagnostics::VariadicPackCountProofUnavailable{.expr = diagExpr});
+        }
+    }
+    return nullptr;
+}
+
 // An `ArgState` classifies the current argument stored in `m_args` for one
 // ordinary argument or witness argument position. The state decides whether that
 // current argument is ready for substitution, and whether later solver
@@ -774,6 +901,22 @@ DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal)
     return as<DeclRefIntVal>(intVal);
 }
 
+// Compare integer values at the semantic equality level used by generic
+// witness matching. This helper deliberately strips only cast wrappers around
+// generic value parameters, e.g. `int(N)` versus `N`; it does not prove
+// algebraic equalities such as `N - 1` versus `M`.
+bool areIntValsSemanticallyEqual(IntVal* left, IntVal* right)
+{
+    if (!left || !right)
+        return left == right;
+    if (left->equals(right))
+        return true;
+
+    auto leftParam = getDeclRefIntValIgnoringCasts(left);
+    auto rightParam = getDeclRefIntValIgnoringCasts(right);
+    return leftParam && rightParam && leftParam->getDeclRef().equals(rightParam->getDeclRef());
+}
+
 // Return the ordinary-argument merge mode requested by unification.
 SemanticsVisitor::SolverConstraint::OrdinaryArgMergeMode getOrdinaryArgMergeMode(
     SemanticsVisitor::UnificationOptions const& unificationOptions)
@@ -804,6 +947,74 @@ Index getGenericParamIndex(Decl* genericParamDecl)
     // after ordinary arguments and are found by scanning source generic
     // constraint declarations.
     return -1;
+}
+
+struct VariadicPackCountWitnessKey
+{
+    Val* packArg = nullptr;
+    DeclRef<Decl> packDeclRef;
+    IntVal* expectedCount = nullptr;
+};
+
+static Val* _tryGetSubstitutedPackArgForPackCountConstraint(
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& constraintDeclRef,
+    DeclRef<Decl> const& packDeclRef)
+{
+    auto packDecl = packDeclRef.getDecl();
+    auto genericDecl = packDecl ? as<GenericDecl>(packDecl->parentDecl) : nullptr;
+    if (!genericDecl)
+        return nullptr;
+
+    auto args = tryGetGenericArguments(SubstitutionSet(constraintDeclRef), genericDecl);
+    auto argIndex = getGenericParamIndex(packDecl);
+    if (argIndex >= 0 && argIndex < args.getCount())
+        return args[argIndex];
+    return nullptr;
+}
+
+static bool _tryGetVariadicPackCountWitnessKey(
+    ASTBuilder* astBuilder,
+    Val* witness,
+    VariadicPackCountWitnessKey& outKey)
+{
+    if (auto declaredWitness = as<DeclaredVariadicPackCountWitness>(witness))
+    {
+        auto constraintDeclRef = declaredWitness->getDeclRef();
+        outKey.packDeclRef = _getPackDeclRefForPackCountConstraint(astBuilder, constraintDeclRef);
+        outKey.packArg =
+            _tryGetSubstitutedPackArgForPackCountConstraint(constraintDeclRef, outKey.packDeclRef);
+        outKey.expectedCount = getPackCountConstraintExpectedCount(astBuilder, constraintDeclRef);
+        return outKey.expectedCount && (outKey.packArg || outKey.packDeclRef);
+    }
+
+    if (auto concreteWitness = as<ConcreteVariadicPackCountWitness>(witness))
+    {
+        outKey.packArg = concreteWitness->getPack();
+        outKey.packDeclRef = getDeclRefFromVal(outKey.packArg);
+        outKey.expectedCount = concreteWitness->getExpectedCount();
+        return outKey.packArg && outKey.expectedCount;
+    }
+
+    return false;
+}
+
+static bool _areVariadicPackCountWitnessKeysEqual(
+    VariadicPackCountWitnessKey const& left,
+    VariadicPackCountWitnessKey const& right)
+{
+    // Generic-app decl-ref unification can compare a default declared witness
+    // with a solved concrete witness for the same hidden argument. Treat them
+    // as the same proof only when they describe the same substituted pack and
+    // the same semantic integer count; do not infer or prove new facts here.
+    if (!areIntValsSemanticallyEqual(left.expectedCount, right.expectedCount))
+        return false;
+
+    if (left.packArg && right.packArg)
+        return areValsEqual(left.packArg, right.packArg);
+
+    auto leftDeclRef = left.packDeclRef ? left.packDeclRef : getDeclRefFromVal(left.packArg);
+    auto rightDeclRef = right.packDeclRef ? right.packDeclRef : getDeclRefFromVal(right.packArg);
+    return leftDeclRef && rightDeclRef && leftDeclRef.equals(rightDeclRef);
 }
 
 // Return the outermost generic declaration in a nested generic declaration
@@ -1148,7 +1359,9 @@ private:
         // checks, and differentiability constraints all need compiler-formed
         // witness values.
         return as<GenericTypeConstraintDecl>(member) || as<TypeCoercionConstraintDecl>(member) ||
-               as<NonEmptyPackConstraintDecl>(member) || as<HasDiffTypeInfoConstraintDecl>(member);
+               as<NonEmptyPackConstraintDecl>(member) ||
+               as<GenericVariadicPackCountConstraintDecl>(member) ||
+               as<HasDiffTypeInfoConstraintDecl>(member);
     }
 
     // Add a solver constraint for one default generic argument.
@@ -1549,9 +1762,10 @@ private:
         SolverConstraint const& constraint)
     {
         // Only subtype/equality constraints have a conformance shape that can
-        // expose more ordinary arguments. Coercion, pack, and differentiability
-        // witnesses prove their own source constraint but do not compare a
-        // solved subject type against an interface with generic arguments.
+        // expose more ordinary arguments. Coercion, pack, pack-count, and
+        // differentiability witnesses prove their own source constraint but do
+        // not compare a solved subject type against an interface with generic
+        // arguments.
         auto typeConstraintDecl = as<GenericTypeConstraintDecl>(constraint.decl);
         if (!typeConstraintDecl)
             return WitnessConstraintInferenceResult::NotApplicable;
@@ -1952,6 +2166,33 @@ private:
             return true;
         }
 
+        // `where countof(I) == N` can only be validated after both `I` and
+        // `N` have been solved by other inputs. This is intentionally a
+        // dependency check, not an inference path;
+        // `trySolveVariadicPackCountWitnessForConstraint` will reject the
+        // constraint if those solved values do not prove equality.
+        if (auto packCountConstraintDecl =
+                as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
+        {
+            auto packDeclRef = getPackDeclRefForPackCountConstraint(packCountConstraintDecl);
+            if (auto typePackDeclRef = packDeclRef.as<GenericTypePackParamDecl>())
+            {
+                if (!isArgReady(typePackDeclRef.getDecl()))
+                    return true;
+            }
+            else if (auto valuePackDeclRef = packDeclRef.as<GenericValuePackParamDecl>())
+            {
+                if (!isArgReady(valuePackDeclRef.getDecl()))
+                    return true;
+            }
+            else
+            {
+                return true;
+            }
+
+            return hasUnreadyDependenciesForVal(packCountConstraintDecl->expectedCountVal);
+        }
+
         // Diff-type-info witnesses wait for their substituted subject type.
         if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
         {
@@ -2057,6 +2298,28 @@ private:
             if (auto valuePackDeclRef = packDeclRef.as<GenericValuePackParamDecl>())
                 return valuePackDeclRef.getDecl() == changedArgDecl;
             return false;
+        }
+
+        // When either side of `countof(I) == N` changes, the witness proof must
+        // be retried under the new argument list. The target pack is stored in
+        // `packExpr`; any value parameters used by the count are stored in the
+        // checked `expectedCountVal`.
+        if (auto packCountConstraintDecl =
+                as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
+        {
+            auto packDeclRef = getPackDeclRefForPackCountConstraint(packCountConstraintDecl);
+            if (auto typePackDeclRef = packDeclRef.as<GenericTypePackParamDecl>())
+            {
+                if (typePackDeclRef.getDecl() == changedArgDecl)
+                    return true;
+            }
+            else if (auto valuePackDeclRef = packDeclRef.as<GenericValuePackParamDecl>())
+            {
+                if (valuePackDeclRef.getDecl() == changedArgDecl)
+                    return true;
+            }
+
+            return valDependsOnArg(packCountConstraintDecl->expectedCountVal, changedArgDecl);
         }
 
         // Diff-type-info constraints depend on the subject type they inspect.
@@ -2203,6 +2466,17 @@ private:
         // generic parameter rather than a `Val` tree. Keep the decl-ref intact
         // while classifying it so any substitution context on the expression is
         // still available to the caller.
+        if (auto declRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
+            return getDeclRef(m_astBuilder, declRefExpr);
+        return DeclRef<Decl>();
+    }
+
+    // Return the direct pack declaration named by a checked pack-count
+    // constraint. The declaration checker enforces that shape, so a missing
+    // decl-ref here means earlier errors already made the constraint invalid.
+    DeclRef<Decl> getPackDeclRefForPackCountConstraint(
+        GenericVariadicPackCountConstraintDecl* constraintDecl)
+    {
         if (auto declRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
             return getDeclRef(m_astBuilder, declRefExpr);
         return DeclRef<Decl>();
@@ -2589,6 +2863,11 @@ private:
                 typeCoercionConstraintDecl);
         if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
             return trySolveNonEmptyPackWitnessForConstraint(genericDecl, nonEmptyConstraintDecl);
+        if (auto packCountConstraintDecl =
+                as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
+            return trySolveVariadicPackCountWitnessForConstraint(
+                genericDecl,
+                packCountConstraintDecl);
         if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
             return trySolveDiffTypeInfoWitnessForConstraint(
                 genericDecl,
@@ -2830,6 +3109,78 @@ private:
             constrainedArg,
             nullptr,
             false);
+    }
+
+    // Record a concrete pack-count mismatch for overload completion. The path is
+    // `inferGenericArguments` -> `trySolveGenericArguments` while overload
+    // candidates are still speculative, so this helper stores the focused
+    // reason in `GenericInferenceContext::failure`; `CompleteOverloadCandidate`
+    // emits the diagnostic only after overload resolution selects this failed
+    // candidate.
+    void recordVariadicPackCountMismatchForSelectedCandidate(
+        Val* constrainedArg,
+        IntVal* expectedCount)
+    {
+        if (!m_context.failure || !constrainedArg || !expectedCount)
+            return;
+        if (m_context.failure->kind != GenericArgumentInferenceFailure::Kind::None)
+            return;
+
+        auto resolvedExpectedCount = as<IntVal>(expectedCount->resolve());
+        if (!resolvedExpectedCount)
+            resolvedExpectedCount = expectedCount;
+
+        auto foldedActualCount =
+            CountOfIntVal::tryFold(m_astBuilder, resolvedExpectedCount->getType(), constrainedArg);
+        auto actualCount = foldedActualCount ? as<IntVal>(foldedActualCount->resolve()) : nullptr;
+        auto actualConstant = as<ConstantIntVal>(actualCount);
+        auto expectedConstant = as<ConstantIntVal>(resolvedExpectedCount);
+        if (!actualConstant || !expectedConstant)
+            return;
+
+        m_context.failure->kind = GenericArgumentInferenceFailure::Kind::VariadicPackCountMismatch;
+        auto& failure = m_context.failure->variadicPackCountMismatch;
+        failure.expectedCount = (int64_t)expectedConstant->getValue();
+        failure.actualCount = (int64_t)actualConstant->getValue();
+        failure.location = m_context.applicationLoc;
+    }
+
+    // Try to solve the witness for a pack-count constraint from the current
+    // generic-application arguments. `findVariadicPackCountWitnessForConstraint`
+    // owns the proof rules; this method only extracts the current target pack
+    // and substituted expected count from the solver state.
+    Val* trySolveVariadicPackCountWitnessForConstraint(
+        GenericDecl* genericDecl,
+        GenericVariadicPackCountConstraintDecl* constraintDecl)
+    {
+        SLANG_UNUSED(genericDecl);
+
+        auto constrainedPackDeclRef = getPackDeclRefForPackCountConstraint(constraintDecl);
+
+        Val* constrainedArg = nullptr;
+        if (auto typePackDeclRef = constrainedPackDeclRef.as<GenericTypePackParamDecl>())
+        {
+            constrainedArg = getCurrentArg(typePackDeclRef.getDecl());
+        }
+        else if (auto valuePackDeclRef = constrainedPackDeclRef.as<GenericValuePackParamDecl>())
+        {
+            constrainedArg = getCurrentArg(valuePackDeclRef.getDecl());
+        }
+
+        auto constraintDeclRef =
+            buildSubstDeclRef(constraintDecl).as<GenericVariadicPackCountConstraintDecl>();
+        auto expectedCount = getPackCountConstraintExpectedCount(m_astBuilder, constraintDeclRef);
+
+        auto witness = findVariadicPackCountWitnessForConstraint(
+            m_astBuilder,
+            m_visitor,
+            constrainedArg,
+            expectedCount,
+            nullptr,
+            false);
+        if (!witness)
+            recordVariadicPackCountMismatchForSelectedCandidate(constrainedArg, expectedCount);
+        return witness;
     }
 
     // Try to solve the witness for a differentiability constraint.
@@ -3158,6 +3509,16 @@ bool SemanticsVisitor::TryUnifyVals(
                 as<SubtypeWitness>(fst)->getSup());
             return true;
         }
+    }
+
+    VariadicPackCountWitnessKey fstPackCountWitnessKey;
+    VariadicPackCountWitnessKey sndPackCountWitnessKey;
+    if (_tryGetVariadicPackCountWitnessKey(m_astBuilder, fst, fstPackCountWitnessKey) &&
+        _tryGetVariadicPackCountWitnessKey(m_astBuilder, snd, sndPackCountWitnessKey))
+    {
+        return _areVariadicPackCountWitnessKeysEqual(
+            fstPackCountWitnessKey,
+            sndPackCountWitnessKey);
     }
 
     // Two subtype witnesses can be unified if they exist (non-null) and

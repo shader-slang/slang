@@ -851,6 +851,10 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(
             {
                 index++;
             }
+            else if (as<GenericVariadicPackCountConstraintDecl>(member))
+            {
+                index++;
+            }
             else if (as<HasDiffTypeInfoConstraintDecl>(member))
             {
                 index++;
@@ -1361,6 +1365,7 @@ Val* HasDiffTypeInfoWitness::_substituteImplOverride(
                 if (as<GenericTypeConstraintDecl>(member) ||
                     as<TypeCoercionConstraintDecl>(member) ||
                     as<NonEmptyPackConstraintDecl>(member) ||
+                    as<GenericVariadicPackCountConstraintDecl>(member) ||
                     as<HasDiffTypeInfoConstraintDecl>(member))
                 {
                     if (member == constraintDeclRef.getDecl())
@@ -1397,6 +1402,146 @@ Val* HasDiffTypeInfoWitness::_substituteImplOverride(
     if (!substConstraintDeclRef)
         return this;
     return astBuilder->getHasDiffTypeInfoWitness(substConstraintDeclRef);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclaredVariadicPackCountWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void DeclaredVariadicPackCountWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "declared_pack_count_witness(" << getDeclRef() << ")";
+}
+
+Val* DeclaredVariadicPackCountWitness::_resolveImplOverride()
+{
+    auto resolvedDeclRef = getDeclRef().declRefBase->resolve();
+    if (auto resolvedVal = as<Witness>(resolvedDeclRef))
+        return resolvedVal;
+
+    auto newDeclRef = as<DeclRefBase>(resolvedDeclRef);
+    if (!newDeclRef)
+        newDeclRef = getDeclRef().declRefBase;
+    if (newDeclRef != getDeclRef().declRefBase)
+    {
+        auto newPackCountDeclRef =
+            DeclRef<Decl>(newDeclRef).as<GenericVariadicPackCountConstraintDecl>();
+        if (newPackCountDeclRef)
+            return getCurrentASTBuilder()->getDeclaredVariadicPackCountWitness(newPackCountDeclRef);
+    }
+    return this;
+}
+
+Val* DeclaredVariadicPackCountWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto constraintDeclRef = getDeclRef();
+    auto genericDecl = as<GenericDecl>(constraintDeclRef.getDecl()->parentDecl);
+    if (genericDecl)
+    {
+        auto args = tryGetGenericArguments(subst, genericDecl);
+        if (args.getCount())
+        {
+            // Generic application arguments store ordinary parameters first and
+            // then one witness argument for each source generic constraint, in
+            // the same member order used by `getDefaultSubstitutionArgs` and
+            // `_lowerSubstitutionEnv`. When substituting a declared pack-count
+            // witness through `foo<5, int, ...>`, return that hidden witness
+            // argument directly if it is present in the substitution.
+            bool found = false;
+            Index index = 0;
+            for (auto member : genericDecl->getDirectMemberDecls())
+            {
+                if (as<GenericTypeConstraintDecl>(member) ||
+                    as<TypeCoercionConstraintDecl>(member) ||
+                    as<NonEmptyPackConstraintDecl>(member) ||
+                    as<GenericVariadicPackCountConstraintDecl>(member) ||
+                    as<HasDiffTypeInfoConstraintDecl>(member))
+                {
+                    if (member == constraintDeclRef.getDecl())
+                    {
+                        found = true;
+                        break;
+                    }
+                    index++;
+                }
+            }
+
+            if (found)
+            {
+                auto ordinaryParamCount =
+                    genericDecl->getMembersOfType<GenericTypeParamDeclBase>().getCount() +
+                    genericDecl->getMembersOfType<GenericValueParamDecl>().getCount() +
+                    genericDecl->getMembersOfType<GenericValuePackParamDecl>().getCount();
+                if (index + ordinaryParamCount < args.getCount())
+                {
+                    (*ioDiff)++;
+                    return args[index + ordinaryParamCount];
+                }
+            }
+        }
+    }
+
+    int diff = 0;
+    auto substDeclRef = constraintDeclRef.substituteImpl(astBuilder, subst, &diff);
+    if (!diff)
+        return this;
+
+    auto substConstraintDeclRef = substDeclRef.as<GenericVariadicPackCountConstraintDecl>();
+    if (!substConstraintDeclRef)
+        return this;
+
+    (*ioDiff)++;
+    return astBuilder->getDeclaredVariadicPackCountWitness(substConstraintDeclRef);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConcreteVariadicPackCountWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ConcreteVariadicPackCountWitness::_toTextOverride(StringBuilder& out)
+{
+    out.append("pack_count_witness(");
+    if (auto pack = getPack())
+        pack->toText(out);
+    else
+        out.append("<null>");
+    out.append(", ");
+    if (auto count = getExpectedCount())
+        count->toText(out);
+    else
+        out.append("<null>");
+    out.append(")");
+}
+
+Val* ConcreteVariadicPackCountWitness::_resolveImplOverride()
+{
+    auto resolvedPack = getPack() ? getPack()->resolve() : nullptr;
+    auto resolvedCount = getExpectedCount() ? as<IntVal>(getExpectedCount()->resolve()) : nullptr;
+    if (resolvedPack != getPack() || resolvedCount != getExpectedCount())
+        return getCurrentASTBuilder()->getConcreteVariadicPackCountWitness(
+            resolvedPack,
+            resolvedCount);
+    return this;
+}
+
+Val* ConcreteVariadicPackCountWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    // Concrete witnesses are proof-only values, but the pack and count operands
+    // still participate in specialization. Substituting both operands keeps
+    // serialized/lowered witnesses tied to the exact specialized
+    // `countof(pack) == count` fact that the checker validated.
+    int diff = 0;
+    auto substPack = getPack() ? getPack()->substituteImpl(astBuilder, subst, &diff) : nullptr;
+    auto substCount = getExpectedCount()
+                          ? as<IntVal>(getExpectedCount()->substituteImpl(astBuilder, subst, &diff))
+                          : nullptr;
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+    return astBuilder->getConcreteVariadicPackCountWitness(substPack, substCount);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NonEmptyPackWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

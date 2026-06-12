@@ -1109,6 +1109,42 @@ class HasDiffTypeInfoWitness : public Witness
 };
 
 FIDDLE()
+class DeclaredVariadicPackCountWitness : public Witness
+{
+    FIDDLE(...)
+    DeclaredVariadicPackCountWitness(DeclRef<GenericVariadicPackCountConstraintDecl> inDeclRef)
+    {
+        setOperands(inDeclRef);
+    }
+
+    DeclRef<GenericVariadicPackCountConstraintDecl> getDeclRef()
+    {
+        return as<DeclRefBase>(getOperand(0));
+    }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class ConcreteVariadicPackCountWitness : public Witness
+{
+    FIDDLE(...)
+    ConcreteVariadicPackCountWitness(Val* pack, IntVal* expectedCount)
+    {
+        setOperands(pack, expectedCount);
+    }
+
+    Val* getPack() const { return getOperand(0); }
+    IntVal* getExpectedCount() const { return as<IntVal>(getOperand(1)); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
 class NonEmptyPackWitness : public Witness
 {
     FIDDLE(...)
