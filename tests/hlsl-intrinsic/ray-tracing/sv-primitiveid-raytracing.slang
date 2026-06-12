@@ -19,6 +19,10 @@
 //TEST:SIMPLE(filecheck=NAME_COLLISION_SPIRV):-target spirv-assembly -entry main_chit_name_collision -stage closesthit
 //TEST:SIMPLE(filecheck=NAME_COLLISION_GLSL):-target glsl -entry main_chit_name_collision -stage closesthit
 //TEST:SIMPLE(filecheck=NAME_COLLISION_CUDA):-target cuda -entry main_chit_name_collision -stage closesthit
+//TEST:SIMPLE(filecheck=ADDRESS_HLSL):-target hlsl -entry main_chit_inout -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=ADDRESS_DXIL):-target dxil-assembly -entry main_chit_inout -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=STRUCT_HLSL):-target hlsl -entry main_chit_struct -stage closesthit -profile sm_6_5
+//TEST:SIMPLE(filecheck=STRUCT_DXIL):-target dxil-assembly -entry main_chit_struct -stage closesthit -profile sm_6_5
 //TEST:SIMPLE(filecheck=ISECT_CUDA):-target cuda -entry main_isect_cuda -stage intersection
 //TEST:SIMPLE(filecheck=AHIT_CUDA):-target cuda -entry main_ahit -stage anyhit
 //TEST:SIMPLE(filecheck=CHIT_CUDA):-target cuda -entry main_chit -stage closesthit
@@ -36,6 +40,11 @@ struct Attribs
 float getPrimitiveIDAsFloat(in int value)
 {
     return float(value);
+}
+
+void adjustPrimitiveID(inout uint value)
+{
+    value += 3;
 }
 
 uint __slang_ray_tracing_primitive_index()
@@ -183,3 +192,41 @@ void main_chit_name_collision(
 // NAME_COLLISION_CUDA: __global__ void __closesthit__main_chit_name_collision
 // NAME_COLLISION_CUDA: optixGetPrimitiveIndex()
 // NAME_COLLISION_CUDA: float([[USER_FUNC]]())
+
+[shader("closesthit")]
+void main_chit_inout(
+    inout Payload payload,
+    in BuiltInTriangleIntersectionAttributes attribs,
+    uint pid : SV_PrimitiveID)
+{
+    adjustPrimitiveID(pid);
+    payload.val = float(pid) + attribs.barycentrics.x + attribs.barycentrics.y;
+}
+
+// ADDRESS_HLSL: uint [[PRIMITIVE_ID:[A-Za-z_][A-Za-z_0-9]*]] = PrimitiveIndex()
+// ADDRESS_HLSL: uint [[MUTABLE_PID:[A-Za-z_][A-Za-z_0-9]*]] = [[PRIMITIVE_ID]]
+// ADDRESS_HLSL: adjustPrimitiveID_0([[MUTABLE_PID]])
+// ADDRESS_HLSL: float([[MUTABLE_PID]])
+
+// ADDRESS_DXIL: call i32 @dx.op.primitiveIndex.i32
+
+struct ChitPrimitiveInput
+{
+    int pid : SV_PrimitiveID;
+};
+
+[shader("closesthit")]
+void main_chit_struct(
+    inout Payload payload,
+    in BuiltInTriangleIntersectionAttributes attribs,
+    in ChitPrimitiveInput input)
+{
+    payload.val = float(input.pid) + attribs.barycentrics.x + attribs.barycentrics.y;
+}
+
+// STRUCT_HLSL: [shader("closesthit")]void main_chit_struct
+// STRUCT_HLSL-NOT: SV_PrimitiveID
+// STRUCT_HLSL: uint [[PRIMITIVE_ID:[A-Za-z_][A-Za-z_0-9]*]] = PrimitiveIndex()
+// STRUCT_HLSL: float(int([[PRIMITIVE_ID]]))
+
+// STRUCT_DXIL: call i32 @dx.op.primitiveIndex.i32

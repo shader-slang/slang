@@ -341,21 +341,19 @@ IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType)
     return builder.emitCast(toType, val);
 }
 
-// Hit-stage SV_PrimitiveID is handled here because it is a runtime-provided
-// ray-tracing builtin that maps to target intrinsics rather than a user varying.
-static bool isPrimitiveIDSystemValueParam(IRParam* param)
+static bool hasPrimitiveIDSemanticDecoration(IRInst* inst)
 {
-    if (auto semanticDecor = param->findDecoration<IRSemanticDecoration>())
+    if (auto semanticDecor = inst->findDecoration<IRSemanticDecoration>())
     {
         if (semanticDecor->getSemanticName().caseInsensitiveEquals(toSlice("sv_primitiveid")))
             return true;
     }
 
-    auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
-    if (!layoutDecor)
-        return false;
+    return false;
+}
 
-    auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+static bool hasPrimitiveIDSystemValueLayout(IRVarLayout* varLayout)
+{
     if (!varLayout)
         return false;
 
@@ -364,6 +362,27 @@ static bool isPrimitiveIDSystemValueParam(IRParam* param)
         return false;
 
     return systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid"));
+}
+
+// Hit-stage SV_PrimitiveID is handled here because it is a runtime-provided
+// ray-tracing builtin that maps to target intrinsics rather than a user varying.
+static bool isPrimitiveIDSystemValueParam(IRParam* param)
+{
+    if (hasPrimitiveIDSemanticDecoration(param))
+        return true;
+
+    auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecor)
+        return false;
+
+    auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+    return hasPrimitiveIDSystemValueLayout(varLayout);
+}
+
+static bool isPrimitiveIDSystemValueStructField(IRStructField* field, IRVarLayout* fieldLayout)
+{
+    return hasPrimitiveIDSemanticDecoration(field->getKey()) ||
+           hasPrimitiveIDSystemValueLayout(fieldLayout);
 }
 
 static bool hasRayTracingPrimitiveIndexTargetIntrinsicDecoration(
@@ -388,6 +407,13 @@ static bool hasRayTracingPrimitiveIndexTargetIntrinsicDecoration(
 
 static bool isRayTracingPrimitiveIndexFunc(IRBuilder& builder, IRFunc* func)
 {
+    if (!func->findDecoration<IRBuiltinDecoration>() ||
+        func->findDecoration<IRHighLevelDeclDecoration>() ||
+        func->findDecoration<IRUserExternDecoration>())
+    {
+        return false;
+    }
+
     auto nameHint = func->findDecoration<IRNameHintDecoration>();
     if (!nameHint || nameHint->getName() != "__slang_ray_tracing_primitive_index")
         return false;
@@ -438,6 +464,7 @@ static IRFunc* getRayTracingPrimitiveIndexFunc(IRModule* module)
     builder.addNameHintDecoration(
         primitiveIndexFunc,
         UnownedStringSlice("__slang_ray_tracing_primitive_index"));
+    builder.addBuiltinDecoration(primitiveIndexFunc);
     builder.setDataType(primitiveIndexFunc, builder.getFuncType(0, nullptr, builder.getUIntType()));
     builder.addTargetIntrinsicDecoration(
         primitiveIndexFunc,
@@ -477,9 +504,9 @@ static IRInst* emitRayTracingPrimitiveIndexValue(
     return tryConvertValue(builder, primitiveIndexCall, valueType);
 }
 
-static void replacePrimitiveIDParamUses(
+static void replacePrimitiveIDUses(
     IRBuilder& builder,
-    IRParam* param,
+    IRInst* instToReplace,
     IRInst* valueReplacement,
     IRType* valueType,
     bool needsAddressReplacement)
@@ -496,13 +523,13 @@ static void replacePrimitiveIDParamUses(
     };
 
     traverseUses(
-        param,
+        instToReplace,
         [&](IRUse* use)
         {
             auto user = use->getUser();
             if (auto load = as<IRLoad>(user))
             {
-                if (load->getPtr() == param)
+                if (load->getPtr() == instToReplace)
                 {
                     load->replaceUsesWith(valueReplacement);
                     load->removeAndDeallocate();
@@ -514,6 +541,55 @@ static void replacePrimitiveIDParamUses(
                 use,
                 needsAddressReplacement ? getAddressReplacement() : valueReplacement);
         });
+}
+
+static IRType* unwrapParamValueType(IRType* type)
+{
+    if (auto borrowInParamType = as<IRBorrowInParamType>(type))
+        return borrowInParamType->getValueType();
+    else if (auto ptrType = as<IRPtrTypeBase>(type))
+        return ptrType->getValueType();
+    return type;
+}
+
+static IRStructField* findFieldForKey(List<IRStructField*>& fields, IRInst* fieldKey)
+{
+    for (auto field : fields)
+    {
+        if (field->getKey() == fieldKey)
+            return field;
+    }
+
+    return nullptr;
+}
+
+static IRStructField* findPrimitiveIDFieldAccess(
+    IRInst* inst,
+    IRParam* param,
+    List<IRStructField*>& primitiveIDFields)
+{
+    IRInst* base = nullptr;
+    IRInst* fieldKey = nullptr;
+
+    if (auto fieldAddress = as<IRFieldAddress>(inst))
+    {
+        base = fieldAddress->getBase();
+        fieldKey = fieldAddress->getField();
+    }
+    else if (auto fieldExtract = as<IRFieldExtract>(inst))
+    {
+        base = fieldExtract->getBase();
+        fieldKey = fieldExtract->getField();
+    }
+    else
+    {
+        return nullptr;
+    }
+
+    if (base != param)
+        return nullptr;
+
+    return findFieldForKey(primitiveIDFields, fieldKey);
 }
 
 bool tryLegalizeRayTracingPrimitiveIDParam(IRModule* module, IRBuilder& builder, IRParam* param)
@@ -544,7 +620,7 @@ bool tryLegalizeRayTracingPrimitiveIDParam(IRModule* module, IRBuilder& builder,
             // untouched rather than replacing uses with a null value.
             return false;
         }
-        replacePrimitiveIDParamUses(
+        replacePrimitiveIDUses(
             builder,
             param,
             valueReplacement,
@@ -554,6 +630,100 @@ bool tryLegalizeRayTracingPrimitiveIDParam(IRModule* module, IRBuilder& builder,
 
     param->removeAndDeallocate();
 
+    return true;
+}
+
+static bool tryLegalizeRayTracingPrimitiveIDStructParam(
+    IRModule* module,
+    IRBuilder& builder,
+    IRParam* param)
+{
+    auto structType = as<IRStructType>(unwrapParamValueType(param->getFullType()));
+    if (!structType)
+        return false;
+
+    auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecor)
+        return false;
+
+    auto paramLayout = as<IRVarLayout>(layoutDecor->getLayout());
+    if (!paramLayout)
+        return false;
+
+    auto structTypeLayout = as<IRStructTypeLayout>(paramLayout->getTypeLayout());
+    if (!structTypeLayout)
+        return false;
+
+    List<IRStructField*> primitiveIDFields;
+    UInt fieldIndex = 0;
+    for (auto field : structType->getFields())
+    {
+        auto fieldLayout = fieldIndex < structTypeLayout->getFieldCount()
+                               ? structTypeLayout->getFieldLayout(fieldIndex)
+                               : nullptr;
+        if (!isPrimitiveIDSystemValueStructField(field, fieldLayout))
+            return false;
+
+        primitiveIDFields.add(field);
+        fieldIndex++;
+    }
+
+    if (primitiveIDFields.getCount() == 0)
+        return false;
+
+    List<IRInst*> fieldAccesses;
+    bool hasUnhandledUse = false;
+    traverseUses(
+        param,
+        [&](IRUse* use)
+        {
+            auto user = use->getUser();
+            if (findPrimitiveIDFieldAccess(user, param, primitiveIDFields))
+            {
+                fieldAccesses.add(user);
+                return;
+            }
+
+            hasUnhandledUse = true;
+        });
+
+    if (hasUnhandledUse)
+        return false;
+
+    for (auto field : primitiveIDFields)
+    {
+        IRInst* valueReplacement = nullptr;
+
+        for (auto fieldAccess : fieldAccesses)
+        {
+            if (findPrimitiveIDFieldAccess(fieldAccess, param, primitiveIDFields) != field)
+                continue;
+
+            if (!valueReplacement)
+            {
+                valueReplacement =
+                    emitRayTracingPrimitiveIndexValue(module, builder, field->getFieldType());
+                if (!valueReplacement)
+                    return false;
+            }
+
+            auto needsAddressReplacement = as<IRFieldAddress>(fieldAccess) != nullptr;
+            replacePrimitiveIDUses(
+                builder,
+                fieldAccess,
+                valueReplacement,
+                field->getFieldType(),
+                needsAddressReplacement);
+
+            if (!fieldAccess->hasUses())
+                fieldAccess->removeAndDeallocate();
+        }
+    }
+
+    if (param->hasUses())
+        return false;
+
+    param->removeAndDeallocate();
     return true;
 }
 
@@ -1336,6 +1506,10 @@ struct HLSLRayTracingPrimitiveIDParamLegalizeContext : EntryPointVaryingParamLeg
         IRBuilder builder(m_module);
         builder.setInsertBefore(m_firstOrdinaryInst);
         if (tryLegalizeRayTracingPrimitiveIDParam(m_module, builder, param))
+        {
+            modifiedFuncType = true;
+        }
+        else if (tryLegalizeRayTracingPrimitiveIDStructParam(m_module, builder, param))
         {
             modifiedFuncType = true;
         }

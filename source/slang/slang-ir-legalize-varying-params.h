@@ -97,10 +97,17 @@ enum class SystemValueSemanticName
 
 SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticName);
 
+/// Returns true if `stage` is a ray-tracing hit stage where `SV_PrimitiveID` is a
+/// runtime-provided builtin instead of a user varying or hit attribute.
 bool isRayTracingHitStage(Stage stage);
 
+/// Replaces an `SV_PrimitiveID` hit-stage parameter with the canonical primitive-index helper.
+/// Returns true only when the parameter was removed, so callers must capture the next parameter
+/// before calling because `param` is invalid after a successful call.
 bool tryLegalizeRayTracingPrimitiveIDParam(IRModule* module, IRBuilder& builder, IRParam* param);
 
+/// Legalizes hit-stage `SV_PrimitiveID` parameters before HLSL existential-type-layout
+/// lowering removes empty struct parameters that are still needed for this rewrite.
 void legalizeRayTracingPrimitiveIDParamsForHLSL(IRModule* module);
 
 } // namespace Slang
