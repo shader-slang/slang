@@ -64,7 +64,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // DEFAULT: struct _MatrixStorage_float3x3
 // DEFAULT: array<float3, int(3)> data
 
-// Compiling through the real Metal compiler validates that the generated MSL
-// is well-formed (e.g. no leftover whole-row store of a vector into the
-// lowered storage struct, which `lowerMatrixAddresses` must remove).
+// The metallib target compiles the generated MSL with the Metal toolchain and
+// FileCheck runs over the LLVM-IR-style text of the resulting metallib. The
+// pattern below matches only if that compilation succeeded: malformed MSL
+// (e.g. a leftover whole-row store of a vector into the lowered storage
+// struct, which `lowerMatrixAddresses` must remove) fails the Metal compile
+// and produces no metallib text to match.
 // METALLIB: define void @computeMain
