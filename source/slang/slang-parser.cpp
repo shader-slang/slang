@@ -1,6 +1,7 @@
 #include "slang-parser.h"
 
 #include "../core/slang-semantic-version.h"
+#include "../core/slang-string-util.h"
 #include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
@@ -8606,11 +8607,9 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
 
     if (precisionLost && isHexFloat)
     {
-        char floatValue[32]{};
-        snprintf(floatValue, sizeof floatValue, "%a", fixedValue);
         parser->sink->diagnose(Diagnostics::FloatHexLiteralPrecisionLost{
             .literal = String(token.getContent()),
-            .truncatedValue = String(floatValue),
+            .truncatedValue = StringUtil::makeMinimalHexFloat(fixedValue),
             .location = token.loc});
     }
 

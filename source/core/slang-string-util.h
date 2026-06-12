@@ -198,6 +198,14 @@ struct StringUtil
     /// Modifies pos to the position where parsing ends.
     /// Returns parsed integer.
     static int parseIntAndAdvancePos(UnownedStringSlice text, Index& pos);
+
+    /// Format `value` as a C99 hexadecimal floating-point literal (as produced by `%a`) with the
+    /// trailing zeros of the fractional part removed. Some libc implementations (notably
+    /// macOS/BSD) pad the fraction out to the full mantissa width of a `double`, whereas glibc
+    /// emits the minimal form; this normalizes the output across platforms so it is deterministic.
+    /// For example `0x1.fffffe0000000p+0` becomes `0x1.fffffep+0`, and a fraction that is entirely
+    /// zeros loses its `.` (`0x1.000000p+0` becomes `0x1p+0`).
+    static String makeMinimalHexFloat(double value);
 };
 
 /* A helper class that allows parsing of lines from text with iteration. Uses

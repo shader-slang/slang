@@ -975,4 +975,31 @@ int StringUtil::parseIntAndAdvancePos(UnownedStringSlice text, Index& pos)
     return result;
 }
 
+String StringUtil::makeMinimalHexFloat(double value)
+{
+    char buf[32]{};
+    snprintf(buf, sizeof(buf), "%a", value);
+
+    // `%a` output has the shape `[-]0xH[.HHHH]p±D`. Only the fractional part between '.' and the
+    // 'p'/'P' exponent marker can carry the platform-dependent zero padding, so trim it there.
+    char* dot = strchr(buf, '.');
+    char* exp = strpbrk(buf, "pP");
+    if (dot && exp && dot < exp)
+    {
+        // Find the first significant char scanning back from the exponent marker.
+        char* lastSignificant = exp;
+        while (lastSignificant > dot + 1 && lastSignificant[-1] == '0')
+            --lastSignificant;
+
+        // If the whole fraction was zeros, drop the '.' too.
+        if (lastSignificant == dot + 1)
+            --lastSignificant;
+
+        // Close the gap by shifting the exponent (including the terminating null) down.
+        memmove(lastSignificant, exp, strlen(exp) + 1);
+    }
+
+    return String(buf);
+}
+
 } // namespace Slang
