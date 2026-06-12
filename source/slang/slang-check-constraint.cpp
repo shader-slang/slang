@@ -710,7 +710,7 @@ static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountCon
 
         auto declaredExpectedCount =
             getPackCountConstraintExpectedCount(astBuilder, constraintDeclRef);
-        if (arePackCountExpectedCountsEqual(declaredExpectedCount, expectedCount))
+        if (arePackCountExpectedCountsEqual(astBuilder, declaredExpectedCount, expectedCount))
             return constraintDeclRef;
     }
 
@@ -912,29 +912,27 @@ DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal)
     return as<DeclRefIntVal>(intVal);
 }
 
-static IntVal* getIntValWithoutRedundantCasts(IntVal* intVal)
+static IntVal* coercePackCountExpectedCountToInt(ASTBuilder* astBuilder, IntVal* intVal)
 {
-    // `TryUnifyIntParam` may store a value as `TypeCastIntVal(paramType, N)` so
-    // it has the exact declared parameter type. For pack-count proof matching,
-    // `int(N)` and `N` are the same expected count only when the cast is
-    // redundant for the base value's type. A real type-changing cast remains in
-    // the structure and must compare normally.
-    while (auto castIntVal = as<TypeCastIntVal>(intVal))
+    // Pack counts are conceptually integer counts, while generic value
+    // arguments can enter this path with different concrete integer types or
+    // with `TypeCastIntVal` wrappers inserted by `TryUnifyIntParam`. Reuse the
+    // normal `TypeCastIntVal` folding/canonicalization path to express both
+    // expected-count operands as `int`, then compare the canonical `Val*`.
+    auto intType = astBuilder->getIntType();
+    if (auto foldedCast =
+            as<IntVal>(TypeCastIntVal::tryFoldImpl(astBuilder, intType, intVal, nullptr)))
     {
-        auto base = as<IntVal>(castIntVal->getBase());
-        if (!base || !areValsEqual(castIntVal->getType(), base->getType()))
-            return intVal;
-        intVal = base;
+        return foldedCast;
     }
-    return intVal;
+    return astBuilder->getTypeCastIntVal(intType, intVal);
 }
 
 // Compare the expected-count `IntVal`s stored in pack-count witnesses and
-// constraint declarations. The source of truth is structural `Val::equals`;
-// this helper only removes same-type `TypeCastIntVal` wrappers that
-// `TryUnifyIntParam` may add while placing an already-solved integer value into
-// the declared parameter type.
-bool arePackCountExpectedCountsEqual(IntVal* left, IntVal* right)
+// constraint declarations. The source of truth is the same integer coercion
+// machinery used by constant folding: both operands are coerced to `int`, then
+// their canonical `Val*` identities are compared.
+bool arePackCountExpectedCountsEqual(ASTBuilder* astBuilder, IntVal* left, IntVal* right)
 {
     if (!left || !right)
         return left == right;
@@ -943,12 +941,9 @@ bool arePackCountExpectedCountsEqual(IntVal* left, IntVal* right)
     if (!left || !right)
         return left == right;
 
-    if (left->equals(right))
-        return true;
-
-    left = getIntValWithoutRedundantCasts(left);
-    right = getIntValWithoutRedundantCasts(right);
-    return left->equals(right);
+    left = coercePackCountExpectedCountToInt(astBuilder, left);
+    right = coercePackCountExpectedCountToInt(astBuilder, right);
+    return left == right;
 }
 
 // Return the ordinary-argument merge mode requested by unification.
@@ -1033,6 +1028,7 @@ static bool _tryGetVariadicPackCountWitnessKey(
 }
 
 static bool _areVariadicPackCountWitnessKeysEqual(
+    ASTBuilder* astBuilder,
     VariadicPackCountWitnessKey const& left,
     VariadicPackCountWitnessKey const& right)
 {
@@ -1040,7 +1036,7 @@ static bool _areVariadicPackCountWitnessKeysEqual(
     // with a solved concrete witness for the same hidden argument. Treat them
     // as the same proof only when they describe the same substituted pack and
     // the same expected count; do not infer or prove new facts here.
-    if (!arePackCountExpectedCountsEqual(left.expectedCount, right.expectedCount))
+    if (!arePackCountExpectedCountsEqual(astBuilder, left.expectedCount, right.expectedCount))
         return false;
 
     if (left.packArg && right.packArg)
@@ -3558,6 +3554,7 @@ bool SemanticsVisitor::TryUnifyVals(
         // accepts an already-identical proof key and never feeds `T == U` back
         // into ordinary inference.
         return _areVariadicPackCountWitnessKeysEqual(
+            m_astBuilder,
             fstPackCountWitnessKey,
             sndPackCountWitnessKey);
     }
