@@ -2974,31 +2974,18 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
     }
 
     // Decide whether a *top-level* buffer element type needs lowering at all.
-    // For a top-level vector the deciding question is whether the native MSL
-    // buffer stride differs from the natural stride, which is the case
-    // exactly for non-power-of-two element counts: `float3` has a 16-byte
-    // native stride vs. 12 bytes natural, while `float2`/`float4` strides
-    // already coincide with natural layout, so such buffers are byte-for-byte
-    // identical without lowering and keeping the native vector type avoids
-    // pointless pack/unpack conversions. This is intentionally a different
-    // question from `needsScalarVectorStorage`, which governs vectors nested
-    // inside lowered composites where natural *offsets* also matter. (Vector
-    // fields are not gated here: a struct element is in the base class's
-    // lowerable set, and its fields are handled by `lowerLeafLogicalType`.)
+    // Vector elements use the same classification as vectors nested inside
+    // lowered composites (`needsScalarVectorStorage`): under scalar layout a
+    // vector is only guaranteed its element's alignment, so even a `float4`
+    // buffer may be bound at a merely 4-byte-aligned offset — which the
+    // native (16-byte-aligned) MSL vector type cannot express, and which is
+    // exactly the alignment reflection reports for the element.
     bool needsElementLowering(IRType* elementType) override
     {
         if (auto vectorType = as<IRVectorType>(elementType))
         {
-            if (target->getOptionSet().shouldUseScalarLayout() &&
-                !as<IRBoolType>(vectorType->getElementType()))
-            {
-                if (auto countInst = as<IRIntLit>(vectorType->getElementCount()))
-                {
-                    auto count = getIntVal(countInst);
-                    return (count & (count - 1)) != 0;
-                }
-            }
-            return false;
+            return target->getOptionSet().shouldUseScalarLayout() &&
+                   needsScalarVectorStorage(vectorType);
         }
         return DefaultBufferElementTypeLoweringPolicy::needsElementLowering(elementType);
     }
@@ -3019,13 +3006,15 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
         }
     }
 
-    // Decide whether a vector encountered as a *leaf* while lowering a
-    // composite (e.g. a struct field) must use packed-vector storage. Unlike
-    // the top-level check in `needsElementLowering`, this applies to
-    // power-of-two vectors too: natural layout gives a vector only its
-    // element's alignment, so a field like `float4 v` in
-    // `struct Wrapped { float scale; float4 v; }` sits at natural offset 4,
-    // which the native (16-byte-aligned) MSL vector type cannot express.
+    // Decide whether a vector stored under scalar layout must use
+    // packed-vector storage. This is the single classification for vectors,
+    // applied both to top-level buffer elements and to leaves inside lowered
+    // composites: natural layout gives a vector only its element's alignment,
+    // so a field like `float4 v` in `struct Wrapped { float scale; float4 v; }`
+    // sits at natural offset 4, and even a top-level `float4` element is only
+    // guaranteed 4-byte base alignment — neither of which the native
+    // (16-byte-aligned) MSL vector type can express. Only single-element and
+    // `bool` vectors keep their native emission.
     static bool needsScalarVectorStorage(IRVectorType* vectorType)
     {
         // `bool` vectors keep their native MSL emission, consistent with how

@@ -2,11 +2,12 @@
 //TEST:SIMPLE(filecheck=DEFAULT): -target metal -stage compute -entry computeMain
 
 // With `-force-glsl-scalar-layout`, vectors in device buffers use natural
-// (scalar-aligned, tightly packed) layout. MSL `float3` has a 16-byte stride,
-// so `float3` elements are lowered to MSL packed vectors (`packed_float3`:
-// 12-byte stride, 4-byte alignment). `float2`/`float4` buffer elements already
-// have a stride matching natural layout, so they keep their native MSL vector
-// type.
+// (scalar-aligned, tightly packed) layout and are lowered to MSL packed
+// vectors (e.g. `packed_float3`: 12-byte stride, 4-byte alignment). This
+// also applies to `float2`/`float4` elements whose native stride already
+// matches natural layout: scalar layout (and the reflection built on it)
+// only guarantees the *element's* alignment for the buffer contents, which
+// the native (size-aligned) MSL vector types cannot express.
 //
 // Without the option, buffers keep the native MSL layout that reflection
 // reports, so no lowering takes place.
@@ -41,8 +42,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // SCALAR-NOT: {{\bfloat3 device\* positions}}
 // SCALAR-DAG: packed_float3 device* positions
-// SCALAR-DAG: float4 device* colors
-// SCALAR-DAG: float2 device* uvs
+// SCALAR-DAG: packed_float4 device* colors
+// SCALAR-DAG: packed_float2 device* uvs
 // SCALAR-NOT: {{\bfloat3 device\* positions}}
 
 // DEFAULT-NOT: packed_
