@@ -136,6 +136,7 @@ template<typename TList>
 void collectFlattenedVariadicOperands(IRInst* inst, UInt firstOperandIndex, TList& outOperands)
 {
     auto operandCount = inst->getOperandCount();
+    SLANG_RELEASE_ASSERT(firstOperandIndex <= operandCount);
     if (operandCount == firstOperandIndex + 1)
     {
         auto operand = inst->getOperand(firstOperandIndex);
@@ -163,6 +164,7 @@ void collectFlattenedVariadicOperands(
     TList& outOperands)
 {
     auto operandCount = operands.getCount();
+    SLANG_RELEASE_ASSERT(firstOperandIndex >= 0 && firstOperandIndex <= operandCount);
     if (operandCount == firstOperandIndex + 1)
     {
         auto operand = operands[firstOperandIndex];
