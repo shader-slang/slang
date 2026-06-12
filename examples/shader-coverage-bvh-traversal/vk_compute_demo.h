@@ -82,6 +82,9 @@ public:
     // works. Callers running with `-trace-coverage-counter-width 32`
     // (or with coverage off entirely) leave it false.
     void init(bool requireInt64Atomics = false);
+    // Restored explicitly: the deleted copy constructor below suppresses the
+    // implicit default ctor, but the demo uses `Context ctx; ctx.init();`.
+    Context() = default;
     ~Context();
     Context(const Context&) = delete;
     Context& operator=(const Context&) = delete;
