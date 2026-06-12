@@ -3029,13 +3029,15 @@ static IRInst* emitDirectSPIRVPrimitiveIDValue(
     IRVarLayout* layout,
     void* userData)
 {
-    if (!layout)
-        return nullptr;
+    SLANG_RELEASE_ASSERT(layout);
 
     auto semanticDecor = field ? field->getKey()->findDecoration<IRSemanticDecoration>() : nullptr;
     auto systemValueAttr = layout->findSystemValueSemanticAttr();
-    if (!systemValueAttr && !semanticDecor)
-        return nullptr;
+    SLANG_RELEASE_ASSERT(
+        (systemValueAttr &&
+         systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid"))) ||
+        (semanticDecor &&
+         semanticDecor->getSemanticName().caseInsensitiveEquals(toSlice("sv_primitiveid"))));
 
     auto context = static_cast<DirectSPIRVPrimitiveIDEmitterContext*>(userData);
     auto valueType = getPrimitiveIDValueTypeForDirectSPIRV(type);
