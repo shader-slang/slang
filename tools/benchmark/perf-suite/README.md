@@ -12,7 +12,7 @@ regression points at a specific release.
 
 ---
 
-## How it measures
+## Measurement
 
 `slangc` is run with `-report-perf-benchmark`, which prints per-phase timers as
 `[*] <phase> <count> <ms>`. The runner captures **all** of them per run.
@@ -54,7 +54,7 @@ regression points at a specific release.
 
 ---
 
-## The tests and what they target
+## Workloads
 
 Workloads run per release. Synthetic ones are generated deterministically by
 `workloads.py`, scaled by a size knob `N`; `mdl_dxr` is a real shader corpus.
