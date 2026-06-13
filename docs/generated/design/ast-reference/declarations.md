@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 4fbff6632ead047a5c7b8f1f94ae347684e102e096ad26276f0083b8dab39d3e
+generated_at: 2026-06-12T10:15:49Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: ad2a7f5a76a091d730e7cbf54483a1de9f01f4aeeb2e3ec0963d4e400436f2b6
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -120,12 +120,12 @@ carry no FIDDLE concrete tag. Concrete leaves below.
 | `IncludeDecl` | `IncludeDeclBase` | `fileDecl: FileDecl*` | [__include](../syntax-reference/grammar.md#top-level-structure) | `__include`-style file inclusion. |
 | `ImplementingDecl` | `IncludeDeclBase` | `fileDecl: FileDecl*` | [__implementing](../syntax-reference/grammar.md#top-level-structure) | `__implementing` companion to module files. |
 | `ModuleDeclarationDecl` | `Decl` | (no additional state) | [module decl](../syntax-reference/grammar.md#top-level-structure) | The `module M;` form that names the module of the current file. |
-| `RequireCapabilityDecl` | `Decl` | (no additional state) | [require capability](../syntax-reference/grammar.md#top-level-structure) | `require_capability` declaration; expressed as a decl so it can be exported. |
+| `RequireCapabilityDecl` | `Decl` | (no additional state) | [require capability](../syntax-reference/grammar.md#top-level-structure) | `__require_capability` declaration; expressed as a decl so it can be exported. |
 | `GenericDecl` | `ContainerDecl` | `inner: Decl*`, `_cachedArgsForDefaultSubstitution` | [generics](../syntax-reference/grammar.md#declarations) | Generic wrapper: the parameter list lives as members; `inner` is the genericized decl. |
 | `InterfaceDefaultImplDecl` | `GenericDecl` | `thisTypeDecl: GenericTypeParamDecl*`, `thisTypeConstraintDecl` | (none) | Synthetic generic that wraps a default implementation of an interface requirement. |
 | `GenericTypeParamDecl` | `GenericTypeParamDeclBase` | `initType: TypeExp` | [generic type param](../syntax-reference/grammar.md#declarations) | A type parameter of a `GenericDecl`. |
 | `GenericTypePackParamDecl` | `GenericTypeParamDeclBase` | (inherits) | [generic type-pack param](../syntax-reference/grammar.md#declarations) | A variadic type-pack parameter. |
-| `GenericTypeConstraintDecl` | `TypeConstraintDecl` | `sub: TypeExp`, `sup: TypeExp`, `isEqualityConstraint: bool` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | A generic constraint `T : U` or `T == U`. |
+| `GenericTypeConstraintDecl` | `TypeConstraintDecl` | `sub: TypeExp`, `sup: TypeExp`, `isEqualityConstraint: bool` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | A constraint `T : U` or `T == U`; produced by a generic `where` / `<T : I>` clause, an interface `__constraint`, or a relocated `associatedtype` bound. |
 | `TypeCoercionConstraintDecl` | `Decl` | `fromType: TypeExp`, `toType: TypeExp` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | A coercion constraint in a `where` clause. |
 | `NonEmptyPackConstraintDecl` | `Decl` | `packExpr: Expr*` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | Constraint that a type pack is non-empty. |
 | `HasDiffTypeInfoConstraintDecl` | `Decl` | `type: TypeExp` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | Differentiable-type constraint. |
@@ -239,6 +239,37 @@ The checker distinguishes interface requirements from regular members
 via `isInterfaceRequirement(Decl*)` (declared at the bottom of
 [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h)) rather
 than by class.
+
+### GenericTypeConstraintDecl as an interface requirement
+
+A `GenericTypeConstraintDecl` is not only the product of a generic
+`where` clause or `<T : I>` parameter bound — inside an interface body
+it is also a constraint *requirement* of that interface, refining the
+implicit `This` type and/or associated types inherited from base
+interfaces. Three surface forms collapse to this same node, all parsed
+in [slang-parser.cpp](../../../../source/slang/slang-parser.cpp):
+
+- `__constraint <type> : <type>;` / `__constraint <type> == <type>;`,
+  parsed by `parseInterfaceConstraintDecl` (registered in the
+  `g_parseSyntaxEntries` table). The `OpEql` form sets
+  `isEqualityConstraint`. For example, `interface IDerived : IBase {
+  __constraint DataType == This; }` asserts `This.DataType == This` for
+  any conformer.
+- An inheritance-style bound on an associated type
+  (`associatedtype A : IBar`).
+- A `where`-clause bound on an associated type
+  (`associatedtype A where A : IBar`).
+
+For the latter two, `parseAssocType` redirects the constraint to the
+enclosing `InterfaceDecl` via the `constraintTarget` parameter of
+`parseOptionalGenericConstraints`, so the resulting
+`GenericTypeConstraintDecl` becomes a sibling of the associated type
+rather than a child of it — the same representation `__constraint`
+produces. Nesting validity is enforced centrally: a
+`GenericTypeConstraintDecl` is permitted under an `InterfaceDecl` (as a
+requirement) and under a `GenericDecl` (as a parameter sibling), checked
+by `isDeclAllowed` in
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp).
 
 ## See also
 
