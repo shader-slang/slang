@@ -352,6 +352,47 @@ jobs:
       config: release
       runs-on: '["windows-latest"]'
 
+  # Verify docs/command-line-slangc-reference.md matches `slangc -help`.
+  # Reuses the release artifact built by build-linux-release-gcc-x86_64 instead
+  # of building slangc again from scratch (the old standalone
+  # check-cmdline-ref.yml did a full redundant build for this one check).
+  # Comment /regenerate-cmdline-ref on the PR to auto-fix a failure.
+  check-cmdline-ref:
+    needs: [filter, build-linux-release-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Download Slang release artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: slang-tests-linux-x86_64-gcc-release
+          path: artifacts
+
+      - name: Generate command line reference
+        run: |
+          # slangc is dynamically linked against libslang; the artifact lays
+          # libraries under Release/lib, separate from the Release/bin binaries.
+          chmod +x artifacts/Release/bin/* 2>/dev/null || true
+          export LD_LIBRARY_PATH="$PWD/artifacts/Release/lib:$LD_LIBRARY_PATH"
+          mkdir -p temp
+          artifacts/Release/bin/slangc -help-style markdown -h > temp/command-line-slangc-reference.md
+
+      - name: Compare with existing reference
+        run: |
+          if ! diff -q temp/command-line-slangc-reference.md docs/command-line-slangc-reference.md > /dev/null; then
+            echo "Command line reference is out of date. Diff:"
+            diff -u docs/command-line-slangc-reference.md temp/command-line-slangc-reference.md
+            echo "Please run 'slangc -help-style markdown -h > docs/command-line-slangc-reference.md' or comment '/regenerate-cmdline-ref' on your PR."
+            exit 1
+          fi
+
   # Aggregate gate required by branch protection / the merge queue.
   #
   # The build jobs must be listed in `needs` even though every test job
@@ -390,6 +431,7 @@ jobs:
         test-linux-debug-gcc-aarch64,
         test-materialx-windows-release,
         sanitizer-linux-clang-x86_64,
+        check-cmdline-ref,
       ]
     runs-on: ubuntu-latest
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
