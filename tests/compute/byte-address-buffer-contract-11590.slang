@@ -1,0 +1,30 @@
+// byte-address-buffer-contract-11590.slang
+
+// Diagnostic test for https://github.com/shader-slang/slang/issues/11545 — Slice 1 (#11590).
+//
+// The `alignment` argument of `(RW)ByteAddressBuffer.LoadAligned`/`Store` is a compile-time
+// contract: it must be a compile-time constant, and a compile-time-constant `location` must be a
+// multiple of it. Each violation is reported as a distinct diagnostic.
+
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute
+
+RWByteAddressBuffer buffer;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMain(uint3 tid : SV_DispatchThreadID)
+{
+    uint dynamicAlignment = tid.x;
+
+    // A non-constant alignment cannot be honored as a compile-time contract.
+    // CHECK-DAG: error[E41302]
+    float4 a = buffer.LoadAligned<float4>(0, dynamicAlignment);
+
+    // A compile-time-constant location that is not a multiple of the alignment is a
+    // self-contradictory call.
+    // CHECK-DAG: error[E41303]
+    float4 c = buffer.LoadAligned<float4>(20, 16);
+
+    buffer.Store<float4>(0, a + c);
+}

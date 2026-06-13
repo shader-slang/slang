@@ -129,6 +129,10 @@ struct ByteAddressBufferLegalizationContext
         //
         auto type = load->getDataType();
 
+        // Validate the alignment contract first, so it is checked even when the type needs no
+        // legalization and the early-out below fires.
+        validateExplicitAlignment(load->getOperand(1), load->getOperand(2));
+
         // We start by looking at the type being loaded so
         // that we can opt out if it is legal.
         //
@@ -238,6 +242,37 @@ struct ByteAddressBufferLegalizationContext
         // than rely on a downstream compiler.
         //
         return false;
+    }
+
+    // Validate the `alignment`/`location` operands of a single byte-address load/store against the
+    // `LoadAligned`/`StoreAligned` contract (issue #11545): a non-zero `alignment` promise must be
+    // a compile-time constant (else 41302), and a compile-time-constant `location` must be a
+    // multiple of it (else 41303). Diagnostics do not abort legalization; `alignment == 0` is the
+    // "no promise" sentinel (plain `Load`/`Store`) and carries no contract to validate.
+    void validateExplicitAlignment(IRInst* baseOffset, IRInst* alignment)
+    {
+        auto alignLit = as<IRIntLit>(alignment);
+        if (!alignLit)
+        {
+            m_sink->diagnose(Diagnostics::ByteAddressBufferAlignmentNotConstant{
+                .location = baseOffset->sourceLoc,
+            });
+            return;
+        }
+        auto alignmentVal = alignLit->getValue();
+        if (alignmentVal == 0)
+            return;
+        if (auto baseOffsetLit = as<IRIntLit>(baseOffset))
+        {
+            if ((baseOffsetLit->getValue() % alignmentVal) != 0)
+            {
+                m_sink->diagnose(Diagnostics::ByteAddressBufferLocationNotAligned{
+                    .offset = baseOffsetLit->getValue(),
+                    .alignment = alignmentVal,
+                    .location = baseOffset->sourceLoc,
+                });
+            }
+        }
     }
 
     // Returns true if a vectorized load or store of `alignmentVal` bytes at
@@ -1315,6 +1350,10 @@ struct ByteAddressBufferLegalizationContext
         //
         auto value = store->getOperand(3);
         auto type = value->getDataType();
+
+        // Validate the alignment contract first, so it is checked even when the type needs no
+        // legalization and the early-out below fires.
+        validateExplicitAlignment(store->getOperand(1), store->getOperand(2));
 
         // Types that are already legal to use don't require any processing.
         //

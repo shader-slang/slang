@@ -463,8 +463,9 @@ struct ByteAddressBuffer
 
     /// Load a value with type `T` from the buffer at the specified location with a known alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@param location The input address in bytes, which must be a multiple of `alignment`.
+    ///@param alignment The known alignment of `location` in bytes. It must be a compile-time
+    /// constant; otherwise a compile-time error is reported.
     ///@return The value loaded from the buffer.
     ///@remarks
     /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
@@ -6442,8 +6443,9 @@ struct $(item.name)
 
     /// Load a value with type `T` from the buffer at the specified location with a known alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@param location The input address in bytes, which must be a multiple of `alignment`.
+    ///@param alignment The known alignment of `location` in bytes. It must be a compile-time
+    /// constant; otherwise a compile-time error is reported.
     ///@return The value loaded from the buffer.
     ///@remarks
     /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
