@@ -2484,6 +2484,10 @@ IRType* getElementType(IRBuilder& builder, IRType* valueType)
     {
         return vectorType->getElementType();
     }
+    else if (auto packedVectorType = as<IRMetalPackedVectorType>(valueType))
+    {
+        return packedVectorType->getElementType();
+    }
     else if (auto basicType = as<IRBasicType>(valueType))
     {
         return basicType;

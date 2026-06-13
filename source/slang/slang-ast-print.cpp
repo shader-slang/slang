@@ -298,6 +298,26 @@ void ASTPrinter::addExpr(Expr* expr)
         }
         sb << ")";
     }
+    else if (const auto builtinOpExpr = as<BuiltinOperatorExpr>(expr))
+    {
+        // A fast-path builtin operator renders like the equivalent `operator OP` form:
+        // `(a OP b)` for binary, `OP a` for unary.
+        auto opText = getBuiltinOperationOpText(builtinOpExpr->op);
+        if (builtinOpExpr->arguments.getCount() == 2)
+        {
+            sb << "(";
+            addExpr(builtinOpExpr->arguments[0]);
+            sb << " " << opText << " ";
+            addExpr(builtinOpExpr->arguments[1]);
+            sb << ")";
+        }
+        else if (builtinOpExpr->arguments.getCount() == 1)
+        {
+            sb << opText;
+            addExpr(builtinOpExpr->arguments[0]);
+        }
+        return;
+    }
     else if (const auto invokeExpr = as<InvokeExpr>(expr))
     {
         if (const auto operatorExpr = as<OperatorExpr>(invokeExpr))
