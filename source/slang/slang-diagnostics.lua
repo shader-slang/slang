@@ -2986,6 +2986,16 @@ err(
 )
 
 err(
+    "partial-interface-accessor-default-implementation",
+    30318,
+    "partial interface accessor default implementation",
+    span {
+        loc = "decl:Decl",
+        message = "interface accessor default implementation is incomplete; define all accessors or none."
+    }
+)
+
+err(
     "interface-requirement-cannot-be-override",
     30312,
     "interface requirement cannot override",

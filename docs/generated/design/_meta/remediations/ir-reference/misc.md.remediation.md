@@ -1,13 +1,13 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-05T15:45:00Z
+remediated_at: 2026-06-12T14:15:48Z
 target_doc: ir-reference/misc.md
 review_report: ../../reviews/ir-reference/misc.md.review.md
-target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 actions:
-  fixed: 1
+  fixed: 2
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,12 +18,18 @@ actions:
 
 ## Summary
 
-The single finding was fixed; none were rejected, deferred, or
-escalated. The two concrete children of `ForceVarIntoStructTemporarilyBase`
-were missing from the catch-all tables and have been added.
+Both findings in the review were verified against source at the target
+commit and fixed; none were rejected, deferred, or escalated. F-001 was
+a genuine coverage gap: the concrete `capabilityConjunction` /
+`capabilityDisjunction` opcodes were undocumented on any page, so a
+capability-set sub-table was added to this catch-all. F-002 was a
+genuine source-alignment error: the kernel-launch operand shapes and the
+`CudaKernelLaunch` consumer link did not match the builder/emitter code,
+so the two rows and the callout were corrected.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `ir-reference-misc.md:16` names `ForceVarIntoStructTemporarilyBase` as a typical misc inhabitant; its children at `source/slang/slang-ir-insts.lua:1541-1548` were absent and no sibling page lists them. Behavior verified at `source/slang/slang-ir-hlsl-legalize.cpp:62-130`. | Added a `### Variable struct-wrapping legalization` sub-table with rows for `ForceVarIntoStructTemporarily` and `ForceVarIntoRayPayloadStructTemporarily`. |
+| F-001 | fixed | Confirmed `source/slang/slang-ir-insts.lua:871` declares `CapabilitySet` as a top-level group whose concrete children `capabilityConjunction` / `capabilityDisjunction` carry stable names 153/154 (`source/slang/slang-ir-insts-stable-names.lua:153-154`). This group is distinct from the `CapabilitySet` type opcode at `slang-ir-insts.lua:59` (wrapper `CapabilitySetType`) that types.md documents, so the two concrete opcodes were unclaimed by any page; the misc catch-all rule applies. | Added a `### Capability sets` sub-table under `## Opcodes` with rows for `capabilityConjunction` and `capabilityDisjunction` (variadic, hoistable, synthesized), citing `IRBuilder::getCapabilityValue` and noting the distinction from the type opcode. |
+| F-002 | fixed | Confirmed `source/slang/slang-ir.cpp:3618-3619` appends variadic call args to `DispatchKernel` and `slang-ir.cpp:3630-3638` creates `CudaKernelLaunch` with five operands `baseFn, gridDim, blockDim, argsArray, cudaStream`; `source/slang/slang-emit-torch.cpp:71-99` consumes those five operands. The doc's prior operand shapes and its slang-emit-cuda.cpp consumer link were both wrong. | Corrected the `DispatchKernel` row to `baseFn, threadGroupSize, dispatchSize, args...`, the `CudaKernelLaunch` row to the five-operand shape with the torch-emitter link, and rewrote the `### CudaKernelLaunch` callout to describe the actual five operands and the `cudaLaunchKernel` operand mapping. |

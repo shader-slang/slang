@@ -1,33 +1,22 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-05T15:45:00Z
+remediated_at: 2026-06-12T14:14:58Z
 target_doc: ir-reference/resources-and-atomics.md
 review_report: ../../reviews/ir-reference/resources-and-atomics.md.review.md
-target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
-actions:
-  fixed: 3
-  rejected_bogus: 0
-  rejected_out_of_scope: 0
-  deferred: 0
-  escalated: 0
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+actions: { fixed: 1, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
 ---
 
 # Remediation report for ir-reference/resources-and-atomics.md
 
 ## Summary
 
-All three findings were fixed; none were rejected, deferred, or
-escalated. Two missing varying-input opcodes were added to Shader IO,
-a required sampling notable callout was added, and target-specific
-lowering prose forbidden by the prompt was trimmed in three places and
-replaced with a link to the emit page.
+The review contained one major finding, which was fixed. The `sampleGrad` opcode was incorrectly described as variadic with trailing `gradY`/offset/bias operands; the Lua schema declares a fixed four-operand shape, so both the table operand cell and the notable paragraph were corrected. No findings were rejected, deferred, or escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-ir-insts.lua:1534,1539` declare `GetPerVertexInputArray` / `ResolveVaryingInputRef` (both hoistable); no sibling page lists them. Semantics verified at `source/slang/slang-ir-resolve-varying-input-ref.cpp:8-31`. | Added `GetPerVertexInputArray` and `ResolveVaryingInputRef` rows to the `### Shader IO` table. |
-| F-002 | fixed | `ir-reference-resources-and-atomics.md:59` requires implicit/explicit/gradient sampling notable coverage; `sample` / `sampleGrad` at `source/slang/slang-ir-insts.lua:1508-1509`. | Added a `### sample and sampleGrad` notable callout contrasting implicit-LOD vs explicit-gradient encodings. |
-| F-003 | fixed | `ir-reference-resources-and-atomics.md:75-77` forbids target-specific lowering content. | Trimmed SPIR-V/HLSL/Metal lowering detail from the `SubpassLoad` row, the `imageLoad`/`imageStore` notable, and the `ControlBarrier` notable, replacing each with a link to `../pipeline/06-emit.md`. |
+| F-001 | fixed | Confirmed against `source/slang/slang-ir-insts.lua:1527` at the source commit: `{ sampleGrad = { operands = { { "texture" }, { "sampler" }, { "coord" }, { "gradX" } } } }` has no `min_operands`, so it is a fixed four-operand opcode, not variadic. The IR-reference family contract requires the Operands column to list the Lua operand names and reserve `(variadic)` for variadic ops. | Changed the `sampleGrad` operand cell to `texture, sampler, coord, gradX` and rewrote the notable paragraph to state the fixed four-operand shape, removing the variadic `gradY`/offset/bias claim. |

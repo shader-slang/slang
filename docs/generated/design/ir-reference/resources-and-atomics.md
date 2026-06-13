@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
+generated_at: 2026-06-12T10:19:22Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -32,7 +32,7 @@ The opcodes documented here are scattered through
   `IncrementBranchCoverageCounter` (line ~1129), each also synthesized
   as an atomic add.
 - Image and texture access opcodes (`imageSubscript`, `imageLoad`,
-  `imageStore`) at lines ~1180-1188.
+  `imageStore`, `ImageTexelPointer`) at lines ~1180-1207.
 - Buffer access opcodes (`byteAddressBufferLoad/Store`,
   `structuredBuffer*`, `rwstructuredBuffer*`,
   `StructuredBufferAppend/Consume/GetDimensions`) at lines ~1198-1243.
@@ -94,6 +94,7 @@ flowchart TD
 | `imageSubscript` | — | `image, coord, sampleCoord?` | | `IndexExpr` on a `RWTexture*` in `slang-lower-to-ir.cpp` | Returns a pointer-like value for a texel of an image; used as the lvalue side of `image[coord] = ...`. |
 | `imageLoad` | — | `image, coord, auxCoord1?, auxCoord2?` | | `Texture*::Load` method invocations | Loads a texel from an image. |
 | `imageStore` | — | `image, coord, value` | | `RWTexture*` element-store lowering | Stores a value to a texel of an image. |
+| `ImageTexelPointer` | — | `image, coord, sample` | | GLSL `imageAtomic*` lowering | Forms a pointer to a texel of an image so atomic ops can target it; lowers directly to `SpvOpImageTexelPointer` at emit time. |
 | `SubpassLoad` | `SubpassLoad` | `subpassInput, sample?` | | `SubpassInput*::SubpassLoad` method (raster-input attachment access) | Loads a fragment-shader input attachment value; the optional `sample` operand selects an MSAA sample. Per-target lowering is covered in [../pipeline/06-emit.md](../pipeline/06-emit.md). |
 | `MetalCastToDepthTexture` | — | `texture` | | (synthesized) | Metal-backend-specific cast from a regular texture to a depth texture. |
 | `IsTextureAccess` | — | (variadic, `min=1`) | | (synthesized) | True if the operand was produced by a texture-access opcode; used by the texture-access legalization pass. |
@@ -108,7 +109,7 @@ flowchart TD
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `sample` | — | `texture, sampler, coord` | | `Texture*::Sample` method | Implicit-LOD texture sample. |
-| `sampleGrad` | — | `texture, sampler, coord, gradX, ...` | | `Texture*::SampleGrad` method | Explicit-gradient texture sample (variadic; trailing operands are `gradY`, optional offset, optional bias, ...). |
+| `sampleGrad` | — | `texture, sampler, coord, gradX` | | `Texture*::SampleGrad` method | Explicit-gradient texture sample. |
 | `MakeCombinedTextureSamplerFromHandle` | — | `handle` | | (synthesized) | Constructs a `SamplerState`-paired texture value from a runtime handle. |
 | `CombinedTextureSamplerGetTexture` | — | `sampler` | | (synthesized) | Projects the texture half of a combined texture/sampler. |
 | `CombinedTextureSamplerGetSampler` | — | `sampler` | | (synthesized) | Projects the sampler half of a combined texture/sampler. |
@@ -284,10 +285,12 @@ In this source revision the texture-sampling shortcuts are `sample`
 and `sampleGrad`. `sample(texture, sampler, coord)` is the
 *implicit-LOD* form: the mip level is selected automatically from
 screen-space derivatives, so it is only valid where derivatives are
-available. `sampleGrad(texture, sampler, coord, gradX, ...)` is the
-*explicit-gradient* form: the caller supplies the `gradX` / `gradY`
-derivative vectors that drive LOD selection, plus optional trailing
-operands (offset, bias). A fixed explicit-LOD sample is expressed
+available. `sampleGrad(texture, sampler, coord, gradX)` is the
+*explicit-gradient* form: the caller supplies the `gradX`
+derivative operand that drives LOD selection. The opcode has a
+fixed four-operand shape in this revision; richer gradient/offset/bias
+semantics live in core-module sampling intrinsics rather than as
+extra operands on this IR opcode. A fixed explicit-LOD sample is expressed
 through the ordinary core-module sampling intrinsics rather than a
 dedicated opcode in this revision.
 
