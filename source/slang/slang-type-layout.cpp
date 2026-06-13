@@ -973,12 +973,7 @@ struct MetalStructuredBufferLayoutRulesImpl : MetalLayoutRulesImpl
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
-        // `bool` vectors keep the native MSL layout: codegen does not pack
-        // them (see `needsPackedVectorStorage`), so reflection must not
-        // either. Every other vector is tightly packed to match its emitted
-        // packed storage.
-        if (elementType == BaseType::Bool)
-            return MetalLayoutRulesImpl::GetVectorLayout(elementType, elementInfo, elementCount);
+        SLANG_UNUSED(elementType);
         SimpleLayoutInfo vectorInfo;
         vectorInfo.kind = elementInfo.kind;
         vectorInfo.size = elementInfo.size * elementCount;

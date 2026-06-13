@@ -2998,15 +2998,13 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
 
     // The single classification deciding whether a vector uses packed storage,
     // for both top-level elements and leaves inside composites. Every
-    // multi-element non-`bool` vector does, because natural layout guarantees
-    // only the element's alignment (so a `float4` may sit at offset 4 or be
-    // bound at a 4-byte-aligned base), which no native MSL vector type can
-    // express. `bool` vectors keep native emission, matching how scalar `bool`
-    // is stored on this target.
+    // multi-element vector does, because natural layout guarantees only the
+    // element's alignment (so a `float4` may sit at offset 4 or be bound at a
+    // 4-byte-aligned base), which no native MSL vector type can express. This
+    // includes `bool` vectors: MSL `bool` is a 1-byte storage type, so a
+    // `bool3` is padded to 4 bytes natively but `packed_bool3` is exactly 3.
     static bool needsPackedVectorStorage(IRVectorType* vectorType)
     {
-        if (as<IRBoolType>(vectorType->getElementType()))
-            return false;
         auto countInst = as<IRIntLit>(vectorType->getElementCount());
         if (!countInst)
             return false;
