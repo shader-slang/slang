@@ -55,12 +55,13 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // PACKED-DAG: float3({{.*}}data
 
 // Row-major: a row maps onto one packed vector, so the store is a single
-// packed-vector store.
+// packed-vector store (`packed_float3(float3(...))`, the row converted to its
+// packed storage form) rather than scattered per-component stores.
 // ROWMAJOR: struct _MatrixStorage_float3x3
 // ROWMAJOR-NOT: array<float3,
 // ROWMAJOR: array<packed_float3, int(3)> data
 // ROWMAJOR-NOT: array<float3,
-// ROWMAJOR-DAG: = packed_float3(5.0, 6.0, 7.0)
+// ROWMAJOR-DAG: = packed_float3(float3(5.0, 6.0, 7.0))
 // ROWMAJOR-DAG: float3({{.*}}data
 
 // The metallib target compiles the generated MSL with the Metal toolchain;

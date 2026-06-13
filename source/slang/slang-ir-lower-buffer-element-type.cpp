@@ -2260,8 +2260,7 @@ struct LoweredElementTypeContext
         auto colCount = getIntVal(matrixType->getColumnCount());
         // On Metal, matrices in device buffers are stored as arrays of *packed*
         // vectors rather than ordinary vectors, so whole-row loads/stores need
-        // an element-wise conversion between the row vector and its
-        // packed-vector storage.
+        // a conversion between the row vector and its packed-vector storage.
         IRMetalPackedVectorType* minorPackedType = nullptr;
         if (auto innerArrayType = as<IRArrayTypeBase>(matrixTypeInfo->loweredInnerArrayType))
             minorPackedType = as<IRMetalPackedVectorType>(innerArrayType->getElementType());
@@ -2306,13 +2305,11 @@ struct LoweredElementTypeContext
                             resultInst = builder.emitLoad(element);
                             if (minorPackedType)
                             {
+                                // Convert the loaded packed row to the logical
+                                // row vector (MSL `float3(packed_float3)`).
                                 auto vectorType = as<IRVectorType>(user->getDataType());
                                 SLANG_ASSERT(vectorType);
-                                List<IRInst*> args;
-                                auto count = getIntVal(minorPackedType->getElementCount());
-                                for (IRIntegerValue i = 0; i < count; i++)
-                                    args.add(builder.emitElementExtract(resultInst, i));
-                                resultInst = builder.emitMakeVector(vectorType, args);
+                                resultInst = builder.emitMakeVector(vectorType, 1, &resultInst);
                             }
                         }
                         user->replaceUsesWith(resultInst);
@@ -2350,14 +2347,9 @@ struct LoweredElementTypeContext
                             IRInst* value = storeInst->getVal();
                             if (minorPackedType)
                             {
-                                List<IRInst*> args;
-                                auto count = getIntVal(minorPackedType->getElementCount());
-                                for (IRIntegerValue i = 0; i < count; i++)
-                                    args.add(builder.emitElementExtract(value, i));
-                                value = builder.emitMakeVector(
-                                    minorPackedType,
-                                    (UInt)args.getCount(),
-                                    args.getBuffer());
+                                // Convert the logical row vector to its packed
+                                // storage form (MSL `packed_float3(float3)`).
+                                value = builder.emitMakeVector(minorPackedType, 1, &value);
                             }
                             builder.emitStore(rowAddr, value);
                             user->removeAndDeallocate();
@@ -3022,8 +3014,9 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
     }
 
     // Return a [ForceInline] function that converts a packed-vector storage
-    // value (by address) back to the logical vector, element by element:
-    // `float3 unpackVector(ref packed_float3 p) { return float3(p[0], p[1], p[2]); }`
+    // value (by address) back to the logical vector. MSL constructs a vector
+    // directly from a packed vector, so this is a single conversion:
+    // `float3 unpackVector(ref packed_float3 p) { return float3(p); }`
     IRFunc* createVectorUnpackFunc(
         IRVectorType* vectorType,
         IRMetalPackedVectorType* packedVectorType)
@@ -3041,19 +3034,16 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
 
         auto packedParamRef = builder.emitParam(refPackedType);
         auto packedParam = builder.emitLoad(packedParamRef);
-        List<IRInst*> args;
-        auto elementCount = getIntVal(vectorType->getElementCount());
-        for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
-            args.add(builder.emitElementExtract(packedParam, ii));
-        auto result = builder.emitMakeVector(vectorType, (UInt)args.getCount(), args.getBuffer());
+        auto result = builder.emitMakeVector(vectorType, 1, &packedParam);
         builder.emitReturn(result);
         return func;
     }
 
     // Return a [ForceInline] function that converts a logical vector to its
-    // packed-vector storage form (written through the out parameter), element
-    // by element:
-    // `void packVector(out packed_float3 p, float3 v) { p = packed_float3(v[0], v[1], v[2]); }`
+    // packed-vector storage form (written through the out parameter). MSL
+    // constructs a packed vector directly from a vector, so this is a single
+    // conversion:
+    // `void packVector(out packed_float3 p, float3 v) { p = packed_float3(v); }`
     IRFunc* createVectorPackFunc(
         IRVectorType* vectorType,
         IRMetalPackedVectorType* packedVectorType)
@@ -3071,13 +3061,8 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
         builder.emitBlock();
 
         auto outParam = builder.emitParam(outPackedType);
-        auto originalParam = builder.emitParam(vectorType);
-        List<IRInst*> args;
-        auto elementCount = getIntVal(vectorType->getElementCount());
-        for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
-            args.add(builder.emitElementExtract(originalParam, ii));
-        auto packedVal =
-            builder.emitMakeVector(packedVectorType, (UInt)args.getCount(), args.getBuffer());
+        IRInst* originalParam = builder.emitParam(vectorType);
+        auto packedVal = builder.emitMakeVector(packedVectorType, 1, &originalParam);
         builder.emitStore(outParam, packedVal);
         builder.emitReturn();
         return func;
