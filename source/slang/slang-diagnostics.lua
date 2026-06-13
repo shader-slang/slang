@@ -3695,6 +3695,13 @@ err(
     span { loc = "expr:Expr", message = "ambiguous call to overloaded operation with arguments of type ~args" }
 )
 
+warning(
+    "operator-overload-on-builtin-type-ignored",
+    39073,
+    "operator overload on builtin scalar/vector/matrix operands is ignored",
+    span { loc = "decl:Decl", message = "this operator overload on builtin scalar/vector/matrix operands has no effect: the compiler evaluates these operators directly and will not call this overload" }
+)
+
 standalone_note(
     "overload-candidate",
     40011,

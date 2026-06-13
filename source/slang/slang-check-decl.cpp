@@ -717,6 +717,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkInterfaceRequirement(Decl* decl);
 
     void checkCallableDeclCommon(CallableDecl* decl);
+    void checkForShadowedBuiltinOperatorOverload(CallableDecl* decl);
     void checkPublicCallableOperandVisibility(CallableDecl* decl);
 
     void checkCallableConstraints(CallableDecl* decl);
@@ -14790,6 +14791,76 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 
     checkInterfaceRequirement(decl);
     checkVisibility(decl);
+
+    // Warn if this is a user operator overload that the builtin-operator fast path will silently
+    // shadow (e.g. `int operator+(int, int)`), so the dead overload does not look effective.
+    checkForShadowedBuiltinOperatorOverload(decl);
+}
+
+void SemanticsDeclHeaderVisitor::checkForShadowedBuiltinOperatorOverload(CallableDecl* decl)
+{
+    // The builtin-operator fast path (`convertToBuiltinArithmeticOp`, slang-check-expr.cpp)
+    // rewrites builtin arithmetic/comparison/bitwise/shift/unary operators on
+    // scalar/vector/matrix operands to a `BuiltinOperatorExpr` *before* operator overload
+    // resolution runs. A user operator overload whose operands are exactly those builtin types is
+    // therefore never selected -- e.g. `int operator+(int, int)` is dead code: `a + b` on `int`
+    // operands is fast-pathed and the overload is silently ignored (before the fast path existed
+    // it would have produced an overload-resolution diagnostic). Warn so the dead overload does
+    // not look effective.
+    //
+    // We warn only when the fast path *would* shadow the overload, using the same
+    // `isBuiltinOperatorFastPathEligible` predicate the fast path itself uses (the single source
+    // of truth). Overloads that still resolve normally therefore do not warn: user operand types
+    // (`operator+(MyStruct, int)`), element types invalid for the operator family
+    // (`operator&(float, float)`), shapes the fast path does not handle (matrix*vector), and
+    // operators with no fast-path form (unary `+`, `&&`/`||`, `?:`, `=`, `()`).
+
+    // The core module (core.meta.slang) and the glsl module declare these operators themselves; a
+    // warning there would be spurious, so only user-module decls are flagged.
+    if (isFromCoreModule(decl))
+        return;
+    if (auto moduleDecl = getModuleDecl(decl))
+    {
+        if (moduleDecl->hasModifier<GLSLModuleModifier>())
+            return;
+    }
+
+    auto name = decl->getName();
+    if (!name)
+        return;
+
+    // An operator overload's parameter list holds its operands directly: one for a unary
+    // operator, two for a binary operator. (A member operator's implicit `this` is not a
+    // parameter, so a builtin-typed member operator declared via an extension would show one
+    // fewer parameter and simply not match below -- a conservative miss, never a false warning.)
+    Type* operandTypes[2] = {nullptr, nullptr};
+    Index paramCount = 0;
+    for (auto paramDecl : decl->getParameters())
+    {
+        if (paramCount < 2)
+            operandTypes[paramCount] = paramDecl->getType();
+        ++paramCount;
+    }
+    if (paramCount != 1 && paramCount != 2)
+        return;
+
+    // The parser stores an operator overload's name as the operator symbol itself (e.g. "+"),
+    // see `ParseDeclName` in slang-parser.cpp. Map (symbol, arity) to a `BuiltinOperationKind`;
+    // a non-operator name, or an operator with no builtin fast-path form, yields `Unknown`. The
+    // arity disambiguates `-` (unary `Neg` vs binary `Sub`).
+    auto arity = (paramCount == 1) ? OperatorArity::Unary : OperatorArity::Binary;
+    auto kind = getBuiltinOperationKindFromString(getText(name).getUnownedSlice(), arity);
+    if (kind == BuiltinOperationKind::Unknown)
+        return;
+
+    // The eligibility predicate lives on `SemanticsExprVisitor`; construct one over the current
+    // semantics context to reach it. `rightType == nullptr` selects the unary check.
+    SemanticsExprVisitor exprVisitor(*this);
+    Type* rightType = (paramCount == 2) ? operandTypes[1] : nullptr;
+    if (exprVisitor.isBuiltinOperatorFastPathEligible(kind, operandTypes[0], rightType))
+    {
+        getSink()->diagnose(Diagnostics::OperatorOverloadOnBuiltinTypeIgnored{.decl = decl});
+    }
 }
 
 void SemanticsDeclHeaderVisitor::checkPublicCallableOperandVisibility(CallableDecl* decl)

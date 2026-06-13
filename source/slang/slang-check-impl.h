@@ -3632,6 +3632,20 @@ public:
     // completeness / idempotent re-checks.
     Expr* visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr);
 
+    // True when the builtin-operator fast path (`convertToBuiltinArithmeticOp`) would intercept an
+    // application of `kind` to operands of the given builtin types and rewrite it to a
+    // `BuiltinOperatorExpr`, bypassing generic `operator OP` overload resolution. This is the
+    // single source of truth for fast-path eligibility: `convertToBuiltinArithmeticOp` consults it
+    // to decide whether to take over, and `checkCallableDeclCommon` consults it to warn about a
+    // user operator overload the fast path would silently shadow (e.g. `int operator+(int, int)`).
+    // Pass `rightType == nullptr` for a unary operator; for a binary operator both `leftType` and
+    // `rightType` must be non-null. Pure predicate: it inspects types only and never coerces or
+    // mutates. (Public so `SemanticsDeclHeaderVisitor` can reach it via a temporary expr visitor.)
+    bool isBuiltinOperatorFastPathEligible(
+        BuiltinOperationKind kind,
+        Type* leftType,
+        Type* rightType);
+
     Expr* visitSelectExpr(SelectExpr* expr);
 
     Expr* visitVarExpr(VarExpr* expr);

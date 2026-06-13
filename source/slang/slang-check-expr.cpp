@@ -4567,6 +4567,118 @@ Type* SemanticsExprVisitor::coerceOperandsOfBuiltinBinaryExpr(
     return commonType;
 }
 
+bool SemanticsExprVisitor::isBuiltinOperatorFastPathEligible(
+    BuiltinOperationKind kind,
+    Type* leftType,
+    Type* rightType)
+{
+    // Classify the element base type of a builtin scalar/vector/matrix operand into the
+    // integer/floating-point/bool buckets `convertToBuiltinArithmeticOp` keys on. Returns false
+    // when `type` is not a builtin scalar/vector/matrix (so the operand is a user type and the
+    // fast path must not apply). For a vector/matrix the element base is inspected; for a scalar
+    // the type itself is the element.
+    auto classifyElementBase = [&](Type* type, bool& outInt, bool& outFloat, bool& outBool) -> bool
+    {
+        Type* elementType = type;
+        if (auto v = as<VectorExpressionType>(type))
+            elementType = v->getElementType();
+        else if (auto m = as<MatrixExpressionType>(type))
+            elementType = m->getElementType();
+        auto basic = as<BasicExpressionType>(elementType);
+        if (!basic)
+            return false;
+        auto baseType = basic->getBaseType();
+        auto flags = BaseTypeInfo::getInfo(baseType).flags;
+        outInt = (flags & BaseTypeInfo::Flag::Integer) != 0;
+        outFloat = (flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+        outBool = (baseType == BaseType::Bool);
+        return true;
+    };
+
+    // Unary operator (`rightType == nullptr`): only negate (`-`), logical-not (`!`), and
+    // bitwise-not (`~`) have a builtin fast-path form. Unary `+` maps to `Add`, which is not a
+    // unary fast-path kind, so it is left to normal resolution and is not reported as shadowed.
+    if (!rightType)
+    {
+        if (!leftType)
+            return false;
+        bool isNeg = (kind == BuiltinOperationKind::Neg);
+        bool isLogicalNot = (kind == BuiltinOperationKind::Not);
+        bool isBitNot = (kind == BuiltinOperationKind::BitNot);
+        if (!isNeg && !isLogicalNot && !isBitNot)
+            return false;
+        // In GLSL operator scope the `glsl` module owns matrix operator semantics, so a matrix
+        // operand goes through that module's overloads rather than the fast path.
+        if (isGLSLOperatorScope() && as<MatrixExpressionType>(leftType))
+            return false;
+        bool isInt = false, isFloat = false, isBool = false;
+        if (!classifyElementBase(leftType, isInt, isFloat, isBool))
+            return false;
+        // `-` => signed/float negate; `~` => integer bitwise-not; `!` => bool logical-not.
+        return isNeg ? (isInt || isFloat) : (isBitNot ? isInt : /*isLogicalNot*/ isBool);
+    }
+
+    // Binary operator. Classify the operator family by kind (enum, not text). `Unknown`, the
+    // short-circuiting `And`/`Or` (`&&`/`||`), `Conditional` (`?:`), and assignment-like
+    // operators have no fast-path form.
+    bool isArithmetic = kind == BuiltinOperationKind::Add || kind == BuiltinOperationKind::Sub ||
+                        kind == BuiltinOperationKind::Mul || kind == BuiltinOperationKind::Div ||
+                        kind == BuiltinOperationKind::Mod;
+    bool isComparison = kind == BuiltinOperationKind::Eql || kind == BuiltinOperationKind::Neq ||
+                        kind == BuiltinOperationKind::Less ||
+                        kind == BuiltinOperationKind::Greater ||
+                        kind == BuiltinOperationKind::Leq || kind == BuiltinOperationKind::Geq;
+    bool isBitwise = kind == BuiltinOperationKind::BitAnd || kind == BuiltinOperationKind::BitOr ||
+                     kind == BuiltinOperationKind::BitXor || kind == BuiltinOperationKind::Lsh ||
+                     kind == BuiltinOperationKind::Rsh;
+    if (!isArithmetic && !isComparison && !isBitwise)
+        return false;
+    if (!leftType)
+        return false;
+    bool isEquality = kind == BuiltinOperationKind::Eql || kind == BuiltinOperationKind::Neq;
+    bool isShift = kind == BuiltinOperationKind::Lsh || kind == BuiltinOperationKind::Rsh;
+
+    // GLSL operator scope only overrides matrix operators (algebraic products) and vector equality
+    // (`vec == vec` / `!=` -> scalar `bool`); those go through the glsl module's overloads, so the
+    // fast path does not apply (and a user overload for them is not shadowed).
+    if (isGLSLOperatorScope())
+    {
+        bool leftMat = as<MatrixExpressionType>(leftType) != nullptr;
+        bool rightMat = as<MatrixExpressionType>(rightType) != nullptr;
+        bool anyVec = as<VectorExpressionType>(leftType) != nullptr ||
+                      as<VectorExpressionType>(rightType) != nullptr;
+        if (leftMat || rightMat)
+            return false;
+        if (isEquality && anyVec)
+            return false;
+    }
+
+    // Shift operators do not promote to a common type (`a << b` keeps the type of `a`), so a
+    // mixed-type shift is left to overload resolution.
+    if (isShift && !leftType->equals(rightType))
+        return false;
+
+    // The operands must promote to a common builtin scalar/vector/matrix type (the usual
+    // arithmetic conversions with scalar/vector/matrix broadcast); null => not both builtin
+    // numeric operands or not broadcast-compatible (e.g. user types, or matrix mixed with vector).
+    Type* operandType = getBuiltinArithmeticCommonType(leftType, rightType);
+    if (!operandType)
+        return false;
+
+    // The common element base must be valid for the operator family, matching the eligibility the
+    // builder below relies on: bitwise/shift on integers only; equality on integer/float/bool;
+    // arithmetic and ordering comparison on integer/float. A `bool` arithmetic or a `float`
+    // bitwise operand therefore falls back to normal resolution.
+    bool isInt = false, isFloat = false, isBool = false;
+    if (!classifyElementBase(operandType, isInt, isFloat, isBool))
+        return false;
+    if (isBitwise)
+        return isInt;
+    if (isEquality)
+        return isInt || isFloat || isBool;
+    return isInt || isFloat;
+}
+
 Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
 {
     // Recognize a builtin arithmetic (`+ - * / %`), comparison (`< > <= >=`), equality
@@ -4586,36 +4698,16 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         auto uKind = getBuiltinOperationKindFromString(
             getText(uVarExpr->name).getUnownedSlice(),
             OperatorArity::Unary);
-        bool isNeg = (uKind == BuiltinOperationKind::Neg);
-        bool isLogicalNot = (uKind == BuiltinOperationKind::Not);
-        bool isBitNot = (uKind == BuiltinOperationKind::BitNot);
-        if (!isNeg && !isLogicalNot && !isBitNot)
-            return nullptr;
 
         auto arg = expr->arguments[0];
         if (!arg->type.type)
             return nullptr;
         Type* uOperandType = arg->type.type;
-        // In GLSL operator scope the `glsl` module owns matrix operator semantics, so leave
-        // matrix operands to normal resolution (see the binary case for the full rationale).
-        if (isGLSLOperatorScope() && as<MatrixExpressionType>(uOperandType))
-            return nullptr;
-        Type* uElementType = uOperandType;
-        if (auto v = as<VectorExpressionType>(uOperandType))
-            uElementType = v->getElementType();
-        else if (auto m = as<MatrixExpressionType>(uOperandType))
-            uElementType = m->getElementType();
-        auto uBasic = as<BasicExpressionType>(uElementType);
-        if (!uBasic)
-            return nullptr;
-        auto uBaseType = uBasic->getBaseType();
-        auto uFlags = BaseTypeInfo::getInfo(uBaseType).flags;
-        bool uInt = (uFlags & BaseTypeInfo::Flag::Integer) != 0;
-        bool uFloat = (uFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
-        bool uBool = (uBaseType == BaseType::Bool);
-        // `-` => signed/float negate; `~` => integer bitwise-not; `!` => bool logical-not.
-        bool uEligible = isNeg ? (uInt || uFloat) : (isBitNot ? uInt : /*isLogicalNot*/ uBool);
-        if (!uEligible)
+        // Operator-family and builtin operand-type eligibility (including the GLSL-scope matrix
+        // bail) is decided once by `isBuiltinOperatorFastPathEligible`, the shared source of truth
+        // that the decl-check warning also consults. If it declines, fall back to normal
+        // resolution.
+        if (!isBuiltinOperatorFastPathEligible(uKind, uOperandType, nullptr))
             return nullptr;
 
         auto node = m_astBuilder->create<BuiltinOperatorExpr>();
@@ -4646,89 +4738,36 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         getText(varExpr->name).getUnownedSlice(),
         OperatorArity::Binary);
 
-    // Classify the operator by kind (enum, not text). `Unknown` covers operators with no
-    // builtin fast-path form, notably the short-circuiting `&&`/`||`.
-    bool isArithmetic = kind == BuiltinOperationKind::Add || kind == BuiltinOperationKind::Sub ||
-                        kind == BuiltinOperationKind::Mul || kind == BuiltinOperationKind::Div ||
-                        kind == BuiltinOperationKind::Mod;
-    bool isComparison = kind == BuiltinOperationKind::Eql || kind == BuiltinOperationKind::Neq ||
-                        kind == BuiltinOperationKind::Less ||
-                        kind == BuiltinOperationKind::Greater ||
-                        kind == BuiltinOperationKind::Leq || kind == BuiltinOperationKind::Geq;
-    bool isBitwise = kind == BuiltinOperationKind::BitAnd || kind == BuiltinOperationKind::BitOr ||
-                     kind == BuiltinOperationKind::BitXor || kind == BuiltinOperationKind::Lsh ||
-                     kind == BuiltinOperationKind::Rsh;
-    if (!isArithmetic && !isComparison && !isBitwise)
-        return nullptr;
-    bool isEquality = kind == BuiltinOperationKind::Eql || kind == BuiltinOperationKind::Neq;
-    bool isShift = kind == BuiltinOperationKind::Lsh || kind == BuiltinOperationKind::Rsh;
-
     auto leftArg = expr->arguments[0];
     auto rightArg = expr->arguments[1];
     if (!leftArg->type.type || !rightArg->type.type)
         return nullptr;
 
-    // GLSL operator scope only overrides matrix operators (algebraic products) and vector
-    // equality (`vec == vec` / `!=` -> scalar `bool`); bail to normal resolution for those so
-    // the glsl module's overloads apply. Everything else is identical to HLSL and stays
-    // fast-pathed.
-    if (isGLSLOperatorScope())
-    {
-        bool leftMat = as<MatrixExpressionType>(leftArg->type.type) != nullptr;
-        bool rightMat = as<MatrixExpressionType>(rightArg->type.type) != nullptr;
-        bool anyVec = as<VectorExpressionType>(leftArg->type.type) != nullptr ||
-                      as<VectorExpressionType>(rightArg->type.type) != nullptr;
-        if (leftMat || rightMat)
-            return nullptr;
-        if (isEquality && anyVec)
-            return nullptr;
-    }
-
-    // Shift operators do not promote to a common type: `a << b` keeps the type of `a` (the
-    // shift amount `b` is converted independently). That asymmetry is not modeled by the
-    // common-type rule, so leave mixed-type shifts to overload resolution.
-    if (isShift && !leftArg->type.type->equals(rightArg->type.type))
+    // Operator-family, builtin operand types, common-type promotion, element-type validity, and
+    // the GLSL-scope bails are all decided once by `isBuiltinOperatorFastPathEligible`, the shared
+    // source of truth that the decl-check warning also consults. If it declines, fall back to
+    // normal overload resolution (which finds a user overload or produces the right diagnostic).
+    if (!isBuiltinOperatorFastPathEligible(kind, leftArg->type.type, rightArg->type.type))
         return nullptr;
-    // Promote mixed-type operands to the common operand type (and carry the coerced operands
-    // back onto the expression). Null => not a fast-pathable pair of builtin numeric operands.
+
+    // The result shape depends only on whether the operator is a comparison (boolean result) or
+    // value-preserving; re-derive that classification here for building the result type.
+    bool isComparison = kind == BuiltinOperationKind::Eql || kind == BuiltinOperationKind::Neq ||
+                        kind == BuiltinOperationKind::Less ||
+                        kind == BuiltinOperationKind::Greater ||
+                        kind == BuiltinOperationKind::Leq || kind == BuiltinOperationKind::Geq;
+
+    // Promote mixed-type operands to the common operand type (and carry the coerced operands back
+    // onto the expression). The predicate already established broadcast-compatibility, so a null
+    // here means a coercion failed; abandon the fast path without mutating the operands.
     Type* operandType = coerceOperandsOfBuiltinBinaryExpr(leftArg, rightArg, leftArg, rightArg);
     if (!operandType)
         return nullptr;
     expr->arguments[0] = leftArg;
     expr->arguments[1] = rightArg;
 
-    Type* elementType = operandType;
-    VectorExpressionType* vecType = nullptr;
-    MatrixExpressionType* matType = nullptr;
-    if ((vecType = as<VectorExpressionType>(operandType)))
-        elementType = vecType->getElementType();
-    else if ((matType = as<MatrixExpressionType>(operandType)))
-        elementType = matType->getElementType();
-    auto basicElementType = as<BasicExpressionType>(elementType);
-    if (!basicElementType)
-        return nullptr;
-    auto baseType = basicElementType->getBaseType();
-    auto baseFlags = BaseTypeInfo::getInfo(baseType).flags;
-    bool isIntegerBase = (baseFlags & BaseTypeInfo::Flag::Integer) != 0;
-    bool isFloatBase = (baseFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
-    bool isBoolBase = (baseType == BaseType::Bool);
-    // Some operators do not apply to every element type. For example, it is invalid to apply a
-    // bitwise operator to a floating-point operand, and arithmetic does not apply to `bool`. When
-    // the element type is not valid for the operator family we return null, so the expression
-    // falls back to normal overload resolution (which will either find a user-provided overload
-    // or produce the appropriate diagnostic) instead of being lowered as a builtin operation.
-    //   - bitwise/shift (`& | ^ << >> ~`): integer only;
-    //   - equality (`== !=`): integer, floating-point, or bool;
-    //   - arithmetic (`+ - * / %`) and ordering comparison (`< > <= >=`): integer or float.
-    bool eligible;
-    if (isBitwise)
-        eligible = isIntegerBase;
-    else if (isEquality)
-        eligible = isIntegerBase || isFloatBase || isBoolBase;
-    else
-        eligible = isIntegerBase || isFloatBase;
-    if (!eligible)
-        return nullptr;
+    VectorExpressionType* vecType = as<VectorExpressionType>(operandType);
+    MatrixExpressionType* matType = as<MatrixExpressionType>(operandType);
 
     // Result type: arithmetic/bitwise preserve the operand type; comparison yields a
     // boolean of matching shape (scalar -> bool, vector<T,N> -> vector<bool,N>,
