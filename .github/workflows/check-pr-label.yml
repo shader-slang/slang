@@ -9,7 +9,7 @@ on:
       - "CONTRIBUTING.md"
       - "README.md"
 jobs:
-  label:
+  check-pr-label:
     if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     permissions:
