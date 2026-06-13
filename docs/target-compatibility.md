@@ -295,7 +295,30 @@ A non-zero `alignment` must satisfy all of the following, or a compile-time erro
 | Requirement                                                   | Diagnostic |
 | ------------------------------------------------------------- | ---------- |
 | Be a compile-time constant                                    | 41302      |
+| Be a power of two                                             | 41301      |
+| Be at least the alignment of `T`'s scalar components          | 41300      |
 | (Constant `location`) `location` is a multiple of `alignment` | 41303      |
+
+The implicit single-argument forms (`LoadAligned<T>(location)`, `Load2Aligned`/`Load3Aligned`/
+`Load4Aligned`, `StoreAligned<T>`, `Store2Aligned`/`Store3Aligned`/`Store4Aligned`) forward `T`'s
+natural alignment — the largest power of two dividing `T`'s natural stride (16 for `float4`,
+8 for `float2`/`half4`, 4 for `float3`). Because a 3-component vector's natural stride is not a
+power of two, its single-argument form is lowered to per-component accesses rather than a single
+wide one.
+
+The minimum valid `alignment` is the natural alignment of the scalar component type:
+
+| Scalar component      | Minimum alignment (bytes) |
+| --------------------- | ------------------------- |
+| `u/int8_t`            | 1                         |
+| `u/int16_t`, `half`   | 2                         |
+| `u/int`, `float`      | 4                         |
+| `u/int64_t`, `double` | 8                         |
+
+Whether a given scalar width is usable in a `ByteAddressBuffer` at all is a separate, pre-existing
+capability of each target (the same requirement the scalar type itself has — see
+[Half Type](#half), [u/int8_t Type](#int8_t), and [u/int16_t Type](#int16_t)); the alignment rules
+above do not make a width newly usable on a target that did not already support it.
 
 <a id="mesh-shader"></a>
 

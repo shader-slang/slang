@@ -1,5 +1,6 @@
 #include "slang-ir-peephole.h"
 
+#include "../core/slang-math.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
@@ -1779,6 +1780,57 @@ struct PeepholeContext : InstPassBase
                     auto stride =
                         builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
                     inst->replaceUsesWith(stride);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
+        case kIROp_GetNaturalAlignment:
+            {
+                if (targetProgram)
+                {
+                    if (isInGeneric)
+                        break;
+                    auto type = inst->getOperand(0)->getDataType();
+                    IRSizeAndAlignment sizeAlignment;
+                    const auto res = getNaturalSizeAndAlignment(
+                        targetProgram->getTargetReq(),
+                        type,
+                        &sizeAlignment);
+                    if (!SLANG_SUCCEEDED(res))
+                        break;
+
+                    // The natural alignment we promise for the implicit single-argument
+                    // `*Aligned` accessors is the largest power of two that divides the
+                    // type's natural stride. For a power-of-two-sized aggregate (scalars,
+                    // `vec2`, `vec4`, `half4`, ...) this is the full stride, so a single
+                    // wide access is still possible; for a 3-component vector (stride
+                    // `3 * scalarSize`, never a power of two) it collapses to the scalar
+                    // alignment, which is the strongest *valid* (power-of-two) promise.
+                    // This is deliberately derived from the stride, NOT `sizeAlignment.alignment`
+                    // (the layout-computed natural alignment): the two differ for an aggregate
+                    // `T` (a stride-24 struct yields 8 here, but its natural alignment may be 4)
+                    // -- see the `__naturalAlignmentOf` doc in core.meta.slang. Do not
+                    // "simplify" this to read `.alignment`; that would silently change the
+                    // contract.
+                    //
+                    // A degenerate zero-stride type (an empty struct reaching the generic
+                    // `LoadAligned<T>`/`StoreAligned<T>`) folds to alignment 0 via
+                    // `getLowestBit(0) == 0` -- the legalizer's "no promise" sentinel, which is
+                    // benign (the access then carries no alignment promise). We still fold
+                    // rather than leave the op unfolded: no backend has a case for
+                    // `GetNaturalAlignment`, so for non-generic, target-set code this fold is
+                    // its only consumer and must always run (mirroring `getNaturalStride`,
+                    // which likewise folds its stride here).
+                    IRIntegerValue stride = sizeAlignment.getStride();
+                    IRIntegerValue alignment = Math::getLowestBit(stride);
+
+                    IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
+                    builder.setInsertBefore(inst);
+                    auto alignmentVal = builder.getIntValue(inst->getDataType(), alignment);
+                    inst->replaceUsesWith(alignmentVal);
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }

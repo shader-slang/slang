@@ -3864,6 +3864,29 @@ int __naturalStrideOf()
     return __naturalStrideOf_impl(__declVal<T>());
 }
 
+__generic<T>
+__intrinsic_op($(kIROp_GetNaturalAlignment))
+int __naturalAlignmentOf_impl(T v);
+
+// Return the largest power-of-two byte alignment that `T`'s natural layout guarantees.
+// This is the strongest alignment a value of `T` can be promised when its address is a
+// multiple of `T`'s natural stride, e.g. 16 for `float4`, 8 for `float2`/`half4`, and 4
+// for `float3` (whose 12-byte stride is not a power of two). It is the value the implicit
+// single-argument `*Aligned` byte-address accessors forward as their alignment promise so
+// that the promise is always a valid (power-of-two) alignment.
+//
+// This is the largest power of two dividing the natural *stride*, which is not in general the
+// same as `T`'s layout-computed natural alignment: for an aggregate they can differ (a stride-24
+// struct yields 8 here, while its natural alignment may be 4), so for such a `T` the promise can
+// be stronger than the type itself guarantees. The single-argument `*Aligned` accessors are
+// intended for scalar/vector/matrix `T`, where the two coincide.
+__generic<T>
+[__unsafeForceInlineEarly]
+int __naturalAlignmentOf()
+{
+    return __naturalAlignmentOf_impl(__declVal<T>());
+}
+
 [__unsafeForceInlineEarly]
 int32_t __elemToByteOffset<T>(int32_t elemOffset)
 {
