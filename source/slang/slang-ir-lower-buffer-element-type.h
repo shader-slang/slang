@@ -20,7 +20,8 @@ enum class BufferElementTypeLoweringPolicyKind
     MetalParameterBlock,
     MetalPointerLowering,
     WGSL,
-    LLVM
+    LLVM,
+    Metal
 };
 
 struct BufferElementTypeLoweringOptions
