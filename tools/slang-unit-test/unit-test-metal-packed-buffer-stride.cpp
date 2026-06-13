@@ -1,4 +1,4 @@
-// unit-test-metal-scalar-layout-stride.cpp
+// unit-test-metal-packed-buffer-stride.cpp
 
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -8,13 +8,10 @@
 
 using namespace Slang;
 
-// Test that on Metal, reflection reports the element stride of a structured
-// buffer according to the layout the generated MSL actually uses: natural
-// (scalar-aligned, tightly packed) layout, so a `float3` element has
-// stride 12. (`MetalBufferElementTypeLoweringPolicy` lowers such elements to
-// MSL packed vectors so the MSL layout matches.) This is the default and is
-// unaffected by `forceGLSLScalarBufferLayout`, which requests the same
-// layout explicitly.
+// On Metal, reflection reports a structured buffer's element stride according
+// to the layout the generated MSL actually uses: natural (scalar-aligned,
+// tightly packed) layout, so a `float3` element has stride 12, matching the
+// `packed_float3` storage `MetalBufferElementTypeLoweringPolicy` emits.
 static size_t _getMetalStructuredBufferFloat3Stride(bool forceScalarLayout)
 {
     const char* userSourceBody = R"(
@@ -93,8 +90,9 @@ static size_t _getMetalStructuredBufferFloat3Stride(bool forceScalarLayout)
     return elementTypeLayout->getStride();
 }
 
-SLANG_UNIT_TEST(metalScalarLayoutStructuredBufferStride)
+SLANG_UNIT_TEST(metalPackedBufferStride)
 {
-    SLANG_CHECK(_getMetalStructuredBufferFloat3Stride(true) == 12);
+    // Packed (12-byte) stride is the default and is unaffected by the flag.
     SLANG_CHECK(_getMetalStructuredBufferFloat3Stride(false) == 12);
+    SLANG_CHECK(_getMetalStructuredBufferFloat3Stride(true) == 12);
 }

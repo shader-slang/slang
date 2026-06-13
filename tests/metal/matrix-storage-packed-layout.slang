@@ -3,20 +3,20 @@
 //TEST:SIMPLE(filecheck=ROWMAJOR): -target metal -stage compute -entry computeMain -matrix-layout-row-major
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
-// Matrices in Metal device buffers use natural (scalar-aligned, tightly
-// packed) layout by default. MSL `float3` has a 16-byte stride, so matrix
-// storage uses arrays of packed vectors (`packed_float3`: 12-byte stride)
-// instead of arrays of native vectors. `-force-glsl-scalar-layout` requests
-// the same layout explicitly, so the first two commands must produce
-// identical output.
-//
-// The dynamic row index accesses exercise the whole-row load/store paths of
-// `lowerMatrixAddresses`, which with packed-vector storage must convert
-// between the row vector and its `packed_float3` storage.
+// Matrices in Metal device buffers are stored as arrays of packed vectors
+// (`packed_float3`) so the storage matches natural layout. The first two
+// commands must agree: `-force-glsl-scalar-layout` requests the default.
+// The dynamic row index exercises the whole-row load/store paths of
+// `lowerMatrixAddresses`, which convert between the row vector and its
+// packed storage.
 
 StructuredBuffer<float3x3> mats;
 RWStructuredBuffer<float3x3> outMats;
 RWStructuredBuffer<float> output;
+
+// An explicit `ScalarDataLayout` argument requests the natural layout Metal
+// device buffers already use, so it produces the same packed storage.
+StructuredBuffer<float3x3, ScalarDataLayout> matsScalar;
 
 void addOne(inout float3 v)
 {
@@ -26,7 +26,7 @@ void addOne(inout float3 v)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
-    float3x3 m = mats[tid.x];
+    float3x3 m = mats[tid.x] + matsScalar[tid.x];
     output[tid.x] = m[1][2];
     outMats[tid.x] = m;
     outMats[tid.x][2] = float3(1.0, 2.0, 3.0);
@@ -44,17 +44,18 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // PACKED: array<packed_float3, int(3)> data
 // PACKED-NOT: array<float3,
 
-// With the (default) column-major layout, the dynamic whole-row store
-// decomposes into per-component stores into the packed columns, and the
-// whole-row load reconstructs a `float3` from them.
+// The `ScalarDataLayout`-annotated buffer maps to the same packed storage.
+// PACKED-DAG: _MatrixStorage_float3x3{{[A-Za-z0-9_]*}} device* matsScalar
+
+// Column-major (default): a row is not contiguous, so the whole-row store
+// scatters into per-component stores and the load gathers a `float3`.
 // PACKED-DAG: = 5.0
 // PACKED-DAG: = 6.0
 // PACKED-DAG: = 7.0
 // PACKED-DAG: float3({{.*}}data
 
-// With row-major layout the row maps directly onto one packed vector, so the
-// dynamic whole-row store becomes a single packed-vector store and the
-// whole-row load reconstructs a `float3` from the packed row.
+// Row-major: a row maps onto one packed vector, so the store is a single
+// packed-vector store.
 // ROWMAJOR: struct _MatrixStorage_float3x3
 // ROWMAJOR-NOT: array<float3,
 // ROWMAJOR: array<packed_float3, int(3)> data
@@ -62,10 +63,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // ROWMAJOR-DAG: = packed_float3(5.0, 6.0, 7.0)
 // ROWMAJOR-DAG: float3({{.*}}data
 
-// The metallib target compiles the generated MSL with the Metal toolchain and
-// FileCheck runs over the LLVM-IR-style text of the resulting metallib. The
-// pattern below matches only if that compilation succeeded: malformed MSL
-// (e.g. a leftover whole-row store of a vector into the lowered storage
-// struct, which `lowerMatrixAddresses` must remove) fails the Metal compile
-// and produces no metallib text to match.
+// The metallib target compiles the generated MSL with the Metal toolchain;
+// the pattern below matches only if that compilation succeeded (malformed MSL
+// produces no metallib text).
 // METALLIB: define void @computeMain

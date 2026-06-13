@@ -2258,7 +2258,7 @@ struct LoweredElementTypeContext
             return;
         auto matrixType = as<IRMatrixType>(matrixTypeInfo->originalType);
         auto colCount = getIntVal(matrixType->getColumnCount());
-        // Under Metal scalar layout, matrices are stored as arrays of *packed*
+        // On Metal, matrices in device buffers are stored as arrays of *packed*
         // vectors rather than ordinary vectors, so whole-row loads/stores need
         // an element-wise conversion between the row vector and its
         // packed-vector storage.
@@ -2955,15 +2955,14 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 };
 
 // Metal device buffers use natural (scalar-aligned, tightly packed) layout —
-// the layout `getTypeLayoutRuleNameForBuffer` already declares for them.
-// MSL default vector types are aligned to a
-// power-of-two multiple of their element alignment (e.g. `float3` has size
-// and alignment 16) and so cannot express natural layout, so this policy
-// lowers vectors in such buffers to packed vectors (MSL `packed_T<N>`, e.g.
-// `packed_float3`: 12 bytes with 4-byte alignment) and matrices to structs
-// of packed-vector arrays — both have exactly the natural layout. Constant
-// buffers and argument buffers (Uniform address space) keep the native Metal
-// layout, which is what reflection reports for them.
+// the layout `getTypeLayoutRuleNameForBuffer` already declares for them. MSL
+// vector types are aligned to a power-of-two multiple of their element size
+// (e.g. `float3` has size and alignment 16) and so cannot express natural
+// layout, so this policy lowers vectors in such buffers to packed vectors
+// (MSL `packed_T<N>`, e.g. `packed_float3`: 12 bytes, 4-byte alignment) and
+// matrices to structs of packed-vector arrays. Constant buffers and argument
+// buffers (Uniform address space) keep the native Metal layout, which is what
+// reflection reports for them.
 struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
 {
     MetalBufferElementTypeLoweringPolicy(
@@ -2973,23 +2972,25 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
     {
     }
 
-    // Decide whether a *top-level* buffer element type needs lowering at all.
-    // Vector elements use the same classification as vectors nested inside
-    // lowered composites (`needsScalarVectorStorage`): under natural layout a
-    // vector is only guaranteed its element's alignment, so even a `float4`
-    // buffer may be bound at a merely 4-byte-aligned offset — which the
-    // native (16-byte-aligned) MSL vector type cannot express, and which is
-    // exactly the alignment reflection reports for the element.
+    // Discover top-level vector buffer elements for lowering; the base class's
+    // set (struct/matrix/array/bool) does not include bare vectors. The actual
+    // decision is `needsPackedVectorStorage`, shared with vector fields found
+    // inside lowered composites.
     bool needsElementLowering(IRType* elementType) override
     {
         if (auto vectorType = as<IRVectorType>(elementType))
         {
-            return needsScalarVectorStorage(vectorType);
+            return needsPackedVectorStorage(vectorType);
         }
         return DefaultBufferElementTypeLoweringPolicy::needsElementLowering(elementType);
     }
 
-    bool usesScalarVectorStorage(TypeLoweringConfig config)
+    // Decide whether a buffer with this config uses packed vector storage.
+    // Only device-memory buffers laid out with natural rules do: constant
+    // and argument buffers (Uniform address space) keep the native MSL
+    // layout reflection reports, and an explicit non-natural data layout
+    // (e.g. `Std140DataLayout`) opts out via the rule-name check.
+    bool usesPackedVectorStorage(TypeLoweringConfig config)
     {
         if (config.layoutRuleName != IRTypeLayoutRuleName::Natural)
             return false;
@@ -3003,19 +3004,15 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
         }
     }
 
-    // Decide whether a vector stored under scalar layout must use
-    // packed-vector storage. This is the single classification for vectors,
-    // applied both to top-level buffer elements and to leaves inside lowered
-    // composites: natural layout gives a vector only its element's alignment,
-    // so a field like `float4 v` in `struct Wrapped { float scale; float4 v; }`
-    // sits at natural offset 4, and even a top-level `float4` element is only
-    // guaranteed 4-byte base alignment — neither of which the native
-    // (16-byte-aligned) MSL vector type can express. Only single-element and
-    // `bool` vectors keep their native emission.
-    static bool needsScalarVectorStorage(IRVectorType* vectorType)
+    // The single classification deciding whether a vector uses packed storage,
+    // for both top-level elements and leaves inside composites. Every
+    // multi-element non-`bool` vector does, because natural layout guarantees
+    // only the element's alignment (so a `float4` may sit at offset 4 or be
+    // bound at a 4-byte-aligned base), which no native MSL vector type can
+    // express. `bool` vectors keep native emission, matching how scalar `bool`
+    // is stored on this target.
+    static bool needsPackedVectorStorage(IRVectorType* vectorType)
     {
-        // `bool` vectors keep their native MSL emission, consistent with how
-        // scalar `bool` is stored on this target.
         if (as<IRBoolType>(vectorType->getElementType()))
             return false;
         auto countInst = as<IRIntLit>(vectorType->getElementCount());
@@ -3145,12 +3142,12 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
 
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
     {
-        if (usesScalarVectorStorage(config))
+        if (usesPackedVectorStorage(config))
         {
             bool needExplicitLayout = config.lowerToPhysicalType;
             if (auto vectorType = as<IRVectorType>(type))
             {
-                if (needsScalarVectorStorage(vectorType))
+                if (needsPackedVectorStorage(vectorType))
                 {
                     IRBuilder builder(type);
                     builder.setInsertAfter(type);

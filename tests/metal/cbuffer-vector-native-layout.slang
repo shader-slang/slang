@@ -1,11 +1,9 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain -force-glsl-scalar-layout
 
-// Constant buffers on Metal keep the native MSL layout (`float3` aligned and
-// padded to 16 bytes), which is what reflection reports for them. Vectors in
-// constant buffers must NOT be lowered to packed vectors, even though device
-// buffers use packed (natural) layout by default and even when scalar layout
-// is requested explicitly.
+// Constant buffers keep the native MSL layout reflection reports for them
+// (`float3` padded to 16 bytes); their vectors are NOT packed, even though
+// device buffers pack by default and even with `-force-glsl-scalar-layout`.
 
 struct Params
 {

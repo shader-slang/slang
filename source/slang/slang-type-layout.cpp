@@ -966,7 +966,7 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
 // packed) vector and matrix layout. `MetalBufferElementTypeLoweringPolicy`
 // lowers vectors/matrices in such buffers to MSL packed vectors so the
 // emitted MSL agrees with this layout.
-struct MetalScalarStructuredBufferLayoutRulesImpl : MetalLayoutRulesImpl
+struct MetalStructuredBufferLayoutRulesImpl : MetalLayoutRulesImpl
 {
     SimpleLayoutInfo GetVectorLayout(
         BaseType elementType,
@@ -2723,7 +2723,13 @@ static MetalObjectLayoutRulesImpl kMetalObjectLayoutRulesImpl;
 static MetalArgumentBufferElementLayoutRulesImpl kMetalArgumentBufferElementLayoutRulesImpl;
 static MetalTier2ObjectLayoutRulesImpl kMetalTier2ObjectLayoutRulesImpl;
 static MetalLayoutRulesImpl kMetalLayoutRulesImpl;
-static MetalScalarStructuredBufferLayoutRulesImpl kMetalScalarStructuredBufferLayoutRulesImpl;
+static MetalStructuredBufferLayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl;
+
+LayoutRulesImpl kMetalAnyValueLayoutRulesImpl_ = {
+    &kMetalLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kMetalObjectLayoutRulesImpl,
+};
 
 LayoutRulesImpl kMetalConstantBufferLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
@@ -2749,9 +2755,9 @@ LayoutRulesImpl kMetalTier2ParameterBlockLayoutRulesImpl_ = {
     &kMetalTier2ObjectLayoutRulesImpl,
 };
 
-LayoutRulesImpl kMetalScalarStructuredBufferLayoutRulesImpl_ = {
+LayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
-    &kMetalScalarStructuredBufferLayoutRulesImpl,
+    &kMetalStructuredBufferLayoutRulesImpl,
     &kMetalObjectLayoutRulesImpl,
 };
 
@@ -2799,7 +2805,7 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getEntryPointParameterRules()
 
 LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
 {
-    return &kMetalScalarStructuredBufferLayoutRulesImpl_;
+    return &kMetalStructuredBufferLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
