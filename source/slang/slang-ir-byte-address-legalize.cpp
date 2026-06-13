@@ -278,9 +278,12 @@ struct ByteAddressBufferLegalizationContext
         if (alignmentVal == 0)
             return;
 
-        // The `alignment` operand originates from a `uint` argument, so its constant value is always
-        // non-negative; the power-of-two bit test below is therefore well-defined and no negative
-        // case is reachable.
+        // The `alignment` operand originates from a `uint` argument, so its constant value is
+        // always non-negative; without that, a negative power-of-two-looking value (e.g. -4) would
+        // pass the `x & (x-1)` test below and slip through as "valid". `alignmentVal == 0` is
+        // already handled by the early return above, so this test only ever sees `alignmentVal >=
+        // 1` (where `x & (x-1)` correctly accepts 1) -- the pow2 idiom's edge cases (0 excluded, 1
+        // accepted) are split across these two adjacent points.
         if ((alignmentVal & (alignmentVal - 1)) != 0)
         {
             m_sink->diagnose(Diagnostics::ByteAddressBufferAlignmentNotPowerOfTwo{
@@ -297,6 +300,12 @@ struct ByteAddressBufferLegalizationContext
         // query *natural* (C) layout directly rather than through this file's `getSizeAndAlignment`
         // wrapper because the alignment contract is defined against natural layout, independent of
         // the target's buffer layout (e.g. std430 on GL-family targets).
+        //
+        // If `getNaturalSizeAndAlignment` fails (a `T` with no natural layout for this target) or
+        // reports alignment 0, the 41300 check is skipped: such a `T` is not a valid byte-address
+        // element type and is rejected elsewhere by type/capability checking, so there is no valid
+        // alignment minimum to enforce here -- this skips an already-invalid case, it does not mask
+        // a valid one.
         IRSizeAndAlignment sizeAlignment;
         if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(m_target, accessType, &sizeAlignment)) &&
             sizeAlignment.alignment > 0 && (alignmentVal % sizeAlignment.alignment) != 0)

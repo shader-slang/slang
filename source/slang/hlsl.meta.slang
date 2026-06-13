@@ -354,7 +354,7 @@ struct ByteAddressBuffer
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location with natural alignment.
-    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@param location The input address in bytes, which must be a multiple of 4 (the natural alignment of `uint3`; its 12-byte stride is not a power of two, so the forwarded alignment is the scalar alignment and the access scalarizes).
     ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -481,7 +481,7 @@ struct ByteAddressBuffer
 
     /// Load a value with type `T` from the buffer at the specified location with natural alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of the natural stride of `T`.
+    ///@param location The input address in bytes, which must be a multiple of `T`'s natural alignment (the largest power of two dividing `T`'s natural stride).
     ///@return The value loaded from the buffer.
     ///@remarks
     /// Currently, this function only supports when `T` is scalar, vector or matrix type.
@@ -6312,7 +6312,7 @@ struct $(item.name)
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location with natural alignment.
-    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@param location The input address in bytes, which must be a multiple of 4 (the natural alignment of `uint3`; its 12-byte stride is not a power of two, so the forwarded alignment is the scalar alignment and the access scalarizes).
     ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -6462,7 +6462,7 @@ struct $(item.name)
 
     /// Load a value with type `T` from the buffer at the specified location with natural alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of the natural stride of `T`.
+    ///@param location The input address in bytes, which must be a multiple of `T`'s natural alignment (the largest power of two dividing `T`'s natural stride).
     ///@return The value loaded from the buffer.
     ///@remarks
     /// Currently, this function only supports when `T` is scalar, vector, or matrix type.
@@ -7077,8 +7077,8 @@ $}
     }
 
     /// Set three values to the buffer at the specified location, the address will be aligned
-    /// to the alignment of `uint3`, which is 12.
-    ///@param address The input address in bytes, which must be a multiple of 12.
+    /// to the alignment of `uint3`, which is 4 (its 12-byte stride is not a power of two).
+    ///@param address The input address in bytes, which must be a multiple of 4.
     ///@param value Three input values.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]

@@ -3874,6 +3874,12 @@ int __naturalAlignmentOf_impl(T v);
 // for `float3` (whose 12-byte stride is not a power of two). It is the value the implicit
 // single-argument `*Aligned` byte-address accessors forward as their alignment promise so
 // that the promise is always a valid (power-of-two) alignment.
+//
+// This is the largest power of two dividing the natural *stride*, which is not in general the
+// same as `T`'s layout-computed natural alignment: for an aggregate they can differ (a stride-24
+// struct yields 8 here, while its natural alignment may be 4), so for such a `T` the promise can
+// be stronger than the type itself guarantees. The single-argument `*Aligned` accessors are
+// intended for scalar/vector/matrix `T`, where the two coincide.
 __generic<T>
 [__unsafeForceInlineEarly]
 int __naturalAlignmentOf()

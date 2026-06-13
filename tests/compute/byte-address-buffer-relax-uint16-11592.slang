@@ -7,6 +7,9 @@
 // scalar alignment of 2, so `LoadAligned<uint16_t2>(location, 2)` must compile and scalarize into
 // per-component loads rather than error.
 
+// Checked on `hlsl` only: the CHECK matches the HLSL scalarized-load form `Load<uint16_t >`; on
+// spirv the same access emits `OpLoad %ushort`, which would need a separate target-specific CHECK.
+// The relaxation itself is target-independent (it runs in the byte-address legalizer, before emit).
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 
 RWByteAddressBuffer buffer;

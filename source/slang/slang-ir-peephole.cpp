@@ -1807,11 +1807,22 @@ struct PeepholeContext : InstPassBase
                     // wide access is still possible; for a 3-component vector (stride
                     // `3 * scalarSize`, never a power of two) it collapses to the scalar
                     // alignment, which is the strongest *valid* (power-of-two) promise.
-                    // The types these accessors accept are concrete and non-empty, so the stride
-                    // is always positive; alignment 0 is the legalizer's "no promise" sentinel and
-                    // must never be produced here.
+                    // This is deliberately derived from the stride, NOT `sizeAlignment.alignment`
+                    // (the layout-computed natural alignment): the two differ for an aggregate
+                    // `T` (a stride-24 struct yields 8 here, but its natural alignment may be 4)
+                    // -- see the `__naturalAlignmentOf` doc in core.meta.slang. Do not
+                    // "simplify" this to read `.alignment`; that would silently change the
+                    // contract.
+                    //
+                    // A degenerate zero-stride type (an empty struct reaching the generic
+                    // `LoadAligned<T>`/`StoreAligned<T>`) folds to alignment 0 via
+                    // `getLowestBit(0) == 0` -- the legalizer's "no promise" sentinel, which is
+                    // benign (the access then carries no alignment promise). We still fold
+                    // rather than leave the op unfolded: no backend has a case for
+                    // `GetNaturalAlignment`, so for non-generic, target-set code this fold is
+                    // its only consumer and must always run (mirroring `getNaturalStride`,
+                    // which likewise folds its stride here).
                     IRIntegerValue stride = sizeAlignment.getStride();
-                    SLANG_ASSERT(stride > 0);
                     IRIntegerValue alignment = Math::getLowestBit(stride);
 
                     IRBuilder builder(module);

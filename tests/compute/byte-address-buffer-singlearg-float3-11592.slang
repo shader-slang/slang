@@ -21,7 +21,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float3 v = buffer.LoadAligned<float3>(loc);
 
     // The single-argument store forwards `__naturalAlignmentOf<float3>()` == 4 the same way, so it
-    // also lowers to per-component stores.
+    // also lowers to per-component stores. The two CHECKs sit at different abstraction levels by
+    // necessity: HLSL emits a templated `.Load<float >` but an untemplated `.Store(...)`, so the
+    // load matches the scalarized intrinsic form and the store matches the emitted method.
     // CHECK-COUNT-3: .Store(
     buffer.StoreAligned<float3>(loc, v);
 }
