@@ -835,5 +835,6 @@ return {
 	["IncrementBranchCoverageCounter"] = 859,
 	["Decoration.BuiltinRequirementDecoration"] = 860,
 	["builtinRequirementKey"] = 861,
-	["ImageTexelPointer"] = 862
+	["ImageTexelPointer"] = 862,
+	["getNaturalAlignment"] = 863
 }
