@@ -17,11 +17,11 @@ struct Block {
 [numthreads(1,1,1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
-    // CHECK: error[E41300]: invalid byte address buffer alignment
-    // CHECK: error[E41300]: invalid byte address buffer alignment
+    // CHECK: error[E41301]: byte address buffer alignment must be a power of two
+    // CHECK: error[E41301]: byte address buffer alignment must be a power of two
     buffer.Store<Block>(threadId.x, buffer.LoadAligned<Block>(threadId.x, 5));
-//LOC:                                                                 ^ invalid byte address buffer alignment
+//LOC:                                                                 ^ byte address buffer alignment must be a power of two
     buffer.Store<Block>(threadId.x, buffer.Load<Block>(threadId.x), 3);
-//LOC:                           ^ invalid byte address buffer alignment
+//LOC:                           ^ byte address buffer alignment must be a power of two
 
 }

@@ -131,7 +131,7 @@ struct ByteAddressBufferLegalizationContext
 
         // Validate the alignment contract first, so it is checked even when the type needs no
         // legalization and the early-out below fires.
-        validateExplicitAlignment(load->getOperand(1), load->getOperand(2));
+        validateExplicitAlignment(load->getOperand(1), load->getOperand(2), type);
 
         // We start by looking at the type being loaded so
         // that we can opt out if it is legal.
@@ -244,12 +244,26 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    // Validate the `alignment`/`location` operands of a single byte-address load/store against the
-    // `LoadAligned`/`StoreAligned` contract (issue #11545): a non-zero `alignment` promise must be
-    // a compile-time constant (else 41302), and a compile-time-constant `location` must be a
-    // multiple of it (else 41303). Diagnostics do not abort legalization; `alignment == 0` is the
-    // "no promise" sentinel (plain `Load`/`Store`) and carries no contract to validate.
-    void validateExplicitAlignment(IRInst* baseOffset, IRInst* alignment)
+    // Validate the `alignment` and `location` operands of a single byte-address load/store
+    // against the `LoadAligned`/`StoreAligned` contract (see issue #11545): a non-zero alignment
+    // promise must be a compile-time constant (else 41302), a power of two (else 41301), and at
+    // least the access type's scalar-component alignment (else 41300); and a
+    // compile-time-constant location must itself be a multiple of an otherwise-valid promise
+    // (else 41303). The checks short-circuit, so a single offending call reports exactly one
+    // diagnostic: an invalid alignment value is reported on its own, without also running the
+    // now-meaningless location-multiple check against it.
+    //
+    // The diagnostic, not the emitted code, is the contract enforcement: a diagnosed access does
+    // not abort legalization, and the IR subsequently emitted for it is whatever its (now-invalid)
+    // operands imply rather than a forced fallback. For example `LoadAligned<float4>(20, 16)` is
+    // diagnosed (41303) for the location not being a multiple of 16, yet still lowers to a single
+    // wide load, because `isWideAccessAligned` trusts the promise; that is intentional, and
+    // compilation continues so any later errors can surface too.
+    //
+    // Called once per access on the user's `location`/`alignment` arguments; `alignment == 0` is
+    // the "no promise" sentinel used by the plain `Load`/`Store` accessors and carries no contract
+    // to validate.
+    void validateExplicitAlignment(IRInst* baseOffset, IRInst* alignment, IRType* accessType)
     {
         auto alignLit = as<IRIntLit>(alignment);
         if (!alignLit)
@@ -259,9 +273,43 @@ struct ByteAddressBufferLegalizationContext
             });
             return;
         }
+
         auto alignmentVal = alignLit->getValue();
         if (alignmentVal == 0)
             return;
+
+        // The `alignment` operand originates from a `uint` argument, so its constant value is always
+        // non-negative; the power-of-two bit test below is therefore well-defined and no negative
+        // case is reachable.
+        if ((alignmentVal & (alignmentVal - 1)) != 0)
+        {
+            m_sink->diagnose(Diagnostics::ByteAddressBufferAlignmentNotPowerOfTwo{
+                .alignment = alignmentVal,
+                .location = baseOffset->sourceLoc,
+            });
+            return;
+        }
+
+        // A power-of-two alignment must still be at least the natural alignment of the access
+        // type's scalar components. The natural alignment of a composite is the maximum of its
+        // members' alignments, so checking the whole type here is equivalent to checking each
+        // scalar leaf (and also covers already-legal scalar types that skip the legalizer). We
+        // query *natural* (C) layout directly rather than through this file's `getSizeAndAlignment`
+        // wrapper because the alignment contract is defined against natural layout, independent of
+        // the target's buffer layout (e.g. std430 on GL-family targets).
+        IRSizeAndAlignment sizeAlignment;
+        if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(m_target, accessType, &sizeAlignment)) &&
+            sizeAlignment.alignment > 0 && (alignmentVal % sizeAlignment.alignment) != 0)
+        {
+            m_sink->diagnose(Diagnostics::ByteAddressBufferUnaligned{
+                .alignment = alignmentVal,
+                .requiredAlignment = sizeAlignment.alignment,
+                .location = baseOffset->sourceLoc,
+            });
+            return;
+        }
+
+        // The alignment promise is itself valid; a compile-time-constant location must honor it.
         if (auto baseOffsetLit = as<IRIntLit>(baseOffset))
         {
             if ((baseOffsetLit->getValue() % alignmentVal) != 0)
@@ -1345,7 +1393,7 @@ struct ByteAddressBufferLegalizationContext
 
         // Validate the alignment contract first, so it is checked even when the type needs no
         // legalization and the early-out below fires.
-        validateExplicitAlignment(store->getOperand(1), store->getOperand(2));
+        validateExplicitAlignment(store->getOperand(1), store->getOperand(2), type);
 
         // Types that are already legal to use don't require any processing.
         //
