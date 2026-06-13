@@ -4903,6 +4903,104 @@ RefPtr<IRModule> IRModule::create(Session* session)
     return module;
 }
 
+ModuleLinkingInfo::ModuleLinkingInfo(IRModule* module)
+{
+    _build(module);
+}
+
+void ModuleLinkingInfo::_build(IRModule* module)
+{
+    auto moduleInst = module->getModuleInst();
+    if (!moduleInst)
+        return;
+
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto annotation = as<IRAnnotation>(inst);
+        if (annotation)
+        {
+            if (annotation->getParent() == moduleInst)
+                m_instAnnotationMap[annotation->getTarget()].add(annotation);
+            continue;
+        }
+
+        if (auto hashedStringLits = as<IRGlobalHashedStringLiterals>(inst))
+        {
+            SLANG_RELEASE_ASSERT(
+                !m_globalHashedStringLiterals || m_globalHashedStringLiterals == hashedStringLits);
+            m_globalHashedStringLiterals = hashedStringLits;
+        }
+
+        if (as<IRGlobalParam>(inst))
+            m_globalParams.add(inst);
+
+        bool isHLSLExported = false;
+        bool isKnownBuiltin = false;
+        for (auto decoration : inst->getDecorations())
+        {
+            switch (decoration->getOp())
+            {
+            case kIROp_HLSLExportDecoration:
+            case kIROp_DownstreamModuleExportDecoration:
+                isHLSLExported = true;
+                break;
+
+            case kIROp_KnownBuiltinDecoration:
+                isKnownBuiltin = true;
+                break;
+
+            default:
+                break;
+            }
+        }
+
+        if (isHLSLExported)
+            m_hlslExports.add(inst);
+        if (isKnownBuiltin)
+            m_knownBuiltins.add(inst);
+    }
+}
+
+ArrayView<IRAnnotation*> ModuleLinkingInfo::getAnnotationsForTarget(IRInst* target)
+{
+    if (!target)
+        return {};
+
+    auto annotations = m_instAnnotationMap.tryGetValue(target);
+    if (!annotations)
+        return {};
+
+    return annotations->getArrayView();
+}
+
+void IRModule::_ensureLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    if (!m_linkingInfo)
+        m_linkingInfo = new ModuleLinkingInfo(this);
+}
+
+ModuleLinkingInfo* IRModule::_getOrCreateLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    if (!m_linkingInfo)
+        m_linkingInfo = new ModuleLinkingInfo(this);
+    return m_linkingInfo;
+}
+
+ModuleLinkingInfo* IRModule::_getLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    SLANG_RELEASE_ASSERT(m_linkingInfo);
+    return m_linkingInfo;
+}
+
+void IRModule::_invalidateLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    m_linkingInfo = nullptr;
+}
+
 void IRModule::buildMangledNameToGlobalInstMap()
 {
     m_mapMangledNameToGlobalInst.clear();
@@ -9079,10 +9177,14 @@ void IRInst::removeAndDeallocate()
 
 void IRInst::removeAndDeallocateAllDecorationsAndChildren()
 {
-    IRInst* nextChild = nullptr;
-    for (IRInst* child = getFirstDecorationOrChild(); child; child = nextChild)
+    // We'll process the list of children and decorations in reverse order, since
+    // this way we deallocate fewer items that have uses (which hit slow
+    // corner-case logic when deallocating).
+    //
+    IRInst* prevChild = nullptr;
+    for (IRInst* child = getLastDecorationOrChild(); child; child = prevChild)
     {
-        nextChild = child->getNextInst();
+        prevChild = child->getPrevInst();
         child->removeAndDeallocate();
     }
 }

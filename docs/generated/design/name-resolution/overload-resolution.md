@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 4b84c7f99f5cc6586a2852af0165acc8c35f69765bd0593a6595e5852f1750ec
+generated_at: 2026-06-12T10:21:43Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: d1038851c2165bad76b25d0691b064ceae331bd0dab7b88d9c69cfbfdc90dff2
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -27,8 +27,8 @@ this pipeline is described in [visibility.md](visibility.md).
 
 The candidate type, status, flags, and resolve-context are declared
 in [slang-check-impl.h](../../../../source/slang/slang-check-impl.h)
-(`OverloadCandidate` line 272, `OverloadResolveContext` line 2988,
-`ResolvedOperatorOverload` line 331, `TypeCheckingCache` line 346).
+(`OverloadCandidate` line 272, `OverloadResolveContext` line 3030,
+`ResolvedOperatorOverload` line 339, `TypeCheckingCache` line 354).
 The filter pipeline, candidate construction, and comparator are in
 [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp).
 The `ConversionCost` enum and conversion-cost utilities live in
@@ -66,23 +66,32 @@ The `ConversionCost` enum and conversion-cost utilities live in
   - `SubstitutionSet subst` — the inferred substitution; used by
     generic candidates to avoid re-running inference in
     `CompleteOverloadCandidate`.
+  - `Index explicitGenericArgCount` (line 336) — for a generic
+    candidate, the number of leading ordinary generic arguments the
+    caller supplied explicitly (the rest are filled from parameter
+    defaults). Positional arguments make the explicit set a prefix.
+    `TryCheckGenericOverloadCandidateTypes` records this boundary; it
+    starts at `-1` (not yet computed) and
+    `TryCheckOverloadCandidateConstraints` hands the prefix to the
+    generic constraint solver so defaults and witness arguments are
+    resolved by the solver's fixpoint rather than a linear pass.
 - `OverloadResolveContext`
   ([slang-check-impl.h line
-  2988](../../../../source/slang/slang-check-impl.h)) — the bundle of
+  3030](../../../../source/slang/slang-check-impl.h)) — the bundle of
   call-site state passed to every filter step. Key fields:
-  - `Mode mode` — `JustTrying` or `ForReal` (lines 2990-2997).
+  - `Mode mode` — `JustTrying` or `ForReal` (lines 3032-3040).
     `JustTrying` silently rejects bad candidates; `ForReal` emits
     diagnostics for each rejection. Most of pipeline runs in
     `JustTrying` to score candidates; `CompleteOverloadCandidate`
     switches to `ForReal` once the best candidate is chosen.
   - `Scope* sourceScope` — the requesting scope, used by the
-    visibility step (line 3009).
+    visibility step (line 3051).
   - `Index argCount`, `List<Expr*>* args`, `Type** argTypes` — call-
-    site arguments (lines 3012-3014).
+    site arguments (lines 3054-3056).
   - `OverloadCandidate* bestCandidate`,
     `List<OverloadCandidate> bestCandidates` — the running winner
     plus the equally-best siblings if there is an ambiguity (lines
-    3055-3059).
+    3098-3101).
 - `ConversionCost`
   ([slang-ast-support-types.h line
   89](../../../../source/slang/slang-ast-support-types.h)) — `unsigned
@@ -98,7 +107,7 @@ The `ConversionCost` enum and conversion-cost utilities live in
   exists".
 - `CoercionSite`
   ([slang-check-impl.h line
-  355](../../../../source/slang/slang-check-impl.h)) — `General`,
+  363](../../../../source/slang/slang-check-impl.h)) — `General`,
   `Assignment`, `Argument`, `Return`, `Initializer`,
   `ExplicitCoercion`. Cost computation can vary per site (for
   example, an explicit cast at `ExplicitCoercion` permits the
@@ -106,7 +115,7 @@ The `ConversionCost` enum and conversion-cost utilities live in
 - `ResolvedOperatorOverload` /
   `TypeCheckingCache::resolvedOperatorOverloadCache`
   ([slang-check-impl.h lines
-  331-353](../../../../source/slang/slang-check-impl.h)) — per-`Linkage`
+  339-362](../../../../source/slang/slang-check-impl.h)) — per-`Linkage`
   cache that memoizes operator overload resolution by operand types,
   so a hot expression like `a + b` does not re-run the filter
   pipeline on every encounter.
@@ -128,8 +137,8 @@ the AST node for the call.
 ### Probe phase: `TryCheckOverloadCandidate`
 
 `SemanticsVisitor::TryCheckOverloadCandidate`
-([slang-check-overload.cpp lines
-1240-1268](../../../../source/slang/slang-check-overload.cpp)) is the
+([slang-check-overload.cpp line
+1319](../../../../source/slang/slang-check-overload.cpp)) is the
 inner driver. It advances `candidate.status` step-by-step, returning
 as soon as any step fails:
 
@@ -170,34 +179,66 @@ The individual steps:
    like calling an `infix` operator in prefix position.
 3. **`TryCheckOverloadCandidateTypes`**
    ([slang-check-overload.cpp line
-   752](../../../../source/slang/slang-check-overload.cpp)) — the
+   763](../../../../source/slang/slang-check-overload.cpp)) — the
    per-argument type/coercion check.
-   - For `Flavor::Generic` and `Flavor::UnspecializedGeneric`, the
-     step delegates to `TryCheckGenericOverloadCandidateTypes`
+   - For `Flavor::Generic`, the step delegates to
+     `TryCheckGenericOverloadCandidateTypes`
      ([slang-check-overload.cpp line
      299](../../../../source/slang/slang-check-overload.cpp)) to
-     infer the missing generic arguments. Inference failure sets
-     `Status::GenericArgumentInferenceFailed` and returns false.
-   - For every argument, the step computes
-     `getImplicitConversionCostWithKnownArg`
-     ([slang-check-conversion.cpp line
-     1614](../../../../source/slang/slang-check-conversion.cpp)) and
-     accumulates the cost into `candidate.conversionCostSum`.
-   - When `canConvertImplicitly` rejects an argument's cost, the
-     candidate is dropped (silently in `JustTrying`, with a
-     conversion-error diagnostic in `ForReal`).
+     infer the missing generic arguments. When inference fails, the
+     adder records a separate `Flavor::UnspecializedGeneric`
+     candidate carrying `Status::GenericArgumentInferenceFailed`
+     ([slang-check-overload.cpp lines
+     2846-2851](../../../../source/slang/slang-check-overload.cpp)) so
+     the failure can be diagnosed later.
+   - For every argument, the step calls `canCoerce(paramType,
+     argType, arg, &cost)`
+     ([slang-check-overload.cpp lines
+     833-837](../../../../source/slang/slang-check-overload.cpp)) and
+     accumulates the reported `cost` into
+     `candidate.conversionCostSum`. If `canCoerce` reports that no
+     coercion is possible, the candidate is dropped (silently in
+     `JustTrying`; in `ForReal` the re-check `coerce`s the argument
+     and emits a conversion-error diagnostic).
 4. **`TryCheckOverloadCandidateDirections`**
    ([slang-check-overload.cpp line
-   997](../../../../source/slang/slang-check-overload.cpp)) — enforces
-   parameter directions (`in`, `out`, `inout`, `ref`). An `out`
-   parameter must receive an l-value; passing a literal to
-   `inout` fails here.
+   1008](../../../../source/slang/slang-check-overload.cpp)) — despite
+   its name, the source comment notes that general argument/parameter
+   l-value checking is currently done elsewhere; this step only checks
+   the mutability of the implicit `this` parameter. A `[mutating]`
+   method invoked on an immutable base expression is rejected here,
+   and in `ForReal` mode emits `MutatingMethodOnImmutableValue` (plus
+   a `MutatingMethodOnFunctionInputParameter` warning/error for a
+   mutating call on a function input parameter)
+   ([slang-check-overload.cpp lines
+   1026-1075](../../../../source/slang/slang-check-overload.cpp)).
 5. **`TryCheckOverloadCandidateConstraints`**
    ([slang-check-overload.cpp line
-   1071](../../../../source/slang/slang-check-overload.cpp)) — for an
-   explicit generic application `G<A, B>`, this step is where the
-   `where`-clauses on `G`'s parameters are validated against the
-   inferred substitutions.
+   1082](../../../../source/slang/slang-check-overload.cpp)) — for an
+   explicit generic application `G<A, B>`, this step validates the
+   `where`-clauses on `G`'s parameters against the inferred
+   substitutions and fills in any generic arguments left to defaults.
+   For an *outermost* generic (no enclosing `GenericDecl` parent), it
+   resolves defaults and witness arguments through the generic
+   constraint solver `trySolveGenericArguments`
+   ([slang-check-overload.cpp line
+   2765](../../../../source/slang/slang-check-overload.cpp)) — the same
+   fixpoint loop used for inferred generic arguments — rather than a
+   per-constraint linear pass. It passes only the explicitly-provided
+   ordinary prefix (`candidate.explicitGenericArgCount` arguments) via
+   `setProvidedArg`, which installs each as a fixed
+   `CallerProvidedOrdinaryArg` so a user-written self-reference
+   argument is not overridden by a parameter's default; the solver
+   then fills the remaining defaults. The solved substitution replaces
+   `candidate.subst`. The solver's `solveCost` is deliberately *not*
+   folded into `conversionCostSum` (doing so would shift overload
+   ranking and break ties that should stay ambiguous). On solver
+   failure the step falls through to the legacy per-constraint loop —
+   which visits constraints once in declaration order — so `ForReal`
+   mode can emit a precise diagnostic (the solver reports none) and
+   `JustTrying` mode rejects the candidate. Nested generic
+   applications (the parent chain contains a `GenericDecl`) keep the
+   linear pass.
 6. **`TryCheckOverloadCandidateVisibility`**
    ([slang-check-overload.cpp lines
    265-287](../../../../source/slang/slang-check-overload.cpp)) —
@@ -223,7 +264,7 @@ finalize-phase AST construction.
 
 `AddOverloadCandidateInner`
 ([slang-check-impl.h line
-3162](../../../../source/slang/slang-check-impl.h)) is the call site
+3204](../../../../source/slang/slang-check-impl.h)) is the call site
 that runs `TryCheckOverloadCandidate` and either:
 
 - discards the candidate if it failed before any candidate has yet
@@ -243,8 +284,8 @@ in [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)
 - `AddDeclRefOverloadCandidates` — iterates a `LookupResult` of
   function decls and runs each through the pipeline.
 - `AddFuncOverloadCandidate(LookupResultItem, DeclRef<CallableDecl>, ..., baseCost)`
-  (line 2241) — single-callable variant.
-- `AddCtorOverloadCandidate` (line 2343) — calls that go through a
+  (line 2320) — single-callable variant.
+- `AddCtorOverloadCandidate` (line 2422) — calls that go through a
   `ConstructorDecl`. The owning `Type` is captured in the candidate
   so the resolver can produce a constructor-invocation expression.
 - `AddFuncOverloadCandidate(FuncType*, ..., baseCost)` — first-class
@@ -263,7 +304,7 @@ deep base-class hits and pointer auto-derefs by adding small
 Once the probe phase finishes with exactly one
 `context.bestCandidate`, `CompleteOverloadCandidate`
 ([slang-check-overload.cpp lines
-1310-1520+](../../../../source/slang/slang-check-overload.cpp)) flips
+1389-1560+](../../../../source/slang/slang-check-overload.cpp)) flips
 `context.mode = ForReal` and re-runs the full pipeline starting from
 `TryCheckOverloadCandidateClassNewMatchUp`
 ([slang-check-overload.cpp lines
@@ -282,23 +323,37 @@ diagnostics.lua` 39999) together with a
 After `ForReal` succeeds, `CompleteOverloadCandidate` constructs the
 final AST node:
 
-- `Flavor::Func` or `Flavor::Generic` ->
-  `ConstructLookupResultExpr` + the call form
+- `Flavor::Func` -> `ConstructLookupResultExpr` + the call form
   (`InvokeExpr` / `MemberExpr.invoke`).
-- `Flavor::UnspecializedGeneric` -> wraps the result in a
+- `Flavor::Generic` -> wraps the result in a
   `PartiallyAppliedGenericExpr` when the
-  `IsPartiallyAppliedGeneric` flag is set.
+  `IsPartiallyAppliedGeneric` flag is set
+  ([slang-check-overload.cpp line
+  1547](../../../../source/slang/slang-check-overload.cpp)),
+  otherwise a fully specialized generic decl-ref.
 - `Flavor::Expr` -> uses `candidate.exprVal` directly as the callee.
+
+A `Flavor::UnspecializedGeneric` candidate (the recorded
+failed-inference candidate) never reaches this construction switch:
+its `Status::GenericArgumentInferenceFailed` is handled by the early
+error path at the top of `CompleteOverloadCandidate`
+([slang-check-overload.cpp lines
+1394-1405](../../../../source/slang/slang-check-overload.cpp)).
 
 ## Conversion costs
 
 The `ConversionCost` enum
 ([slang-ast-support-types.h line
 89](../../../../source/slang/slang-ast-support-types.h)) is `unsigned
-int`. Each per-argument conversion is first vetted by
-`canConvertImplicitly`; only conversions it accepts contribute to
-the candidate's ranking sum. The full enum, in source-declaration
-order:
+int`. Overload candidate probing computes each per-argument cost via
+`canCoerce` and accumulates the reported cost into the candidate's
+ranking sum (see the type-check step above); a too-high implicit
+conversion can still be reported as *possible* so that an overload
+involving it is selected over one without, with the cost diagnosed
+later when the result is reified
+([slang-check-conversion.cpp lines
+2551-2556](../../../../source/slang/slang-check-conversion.cpp)). The
+full enum, in source-declaration order:
 
 | Constant | Numeric | Meaning |
 | --- | --- | --- |
@@ -355,8 +410,8 @@ infrastructure compares against `kConversionCost_Impossible`).
 ### Tie-breaking comparator
 
 `CompareOverloadCandidates`
-([slang-check-overload.cpp lines
-2009-2173+](../../../../source/slang/slang-check-overload.cpp)) is a
+([slang-check-overload.cpp line
+2088](../../../../source/slang/slang-check-overload.cpp)) is a
 total-ordering comparator on two candidates of the same `Status`:
 
 1. **Status difference.** A candidate with a higher `Status` wins
@@ -365,7 +420,7 @@ total-ordering comparator on two candidates of the same `Status`:
 2. **Conversion-cost sum.** Lower `conversionCostSum` wins.
 3. **`CompareLookupResultItems`**
    ([slang-check-overload.cpp line
-   1617](../../../../source/slang/slang-check-overload.cpp)) — lexical
+   1696](../../../../source/slang/slang-check-overload.cpp)) — lexical
    "how was the candidate found" comparison. Prefers shadowing
    members of a closer scope over an outer one; prefers an override
    of an inherited member.
@@ -375,7 +430,7 @@ total-ordering comparator on two candidates of the same `Status`:
    in preference to a builtin one with the same cost.
 5. **`compareOverloadCandidateSpecificity`**
    ([slang-check-overload.cpp line
-   1843](../../../../source/slang/slang-check-overload.cpp)) — structural
+   1922](../../../../source/slang/slang-check-overload.cpp)) — structural
    preference: non-generic > generic, non-variadic > variadic, fewer
    default parameters > more.
 6. **`getExportRank`** — `export` decls are preferred to `extern`
@@ -384,7 +439,7 @@ total-ordering comparator on two candidates of the same `Status`:
    computes the lexical    distance from the call site to each
    declaration and prefers the closer one. The comment at
    [slang-check-overload.cpp lines
-   2106-2128](../../../../source/slang/slang-check-overload.cpp)
+   2175-2209](../../../../source/slang/slang-check-overload.cpp)
    explains why this step is skipped for generic candidates: the
    first pass of generic-candidate filtering is keyed on parameter
    list shape rather than actual applicability, so applying scope
@@ -404,13 +459,19 @@ not all of a generic's parameters,
 candidate that is *partially specialized*. In that case the helpers
 set `candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric`
 at four sites in [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)
-(lines 406, 483, 571, 658), and `CompleteOverloadCandidate`
+(lines 413, 490, 578, 665), and `CompleteOverloadCandidate`
 wraps the result in `PartiallyAppliedGenericExpr`
-([slang-check-overload.cpp lines
-1466-1470](../../../../source/slang/slang-check-overload.cpp)).
+([slang-check-overload.cpp line
+1547](../../../../source/slang/slang-check-overload.cpp)).
 
-A `PartiallyAppliedGenericExpr` carries the bound substitution and
-the unresolved generic parameters; the surrounding context (for
+A `PartiallyAppliedGenericExpr` carries `baseGenericDeclRef` (the
+generic being applied) plus `providedOrdinaryArgs`, the already-
+provided ordinary-argument prefix; witness arguments are
+deliberately *not* stored on the node and are formed later, after the
+remaining ordinary arguments are inferred
+([slang-ast-expr.h lines
+955-964](../../../../source/slang/slang-ast-expr.h)). The surrounding
+context (for
 example, an explicit type ascription, a later
 `GenericAppExpr<...>`, or another argument that pins the type) is
 expected to close the remaining holes. Overload resolution treats a
@@ -431,15 +492,23 @@ two extras:
   expression with the appropriate operator-keyed `Name`).
 - A `ResolvedOperatorOverload`
   ([slang-check-impl.h line
-  331](../../../../source/slang/slang-check-impl.h)) cache memoizes the
-  result, keyed by `OperatorOverloadCacheKey` (which captures the
-  operator name and the operand `BasicType` pair). The cache lives
+  339](../../../../source/slang/slang-check-impl.h)) cache memoizes the
+  result, keyed by `OperatorOverloadCacheKey`
+  ([slang-check-impl.h lines
+  197-209](../../../../source/slang/slang-check-impl.h)), which
+  captures `operatorName`, `isGLSLMode`, and a two-entry
+  `BasicTypeKey` operand pair. The cached `operatorName` is not the
+  surface operator name: `fromOperatorExpr` derives it from the
+  `IntrinsicOpModifier` (`intrinsicOp->op`) found on an applicable
+  overloaded definition
+  ([slang-check-impl.h lines
+  230-264](../../../../source/slang/slang-check-impl.h)). The cache lives
   in `TypeCheckingCache::resolvedOperatorOverloadCache`
   ([slang-check-impl.h line
-  348](../../../../source/slang/slang-check-impl.h)) and is populated /
+  356](../../../../source/slang/slang-check-impl.h)) and is populated /
   consulted in
   [slang-check-overload.cpp lines
-  3093 and 3355](../../../../source/slang/slang-check-overload.cpp).
+  3172 and 3434](../../../../source/slang/slang-check-overload.cpp).
   Each cached entry carries a `cacheVersion` because
   `OverloadCandidate` values are not portable across linkages; a
   newer linkage invalidates the entry by bumping
@@ -474,7 +543,7 @@ overload reject a `const` left operand.
   when the callee name is unknown) directly, without calling
   `CompleteOverloadCandidate`
   ([slang-check-overload.cpp lines
-  3216-3232](../../../../source/slang/slang-check-overload.cpp)).
+  3296-3311](../../../../source/slang/slang-check-overload.cpp)).
 - **Generic-argument inference failure.** The candidate ends at
   `Status::GenericArgumentInferenceFailed`.
   `CompleteOverloadCandidate` emits
@@ -482,7 +551,7 @@ overload reject a `const` left operand.
   `generic-signature-tried` note that prints the generic signature
   via `ASTPrinter::getDeclSignatureString`
   ([slang-check-overload.cpp lines
-  1314-1326](../../../../source/slang/slang-check-overload.cpp)).
+  1394-1407](../../../../source/slang/slang-check-overload.cpp)).
 - **A candidate matches but is hidden by visibility.** In
   `JustTrying` it is silently dropped; in `ForReal` it emits
   `decl-is-not-visible` (30600). Other candidates of lower
@@ -496,8 +565,8 @@ overload reject a `const` left operand.
   which rejects anything at or above
   `kConversionCost_GeneralConversion` (900). Only the per-argument
   costs that pass this check are then summed into the candidate's
-  `conversionCostSum` for ranking ([slang-check-overload.cpp lines
-  806-827](../../../../source/slang/slang-check-overload.cpp)) — that
+  `conversionCostSum` for ranking ([slang-check-overload.cpp line
+  837](../../../../source/slang/slang-check-overload.cpp)) — that
   sum has no separate ceiling.
 - **First-class function value vs declared callable of the same
   signature.** Both are `Applicable` with identical
@@ -509,7 +578,7 @@ overload reject a `const` left operand.
   tie-breaking is *skipped* when at least one candidate is
   `Generic` or `UnspecializedGeneric`
   ([slang-check-overload.cpp lines
-  2122-2127](../../../../source/slang/slang-check-overload.cpp)). Other
+  2201-2204](../../../../source/slang/slang-check-overload.cpp)). Other
   steps (cost, specificity) still apply; if they tie, the candidates
   are reported ambiguous.
 - **Operator overload cache stale.** A newer

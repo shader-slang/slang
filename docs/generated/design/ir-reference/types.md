@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
+generated_at: 2026-06-12T10:17:31Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -118,6 +118,7 @@ and its generated wrappers (`getVoidType`, `getIntType`, ...).
 | `Char` | `CharType` | — | H | `BasicExpressionType(Char)` | Character type used by string-literal element type. |
 | `IntPtr` | `IntPtrType` | — | H | `BasicExpressionType(IntPtr)` | Signed integer with pointer-equivalent width. |
 | `UIntPtr` | `UIntPtrType` | — | H | `BasicExpressionType(UIntPtr)` | Unsigned integer with pointer-equivalent width. |
+| `AfterBaseType` | — | — | | — | Sentinel opcode marking the end of the `BasicType` range; not a real type, only a range marker for opcode classification. |
 
 ### Storage-only floating-point
 
@@ -152,6 +153,7 @@ Both are produced via `IRBuilder::getType` (passing the matching
 | --- | --- | --- | --- | --- | --- |
 | `RawPointerType` | — | — | H | Core-module raw-pointer types | Untyped pointer. |
 | `RTTIPointerType` | — | `rTTIOperand` | H | (synthesized) | Pointer to a runtime type-info object; see [generics-and-existentials.md](generics-and-existentials.md). |
+| `AfterRawPointerTypeBase` | — | — | H | — | Sentinel opcode marking the end of the `RawPointerTypeBase` range; not a real type, only a range marker for opcode classification. |
 
 ### Arrays
 
@@ -232,7 +234,7 @@ and `interface` by `IRBuilder::createInterfaceType`.
 | --- | --- | --- | --- | --- | --- |
 | `BindExistentials` | `BindExistentialsType` | `baseType: IRType, args...` | H | (synthesized) | `BindExistentials<B, T0, w0, ...>`; binds each of `B`'s existential parameters. |
 | `BoundInterface` | `BoundInterfaceType` | (variadic, `min=3`) | H | (synthesized) | Specialization for `BindExistentials<B, T0, w0>` where `B` is an interface. |
-| `interface` | `InterfaceType` | (children: `interface_req_entry`) | G | `InterfaceDecl` (see [structure.md](structure.md)) | Interface type; documented here as a type and in [structure.md](structure.md) as a container. |
+| `interface` | `InterfaceType` | (operands: `interface_req_entry`...) | G | `InterfaceDecl` (see [structure.md](structure.md)) | Interface type; its `interface_req_entry` requirements are operands (set via `setOperand`), not children; see [structure.md](structure.md) for the distinction from `witness_table` children. |
 | `associated_type` | `AssociatedType` | `constraintTypes: IRInterfaceType...` | H | `AssocTypeDecl` lowering | Associated type of an interface. |
 | `this_type` | — | `interfaceType: IRType` | H | `ThisType` AST node | The "self" type of an interface or extension. |
 | `rtti_type` | `RTTIType` | — | H | (synthesized) | Type of `IRRTTIObject` values. |
