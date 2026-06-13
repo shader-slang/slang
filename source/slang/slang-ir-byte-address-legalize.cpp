@@ -275,47 +275,36 @@ struct ByteAddressBufferLegalizationContext
         }
     }
 
-    // Returns true if a vectorized load or store of `alignmentVal` bytes at
-    // `baseOffset + immediateOffset` is known to be sufficiently aligned.
-    bool isAligned(
+    // Returns true if a single access of `accessSize` bytes covering `baseOffset +
+    // immediateOffset` provably lands on an `accessSize`-aligned address. This is a pure query
+    // that never diagnoses.
+    //
+    // The decision is driven by the promised alignment alone (issue #11545, point 3): the contract
+    // requires `location` (the runtime base offset) to be a multiple of the promise, so the
+    // access's absolute offset is congruent to `immediateOffset` modulo the promise and a constant
+    // and a runtime location with the same promise legalize identically. Only when there is no
+    // promise (`promisedAlignment == 0`, the plain `Load`/`Store` accessors) do we fall back to a
+    // compile-time-constant base offset to prove alignment.
+    bool isWideAccessAligned(
         IRInst* baseOffset,
         IRIntegerValue immediateOffset,
-        IRInst* unknownOffsetAlignment,
-        IRIntegerValue alignmentVal)
+        IRInst* promisedAlignment,
+        IRIntegerValue accessSize)
     {
-        if (alignmentVal <= 0)
+        if (accessSize <= 0)
             return false;
 
+        if (auto alignLit = as<IRIntLit>(promisedAlignment))
+        {
+            if (auto promisedValue = alignLit->getValue())
+                return (promisedValue % accessSize) == 0 && (immediateOffset % accessSize) == 0;
+        }
+
+        // No alignment promise: only a compile-time-constant base offset can prove that a wide
+        // access is safe.
         if (auto baseOffsetVal = as<IRIntLit>(baseOffset))
-        {
-            // If the offset is a constant known at compile time, simply check if it aligned to
-            // the elementsize of the underlying resource.
-            return ((baseOffsetVal->getValue() + immediateOffset) % alignmentVal) == 0;
-        }
-        else if (auto alignInst = as<IRIntLit>(unknownOffsetAlignment))
-        {
-            // If the offset is not known during compile time, use the explicit align
-            // field of the overloaded `Load` or `Store` operation or via `LoadAligned`
-            // or `StoreAligned` function.
-            //
-            // Unaligned `Load`s or `Store`s are identified with 0 alignment, to prevent
-            // accidentally issuing a wide vectorized operations.
-            if (!alignInst->getValue())
-                return false;
+            return ((baseOffsetVal->getValue() + immediateOffset) % accessSize) == 0;
 
-            if ((immediateOffset % alignmentVal) != 0)
-                return false;
-
-            if ((alignInst->getValue() % alignmentVal) == 0)
-            {
-                return true;
-            }
-            m_sink->diagnose(Diagnostics::ByteAddressBufferUnaligned{
-                .alignment = alignInst->getValue(),
-                .elementSize = alignmentVal,
-                .location = baseOffset->sourceLoc,
-            });
-        }
         return false;
     }
 
@@ -477,7 +466,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -589,7 +578,7 @@ struct ByteAddressBufferLegalizationContext
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
                 if (m_options.scalarizeVectorLoadStore ||
-                    !isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -662,8 +651,11 @@ struct ByteAddressBufferLegalizationContext
                 IRSizeAndAlignment sizeAlignment;
                 SLANG_RETURN_NULL_ON_FAIL(
                     getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
-                if (sizeAlignment.size == 8 &&
-                    !isAligned(baseOffset, immediateOffset, alignment, sizeAlignment.getStride()))
+                if (sizeAlignment.size == 8 && !isWideAccessAligned(
+                                                   baseOffset,
+                                                   immediateOffset,
+                                                   alignment,
+                                                   sizeAlignment.getStride()))
                 {
                     return emitLegalUnaligned64BitLoadFromTwoUInts(
                         type,
@@ -1435,7 +1427,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1545,7 +1537,7 @@ struct ByteAddressBufferLegalizationContext
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
                 if (m_options.scalarizeVectorLoadStore ||
-                    !isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1596,8 +1588,11 @@ struct ByteAddressBufferLegalizationContext
             {
                 IRSizeAndAlignment sizeAlignment;
                 SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
-                if (sizeAlignment.size == 8 &&
-                    !isAligned(baseOffset, immediateOffset, alignment, sizeAlignment.getStride()))
+                if (sizeAlignment.size == 8 && !isWideAccessAligned(
+                                                   baseOffset,
+                                                   immediateOffset,
+                                                   alignment,
+                                                   sizeAlignment.getStride()))
                 {
                     return emitLegalUnaligned64BitStoreAsTwoUInts(
                         buffer,
