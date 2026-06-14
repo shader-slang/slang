@@ -4793,6 +4793,24 @@ void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointIn
     if (oldFunc == entryPoint.entryPointFunc)
         return;
 
+    // `lowerOutParameters` replaced the entry point with a wrapper that calls `oldFunc`, so
+    // `oldFunc` is no longer the entry point. Any entry-point `uniform` that was hoisted to a
+    // global param carries an `IREntryPointParamDecoration` whose operand records the originating
+    // entry point (see `MoveEntryPointUniformParametersToGlobalScope`). That record still names
+    // `oldFunc`; re-point it to the wrapper so `introduceExplicitGlobalContext` recognizes the
+    // uniform as belonging to the live entry point and binds it as a kernel argument. Without this,
+    // the consumer's `originatingEntryPoint != entryPointFunc` check silently drops the uniform.
+    // Collect the uses first, then mutate, so we do not modify `oldFunc`'s use list while walking
+    // it.
+    List<IRUse*> entryPointParamUses;
+    for (auto use = oldFunc->firstUse; use; use = use->nextUse)
+    {
+        if (as<IREntryPointParamDecoration>(use->getUser()))
+            entryPointParamUses.add(use);
+    }
+    for (auto use : entryPointParamUses)
+        use->set(entryPoint.entryPointFunc);
+
     // Since this will no longer be the entry point function, remove those decorations
     List<IRDecoration*> ds;
     for (auto decor : oldFunc->getDecorations())
