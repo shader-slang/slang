@@ -4793,23 +4793,32 @@ void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointIn
     if (oldFunc == entryPoint.entryPointFunc)
         return;
 
-    // `lowerOutParameters` replaced the entry point with a wrapper that calls `oldFunc`, so
-    // `oldFunc` is no longer the entry point. Any entry-point `uniform` that was hoisted to a
-    // global param carries an `IREntryPointParamDecoration` whose operand records the originating
-    // entry point (see `MoveEntryPointUniformParametersToGlobalScope`). That record still names
-    // `oldFunc`; re-point it to the wrapper so `introduceExplicitGlobalContext` recognizes the
+    // `lowerOutParameters` replaced the entry point with `wrapper`, a new function that calls
+    // `oldFunc`. The hoisted entry-point `uniform`'s `IREntryPointParamDecoration` (added by
+    // `MoveEntryPointUniformParametersToGlobalScope`) still records `oldFunc` as the originating
+    // entry point; re-point it to the wrapper so `introduceExplicitGlobalContext` recognizes the
     // uniform as belonging to the live entry point and binds it as a kernel argument. Without this,
-    // the consumer's `originatingEntryPoint != entryPointFunc` check silently drops the uniform.
-    // Collect the uses first, then mutate, so we do not modify `oldFunc`'s use list while walking
-    // it.
-    List<IRUse*> entryPointParamUses;
-    for (auto use = oldFunc->firstUse; use; use = use->nextUse)
-    {
-        if (as<IREntryPointParamDecoration>(use->getUser()))
-            entryPointParamUses.add(use);
-    }
-    for (auto use : entryPointParamUses)
-        use->set(entryPoint.entryPointFunc);
+    // its `originatingEntryPoint != entryPointFunc` check silently drops the uniform.
+    //
+    // This fix-up belongs in the caller, not in `lowerOutParameters`: the decoration sits on the
+    // global param (with `oldFunc` as an operand), not on `oldFunc` itself, so the wrapper's
+    // cloned-from-`oldFunc` decorations never include it.
+    //
+    // `traverseUses` snapshots `oldFunc`'s use list before invoking the callback, so re-pointing a
+    // use mid-walk is safe. `IREntryPointParamDecoration` has exactly one operand (the entry-point
+    // func), so the use we re-point is necessarily that operand; the assert makes a future second
+    // operand fail loudly rather than silently re-point the wrong use.
+    const auto wrapper = entryPoint.entryPointFunc;
+    traverseUses(
+        oldFunc,
+        [&](IRUse* use)
+        {
+            auto decoration = as<IREntryPointParamDecoration>(use->getUser());
+            if (!decoration)
+                return;
+            SLANG_ASSERT(decoration->getOperandCount() == 1);
+            use->set(wrapper);
+        });
 
     // Since this will no longer be the entry point function, remove those decorations
     List<IRDecoration*> ds;

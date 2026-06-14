@@ -1,12 +1,15 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage vertex -entry vsMain
 
-// Regression test for #11606: a vertex entry point with a composite output (here a
-// struct return) goes through `legalizeVertexShaderOutputParamsForMetal`, which wraps
-// the entry point in a new function. The hoisted entry-point `uniform GridCfg* cfg`
-// must still be bound as a kernel argument on the emitted vertex entry point. Before
-// the fix the wrapper swap left the uniform's IREntryPointParamDecoration naming the
-// old function, so `introduceExplicitGlobalContext` dropped it: the emitted vertex
-// signature had no buffer argument and the body read an uninitialized KernelContext.
+// On `-target metal`, a vertex entry point with composite output (a struct return here) is
+// wrapped by a new function in `legalizeVertexShaderOutputParamsForMetal`. This test pins the
+// contract that the hoisted entry-point `uniform GridCfg* cfg` is still bound as a `[[buffer(0)]]`
+// argument on the emitted vertex entry point and that the local `KernelContext` is initialized
+// from it.
+//
+// Regression for #11606: before the fix the wrapper swap left the uniform's
+// `IREntryPointParamDecoration` naming the old function, so `introduceExplicitGlobalContext`
+// dropped it — the emitted vertex signature had no buffer argument and the body read an
+// uninitialized `KernelContext`.
 
 struct GridCfg
 {
@@ -19,9 +22,11 @@ struct VOut
     float4 color : COLOR;
 };
 
-// The hoisted uniform must be bound as a buffer argument on the emitted vertex entry point.
-//METAL: vsMain({{.*}}buffer(0){{.*}})
-// ...and the KernelContext must be initialized from that buffer argument, not left uninitialized.
+// The hoisted uniform is bound as a `[[buffer(0)]]` argument on the emitted vertex entry point.
+//METAL: vsMain({{.*}}{{\[\[}}buffer(0){{\]\]}}{{.*}})
+// ...and the local KernelContext field (LHS) is initialized from the bound kernel argument (RHS);
+// both are spelled `entryPointParams` and are distinguished only by the assignment (`= `). The
+// `{{.*}}` wildcards absorb the per-inst name suffixes and the `(&...)->` access.
 //METAL: kernelContext{{.*}}entryPointParams{{.*}} = entryPointParams
 
 [shader("vertex")]
