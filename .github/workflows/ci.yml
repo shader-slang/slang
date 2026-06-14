@@ -382,7 +382,10 @@ jobs:
           chmod +x artifacts/Release/bin/* 2>/dev/null || true
           export LD_LIBRARY_PATH="$PWD/artifacts/Release/lib:$LD_LIBRARY_PATH"
           mkdir -p temp
-          artifacts/Release/bin/slangc -help-style markdown -h > temp/command-line-slangc-reference.md
+          # Capture stdout+stderr to match how the golden file is produced by
+          # regenerate-cmdline-ref.yml; otherwise stray stderr output would be
+          # baked into the reference but missing here, causing a spurious diff.
+          artifacts/Release/bin/slangc -help-style markdown -h > temp/command-line-slangc-reference.md 2>&1
 
       - name: Compare with existing reference
         run: |
