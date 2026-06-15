@@ -846,28 +846,6 @@ static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<Leg
         legalArgs.getArrayView().getBuffer()));
 }
 
-/// Diagnose an abort payload value that cannot be represented as scalar/vector message data.
-static void diagnoseUnsupportedAbortArgumentType(
-    IRTypeLegalizationContext* context,
-    IRInst* abortInst,
-    IRType* argType)
-{
-    context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
-        .type = argType,
-        .location = abortInst->sourceLoc});
-}
-
-/// Return the scalar element type used to classify an abort payload.
-/// Abort payloads accept scalar values and ordinary vectors of scalar values.
-/// Cooperative vectors and matrices are left as their own types because target
-/// abort emitters do not model them as printf-style message fields.
-static IRType* getAbortPayloadElementType(IRType* type)
-{
-    if (auto vectorType = as<IRVectorType>(type))
-        return vectorType->getElementType();
-    return type;
-}
-
 /// Validate abort payload argument types after variadic-pack and pair legalization.
 /// Scalar values and ordinary vectors with basic element types are accepted because
 /// they have printf-style format specifiers. Composite, pointer, resource, and other
@@ -883,11 +861,15 @@ static bool validateAbortArgumentTypes(
     for (auto arg : payloadArgs)
     {
         auto argType = arg->getDataType();
-        auto elementType = getAbortPayloadElementType(argType);
+        auto elementType = argType;
+        if (auto vectorType = as<IRVectorType>(argType))
+            elementType = vectorType->getElementType();
         if (as<IRBasicType>(elementType))
             continue;
 
-        diagnoseUnsupportedAbortArgumentType(context, abortInst, argType);
+        context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
+            .type = argType,
+            .location = abortInst->sourceLoc});
         return false;
     }
     return true;
@@ -918,20 +900,18 @@ static LegalVal legalizeAbort(
                 auto ordinaryVal = arg.getPair()->ordinaryVal;
                 if (ordinaryVal.flavor != LegalVal::Flavor::simple)
                 {
-                    diagnoseUnsupportedAbortArgumentType(
-                        context,
-                        originalInst,
-                        originalInst->getOperand(i)->getDataType());
+                    context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
+                        .type = originalInst->getOperand(i)->getDataType(),
+                        .location = originalInst->sourceLoc});
                     return LegalVal::simple(context->builder->getVoidValue());
                 }
                 legalArgs.add(ordinaryVal.getSimple());
             }
             break;
         default:
-            diagnoseUnsupportedAbortArgumentType(
-                context,
-                originalInst,
-                originalInst->getOperand(i)->getDataType());
+            context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
+                .type = originalInst->getOperand(i)->getDataType(),
+                .location = originalInst->sourceLoc});
             return LegalVal::simple(context->builder->getVoidValue());
         }
     }
