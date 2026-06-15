@@ -46,6 +46,7 @@ DEFAULT_LABEL_GROUPS = [
     ({"ubuntu-24.04-arm"}, "Linux ARM64 (GH)", False),
     ({"macos-latest"}, "macOS (GH)", False),
     ({"windows-latest"}, "Windows (GH)", False),
+    ({"windows-2025"}, "Windows (GH)", False),
 ]
 
 

@@ -69,6 +69,25 @@ class TestRunnerTypeCoverage(unittest.TestCase):
         self.assertEqual(group, "Linux SM80Plus GPU (GCP)")
         self.assertTrue(self_hosted)
 
+    def test_shipped_config_classifies_all_hosted_windows_labels(self):
+        """The shipped runner_config.json must map every GitHub-hosted Windows
+        image label to the "Windows (GH)" group. GitHub repoints the
+        windows-latest alias over time (currently VS2022 → VS2025), and our
+        workflows pin to the explicit image, so both the alias and the pinned
+        labels can appear on jobs. Each must classify identically; an unmapped
+        label silently falls into "Other" and is dropped from hosted-runner
+        reporting.
+        """
+        config = ci_visualization.load_config()
+        for label in ("windows-latest", "windows-2022", "windows-2025"):
+            group, self_hosted = ci_visualization.classify_group([label], config)
+            self.assertEqual(
+                group,
+                "Windows (GH)",
+                msg=f"{label!r} did not classify as Windows (GH)",
+            )
+            self.assertFalse(self_hosted, msg=f"{label!r} should be GitHub-hosted")
+
     def test_record_snapshot_counts_all_gcp_runner_types(self):
         queue_data = {
             "summary": {
