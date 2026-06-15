@@ -22322,7 +22322,7 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_lss)]
+    [require(glsl_hlsl_spirv, rayquery_sphere)]
     float4 CandidateSphereObjectPositionAndRadius()
     {
         __target_switch
@@ -22350,7 +22350,7 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_lss)]
+    [require(glsl_hlsl_spirv, rayquery_sphere)]
     float4 CommittedSphereObjectPositionAndRadius()
     {
         __target_switch
@@ -22576,7 +22576,7 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_lss)]
+    [require(glsl_hlsl_spirv, rayquery_sphere)]
     bool CandidateIsNonOpaqueSphere()
     {
         __target_switch
@@ -22601,7 +22601,7 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_lss)]
+    [require(glsl_hlsl_spirv, rayquery_sphere)]
     bool CommittedIsSphere()
     {
         __target_switch

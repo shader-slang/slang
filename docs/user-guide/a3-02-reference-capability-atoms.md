@@ -1306,17 +1306,27 @@ Compound Capabilities
 > Capabilities needed for compute-shader rayquery
 
 `rayquery_lss`
-> Collection of capabilities for line-swept-spheres and sphere geometry
-> accessed through an inline ray query. Available on any RayQuery-capable
-> stage, but each target must carry its line-swept-spheres geometry support:
-> GLSL requires `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR`
-> together with `spvRayTracingLinearSweptSpheresGeometryNV` or
-> `spvRayTracingSpheresGeometryNV` (so a SPIR-V caller cannot satisfy this with
-> plain ray query alone); HLSL/NVAPI (`_sm_6_3`), Metal, and CUDA/OptiX carry
-> the geometry support implicitly.
+> Collection of capabilities for the line-swept-spheres (LSS) accessors of an
+> inline ray query. Available on any RayQuery-capable stage, but each target
+> must carry its LSS geometry support: GLSL requires
+> `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
+> `spvRayTracingLinearSweptSpheresGeometryNV` (so a SPIR-V caller cannot satisfy
+> this with plain ray query alone, and a sphere-only caller cannot reach the
+> LSS accessors); HLSL/NVAPI (`_sm_6_3`), Metal, and CUDA/OptiX carry the
+> geometry support implicitly.
 
 `rayquery_position`
 > Collection of capabilities for rayquery + ray_tracing_position_fetch.
+
+`rayquery_sphere`
+> Collection of capabilities for the sphere-geometry accessors of an inline
+> ray query. Available on any RayQuery-capable stage, but each target must
+> carry its sphere geometry support: GLSL requires
+> `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
+> `spvRayTracingSpheresGeometryNV` (so a SPIR-V caller cannot satisfy this with
+> plain ray query alone, and an LSS-only caller cannot reach the sphere
+> accessors); HLSL/NVAPI (`_sm_6_3`), Metal, and CUDA/OptiX carry the geometry
+> support implicitly.
 
 `raytracing`
 > Capabilities needed for minimal raytracing support
