@@ -131,15 +131,19 @@ bool isComInterfaceType(IRType* type);
 // If `type` is a vector, returns its element type. Otherwise, return `type`.
 IRType* getVectorElementType(IRType* type);
 
-/// Collects variadic operands, unwrapping the single `MakeStruct` form when present.
-template<typename TList>
-void collectFlattenedVariadicOperands(IRInst* inst, UInt firstOperandIndex, TList& outOperands)
+/// Collects variadic operands from an indexed operand source, unwrapping a single `MakeStruct`
+/// when present.
+template<typename TGetOperand, typename TList>
+void collectFlattenedVariadicOperandsImpl(
+    Index operandCount,
+    Index firstOperandIndex,
+    TGetOperand getOperand,
+    TList& outOperands)
 {
-    auto operandCount = inst->getOperandCount();
-    SLANG_RELEASE_ASSERT(firstOperandIndex <= operandCount);
+    SLANG_RELEASE_ASSERT(firstOperandIndex >= 0 && firstOperandIndex <= operandCount);
     if (operandCount == firstOperandIndex + 1)
     {
-        auto operand = inst->getOperand(firstOperandIndex);
+        auto operand = getOperand(firstOperandIndex);
         if (auto makeStruct = as<IRMakeStruct>(operand))
         {
             for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
@@ -153,7 +157,18 @@ void collectFlattenedVariadicOperands(IRInst* inst, UInt firstOperandIndex, TLis
     }
 
     for (UInt i = firstOperandIndex; i < operandCount; i++)
-        outOperands.add(inst->getOperand(i));
+        outOperands.add(getOperand(i));
+}
+
+/// Collects variadic operands, unwrapping the single `MakeStruct` form when present.
+template<typename TList>
+void collectFlattenedVariadicOperands(IRInst* inst, Index firstOperandIndex, TList& outOperands)
+{
+    collectFlattenedVariadicOperandsImpl(
+        inst->getOperandCount(),
+        firstOperandIndex,
+        [inst](Index index) { return inst->getOperand(index); },
+        outOperands);
 }
 
 /// Collects variadic operands from an operand view, unwrapping a single `MakeStruct` when present.
@@ -163,25 +178,11 @@ void collectFlattenedVariadicOperands(
     Index firstOperandIndex,
     TList& outOperands)
 {
-    auto operandCount = operands.getCount();
-    SLANG_RELEASE_ASSERT(firstOperandIndex >= 0 && firstOperandIndex <= operandCount);
-    if (operandCount == firstOperandIndex + 1)
-    {
-        auto operand = operands[firstOperandIndex];
-        if (auto makeStruct = as<IRMakeStruct>(operand))
-        {
-            for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
-                outOperands.add(makeStruct->getOperand(i));
-        }
-        else
-        {
-            outOperands.add(operand);
-        }
-        return;
-    }
-
-    for (Index i = firstOperandIndex; i < operandCount; i++)
-        outOperands.add(operands[i]);
+    collectFlattenedVariadicOperandsImpl(
+        operands.getCount(),
+        firstOperandIndex,
+        [operands](Index index) { return operands[index]; },
+        outOperands);
 }
 
 // If `type` is a vector or a coop matrix, returns its element type. Otherwise, return `type`.
