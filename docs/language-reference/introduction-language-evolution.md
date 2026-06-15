@@ -20,7 +20,7 @@ When the following criteria are met, the specification proposal process should b
    2. The change adds new items in stable Slang standard modules; OR
    3. Existing syntax for Slang applications is modified; OR
    4. Existing syntax for Slang applications is deprecated; OR
-   5. Existing standard modules for Slang applications are modified (see the remark below); OR
+   5. Existing standard modules for Slang applications are modified (see Remark 2 below); OR
    6. Existing standard modules for Slang applications are deprecated; OR
    7. An experimental Slang standard module is matured as stable; OR
    8. A stable Slang standard module is deprecated or its status is reverted to experimental; OR
@@ -34,9 +34,6 @@ A change is considered a minor defect fix when:
 The specification proposal process may also be used when the above criteria are not met. In particular, the
 proposal process is recommended for experimental features that are expected to be integrated into Slang. The
 proposal process is explicitly not required for internal Slang language features such as compiler intrinsics.
-
-> 📝 **Remark:** The change process for Slang standard modules is still under consideration. This is tracked
-> by GitHub issue <a href="https://github.com/shader-slang/slang/issues/11612">#11612</a>.
 
 **Criteria interpretation examples:**
 
@@ -88,9 +85,12 @@ proposal process is explicitly not required for internal Slang language features
 </tr>
 </table>
 
-> 📝 **Remark:** The specification proposal process is significantly heavier than the GitHub
+> 📝 **Remark 1:** The specification proposal process is significantly heavier than the GitHub
 > issue-driven process. This is the reason why fixing minor defects is exempted from the language
 > specification proposal process, even if the fixes are potentially breaking changes.
+
+> 📝 **Remark 2:** The change process for Slang standard modules is still under consideration. This is tracked
+> by GitHub issue <a href="https://github.com/shader-slang/slang/issues/11612">#11612</a>.
 
 ## Specification Proposal Process
 
