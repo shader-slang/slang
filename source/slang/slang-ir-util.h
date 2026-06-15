@@ -131,19 +131,35 @@ bool isComInterfaceType(IRType* type);
 // If `type` is a vector, returns its element type. Otherwise, return `type`.
 IRType* getVectorElementType(IRType* type);
 
+struct IRInstOperandSource
+{
+    IRInst* inst;
+
+    Index getOperandCount() const { return Index(inst->getOperandCount()); }
+    IRInst* getOperand(Index index) const { return inst->getOperand(UInt(index)); }
+};
+
+struct IRArrayOperandSource
+{
+    ArrayView<IRInst*> operands;
+
+    Index getOperandCount() const { return operands.getCount(); }
+    IRInst* getOperand(Index index) const { return operands[index]; }
+};
+
 /// Collects variadic operands from an indexed operand source, unwrapping a single `MakeStruct`
 /// when present.
-template<typename TGetOperand, typename TList>
+template<typename TOperandSource, typename TList>
 void collectFlattenedVariadicOperandsImpl(
-    Index operandCount,
+    const TOperandSource& operandSource,
     Index firstOperandIndex,
-    TGetOperand getOperand,
     TList& outOperands)
 {
+    auto operandCount = operandSource.getOperandCount();
     SLANG_RELEASE_ASSERT(firstOperandIndex >= 0 && firstOperandIndex <= operandCount);
     if (operandCount == firstOperandIndex + 1)
     {
-        auto operand = getOperand(firstOperandIndex);
+        auto operand = operandSource.getOperand(firstOperandIndex);
         if (auto makeStruct = as<IRMakeStruct>(operand))
         {
             for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
@@ -156,8 +172,8 @@ void collectFlattenedVariadicOperandsImpl(
         return;
     }
 
-    for (UInt i = firstOperandIndex; i < operandCount; i++)
-        outOperands.add(getOperand(i));
+    for (Index i = firstOperandIndex; i < operandCount; i++)
+        outOperands.add(operandSource.getOperand(i));
 }
 
 /// Collects variadic operands, unwrapping the single `MakeStruct` form when present.
@@ -165,9 +181,8 @@ template<typename TList>
 void collectFlattenedVariadicOperands(IRInst* inst, Index firstOperandIndex, TList& outOperands)
 {
     collectFlattenedVariadicOperandsImpl(
-        inst->getOperandCount(),
+        IRInstOperandSource{inst},
         firstOperandIndex,
-        [inst](Index index) { return inst->getOperand(index); },
         outOperands);
 }
 
@@ -179,9 +194,8 @@ void collectFlattenedVariadicOperands(
     TList& outOperands)
 {
     collectFlattenedVariadicOperandsImpl(
-        operands.getCount(),
+        IRArrayOperandSource{operands},
         firstOperandIndex,
-        [operands](Index index) { return operands[index]; },
         outOperands);
 }
 
