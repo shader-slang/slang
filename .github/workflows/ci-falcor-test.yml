@@ -1,29 +1,13 @@
-# This is a basic workflow to help you get started with Actions
-
-name: Falcor Compiler Perf-Test
+name: CI Falcor Test Workflow
 
 on:
-  pull_request:
-    branches: [master]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore:
-      - "docs/**"
-      - "LICENSES/**"
-      - "LICENSE"
-      - "CONTRIBUTING.md"
-      - "README.md"
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-permissions:
-  contents: read
+  workflow_call:
+
 jobs:
-  build:
-    name: Build
-    if: github.event.pull_request.draft != true
+  test-falcor:
+    name: Test (Falcor)
     timeout-minutes: 100
-    continue-on-error: false
-    runs-on: [Windows, self-hosted, build]
+    runs-on: [Windows, self-hosted, falcor]
     defaults:
       run:
         shell: bash
@@ -36,58 +20,52 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
-          submodules: "recursive"
-          fetch-depth: "0"
-      # Restore (read-only) the Windows-release sccache populated on master by
-      # populate-sccache.yml. We deliberately do not save a new cache entry, so
-      # this adds zero pressure on the 10 GB GitHub Actions cache budget and
-      # cannot evict the populate caches.
-      - name: Restore sccache cache (read-only)
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+          submodules: "false"
+          fetch-depth: "1"
+      - name: Download Slang build
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          path: C:/sccache
-          key: sccache-windows-cl-x86_64-release-${{ github.sha }}
-          restore-keys: |
-            sccache-windows-cl-x86_64-release-
-      - name: Setup sccache
-        uses: ./.github/actions/setup-sccache
-        with:
-          platform: windows
-      - name: Setup
-        uses: ./.github/actions/common-setup
-        with:
-          os: windows
-          compiler: cl
-          platform: x86_64
-          config: release
-          build-llvm: true
-      - name: Build Slang
+          name: slang-tests-windows-x86_64-cl-release
+          path: slang-bin
+      - name: setup-falcor
+        shell: pwsh
         run: |
-          echo "📊 sccache statistics (pre-build):"
-          sccache --show-stats || true
-          cmake --preset default --fresh \
-            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-            -DCMAKE_COMPILE_WARNING_AS_ERROR=true \
-            -DSLANG_ENABLE_CUDA=1 \
-            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
-            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
-            -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON
-          cmake --workflow --preset release
-          echo "📊 sccache statistics (post-build):"
-          sccache --show-stats || true
-      - name: Upload Slang build
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: slang-falcor-perf-build-windows-release
-          path: build/Release/bin/
-          if-no-files-found: error
-          retention-days: 7
-  test:
+          mkdir FalcorBin
+          cd FalcorBin
+          Copy-Item -Path 'C:\Falcor\build\windows-vs2022\bin' -Destination '.\build\windows-vs2022\bin' -Recurse -Exclude ("*.pdb")
+          Copy-Item -Path 'C:\Falcor\tests' -Destination '.\' -Recurse
+          Copy-Item -Path 'C:\Falcor\tools' -Destination '.\' -Recurse
+          Copy-Item -Path 'C:\Falcor\media' -Destination '.\' -Recurse
+          Copy-Item -Path 'C:\Falcor\media_internal' -Destination '.\' -Recurse
+          Copy-Item -Path 'C:\Falcor\scripts' -Destination '.\' -Recurse
+          cd ..\
+      - name: Copy Slang to Falcor
+        run: |
+          cp --verbose --recursive --target-directory ./FalcorBin/build/windows-vs2022/bin/Release slang-bin/Release/bin/*
+      - name: falcor-unit-test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          cd .\FalcorBin\tests
+          python ./testing/run_unit_tests.py --config windows-vs2022-Release -t "-slow"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          cd ../../
+      - name: falcor-image-test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          cd .\FalcorBin\tests
+          python ./testing/run_image_tests.py --config windows-vs2022-Release --run-only
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          cd ../../
+
+  test-falcor-perf:
     name: Test (Falcor Perf)
-    needs: build
-    if: github.event.pull_request.draft != true
     timeout-minutes: 100
-    continue-on-error: false
     runs-on: [Windows, self-hosted, perf]
     defaults:
       run:
@@ -106,8 +84,8 @@ jobs:
       - name: Download Slang build
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: slang-falcor-perf-build-windows-release
-          path: build/Release/bin
+          name: slang-tests-windows-x86_64-cl-release
+          path: build
 
       - uses: robinraju/release-downloader@28fc21f50d76778e7023361aa1f863e717d3d56f # v1.13
         id: download

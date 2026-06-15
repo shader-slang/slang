@@ -396,6 +396,15 @@ jobs:
             exit 1
           fi
 
+  # Falcor integration tests (self-hosted falcor/perf runners). Reuses the
+  # slang-tests-windows-x86_64-cl-release artifact already built by
+  # build-windows-release-cl-x86_64-gpu instead of building a separate Slang
+  # binary, mirroring test-materialx-windows-release above.
+  test-falcor:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
+    uses: ./.github/workflows/ci-falcor-test.yml
+
   # Aggregate gate required by branch protection / the merge queue.
   #
   # The build jobs must be listed in `needs` even though every test job
@@ -468,6 +477,56 @@ jobs:
           fi
 
           echo "All CI jobs completed successfully!"
+
+  # Independent aggregate gate for Falcor, separate from check-ci so that
+  # Falcor's self-hosted falcor/perf runners (a scarce resource not exercised
+  # on merge_group) don't gate the main CI status check.
+  #
+  # build-windows-release-cl-x86_64-gpu must be listed in `needs` even though
+  # test-falcor already depends on it: when a needed job fails, GitHub Actions
+  # marks the dependent job "skipped" (not "failed"), and skipped must be
+  # allowed here so that non-pull_request runs (where test-falcor is skipped
+  # by design, see test-falcor's `if` above) still pass. Without
+  # build-windows-release-cl-x86_64-gpu listed explicitly, a broken build
+  # turns test-falcor into an allowed skip and the gate passes (see #11585 /
+  # check-ci's build-job handling above).
+  #
+  # wait-for-human-priority is listed for the same reason check-ci lists it
+  # above: when a bot run yields, that job's result is "failure" (not
+  # "skipped"), so check-falcor goes red too and retry-yielded-bot-ci picks it
+  # up, instead of build-windows-release-cl-x86_64-gpu/test-falcor being
+  # skipped (an allowed result) and check-falcor reporting a false pass.
+  check-falcor:
+    name: Check Falcor
+    needs:
+      [
+        build-windows-release-cl-x86_64-gpu,
+        test-falcor,
+        wait-for-human-priority,
+      ]
+    runs-on: ubuntu-latest
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
+    steps:
+      - name: Check Falcor Results
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          echo "=== Falcor CI Results Summary ==="
+          echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+
+          # Allow "success" and "skipped"; fail on "failure" or "cancelled".
+          # Checking the generic `needs` JSON (rather than enumerating each
+          # job) means any job added to `needs` above is gated automatically.
+          failed=$(echo "$NEEDS_JSON" | jq -r 'to_entries[]
+            | select(.value.result == "failure" or .value.result == "cancelled")
+            | .key')
+          if [[ -n "$failed" ]]; then
+            echo "These Falcor CI jobs failed or were cancelled:"
+            echo "$failed"
+            exit 1
+          fi
+
+          echo "All Falcor CI jobs completed successfully (passed or skipped)!"
 
   # Automatically retry GPU health check failures by dispatching ci-retry.yml,
   # which watches this run until it completes, then reruns only failed jobs.
