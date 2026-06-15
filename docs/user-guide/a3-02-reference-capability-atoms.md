@@ -568,6 +568,9 @@ Extensions
 `GL_NV_gpu_shader5`
 > Represents the GL_NV_gpu_shader5 extension.
 
+`GL_NV_linear_swept_spheres`
+> Represents the GL_NV_linear_swept_spheres extension.
+
 `GL_NV_ray_tracing`
 > Represents the GL_NV_ray_tracing extension.
 
@@ -1305,12 +1308,12 @@ Compound Capabilities
 `rayquery_lss`
 > Collection of capabilities for line-swept-spheres and sphere geometry
 > accessed through an inline ray query. Available on any RayQuery-capable
-> stage. On SPIR-V the sphere / linear-swept-sphere geometry capabilities are
-> mandatory (not optional): the SPIR-V alternatives require spvRayQueryKHR
-> together with the corresponding SPV_NV_linear_swept_spheres geometry
-> capability, so a SPIR-V caller cannot satisfy this with plain ray query
-> alone. The non-SPIR-V alternatives (GLSL ray query, SM 6.3 for HLSL/NVAPI,
-> Metal, CUDA/OptiX) carry the geometry support implicitly.
+> stage, but each target must carry its line-swept-spheres geometry support:
+> GLSL requires `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR`
+> together with `spvRayTracingLinearSweptSpheresGeometryNV` or
+> `spvRayTracingSpheresGeometryNV` (so a SPIR-V caller cannot satisfy this with
+> plain ray query alone); HLSL/NVAPI (`_sm_6_3`), Metal, and CUDA/OptiX carry
+> the geometry support implicitly.
 
 `rayquery_position`
 > Collection of capabilities for rayquery + ray_tracing_position_fetch.

@@ -1020,6 +1020,7 @@ def _GL_KHR_shader_subgroup_rotate : _GLSL_140;
 def _GL_NV_compute_shader_derivatives : _GLSL_450;
 def _GL_NV_fragment_shader_barycentric : _GL_EXT_fragment_shader_barycentric;
 def _GL_NV_gpu_shader5 : _GL_ARB_gpu_shader5;
+def _GL_NV_linear_swept_spheres : _GL_EXT_ray_query;
 def _GL_NV_ray_tracing : _GL_EXT_ray_tracing;
 def _GL_NV_ray_tracing_motion_blur : _GLSL_460;
 def _GL_NV_shader_atomic_fp16_vector : _GL_NV_gpu_shader5;
@@ -1258,6 +1259,10 @@ alias GL_NV_fragment_shader_barycentric = GL_EXT_fragment_shader_barycentric;
 /// Represents the GL_NV_gpu_shader5 extension.
 /// [EXT]
 alias GL_NV_gpu_shader5 = GL_ARB_gpu_shader5;
+
+/// Represents the GL_NV_linear_swept_spheres extension.
+/// [EXT]
+alias GL_NV_linear_swept_spheres = _GL_NV_linear_swept_spheres;
 
 /// Represents the GL_NV_ray_tracing extension.
 /// [EXT]
@@ -2587,14 +2592,14 @@ alias raytracing_lss = raytracing_anyhit_closesthit | spvRayTracingLinearSweptSp
 
 /// Collection of capabilities for line-swept-spheres and sphere geometry
 /// accessed through an inline ray query. Available on any RayQuery-capable
-/// stage. On SPIR-V the sphere / linear-swept-sphere geometry capabilities are
-/// mandatory (not optional): the SPIR-V alternatives require spvRayQueryKHR
-/// together with the corresponding SPV_NV_linear_swept_spheres geometry
-/// capability, so a SPIR-V caller cannot satisfy this with plain ray query
-/// alone. The non-SPIR-V alternatives (GLSL ray query, SM 6.3 for HLSL/NVAPI,
-/// Metal, CUDA/OptiX) carry the geometry support implicitly.
+/// stage, but each target must carry its line-swept-spheres geometry support:
+/// GLSL requires `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR`
+/// together with `spvRayTracingLinearSweptSpheresGeometryNV` or
+/// `spvRayTracingSpheresGeometryNV` (so a SPIR-V caller cannot satisfy this with
+/// plain ray query alone); HLSL/NVAPI (`_sm_6_3`), Metal, and CUDA/OptiX carry
+/// the geometry support implicitly.
 /// [Compound]
-alias rayquery_lss = _GL_EXT_ray_query
+alias rayquery_lss = _GL_NV_linear_swept_spheres
                    | _sm_6_3
                    | metal
                    | cuda
