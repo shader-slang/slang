@@ -4853,14 +4853,32 @@ NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
 {
     TypeDefDecl* typeDefDecl = parser->astBuilder->create<TypeDefDecl>();
 
-    // TODO(tfoley): parse an actual declarator
+    // Parse the base type. `ParseTypeExpAllowDecl` already consumes any leading
+    // array suffix, so the leading-array form `typedef int[2] arr;` arrives here
+    // with `type` fully formed.
     auto type = parser->ParseTypeExpAllowDecl();
 
-    auto nameToken = parser->ReadToken(TokenType::Identifier);
-    typeDefDecl->loc = nameToken.loc;
+    // Parse the alias name through the shared declarator machinery rather than a bare
+    // identifier read. This accepts the full non-abstract declarator that variable
+    // declarations accept -- a name plus trailing `[N]` array suffixes, and the prefix `*`
+    // pointer / parenthesized declarator forms -- so the C-style `typedef int arr[2];` now
+    // parses where the old `ReadToken(Identifier)` rejected it. We use the bare declarator,
+    // not parseInitDeclarator, because a typedef takes no initializer or semantics.
+    //
+    // UnwrapDeclarator folds the declarator suffixes onto the base type with C
+    // array-variable semantics: `typedef int m[A][B];` yields Array<Array<int, B>, A> -- the
+    // same type as the variable `int m[A][B];`. For a single dimension that equals the
+    // leading form `typedef int[N] arr;`; for multiple dimensions the trailing form is the
+    // transpose of the leading form (which wraps left-to-right), so the two are not
+    // interchangeable beyond one dimension.
+    DeclaratorInfo declaratorInfo;
+    declaratorInfo.typeSpec = type.exp;
+    auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);
+    UnwrapDeclarator(parser->astBuilder, declarator, &declaratorInfo);
 
-    typeDefDecl->nameAndLoc = NameLoc(nameToken);
-    typeDefDecl->type = type;
+    typeDefDecl->loc = declaratorInfo.nameAndLoc.loc;
+    typeDefDecl->nameAndLoc = declaratorInfo.nameAndLoc;
+    typeDefDecl->type = TypeExp(declaratorInfo.typeSpec);
 
     AdvanceIf(parser, TokenType::Semicolon);
 
@@ -5735,13 +5753,86 @@ static bool parseGLSLGlobalDecl(Parser* parser, ContainerDecl* containerDecl)
     return false;
 }
 
-static void parseInterfaceDefaultMethodAsExplicitGeneric(
+enum class InterfaceDefaultImplBodyStatus
+{
+    None,
+    Complete,
+    Partial,
+};
+
+// Storage declarations such as subscripts and properties represent default bodies on
+// their accessors, so classify the whole accessor set before deciding how to handle it.
+static InterfaceDefaultImplBodyStatus getStorageDeclDefaultImplBodyStatus(
+    ContainerDecl* storageDecl,
+    AccessorDecl** outFirstAccessorWithBody = nullptr)
+{
+    bool hasAccessorBody = false;
+    bool hasAccessorWithoutBody = false;
+    for (auto accessorDecl : storageDecl->getDirectMemberDeclsOfType<AccessorDecl>())
+    {
+        if (accessorDecl->body)
+        {
+            if (!hasAccessorBody && outFirstAccessorWithBody)
+                *outFirstAccessorWithBody = accessorDecl;
+
+            hasAccessorBody = true;
+        }
+        else
+        {
+            hasAccessorWithoutBody = true;
+        }
+    }
+
+    if (hasAccessorBody && hasAccessorWithoutBody)
+        return InterfaceDefaultImplBodyStatus::Partial;
+
+    return hasAccessorBody ? InterfaceDefaultImplBodyStatus::Complete
+                           : InterfaceDefaultImplBodyStatus::None;
+}
+
+static InterfaceDefaultImplBodyStatus getInterfaceDefaultImplBodyStatus(
+    CallableDecl* callableDecl,
+    AccessorDecl** outFirstAccessorWithBody = nullptr)
+{
+    if (auto funcDecl = as<FuncDecl>(callableDecl))
+    {
+        return funcDecl->body != nullptr ? InterfaceDefaultImplBodyStatus::Complete
+                                         : InterfaceDefaultImplBodyStatus::None;
+    }
+
+    if (auto subscriptDecl = as<SubscriptDecl>(callableDecl))
+    {
+        // A subscript default implementation is represented by accessor bodies.
+        return getStorageDeclDefaultImplBodyStatus(subscriptDecl, outFirstAccessorWithBody);
+    }
+
+    return InterfaceDefaultImplBodyStatus::None;
+}
+
+static void removeInterfaceDefaultImplBodyFromRequirement(Decl* parsedDecl)
+{
+    auto requirementDecl = maybeGetInner(parsedDecl);
+    if (auto funcDecl = as<FuncDecl>(requirementDecl))
+    {
+        funcDecl->body = nullptr;
+    }
+    else if (auto subscriptDecl = as<SubscriptDecl>(requirementDecl))
+    {
+        // The parsed interface member remains the abstract requirement. Its accessor
+        // bodies either belong to the duplicate `InterfaceDefaultImplDecl` or have
+        // already been diagnosed as an unsupported partial default implementation.
+        for (auto accessorDecl : subscriptDecl->getDirectMemberDeclsOfType<AccessorDecl>())
+            accessorDecl->body = nullptr;
+    }
+}
+
+static void parseInterfaceDefaultCallableAsExplicitGeneric(
     Parser* parser,
     Decl* parsedDecl,
     ContainerDecl* interfaceDecl)
 {
-    // If we parsed an interface method with a body,
-    // parse it again as an explicit generic decl on ThisType.
+    // If we parsed an interface callable with a body, parse it again as an
+    // explicit generic decl on ThisType.
     auto astBuilder = parser->astBuilder;
     InterfaceDefaultImplDecl* genericDecl = astBuilder->create<InterfaceDefaultImplDecl>();
     parser->PushScope(genericDecl);
@@ -5800,31 +5891,45 @@ static void parseInterfaceDefaultMethodAsExplicitGeneric(
     }
 
     // Remove the body from the requirement decl.
-    auto requirementFunc = maybeGetInner(parsedDecl);
-    if (auto funcDecl = as<FuncDecl>(requirementFunc))
-        funcDecl->body = nullptr;
+    removeInterfaceDefaultImplBodyFromRequirement(parsedDecl);
 }
 
-static void maybeReparseInterfaceFuncAsExplicitGeneric(
+static void maybeReparseInterfaceCallableAsExplicitGeneric(
     Parser* parser,
     Decl* parsedDecl,
     ContainerDecl* containerDecl,
     TokenReader tokenReader)
 {
-    auto funcDecl = as<FuncDecl>(maybeGetInner(parsedDecl));
-    if (!funcDecl || !funcDecl->body)
+    auto callableDecl = as<CallableDecl>(maybeGetInner(parsedDecl));
+    if (!callableDecl)
+        return;
+
+    AccessorDecl* accessorWithDefaultBody = nullptr;
+    auto defaultImplBodyStatus =
+        getInterfaceDefaultImplBodyStatus(callableDecl, &accessorWithDefaultBody);
+    if (defaultImplBodyStatus == InterfaceDefaultImplBodyStatus::None)
         return;
 
     auto interfaceDecl = as<InterfaceDecl>(containerDecl);
     if (!interfaceDecl)
         return;
 
+    if (defaultImplBodyStatus == InterfaceDefaultImplBodyStatus::Partial)
+    {
+        Decl* diagnosticDecl = accessorWithDefaultBody ? static_cast<Decl*>(accessorWithDefaultBody)
+                                                       : static_cast<Decl*>(callableDecl);
+        parser->sink->diagnose(
+            Diagnostics::PartialInterfaceAccessorDefaultImplementation{.decl = diagnosticDecl});
+        removeInterfaceDefaultImplBodyFromRequirement(parsedDecl);
+        return;
+    }
+
     if (parser->sink->getErrorCount() != 0)
         return;
 
     Parser newParser(*parser);
     newParser.tokenReader = tokenReader;
-    parseInterfaceDefaultMethodAsExplicitGeneric(&newParser, parsedDecl, interfaceDecl);
+    parseInterfaceDefaultCallableAsExplicitGeneric(&newParser, parsedDecl, interfaceDecl);
 }
 
 static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedTokenType matchType)
@@ -5885,7 +5990,7 @@ static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedToke
             // as an `UnparsedStmt` at this stage of parsing, which is a relatively simple
             // process. Once we have the functionality to systematically clone AST nodes,
             // we can eliminate this reparsing hack.
-            maybeReparseInterfaceFuncAsExplicitGeneric(
+            maybeReparseInterfaceCallableAsExplicitGeneric(
                 parser,
                 as<Decl>(decl),
                 containerDecl,

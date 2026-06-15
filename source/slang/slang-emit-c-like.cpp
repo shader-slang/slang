@@ -4655,8 +4655,12 @@ void CLikeSourceEmitter::emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, 
         layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
     {
         emitInterpolationModifiers(varDecl, varType, layout);
-        emitMeshShaderModifiers(varDecl);
     }
+
+    // Mesh output decorations do not always come with a varying-output layout kind
+    // (for example, OutputVertices can lower to a plain array layout), so gate on the
+    // decoration itself instead of the layout classification.
+    emitMeshShaderModifiers(varDecl);
 
     // Output target specific qualifiers
     emitLayoutQualifiersImpl(layout);

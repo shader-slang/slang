@@ -1,43 +1,44 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:58:02+00:00
+reviewed_at: 2026-06-12T13:17:20+00:00
 target_doc: ast-reference/statements.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: ba11abbe597dfa9416ac8424c666530b1e926d860fa6eba7e8b1c87f6ff4863c
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 1e20209a27420ffb3b4a21146a697ad5de4a4148e92e47a97368c920b78d2800
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 3
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 2
-  minor: 1
+  major: 0
+  minor: 0
   nit: 0
 ---
 
 # Review report for ast-reference/statements.md
 
 ## Summary
-The statements page covers the concrete statement classes, but it still has source-alignment and prompt-completeness issues. The most important factual issue is that `CatchStmt` is described as `try ... catch` syntax even though the parser constructs it from `do ... catch`.
+No findings were identified for the statements page. The page covers all concrete statement-family FIDDLE classes, keeps abstract intermediates out of the Nodes table, and its parser/source claims matched the watched files checked in this pass.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show ast-reference/statements.md` and used the listed watched files at `52339028a2aa703271533454c6b9528a534bac31`.
-- Compared all concrete `FIDDLE()` entries in `source/slang/slang-ast-stmt.h` with the `## Nodes` table and separately checked abstract intermediates in the hierarchy diagram.
-- Read the per-document prompt, `_common.md`, and dependency docs `ast-reference/base.md` and `syntax-reference/grammar.md`.
-- Resolved all relative markdown links and anchors in the target document.
-- Spot-checked at least 12 source-alignment claims, including `BlockStmt`, `SeqStmt`, `BreakableStmt`, `ChildStmt`, `ForStmt`, `CompileTimeForStmt`, `CatchStmt`, `RequireCapabilityStmt`, labeled breaks, parser statement dispatch, `try` expression handling, and field names in the header.
-- Checked required front matter keys and verified that the target digest is a 64-character hex value.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show ast-reference/statements.md` and used the listed prompt, dependency docs, and watched files at `eb9403ef595a99c2ff6def1d538dbd7a792d9371`.
+- Compared all 30 concrete `FIDDLE()` entries in `source/slang/slang-ast-stmt.h` with the `## Nodes` table and verified that no `FIDDLE(abstract)` class appears as a row.
+- Checked immediate parent names in the Nodes table against the header declarations, including `ScopeStmt`, `BreakableStmt`, `LoopStmt`, `ChildStmt`, `CaseStmtBase`, and `JumpStmt`.
+- Spot-checked source-alignment claims for `BlockStmt`, `SeqStmt`, `IfStmt`, `SwitchStmt`, `CaseStmt`, `DefaultStmt`, `ForStmt`, `CompileTimeForStmt`, `TargetSwitchStmt`, `StageSwitchStmt`, `DeferStmt`, `CatchStmt`, `LabelStmt`, `BreakStmt`, `ContinueStmt`, `DiscardStmt`, `ExpressionStmt`, `DeclStmt`, `EmptyStmt`, and `RequireCapabilityStmt`.
+- Verified that the statement parser dispatches `do ... catch`, `try` expression statements, `$for` compile-time statements, `__target_switch`, `__stage_switch`, and `__GPU_FOREACH` consistently with the document.
+- Resolved the relative links and anchors; the body has no source line-number citations.
 
 ## Findings
 
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Nodes`, `CatchStmt` row | The `CatchStmt` row describes `try { ... } catch (e) { ... }`, but the parser builds statement-level catch handling from `do` followed by `catch`; `try` is routed as an expression statement. | `source/slang/slang-parser.cpp:6509-6512` sends `try` to `ParseExpressionStatement`, while `source/slang/slang-parser.cpp:7052-7065` reads `do` and then calls `ParseDoCatchStatement` when the next token is `catch`. | Change the `CatchStmt` summary to describe `do S catch (...) H` and remove the `try ... catch` wording from the statements page. |
-| F-002 | minor | `## Family hierarchy` and `## Nodes` | The prose says `UniqueStmtIDNode` is excluded from the `## Nodes` table because it is not parsed as a statement, but the table includes a `UniqueStmtIDNode` row. | `source/slang/slang-ast-stmt.h:92-94` declares `class UniqueStmtIDNode : public Decl`, and the target document includes it in the table despite its own exclusion note. | Either remove the `UniqueStmtIDNode` row and keep the prose note, or revise the prose to explicitly say the row is included as a helper even though it is not in the `Stmt` hierarchy. |
-| F-003 | major | `## Notable nodes` | The statement prompt requires notable-node callouts for `ReturnStmt`, `ContinueStmt`, `DiscardStmt`, and `EmptyStmt`, but these nodes appear only in the table and hierarchy, not in the `## Notable nodes` callouts. | `docs/generated/design/_meta/prompts/ast-reference-statements.md:37-46` lists those nodes under the required `## Notable nodes` coverage. | Add concise callouts or expand the existing callouts so `ReturnStmt`, `ContinueStmt`, `DiscardStmt`, and `EmptyStmt` are explicitly covered in `## Notable nodes`. |
+(no findings)
+
+## No-issues notes
+- The `UniqueStmtIDNode` row is explicitly framed as a serialized helper outside the `Stmt` hierarchy, matching its `Decl` parent in the header.
+- The `CatchStmt` row and notable callout describe `do ... catch`, while the parser routes `try` through expression-statement parsing.
+- The required notable-node coverage for block/sequence statements, branch statements, loops, returns, defer, labeled control flow, expression/declaration/empty wrappers, and capability statements is present.

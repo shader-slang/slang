@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:58:30+00:00
+reviewed_at: 2026-06-12T13:18:05+00:00
 target_doc: cross-cutting/targets.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 44ece489c777e2db22b80fbab38fd7ce4eb6569d58ded6c76fe63d582db24928
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 84097e639319e025582296c205ef440d38bd023139ac79f25b4042f2e2d3f2d4
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
   completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 1
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 1
+  major: 0
   minor: 0
   nit: 0
 ---
@@ -24,17 +24,21 @@ severity_breakdown:
 # Review report for cross-cutting/targets.md
 
 ## Summary
-The page satisfies the requested structure and all workspace-relative links resolve, but review found 1 factual source-alignment issue. The capability-system example for `raytracing` uses a stale expansion that is contradicted by the authoritative alias declaration in `slang-capabilities.capdef`.
+The targets page satisfies the prompt contract and the sampled source claims align with the recorded source commit. I found no reportable factual, structural, link, style, or front-matter issues.
 
 ## Items checked
-- Ran `regenerate.py show cross-cutting/targets.md` and used the listed prompt, dependencies, and watched files.
-- Verified required front-matter keys, source commit and watched digest shape, first paragraph, size cap, and required sections.
-- Resolved all 63 workspace-relative markdown links at target source commit `52339028a2aa703271533454c6b9528a534bac31`.
-- Spot-checked 17 source-alignment claims against `include/slang.h`, `slang-emit-*`, `slang-capabilities.capdef`, `slang-capability.*`, and `slang-profile.*`.
-- Checked target enum grouping, representative emit files, capability vocabulary, generated capability headers, `SourceLanguage`, profile declarations, target-specific pass references, and add-target checklist.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show cross-cutting/targets.md` and reviewed the per-doc prompt, `_common.md`, resolved watched files, and dependencies `architecture/overview.md` and `pipeline/06-emit.md`.
+- Checked front matter for required keys, source commit, watched-path digest, and warning string.
+- Verified required coverage for target rows, capability-system vocabulary, profiles, target-sensitive IR behavior, per-target pipelines, and the add-target checklist.
+- Spot-checked more than 10 source claims against `include/slang.h`, `slang-emit-*`, `slang-capabilities.capdef`, `slang-capability.h`, `slang-capability.cpp`, `slang-profile.h`, `slang-profile.cpp`, `slang-profile-defs.h`, and `slang-target.cpp`.
+- Checked that target rows point at existing emit files and that the `raytracing` capability example matches the current alias declaration.
+- Checked relative links and peer links used by the page; no unresolved target was found.
+- Checked that the body has no source line-number citations requiring line-by-line verification.
 
 ## Findings
+(no findings)
 
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | major | `### Vocabulary` | The page states that `raytracing` expands to GLSL ray tracing, SPIR-V ray tracing, or HLSL shader model 6.4 capability alternatives. The authoritative alias later in the same capability file is different: it expands to `GL_EXT_ray_tracing`, `_sm_6_3`, or `cuda`. | `source/slang/slang-capabilities.capdef` line 1312 declares `alias raytracing = GL_EXT_ray_tracing` plus `_sm_6_3` plus `cuda`; the top-of-file comment at lines 15-18 is only an example and is stale relative to the declaration. | Update the example to match the alias declaration, or avoid naming `raytracing` and use a capability expression that is not contradicted by the actual `.capdef` entry. |
+## No-issues notes
+- The public target table matches the sampled `SlangCompileTarget` enum entries in `include/slang.h`.
+- The capability vocabulary aligns with the introductory comments and declarations in `source/slang/slang-capabilities.capdef`.
+- The profile discussion matches `Profile`, `Stage`, and profile-definition X-macros in `source/slang/slang-profile.*`.

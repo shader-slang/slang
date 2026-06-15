@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:05:36+00:00
+reviewed_at: 2026-06-12T12:06:07+00:00
 target_doc: ir-reference/control-flow.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
   factual_accuracy: pass
   cross_references: pass
@@ -24,14 +24,14 @@ severity_breakdown:
 # Review report for ir-reference/control-flow.md
 
 ## Summary
-No findings were identified in this independent review. The page covers the required control-flow opcode set, resolves its relative links, and the sampled source claims matched the watched files at the target source commit.
+No findings were identified. The page satisfies the control-flow prompt structure, covers the required `block`, `Param`, and `TerminatorInst` entries, and the sampled source claims matched the watched files at the target source commit.
 
 ## Items checked
-- Ran `regenerate.py show ir-reference/control-flow.md` and checked the resolved watched files and dependencies.
-- Verified front matter keys, target source commit, watched-path digest shape, 12 relative links, required IR-reference sections, and table columns.
-- Checked all 25 opcode table rows against `slang-ir-insts.lua`, including `block`, `param`, every `TerminatorInst` leaf, `discard`, `gpuForeach`, and the adjacent requirement or assertion opcodes.
-- Spot-checked more than 10 factual claims about operand counts, wrappers, flags, AST origins, and notable opcode behavior against `slang-ir-insts.lua`, `slang-ir-insts.h`, `slang-ir.h`, `slang-ir.cpp`, and `slang-lower-to-ir.cpp`.
+- Ran `regenerate.py show ir-reference/control-flow.md` and used its prompt path, watched files, and dependencies.
+- Read `_common.md`, `ir-reference-control-flow.md`, the full target document, `cross-cutting/ir-instructions.md`, `pipeline/04-ast-to-ir.md`, and `ast-reference/statements.md`.
+- Verified front matter keys, target source commit, watched-path digest shape, required IR-reference sections, table columns, and all relative links via source inspection plus pending lint.
+- Checked all 25 opcode table rows against `source/slang/slang-ir-insts.lua`, including `block`, `param`, every `TerminatorInst` leaf, `discard`, `gpuForeach`, and adjacent `Require*`/assertion rows.
+- Spot-checked more than 10 factual claims: Lua line ranges, `IRBlock`/`IRParam` wrappers, `Parent` flag on `block`, `Return` wrapper, branch operand counts, `tryCall` operands, `defer` operands, `discard` non-terminator status, statement visitor origins, and flag meanings in `slang-ir.h`.
 
 ## Findings
-
 (no findings)
