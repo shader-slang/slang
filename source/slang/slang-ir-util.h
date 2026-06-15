@@ -180,10 +180,7 @@ void collectFlattenedVariadicOperandsImpl(
 template<typename TList>
 void collectFlattenedVariadicOperands(IRInst* inst, Index firstOperandIndex, TList& outOperands)
 {
-    collectFlattenedVariadicOperandsImpl(
-        IRInstOperandSource{inst},
-        firstOperandIndex,
-        outOperands);
+    collectFlattenedVariadicOperandsImpl(IRInstOperandSource{inst}, firstOperandIndex, outOperands);
 }
 
 /// Collects variadic operands from an operand view, unwrapping a single `MakeStruct` when present.
