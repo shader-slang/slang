@@ -1289,6 +1289,57 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
             newArgs.add(nonEmptyPackWitness);
         }
         else if (
+            auto packCountConstraintDecl =
+                as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
+        {
+            // `TryCheckOverloadCandidateConstraints` runs after ordinary
+            // overload checks have selected a generic candidate. Rebuild the
+            // constraint decl-ref with the candidate's current argument list so
+            // the shared proof helper sees the same substituted `(pack, count)`
+            // pair that lowering will later receive as a hidden witness arg.
+            DeclRef<GenericVariadicPackCountConstraintDecl> constraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        genericDeclRef,
+                        newArgs.getArrayView().arrayView,
+                        packCountConstraintDecl)
+                    .as<GenericVariadicPackCountConstraintDecl>();
+
+            DeclRef<Decl> constrainedPackDeclRef;
+            if (auto declRefExpr = getPackCountConstraintPackExpr(m_astBuilder, constraintDeclRef)
+                                       .as<DeclRefExpr>())
+            {
+                constrainedPackDeclRef = getDeclRef(m_astBuilder, declRefExpr);
+            }
+
+            Val* constrainedArg = nullptr;
+            if (auto typePackDeclRef = constrainedPackDeclRef.as<GenericTypePackParamDecl>())
+            {
+                auto typePackDecl = typePackDeclRef.getDecl();
+                if (typePackDecl->parameterIndex < newArgs.getCount())
+                    constrainedArg = newArgs[typePackDecl->parameterIndex];
+            }
+            else if (auto valuePackDeclRef = constrainedPackDeclRef.as<GenericValuePackParamDecl>())
+            {
+                auto valuePackDecl = valuePackDeclRef.getDecl();
+                if (valuePackDecl->parameterIndex < newArgs.getCount())
+                    constrainedArg = newArgs[valuePackDecl->parameterIndex];
+            }
+
+            auto expectedCount =
+                getPackCountConstraintExpectedCount(m_astBuilder, constraintDeclRef);
+            auto packCountWitness = findVariadicPackCountWitnessForConstraint(
+                m_astBuilder,
+                this,
+                constrainedArg,
+                expectedCount,
+                &context,
+                context.mode != OverloadResolveContext::Mode::JustTrying);
+            if (!packCountWitness)
+                return false;
+            newArgs.add(packCountWitness);
+        }
+        else if (
             auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
         {
             // Differentiability constraints use the shared helper so the
@@ -1393,6 +1444,26 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
     // special case for generic argument inference failure
     if (candidate.status == OverloadCandidate::Status::GenericArgumentInferenceFailed)
     {
+        // Pack-count mismatches can fail during generic argument solving before
+        // the candidate has a specialized decl-ref. The solver records the
+        // concrete `(expected, actual)` pair, and this final selected-candidate
+        // path emits the focused diagnostic instead of the generic fallback.
+        if (candidate.genericInferenceFailure.kind ==
+            GenericArgumentInferenceFailure::Kind::VariadicPackCountMismatch)
+        {
+            auto& failure = candidate.genericInferenceFailure.variadicPackCountMismatch;
+            getSink()->diagnose(Diagnostics::VariadicPackCountDoesNotMatch{
+                .expectedCount = failure.expectedCount,
+                .actualCount = failure.actualCount,
+                .location = failure.location});
+
+            String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+            getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                .signature = declString,
+                .location = candidate.item.declRef.getLoc()});
+            goto error;
+        }
+
         String callString = getCallSignatureString(context);
         getSink()->diagnose(Diagnostics::GenericArgumentInferenceFailed{
             .args = callString,
@@ -2649,7 +2720,8 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     OverloadResolveContext& context,
     ArrayView<Val*> providedOrdinaryArgs,
     ConversionCost& outBaseCost,
-    List<QualType>* innerParameterTypes)
+    List<QualType>* innerParameterTypes,
+    GenericArgumentInferenceFailure* outFailure)
 {
     // The call site may have already provided some ordinary generic arguments,
     // such as the `int` in `foo<int>(x)`. The remaining ordinary arguments and
@@ -2666,6 +2738,10 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     // `vector<float, 4>` contributes constraints like `T = float` and `N = 4`.
     GenericInferenceContext inferenceContext;
     inferenceContext.genericDecl = genericDeclRef.getDecl();
+    inferenceContext.failure = outFailure;
+    inferenceContext.applicationLoc = context.loc;
+    if (outFailure)
+        *outFailure = GenericArgumentInferenceFailure();
 
     // Function-like generics infer ordinary arguments by matching value-level
     // call arguments against the generic function's parameter types. Other
@@ -2825,8 +2901,14 @@ void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
     ConversionCost baseCost = kConversionCost_None;
 
     // Try to infer generic arguments, based on the context
-    DeclRef<Decl> innerRef =
-        inferGenericArguments(genericDeclRef, context, providedOrdinaryArgs, baseCost);
+    GenericArgumentInferenceFailure genericInferenceFailure;
+    DeclRef<Decl> innerRef = inferGenericArguments(
+        genericDeclRef,
+        context,
+        providedOrdinaryArgs,
+        baseCost,
+        nullptr,
+        &genericInferenceFailure);
 
     if (innerRef)
     {
@@ -2847,6 +2929,7 @@ void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
         candidate.item = genericItem;
         candidate.flavor = OverloadCandidate::Flavor::UnspecializedGeneric;
         candidate.status = OverloadCandidate::Status::GenericArgumentInferenceFailed;
+        candidate.genericInferenceFailure = genericInferenceFailure;
 
         AddOverloadCandidateInner(context, candidate);
     }
