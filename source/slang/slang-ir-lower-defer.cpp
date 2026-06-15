@@ -33,7 +33,12 @@ struct DeferLoweringContext : InstPassBase
         }
     }
 
-    // Returns the new last block.
+    // Inline the blocks for a `defer` before `beforeInst`, preserving the remaining
+    // instructions in `targetBlock` after the inlined cleanup. If the cleanup has
+    // multiple blocks, this splices cloned defer blocks after `targetBlock`, branches
+    // from `targetBlock` to the first clone, moves `beforeInst` and following
+    // instructions to the cloned block that originally branched to `mergeBlock`, and
+    // returns that new last block so callers can keep mapping the old scope exit.
     IRBlock* inlineDefer(
         IRInst* beforeInst,
         IRBlock* targetBlock,
