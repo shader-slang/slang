@@ -1844,6 +1844,62 @@ err(
     span { loc = "expr:Expr", message = "this pack parameter is declared outside the current generic" }
 )
 
+err(
+    "invalid-variadic-pack-count-constraint-target",
+    30430,
+    "`countof(...)` pack-count constraint requires a generic type pack or value pack parameter",
+    span { loc = "expr:Expr", message = "expected a direct reference to a generic pack parameter here" }
+)
+
+err(
+    "variadic-pack-count-constraint-target-must-be-from-current-generic",
+    30431,
+    "`countof(...)` pack-count constraint target must be declared in the current generic",
+    span { loc = "expr:Expr", message = "this pack parameter is declared outside the current generic" }
+)
+
+err(
+    "invalid-variadic-pack-count-constraint-count",
+    30432,
+    "`countof(...)` pack-count constraint requires a compile-time integer count",
+    span { loc = "expr:Expr", message = "expected a compile-time integer expression here" }
+)
+
+err(
+    "variadic-pack-count-does-not-match",
+    30433,
+    "pack count does not satisfy `countof(...)` constraint",
+    span { loc = "location", message = "expected ~expectedCount:Int elements, but pack argument has ~actualCount:Int" }
+)
+
+err(
+    "optional-variadic-pack-count-constraint-is-invalid",
+    30434,
+    "`optional countof(...)` pack-count constraint is not meaningful",
+    span { loc = "expr:Expr", message = "remove `optional` from this `countof(...)` constraint" }
+)
+
+err(
+    "variadic-pack-count-proof-unavailable",
+    30435,
+    "`countof(...)` pack-count constraint is not satisfied",
+    span { loc = "expr:Expr", message = "cannot prove the required `countof(...)` pack-count constraint for this specialization" }
+)
+
+err(
+    "variadic-pack-count-constraint-requires-equality",
+    30436,
+    "`countof(...)` pack-count constraint requires '=='",
+    span { loc = "location", message = "use '==' for a `countof(...)` pack-count constraint" }
+)
+
+err(
+    "variadic-pack-count-constraint-requires-countof-on-left",
+    30437,
+    "`countof(...)` pack-count constraint must be written with `countof(...)` on the left side",
+    span { loc = "location", message = "write this constraint as `countof(Pack) == IntExpr`" }
+)
+
 -- Float bit cast diagnostics
 
 err(
