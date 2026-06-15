@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:38:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: fcfe91e111a6ac8caf6474a3c896282098f36eaaf23bfc11208dcafc53594873
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:15:50Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: d6bb63223a0f2c41cb6dae09f1e45a4ddd44111fc422e5baf80f5ec043e38517
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -96,7 +96,7 @@ is authoritative.
 | `VarDecl` (global) | An `IRGlobalVar` |
 | `VarDecl` (local) | An `IRVar` allocated inside a block |
 | `StructDecl` | An `IRStructType` with `IRStructField` children |
-| `InterfaceDecl` | An `IRInterfaceType` plus per-method requirement insts |
+| `InterfaceDecl` | An `IRInterfaceType` whose requirement-key entries are `IRStructKey`s or hoistable `IRBuiltinRequirementKey`s (see [Generics and existentials](#generics-and-existentials)) |
 | `GenericDecl` | An `IRGeneric` (a function-shaped instruction whose body computes type-level values) |
 | `BlockStmt` | A sequence of basic blocks; locals turn into `IRVar` |
 | `IfStmt`, `ForStmt`, `WhileStmt`, `SwitchStmt` | Structured branches whose join point is an explicit operand on the terminator (see [../../../design/ir.md](../../../design/ir.md) for the structured-CFG encoding) |
@@ -129,15 +129,49 @@ Witness tables (computed by
 become `IRWitnessTable` insts whose entries map interface
 requirements to the concrete implementations.
 
+Each interface requirement is identified by a *requirement key*.
+`getInterfaceRequirementKey` in
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+returns an `IRInst*` (cached per requirement `Decl` in
+`SharedIRGenContext::interfaceRequirementKeys`) of one of two shapes:
+
+- For an ordinary requirement (most methods, associated types), a
+  per-decl `IRStructKey` that is a distinct `global` symbol unified
+  across modules by its `key_<mangled>` linkage name.
+- For a *recognized built-in* requirement — one tagged with
+  `BuiltinRequirementModifier` (e.g. `IDifferentiable.Differential`,
+  `.dzero`, `.dadd`), or the conformance constraint of such a built-in
+  associated type — a hoistable `IRBuiltinRequirementKey` whose identity
+  is its `BuiltinRequirementKind` operand. Because it is hoistable, the
+  same logical built-in requirement deduplicates to a single key inst
+  across decls and across the precompiled-core-module boundary, so a
+  witness lookup and the witness-table entry always agree. The key also
+  carries an `IRBuiltinRequirementDecoration` so role-scanning consumers
+  (autodiff) can find a requirement by role rather than by position in
+  the requirement list. The witness-table entry's `lookupKey` operand
+  is therefore typed `IRInst` (not `IRStructKey`).
+
+`visitGenericTypeConstraintDecl` lowers a constraint that is a direct
+member of an `InterfaceDecl` (an interface-level `__constraint`, see
+[03-semantic-check.md](03-semantic-check.md)) as the requirement key for
+that requirement, and a non-equality subtype constraint relocated to
+interface level gets a `WitnessTableType` requirement value, matching
+how the bound was lowered when nested inside the associated type.
+
 ## Diagnostics during lowering
 
 Most diagnostic-worthy issues are caught in semantic checking, but a
 handful of constructs become problems only when lowering tries to
 encode them — typically because a feature is unsupported on a given
-target or a synthesized witness cannot be produced. Lowering errors
-flow through the same `DiagnosticSink` used by the rest of the
-front-end (see
-[../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md)).
+target or a synthesized witness cannot be produced. For example, when
+the assignment-lowering switch in
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+reaches an assignment whose left-hand side it cannot encode, it now
+emits `Diagnostics::UnsupportedAssignmentTarget` (recovering the
+nearest non-zero source location from the builder's source-loc info)
+rather than aborting via `SLANG_UNIMPLEMENTED_X`. Lowering errors flow
+through the same `DiagnosticSink` used by the rest of the front-end
+(see [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md)).
 
 ## Module-level outputs
 
@@ -169,6 +203,8 @@ IR-pass pipeline:
   or `performMandatoryEarlyInlining` run, and what gates them?".
 - [04c-layout-ir.md](04c-layout-ir.md) — `TargetProgram::createIRModuleForLayout`
   builds a separate, per-target IR module whose only contents are
-  `IRLayoutDecoration`s on stub globals and entry points. It does
-  not run the mandatory passes above and is not fed into
-  `linkAndOptimizeIR`.
+  `IRLayoutDecoration`s on stub globals and entry points. It is not
+  the executable per-translation-unit module and does not run the
+  mandatory passes above, but an existing layout module is considered
+  by `linkIR` (`slang-ir-link.cpp` lines 2120-2127) so its
+  layout-decorated global symbols participate in linking.

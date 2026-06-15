@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-12T12:06:07+00:00
 target_doc: ir-reference/control-flow.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: fail
+  completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 1
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 1
+  major: 0
   minor: 0
   nit: 0
 ---
@@ -24,13 +24,14 @@ severity_breakdown:
 # Review report for ir-reference/control-flow.md
 
 ## Summary
-The page is structurally lint-clean, but review found 1 finding; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+No findings were identified. The page satisfies the control-flow prompt structure, covers the required `block`, `Param`, and `TerminatorInst` entries, and the sampled source claims matched the watched files at the target source commit.
 
 ## Items checked
-- Checked block/param rows, terminator rows, other control-flow rows, source control-flow ranges, relative links, and front matter.
+- Ran `regenerate.py show ir-reference/control-flow.md` and used its prompt path, watched files, and dependencies.
+- Read `_common.md`, `ir-reference-control-flow.md`, the full target document, `cross-cutting/ir-instructions.md`, `pipeline/04-ast-to-ir.md`, and `ast-reference/statements.md`.
+- Verified front matter keys, target source commit, watched-path digest shape, required IR-reference sections, table columns, and all relative links via source inspection plus pending lint.
+- Checked all 25 opcode table rows against `source/slang/slang-ir-insts.lua`, including `block`, `param`, every `TerminatorInst` leaf, `discard`, `gpuForeach`, and adjacent `Require*`/assertion rows.
+- Spot-checked more than 10 factual claims: Lua line ranges, `IRBlock`/`IRParam` wrappers, `Parent` flag on `block`, `Return` wrapper, branch operand counts, `tryCall` operands, `defer` operands, `discard` non-terminator status, statement visitor origins, and flag meanings in `slang-ir.h`.
 
 ## Findings
-
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | major | lines 132-140 | The “Other control-flow opcodes” table omits concrete opcodes adjacent to included `RequirePrelude`, `StaticAssert`, and `Printf` entries. | `source/slang/slang-ir-insts.lua:1381-1389` defines `RequirePrelude`, `RequireTargetExtension`, `RequireComputeDerivative`, `StaticAssert`, `Printf`, `RequireMaximallyReconverges`, and `RequireQuadDerivatives`. | Add the four missing `Require*` rows or move the whole group to another page consistently. |
+(no findings)

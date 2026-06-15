@@ -1297,7 +1297,7 @@ err(
     "expected-a-type",
     30060,
     "expected a type",
-    span { loc = "expr:Expr", message = "expected a type, got a '~whatWeGot'" }
+    span { loc = "expr:Expr", message = "expected a type, got ~whatWeGot" }
 )
 
 err(
@@ -2986,6 +2986,16 @@ err(
 )
 
 err(
+    "partial-interface-accessor-default-implementation",
+    30318,
+    "partial interface accessor default implementation",
+    span {
+        loc = "decl:Decl",
+        message = "interface accessor default implementation is incomplete; define all accessors or none."
+    }
+)
+
+err(
     "interface-requirement-cannot-be-override",
     30312,
     "interface requirement cannot override",
@@ -3249,6 +3259,13 @@ warning(
     30407,
     "failed to resolve canonical order of generic equality constraint",
     span { loc = "decl:Decl", message = "failed to resolve canonical order of generic equality constraint" }
+)
+
+err(
+    "constraint-subject-cannot-be-this-type",
+    30427,
+    "the subject of a constraint cannot be the 'This' type",
+    span { loc = "typeExp:Expr", message = "constrain an associated type such as 'This.A' here, or use an inheritance clause (e.g. 'interface IFoo : IBar') to give an interface a base" }
 )
 
 --
@@ -4475,6 +4492,13 @@ err(
 )
 
 err(
+    "unsupported-assignment-target",
+    40017,
+    "assignment target is not supported",
+    span { loc = "location", message = "this form of assignment is not currently supported; consider assigning to the whole value instead of an individual element" }
+)
+
+err(
     "cannot-unroll-loop",
     40020,
     "loop unrolling failed",
@@ -4572,6 +4596,20 @@ warning(
     41033,
     "use of uninitialized value",
     span { loc = "location", message = "use of uninitialized value of type '~typeName'" }
+)
+
+warning(
+    "possibly-using-uninitialized-variable",
+    41035,
+    "possible use of uninitialized variable",
+    span { loc = "location", message = "variable '~varName' may be uninitialized on some paths; it is only conditionally assigned" }
+)
+
+warning(
+    "possibly-using-uninitialized-value",
+    41036,
+    "possible use of uninitialized value",
+    span { loc = "location", message = "value of type '~typeName' may be uninitialized on some paths; it is only conditionally assigned" }
 )
 
 warning(
@@ -4796,6 +4834,49 @@ warning(
     "`-trace-coverage-reserved-space` does not apply to this target; ignoring reserved spaces"
 )
 
+err(
+    "coverage-manifest-output-without-coverage",
+    45108,
+    "`-coverage-manifest-output` requires a coverage tracing option; use `-trace-coverage`, `-trace-function-coverage`, or `-trace-branch-coverage`"
+)
+
+err(
+    "coverage-manifest-output-multiple-artifacts",
+    45109,
+    "`-coverage-manifest-output` path '~path' is not supported for multiple coverage-instrumented artifacts; use per-artifact `<output>.coverage-manifest.json` sidecars or compile each target separately"
+)
+
+err(
+    "coverage-manifest-output-collides-with-artifact",
+    45110,
+    "`-coverage-manifest-output` path '~path' must differ from any artifact output path emitted by this compile"
+)
+
+err(
+    "coverage-manifest-output-with-container",
+    45111,
+    "`-coverage-manifest-output` is not supported when writing a container output"
+)
+
+err(
+    "coverage-manifest-output-without-coverage-data",
+    45112,
+    "`-coverage-manifest-output` path '~path' was requested, but the selected target did not produce coverage metadata"
+)
+
+err(
+    "coverage-counter-width-invalid",
+    45113,
+    "`-trace-coverage-counter-width` value is invalid",
+    span { loc = "location", message = "option `-trace-coverage-counter-width` accepts only `32` or `64`, but got `~parsedValue:Int`. uint64 (the default) effectively cannot wrap; uint32 wraps silently at 2^32 hits per slot but is needed when the runtime driver does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon)." }
+)
+
+err(
+    "coverage-counter-width-bytes-invalid",
+    45114,
+    "coverage counter width API option value is invalid: the `CompilerOptionName::TraceCoverageCounterByteWidth` API option accepts only `4` (uint32) or `8` (uint64), but got `~byteWidth:Int`. This is the API-path counterpart to `E45113` (the CLI parser, which validates bits 32/64 before storing the byte width here); a host setting the API option directly must pass the byte width (divide bits by 8), not the bit width."
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(
@@ -4895,6 +4976,13 @@ err(
     50060,
     "invalid mesh output topology",
     span { loc = "location", message = "Invalid mesh stage output topology '~topology' for target '~target', must be one of: ~validTopologies" }
+)
+
+err(
+    "invalid-stage-output-topology",
+    50061,
+    "invalid output topology",
+    span { loc = "location", message = "Invalid output topology '~topology' for stage '~stage', must be one of: ~validTopologies" }
 )
 
 err(

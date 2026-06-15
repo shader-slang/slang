@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-28T09:03:07+00:00
+reviewed_at: 2026-06-12T12:04:49+00:00
 target_doc: pipeline/06-emit.md
-target_doc_source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-target_doc_watched_paths_digest: a36bfc191a0ab4adb9168e61c6ea332b786bc78e7f29a88ec21d3e53fc1f4f9b
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 77f4f05b3dc0ad28bce5954a34b857ef3d07af59deedcfa5c6b2acfb674fa265
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
   factual_accuracy: pass
   cross_references: pass
@@ -24,17 +24,24 @@ severity_breakdown:
 # Review report for pipeline/06-emit.md
 
 ## Summary
-No findings were identified in this follow-up review. The prior front-matter / freshness-ledger findings have been remediated, and the sampled source claims checked in this pass are supported by the source tree.
+
+The emission page conforms to its prompt and matched the sampled dispatcher/backend sources. I found no findings.
 
 ## Items checked
-- Checked front matter against `_meta/freshness.json` and current digest after remediation of the stale/fresh ledger mismatch.
-- Verified the target document front matter against `docs/generated/design/_meta/freshness.json` and the current `regenerate.py digest` result.
-- Ran the generated-doc linter before and after updating the review records.
+
+- Ran `regenerate.py show pipeline/06-emit.md` and read the target page, `_common.md`, `pipeline-06-emit.md`, and dependency `pipeline/05-ir-passes.md`.
+- Verified front matter keys, recorded source commit, and 64-character hex watched-path digest.
+- Spot-checked 17 emission claims against `source/slang/slang-emit.cpp`, `source/slang/slang-emit-c-like.h`, `source/slang/slang-emit-source-writer.h`, `source/slang/slang-emit-source-writer.cpp`, and representative backend files.
+- Confirmed backend subsections exist for all prompt-listed emit backends and that shared C-like, source-writer, precedence, prelude, dependency-file, and add-backend sections are present.
+- Checked dispatcher claims against `CodeGenContext::emitEntryPointsSourceFromIR`, including `SourceWriter` setup, backend selection, `linkAndOptimizeIR`, `simplifyForEmit`, `emitModule`, prelude emission, and artifact creation.
+- Resolved relative links with `regenerate.py lint` for this assigned doc group; lint reported no issues.
 
 ## Findings
 
 (no findings)
 
 ## No-issues notes
-- The document front matter now matches the freshness ledger entry.
-- The current digest computed by `regenerate.py digest` matches the document front matter.
+
+- The textual backend sharing description matches `CLikeSourceEmitter` and `emitModuleImpl` structure.
+- The line-directive/source-map discussion is backed by `SourceWriter` declarations and implementation.
+- The backend list does not invent a backend outside the watched `slang-emit-*.cpp` files.

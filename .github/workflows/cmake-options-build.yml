@@ -50,7 +50,7 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           sparse-checkout: .github/cmake-options-matrix.json
           sparse-checkout-cone-mode: false
@@ -69,12 +69,16 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      # Keep macOS option sweeps from building DXC from source. The
+      # SLANG_DXC_BUILD_FROM_SOURCE matrix entry still tests OFF.
+      SLANG_CI_DXC_BUILD_FROM_SOURCE: ${{ inputs.os == 'macos' && '-DSLANG_DXC_BUILD_FROM_SOURCE=OFF' || '' }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           submodules: "recursive"
           fetch-depth: "2"
@@ -98,7 +102,11 @@ jobs:
 
       - name: Set up MSVC cross-compilation
         if: inputs.os == 'windows' && inputs.arch != ''
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        # msvc-dev-cmd has no Node 24 release yet (upstream ilammy/msvc-dev-cmd#105);
+        # force its node20 runtime onto node24 to clear the deprecation warning.
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           arch: ${{ inputs.arch }}
 
@@ -130,6 +138,7 @@ jobs:
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DSLANG_USE_SCCACHE=OFF \
+                $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 -LA 2>/dev/null \
               | grep -E "^${option}:(BOOL|STRING)=" \
               | sed 's/.*=//' \
@@ -162,6 +171,7 @@ jobs:
               -DSLANG_USE_SCCACHE=OFF \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
               $generators_path \
+              $SLANG_CI_DXC_BUILD_FROM_SOURCE \
               "-D${option}=${value}" \
               ${{ matrix.extra_cmake_flags || '' }}
           else
@@ -170,6 +180,7 @@ jobs:
               -DSLANG_USE_SCCACHE=OFF \
               -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
               $generators_path \
+              $SLANG_CI_DXC_BUILD_FROM_SOURCE \
               "-D${option}=${value}" \
               ${{ matrix.extra_cmake_flags || '' }}
           fi

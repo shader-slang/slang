@@ -326,6 +326,14 @@ struct OverloadCandidate
     // arguments so that we don't have to repeat work across checking
     // phases. Currently this is only needed for generics.
     SubstitutionSet subst;
+
+    // For a generic candidate, the number of leading ordinary generic arguments
+    // that were supplied explicitly (as opposed to filled from a parameter's
+    // default). `TryCheckOverloadCandidateConstraints` hands this prefix to the
+    // generic constraint solver so defaults and witness arguments are resolved by
+    // the solver's fixpoint -- the same path used for inferred generic arguments
+    // -- rather than a separate linear pass. -1 until computed.
+    Index explicitGenericArgCount = -1;
 };
 
 struct ResolvedOperatorOverload
@@ -779,6 +787,21 @@ struct SharedSemanticsContext : public RefObject
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
 
+    // Whether the `glsl` module has been imported into this checking session. Set when the
+    // `glsl` import is handled (see `importModuleIntoScope`), rather than scanning the imported
+    // module list on demand, because the builtin-operator fast path consults
+    // `isGLSLOperatorScope()` for every operator expression.
+    bool m_isGLSLModuleImported = false;
+
+public:
+    /// Is the current checking session in GLSL operator scope? True when `-allow-glsl` is set or
+    /// the `glsl` module has been imported (its overloads give builtin operators GLSL semantics).
+    bool isGLSLOperatorScope()
+    {
+        return getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL) ||
+               m_isGLSLModuleImported;
+    }
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
@@ -817,6 +840,18 @@ public:
     /// Invalidate inheritance info for `type`
     void invalidateInheritanceInfo(Type* type);
 
+    /// Try to resolve the endpoint types of `constraintDeclRef` enough to match it
+    /// during inheritance computation, for both constraint scans in
+    /// `_calcInheritanceInfo` (the access-centric scan for associated-type accesses and
+    /// the sub-centric scan for generic type parameters). A leaf endpoint is resolved
+    /// eagerly; an unresolved multi-level (member-expression) endpoint is NOT resolved
+    /// (doing so would re-enter the in-progress type).
+    ///
+    /// Returns true if the endpoints are resolved and the caller may proceed to match
+    /// the constraint; false if a multi-level endpoint is still unresolved (the caller
+    /// then defers the constraint and records it as an in-progress skip).
+    bool tryResolveConstraintTypes(DeclRef<GenericTypeConstraintDecl> constraintDeclRef);
+
     void registerAssociatedDecl(Decl* original, DeclAssociationKind assoc, Decl* declaration);
 
     List<RefPtr<DeclAssociation>> const& getAssociatedDeclsForDecl(Decl* decl);
@@ -842,15 +877,27 @@ public:
 
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker() { return &m_glslBindingOffsetTracker; }
 
-    /// Get the processed inheritance information for `type`, including all its facets
+    /// Get the processed inheritance information for `type`, including all its facets.
+    ///
+    /// `ioSkippedIncompleteFacet` is an internal accumulator used to make
+    /// inheritance computation tolerant of *benevolent* cycles introduced by
+    /// equality constraints (e.g. an interface `__constraint A == B`, which
+    /// makes `T.A` and `T.B` mutual bases). When a computation has to skip a
+    /// constraint because its base type is still being computed (an ancestor on
+    /// the call stack), the skipped ancestor's `DeclRef` is recorded here so the
+    /// caller can tell its result is *contextual* (partial) and must not be
+    /// cached. External callers leave it null. See `_getInheritanceInfo` for the
+    /// "skipped-ancestors minus self" completeness rule.
     InheritanceInfo getInheritanceInfo(
         Type* type,
-        InheritanceCircularityInfo* circularityInfo = nullptr);
+        InheritanceCircularityInfo* circularityInfo = nullptr,
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet = nullptr);
 
     /// Get the processed inheritance information for `extension`, including all its facets
     InheritanceInfo getInheritanceInfo(
         DeclRef<ExtensionDecl> const& extension,
-        InheritanceCircularityInfo* circularityInfo = nullptr);
+        InheritanceCircularityInfo* circularityInfo = nullptr,
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet = nullptr);
 
     /// Prevent an unsupported case of
     /// ```
@@ -914,14 +961,24 @@ private:
     InheritanceInfo _getInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
-        InheritanceCircularityInfo* circularityInfo);
+        InheritanceCircularityInfo* circularityInfo,
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet = nullptr);
 
-    InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
+    InheritanceInfo _calcInheritanceInfo(
+        Type* type,
+        InheritanceCircularityInfo* circularityInfo,
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet);
 
     InheritanceInfo _calcInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
-        InheritanceCircularityInfo* circularityInfo);
+        InheritanceCircularityInfo* circularityInfo,
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet);
+
+    /// True if inheritance info for `type` is currently being computed (its
+    /// cache entry is marked in-progress) -- i.e. `type` is an ancestor on the
+    /// current inheritance-computation stack. Used to detect benevolent cycles.
+    bool _isInheritanceInfoBeingComputed(Type* type);
 
     UInt getDeclExtensionEpoch(Decl* decl) const;
     void bumpDeclExtensionEpoch(Decl* decl);
@@ -2534,6 +2591,14 @@ public:
         ConstantFoldingKind kind,
         ConstantFoldingCircularityInfo* circularityInfo);
 
+    /// Constant-fold a builtin-operator fast-path node (`a + b`, `N / 2`, etc.), producing a
+    /// concrete `ConstantIntVal`, a `PolynomialIntVal` (for `+`/`-`/`*`), or a decl-free
+    /// `BuiltinOperationIntVal` when operands are still symbolic.
+    IntVal* tryConstantFoldBuiltinOperatorExpr(
+        SubstExpr<BuiltinOperatorExpr> expr,
+        ConstantFoldingKind kind,
+        ConstantFoldingCircularityInfo* circularityInfo);
+
     /// Try to apply front-end constant folding to determine the value of `expr`.
     IntVal* tryConstantFoldExpr(
         SubstExpr<Expr> expr,
@@ -3562,6 +3627,11 @@ public:
 
     Expr* visitInvokeExpr(InvokeExpr* expr);
 
+    // A `BuiltinOperatorExpr` is produced already-checked by `convertToBuiltinArithmeticOp`
+    // (during `visitInvokeExpr`), so checking it is a no-op; this exists for visitor
+    // completeness / idempotent re-checks.
+    Expr* visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr);
+
     Expr* visitSelectExpr(SelectExpr* expr);
 
     Expr* visitVarExpr(VarExpr* expr);
@@ -3656,6 +3726,59 @@ public:
 private:
     // Convert the logic operator expression to not use 'InvokeExpr' type
     Expr* convertToLogicOperatorExpr(InvokeExpr* expr);
+
+    // Recognize an ordinary builtin operator on builtin scalar/vector/matrix operands and
+    // rewrite it directly to a `BuiltinOperatorExpr` carrying the resolved `BuiltinOperationKind`,
+    // returning null when the operator should instead go through normal overload resolution.
+    //
+    // This exists for performance: the vast majority of operators in real shader code are builtin
+    // arithmetic/comparison/bitwise/unary ops on numeric scalars/vectors/matrices, and routing
+    // each one through full generic `operator OP` overload resolution (candidate collection,
+    // inference, coercion) is a large front-end cost. Handling them here lets the common case skip
+    // all of that and lower straight to the corresponding builtin IR op.
+    //
+    // Recognized: `+ - * / %`, `== != < > <= >=`, `& | ^ << >>`, and unary `- ! ~` on builtin
+    // integer/floating-point/bool operands (same-type operands as-is; different builtin types
+    // promoted via `getBuiltinArithmeticCommonType`). Returns null to fall back to normal
+    // resolution for: the short-circuiting `&&`/`||`, mixed shapes that are not
+    // broadcast-compatible, user-defined operand types, and -- in GLSL operator scope only --
+    // matrix operands and vector equality (`==`/`!=`), whose semantics the `glsl` module owns.
+    Expr* convertToBuiltinArithmeticOp(InvokeExpr* expr);
+
+    // For a builtin binary operator `a OP b` whose operands have *different* builtin
+    // scalar/vector/matrix types, compute the common operand type that overload resolution
+    // would converge on (the "usual arithmetic conversions"): the result element type is the
+    // higher-ranked of the two base types (float beats int; among ints the larger size wins,
+    // and on a size tie the unsigned type wins) so neither operand needs a narrowing
+    // conversion, and the result shape broadcasts a scalar against a vector/matrix (requiring
+    // matching extents for vector-vector / matrix-matrix). Returns null when the operands are
+    // not both builtin numeric scalar/vector/matrix types or the shapes are not
+    // broadcast-compatible, in which case the caller falls back to overload resolution.
+    Type* getBuiltinArithmeticCommonType(Type* left, Type* right);
+
+    // Return `target` with its element/base type replaced by `newElementType`, preserving the
+    // composite shape: a scalar becomes `newElementType`, a `vector<T,N>` becomes
+    // `vector<newElementType,N>`, and a `matrix<T,R,C>` becomes `matrix<newElementType,R,C>`.
+    Type* substituteElementOfCompositeType(Type* target, Type* newElementType);
+
+    // Coerce the operands of a builtin binary operator to the common operand type that overload
+    // resolution would have selected (via `getBuiltinArithmeticCommonType`), and return that
+    // type. Each operand is converted to its *own* shape with the common element base (so e.g. a
+    // `vector * scalar` stays a two-shape operation that backends can lower to a vector-times-
+    // scalar instruction). `outLeftArg`/`outRightArg` receive the (possibly coerced) operand
+    // expressions. Operands that are already the same type are returned unchanged. Returns null
+    // when the operands are not broadcast-compatible builtin numeric types or a coercion fails,
+    // signalling that the fast-path conversion should be abandoned.
+    Type* coerceOperandsOfBuiltinBinaryExpr(
+        Expr* leftArg,
+        Expr* rightArg,
+        Expr*& outLeftArg,
+        Expr*& outRightArg);
+
+    // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either
+    // `-allow-glsl` is set, or the `glsl` module is in scope (its `operator*` overloads
+    // make `mat * mat` a matrix product). The builtin-operator fast path is disabled then.
+    bool isGLSLOperatorScope();
 };
 
 struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmtVisitor>

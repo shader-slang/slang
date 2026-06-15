@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T17:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-12T14:15:48Z
 target_doc: ir-reference/misc.md
 review_report: ../../reviews/ir-reference/misc.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 actions:
-  fixed: 3
+  fixed: 2
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,16 +18,18 @@ actions:
 
 ## Summary
 
-Three major findings addressed: added "System opcodes" and "Tensor
-and runtime helpers" sub-tables for the unclaimed concrete opcodes
-the catch-all had been missing; removed the `CastStorageToLogicalBase`
-and `LiveRangeMarker` grouping-parent rows; removed `DiffTypeInfo`
-(now owned by `differentiation.md`).
+Both findings in the review were verified against source at the target
+commit and fixed; none were rejected, deferred, or escalated. F-001 was
+a genuine coverage gap: the concrete `capabilityConjunction` /
+`capabilityDisjunction` opcodes were undocumented on any page, so a
+capability-set sub-table was added to this catch-all. F-002 was a
+genuine source-alignment error: the kernel-launch operand shapes and the
+`CudaKernelLaunch` consumer link did not match the builder/emitter code,
+so the two rows and the callout were corrected.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-ir-insts.lua:14-18` defines `nop` and `Unrecognized` (system-level placeholders); `:1528-1576` defines runtime/tensor helpers (`makeArrayList`, `makeTensorView`, `allocTorchTensor`, `TorchGetCudaStream`, `TorchTensorGetView`, `allocateOpaqueHandle`); the cooperative-matrix/vector ops from that same range belong on `resources-and-atomics.md` (added there in this cycle); the constexpr arithmetic/cast cluster at `:3142-3174` is value-like and was added to `values.md` in this cycle. | Added `### System opcodes` and `### Tensor and runtime helpers` to the top of `## Opcodes`. |
-| F-002 | fixed | `source/slang/slang-ir-insts.lua:2517-2522` and `:2701` show `CastStorageToLogicalBase` and `LiveRangeMarker` as grouping parents with no IR opcode of their own. | Removed both rows; folded a short note above each affected table identifying the parent and its concrete children; renamed the "CastStorageToLogicalBase" notable-opcode block to "Storage / logical casts" so the existing prose still applies. |
-| F-003 | fixed | `source/slang/slang-ir-insts.lua:1006-1010` annotates `DiffTypeInfo` as differential-type-info; the paired `differentiation.md` remediation adds the canonical row there. | Removed the `DiffTypeInfo` row from the "Pack and expansion" table. |
+| F-001 | fixed | Confirmed `source/slang/slang-ir-insts.lua:871` declares `CapabilitySet` as a top-level group whose concrete children `capabilityConjunction` / `capabilityDisjunction` carry stable names 153/154 (`source/slang/slang-ir-insts-stable-names.lua:153-154`). This group is distinct from the `CapabilitySet` type opcode at `slang-ir-insts.lua:59` (wrapper `CapabilitySetType`) that types.md documents, so the two concrete opcodes were unclaimed by any page; the misc catch-all rule applies. | Added a `### Capability sets` sub-table under `## Opcodes` with rows for `capabilityConjunction` and `capabilityDisjunction` (variadic, hoistable, synthesized), citing `IRBuilder::getCapabilityValue` and noting the distinction from the type opcode. |
+| F-002 | fixed | Confirmed `source/slang/slang-ir.cpp:3618-3619` appends variadic call args to `DispatchKernel` and `slang-ir.cpp:3630-3638` creates `CudaKernelLaunch` with five operands `baseFn, gridDim, blockDim, argsArray, cudaStream`; `source/slang/slang-emit-torch.cpp:71-99` consumes those five operands. The doc's prior operand shapes and its slang-emit-cuda.cpp consumer link were both wrong. | Corrected the `DispatchKernel` row to `baseFn, threadGroupSize, dispatchSize, args...`, the `CudaKernelLaunch` row to the five-operand shape with the torch-emitter link, and rewrote the `### CudaKernelLaunch` callout to describe the actual five operands and the `cudaLaunchKernel` operand mapping. |

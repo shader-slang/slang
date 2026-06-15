@@ -27,7 +27,11 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // CHECK2: float {{.*}} = (buffer_0).Load<float >(12U);
     // CHECK2: float {{.*}} = (buffer_0).Load<float >(16U);
     // CHECK2: float4 {{.*}} = float4({{.*}}, {{.*}}, {{.*}}, {{.*}});
-    // CHECK2: float4 {{.*}} = (buffer_0).Load<float4 >(20U);
+    // CHECK2: float {{.*}} = (buffer_0).Load<float >(20U);
+    // CHECK2: float {{.*}} = (buffer_0).Load<float >(24U);
+    // CHECK2: float {{.*}} = (buffer_0).Load<float >(28U);
+    // CHECK2: float {{.*}} = (buffer_0).Load<float >(32U);
+    // CHECK2: float4 {{.*}} = float4({{.*}}, {{.*}}, {{.*}}, {{.*}});
     // CHECK2: buffer_0.Store(16U,{{.*}});
     // CHECK2: buffer_0.Store(32U,{{.*}});
 

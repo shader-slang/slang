@@ -1176,6 +1176,33 @@ typedef uint32_t SlangSizeT;
                  //   a repeatable hint consumed only when any coverage mode is enabled.
         TraceFunctionCoverage = 148, // bool: insert per-function-entry coverage counters
         TraceBranchCoverage = 149,   // bool: insert per-branch-arm coverage counters
+        CoverageManifestOutput =
+            150, // stringValue0: explicit path for the slangc coverage manifest sidecar.
+                 //   When unset, slangc writes <output>.coverage-manifest.json next to
+                 //   file outputs that carry coverage metadata. This option is output
+                 //   policy only and is excluded from compiler cache keys. It requires
+                 //   at least one coverage tracing mode, is rejected for container
+                 //   outputs, and errors if the selected outputs produce no coverage
+                 //   metadata. Explicit paths are valid only when exactly one compiled
+                 //   artifact carries coverage metadata and must not overlap any emitted
+                 //   artifact path. Query/set with the string option APIs.
+        TraceCoverageCounterByteWidth =
+            151, // intValue0: per-slot byte width of the synthesized __slang_coverage
+                 //   buffer. Accepts 4 (uint32) or 8 (uint64). Omitting the option
+                 //   yields 8 when any coverage mode is enabled. Use 4 to opt down to
+                 //   uint32 when the runtime driver lacks 64-bit shader atomic support
+                 //   (notably MoltenVK on Apple Silicon, where Vulkan exposes
+                 //   shaderBufferInt64Atomics = false). uint32 counters wrap silently
+                 //   at 2^32 hits per slot; uint64 counters effectively do not wrap
+                 //   within any practical run. The corresponding CLI flag
+                 //   `-trace-coverage-counter-width <bits>` takes a bit count (32/64)
+                 //   and stores the matching byte width here.
+        TraceCoverageBoolean =
+            152, // bool: record boolean coverage (CoverageCounterMode::Boolean) instead of exact
+                 //   execution counts. Each counter is written with a plain non-atomic store
+                 //   of `1`, eliminating atomic contention (much faster, and avoids the GPU
+                 //   watchdog timeouts heavy coverage can trigger) at the cost of exact
+                 //   counts. Off by default.
 
         CountOf,
     };
@@ -4601,7 +4628,15 @@ enum class CoverageEntryKind : uint32_t
 
 enum class CoverageCounterMode : uint32_t
 {
+    /// The counter holds the number of times the entry executed
+    /// (atomic add per execution).
     Count = 0,
+    /// The counter is a boolean flag: `0` if the entry never executed,
+    /// non-zero if it executed at least once. Written with a plain
+    /// (non-atomic) store of `1`, so it carries no execution count but
+    /// avoids all atomic contention. Selected by
+    /// `-trace-coverage-boolean`.
+    Boolean = 1,
 };
 
 enum class CoverageBranchArmKind : uint32_t
@@ -4716,6 +4751,21 @@ struct CoverageBufferInfo
     /// `register`, Vulkan `binding`), or -1 if not assigned for
     /// this target.
     int32_t binding = -1;
+
+    /// Byte width of one counter slot in the synthesized buffer:
+    /// `4` for a `RWStructuredBuffer<uint>`, `8` for a
+    /// `RWStructuredBuffer<uint64_t>`. The host reads back
+    /// `getCounterCount() * elementByteWidth` bytes and interprets
+    /// each slot as a little-endian unsigned integer of this width.
+    /// Mirrored on the JSON sidecar as `buffer.element_stride`.
+    ///
+    /// A current in-process implementation always writes `4` or `8`;
+    /// the in-class default `4` only appears if the caller forgot to
+    /// pass the field to `getBufferInfo`. A sentinel `0` can only
+    /// arise when reading a metadata object from an older compiler
+    /// that pre-dates this field; both values should be treated as
+    /// the historical uint32 layout.
+    uint32_t elementByteWidth = 4;
 };
 
 struct ICoverageTracingMetadata : public ISlangCastable
@@ -5435,6 +5485,12 @@ struct IModulePrecompileService_Experimental : public ISlangUnknown
         0x433e,
         {0xaf, 0xcb, 0x13, 0xa0, 0x88, 0xbc, 0x5e, 0xe5})
 
+    /// Precompile this module for a target and embed the resulting target library in the module.
+    ///
+    /// This function is experimental and not thread-safe since it mutates the module by adding
+    /// precompiled target IR and temporary export metadata. Callers must externally synchronize
+    /// access to the module and must not use this API concurrently with other operations on the
+    /// same module or session.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     precompileForTarget(SlangCompileTarget target, ISlangBlob** outDiagnostics) = 0;
 
@@ -5539,7 +5595,7 @@ struct SlangGlobalSessionDesc
 SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size);
 
 /* Serialize coverage metadata into the canonical
- * `.coverage-mapping.json` shape. Same bytes that `slangc` writes
+ * `.coverage-manifest.json` shape. Same bytes that `slangc` writes
  * alongside compiled output when `-trace-coverage` is on, available
  * in-process for hosts compiling via the C++ API.
  *

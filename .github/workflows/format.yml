@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
           ref: ${{ github.event.client_payload.pull_request.head.ref }}
@@ -21,7 +21,7 @@ jobs:
           persist-credentials: false
 
       - name: Checkout target branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: shader-slang/slang
           ref: ${{ github.event.client_payload.pull_request.base.ref }}
@@ -51,7 +51,7 @@ jobs:
 
       - name: Create Pull Request
         id: create-pr
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
           path: pr-branch
@@ -70,7 +70,7 @@ jobs:
         run: rm -f "${{ runner.temp }}/signing_key"
 
       - name: Comment on PR
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         if: always()
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
@@ -87,7 +87,7 @@ jobs:
 
       - name: Add reaction
         if: steps.format.conclusion == 'success' && steps.create-pr.conclusion == 'success'
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
           repository: shader-slang/slang
