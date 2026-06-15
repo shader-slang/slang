@@ -403,6 +403,9 @@ jobs:
   test-falcor:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      actions: read
     uses: ./.github/workflows/ci-falcor-test.yml
 
   # Aggregate gate required by branch protection / the merge queue.
@@ -505,6 +508,7 @@ jobs:
         wait-for-human-priority,
       ]
     runs-on: ubuntu-latest
+    permissions: {}
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
     steps:
       - name: Check Falcor Results
