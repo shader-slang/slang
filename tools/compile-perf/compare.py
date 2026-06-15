@@ -21,7 +21,7 @@ import argparse
 import json
 import os
 
-import analyze
+from lib import analyze
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))

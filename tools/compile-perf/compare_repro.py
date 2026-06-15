@@ -15,7 +15,7 @@ import argparse
 import json
 import os
 
-import analyze
+from lib import analyze
 import statistics
 
 

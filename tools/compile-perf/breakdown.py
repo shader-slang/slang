@@ -27,9 +27,7 @@ import inspect
 import json
 import os
 
-import analyze
-import manifest
-import plot
+from lib import analyze, manifest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -363,7 +361,7 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
                  f"({esc(metric)} ms)")
 
     # release/daily split: daily ToT points (orange) start at `boundary`
-    boundary = next((i for i, t in enumerate(order) if plot.is_daily(t)), nrel)
+    boundary = next((i for i, t in enumerate(order) if analyze.is_daily(t)), nrel)
 
     s = [f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
          f'width="{W}" height="{H}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet" '
@@ -420,8 +418,8 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
 
         for i in tick_idx:
             x = xmap(i)
-            t = plot.short_tag(order[i])
-            day = plot.is_daily(order[i])
+            t = analyze.short_tag(order[i])
+            day = analyze.is_daily(order[i])
             col = "#e8731a" if day else "#666"
             s.append(f'<line x1="{x:.1f}" y1="{oy+mt+ph:.1f}" x2="{x:.1f}" y2="{oy+mt+ph+3:.1f}" stroke="#999"/>')
             s.append(f'<text x="{x:.1f}" y="{oy+mt+ph+15:.1f}" text-anchor="end" fill="{col}" '

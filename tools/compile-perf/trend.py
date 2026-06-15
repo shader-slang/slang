@@ -23,7 +23,7 @@ import json
 import os
 import statistics
 
-import manifest
+from lib import manifest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 

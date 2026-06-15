@@ -5,7 +5,7 @@
 # translation units recompile per commit. Idempotent: skips a day already done.
 set -uo pipefail
 
-SUITE=/home/jvepsalainen/gitlab/slang/tools/benchmark/perf-suite
+SUITE=/home/jvepsalainen/gitlab/slang/tools/compile-perf
 REPO=/home/jvepsalainen/workspace/jvepsalainen-nv-2/slang
 OUT=$SUITE/perf-results
 SAMPLES=5

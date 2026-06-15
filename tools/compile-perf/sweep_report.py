@@ -16,9 +16,8 @@ import html
 import json
 import os
 
-import analyze
 import breakdown  # stacked phase-composition vs N
-import plot  # for esc() + PALETTE
+from lib import analyze
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -134,12 +133,12 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
         nfill = "#1a5fb4" if link else "#1a1a1a"
         deco = ' text-decoration="underline"' if link else ""
         ttl = (f'<text x="{ox+ml}" y="{oy+18}" font-size="13" font-weight="600" fill="{nfill}"{deco}>'
-               f'{plot.esc(wl)}</text>')
+               f'{html.escape(wl)}</text>')
         if link:
-            ttl = f'<a xlink:href="{plot.esc(link)}" href="{plot.esc(link)}" target="_top">{ttl}</a>'
+            ttl = f'<a xlink:href="{html.escape(link)}" href="{html.escape(link)}" target="_top">{ttl}</a>'
         s.append(ttl)
         s.append(f'<text x="{ox+ml+pw}" y="{oy+18}" text-anchor="end" font-size="11" '
-                 f'fill="{kcl}" font-weight="600">{plot.esc(f"∝N^{kk:.2f}")}</text>')
+                 f'fill="{kcl}" font-weight="600">{html.escape(f"∝N^{kk:.2f}")}</text>')
 
         for frac in (0.0, 0.5, 1.0):
             yv = hi * frac
@@ -173,7 +172,7 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
     scaling analysis (floor / k / top-2×), and the raw per-size sweep numbers.
     Returns {workload: href relative to the sweep report} for linking."""
     import inspect
-    import manifest
+    from lib import manifest
     wdir = os.path.join(outdir, "workloads")
     os.makedirs(wdir, exist_ok=True)
     pre = ("background:#fff;border:1px solid #eee;border-radius:6px;padding:8px;overflow:auto")
@@ -196,8 +195,8 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
         topcls = "reg" if (top and top > 2.15) else "flat"
         desc = (inspect.getdoc(spec.gen) if spec and spec.gen else "") or "(no description)"
         flags = " ".join(spec.extra_flags) if spec and spec.extra_flags else "(none)"
-        meta = (f"<b>bucket:</b> {plot.esc(spec.bucket)} &nbsp;·&nbsp; <b>mode:</b> "
-                f"{plot.esc(spec.mode)} &nbsp;·&nbsp; <b>flags:</b> <code>{plot.esc(flags)}</code>"
+        meta = (f"<b>bucket:</b> {html.escape(spec.bucket)} &nbsp;·&nbsp; <b>mode:</b> "
+                f"{html.escape(spec.mode)} &nbsp;·&nbsp; <b>flags:</b> <code>{html.escape(flags)}</code>"
                 if spec else "")
 
         # sweep numbers: one row per size; compileInner + the workload's primary timers

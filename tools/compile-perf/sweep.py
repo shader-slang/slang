@@ -16,8 +16,7 @@ import os
 import subprocess
 import sys
 
-import analyze
-import manifest
+from lib import analyze, manifest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 

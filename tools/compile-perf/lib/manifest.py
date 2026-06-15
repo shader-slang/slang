@@ -17,7 +17,7 @@ Compile modes:
 
 from dataclasses import dataclass, field
 
-import workloads
+from . import workloads
 
 
 @dataclass

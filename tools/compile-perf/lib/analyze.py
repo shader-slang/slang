@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Stack per-release perf results into time-series and flag regressions.
 
 Loads releases/<tag>/results.json for every release in the index
@@ -11,14 +10,11 @@ Loads releases/<tag>/results.json for every release in the index
   - for a flagged compileInner jump, attributes it to the child stage timer with
     the largest concurrent delta.
 Also derives the diagnostics path-cost series (errors - clean).
-
-Outputs a ranked console report plus results/_analysis/{series.csv,flags.csv}.
 """
-import argparse
-import csv
 import json
 import math
 import os
+import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -75,7 +71,7 @@ def canonical_runs(runs):
     trend charts compare like-with-like across releases, so collapse to each
     workload's default_size (falling back to the first row seen). Scaling
     analysis reads the full multi-size data separately (ladder_scaling.py)."""
-    import manifest
+    from . import manifest
     best = {}
     for r in runs:
         wl = r["workload"]
@@ -218,170 +214,16 @@ def flag_steps(values, rel_thr, abs_floor):
     return flags
 
 
-def main():
-    ap = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    ap.add_argument("--index", default=os.path.join(HERE, "releases", "index.json"))
-    ap.add_argument("--results", default=os.path.join(HERE, "results"))
-    ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])
-    ap.add_argument("--rel", type=float, default=1.15, help="min ratio to flag (1.15 = +15%%)")
-    ap.add_argument("--abs", type=float, default=2.0, help="min absolute ms jump to flag")
-    ap.add_argument("--primary-only", action="store_true",
-                    help="only consider each workload's primary timers")
-    ap.add_argument("--slope-label", default=None,
-                    help="fit floor+slope (time = a + b*N) from a --sweep run's "
-                         "multi-size results under results/<label>/ and exit")
-    args = ap.parse_args()
-
-    if args.slope_label:
-        slope_report(args.results, args.slope_label, args.metric)
-        return
-
-    with open(args.index) as fh:
-        index = json.load(fh)
-    series, lookup, order = load_series(index, args.results, args.metric)
-    if not order:
-        raise SystemExit("no results found; run sweep.py first")
-
-    # which timers are 'primary' per workload (read from any result file)
-    primary = {}
-    for rec in index:
-        if "slangc" not in rec:
-            continue
-        p = results_path(args.results, rec["tag"])
-        if os.path.exists(p):
-            for run in json.load(open(p)):
-                primary[run["workload"]] = set(run.get("primary_timers", []))
-            break
-
-    outdir = os.path.join(args.results, "_analysis")
-    os.makedirs(outdir, exist_ok=True)
-
-    # full series csv
-    with open(os.path.join(outdir, "series.csv"), "w", newline="") as fh:
-        w = csv.writer(fh)
-        w.writerow(["workload", "timer", "tag", "date", f"{args.metric}_ms"])
-        for (wl, timer), vals in sorted(series.items()):
-            for tag, date, val in vals:
-                w.writerow([wl, timer, tag, date, val])
-
-    # these timers are ~aliases of another and just duplicate rows in the report
-    ALIAS = {"endToEndActions", "checkAllTranslationUnits", "generateIRForTranslationUnit"}
-
-    # collect flags
-    all_flags = []
-    for (wl, timer), vals in series.items():
-        if timer in ALIAS:
-            continue
-        if args.primary_only and timer not in primary.get(wl, {timer}):
-            continue
-        if len(vals) < 2:
-            continue
-        # noise floor: a flat constant (--abs); the median metric already rejects most noise
-        for ptag, tag, pv, cv, rel, delta in flag_steps(vals, args.rel, args.abs):
-            is_primary = timer in primary.get(wl, set())
-            attribution = ""
-            if timer == "compileInner":
-                # attribute to the LEAF pass with the biggest concurrent delta
-                deltas = leaf_deltas(lookup, ptag, tag, wl)
-                if deltas:
-                    best = max(deltas, key=lambda k: deltas[k])
-                    if deltas[best] > 0:
-                        attribution = f"{best} (+{deltas[best]:.1f}ms)"
-            all_flags.append({
-                "workload": wl, "timer": timer, "from": ptag, "to": tag,
-                "prev_ms": round(pv, 2), "cur_ms": round(cv, 2),
-                "ratio": round(rel, 3), "delta_ms": round(delta, 2),
-                "primary": is_primary, "attribution": attribution,
-            })
-
-    all_flags.sort(key=lambda f: (-f["delta_ms"]))
-    with open(os.path.join(outdir, "flags.csv"), "w", newline="") as fh:
-        cols = ["workload", "timer", "from", "to", "prev_ms", "cur_ms",
-                "ratio", "delta_ms", "primary", "attribution"]
-        w = csv.DictWriter(fh, fieldnames=cols)
-        w.writeheader()
-        for f in all_flags:
-            w.writerow(f)
-
-    # diagnostics path-cost (errors - clean), per release
-    diag = []
-    for tag, date in order:
-        e = lookup.get((tag, "diagnostics_errors", "SemanticChecking"))
-        c = lookup.get((tag, "diagnostics_clean", "SemanticChecking"))
-        if e is not None and c is not None:
-            diag.append((tag, date, round(e - c, 2)))
-
-    # ---- console report ----
-    first_tag, _ = order[0]
-    last_tag, _ = order[-1]
-    print(f"Releases analyzed ({len(order)}): {first_tag} .. {last_tag}")
-    print(f"Metric: {args.metric}; flag if ratio>={args.rel} and jump>={args.abs}ms\n")
-
-    print("== End-to-end drift (compileInner, first -> last) ==")
-    classes = {}
-    for (wl, timer), vals in sorted(series.items()):
-        if timer != "compileInner" or len(vals) < 2:
-            continue
-        f, l = vals[0][2], vals[-1][2]
-        ratio = l / f if f else 0
-        c = classify(vals)
-        classes[wl] = c
-        kind = c["kind"].upper() if c else "?"
-        print(f"  {wl:18s} {f:9.1f} -> {l:9.1f} ms  ({ratio:4.2f}x)  [{kind}]")
-
-    # Gradual drift: meaningful total rise with NO single dominant step — the
-    # creep that step-change detection structurally misses (e.g. parse, sema).
-    drifters = [(wl, c) for wl, c in classes.items() if c and c["kind"] == "drift"]
-    drifters.sort(key=lambda x: -x[1]["total"])
-    print("\n== Gradual drift (no single step >= 1.4x; ranked by total rise) ==")
-    if not drifters:
-        print("  none")
-    for wl, c in drifters:
-        print(f"  {wl:18s} total {c['total']:.2f}x over {c['n_steps']} steps  "
-              f"(biggest single {c['max_step']:.2f}x; {c['up_frac']*100:.0f}% of steps rose)")
-
-    print("\n== Flagged step-changes (ranked by absolute jump) ==")
-    if not all_flags:
-        print("  none")
-    for f in all_flags[:40]:
-        star = "*" if f["primary"] else " "
-        attr = f"  [{f['attribution']}]" if f["attribution"] else ""
-        print(f" {star}{f['workload']:17s} {f['timer']:18s} "
-              f"{f['from']}->{f['to']}  {f['prev_ms']:8.1f} -> {f['cur_ms']:8.1f} ms "
-              f"({f['ratio']:.2f}x, +{f['delta_ms']:.1f}){attr}")
-
-    print("\n== Per-release series (primary timer of each workload) ==")
-    print("   (each cell = min ms at that release; >=1.4x jump vs prev marked '<')")
-    short = [t for t, _ in order]
-    print("   " + " ".join(f"{t.replace('v20','').replace('.', '_'):>7s}" for t in short))
-    for (wl, timer), vals in sorted(series.items()):
-        if timer not in primary.get(wl, set()):
-            continue
-        byt = {t: v for t, _, v in vals}
-        cells, prev = [], None
-        for t in short:
-            v = byt.get(t)
-            if v is None:
-                cells.append(f"{'-':>7s}")
-            else:
-                mark = "<" if (prev and v / prev >= 1.4) else " "
-                cells.append(f"{v:6.0f}{mark}")
-            if v is not None:
-                prev = v
-        print(f"  {wl}.{timer}")
-        print("   " + " ".join(cells))
-
-    if diag:
-        print("\n== Diagnostics path cost (SemanticChecking: errors - clean) ==")
-        base = diag[0][2]
-        for tag, date, v in diag:
-            ratio = v / base if base else 0
-            print(f"  {tag:12s} {v:8.1f} ms  ({ratio:4.2f}x)")
-
-    print(f"\nwrote {outdir}/series.csv and {outdir}/flags.csv")
 
 
-if __name__ == "__main__":
-    main()
+def short_tag(tag):
+    """Compact label: release 'v2026.10' -> '2026.10'; daily label '2026-06-08-<sha>' -> '06-08'."""
+    if re.match(r"v\d", tag):
+        return tag.replace("v20", "")
+    m = re.match(r"\d{4}-(\d{2}-\d{2})-", tag)
+    return m.group(1) if m else tag
+
+
+def is_daily(tag):
+    """True for a daily ToT label '<YYYY-MM-DD>-<sha>' (vs a release 'vX.Y')."""
+    return bool(re.match(r"\d{4}-\d{2}-\d{2}-", tag))

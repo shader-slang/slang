@@ -26,8 +26,7 @@ import sys
 import tempfile
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import manifest  # noqa: E402
+from lib import manifest
 
 
 def parse_timers(text):
