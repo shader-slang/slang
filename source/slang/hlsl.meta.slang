@@ -28483,7 +28483,7 @@ $}
 
     [__NoSideEffect]
     [require(cooperative_matrix, byteaddressbuffer)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(
@@ -28505,7 +28505,7 @@ $}
 
     [__NoSideEffect]
     [require(cuda_metal_spirv, cooperative_matrix)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         L : IBufferDataLayout = DefaultDataLayout
@@ -28549,7 +28549,7 @@ $}
     [ForceInline]
     [__NoSideEffect]
     [require(cuda_metal_spirv, cooperative_matrix)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
@@ -28588,7 +28588,7 @@ $}
     [ForceInline]
     [__NoSideEffect]
     [require(cooperative_matrix_spirv, vk_mem_model)]
-    [nodiscard]
+    [NoDiscard]
     static This LoadCoherent<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
@@ -28612,7 +28612,7 @@ $}
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
     [require(cuda_metal_spirv, cooperative_matrix)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
@@ -28642,7 +28642,7 @@ $}
 
     [ForceInline]
     [require(cuda_metal_spirv, cooperative_matrix)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
     >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
@@ -28678,7 +28678,7 @@ $}
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
     [require(cuda_metal_spirv, cooperative_matrix)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -28712,7 +28712,7 @@ $}
 
     [ForceInline]
     [require(cuda_metal_spirv, cooperative_matrix)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -28751,7 +28751,7 @@ $}
     /// @return A cooperative matrix loaded from the groupshared vector array.
     [ForceInline]
     [require(cooperative_matrix_spirv)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -28797,7 +28797,7 @@ $}
     ///          16-byte aligned; prefer base pointer + layout slice over pointer shifting.
     ///
     [require(cooperative_matrix_tensor_addressing)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let Dim : uint32_t,
         let ClampMode : CoopMatClampMode,
@@ -28819,7 +28819,7 @@ $}
     }
 
     [require(cooperative_matrix_tensor_addressing)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let Dim : uint32_t,
         let ClampMode : CoopMatClampMode,
@@ -28845,7 +28845,7 @@ $}
     }
 
     [require(cooperative_matrix_block_load)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         U,
         let Dim : uint32_t,
@@ -28869,7 +28869,7 @@ $}
     }
 
     [require(cooperative_matrix_block_load)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         U,
         let Dim : uint32_t,
@@ -28904,7 +28904,7 @@ ${
 $}
 
     [require(cooperative_matrix_tensor_addressing)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let Dim : uint32_t,
         let ClampMode : CoopMatClampMode
@@ -28917,7 +28917,7 @@ $}
     }
 
     [require(cooperative_matrix_tensor_addressing)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let Dim : uint32_t,
         let ClampMode : CoopMatClampMode,
@@ -28954,7 +28954,7 @@ $}
     }
 
     [require(cooperative_matrix_tensor_addressing)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let Dim : uint32_t,
         let ClampMode : CoopMatClampMode,
@@ -28971,7 +28971,7 @@ $}
     }
 
     [require(cooperative_matrix_tensor_addressing)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         let Dim : uint32_t,
         let ClampMode : CoopMatClampMode,
@@ -29016,7 +29016,7 @@ $}
     }
 
     [require(cooperative_matrix_block_load)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         U,
         let Dim : uint32_t,
@@ -29031,7 +29031,7 @@ $}
     }
 
     [require(cooperative_matrix_block_load)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         U,
         let Dim : uint32_t,
@@ -29072,7 +29072,7 @@ $}
     }
 
     [require(cooperative_matrix_block_load)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         U,
         let Dim : uint32_t,
@@ -29091,7 +29091,7 @@ $}
     }
 
     [require(cooperative_matrix_block_load)]
-    [nodiscard]
+    [NoDiscard]
     static This Load<
         U,
         let Dim : uint32_t,

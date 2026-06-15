@@ -1385,7 +1385,7 @@ class NonmutatingAttribute : public Attribute
     FIDDLE(...)
 };
 
-// A `[nodiscard]` attribute, which indicates that the result
+// A `[NoDiscard]` attribute, which indicates that the result
 // of calling the function should not be discarded.
 //
 FIDDLE()

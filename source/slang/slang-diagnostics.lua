@@ -1293,11 +1293,11 @@ warning(
     span { loc = "expr:Expr", message = "result of '==' not used, did you intend '='?" }
 )
 
-warning(
+err(
     "discarded-nodiscard-result",
     30059,
-    "ignoring return value of function declared with '[nodiscard]' attribute",
-    span { loc = "expr:Expr", message = "the result of this '[nodiscard]' call is being discarded" }
+    "ignoring return value of function declared with '[NoDiscard]' attribute",
+    span { loc = "expr:Expr", message = "the result of this '[NoDiscard]' call is being discarded" }
 )
 
 err(
