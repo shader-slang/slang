@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:10:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: a7b1c184243cc33ab7365f1e766ae76123f4e9039f529babd0a030cb03949933
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:13:27Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 48ed6f3a5c2185f6c92001fe814211a9e9a1c534cd93f7d7a112e99b17b02e52
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -122,8 +122,8 @@ declarations live in
 | Opcode | `struct_name` | Operands | Notes |
 | --- | --- | --- | --- |
 | `Int`, `Float`, `Bool`, ... | `IntType`, `FloatType`, `BoolType`, ... | — | Basic scalar types; see [../ir-reference/types.md](../ir-reference/types.md). |
-| `vector` | `VectorType` | `elementType, elementCount` | Vector types; hoistable. |
-| `matrix` | `MatrixType` | `elementType, rowCount, columnCount, layout` | Matrix types; hoistable. |
+| `Vec` | `VectorType` | `elementType, elementCount` | Vector types; hoistable. |
+| `Mat` | `MatrixType` | `elementType, rowCount, columnCount, layout` | Matrix types; hoistable. |
 | `Array` | `ArrayType` | `elementType, elementCount` | Fixed-size array; hoistable. |
 | `Ptr` | `PtrType` | `valueType, accessQualifier?, addressSpace?, dataLayout?` | Pointer type; hoistable. |
 | `Texture` | — | `elementType, shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format` | Texture types; hoistable. |
@@ -158,7 +158,7 @@ declarations live in
 | --- | --- | --- | --- |
 | `block` | `IRBlock` | parent of `Param`s and instructions | Basic block; first N children are `Param`s. |
 | `param` | `IRParam` | (variadic) | Block or function parameter; replaces SSA `phi`. |
-| `branch` / `condBranch` / `ifElse` / `switch` / `loop` | — | (terminator-specific) | Terminators in the `TerminatorInst` family. |
+| `unconditionalBranch` / `conditionalBranch` / `ifElse` / `switch` / `loop` | — | (terminator-specific) | Terminators in the `TerminatorInst` family. |
 | `return_val` / `unreachable` / `discard` | — | (terminator-specific) | Return and exit terminators. |
 | `RequirePrelude`, `RequireTargetExtension`, `Printf`, `StaticAssert`, ... | — | (variadic) | Other control-flow / backend-hint opcodes. |
 | (...see [../ir-reference/control-flow.md](../ir-reference/control-flow.md) for the full list) | | | |
@@ -172,6 +172,7 @@ declarations live in
 | `generic` | `IRGeneric` | (variadic) | Type-level computation parent ending in `yield`. |
 | `global_var`, `global_param`, `globalConstant` | `IRGlobalVar`, ... | (variadic) | Module-scope storage / parameters; `Global`. |
 | `witness_table` / `witness_table_entry` | — | (variadic) / `requirementKey, satisfyingVal` | Witness table machinery; hoistable. |
+| `key` / `builtinRequirementKey` | `StructKey` / `BuiltinRequirementKey` | — / `kindOperand` | Requirement keys: an ordinary `key` is a per-decl `global` symbol; `builtinRequirementKey` is `hoistable`, deduplicated from its `BuiltinRequirementKind` operand so a built-in requirement (e.g. an `IDifferentiable` member) resolves to one key inst. |
 | (...see [../ir-reference/structure.md](../ir-reference/structure.md) for the full list) | | | |
 
 ### Specialization and existentials
@@ -193,6 +194,7 @@ declarations live in
 | `KeepAliveDecoration` | `IRKeepAliveDecoration` | — | Forbids DCE on the host instruction. |
 | `TargetIntrinsicDecoration` | `IRTargetIntrinsicDecoration` | `targetTokens, definition` | Maps an IR op to a target intrinsic. |
 | `EntryPointDecoration` | `IREntryPointDecoration` | `profile, name, moduleName` | Marks a function as a pipeline entry point. |
+| `BuiltinRequirementDecoration` | `IRBuiltinRequirementDecoration` | `kindOperand` | Tags an interface requirement key with its `BuiltinRequirementKind`, so consumers find the requirement by role rather than by entry order. |
 | (...see [../ir-reference/decorations.md](../ir-reference/decorations.md) for the full list of ~180 decorations) | | | |
 
 ### Resource and shader-IO opcodes
@@ -200,6 +202,7 @@ declarations live in
 | Opcode | `struct_name` | Operands | Notes |
 | --- | --- | --- | --- |
 | `imageLoad` / `imageStore` | — | `image, coord, ...` | Image read / write. |
+| `ImageTexelPointer` | — | `image, coord, sample` | Forms a pointer to an image texel for atomic operations. |
 | `structuredBufferLoad` / `rwstructuredBufferStore` | — | `base, index, val?` | Structured-buffer access. |
 | `atomicLoad` / `atomicStore` / `atomicAdd` / ... | — | `ptr, val?` | `AtomicOperation` family. |
 | `ControlBarrier` / `GroupMemoryBarrierWithGroupSync` / `BeginFragmentShaderInterlock` / `EndFragmentShaderInterlock` | — | — | Barriers and synchronization. |
@@ -241,6 +244,33 @@ covered in [../../../design/ir.md](../../../design/ir.md). Pass authors
 **must** read that document before writing transformations that mutate
 the IR.
 
+`Hoistable` is the mechanism behind several "one canonical inst per
+logical value" guarantees. For example, `builtinRequirementKey` is
+hoistable so that `IRBuilder::getBuiltinRequirementKey(kind)` in
+[slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) returns the same
+key inst for a given `BuiltinRequirementKind`, regardless of which decl
+or module asks — making a witness lookup and the matching witness-table
+entry agree by construction rather than by entry order. The same flag is
+why hoistable emitters are named `get*` (`getPoison`,
+`getBuiltinRequirementKey`) rather than `emit*`: they may return an
+existing deduplicated inst instead of creating a new one.
+
+## Decorations
+
+A number of opcodes are conceptually *decorations*: every entry in the
+`Decoration` family in
+[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) (the
+`*Decoration` opcodes such as `NameHintDecoration` and
+`TargetIntrinsicDecoration`) is modeled as an ordinary `IRInst`,
+wrapped by `IRDecoration` in
+[slang-ir.h](../../../../source/slang/slang-ir.h). A decoration does
+not sit in a block's instruction stream; it is attached to a host
+instruction's decoration list and reached via
+`IRInst::getFirstDecoration`, annotating the host with metadata
+(names, linkage, layout, target-intrinsic spellings) without
+producing a value. The full per-opcode catalog is in
+[../ir-reference/decorations.md](../ir-reference/decorations.md).
+
 ## Module versioning and opcode insertion
 
 The comment at the top of
@@ -251,7 +281,10 @@ The comment at the top of
 
 Inserting a new opcode renumbers downstream entries, which breaks
 deserialization of older `.slang-module` files unless the supported-
-version range is bumped. The serialization rules are in
+version range is bumped. `IRModule` in
+[slang-ir.h](../../../../source/slang/slang-ir.h) tracks this range as
+`k_minSupportedModuleVersion` (4) and `k_maxSupportedModuleVersion`
+(20). The serialization rules are in
 [../cross-cutting/serialization.md](serialization.md)
 and
 [../../../design/backwards-compat-for-ir-modules.md](../../../design/backwards-compat-for-ir-modules.md).

@@ -140,45 +140,19 @@ struct AnyValueMarshallingContext
             bool isBindless,
             IRIntegerValue sizeInBytes) = 0;
 
-        void ensureOffsetAt4ByteBoundary()
-        {
-            if (intraFieldOffset)
-            {
-                fieldOffset++;
-                intraFieldOffset = 0;
-            }
-        }
-        void ensureOffsetAt8ByteBoundary()
-        {
-            ensureOffsetAt4ByteBoundary();
-            if ((fieldOffset & 1) != 0)
-                fieldOffset++;
-        }
-        void ensureOffsetAt2ByteBoundary()
-        {
-            if (intraFieldOffset == 0)
-                return;
-            if (intraFieldOffset <= 2)
-            {
-                intraFieldOffset = 2;
-                return;
-            }
-            fieldOffset++;
-            intraFieldOffset = 0;
-            return;
-        }
-
+        // Round the cursor up to the next multiple of `n` bytes, skipping
+        // the padding bytes the payload layout has at this position. The
+        // fixed-size variants are convenience wrappers.
         void ensureOffsetAtNByteBoundary(int n)
         {
-            if (n == 1)
-                return;
-            else if (n == 2)
-                ensureOffsetAt2ByteBoundary();
-            else if (n == 4)
-                ensureOffsetAt4ByteBoundary();
-            else if (n == 8)
-                ensureOffsetAt8ByteBoundary();
+            SLANG_ASSERT(n > 0);
+            auto alignedByteOffset = (uint32_t)align(fieldOffset * 4 + intraFieldOffset, n);
+            fieldOffset = alignedByteOffset / 4;
+            intraFieldOffset = alignedByteOffset % 4;
         }
+        void ensureOffsetAt2ByteBoundary() { ensureOffsetAtNByteBoundary(2); }
+        void ensureOffsetAt4ByteBoundary() { ensureOffsetAtNByteBoundary(4); }
+        void ensureOffsetAt8ByteBoundary() { ensureOffsetAtNByteBoundary(8); }
 
         void advanceOffset(uint32_t bytes)
         {
@@ -281,6 +255,22 @@ struct AnyValueMarshallingContext
         case kIROp_StructType:
             {
                 auto structType = cast<IRStructType>(dataType);
+
+                // Align the struct's start to its natural alignment,
+                // and pad its end out to its natural size.
+                IRSizeAndAlignment structLayout;
+                bool hasStructLayout =
+                    SLANG_SUCCEEDED(getNaturalSizeAndAlignment(
+                        context->targetRequest,
+                        dataType,
+                        &structLayout)) &&
+                    structLayout.size != IRSizeAndAlignment::kIndeterminateSize &&
+                    structLayout.size >= 0;
+                if (hasStructLayout)
+                    context->ensureOffsetAtNByteBoundary((int)structLayout.alignment);
+                uint32_t startFieldOffset = context->fieldOffset;
+                uint32_t startIntraFieldOffset = context->intraFieldOffset;
+
                 for (auto field : structType->getFields())
                 {
                     auto fieldAddr = builder->emitFieldAddress(
@@ -288,6 +278,18 @@ struct AnyValueMarshallingContext
                         concreteTypedVar,
                         field->getKey());
                     emitMarshallingCode(builder, context, fieldAddr);
+                }
+
+                if (hasStructLayout)
+                {
+                    auto packedSize = (int64_t)(context->fieldOffset - startFieldOffset) * 4 +
+                                      (int64_t)context->intraFieldOffset - startIntraFieldOffset;
+                    // A struct that starts at its natural alignment packs
+                    // within its natural size; a violation means the walk
+                    // and the natural layout have diverged.
+                    SLANG_ASSERT(packedSize <= structLayout.size);
+                    if (packedSize < structLayout.size)
+                        context->advanceOffset(uint32_t(structLayout.size - packedSize));
                 }
                 break;
             }

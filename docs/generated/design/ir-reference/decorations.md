@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4efe93afbd22f4572d6d334ca82947cebf8058c7572291261103fd18aa04f6bd
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:17:30Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: c993f7837f8ee2af868f6b993bef4697dfae2a5a4522346050a4c431dadfeb19
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,7 +12,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 This page is the per-opcode reference for the `Decoration` family —
 the largest single family in
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua),
-spanning lines ~1591-2454. Decorations attach metadata to other IR
+spanning lines ~1623-2484. Decorations attach metadata to other IR
 instructions: names, layout binding, control-flow hints,
 target-specific intrinsic spellings, capability requirements,
 inlining preferences, autodiff markers, and so on.
@@ -25,7 +25,7 @@ decoration says about it.
 
 The opcodes live under the top-level `Decoration` entry of
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) at
-line ~1591. Per-opcode info (names, operand counts) is registered
+line ~1623. Per-opcode info (names, operand counts) is registered
 in
 [slang-ir-insts-info.cpp](../../../../source/slang/slang-ir-insts-info.cpp).
 C++ wrappers are declared in
@@ -276,6 +276,7 @@ flowchart TD
 | `SequentialIDDecoration` | — | `sequentialIdOperand: IRIntLit` | | (synthesized) | Stable integer ID used by `GetSequentialID`. |
 | `DynamicDispatchWitnessDecoration` | — | — | | (synthesized) | Marks a witness table as participating in dynamic dispatch. |
 | `StaticRequirementDecoration` | — | — | | (synthesized) | Marks an interface requirement as static. |
+| `BuiltinRequirementDecoration` | `BuiltinRequirementDecoration` | `kindOperand: IRIntLit` | | `slang-lower-to-ir.cpp` (requirement-key lowering of a `BuiltinRequirementModifier`) | Marks an interface requirement key with the `BuiltinRequirementKind` role (e.g. `IDifferentiable.Differential`) of the built-in requirement it represents, so consumers identify it by role rather than by position in the requirement list. |
 | `DispatchFuncDecoration` | — | `func` | | (synthesized) | Records the dispatch function for an interface call. |
 | `TypeConstraintDecoration` | — | `constraintType` | | `GenericTypeConstraintDecl` lowering | Records the interface constraint of a generic parameter. |
 | `ResultWitness` | `ResultWitnessDecoration` | `witness` | | (synthesized) | Records the original interface witness when a function used to return an existential. |
@@ -374,6 +375,17 @@ Its single integer operand is the `kIROp_*` tag of the
 implementing opcode; the inliner uses it to replace calls with
 direct opcode emission when the target supports it.
 
+### `branch` / `flatten` / `loopControl`
+
+These are the control-flow hint decorations. `branch` and
+`flatten` attach to a conditional (from the `[branch]` /
+`[flatten]` attributes) and select the divergent vs. predicated
+emission strategy; `loopControl` records the unroll / loop mode
+(from `[unroll]` / `[loop]`). They carry no IR semantics of their
+own — they flow through unchanged and are consumed by the backend
+emit step to choose the corresponding target control-flow
+construct.
+
 ### `KeepAliveDecoration`
 
 `KeepAliveDecoration` is the DCE-suppression decoration. Insts
@@ -411,6 +423,26 @@ primal and differential outputs (the `pairType` operand is the
 `DifferentialPairType`). The unzip pass uses these markers to
 split a mixed function into its primal-side and propagate-side
 copies.
+
+### `BuiltinRequirementDecoration`
+
+`BuiltinRequirementDecoration` tags an interface *requirement key*
+with the `BuiltinRequirementKind` role (an `IRIntLit` operand) of
+the built-in requirement it stands for — for example the
+`Differential` type or differential-witness requirements of
+`IDifferentiable`. It is attached during requirement-key lowering
+in
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+to the `IRBuiltinRequirementKey` produced for a requirement decl
+that carries an AST `BuiltinRequirementModifier`. Unlike an
+ordinary requirement, a recognized built-in requirement is keyed
+by a hoistable `IRBuiltinRequirementKey` (deduplicated by
+construction from its `kind` operand) rather than a per-decl
+`StructKey`. The decoration lets later passes — notably autodiff
+— locate a requirement entry by its role instead of by its
+position in the interface's (semantically unordered) requirement
+list. See [../glossary.md](../glossary.md) for `witness` and
+requirement-key terminology.
 
 ## See also
 

@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-28T08:29:27+00:00
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-watched_paths_digest: 5945bacf4c9d96f2589a494589832a219c29d05fac941ffa13504c7d08cf982a
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:13:30Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 6654bd6fd16af6b2f9308c3f9d577016f106721659f147496571fe0a0cefd1f4
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -101,8 +101,8 @@ The full set of declarations covers scalar / vector / matrix types,
 operator overloads (mapped to IR opcodes via
 `__intrinsic_op` / `__target_intrinsic` modifiers — see
 [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md)),
-implicit conversions, ranges and iterators, and the `Optional`,
-`Result`, `Tuple` types.
+implicit conversions, ranges and iterators, and the `Optional`
+and `Tuple` types.
 
 The HLSL meta-module layers in HLSL-named texture / sampler / buffer
 types and the corresponding intrinsics so that HLSL code compiles
@@ -150,6 +150,7 @@ The single standard module shipping today is the **neural** module:
   `mma-tiled-layout-helper.slang`,
   `mma-tiled-metal.slang`,
   `mma-tiled-vulkan.slang`,
+  `network-parameter-layout-converter.slang`,
   `permuto-encoder.slang`,
   `shared-memory-pool.slang`,
   `vectorized-reader.slang`,

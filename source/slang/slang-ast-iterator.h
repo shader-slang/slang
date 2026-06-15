@@ -121,6 +121,13 @@ struct ASTIterator
                 dispatchIfNotNull(arg);
         }
 
+        void visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            for (auto arg : expr->arguments)
+                dispatchIfNotNull(arg);
+        }
+
         void visitVarExpr(VarExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);

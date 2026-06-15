@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-28T08:21:36+00:00
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-watched_paths_digest: 2c95fac86190d3096ef9459a727d2536a788f979789ce16c457446379c7e499f
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:15:50Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: cac7e2d9eb8ba3e143943a9ace5008f267481600341257629d6b70ee60b4f3a5
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -94,7 +94,7 @@ flowchart TD
 | `ExplicitCtorInvokeExpr` | `InvokeExpr` | (inherits) | [constructor call](../syntax-reference/grammar.md#expressions) | Explicit `T(...)` constructor invocation. |
 | `TryExpr` | `Expr` | `base: Expr*`, `tryClauseType` (Standard / Optional / Assert) | [try](../syntax-reference/grammar.md#expressions) | `try expr` wrapper for fallible calls. |
 | `NewExpr` | `InvokeExpr` | (inherits) | [new](../syntax-reference/grammar.md#expressions) | `new T(...)`. |
-| `OperatorExpr` | `InvokeExpr` | (inherits) | [operator](../syntax-reference/grammar.md#expressions) | Operator application reified as a call; abstract intermediate inferred from the source label. |
+| `OperatorExpr` | `InvokeExpr` | (inherits) | [operator](../syntax-reference/grammar.md#expressions) | Operator application reified as a call; shared base for the infix, prefix, postfix, select, and short-circuit operator forms. |
 | `InfixExpr` | `OperatorExpr` | (inherits) | [infix operator](../syntax-reference/grammar.md#expressions) | Binary operator (`a + b`). |
 | `PrefixExpr` | `OperatorExpr` | (inherits) | [prefix operator](../syntax-reference/grammar.md#expressions) | Unary prefix operator (`-a`, `!x`). |
 | `PostfixExpr` | `OperatorExpr` | (inherits) | [postfix operator](../syntax-reference/grammar.md#expressions) | Unary postfix operator (`a++`). |
@@ -161,7 +161,7 @@ flowchart TD
 | `FuncTypeExpr` | `Expr` | `parameters: List<TypeExp>`, `result: TypeExp` | [function type](../syntax-reference/grammar.md#types) | `(T1, T2) -> R` function-type expression. |
 | `TupleTypeExpr` | `Expr` | `members: List<TypeExp>` | [tuple type](../syntax-reference/grammar.md#types) | `(T1, T2, ...)` tuple-type expression. |
 | `PackBranchTypeExpr` | `Expr` | `packOperand: TypeExp`, `emptyType: TypeExp`, `nonEmptyType: TypeExp` | (none) | Pack-conditional type expression. |
-| `PartiallyAppliedGenericExpr` | `Expr` | `baseGenericDeclRef: DeclRef<GenericDecl>`, `knownGenericArgs: List<Val*>` | (none) | A generic applied to some but not all parameters; resolved by overload resolution. |
+| `PartiallyAppliedGenericExpr` | `Expr` | `baseGenericDeclRef: DeclRef<GenericDecl>`, `providedOrdinaryArgs: List<Val*>` | (none) | A generic applied to some but not all parameters; resolved by overload resolution. |
 | `PackExpr` | `Expr` | `args: List<Expr*>` | (none) | Bundle of argument exprs matched to a pack parameter during overload resolution. |
 | `SPIRVAsmExpr` | `Expr` | `insts: List<SPIRVAsmInst>` | [`spirv_asm` block](../syntax-reference/grammar.md#expressions) | Inline-SPIRV assembly expression. |
 
@@ -219,8 +219,9 @@ any name-resolution result uniformly.
 `NullPtrLiteralExpr`, `NoneLiteralExpr`, and `StringLiteralExpr`
 share `LiteralExpr` as a base. The base stores the originating
 `Token` (so the source text and suffix are recoverable) and the
-parsed `suffixType`. Adjacent string literals are merged at lex time
-into a single `StringLiteralExpr` (see [tokens.md](../syntax-reference/tokens.md)).
+parsed `suffixType`. Adjacent string literals are merged during
+expression parsing — after lexing produces adjacent string-literal
+tokens — into a single `StringLiteralExpr` (see [tokens.md](../syntax-reference/tokens.md)).
 
 ### PartiallyAppliedGenericExpr
 

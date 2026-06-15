@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:17:31Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -97,7 +97,8 @@ flowchart TD
 ### Basic scalar types
 
 All `BasicType` children are hoistable; one IR value per scalar
-type per module.
+type per module. They are obtained from `IRBuilder::getBasicType`
+and its generated wrappers (`getVoidType`, `getIntType`, ...).
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -117,8 +118,12 @@ type per module.
 | `Char` | `CharType` | — | H | `BasicExpressionType(Char)` | Character type used by string-literal element type. |
 | `IntPtr` | `IntPtrType` | — | H | `BasicExpressionType(IntPtr)` | Signed integer with pointer-equivalent width. |
 | `UIntPtr` | `UIntPtrType` | — | H | `BasicExpressionType(UIntPtr)` | Unsigned integer with pointer-equivalent width. |
+| `AfterBaseType` | — | — | | — | Sentinel opcode marking the end of the `BasicType` range; not a real type, only a range marker for opcode classification. |
 
 ### Storage-only floating-point
+
+These nullary types are produced via `IRBuilder::getType` with the
+corresponding `kIROp_*` tag.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -127,6 +132,9 @@ type per module.
 | `BFloat16Type` | `BFloat16Type` | — | H | Core-module `BFloat16` type | bfloat16; storage-only on most targets. |
 
 ### Strings and dynamic types
+
+`AnyValueType` is built by `IRBuilder::getAnyValueType`; the
+remaining nullary types come from `IRBuilder::getType`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -138,12 +146,18 @@ type per module.
 
 ### Raw and RTTI pointers
 
+Both are produced via `IRBuilder::getType` (passing the matching
+`kIROp_*` tag and any operand).
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `RawPointerType` | — | — | H | Core-module raw-pointer types | Untyped pointer. |
 | `RTTIPointerType` | — | `rTTIOperand` | H | (synthesized) | Pointer to a runtime type-info object; see [generics-and-existentials.md](generics-and-existentials.md). |
+| `AfterRawPointerTypeBase` | — | — | H | — | Sentinel opcode marking the end of the `RawPointerTypeBase` range; not a real type, only a range marker for opcode classification. |
 
 ### Arrays
+
+Both are built by `IRBuilder::getArrayTypeBase`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -152,12 +166,17 @@ type per module.
 
 ### Functions and basic blocks
 
+`Func` is built by `IRBuilder::getFuncType`.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `Func` | `FuncType` | `resultType: IRType, paramTypes: IRType...` | H | `FuncType` AST node | Function type; first operand is the result type, remaining operands are parameter types. |
 | `BasicBlock` | `BasicBlockType` | — | H | (synthesized) | The type of an `IRBlock` value (i.e. of a branch target). |
 
 ### Vectors, matrices, and composite
+
+`Vec` is built by `IRBuilder::getVectorType` and `Enum` by
+`IRBuilder::createEnumType`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -172,6 +191,9 @@ type per module.
 | `Attributed` | `AttributedType` | `baseType: IRType, attr` | H | `Attributed` AST modifiers (`unorm`, `snorm`, `Aligned`, ...) | A base type with an attached `Attr` opcode (see [metadata.md](metadata.md)). |
 
 ### Differentiation types
+
+The context-channel types are built by helpers such as
+`IRBuilder::getBackwardDiffIntermediateContextType`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -191,6 +213,8 @@ type per module.
 
 ### Tensor and torch-tensor types
 
+`TorchTensor` is built by `IRBuilder::getTorchTensorType`.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `TensorView` | `TensorViewType` | `elementType: IRType` | H | Tensor-API lowering | View of a tensor element type. |
@@ -203,11 +227,14 @@ type per module.
 
 ### Existentials and interfaces
 
+`BindExistentials` is built by `IRBuilder::getBindExistentialsType`
+and `interface` by `IRBuilder::createInterfaceType`.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `BindExistentials` | `BindExistentialsType` | `baseType: IRType, args...` | H | (synthesized) | `BindExistentials<B, T0, w0, ...>`; binds each of `B`'s existential parameters. |
 | `BoundInterface` | `BoundInterfaceType` | (variadic, `min=3`) | H | (synthesized) | Specialization for `BindExistentials<B, T0, w0>` where `B` is an interface. |
-| `interface` | `InterfaceType` | (children: `interface_req_entry`) | G | `InterfaceDecl` (see [structure.md](structure.md)) | Interface type; documented here as a type and in [structure.md](structure.md) as a container. |
+| `interface` | `InterfaceType` | (operands: `interface_req_entry`...) | G | `InterfaceDecl` (see [structure.md](structure.md)) | Interface type; its `interface_req_entry` requirements are operands (set via `setOperand`), not children; see [structure.md](structure.md) for the distinction from `witness_table` children. |
 | `associated_type` | `AssociatedType` | `constraintTypes: IRInterfaceType...` | H | `AssocTypeDecl` lowering | Associated type of an interface. |
 | `this_type` | — | `interfaceType: IRType` | H | `ThisType` AST node | The "self" type of an interface or extension. |
 | `rtti_type` | `RTTIType` | — | H | (synthesized) | Type of `IRRTTIObject` values. |
@@ -215,12 +242,17 @@ type per module.
 
 ### Witness-table types
 
+Both are built by `IRBuilder::getWitnessTableType`.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `witness_table_t` | `WitnessTableType` | `baseType: IRType` | H | (synthesized) | Type of a `witness_table` value parameterized by interface. |
 | `witness_table_id_t` | `WitnessTableIDType` | `baseType: IRType` | H | (synthesized) | Integer-id form of a witness-table type; used during dynamic-dispatch lowering before being replaced with `uint`. |
 
 ### Pointer types
+
+All are built by `IRBuilder::getPtrType` and its variants
+(`getRefParamType`, `getBorrowInParamType`).
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -235,6 +267,8 @@ type per module.
 | `DescriptorHandle` | `DescriptorHandleType` | `resourceType: IRType` | H | `DescriptorHandle<T>` AST type | Bindless handle to an opaque resource. |
 
 ### Sampler and buffer-layout types
+
+These nullary marker types are produced via `IRBuilder::getType`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -253,6 +287,9 @@ type per module.
 | `LLVMLayout` | `LLVMBufferLayoutType` | — | H | (synthesized) | LLVM buffer layout marker. |
 
 ### Resource and texture types
+
+These lower from AST resource types through the `lowerType` family
+in [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -304,7 +341,8 @@ containers for their field and key children. The container side is
 documented in [structure.md](structure.md); the rows here describe
 their role as types. The `interface` opcode is documented above
 under Existentials and interfaces and as a container in
-[structure.md](structure.md).
+[structure.md](structure.md). The type insts are built by
+`IRBuilder::createStructType` and `IRBuilder::createClassType`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -312,6 +350,8 @@ under Existentials and interfaces and as a container in
 | `class` | `ClassType` | (children: `field`, `key`) | P | `ClassDecl` lowering | User-defined class type. |
 
 ### Tuples, packs, and target tuples
+
+`tuple_type` is built by `IRBuilder::getTupleType`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -324,6 +364,9 @@ under Existentials and interfaces and as a container in
 
 ### SPIR-V literals and kinds
 
+The kind types are produced via `IRBuilder::getType` (e.g.
+`getTypeKind`).
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `spirvLiteralType` | `SPIRVLiteralType` | `valueType: IRType` | H | `__intrinsic_asm` lowering | Wraps a value type that should be emitted as a SPIR-V literal operand. |
@@ -334,6 +377,9 @@ under Existentials and interfaces and as a container in
 | `Generic` | `GenericKind` | — | H | (synthesized) | Kind of generic values. |
 
 ### Rates and rate-qualified types
+
+These are produced via `IRBuilder::getType` with the matching
+`kIROp_*` rate tag.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -347,7 +393,9 @@ under Existentials and interfaces and as a container in
 
 These types represent membership and tagging in sets of types or
 witness tables; used by the existential-elimination pass to
-specialize possibilities.
+specialize possibilities. They are built by helpers such as
+`IRBuilder::getTaggedUnionType`, `getUntaggedUnionType`, and
+`getSetTagType`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -387,6 +435,16 @@ omits the `elementCount` operand and represents an array of
 runtime extent — the common form on the GPU side of variable-size
 buffer access. The optional `stride` operand records the per-element
 stride for layout purposes.
+
+### `Enum`
+
+`Enum(tagType)` is a *parent* opcode (`P` flag). Its single operand
+is the `tagType` — the underlying integer type that stores the
+enum's value — and it is built by `IRBuilder::createEnumType` from
+that tag type during `EnumDecl` lowering. The enum's cases are not
+operands; they are encoded as child instructions of the `Enum`, so
+enumerating an enum's cases means walking the children of the
+`Enum` inst rather than reading its operand list.
 
 ### `Ptr` and the access-qualifier / address-space operands
 

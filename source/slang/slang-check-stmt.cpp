@@ -675,16 +675,21 @@ void SemanticsStmtVisitor::visitCatchStmt(CatchStmt* stmt)
 void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
 {
     stmt->expression = CheckExpr(stmt->expression);
+    // Warn on a dangling `==` whose result is discarded (likely a mistyped `=`). The
+    // comparison may be either a resolved `operator==` call or a builtin fast-path
+    // `BuiltinOperatorExpr` (the common scalar case).
+    bool isDanglingEquality = false;
     if (auto operatorExpr = as<OperatorExpr>(stmt->expression))
     {
         if (auto func = as<VarExpr>(operatorExpr->functionExpr))
-        {
-            if (func->name && func->name->text == "==")
-            {
-                getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = operatorExpr});
-            }
-        }
+            isDanglingEquality = func->name && func->name->text == "==";
     }
+    else if (auto builtinOp = as<BuiltinOperatorExpr>(stmt->expression))
+    {
+        isDanglingEquality = (builtinOp->op == BuiltinOperationKind::Eql);
+    }
+    if (isDanglingEquality)
+        getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = stmt->expression});
 }
 
 void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)
@@ -736,34 +741,40 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         tryFoldIntegerConstantExpression(initialVal, ConstantFoldingKind::CompileTime, nullptr));
 
     ConstantIntVal* finalVal = nullptr;
-    auto binaryExpr = as<InfixExpr>(stmt->predicateExpression);
-    if (!binaryExpr)
-        return;
-    auto compareFuncExpr = as<DeclRefExpr>(binaryExpr->functionExpr);
-    if (!compareFuncExpr)
-        return;
-    if (!compareFuncExpr->declRef.getDecl())
-        return;
     IROp compareOp = kIROp_Nop;
-    if (auto intrinsicOpModifier =
-            compareFuncExpr->declRef.getDecl()->findModifier<IntrinsicOpModifier>())
+    // A comparison loop predicate `i < N` on builtin scalar operands is always rewritten by the
+    // fast path to a `BuiltinOperatorExpr`, so that is the only form we need to recognize here.
+    auto cmpExpr = as<BuiltinOperatorExpr>(stmt->predicateExpression);
+    if (!cmpExpr)
+        return;
+    switch (cmpExpr->op)
     {
-        compareOp = (IROp)intrinsicOpModifier->op;
-    }
-    else
-    {
+    case BuiltinOperationKind::Less:
+        compareOp = kIROp_Less;
+        break;
+    case BuiltinOperationKind::Leq:
+        compareOp = kIROp_Leq;
+        break;
+    case BuiltinOperationKind::Greater:
+        compareOp = kIROp_Greater;
+        break;
+    case BuiltinOperationKind::Geq:
+        compareOp = kIROp_Geq;
+        break;
+    default:
+        // Only ordering comparisons drive trip-count inference.
         return;
     }
-    if (binaryExpr->arguments.getCount() != 2)
+    if (cmpExpr->arguments.getCount() != 2)
         return;
-    auto leftCompareOperand = binaryExpr->arguments[0];
-    auto rightCompareOperand = binaryExpr->arguments[1];
+    auto leftCompareOperand = cmpExpr->arguments[0];
+    auto rightCompareOperand = cmpExpr->arguments[1];
     if (!leftCompareOperand)
         return;
     if (!rightCompareOperand)
         return;
     if (auto rightVal = tryFoldIntegerConstantExpression(
-            binaryExpr->arguments[1],
+            cmpExpr->arguments[1],
             ConstantFoldingKind::CompileTime,
             nullptr))
     {
@@ -775,7 +786,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     }
     else if (
         auto leftVal = tryFoldIntegerConstantExpression(
-            binaryExpr->arguments[0],
+            cmpExpr->arguments[0],
             ConstantFoldingKind::CompileTime,
             nullptr))
     {

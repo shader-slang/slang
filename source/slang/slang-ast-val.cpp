@@ -851,6 +851,10 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(
             {
                 index++;
             }
+            else if (as<GenericVariadicPackCountConstraintDecl>(member))
+            {
+                index++;
+            }
             else if (as<HasDiffTypeInfoConstraintDecl>(member))
             {
                 index++;
@@ -1361,6 +1365,7 @@ Val* HasDiffTypeInfoWitness::_substituteImplOverride(
                 if (as<GenericTypeConstraintDecl>(member) ||
                     as<TypeCoercionConstraintDecl>(member) ||
                     as<NonEmptyPackConstraintDecl>(member) ||
+                    as<GenericVariadicPackCountConstraintDecl>(member) ||
                     as<HasDiffTypeInfoConstraintDecl>(member))
                 {
                     if (member == constraintDeclRef.getDecl())
@@ -1397,6 +1402,146 @@ Val* HasDiffTypeInfoWitness::_substituteImplOverride(
     if (!substConstraintDeclRef)
         return this;
     return astBuilder->getHasDiffTypeInfoWitness(substConstraintDeclRef);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclaredVariadicPackCountWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void DeclaredVariadicPackCountWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "declared_pack_count_witness(" << getDeclRef() << ")";
+}
+
+Val* DeclaredVariadicPackCountWitness::_resolveImplOverride()
+{
+    auto resolvedDeclRef = getDeclRef().declRefBase->resolve();
+    if (auto resolvedVal = as<Witness>(resolvedDeclRef))
+        return resolvedVal;
+
+    auto newDeclRef = as<DeclRefBase>(resolvedDeclRef);
+    if (!newDeclRef)
+        newDeclRef = getDeclRef().declRefBase;
+    if (newDeclRef != getDeclRef().declRefBase)
+    {
+        auto newPackCountDeclRef =
+            DeclRef<Decl>(newDeclRef).as<GenericVariadicPackCountConstraintDecl>();
+        if (newPackCountDeclRef)
+            return getCurrentASTBuilder()->getDeclaredVariadicPackCountWitness(newPackCountDeclRef);
+    }
+    return this;
+}
+
+Val* DeclaredVariadicPackCountWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto constraintDeclRef = getDeclRef();
+    auto genericDecl = as<GenericDecl>(constraintDeclRef.getDecl()->parentDecl);
+    if (genericDecl)
+    {
+        auto args = tryGetGenericArguments(subst, genericDecl);
+        if (args.getCount())
+        {
+            // Generic application arguments store ordinary parameters first and
+            // then one witness argument for each source generic constraint, in
+            // the same member order used by `getDefaultSubstitutionArgs` and
+            // `_lowerSubstitutionEnv`. When substituting a declared pack-count
+            // witness through `foo<5, int, ...>`, return that hidden witness
+            // argument directly if it is present in the substitution.
+            bool found = false;
+            Index index = 0;
+            for (auto member : genericDecl->getDirectMemberDecls())
+            {
+                if (as<GenericTypeConstraintDecl>(member) ||
+                    as<TypeCoercionConstraintDecl>(member) ||
+                    as<NonEmptyPackConstraintDecl>(member) ||
+                    as<GenericVariadicPackCountConstraintDecl>(member) ||
+                    as<HasDiffTypeInfoConstraintDecl>(member))
+                {
+                    if (member == constraintDeclRef.getDecl())
+                    {
+                        found = true;
+                        break;
+                    }
+                    index++;
+                }
+            }
+
+            if (found)
+            {
+                auto ordinaryParamCount =
+                    genericDecl->getMembersOfType<GenericTypeParamDeclBase>().getCount() +
+                    genericDecl->getMembersOfType<GenericValueParamDecl>().getCount() +
+                    genericDecl->getMembersOfType<GenericValuePackParamDecl>().getCount();
+                if (index + ordinaryParamCount < args.getCount())
+                {
+                    (*ioDiff)++;
+                    return args[index + ordinaryParamCount];
+                }
+            }
+        }
+    }
+
+    int diff = 0;
+    auto substDeclRef = constraintDeclRef.substituteImpl(astBuilder, subst, &diff);
+    if (!diff)
+        return this;
+
+    auto substConstraintDeclRef = substDeclRef.as<GenericVariadicPackCountConstraintDecl>();
+    if (!substConstraintDeclRef)
+        return this;
+
+    (*ioDiff)++;
+    return astBuilder->getDeclaredVariadicPackCountWitness(substConstraintDeclRef);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConcreteVariadicPackCountWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ConcreteVariadicPackCountWitness::_toTextOverride(StringBuilder& out)
+{
+    out.append("pack_count_witness(");
+    if (auto pack = getPack())
+        pack->toText(out);
+    else
+        out.append("<null>");
+    out.append(", ");
+    if (auto count = getExpectedCount())
+        count->toText(out);
+    else
+        out.append("<null>");
+    out.append(")");
+}
+
+Val* ConcreteVariadicPackCountWitness::_resolveImplOverride()
+{
+    auto resolvedPack = getPack() ? getPack()->resolve() : nullptr;
+    auto resolvedCount = getExpectedCount() ? as<IntVal>(getExpectedCount()->resolve()) : nullptr;
+    if (resolvedPack != getPack() || resolvedCount != getExpectedCount())
+        return getCurrentASTBuilder()->getConcreteVariadicPackCountWitness(
+            resolvedPack,
+            resolvedCount);
+    return this;
+}
+
+Val* ConcreteVariadicPackCountWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    // Concrete witnesses are proof-only values, but the pack and count operands
+    // still participate in specialization. Substituting both operands keeps
+    // serialized/lowered witnesses tied to the exact specialized
+    // `countof(pack) == count` fact that the checker validated.
+    int diff = 0;
+    auto substPack = getPack() ? getPack()->substituteImpl(astBuilder, subst, &diff) : nullptr;
+    auto substCount = getExpectedCount()
+                          ? as<IntVal>(getExpectedCount()->substituteImpl(astBuilder, subst, &diff))
+                          : nullptr;
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+    return astBuilder->getConcreteVariadicPackCountWitness(substPack, substCount);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NonEmptyPackWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2030,16 +2175,147 @@ Val* TypeCastIntVal::_resolveImplOverride()
     return this;
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncCallIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// Fold a constant integer shift. Negative counts leave the value symbolic (returns false);
+// out-of-range counts are masked to the operand width, matching common hardware behavior and
+// avoiding C++ undefined behavior. Shared by every constant-folding path so `x << y` produces
+// the same constant regardless of which path reaches it.
+static bool _tryFoldConstantShift(
+    IntegerLiteralValue base,
+    IntegerLiteralValue count,
+    bool isLeftShift,
+    IntegerLiteralValue& out)
+{
+    if (count < 0)
+        return false;
+    const auto width = std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
+    const auto shiftCount = static_cast<std::make_unsigned_t<IRIntegerValue>>(count) % width;
+    out = isLeftShift
+              ? static_cast<IntegerLiteralValue>(
+                    static_cast<std::make_unsigned_t<IntegerLiteralValue>>(base) << shiftCount)
+              : (base >> shiftCount);
+    return true;
+}
 
-void FuncCallIntVal::_toTextOverride(StringBuilder& out)
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinOperationIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op)
+{
+    switch (op)
+    {
+    case BuiltinOperationKind::Add:
+        return toSlice("+");
+    case BuiltinOperationKind::Sub:
+        return toSlice("-");
+    case BuiltinOperationKind::Mul:
+        return toSlice("*");
+    case BuiltinOperationKind::Div:
+        return toSlice("/");
+    case BuiltinOperationKind::Mod:
+        return toSlice("%");
+    case BuiltinOperationKind::Neg:
+        return toSlice("-");
+    case BuiltinOperationKind::Eql:
+        return toSlice("==");
+    case BuiltinOperationKind::Neq:
+        return toSlice("!=");
+    case BuiltinOperationKind::Less:
+        return toSlice("<");
+    case BuiltinOperationKind::Greater:
+        return toSlice(">");
+    case BuiltinOperationKind::Leq:
+        return toSlice("<=");
+    case BuiltinOperationKind::Geq:
+        return toSlice(">=");
+    case BuiltinOperationKind::BitAnd:
+        return toSlice("&");
+    case BuiltinOperationKind::BitOr:
+        return toSlice("|");
+    case BuiltinOperationKind::BitXor:
+        return toSlice("^");
+    case BuiltinOperationKind::BitNot:
+        return toSlice("~");
+    case BuiltinOperationKind::Lsh:
+        return toSlice("<<");
+    case BuiltinOperationKind::Rsh:
+        return toSlice(">>");
+    case BuiltinOperationKind::Not:
+        return toSlice("!");
+    case BuiltinOperationKind::Conditional:
+        return toSlice("?:");
+    case BuiltinOperationKind::And:
+        return toSlice("&&");
+    case BuiltinOperationKind::Or:
+        return toSlice("||");
+    case BuiltinOperationKind::Unknown:
+        break;
+    }
+    // Every real `BuiltinOperationKind` must have op text (it feeds `toText` and mangling); a
+    // missing case (or the `Unknown` sentinel reaching here) is a bug, not a silently-"?"
+    // operator.
+    SLANG_UNEXPECTED("unhandled BuiltinOperationKind in getBuiltinOperationOpText");
+    UNREACHABLE_RETURN(toSlice("?"));
+}
+
+BuiltinOperationKind getBuiltinOperationKindFromString(
+    UnownedStringSlice opText,
+    OperatorArity arity)
+{
+    const bool isUnary = (arity == OperatorArity::Unary);
+    if (opText == toSlice("+"))
+        return BuiltinOperationKind::Add;
+    if (opText == toSlice("-"))
+        return isUnary ? BuiltinOperationKind::Neg : BuiltinOperationKind::Sub;
+    if (opText == toSlice("*"))
+        return BuiltinOperationKind::Mul;
+    if (opText == toSlice("/"))
+        return BuiltinOperationKind::Div;
+    if (opText == toSlice("%"))
+        return BuiltinOperationKind::Mod;
+    if (opText == toSlice("~"))
+        return BuiltinOperationKind::BitNot;
+    if (opText == toSlice("!"))
+        return BuiltinOperationKind::Not;
+    if (opText == toSlice("=="))
+        return BuiltinOperationKind::Eql;
+    if (opText == toSlice("!="))
+        return BuiltinOperationKind::Neq;
+    if (opText == toSlice("<"))
+        return BuiltinOperationKind::Less;
+    if (opText == toSlice(">"))
+        return BuiltinOperationKind::Greater;
+    if (opText == toSlice("<="))
+        return BuiltinOperationKind::Leq;
+    if (opText == toSlice(">="))
+        return BuiltinOperationKind::Geq;
+    if (opText == toSlice("&"))
+        return BuiltinOperationKind::BitAnd;
+    if (opText == toSlice("|"))
+        return BuiltinOperationKind::BitOr;
+    if (opText == toSlice("^"))
+        return BuiltinOperationKind::BitXor;
+    if (opText == toSlice("<<"))
+        return BuiltinOperationKind::Lsh;
+    if (opText == toSlice(">>"))
+        return BuiltinOperationKind::Rsh;
+    // `?:`/`&&`/`||` are not rewritten by the fast path (`?:` is not an infix operator and
+    // `&&`/`||` short-circuit), but a *resolved* operator call on them can still fold to a
+    // constant `BuiltinOperationIntVal`; the fast path naturally ignores these kinds because
+    // they are neither arithmetic, comparison, nor bitwise.
+    if (opText == toSlice("?:"))
+        return BuiltinOperationKind::Conditional;
+    if (opText == toSlice("&&"))
+        return BuiltinOperationKind::And;
+    if (opText == toSlice("||"))
+        return BuiltinOperationKind::Or;
+    return BuiltinOperationKind::Unknown;
+}
+
+void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
 {
     auto args = getArgs();
-    auto funcDeclRef = getFuncDeclRef();
-
-    auto argToText = [&](int index)
+    auto argToText = [&](Index index)
     {
-        if (as<PolynomialIntVal>(args[index]) || as<FuncCallIntVal>(args[index]))
+        if (as<PolynomialIntVal>(args[index]) || as<BuiltinOperationIntVal>(args[index]))
         {
             out << "(";
             args[index]->toText(out);
@@ -2050,59 +2326,154 @@ void FuncCallIntVal::_toTextOverride(StringBuilder& out)
             args[index]->toText(out);
         }
     };
-    Name* name = funcDeclRef.getName();
-    if (args.getCount() == 2)
-    {
-        argToText(0);
-        out << (name ? name->text : "");
-        argToText(1);
-        ;
-    }
-    else if (args.getCount() == 1)
-    {
-        out << (name ? name->text : "");
-        argToText(0);
-    }
-    else if (name && name->text == "?:")
+    if (getOp() == BuiltinOperationKind::Conditional && args.getCount() == 3)
     {
         argToText(0);
         out << "?";
         argToText(1);
         out << ":";
         argToText(2);
+        return;
     }
-    else
+    auto opText = getBuiltinOperationOpText(getOp());
+    if (args.getCount() == 2)
     {
-        if (name)
-        {
-            out << name->text;
-        }
-        out << "(";
-        for (Index i = 0; i < args.getCount(); i++)
-        {
-            if (i > 0)
-                out << ", ";
-            args[i]->toText(out);
-        }
-        out << ")";
+        argToText(0);
+        out << opText;
+        argToText(1);
+    }
+    else if (args.getCount() == 1)
+    {
+        out << opText;
+        argToText(0);
     }
 }
 
-Val* FuncCallIntVal::_resolveImplOverride()
+Val* BuiltinOperationIntVal::tryFoldImpl(
+    ASTBuilder* astBuilder,
+    Type* resultType,
+    BuiltinOperationKind op,
+    List<IntVal*>& newArgs,
+    DiagnosticSink* sink,
+    SourceLoc loc)
+{
+    List<ConstantIntVal*> constArgs;
+    for (auto arg : newArgs)
+    {
+        auto c = as<ConstantIntVal>(arg);
+        if (!c)
+            return nullptr; // still symbolic
+        constArgs.add(c);
+    }
+
+    // Reject a malformed node whose argument count does not match the operation's arity, so a
+    // unary op never reads a missing second operand and a binary op never folds with a
+    // defaulted one.
+    const bool isUnary =
+        (op == BuiltinOperationKind::Neg || op == BuiltinOperationKind::BitNot ||
+         op == BuiltinOperationKind::Not);
+    const Index expectedArgs = (op == BuiltinOperationKind::Conditional) ? 3 : (isUnary ? 1 : 2);
+    if (constArgs.getCount() != expectedArgs)
+        return nullptr;
+
+    const IntegerLiteralValue a0 = constArgs[0]->getValue();
+    const IntegerLiteralValue a1 = (constArgs.getCount() > 1) ? constArgs[1]->getValue() : 0;
+    const IntegerLiteralValue a2 = (constArgs.getCount() > 2) ? constArgs[2]->getValue() : 0;
+    // Do the wrapping arithmetic (negate/add/sub/mul) through the unsigned type: signed
+    // overflow is UB (and `-INT64_MIN` / `INT64_MIN / -1` even trap on real hardware), while
+    // unsigned wraps two's-complement, matching what the target IR ops compute at runtime.
+    using UInt = std::make_unsigned_t<IntegerLiteralValue>;
+    const UInt u0 = (UInt)a0;
+    const UInt u1 = (UInt)a1;
+    IntegerLiteralValue r = 0;
+    switch (op)
+    {
+    case BuiltinOperationKind::Neg:
+        r = (IntegerLiteralValue)(UInt(0) - u0);
+        break;
+    case BuiltinOperationKind::BitNot:
+        r = ~a0;
+        break;
+    case BuiltinOperationKind::Not:
+        r = (a0 == 0);
+        break;
+    case BuiltinOperationKind::Eql:
+        r = (a0 == a1);
+        break;
+    case BuiltinOperationKind::Neq:
+        r = (a0 != a1);
+        break;
+    case BuiltinOperationKind::Less:
+        r = (a0 < a1);
+        break;
+    case BuiltinOperationKind::Greater:
+        r = (a0 > a1);
+        break;
+    case BuiltinOperationKind::Leq:
+        r = (a0 <= a1);
+        break;
+    case BuiltinOperationKind::Geq:
+        r = (a0 >= a1);
+        break;
+    case BuiltinOperationKind::BitAnd:
+        r = a0 & a1;
+        break;
+    case BuiltinOperationKind::BitOr:
+        r = a0 | a1;
+        break;
+    case BuiltinOperationKind::BitXor:
+        r = a0 ^ a1;
+        break;
+    case BuiltinOperationKind::Add:
+        r = (IntegerLiteralValue)(u0 + u1);
+        break;
+    case BuiltinOperationKind::Sub:
+        r = (IntegerLiteralValue)(u0 - u1);
+        break;
+    case BuiltinOperationKind::Mul:
+        r = (IntegerLiteralValue)(u0 * u1);
+        break;
+    case BuiltinOperationKind::Div:
+    case BuiltinOperationKind::Mod:
+        if (a1 == 0)
+        {
+            if (sink)
+                sink->diagnose(Diagnostics::DivideByZero{.location = loc});
+            return nullptr;
+        }
+        // `INT64_MIN / -1` overflows and traps (SIGFPE) on real hardware, so handle the
+        // `/ -1` case without dividing: `x / -1 == -x` (wrapping) and `x % -1 == 0`.
+        if (a1 == -1)
+            r = (op == BuiltinOperationKind::Div) ? (IntegerLiteralValue)(UInt(0) - u0) : 0;
+        else
+            r = (op == BuiltinOperationKind::Div) ? (a0 / a1) : (a0 % a1);
+        break;
+    case BuiltinOperationKind::Lsh:
+    case BuiltinOperationKind::Rsh:
+        if (!_tryFoldConstantShift(a0, a1, /*isLeftShift*/ op == BuiltinOperationKind::Lsh, r))
+            return nullptr;
+        break;
+    case BuiltinOperationKind::And:
+        r = ((a0 != 0) && (a1 != 0)) ? 1 : 0;
+        break;
+    case BuiltinOperationKind::Or:
+        r = ((a0 != 0) || (a1 != 0)) ? 1 : 0;
+        break;
+    case BuiltinOperationKind::Conditional:
+        r = (a0 != 0) ? a1 : a2;
+        break;
+    default:
+        return nullptr;
+    }
+    return astBuilder->getIntVal(resultType, r);
+}
+
+Val* BuiltinOperationIntVal::_resolveImplOverride()
 {
     auto astBuilder = getCurrentASTBuilder();
-    auto args = getArgs();
-    auto funcDeclRef = getFuncDeclRef();
-    auto funcType = getFuncType();
-
-    Val* resolvedVal = this;
-
-    auto newFuncDeclRef = as<DeclRefBase>(funcDeclRef.declRefBase->resolve());
-    if (!newFuncDeclRef)
-        return this;
     bool diff = false;
     List<IntVal*> newArgs;
-    for (auto arg : args)
+    for (auto arg : getArgs())
     {
         auto newArg = as<IntVal>(arg->resolve());
         if (!newArg)
@@ -2111,146 +2482,22 @@ Val* FuncCallIntVal::_resolveImplOverride()
         if (newArg != arg)
             diff = true;
     }
-
-    if (auto resolved = tryFoldImpl(astBuilder, getType(), newFuncDeclRef, newArgs, nullptr))
-        resolvedVal = resolved;
-    else if (diff)
-    {
-        resolvedVal = astBuilder->getOrCreate<FuncCallIntVal>(
+    if (auto resolved = tryFoldImpl(astBuilder, getType(), getOp(), newArgs, nullptr))
+        return resolved;
+    if (diff)
+        return astBuilder->getOrCreate<BuiltinOperationIntVal>(
             getType(),
-            newFuncDeclRef,
-            funcType,
+            getOp(),
             newArgs.getArrayView());
-    }
-    return resolvedVal;
+    return this;
 }
 
-Val* FuncCallIntVal::tryFoldImpl(
-    ASTBuilder* astBuilder,
-    Type* resultType,
-    DeclRef<Decl> newFuncDecl,
-    List<IntVal*>& newArgs,
-    DiagnosticSink* sink)
-{
-    // Are all args const now?
-    List<ConstantIntVal*> constArgs;
-    bool allConst = true;
-    for (auto arg : newArgs)
-    {
-        if (auto c = as<ConstantIntVal>(arg))
-        {
-            constArgs.add(c);
-        }
-        else
-        {
-            allConst = false;
-            break;
-        }
-    }
-    if (allConst)
-    {
-        // Evaluate the function.
-        auto opName = newFuncDecl.getName();
-        SLANG_ASSERT(opName);
-
-        const auto opNameSlice = opName->text.getUnownedSlice();
-
-        IntegerLiteralValue resultValue = 0;
-
-        // Define convenience macros.
-        // The last macro used in the list *must* be
-        // TERMINATING_CASE, as this handles the closing else, and matches if nothing else does.
-
-#define BINARY_OPERATOR_CASE(op)                                            \
-    if (opNameSlice == toSlice(#op))                                        \
-    {                                                                       \
-        resultValue = constArgs[0]->getValue() op constArgs[1]->getValue(); \
-    }                                                                       \
-    else
-
-#define DIV_OPERATOR_CASE(op)                                                                \
-    if (opNameSlice == toSlice(#op))                                                         \
-    {                                                                                        \
-        if (constArgs[1]->getValue() == 0)                                                   \
-        {                                                                                    \
-            if (sink)                                                                        \
-                sink->diagnose(Diagnostics::DivideByZero{.location = newFuncDecl.getLoc()}); \
-            return nullptr;                                                                  \
-        }                                                                                    \
-        resultValue = constArgs[0]->getValue() op constArgs[1]->getValue();                  \
-    }                                                                                        \
-    else
-
-#define LOGICAL_OPERATOR_CASE(op)                                                          \
-    if (opNameSlice == toSlice(#op))                                                       \
-    {                                                                                      \
-        resultValue =                                                                      \
-            (((constArgs[0]->getValue() != 0) op(constArgs[1]->getValue() != 0)) ? 1 : 0); \
-    }                                                                                      \
-    else
-
-
-#define SPECIAL_OPERATOR_CASE(op, IF_MATCH) \
-    if (opNameSlice == toSlice(op))         \
-    {                                       \
-        IF_MATCH                            \
-    }                                       \
-    else
-
-#define TERMINATING_CASE(MATCH) {MATCH}
-
-        // Handle the cases using the macros
-        BINARY_OPERATOR_CASE(>=)
-        BINARY_OPERATOR_CASE(<=)
-        BINARY_OPERATOR_CASE(>)
-        BINARY_OPERATOR_CASE(<)
-        BINARY_OPERATOR_CASE(!=)
-        BINARY_OPERATOR_CASE(==)
-        BINARY_OPERATOR_CASE(<<)
-        BINARY_OPERATOR_CASE(>>)
-        BINARY_OPERATOR_CASE(&)
-        BINARY_OPERATOR_CASE(|)
-        BINARY_OPERATOR_CASE(^)
-        DIV_OPERATOR_CASE(/)
-        DIV_OPERATOR_CASE(%)
-        LOGICAL_OPERATOR_CASE(&&)
-        LOGICAL_OPERATOR_CASE(||)
-        // Special cases need their "operator" names quoted.
-        SPECIAL_OPERATOR_CASE("!", resultValue = ((constArgs[0]->getValue() == 0) ? 1 : 0);)
-        SPECIAL_OPERATOR_CASE("~", resultValue = ~constArgs[0]->getValue();)
-        SPECIAL_OPERATOR_CASE("?:",
-                              resultValue = constArgs[0]->getValue() != 0
-                                                ? constArgs[1]->getValue()
-                                                : constArgs[2]->getValue();)
-        TERMINATING_CASE(SLANG_UNREACHABLE("constant folding of FuncCallIntVal");)
-
-        return astBuilder->getIntVal(resultType, resultValue);
-
-        // The macros for the cases are no longer needed so undef them all.
-#undef BINARY_OPERATOR_CASE
-#undef DIV_OPERATOR_CASE
-#undef LOGICAL_OPERATOR_CASE
-#undef SPECIAL_OPERATOR_CASE
-#undef TERMINATING_CASE
-    }
-    return nullptr;
-}
-
-Val* FuncCallIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
-{
-    List<IntVal*> newArgs;
-    for (auto arg : getArgs())
-        newArgs.add(as<IntVal>(arg->linkTimeResolve(map)));
-    return tryFoldImpl(getCurrentASTBuilder(), getType(), getFuncDeclRef(), newArgs, nullptr);
-}
-
-Val* FuncCallIntVal::_substituteImplOverride(
+Val* BuiltinOperationIntVal::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
 {
     int diff = 0;
-    auto newFuncDeclRef = getFuncDeclRef().substituteImpl(astBuilder, subst, &diff);
     List<IntVal*> newArgs;
     for (auto& arg : getArgs())
     {
@@ -2262,22 +2509,22 @@ Val* FuncCallIntVal::_substituteImplOverride(
     *ioDiff += diff;
     if (diff)
     {
-        // TODO: report diagnostics back.
-        auto newVal = tryFoldImpl(astBuilder, getType(), newFuncDeclRef, newArgs, nullptr);
-        if (newVal)
+        if (auto newVal = tryFoldImpl(astBuilder, getType(), getOp(), newArgs, nullptr))
             return newVal;
-        else
-        {
-            auto result = astBuilder->getOrCreate<FuncCallIntVal>(
-                getType(),
-                newFuncDeclRef,
-                getFuncType(),
-                newArgs.getArrayView());
-            return result;
-        }
+        return astBuilder->getOrCreate<BuiltinOperationIntVal>(
+            getType(),
+            getOp(),
+            newArgs.getArrayView());
     }
-    // Nothing found: don't substitute.
     return this;
+}
+
+Val* BuiltinOperationIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
+{
+    List<IntVal*> newArgs;
+    for (auto arg : getArgs())
+        newArgs.add(as<IntVal>(arg->linkTimeResolve(map)));
+    return tryFoldImpl(getCurrentASTBuilder(), getType(), getOp(), newArgs, nullptr);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SizeOfIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

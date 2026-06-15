@@ -1,36 +1,40 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-12T13:17:20+00:00
 target_doc: ast-reference/types.md
-target_doc_source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-target_doc_watched_paths_digest: 05b1016228f8c0bbf2fd6e6ea6d165c4d173a37c116aea0c0eccdb47c10abf97
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 41373768d4b2491e1d78d77785d48737b8704c56161f5e163acb779e61a784be
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: pass
+  factual_accuracy: partial
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
-  source_alignment: pass
+  source_alignment: partial
   front_matter_validity: pass
 finding_count: 1
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 0
+  major: 0
+  minor: 1
   nit: 0
 ---
 
 # Review report for ast-reference/types.md
 
 ## Summary
-The page is structurally lint-clean, but review found 1 finding; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The types page satisfies the concrete-class coverage rule: all concrete `FIDDLE()` classes in `slang-ast-type.h` appear in the Nodes tables and abstract classes do not appear as rows. The only issue found is a hierarchy-diagram parent edge for `ThisType` that conflicts with the source and with the table row later in the page.
 
 ## Items checked
-- Checked concrete and abstract type-class classification, `Val -> Type` relationship, grammar links, and all links/anchors.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show ast-reference/types.md` and used the listed prompt, dependency docs, and watched files at `eb9403ef595a99c2ff6def1d538dbd7a792d9371`.
+- Compared all 119 concrete `FIDDLE()` classes in `source/slang/slang-ast-type.h` with the `## Nodes` tables and verified that no `FIDDLE(abstract)` class appears as a row.
+- Checked immediate parent names in the Nodes tables against the header declarations and verified the required `Val -> Type` relationship.
+- Spot-checked source-backed claims for `DeclRefType`, `BasicExpressionType`, vector/matrix types, `ArrayExpressionType`, pointer and parameter-passing types, resource and texture types, parameter-group types, data-layout types, `FuncType`, `ThisType`, `ExtractExistentialType`, `ExistentialSpecializedType`, `AndType`, `ModifiedType`, and pack types.
+- Resolved the relative links and anchors; the body has no source line-number citations.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Nodes` | `Fp8Type` appears in the Nodes table even though it is declared `FIDDLE(abstract)`. | `source/slang/slang-ast-type.h:113-114` declares `FIDDLE(abstract)` `class Fp8Type : public DeclRefType`. | Remove `Fp8Type` from the Nodes table and keep it only in the hierarchy or abstract-intermediates discussion. |
+| F-001 | minor | `## Family hierarchy` | The diagram shows `Type --> ThisType`, but `ThisType` is declared as a `DeclRefType` subclass. The Nodes table later uses `DeclRefType` as the parent, so the diagram is internally inconsistent as well as source-inaccurate. | `source/slang/slang-ast-type.h:1308-1311` declares `class ThisType : public DeclRefType`. | Change the hierarchy edge to `DeclRefType --> ThisType` so the diagram matches both the source and the Nodes table. |

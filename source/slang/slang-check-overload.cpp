@@ -390,6 +390,13 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     Index aa = 0;
     for (auto memberRef : getMembers(m_astBuilder, genericDeclRef))
     {
+        // Capture how many ordinary arguments were supplied explicitly, the first
+        // time we reach a parameter with no remaining explicit argument (the rest
+        // are defaults). Positional arguments make the explicit args a prefix, so
+        // this is the boundary the constraint solver later treats as "provided".
+        if (aa >= matchedArgs.getCount() && candidate.explicitGenericArgCount < 0)
+            candidate.explicitGenericArgCount = checkedArgs.getCount();
+
         if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
         {
             if (aa >= matchedArgs.getCount())
@@ -689,6 +696,10 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             continue;
         }
     }
+
+    // Every ordinary argument was supplied explicitly (no defaults filled).
+    if (candidate.explicitGenericArgCount < 0)
+        candidate.explicitGenericArgCount = checkedArgs.getCount();
 
     auto genSubst = m_astBuilder->getGenericAppDeclRef(genericDeclRef, checkedArgs.getArrayView());
     candidate.subst = SubstitutionSet(genSubst);
@@ -1099,6 +1110,74 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
     auto substArgs = tryGetGenericArguments(candidate.subst, genericDeclRef.getDecl());
     SLANG_ASSERT(substArgs.getCount());
 
+    bool genericIsOutermost = true;
+    for (auto p = genericDeclRef.getDecl()->parentDecl; p; p = p->parentDecl)
+    {
+        if (as<GenericDecl>(p))
+        {
+            genericIsOutermost = false;
+            break;
+        }
+    }
+
+    Index explicitCount = candidate.explicitGenericArgCount;
+    if (explicitCount < 0 || explicitCount > substArgs.getCount())
+        explicitCount = substArgs.getCount();
+
+    // Resolve defaults and witness arguments through the generic constraint
+    // solver -- the same fixpoint loop used for inferred generic arguments --
+    // rather than the per-constraint linear pass below. The solver blocks each
+    // default until its dependencies (including witnesses) are ready, substitutes
+    // the pristine default through the full substitution (re-rooting any
+    // conformance witness the default embeds onto the solved witness arguments),
+    // and wakes dependents on progress until fixpoint. The linear pass cannot do
+    // this -- it visits constraints once in declaration order.
+    //
+    // We pass only the explicitly-provided ordinary prefix; `setProvidedArg`
+    // installs each as fixed caller input (a `CallerProvidedOrdinaryArg`), so a
+    // user-written self-reference argument -- e.g. forming `Foo<U, accessOther,
+    // addrSpace>` inside `Foo`, where the `addrSpace` argument is `Foo`'s own
+    // parameter -- is not overridden by that parameter's default. The solver then
+    // fills the remaining defaults itself.
+    //
+    // On solver failure we fall through to the per-constraint loop, which
+    // re-derives the failing constraint to emit a precise diagnostic (the solver
+    // reports none). The solver's `setProvidedArg` requires an outermost generic
+    // when ordinary arguments are provided, so a nested generic application keeps
+    // the linear pass for now.
+    if (genericIsOutermost)
+    {
+        ShortList<Val*> providedOrdinaryArgs;
+        for (Index i = 0; i < explicitCount; i++)
+            providedOrdinaryArgs.add(substArgs[i]);
+
+        GenericInferenceContext inferenceContext;
+        inferenceContext.genericDecl = genericDeclRef.getDecl();
+
+        ConversionCost solveCost = kConversionCost_None;
+        auto solved = trySolveGenericArguments(
+            _Move(inferenceContext),
+            genericDeclRef,
+            providedOrdinaryArgs.getArrayView().arrayView,
+            solveCost);
+        if (solved)
+        {
+            auto solvedArgs =
+                tryGetGenericArguments(SubstitutionSet(solved), genericDeclRef.getDecl());
+            candidate.subst =
+                SubstitutionSet(m_astBuilder->getGenericAppDeclRef(genericDeclRef, solvedArgs));
+            // Note: deliberately do not fold `solveCost` into `conversionCostSum`
+            // here. The previous per-constraint validation added no conformance
+            // cost at this stage, and doing so shifts overload ranking (e.g.
+            // breaks ties that should stay ambiguous).
+            return true;
+        }
+        // Solver failed: in real mode fall through so the per-constraint loop can
+        // emit a precise diagnostic; in just-trying mode reject the candidate.
+        if (context.mode == OverloadResolveContext::Mode::JustTrying)
+            return false;
+    }
+
     ShortList<Val*> newArgs;
     for (auto arg : substArgs)
         newArgs.add(arg);
@@ -1210,6 +1289,57 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
             newArgs.add(nonEmptyPackWitness);
         }
         else if (
+            auto packCountConstraintDecl =
+                as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
+        {
+            // `TryCheckOverloadCandidateConstraints` runs after ordinary
+            // overload checks have selected a generic candidate. Rebuild the
+            // constraint decl-ref with the candidate's current argument list so
+            // the shared proof helper sees the same substituted `(pack, count)`
+            // pair that lowering will later receive as a hidden witness arg.
+            DeclRef<GenericVariadicPackCountConstraintDecl> constraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        genericDeclRef,
+                        newArgs.getArrayView().arrayView,
+                        packCountConstraintDecl)
+                    .as<GenericVariadicPackCountConstraintDecl>();
+
+            DeclRef<Decl> constrainedPackDeclRef;
+            if (auto declRefExpr = getPackCountConstraintPackExpr(m_astBuilder, constraintDeclRef)
+                                       .as<DeclRefExpr>())
+            {
+                constrainedPackDeclRef = getDeclRef(m_astBuilder, declRefExpr);
+            }
+
+            Val* constrainedArg = nullptr;
+            if (auto typePackDeclRef = constrainedPackDeclRef.as<GenericTypePackParamDecl>())
+            {
+                auto typePackDecl = typePackDeclRef.getDecl();
+                if (typePackDecl->parameterIndex < newArgs.getCount())
+                    constrainedArg = newArgs[typePackDecl->parameterIndex];
+            }
+            else if (auto valuePackDeclRef = constrainedPackDeclRef.as<GenericValuePackParamDecl>())
+            {
+                auto valuePackDecl = valuePackDeclRef.getDecl();
+                if (valuePackDecl->parameterIndex < newArgs.getCount())
+                    constrainedArg = newArgs[valuePackDecl->parameterIndex];
+            }
+
+            auto expectedCount =
+                getPackCountConstraintExpectedCount(m_astBuilder, constraintDeclRef);
+            auto packCountWitness = findVariadicPackCountWitnessForConstraint(
+                m_astBuilder,
+                this,
+                constrainedArg,
+                expectedCount,
+                &context,
+                context.mode != OverloadResolveContext::Mode::JustTrying);
+            if (!packCountWitness)
+                return false;
+            newArgs.add(packCountWitness);
+        }
+        else if (
             auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
         {
             // Differentiability constraints use the shared helper so the
@@ -1314,6 +1444,26 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
     // special case for generic argument inference failure
     if (candidate.status == OverloadCandidate::Status::GenericArgumentInferenceFailed)
     {
+        // Pack-count mismatches can fail during generic argument solving before
+        // the candidate has a specialized decl-ref. The solver records the
+        // concrete `(expected, actual)` pair, and this final selected-candidate
+        // path emits the focused diagnostic instead of the generic fallback.
+        if (candidate.genericInferenceFailure.kind ==
+            GenericArgumentInferenceFailure::Kind::VariadicPackCountMismatch)
+        {
+            auto& failure = candidate.genericInferenceFailure.variadicPackCountMismatch;
+            getSink()->diagnose(Diagnostics::VariadicPackCountDoesNotMatch{
+                .expectedCount = failure.expectedCount,
+                .actualCount = failure.actualCount,
+                .location = failure.location});
+
+            String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+            getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                .signature = declString,
+                .location = candidate.item.declRef.getLoc()});
+            goto error;
+        }
+
         String callString = getCallSignatureString(context);
         getSink()->diagnose(Diagnostics::GenericArgumentInferenceFailed{
             .args = callString,
@@ -2570,7 +2720,8 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     OverloadResolveContext& context,
     ArrayView<Val*> providedOrdinaryArgs,
     ConversionCost& outBaseCost,
-    List<QualType>* innerParameterTypes)
+    List<QualType>* innerParameterTypes,
+    GenericArgumentInferenceFailure* outFailure)
 {
     // The call site may have already provided some ordinary generic arguments,
     // such as the `int` in `foo<int>(x)`. The remaining ordinary arguments and
@@ -2587,6 +2738,10 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     // `vector<float, 4>` contributes constraints like `T = float` and `N = 4`.
     GenericInferenceContext inferenceContext;
     inferenceContext.genericDecl = genericDeclRef.getDecl();
+    inferenceContext.failure = outFailure;
+    inferenceContext.applicationLoc = context.loc;
+    if (outFailure)
+        *outFailure = GenericArgumentInferenceFailure();
 
     // Function-like generics infer ordinary arguments by matching value-level
     // call arguments against the generic function's parameter types. Other
@@ -2746,8 +2901,14 @@ void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
     ConversionCost baseCost = kConversionCost_None;
 
     // Try to infer generic arguments, based on the context
-    DeclRef<Decl> innerRef =
-        inferGenericArguments(genericDeclRef, context, providedOrdinaryArgs, baseCost);
+    GenericArgumentInferenceFailure genericInferenceFailure;
+    DeclRef<Decl> innerRef = inferGenericArguments(
+        genericDeclRef,
+        context,
+        providedOrdinaryArgs,
+        baseCost,
+        nullptr,
+        &genericInferenceFailure);
 
     if (innerRef)
     {
@@ -2768,6 +2929,7 @@ void SemanticsVisitor::addOverloadCandidatesForCallToGeneric(
         candidate.item = genericItem;
         candidate.flavor = OverloadCandidate::Flavor::UnspecializedGeneric;
         candidate.status = OverloadCandidate::Status::GenericArgumentInferenceFailed;
+        candidate.genericInferenceFailure = genericInferenceFailure;
 
         AddOverloadCandidateInner(context, candidate);
     }
@@ -3079,43 +3241,6 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     context.sourceScope = m_outerScope;
     context.baseExpr = GetBaseExpr(funcExpr);
 
-    // check if this is a core module operator call, if so we want to use cached results
-    // to speed up compilation
-    bool shouldAddToCache = false;
-    OperatorOverloadCacheKey key;
-    TypeCheckingCache* typeCheckingCache = getLinkage()->getTypeCheckingCache();
-    if (auto opExpr = as<OperatorExpr>(expr))
-    {
-        if (key.fromOperatorExpr(opExpr))
-        {
-            key.isGLSLMode = getShared()->glslModuleDecl != nullptr;
-            ResolvedOperatorOverload candidate;
-            if (typeCheckingCache->resolvedOperatorOverloadCache.tryGetValue(key, candidate))
-            {
-                // We should only use the cached candidate if it is persistent direct declref
-                // created from GlobalSession's ASTBuilder, or it is created in the current
-                // Linkage.
-                if (candidate.cacheVersion == typeCheckingCache->version ||
-                    findNextOuterGeneric(candidate.decl) == nullptr)
-                {
-                    context.bestCandidateStorage = candidate.candidate;
-                    context.bestCandidate = &context.bestCandidateStorage;
-                }
-                else
-                {
-                    LookupResultItem overloadCandidate = {};
-                    overloadCandidate.declRef = getOuterGenericOrSelf(candidate.decl);
-                    AddDeclRefOverloadCandidates(overloadCandidate, context, 0);
-                    shouldAddToCache = true;
-                }
-            }
-            else
-            {
-                shouldAddToCache = true;
-            }
-        }
-    }
-
     // We run a special case here where an `InvokeExpr`
     // with a single argument where the base/func expression names
     // a type should always be treated as an explicit type coercion
@@ -3342,20 +3467,6 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         // applicable in the end.
         // We will report errors for this one candidate, then, to give
         // the user the most help we can.
-        if (shouldAddToCache)
-        {
-            if (isFromCoreModule(context.bestCandidate->item.declRef.getDecl()) ||
-                getShared()->glslModuleDecl ==
-                    getModuleDecl(context.bestCandidate->item.declRef.getDecl()))
-            {
-                ResolvedOperatorOverload overloadResult;
-                overloadResult.candidate = *context.bestCandidate;
-                overloadResult.decl = context.bestCandidate->item.declRef.getDecl();
-                overloadResult.cacheVersion = typeCheckingCache->version;
-                typeCheckingCache->resolvedOperatorOverloadCache[key] = overloadResult;
-            }
-        }
-
         // Now that we have resolved the overload candidate, we need to undo an
         // `openExistential` operation that was applied to `out` arguments.
         //
