@@ -5,11 +5,11 @@ The Slang language evolution is driven by two processes:
 - The specification proposal process.
 - GitHub issue-driven process.
 
-The specification proposal process is intended for changes to the application-visible part of Slang,
-including the syntax and the standard modules. The GitHub issue-driven process is intended for fixing defects
-and tracking experimental and implementation-specific parts of Slang.
+The specification proposal process is intended for significant changes to the application-visible part of
+Slang, including its syntax and standard modules. For other changes, a lighter-weight GitHub issue-driven
+process may be used.
 
-The criteria for using the specification proposal process are as follows:
+When the following criteria are met, the specification proposal process should be used:
 
 1. The change applies to the application-visible part of Slang. That is, syntax (grammar and the underlying
    semantics) or stable Slang standard modules; AND
@@ -20,7 +20,7 @@ The criteria for using the specification proposal process are as follows:
    2. The change adds new items in stable Slang standard modules; OR
    3. Existing syntax for Slang applications is modified; OR
    4. Existing syntax for Slang applications is deprecated; OR
-   5. Existing standard modules for Slang applications are modified; OR
+   5. Existing standard modules for Slang applications are modified (see the remark below); OR
    6. Existing standard modules for Slang applications are deprecated; OR
    7. An experimental Slang standard module is matured as stable; OR
    8. A stable Slang standard module is deprecated or its status is reverted to experimental; OR
@@ -31,7 +31,12 @@ A change is considered a minor defect fix when:
 1. it fixes an obvious defect; OR
 2. it clarifies existing and previously undocumented behavior.
 
-When the criteria for the specification proposal process are not met, the GitHub issue-driven process may be used.
+The specification proposal process may also be used when the above criteria are not met. In particular, the
+proposal process is recommended for experimental features that are expected to be integrated into Slang. The
+proposal process is explicitly not required for internal Slang language features such as compiler intrinsics.
+
+> 📝 **Remark:** The change process for Slang standard modules is still under consideration. This is tracked
+> by GitHub issue <a href="https://github.com/shader-slang/slang/issues/11612">#11612</a>.
 
 **Criteria interpretation examples:**
 
@@ -74,6 +79,12 @@ When the criteria for the specification proposal process are not met, the GitHub
   <td><a href="https://github.com/shader-slang/slang/issues/11156">Fix GL_EXT_texture_shadow_lod capability requirements in depth sampling (GLSL)</a></td>
   <td>GitHub</td>
   <td>Adjust standard module behavior to better fit the downstream language.</td>
+</tr>
+<tr>
+  <td>Changes to `__intrinsic_type` keyword</td>
+  <td>GitHub</td>
+  <td>The `__intrinsic_type` keyword is an implementation-specific language extension that is internal to the
+    Slang compiler. It should never be used directly by an application.</td>
 </tr>
 </table>
 
@@ -125,7 +136,8 @@ the time of writing. The next steps:
 
 ## GitHub Process
 
-The GitHub process is straightforward: file a GitHub issue with "Language Maturity" issue type, and submit a pull request. See GitHub issue #[11216](https://github.com/shader-slang/slang/issues/11216) for an example.
+The GitHub process is straightforward: file a GitHub issue with "Language Maturity" issue type, and submit a
+pull request. See GitHub issue #[11216](https://github.com/shader-slang/slang/issues/11216) for an example.
 
 ## Checklist for Implementing Changes Related to Slang Language
 
