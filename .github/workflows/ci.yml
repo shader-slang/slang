@@ -45,17 +45,22 @@ jobs:
           fi
           echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
 
-  # Low-priority gate: only nv-slang-bot[bot] PRs run this. It exits quickly.
+  # Low-priority gate: only nv-slang-bot[bot]-triggered CI runs this — both
+  # bot-authored PRs and bot-triggered workflow_dispatch runs. It exits quickly.
   # If human-authored CI, merge-queue CI, or older bot CI is active, a marker
   # step fails this bot run so it consumes no expensive build/test runners. The
   # retry-yielded-bot-ci workflow reruns yielded bot CI after CI becomes quiet.
-  # Human PRs skip this job (result == 'skipped').
+  # Human PRs and human dispatches skip this job (result == 'skipped').
   wait-for-human-priority:
     needs: [filter]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.user.login == 'nv-slang-bot[bot]'
+      (
+      (github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login == 'nv-slang-bot[bot]') ||
+      (github.event_name == 'workflow_dispatch' &&
+      github.triggering_actor == 'nv-slang-bot[bot]')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Only reads Actions API state and runs a script; no write access needed.

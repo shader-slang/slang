@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
   # Safety backstop in case a workflow_run event is missed. The job is
   # short-lived and exits immediately if CI is still active.
+  # Runs hourly at :17 — an off-peak minute on purpose. GitHub heavily
+  # oversubscribes round-number cron slots (:00/:15/:30/:45), so schedules
+  # there are delayed or silently dropped; an odd minute avoids that.
   schedule:
     - cron: "17 * * * *"
 

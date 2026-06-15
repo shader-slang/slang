@@ -4,8 +4,9 @@ Rerun bot CI runs that intentionally yielded to higher-priority CI.
 
 This script is designed for a short-lived workflow_run/scheduled workflow. It
 does not wait or poll. Each invocation checks whether the CI workflow is quiet;
-if so, it reruns at most one recent bot-authored pull-request run whose priority
-gate failed in the dedicated "Stop yielded bot CI" marker step.
+if so, it reruns at most one recent bot-triggered run (pull_request or
+workflow_dispatch) whose priority gate failed in the dedicated "Stop yielded
+bot CI" marker step.
 """
 
 import argparse
@@ -32,6 +33,9 @@ GATE_JOB_NAME = "wait-for-human-priority"
 YIELDED_STEP_NAME = "Stop yielded bot CI"
 CHECK_CI_JOB_NAME = "check-ci"
 RERUNNABLE_CONCLUSIONS = {"failure", "cancelled"}
+
+# Events the priority gate can yield, and so the events we may need to rerun.
+RETRYABLE_EVENTS = ("pull_request", "workflow_dispatch")
 
 
 def normalize_bot_logins(extra_logins=None):
@@ -83,14 +87,23 @@ def parse_github_time(value):
 
 
 def fetch_recent_completed_runs(repo, workflow):
-    runs, err = gh_api_list(
-        f"/repos/{repo}/actions/workflows/{workflow}/runs"
-        "?status=completed&event=pull_request&per_page=100",
-        "workflow_runs",
-    )
-    if err:
-        raise RuntimeError(f"Failed to list completed pull-request runs: {err}")
-    return runs or []
+    """Return completed runs for events the priority gate can yield.
+
+    The gate runs for bot-authored pull requests and bot-triggered
+    workflow_dispatch runs, so both event types are candidates for rerun.
+    """
+    runs = {}
+    for event in RETRYABLE_EVENTS:
+        items, err = gh_api_list(
+            f"/repos/{repo}/actions/workflows/{workflow}/runs"
+            f"?status=completed&event={event}&per_page=100",
+            "workflow_runs",
+        )
+        if err:
+            raise RuntimeError(f"Failed to list completed {event} runs: {err}")
+        for run in items or []:
+            runs[run["id"]] = run
+    return list(runs.values())
 
 
 def fetch_jobs(repo, run_id):
