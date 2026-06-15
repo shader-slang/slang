@@ -38,6 +38,21 @@ jobs:
           persist-credentials: false
           submodules: "recursive"
           fetch-depth: "0"
+      # Restore (read-only) the Windows-release sccache populated on master by
+      # populate-sccache.yml. We deliberately do not save a new cache entry, so
+      # this adds zero pressure on the 10 GB GitHub Actions cache budget and
+      # cannot evict the populate caches.
+      - name: Restore sccache cache (read-only)
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: C:/sccache
+          key: sccache-windows-cl-x86_64-release-${{ github.sha }}
+          restore-keys: |
+            sccache-windows-cl-x86_64-release-
+      - name: Setup sccache
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: windows
       - name: Setup
         uses: ./.github/actions/common-setup
         with:
@@ -48,11 +63,18 @@ jobs:
           build-llvm: true
       - name: Build Slang
         run: |
+          echo "📊 sccache statistics (pre-build):"
+          sccache --show-stats || true
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=true \
-            -DSLANG_ENABLE_CUDA=1
+            -DSLANG_ENABLE_CUDA=1 \
+            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON
           cmake --workflow --preset release
+          echo "📊 sccache statistics (post-build):"
+          sccache --show-stats || true
       - name: Upload Slang build
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
