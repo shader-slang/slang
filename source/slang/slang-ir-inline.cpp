@@ -348,7 +348,8 @@ struct InliningPassBase
         // case. If we are travesing back the call inst and if we find a DebugNoScope, it means
         // that there's another function that was inlined. We don't want that scope. If the call
         // inst truly belongs to another DebugScope, then we should hit a DebugScope inst
-        // *before* we see a DebugNoScope
+        // *before* we see a DebugNoScope. Both a DebugScope (including a one-operand caller-restore
+        // scope left by a preceding inlined region) and a DebugNoScope act as boundaries here.
         IRDebugScope* callDebugScope = nullptr;
         builder.setInsertAfter(call);
         for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
@@ -364,11 +365,12 @@ struct InliningPassBase
                 break;
             }
         }
-        if (!callDebugScope)
-        {
-            builder.emitDebugNoScope();
-        }
-
+        // Find the `IRDebugInlinedAt` active at the call site, if any. It is null when the call is
+        // not inside an inlined region (e.g. a top-level entry point). The call's inline context is
+        // the inlinedAt of its *enclosing* DebugScope, so stop at the first DebugScope and take its
+        // inlinedAt (null for a one-operand caller-restore scope). Stopping at a DebugScope is what
+        // prevents crossing a preceding sibling inlined region's restore scope and wrongly picking
+        // up that earlier region's DebugInlinedAt. A DebugNoScope is likewise a hard boundary.
         IRDebugInlinedAt* callDebugInlinedAt = nullptr;
         for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
         {
@@ -376,11 +378,38 @@ struct InliningPassBase
             {
                 break;
             }
+            if (auto debugScope = as<IRDebugScope>(inst))
+            {
+                callDebugInlinedAt = as<IRDebugInlinedAt>(debugScope->getInlinedAt());
+                break;
+            }
             if (as<IRDebugInlinedAt>(inst))
             {
                 callDebugInlinedAt = as<IRDebugInlinedAt>(inst);
                 break;
             }
+        }
+
+        // Resolve the caller function's own `DebugFunction`. A function's entry `DebugScope` is
+        // synthesized at SPIR-V emit time (see emitGlobalInst in slang-emit-spirv.cpp) and never
+        // exists as an IR inst, so when the backward scan above found no enclosing
+        // `callDebugScope` we reconstruct the caller's scope from its `DebugFunction` here.
+        auto callerFunc = getParentFunc(call);
+        IRInst* callerDebugFunc = callerFunc ? findExistingDebugFunc(callerFunc) : nullptr;
+
+        // When the call did not belong to an in-IR `DebugScope`, restore the caller function's
+        // own scope after the inlined region rather than clearing scope entirely. Without this,
+        // the caller's subsequent debug records (e.g. a `DebugValue` for a caller local) would be
+        // emitted under `DebugNoScope` with no enclosing scope. `callDebugInlinedAt` is null for a
+        // top-level caller, yielding a one-operand `DebugScope %callerDebugFunc`. Reserve
+        // `DebugNoScope` for the genuine no-debug-info case where the caller has no
+        // `DebugFunction`. See shader-slang/slang#11616.
+        if (!callDebugScope)
+        {
+            if (callerDebugFunc)
+                builder.emitDebugScope(callerDebugFunc, callDebugInlinedAt);
+            else
+                builder.emitDebugNoScope();
         }
 
         // Find the last IRDebugLine to extract debug info.
@@ -400,11 +429,11 @@ struct InliningPassBase
 
         // The caller func is the right lexical scope needed for nsight to show where
         // the function is getting inlined inside.
-        if (auto callerFunc = getParentFunc(call))
+        if (callerFunc)
         {
             // When `maybeAddDebugLocationDecoration()` failed to find the source
             // location, IRDebugFuncDecoration is expected to be absent.
-            if (auto callerDebugFunc = findExistingDebugFunc(callerFunc))
+            if (callerDebugFunc)
             {
                 builder.setInsertBefore(call);
                 auto newDebugInlinedAt = builder.emitDebugInlinedAt(
@@ -675,6 +704,28 @@ struct InliningPassBase
                     break;
                 }
 
+            case kIROp_DebugScope:
+                {
+                    // A one-operand DebugScope restores a (previously non-inlined) caller's own
+                    // function scope after an inlined region (see emitCalleeDebugInlinedAt). Now
+                    // that that caller is itself being inlined here, attach this call site's
+                    // DebugInlinedAt so the restored scope reflects the new inline depth — the
+                    // same upgrade the DebugNoScope placeholder above receives. Two-operand
+                    // DebugScopes already carry a DebugInlinedAt and are fixed up via that operand.
+                    auto srcScope = as<IRDebugScope>(inst);
+                    if (newDebugInlinedAt && !srcScope->isInlinedAtPresent())
+                    {
+                        builder->emitDebugScope(
+                            findCloneForOperand(env, srcScope->getScope()),
+                            newDebugInlinedAt);
+                    }
+                    else
+                    {
+                        _cloneInstWithSourceLoc(callSite, env, builder, inst);
+                    }
+                    break;
+                }
+
             case kIROp_DebugInlinedAt:
                 {
                     auto clonedInst = _cloneInstWithSourceLoc(callSite, env, builder, inst);
@@ -940,6 +991,7 @@ struct InliningPassBase
 
                 List<IRInst*> debugNoScopeToRemove;
                 List<IRDebugInlinedAt*> debugInlinedAtToProcess;
+                List<IRDebugScope*> debugScopeToUpgrade;
                 for (auto inst : clonedBlock->getChildren())
                 {
                     if (as<IRDebugNoScope>(inst))
@@ -953,12 +1005,31 @@ struct InliningPassBase
                             debugInlinedAtToProcess.add(inlinedAt);
                         }
                     }
+                    // A one-operand DebugScope restores a (previously non-inlined) caller's own
+                    // function scope (see emitCalleeDebugInlinedAt). Now that that caller is being
+                    // inlined here, attach this call site's DebugInlinedAt so the restored scope
+                    // reflects the new inline depth — the same upgrade the DebugNoScope placeholder
+                    // receives. The block-start scope emitted just above is two-operand and
+                    // skipped.
+                    if (auto debugScope = as<IRDebugScope>(inst))
+                    {
+                        if (!debugScope->isInlinedAtPresent())
+                        {
+                            debugScopeToUpgrade.add(debugScope);
+                        }
+                    }
                 }
                 for (auto inst : debugNoScopeToRemove)
                 {
                     builder->setInsertAfter(inst);
                     builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
                     inst->removeAndDeallocate();
+                }
+                for (auto debugScope : debugScopeToUpgrade)
+                {
+                    builder->setInsertAfter(debugScope);
+                    builder->emitDebugScope(debugScope->getScope(), newDebugInlinedAt);
+                    debugScope->removeAndDeallocate();
                 }
                 for (auto inlinedAt : debugInlinedAtToProcess)
                 {

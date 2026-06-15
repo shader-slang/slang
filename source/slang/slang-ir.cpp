@@ -3522,8 +3522,17 @@ IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
 
 IRInst* IRBuilder::emitDebugScope(IRInst* scope, IRInst* inlinedAt)
 {
-    IRInst* args[] = {scope, inlinedAt};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 2, args);
+    // When the scope is not inside an inlined region (e.g. restoring a top-level caller's own
+    // function scope), there is no `inlinedAt`; emit a one-operand DebugScope rather than a
+    // two-operand one with a null operand. A null operand would crash consumers that iterate
+    // operands unguarded (e.g. buildEntryPointReferenceGraph). This mirrors how emitDebugInlinedAt
+    // makes its trailing outer-inlinedAt operand optional via operand count.
+    if (inlinedAt)
+    {
+        IRInst* args[] = {scope, inlinedAt};
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 2, args);
+    }
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 1, &scope);
 }
 
 IRInst* IRBuilder::emitDebugNoScope()
