@@ -81,9 +81,9 @@ proposal process is explicitly not required for internal Slang language features
   <td>Adjust standard module behavior to better fit the downstream language.</td>
 </tr>
 <tr>
-  <td>Changes to `__intrinsic_type` keyword</td>
+  <td>Changes to <code>__intrinsic_type</code> keyword</td>
   <td>GitHub</td>
-  <td>The `__intrinsic_type` keyword is an implementation-specific language extension that is internal to the
+  <td>The <code>__intrinsic_type</code> keyword is an implementation-specific language extension that is internal to the
     Slang compiler. It should never be used directly by an application.</td>
 </tr>
 </table>
