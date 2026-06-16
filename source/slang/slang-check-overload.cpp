@@ -814,6 +814,33 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         return result;
     };
 
+    // Record the first argument that fails to match, so that a "no applicable
+    // overload" diagnostic can point at the offending argument (issue #7857).
+    // Only the first failure is kept, since type checking of a candidate stops at
+    // that point.
+    //
+    // The reported index is the *argument* index (`argIndex - 1`: `readArg` has
+    // already advanced `argIndex` past the just-read argument), not `paramIndex`.
+    // These differ for a `ConcreteTypePack` parameter, where several arguments
+    // are consumed against a single fixed `paramIndex` -- using `paramIndex`
+    // there would point at the wrong argument number.
+    //
+    // Only record when the underlying types actually differ. A failure where the
+    // types are equal but the qualifiers differ (e.g. an l-value/`inout`
+    // mismatch) has its own dedicated diagnostics; recording it here would
+    // produce a confusing "expected 'T', got 'T'" note that names only the bare
+    // types.
+    auto recordArgMismatch = [&](QualType paramType, QualType argType)
+    {
+        if (candidate.argMismatchArgIndex < 0 && paramType.type && argType.type &&
+            !paramType.type->equals(argType.type))
+        {
+            candidate.argMismatchArgIndex = argIndex - 1;
+            candidate.argMismatchExpectedType = paramType.type;
+            candidate.argMismatchActualType = argType.type;
+        }
+    };
+
     auto coerceArgToParam = [&](Arg arg, QualType paramType) -> Arg
     {
         auto argType = QualType(arg.type, paramType.isLeftValue);
@@ -828,10 +855,14 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
             {
                 // We need an exact match in this case.
                 if (!paramType->equals(argType))
+                {
+                    recordArgMismatch(paramType, argType);
                     return {nullptr, nullptr};
+                }
             }
             else if (!canCoerce(paramType, argType, arg.argExpr, &cost))
             {
+                recordArgMismatch(paramType, argType);
                 return {nullptr, nullptr};
             }
             candidate.conversionCostSum += cost;
@@ -3354,6 +3385,80 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             {
                 getSink()->diagnose(
                     Diagnostics::NoApplicableWithArgs{.args = argsList, .expr = expr});
+            }
+
+            // For each candidate, show its signature and, when we recorded one,
+            // which argument failed to match. This helps the user see precisely
+            // why no overload applied (issue #7857).
+            {
+                Index maxCandidatesToPrint = 10;
+
+                // Order by check status, with the declaration's source location
+                // as a deterministic tie-breaker so candidates with equal status
+                // are not reordered arbitrarily by the sort (which would make the
+                // diagnostic output nondeterministic across builds/platforms).
+                context.bestCandidates.sort(
+                    [](const OverloadCandidate& c1, const OverloadCandidate& c2)
+                    {
+                        if (c1.status != c2.status)
+                            return c1.status < c2.status;
+                        return c1.item.declRef.getLoc().getRaw() <
+                               c2.item.declRef.getLoc().getRaw();
+                    });
+
+                // `bestCandidates` can contain the same candidate more than once
+                // (e.g. a synthesized constructor reached via several lookup
+                // paths); report each once. Dedup by the rendered signature
+                // string rather than by `Decl*`: `declRef.getDecl()` strips
+                // substitutions, so two distinct specializations of the same
+                // generic (e.g. `foo<float>` vs `foo<int>`) share a `Decl*` and
+                // would wrongly collapse into one note, hiding a genuinely
+                // different per-argument mismatch. The signature string is what
+                // the user sees and distinguishes specializations. A single pass
+                // prints up to `maxCandidatesToPrint` unique candidates and
+                // counts any further unique ones so the trailing "N more" note is
+                // accurate.
+                HashSet<String> seenCandidates;
+                Index printedCount = 0;
+                Index remainingCount = 0;
+                for (const auto& candidate : context.bestCandidates)
+                {
+                    if (!candidate.item.declRef.getDecl())
+                        continue;
+
+                    String declString =
+                        ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                    if (!seenCandidates.add(declString))
+                        continue;
+
+                    if (printedCount >= maxCandidatesToPrint)
+                    {
+                        remainingCount++;
+                        continue;
+                    }
+
+                    getSink()->diagnose(Diagnostics::OverloadCandidate{
+                        .candidate = declString,
+                        .location = candidate.item.declRef.getLoc()});
+
+                    if (candidate.argMismatchArgIndex >= 0 && candidate.argMismatchExpectedType &&
+                        candidate.argMismatchActualType)
+                    {
+                        getSink()->diagnose(Diagnostics::OverloadCandidateArgumentTypeMismatch{
+                            .argIndex = (int64_t)candidate.argMismatchArgIndex,
+                            .expectedType = candidate.argMismatchExpectedType,
+                            .actualType = candidate.argMismatchActualType,
+                            .location = candidate.item.declRef.getLoc()});
+                    }
+
+                    printedCount++;
+                }
+                if (remainingCount > 0)
+                {
+                    getSink()->diagnose(Diagnostics::MoreOverloadCandidates{
+                        .count = (int64_t)remainingCount,
+                        .location = expr->loc});
+                }
             }
         }
         else
