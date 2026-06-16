@@ -2400,7 +2400,7 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     if (!param->findDecoration<IRHLSLMeshPayloadDecoration>())
         emitRateQualifiersAndAddressSpace(param);
 
-    // [MaxRecords(n)] on work-graph node output parameters
+    // [MaxRecords(n)] on work-graph node input/output parameters.
     if (auto decor = param->findDecoration<IRMaxRecordsDecoration>())
     {
         m_writer->emit("[MaxRecords(");
