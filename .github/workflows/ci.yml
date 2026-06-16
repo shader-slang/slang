@@ -299,11 +299,9 @@ jobs:
   #
   # The build jobs must be listed in `needs` even though every test job
   # already depends on a build job: when a needed job fails, GitHub
-  # Actions marks the dependent jobs "skipped" (not "failed"), and
-  # skipped must be allowed here because several test jobs intentionally
-  # skip on plain pull_request events (they only run in the merge queue).
-  # Without the build jobs listed explicitly, a broken build turns all
-  # its test jobs into allowed skips and the gate passes (see #11553).
+  # Actions marks the dependent jobs "skipped" (not "failed"). Requiring
+  # every needed job to succeed ensures skipped jobs cannot hide a failed
+  # dependency (see #11553).
   check-ci:
     needs:
       [
@@ -339,19 +337,19 @@ jobs:
           echo "=== CI Results Summary ==="
           echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
 
-          # Allow "success" and "skipped"; fail on "failure" or "cancelled".
-          # Checking the generic `needs` JSON (rather than enumerating each
-          # job) means any job added to `needs` above is gated automatically.
-          failed=$(echo "$NEEDS_JSON" | jq -r 'to_entries[]
-            | select(.value.result == "failure" or .value.result == "cancelled")
-            | .key')
-          if [[ -n "$failed" ]]; then
-            echo "These CI jobs failed or were cancelled:"
-            echo "$failed"
+          # Require every needed job to succeed. Checking the generic
+          # `needs` JSON (rather than enumerating each job) means any job
+          # added to `needs` above is gated automatically.
+          unsuccessful=$(echo "$NEEDS_JSON" | jq -r 'to_entries[]
+            | select(.value.result != "success")
+            | "\(.key): \(.value.result)"')
+          if [[ -n "$unsuccessful" ]]; then
+            echo "These CI jobs did not succeed:"
+            echo "$unsuccessful"
             exit 1
           fi
 
-          echo "All CI jobs completed successfully (passed or skipped)!"
+          echo "All CI jobs completed successfully!"
 
   # Automatically retry GPU health check failures by dispatching ci-retry.yml,
   # which watches this run until it completes, then reruns only failed jobs.
