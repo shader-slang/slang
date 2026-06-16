@@ -6,6 +6,16 @@
 
 #include <cstring>
 
+// VK_KHR_portability_enumeration was introduced in Vulkan SDK 1.3.x headers.
+// Define string and flag fallbacks so the runtime detection below compiles
+// against any SDK version; both values are fixed by the Vulkan spec.
+#ifndef VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
+#define VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME "VK_KHR_portability_enumeration"
+#endif
+#ifndef VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR
+#define VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR ((VkInstanceCreateFlagBits)0x00000001)
+#endif
+
 namespace vkdemo
 {
 
@@ -18,10 +28,6 @@ void Context::init(bool requireInt64Atomics)
     std::vector<VkExtensionProperties> props(propertyCount);
     vkEnumerateInstanceExtensionProperties(nullptr, &propertyCount, props.data());
     bool hasPortabilityEnum = false;
-    // VK_KHR_portability_enumeration is only defined by Vulkan headers >= 1.3.x.
-    // Guard the references so older headers (e.g. on some Linux CI runners) still
-    // compile; the runtime detection runs wherever the extension is available.
-#if defined(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)
     for (auto& p : props)
     {
         if (std::strcmp(p.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0)
@@ -31,7 +37,6 @@ void Context::init(bool requireInt64Atomics)
             break;
         }
     }
-#endif
 
     VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -50,11 +55,8 @@ void Context::init(bool requireInt64Atomics)
     ci.pApplicationInfo = &appInfo;
     ci.enabledExtensionCount = (uint32_t)instanceExts.size();
     ci.ppEnabledExtensionNames = instanceExts.data();
-#if defined(VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR)
     if (hasPortabilityEnum)
         ci.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-#endif
-    (void)hasPortabilityEnum; // unused when the portability headers are absent
     check(vkCreateInstance(&ci, nullptr, &instance), "vkCreateInstance");
 
     // Pick a physical device with a compute-capable queue family. When 64-bit
