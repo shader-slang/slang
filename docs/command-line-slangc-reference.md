@@ -1307,7 +1307,7 @@ Stage
 * `mesh` 
 * `amplification`, `task` 
 * `dispatch` 
-* `node` 
+* `node`
 
 <a id="vulkan-shift"></a>
 ## vulkan-shift
@@ -1638,7 +1638,7 @@ A capability describes an optional feature that a target may or may not support.
 * `mesh` 
 * `task` 
 * `amplification` 
-* `node` 
+* `node`
 * `any_stage` 
 * `amplification_mesh` 
 * `raytracing_stages` 
@@ -1911,4 +1911,3 @@ Available help categories for the [-h](#h) option
 * `capability` : A capability describes an optional feature that a target may or may not support. When a [-capability](#capability-1) is specified, the compiler may assume that the target supports that capability, and generate code accordingly. 
 * `file-extension` : A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) may be inferred from the extension of an input or [-o](#o) path 
 * `help-category` : Available help categories for the [-h](#h) option 
-
