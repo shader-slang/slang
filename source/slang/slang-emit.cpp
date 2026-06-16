@@ -9,6 +9,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-writer.h"
+#include "slang-capability.h"
 #include "slang-check-out-of-bound-access.h"
 #include "slang-emit-c-like.h"
 #include "slang-emit-cpp.h"
@@ -1077,6 +1078,43 @@ Result linkAndOptimizeIR(
                 reservedSpaces.add((int)value.intValue);
             }
         }
+        // Default to uint64. Customers opt down to uint32 (4 bytes per
+        // slot) only when targeting a runtime driver without 64-bit
+        // shader-atomic-add support — notably MoltenVK on Apple Silicon,
+        // where Vulkan reports `shaderBufferInt64Atomics = false`. The
+        // compiler can't see the runtime driver, so the choice is the
+        // caller's responsibility.
+        int counterByteWidth = kDefaultCoverageCounterByteWidth;
+        if (auto values =
+                opts.options.tryGetValue(CompilerOptionName::TraceCoverageCounterByteWidth))
+        {
+            if (values->getCount() > 0)
+                counterByteWidth = (int)(*values)[0].intValue;
+        }
+        // Validate the byte width on the API path. The CLI parser
+        // (`slang-options.cpp`) already validates the user-facing bit
+        // width and stores 4 or 8, but a host that sets the
+        // `TraceCoverageCounterByteWidth` option directly bypasses that
+        // check. Only 4 and 8 have a synthesizable element type; rather
+        // than silently coercing anything else to uint32 (which would
+        // hide a caller's misconfiguration — e.g. forwarding bits 32/64
+        // instead of bytes 4/8), fail loudly here, matching the CLI's
+        // `E45113` guarantee.
+        if (counterByteWidth != 4 && counterByteWidth != 8)
+        {
+            sink->diagnose(Diagnostics::CoverageCounterWidthBytesInvalid{
+                .byteWidth = counterByteWidth,
+            });
+            return SLANG_FAIL;
+        }
+        // Opt-in boolean mode (off by default): record whether each entry
+        // executed (non-atomic store of 1) instead of an exact count.
+        bool coverageBoolean = false;
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
+        {
+            if (values->getCount() > 0)
+                coverageBoolean = (*values)[0].intValue != 0;
+        }
         SLANG_PASS(
             instrumentCoverage,
             sink,
@@ -1085,6 +1123,8 @@ Result linkAndOptimizeIR(
             explicitSpace,
             reservedSpaces.getBuffer(),
             (int)reservedSpaces.getCount(),
+            counterByteWidth,
+            coverageBoolean,
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);
@@ -2221,6 +2261,9 @@ Result linkAndOptimizeIR(
     else if (isKhronosTarget(targetRequest))
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::KhronosTarget;
+    else if (isMetalTarget(targetRequest))
+        bufferElementTypeLoweringOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::Metal;
     else
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::Default;
@@ -2474,7 +2517,17 @@ Result linkAndOptimizeIR(
         SLANG_PASS(unexportNonEmbeddableIR, target);
     }
 
-    SLANG_PASS(collectMetadata, *metadata);
+    {
+        auto targetCaps = targetRequest->getTargetCaps();
+        if (target != CodeGenTarget::PyTorchCppBinding &&
+            targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(
+                CapabilityName::descriptor_handle)) == CapabilitySet::ImpliesReturnFlags::Implied)
+        {
+            if (!targetProgram->getOrCreateLayout(sink))
+                return SLANG_FAIL;
+        }
+    }
+    SLANG_PASS(collectMetadata, targetProgram, *metadata);
 
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);

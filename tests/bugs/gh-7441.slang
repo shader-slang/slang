@@ -46,12 +46,12 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // BUFFER-NEXT: 10001
 // BUFFER-NEXT: 12345678
 
-// Expected output for Metal (different struct layout)
+// Expected output for Metal (device buffers use tightly packed vector layout)
 // BUFFER-MTL: 7
-// BUFFER-MTL-NEXT: 101
-// BUFFER-MTL-NEXT: 101
+// BUFFER-MTL-NEXT: 1000101
 // BUFFER-MTL-NEXT: 10001
-// BUFFER-MTL-NEXT: 10001
+// BUFFER-MTL-NEXT: 1000101
+// BUFFER-MTL-NEXT: 0
 // BUFFER-MTL-NEXT: 12345678
 
 // REFLECT:         "name": "f_bool1",
@@ -63,12 +63,14 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // REFLECT:         "name": "f_bool4",
 // REFLECT:         "binding": {"kind": "uniform", "offset": 16, "size": 4, "elementStride": 1}
 
-// Metal-specific reflection (different bool3 layout)
+// Metal-specific reflection: device buffers pack bool vectors to element
+// alignment (a `bool3` is 3 bytes, like `packed_bool3`), so the fields sit at
+// tighter offsets than the padded native MSL layout.
 // REFLECT-MTL:         "name": "f_bool1",
 // REFLECT-MTL:         "binding": {"kind": "uniform", "offset": 5, "size": 1, "elementStride": 1}
 // REFLECT-MTL:         "name": "f_bool2",
-// REFLECT-MTL:         "binding": {"kind": "uniform", "offset": 8, "size": 2, "elementStride": 1}
+// REFLECT-MTL:         "binding": {"kind": "uniform", "offset": 7, "size": 2, "elementStride": 1}
 // REFLECT-MTL:         "name": "f_bool3",
-// REFLECT-MTL:         "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 1}
+// REFLECT-MTL:         "binding": {"kind": "uniform", "offset": 10, "size": 3, "elementStride": 1}
 // REFLECT-MTL:         "name": "f_bool4",
-// REFLECT-MTL:         "binding": {"kind": "uniform", "offset": 16, "size": 4, "elementStride": 1}
+// REFLECT-MTL:         "binding": {"kind": "uniform", "offset": 13, "size": 4, "elementStride": 1}

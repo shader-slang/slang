@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:52:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 6ebf89cec5003af621b64dff064087207dc7299f8872526b3a08d82df64fd1e6
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:25:56Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 4080bcfcf1b112fa3ace17207ae1272f8aa8c5e9ac63ab53a4746286f7f0d9b4
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -62,10 +62,11 @@ flowchart LR
 ```
 
 The arrows show the rough phases. In the actual compiler some of
-these phases are interleaved — for example, `lookup.md` describes
-how shadowing is enforced *during* the scope walk, and
-`visibility.md` describes how `TryCheckOverloadCandidateVisibility`
-applies a second visibility check *inside* overload resolution. The
+these phases are interleaved — for example, [lookup.md](lookup.md)
+describes how shadowing is enforced *during* the scope walk, and
+[visibility.md](visibility.md) describes how
+`TryCheckOverloadCandidateVisibility` applies a second visibility
+check *inside* [overload-resolution.md](overload-resolution.md). The
 pages have inline cross-references where the boundary is not strict.
 
 ## Where this fits in the pipeline
@@ -80,9 +81,10 @@ is responsible for actually calling the lookup entry points,
 filtering the results, and ranking overloads; the four pages here
 document the rules those calls follow.
 
-Downstream, the resolved `DeclRef` flows into AST-to-IR lowering
-([../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md)) where
-breadcrumb chains are turned into concrete IR access patterns.
+Downstream, the resolved `DeclRef` — with any breadcrumb chain
+already expanded into concrete AST access expressions during semantic
+checking (see [lookup.md](lookup.md)) — flows into AST-to-IR lowering
+([../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md)).
 Cross-cutting consumers of `DeclRef` are documented in
 [../cross-cutting/ir-instructions.md](../cross-cutting/ir-instructions.md).
 

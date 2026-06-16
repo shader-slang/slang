@@ -1,37 +1,46 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-12T12:04:49+00:00
 target_doc: pipeline/04c-layout-ir.md
-target_doc_source_commit: 07b911645ab895c59decdcc25c6c56ee245833af
-target_doc_watched_paths_digest: e038ce8b26af34313cbb735372967b47c8a59d14ba4b479adca77628797061b1
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 71774435a40512fdfeaa2771405f426a01abae3299e7b7ac5b896252ae444cc5
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
   completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 2
+finding_count: 0
 severity_breakdown:
   critical: 0
   major: 0
-  minor: 2
+  minor: 0
   nit: 0
 ---
 
 # Review report for pipeline/04c-layout-ir.md
 
 ## Summary
-The page is structurally lint-clean, but review found 2 findings; the most significant severity is minor. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+
+The layout-IR page matches `TargetProgram::createIRModuleForLayout` and its prompt shape. I found no issues requiring remediation.
 
 ## Items checked
-- Checked `createIRModuleForLayout`, cache/assert/build flow, global parameter loop, parameter-group branch, entry-point loop, capability atom filter, obfuscation block, and target-program cache accessors.
+
+- Ran `regenerate.py show pipeline/04c-layout-ir.md` and read the target page, `_common.md`, `pipeline-04c-layout-ir.md`, and dependencies `pipeline/04-ast-to-ir.md`, `pipeline/04b-pre-link-passes.md`, `cross-cutting/targets.md`, and `ir-reference/index.md`.
+- Verified front matter keys, recorded source commit, and 64-character hex watched-path digest.
+- Checked all source line citations against `source/slang/slang-lower-to-ir.cpp`, `source/slang/slang-target-program.h`, `source/slang/slang-parameter-binding.cpp`, and `source/slang/slang-ir-link.cpp`.
+- Spot-checked 18 layout-construction claims including cache behavior, `m_layout` assertion, global-parameter loop, parameter-group layout branch, entry-point skip conditions, import decoration, SPIR-V/Metal capability atom forwarding, optional obfuscation strip/DCE, and final mangled-name-map construction.
+- Resolved relative links with `regenerate.py lint` for this assigned doc group; lint reported no issues.
 
 ## Findings
 
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | minor | lines 105-108 | The per-global-parameter loop is cited as lines `14374-14394`, but it is in `createIRModuleForLayout` around `15374-15394`. | `source/slang/slang-lower-to-ir.cpp:15374-15394` contains the `globalStructLayout->fields` loop. | Change the cited range to `15374-15394`. |
-| F-002 | minor | lines 224-226 | The page says `getExistingIRModuleForLayout()` is at line `15311` of `slang-target-program.h`; the declaration is around line 111. | `source/slang/slang-target-program.h:109-111` declares `getOrCreateIRModuleForLayout` and `getExistingIRModuleForLayout`. | Change the citation to `~111` or remove the exact line number. |
+(no findings)
+
+## No-issues notes
+
+- The document correctly avoids turning layout-IR construction into a four-phase target-pipeline page.
+- The optional obfuscation description matches the `shouldObfuscateCode()` block and strip options.
+- The caveat about layout modules participating in `linkIR` is supported by `targetProgram->getExistingIRModuleForLayout()`.

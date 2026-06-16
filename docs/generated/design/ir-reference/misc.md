@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:17:31Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -69,6 +69,21 @@ flowchart TD
 | --- | --- | --- | --- | --- | --- |
 | `nop` | — | — | | (synthesized) | No-op placeholder. |
 | `Unrecognized` | — | — | | (synthesized) | Placeholder used when deserializing a module containing an opcode the current build does not define; should never appear except immediately after deserialization. |
+
+### Capability sets
+
+Concrete children of the top-level `CapabilitySet` group, built by
+`IRBuilder::getCapabilityValue` in
+[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) to encode a
+compacted capability set in disjunction-of-conjunctions normal form.
+Both produce a `CapabilitySetType` value. (Note: this group is distinct
+from the `CapabilitySet` *type* opcode documented in
+[types.md](types.md).)
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `capabilityConjunction` | — | (variadic) | H | (synthesized) | An AND of capability atoms, each operand a capability-atom integer value. |
+| `capabilityDisjunction` | — | (variadic) | H | (synthesized) | An OR of `capabilityConjunction` operands; the outer level of the normal form. |
 
 ### Tensor and runtime helpers
 
@@ -168,6 +183,20 @@ concrete children are listed here.
 | `TreatAsDynamicUniform` | — | `value` | | (synthesized) | Annotation cast marking a value as dynamically uniform; affects target legalization. |
 | `GetLegalizedSPIRVGlobalParamAddr` | — | (variadic, `min=1`) | | (synthesized) | Returns the legalized address of a global parameter for the SPIR-V backend. |
 
+### Variable struct-wrapping legalization
+
+Concrete children of the `ForceVarIntoStructTemporarilyBase` parent.
+They wrap a variable so a callee that expects a struct receives one;
+the `slang-ir-hlsl-legalize.cpp` pass either unwraps the argument
+(when its base type is already a `StructType`) or materializes a
+temporary single-field struct and copies the value back for
+`out`/`inout` parameters.
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `ForceVarIntoStructTemporarily` | — | `var` | | core-module `__forceVarIntoStructTemporarily` intrinsic | Forces a variable to be passed as a struct temporary; legalized by `slang-ir-hlsl-legalize.cpp`. |
+| `ForceVarIntoRayPayloadStructTemporarily` | — | `var` | | core-module ray-payload intrinsic | Same as above, additionally adding the `RayPayload` decoration and default payload access qualifiers to the wrapping struct. |
+
 ### Annotations
 
 Generic annotation opcodes used by IR passes to attach extra
@@ -209,8 +238,8 @@ CPU-side launch opcodes produced by the host-shader / CUDA backends.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `DispatchKernel` | — | `baseFn, threadGroupSize, dispatchSize` | | (synthesized) | Generic kernel-dispatch op produced by the host-side lowering. |
-| `CudaKernelLaunch` | — | `kernel, gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY` | | (synthesized) | CUDA-specific kernel-launch op consumed by [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp). |
+| `DispatchKernel` | — | `baseFn, threadGroupSize, dispatchSize, args...` | | (synthesized) | Generic kernel-dispatch op produced by the host-side lowering; trailing variadic operands are the call arguments. |
+| `CudaKernelLaunch` | — | `baseFn, gridDim, blockDim, argsArray, cudaStream` | | (synthesized) | CUDA-specific kernel-launch op consumed by the Torch emitter [slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp). |
 
 ## Notable opcodes
 
@@ -266,12 +295,16 @@ intermediate passes treat them as opaque conversions.
 
 ### `CudaKernelLaunch`
 
-The CUDA-specific kernel-launch opcode produced by the host-side
-lowering when a Slang program targets CUDA. The operand list mirrors
-the CUDA driver-API launch signature: kernel function, three grid
-dimensions, and (currently) two block dimensions. The opcode is
+The CUDA-specific kernel-launch opcode produced by
+`IRBuilder::emitCudaKernelLaunch` in
+[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) when a Slang
+program targets the Torch/CUDA host path. It has exactly five operands
+— `baseFn, gridDim, blockDim, argsArray, cudaStream` — which the
+emitter maps onto a `cudaLaunchKernel` call: operand 0 is the function,
+operands 1-2 are bit-cast to `dim3` grid/block dimensions, operand 3 is
+the packed argument array, and operand 4 is the stream. The opcode is
 consumed by
-[slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp);
+[slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp);
 no IR pass introspects it.
 
 ### `Annotation`

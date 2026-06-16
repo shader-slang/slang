@@ -1,31 +1,22 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T19:00:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-12T14:14:04Z
 target_doc: name-resolution/lookup.md
 review_report: ../../reviews/name-resolution/lookup.md.review.md
-target_doc_source_commit_before: 5b3ff4ef03c6a7b8c4e1a98a16d18ae2b66b8c5e
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
-actions:
-  fixed: 2
-  rejected_bogus: 0
-  rejected_out_of_scope: 0
-  deferred: 0
-  escalated: 0
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+actions: { fixed: 1, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
 ---
 
 # Remediation report for name-resolution/lookup.md
 
 ## Summary
 
-Both findings addressed: the manifest watched-paths gap is closed,
-and the missing-information finding about lookup-level deduplication
-is documented in a new sub-section under "Container-level overload
-accumulation".
+The review raised one major finding and I fixed it. The edge-case section omitted the prompt-required mask-refinement case in which an overloaded `LookupResult` is re-filtered against a narrower mask and non-matching items are silently dropped. I verified the finding against the prompt and `slang-lookup.cpp` and expanded the first edge-case bullet accordingly. No findings were rejected, deferred, or escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | The page documents `AddToLookupResult` behavior; the absence of any dedupe step is a load-bearing fact that callers (overload resolution, visibility filtering) rely on. | Added a new `#### Deduplication: there isn't any at the LookupResult level` block under `### Container-level overload accumulation`, with code citations to `AddToLookupResult` lines 95-125 and pointers to overload-resolution and visibility for the downstream handling. |
-| F-002 | fixed | Runbook "Manifest gaps" pattern: the doc legitimately cites these files but they were absent from `watched_paths`. | Added `source/slang/slang-check-decl.cpp`, `slang-check-stmt.cpp`, `slang-check-expr.cpp`, and `include/slang.h` to the `name-resolution/lookup.md` `watched_paths` in `_meta/manifest.yaml`. |
+| F-001 | fixed | The per-doc prompt (`name-resolution-lookup.md:129-132`) requires the edge case "`LookupResult` with multiple items but only one matches the mask — the others are filtered silently," and `source/slang/slang-lookup.cpp:128-143` implements `refineLookup` exactly that way (iterates `inResult.items`, skips items failing `DeclPassesLookupMask`, returns survivors). The original first bullet covered only the multi-item overloaded case, omitting the single-survivor silent-filtering path. | Expanded the first edge-case bullet to describe `refineLookup` re-filtering, the single-survivor outcome, and silent dropping of non-matching items, with a citation to `slang-lookup.cpp:128-143`. |

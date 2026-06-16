@@ -1,38 +1,40 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-12T12:06:22+00:00
 target_doc: ir-reference/values.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
   factual_accuracy: partial
-  cross_references: pass
-  completeness: fail
+  cross_references: partial
+  completeness: pass
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 3
+finding_count: 1
 severity_breakdown:
   critical: 0
-  major: 3
-  minor: 0
+  major: 0
+  minor: 1
   nit: 0
 ---
 
 # Review report for ir-reference/values.md
 
 ## Summary
-The page is structurally lint-clean, but review found 3 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The page has valid front matter, required sections, and resolving links. I found one minor cross-reference/source-alignment issue: the see-also section sends readers to `misc.md` for bitfield opcodes that are actually documented on this page.
 
 ## Items checked
-- Checked literal, undefined, arithmetic, conversion, memory, aggregate, optional/result tables, duplicates, source value clusters, links, and front matter.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/values.md`.
+- Read `_common.md`, `ir-reference-values.md`, the target document including front matter, dependency docs, and watched source files.
+- Resolved the document's relative Markdown links and checked peer generated-doc links against the generated-doc tree.
+- Checked required value-family sections, table columns, front matter, literal payload notes, memory rows, aggregate rows, conversion rows, constexpr rows, and notable-opcode coverage.
+- Spot-checked more than 10 factual claims against source for `boolConst`, `integer_constant`, `float_constant`, `string_constant`, `LoadFromUninitializedMemory`, `Poison`, `defaultConstruct`, `add`, `irem`, `frem`, `logicalAnd`, `select`, `BuiltinCast`, `var`, `load`, `store`, `get_field`, `getElementPtr`, `swizzle`, `makeVector`, `makeUInt64`, `makeOptionalNone`, and `constexprAdd`.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | lines 96-103 | `Undefined` is listed as an opcode row despite being a grouping parent. | `source/slang/slang-ir-insts.lua:857-894` defines `Undefined` as the parent for `LoadFromUninitializedMemory` and `Poison`. | Remove the `Undefined` row from `## Opcodes` and leave it in hierarchy/prose only. |
-| F-002 | major | lines 78-236 | Several concrete value-like opcodes are omitted, including `allocObj`, `CUDA_LDG`, `getNativeStr`, `makeString`, `getNativePtr`, managed-pointer helpers, and managed-pointer attach/detach operations. | `source/slang/slang-ir-insts.lua:946`, `:1067`, and `:1139-1149` define these opcodes. | Add these to the values or misc table, with cross-links if ownership is intentionally elsewhere. |
-| F-003 | major | lines 105-169 | The compile-time arithmetic/cast opcode family is missing. | `source/slang/slang-ir-insts.lua:3145-3174` defines `constexprAdd` through `constexprEnumCast`. | Add a constexpr arithmetic/cast sub-table or explicitly move these to `misc.md`. |
+| F-001 | minor | `## See also` | The bullet for `misc.md` says that page covers `bitfieldExtract` and `bitfieldInsert`, but the actual opcode rows for both are in this document and `misc.md` does not list them. This misdirects readers looking for those opcodes. | `docs/generated/design/ir-reference/values.md:125-126` lists `bitfieldExtract` and `bitfieldInsert`; `docs/generated/design/ir-reference/values.md:406-408` claims `misc.md` covers them; `docs/generated/design/ir-reference/misc.md` has no matching opcode rows. | Remove the bitfield-opcode wording from the `misc.md` see-also bullet, or replace it with examples that actually live in `misc.md`, such as type-introspection predicates or pack helpers. |

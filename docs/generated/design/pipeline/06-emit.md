@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-28T08:29:27+00:00
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-watched_paths_digest: a36bfc191a0ab4adb9168e61c6ea332b786bc78e7f29a88ec21d3e53fc1f4f9b
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:19:21Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 77f4f05b3dc0ad28bce5954a34b857ef3d07af59deedcfa5c6b2acfb674fa265
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -19,7 +19,7 @@ modifying a target backend.
 
 - **Input**: a fully linked, specialized, and legalized `IRModule`
   produced by `linkAndOptimizeIR`
-  ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 893)
+  ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 895)
   for one `TargetRequest`.
 - **Output**: a target artefact wrapped in an `IArtifact`
   (declared in
@@ -30,8 +30,8 @@ modifying a target backend.
 
 ## Emit dispatcher
 
-The dispatch happens in `emitEntryPointsSourceFromIR`
-([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2418 at
+The dispatch happens in `CodeGenContext::emitEntryPointsSourceFromIR`
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2526 at
 `source_commit`) plus the variants invoked when targeting non-textual
 formats. The dispatcher:
 

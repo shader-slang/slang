@@ -2,7 +2,8 @@
 // Exercises the RayTracingKHR branch of requireSPIRVAnyCapability when
 // loading a RaytracingAccelerationStructure from a descriptor heap in a
 // raygeneration shader (which already requires SpvCapabilityRayTracingKHR).
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage raygeneration -entry rayGenMain -profile sm_6_6 -capability spvDescriptorHeapEXT -spirv-resource-heap-stride 32
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage raygeneration -entry rayGenMain -profile sm_6_6 -capability spvDescriptorHeapEXT
+//TEST:SIMPLE(filecheck=OVERRIDE): -target spirv-asm -stage raygeneration -entry rayGenMain -profile sm_6_6 -capability spvDescriptorHeapEXT -spirv-resource-heap-stride 32
 
 struct PushConstants
 {
@@ -20,8 +21,12 @@ void rayGenMain(uniform PushConstants pushConstants)
 {
     // CHECK-DAG: %[[U64:[A-Za-z0-9_]+]] = OpTypeInt 64 0
     // CHECK-DAG: %[[AS_TYPE:[A-Za-z0-9_]+]] = OpTypeAccelerationStructureKHR
-    // CHECK-DAG: %[[AS_HEAP_ARRAY:[A-Za-z0-9_]+]] = OpTypeRuntimeArray %[[AS_TYPE]]
-    // CHECK-DAG: OpDecorate %[[AS_HEAP_ARRAY]] ArrayStride 32
+    // CHECK-DAG: %[[AS_HEAP_ARRAY:[A-Za-z0-9_]+]] = OpTypeRuntimeArray %[[U64]]
+    // CHECK-DAG: OpDecorate %[[AS_HEAP_ARRAY]] ArrayStride 8
+    // OVERRIDE-DAG: %[[OVERRIDE_U64:[A-Za-z0-9_]+]] = OpTypeInt 64 0
+    // OVERRIDE-DAG: %[[OVERRIDE_AS_TYPE:[A-Za-z0-9_]+]] = OpTypeAccelerationStructureKHR
+    // OVERRIDE-DAG: %[[OVERRIDE_AS_HEAP_ARRAY:[A-Za-z0-9_]+]] = OpTypeRuntimeArray %[[OVERRIDE_U64]]
+    // OVERRIDE-DAG: OpDecorate %[[OVERRIDE_AS_HEAP_ARRAY]] ArrayStride 32
     // CHECK-DAG: OpCapability RayTracingKHR
     // CHECK: OpUntypedAccessChainKHR %_ptr_UniformConstant %[[AS_HEAP_ARRAY]] %slang_resourceHeap
     // CHECK-NEXT: %[[AS_ADDR:[A-Za-z0-9_]+]] = OpLoad %[[U64]]

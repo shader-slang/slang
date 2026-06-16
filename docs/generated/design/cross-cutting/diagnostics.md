@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:20:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 81f47a822a99f93b8701131d76480cb13010b16d56d184d434ff385df559169e
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:13:29Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: d42270f6daaebc67791d018218ab19aef406d36f8b4094dd0346c2a1ef697ec1
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -219,8 +219,10 @@ governed by the `SLANG_ASSERT` environment variable (see
 `system`, `debugbreak`, `release-assert-only`, or unset). On Windows
 the build option `SLANG_IGNORE_ABORT_MSG` further suppresses modal
 abort dialogs in unattended runs. These mechanisms are independent of
-the diagnostic sink but interact with it: a release-assert that fires
-typically calls into the sink before terminating.
+the diagnostic sink: `SLANG_ASSERT` / `SLANG_RELEASE_ASSERT` route
+through `::Slang::handleAssert` rather than the sink. The sink-based
+internal-error path is the `SLANG_INTERNAL_ERROR`,
+`SLANG_UNIMPLEMENTED`, and `SLANG_DIAGNOSE_UNEXPECTED` macros above.
 
 ## Adding a new diagnostic
 

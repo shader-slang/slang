@@ -1600,7 +1600,7 @@ IRFunc* splitApplyAndPropFuncs(
                 }
 
                 newOperands.add(
-                    builder.emitPoison(tupleNameType)); // For the tuple name type operand.
+                    builder.getPoison(tupleNameType)); // For the tuple name type operand.
                 auto newMakeTuple = builder.emitMakeTuple(newOperands);
                 makeStruct->replaceUsesWith(newMakeTuple);
                 makeStruct->removeAndDeallocate();

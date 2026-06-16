@@ -701,7 +701,7 @@ interface IForwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
     [MaybeDifferentiable]
-    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff 
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff
 };
 
 // Core library interfaces:
@@ -718,10 +718,10 @@ __magic_type(BwdDiffFuncInterfaceType)
 [__FunctionInterface]
 interface IBackwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
-    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType))
     associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
 
-    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType)) 
+    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType))
     associatedtype MinimalContext; // -> minimal_context_type
 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
@@ -1322,7 +1322,7 @@ $}
         {
             return a + b;
         }
-        
+
 ${
         break;
     }
@@ -2455,7 +2455,7 @@ extension matrix<T,N,M,L> : IFloat
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
     __init(float v) { this = matrix<T,N,M>(T(v)); }
-    
+
     /// Initialize a matrix where all elements have the same scalar `value`.
     [OverloadRank(-1)]
     [Differentiable]
@@ -4524,6 +4524,31 @@ attribute_syntax [mutating] : MutatingAttribute;
 ///
 __attributeTarget(AccessorDecl)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
+
+/// Marks a function whose return value should not be discarded. When a call to a
+/// function marked with `[NoDiscard]` is made in a context where its result is
+/// discarded — an expression statement, or a `for` loop's side-effect expression,
+/// including through transparent wrappers (parentheses) and pass-through operands
+/// (comma, ternary arms, the right-hand side of `&&`/`||`) — the compiler emits an
+/// error. Applying `[NoDiscard]` to a function that returns `void` is itself an
+/// error, reported at the declaration, since such a function has no result to discard.
+/// @remarks
+/// This is useful for functions that look like they mutate the object they are called
+/// on, but instead return a result. For example, a member function `load` that returns
+/// the loaded value rather than mutating `this`:
+/// ```
+/// struct MyType
+/// {
+///    [NoDiscard]
+///    MyType load() { ... }
+/// }
+/// MyType t;
+/// t.load(); // error: result of '[NoDiscard]' function is discarded.
+/// let loaded = t.load(); // OK
+/// ```
+///
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [NoDiscard] : NoDiscardAttribute;
 
 /// @internal
 /// Marks a member function to make `this` argument passed by const reference.

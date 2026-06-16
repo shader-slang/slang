@@ -467,6 +467,31 @@ struct IRKnownBuiltinDecoration : IRDecoration
 };
 
 FIDDLE()
+struct IRBuiltinRequirementDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+
+    // The `BuiltinRequirementKind`, as its integer value (kept as a raw integer
+    // here so this IR header need not depend on the AST enum).
+    IRIntegerValue getKind() { return getIntVal(getKindOperand()); }
+};
+
+// A requirement key for a recognized built-in interface requirement (e.g. an
+// `IDifferentiable` requirement identified by `BuiltinRequirementKind`). It is a
+// hoistable inst, so it is deduplicated by construction from its `kind` operand:
+// every reference to the same built-in requirement resolves to a single key inst
+// (even across decls and the precompiled core module). See the lua definition
+// for the full rationale.
+FIDDLE()
+struct IRBuiltinRequirementKey : IRInst
+{
+    FIDDLE(leafInst())
+
+    // The `BuiltinRequirementKind`, as its integer value.
+    IRIntegerValue getKind() { return getIntVal(getKindOperand()); }
+};
+
+FIDDLE()
 struct IREntryPointParamDecoration : IRDecoration
 {
     FIDDLE(leafInst())
@@ -3460,6 +3485,17 @@ $(type_info.return_type) $(type_info.method_name)(
         return emitIntrinsicInst(getVoidType(), kIROp_IndexedFieldKey, 2, args);
     }
 
+    // Get the unique (deduplicated) requirement key for a built-in interface
+    // requirement identified by `kind` (a `BuiltinRequirementKind`). Because the
+    // inst is hoistable, repeated calls with the same `kind` return the same key
+    // inst, so a witness lookup and the witness-table entry always agree.
+    IRBuiltinRequirementKey* getBuiltinRequirementKey(IRIntegerValue kind)
+    {
+        IRInst* arg = getIntValue(getIntType(), kind);
+        return cast<IRBuiltinRequirementKey>(
+            emitIntrinsicInst(nullptr, kIROp_BuiltinRequirementKey, 1, &arg));
+    }
+
     IRCompilerDictionaryEntry* _getCompilerDictionaryEntry(List<IRInst*> const& keys);
 
     void addCompilerDictionaryEntry(
@@ -3872,7 +3908,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitGpuForeach(List<IRInst*> args);
 
     IRLoadFromUninitializedMemory* emitLoadFromUninitializedMemory(IRType* type);
-    IRPoison* emitPoison(IRType* type);
+    IRPoison* getPoison(IRType* type);
 
     IRInst* emitReinterpret(IRInst* type, IRInst* value);
     IRInst* emitOutImplicitCast(IRInst* type, IRInst* value);
@@ -4833,6 +4869,16 @@ $(type_info.return_type) $(type_info.method_name)(
 
     void addSPIRVNonUniformResourceDecoration(IRInst* value)
     {
+        // A constant is dynamically uniform by definition, so it can never be
+        // NonUniform; never decorate one. This matters beyond tidiness: integer
+        // literals are deduplicated module-wide, so decorating a shared literal
+        // (e.g. a fixed [0] access-chain index reached via a non-uniform base)
+        // would make NonUniform propagation see every other uniform access chain
+        // that reuses that literal as "already NonUniform" and spuriously
+        // decorate it -- potentially pulling in an unrelated
+        // *ArrayNonUniformIndexing capability the shader does not need.
+        if (as<IRConstant>(value))
+            return;
         addDecoration(value, kIROp_SPIRVNonUniformResourceDecoration);
     }
 
@@ -5241,6 +5287,14 @@ $(type_info.return_type) $(type_info.method_name)(
             value,
             kIROp_KnownBuiltinDecoration,
             getIntValue(getIntType(), IRIntegerValue(enumValue)));
+    }
+
+    // Mark `value` (an interface requirement key) with the built-in requirement
+    // role `kind` (a `BuiltinRequirementKind` integer value), so consumers can
+    // find the requirement by role instead of by entry order.
+    void addBuiltinRequirementDecoration(IRInst* value, IRIntegerValue kind)
+    {
+        addDecoration(value, kIROp_BuiltinRequirementDecoration, getIntValue(getIntType(), kind));
     }
 
     void addKnownBuiltinDecoration(IRInst* value, UnownedStringSlice const& name)
