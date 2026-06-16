@@ -77,8 +77,8 @@ SLANG_UNIT_TEST(vtableISlangUnknown)
 struct IShaderProgramD3D12Probe : gfx::IShaderProgramD3D12
 {
     int lastSlot = -1;
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
     {
         lastSlot = 0;
         SlangUUID const interfaceID = SLANG_UUID_IShaderProgramD3D12;
@@ -112,8 +112,7 @@ SLANG_UNIT_TEST(vtableIShaderProgramD3D12)
     IShaderProgramD3D12Probe p;
 
     gfx::IShaderProgramD3D12* queried = nullptr;
-    SLANG_CHECK(
-        p.queryInterface(SLANG_UUID_IShaderProgramD3D12, (void**)&queried) == SLANG_OK);
+    SLANG_CHECK(p.queryInterface(SLANG_UUID_IShaderProgramD3D12, (void**)&queried) == SLANG_OK);
     SLANG_CHECK(queried == &p);
     callSlot(queried, 3);
     SLANG_CHECK(p.lastSlot == 3); // getRootSignature
@@ -125,8 +124,8 @@ SLANG_UNIT_TEST(vtableIShaderProgramD3D12)
 struct IComputeCommandEncoderD3D12Probe : gfx::IComputeCommandEncoderD3D12
 {
     int lastSlot = -1;
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
     {
         lastSlot = 0;
         SlangUUID const interfaceID = SLANG_UUID_IComputeCommandEncoderD3D12;
