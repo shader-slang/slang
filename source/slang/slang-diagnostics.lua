@@ -4059,6 +4059,13 @@ err(
     span { loc = "location", message = "entry point '~entryPoint:Name' cannot return array type '~returnType:Type'" }
 )
 
+err(
+    "entry-point-cannot-be-generic",
+    38014,
+    "generic entry point used without specialization arguments",
+    span { loc = "location", message = "generic entry point '~entryPoint:Name' must be specialized with concrete generic arguments (e.g. via '-specialize' or 'addEntryPointEx'); an unspecialized generic entry point cannot be compiled" }
+)
+
 
 -- Load semantic checking diagnostics (part 10) - Interface Requirements, Global Generics, Differentiation, Modules
 -- (inlined from slang-diagnostics-semantic-checking-10.lua)
