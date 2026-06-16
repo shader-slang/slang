@@ -39,8 +39,8 @@ static constexpr IROp kStableNameToOpcode[] = {
 #endif // FIDDLE END
 };
 
-#define SLANG_CHECK_IR_STABLE_NAME(op, stableName)                  \
-    static_assert(kOpcodeToStableName[op] == stableName);           \
+#define SLANG_CHECK_IR_STABLE_NAME(op, stableName)        \
+    static_assert(kOpcodeToStableName[op] == stableName); \
     static_assert(kStableNameToOpcode[stableName] == op)
 
 SLANG_CHECK_IR_STABLE_NAME(kIROp_NodeLaunchDecoration, 865);
