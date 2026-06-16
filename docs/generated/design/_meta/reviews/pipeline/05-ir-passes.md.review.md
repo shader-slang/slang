@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-12T12:04:49+00:00
 target_doc: pipeline/05-ir-passes.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 8749b5a60327ef9aea96c0b02a10d643c2d39d04195e7cbd40904b69dabc7f6e
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 3c3b5585e80344fff65833edfb71495cd9350eddefb45844496574bcd283e01a
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
   factual_accuracy: pass
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
   source_alignment: pass
   front_matter_validity: pass
-finding_count: 1
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 1
+  major: 0
   minor: 0
   nit: 0
 ---
@@ -24,13 +24,24 @@ severity_breakdown:
 # Review report for pipeline/05-ir-passes.md
 
 ## Summary
-The page is structurally lint-clean, but review found 1 finding; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+
+The IR-pass catalog satisfies the representative inventory prompt and matched sampled source files and orchestrator calls. I found no findings.
 
 ## Items checked
-- Checked the `linkAndOptimizeIR` anchor, representative pass files across categories, target-sensitive ordering caveat, pre-link and target-pipeline cross-links, and the adding-a-pass checklist.
+
+- Ran `regenerate.py show pipeline/05-ir-passes.md` and read the target page, `_common.md`, `pipeline-05-ir-passes.md`, and dependency `pipeline/04-ast-to-ir.md`.
+- Verified front matter keys, recorded source commit, and 64-character hex watched-path digest.
+- Spot-checked more than 25 table rows against actual `source/slang/slang-ir-*.cpp` files, including legalization, autodiff, target-specific, coverage, layout, loop, utility, and validation entries.
+- Checked the `linkAndOptimizeIR` ordering overview against `source/slang/slang-emit.cpp`, including the `SLANG_PASS` wrapper, coverage instrumentation/finalization, uniform collection, specialization, optional type/result lowering, target-specific legalization, and emit handoff.
+- Confirmed the document treats 04b and per-target pipeline pages as the authoritative ordered references while keeping this page categorical, as required by the prompt.
+- Resolved relative links with `regenerate.py lint` for this assigned doc group; lint reported no issues.
 
 ## Findings
 
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | major | document structure | The prompt requires a top-level `## Pass utilities` section, but the document has only `### Shared utilities (not passes)` nested under `## Pass categories`. | `docs/generated/design/_meta/prompts/pipeline-05-ir-passes.md` requires `## Pass utilities`. | Promote or rename the shared-utilities subsection to `## Pass utilities`. |
+(no findings)
+
+## No-issues notes
+
+- Representative pass rows point to files that exist in the watched-path expansion.
+- The page correctly distinguishes pre-link ordering from post-link target-sensitive ordering.
+- The coverage instrumentation row matches the current `instrumentCoverage` option handling in `linkAndOptimizeIR`.

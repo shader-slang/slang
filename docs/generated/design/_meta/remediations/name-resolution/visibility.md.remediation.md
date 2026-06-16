@@ -1,34 +1,24 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T19:00:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-12T14:14:52Z
 target_doc: name-resolution/visibility.md
 review_report: ../../reviews/name-resolution/visibility.md.review.md
-target_doc_source_commit_before: a0f1b39ad14e7e4d4fdf3a07c98e3d76aae0ad1f
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
-actions:
-  fixed: 3
-  rejected_bogus: 0
-  rejected_out_of_scope: 0
-  deferred: 0
-  escalated: 0
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+actions: { fixed: 3, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
 ---
 
 # Remediation report for name-resolution/visibility.md
 
 ## Summary
 
-All three findings addressed: the default-language-version statement
-is clarified to distinguish `SLANG_LANGUAGE_VERSION_DEFAULT` (the
-legacy enum value, still 2018) from `SessionDesc::minLanguageVersion`
-(defaulted to 2025 in the API), and both manifest watched-paths
-findings (F-001 and F-003 cover the same gap from different angles)
-are closed by the same manifest edit.
+All three review findings were verified against the source at `eb9403ef595a99c2ff6def1d538dbd7a792d9371` and fixed. F-001 corrected the API surface for the `minLanguageVersion` default field; F-002 added the prompt-required `using`/re-export edge case, naming the actual source-backed rejection path; F-003 corrected the diagnostic attribution for duplicated visibility modifiers. No findings were rejected, deferred, or escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Runbook "Manifest gaps" pattern: `slang-check-expr.cpp` holds the visibility filter the doc relies on, and it was not watched. | Added `source/slang/slang-check-decl.cpp`, `slang-check-modifier.cpp`, `slang-check-expr.cpp`, `slang-ast-support-types.h`, `slang-lookup.cpp`, `slang-diagnostics.lua`, and `include/slang.h` to the `name-resolution/visibility.md` `watched_paths` in `_meta/manifest.yaml`. |
-| F-002 | fixed | The reviewer correctly flagged that `SLANG_LANGUAGE_VERSION_DEFAULT` is still 2018 in the public enum; what defaults to 2025 is `SessionDesc::minLanguageVersion`. | Rewrote the "Default language version" paragraph to make this distinction explicit, citing both `include/slang.h` and `slang-session.cpp`. |
-| F-003 | fixed | Same manifest-gap pattern as F-001, listing the additional cited-but-unwatched files. | The F-001 manifest expansion already adds `slang-ast-support-types.h`, `slang-check-expr.cpp`, `slang-lookup.cpp`, `slang-diagnostics.lua`, and `include/slang.h`, so this finding is closed by the same edit. |
+| F-001 | fixed | Confirmed: `include/slang.h:5574` declares `minLanguageVersion = SLANG_LANGUAGE_VERSION_2025` inside `struct SlangGlobalSessionDesc` (line 5565); `struct SessionDesc` (line 4244) has no such field. | Renamed the cited field to `SlangGlobalSessionDesc::minLanguageVersion` in the `SlangLanguageVersion` concept bullet. |
+| F-002 | fixed | Prompt line 93 requires this edge case and the doc omitted it. Verified `visitUsingDecl` (slang-check-decl.cpp:16419) only accepts a namespace argument (`ExpectedANamespace` otherwise) and does not re-export individual members; the actual less-visible-alias rejection is `validatePublicCallableOperandVisibility`'s `FuncAliasDecl` branch (slang-check-decl.cpp:9012-9037) emitting `public-custom-derivative-uses-non-exported-import` (slang-diagnostics.lua:2652, code 31162). | Added a "Re-exporting a non-exported decl through an alias" edge-case bullet stating the absence of a `using`-specific path and citing the `FuncAliasDecl` rejection path and diagnostic. |
+| F-003 | fixed | Confirmed: `InvalidVisibilityModifierOnTypeOfDecl` fires for `private`/`internal` on a `NamespaceDeclBase` (slang-check-modifier.cpp:1998,2018), not for `public public`. Duplicate visibility modifiers are caught by the `VisibilityModifier` conflict group (slang-check-modifier.cpp:1500) and emit `DuplicateModifier` (slang-check-modifier.cpp:2306, `duplicate-modifier` code 31202). | Replaced the `public public ...` example with the namespace `private`/`internal` case and noted that repeated modifiers emit `duplicate-modifier` from the conflict-group check. |

@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-07T14:35:56+00:00
-source_commit: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-watched_paths_digest: 799ebd5687158b54f5b05c7af11525c7a9fdec1c4d76519bd51ffdb180085561
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:11:24Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 723594a42095f62fd08e8a2b4425d9775c105e0d4a0f5882282a816aa7314537
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -227,6 +227,46 @@ solving and substitution happen during checking
 ([slang-check-constraint.cpp](../../../../source/slang/slang-check-constraint.cpp))
 and IR specialization (see
 [../pipeline/05-ir-passes.md](05-ir-passes.md)).
+
+Constraints are parsed by `parseOptionalGenericConstraints` (the
+inheritance-clause form, `: Base1, Base2`) and
+`maybeParseGenericConstraints` (the `where` form), both in
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp). Each
+produces `GenericTypeConstraintDecl` members
+([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h)). For a
+generic, those constraint decls are siblings of the parameters under
+the enclosing `GenericDecl`. `parseOptionalGenericConstraints` takes an
+optional `constraintTarget` parameter that decouples the constrained
+subject (derived from the decl being parsed) from the container the
+constraint decls are added to.
+
+### Interface associated-type and `__constraint` requirements
+
+When an `associatedtype` is declared inside an interface, its
+constraints — whether written as an inheritance clause
+(`associatedtype A : IBar`) or a `where` clause
+(`associatedtype A where A : IBar`) — are relocated to the enclosing
+`InterfaceDecl` so that they become interface-level requirements,
+siblings of the associated type. `parseAssocType`
+([slang-parser.cpp](../../../../source/slang/slang-parser.cpp)) detects
+the enclosing interface through `parser->currentScope` and passes it as
+the `constraintTarget`. This yields the same representation as the
+`__constraint` syntax-as-declaration form:
+
+```slang
+interface IDerived : IBase { __constraint DataType == This; }
+```
+
+The `__constraint` keyword is registered in the syntax-parse table
+(`g_parseSyntaxEntries` in
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp)) and
+handled by `parseInterfaceConstraintDecl`, which builds a
+`GenericTypeConstraintDecl`, parsing the subject type, then either
+`==` (setting `isEqualityConstraint`) or `:` (a subtype requirement),
+then the bound type. Where a `__constraint` is legal is enforced
+centrally by `isDeclAllowed`, which permits a
+`GenericTypeConstraintDecl` only as a member of an `InterfaceDecl` or a
+`GenericDecl`.
 
 The deeper treatment of the disambiguation strategy lives in
 [../../../design/parsing.md](../../../design/parsing.md).

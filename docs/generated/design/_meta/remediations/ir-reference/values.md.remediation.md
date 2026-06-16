@@ -1,33 +1,21 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T17:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-12T14:14:47Z
 target_doc: ir-reference/values.md
 review_report: ../../reviews/ir-reference/values.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
-actions:
-  fixed: 3
-  rejected_bogus: 0
-  rejected_out_of_scope: 0
-  deferred: 0
-  escalated: 0
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+actions: { fixed: 1, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
 ---
 
 # Remediation report for ir-reference/values.md
 
 ## Summary
-
-Three major findings addressed: removed the `Undefined`
-grouping-parent row, added the missing concrete value-like opcodes
-in two new sub-tables ("Strings and native pointers", "Object and
-CUDA helpers"), and added a comprehensive
-`### Constexpr arithmetic and casts` sub-table.
+The review contained one minor finding, which was fixed. The `See also` bullet for `misc.md` incorrectly directed readers there for the `bitfieldExtract` and `bitfieldInsert` opcodes, which are actually documented in this page and absent from `misc.md`. No findings were rejected, deferred, or escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-ir-insts.lua:857-894` shows `Undefined` as the grouping parent of `LoadFromUninitializedMemory` and `Poison`; it is not itself an opcode. | Removed the `Undefined` row from `### Undefined and default-construct` and added a one-sentence note above the table identifying it as the grouping parent of the two remaining concrete rows. |
-| F-002 | fixed | `source/slang/slang-ir-insts.lua:946`, `:1067`, and `:1139-1149` define `allocObj`, `CUDA_LDG`, `getNativeStr`, `makeString`, `getNativePtr`, `getManagedPtrWriteRef`, `ManagedPtrAttach`, and `ManagedPtrDetach` as concrete value-producing opcodes. | Added `### Strings and native pointers` with `makeString`, `getNativeStr`, `getNativePtr`, `getManagedPtrWriteRef`, `ManagedPtrAttach`, `ManagedPtrDetach`; added `### Object and CUDA helpers` with `allocObj` and `CUDA_LDG`. Both sub-tables inserted between "Memory" and "Aggregate constructors". |
-| F-003 | fixed | `source/slang/slang-ir-insts.lua:3142-3174` defines `constexprAdd` through `constexprEnumCast` as hoistable arithmetic / cast variants used for `IntVal`-class lowering. | Added `### Constexpr arithmetic and casts` between "Result / Optional / Conditional helpers" and "Notable opcodes", with rows for all 29 constexpr opcodes. |
+| F-001 | fixed | Verified: the `bitfieldExtract`/`bitfieldInsert` rows live in this doc (values.md:125-126); `grep -i bitfield` over `docs/generated/design/ir-reference/misc.md` finds only an unrelated "op-flag bitfield" mention (misc.md:35) and no matching opcode rows, while `misc.md` does document the type-introspection predicates `IsType`/`IsInt` (misc.md:124-126). The bullet misdirected readers. | Removed the bitfield-opcode wording from the `misc.md` see-also bullet, leaving the accurate type-introspection-predicate reference. |

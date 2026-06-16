@@ -112,11 +112,10 @@ Linkage::~Linkage()
         auto globalSession = getSessionImpl();
         std::lock_guard<std::mutex> lock(globalSession->m_typeCheckingCacheMutex);
         if (!globalSession->m_typeCheckingCache ||
-            globalSession->getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount() <
-                getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount())
+            globalSession->getTypeCheckingCache()->conversionCostCache.getCount() <
+                getTypeCheckingCache()->conversionCostCache.getCount())
         {
             globalSession->m_typeCheckingCache = m_typeCheckingCache;
-            getTypeCheckingCache()->version++;
         }
         destroyTypeCheckingCache();
     }

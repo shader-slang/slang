@@ -1,34 +1,22 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T17:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-12T14:14:58Z
 target_doc: ir-reference/resources-and-atomics.md
 review_report: ../../reviews/ir-reference/resources-and-atomics.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
-actions:
-  fixed: 2
-  rejected_bogus: 0
-  rejected_out_of_scope: 0
-  deferred: 0
-  escalated: 0
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+actions: { fixed: 1, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
 ---
 
 # Remediation report for ir-reference/resources-and-atomics.md
 
 ## Summary
 
-Two major findings addressed: added a new cooperative-matrix/vector
-sub-table and the fragment-shader-interlock sync opcodes, and
-removed the `BindingQuery` grouping-parent row. Non-resource helper
-opcodes from the cited Lua range (texture-access introspection,
-SPIR-V global-param helpers, Torch / tensor-view helpers,
-`allocateOpaqueHandle`) are picked up by the `misc.md` remediation
-in this same cycle.
+The review contained one major finding, which was fixed. The `sampleGrad` opcode was incorrectly described as variadic with trailing `gradY`/offset/bias operands; the Lua schema declares a fixed four-operand shape, so both the table operand cell and the notable paragraph were corrected. No findings were rejected, deferred, or escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-ir-insts.lua:2709-2711` defines `BeginFragmentShaderInterlock` and `EndFragmentShaderInterlock` as synchronization opcodes; `:1533-1574` defines a cooperative matrix/vector cluster (`CoopMatMulAdd`, `CoopVecMatMulAdd`, etc.) that fits the resources/cooperative scope. | Added the two interlock rows to `### Barriers and synchronization` and a new `### Cooperative matrix and vector` sub-table with `CoopMatMapElementIFunc`, `CoopMatMulAdd`, `CoopVecMatMulAdd`, `CoopVecOuterProductAccumulate`, `CoopVecReduceSumAccumulate`. |
-| F-002 | fixed | `source/slang/slang-ir-insts.lua:1578-1591` defines `BindingQuery` as a grouping parent with `getRegisterIndex` and `getRegisterSpace` as its only concrete children. | Removed the `BindingQuery` row; replaced with a one-paragraph note above the table identifying it as the grouping parent of the remaining two concrete rows. |
+| F-001 | fixed | Confirmed against `source/slang/slang-ir-insts.lua:1527` at the source commit: `{ sampleGrad = { operands = { { "texture" }, { "sampler" }, { "coord" }, { "gradX" } } } }` has no `min_operands`, so it is a fixed four-operand opcode, not variadic. The IR-reference family contract requires the Operands column to list the Lua operand names and reserve `(variadic)` for variadic ops. | Changed the `sampleGrad` operand cell to `texture, sampler, coord, gradX` and rewrote the notable paragraph to state the fixed four-operand shape, removing the variadic `gradY`/offset/bias claim. |
