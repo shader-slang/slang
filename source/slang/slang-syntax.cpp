@@ -335,6 +335,9 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
     case ASTNodeType::NonEmptyPackConstraintDecl:
         sb << "NonEmptyPackConstraintDecl";
         break;
+    case ASTNodeType::GenericVariadicPackCountConstraintDecl:
+        sb << "GenericVariadicPackCountConstraintDecl";
+        break;
     case ASTNodeType::HasDiffTypeInfoConstraintDecl:
         sb << "__hasDiffTypeInfo";
         break;

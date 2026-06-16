@@ -2616,6 +2616,7 @@ struct ForwardDiffTranslationContext
         case kIROp_SizeOf:
         case kIROp_AlignOf:
         case kIROp_Printf:
+        case kIROp_Abort:
         case kIROp_MakeCoopVector:
         case kIROp_MakeCoopVectorFromValuePack:
         case kIROp_GetCurrentStage:
