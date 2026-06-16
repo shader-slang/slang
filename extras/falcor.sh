@@ -119,6 +119,9 @@ Options:
   --config-string <str>            Override the test runner --config value
                                    (default: <preset>-<falcor-config>)
   --image-tests                    Also run Falcor's image tests (needs a GPU)
+  --werror                         Keep Falcor's strict warnings-as-errors
+                                   (default: relaxed so deprecation warnings
+                                   don't fail the build; warnings still print)
   --clean                          For clone: remove any existing Falcor clone first
   --help                           Show this help message
 EOF
@@ -138,6 +141,7 @@ FALCOR_REF=""
 CONFIG_STRING=""
 IMAGE_TESTS=false
 CLEAN=false
+RELAX_WARNINGS=true
 
 # Abort with a clear message when an option that expects a value has none.
 # $1 is the option name, $2 is the remaining argument count ($#); checking the
@@ -193,6 +197,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --image-tests)
     IMAGE_TESTS=true
+    shift
+    ;;
+  --werror | --strict-warnings)
+    RELAX_WARNINGS=false
     shift
     ;;
   --clean)
@@ -327,6 +335,37 @@ preflight_target_tools() {
   fi
 }
 
+# Relax (or, with --werror, restore) Falcor's warnings-as-errors before
+# configuring. Falcor hardcodes /WX (MSVC; -Werror would apply to clang/gcc) in
+# Source/Falcor/CMakeLists.txt with no CMake toggle, so we patch that one file
+# in place after backing it up. Only the warnings-as-error flags are removed -
+# warnings (e.g. Slang deprecations) still print, so version-skew stays visible;
+# the build just proceeds to the real errors instead of stopping at a warning.
+# The patch is idempotent (the backup's presence marks "already patched"),
+# reversible (--werror or `clone --clean` restores it), and scoped to Falcor.
+apply_falcor_warning_policy() {
+  local f="$FALCOR_DIR/Source/Falcor/CMakeLists.txt"
+  local bak="$f.falcor-sh.bak"
+  [ -f "$f" ] || return 0
+
+  if [ "$RELAX_WARNINGS" = true ]; then
+    if [ -f "$bak" ]; then
+      log_info "Falcor warnings-as-errors already relaxed (patched on a previous run)."
+      return 0
+    fi
+    log_info "Relaxing Falcor's warnings-as-errors (/WX, -Werror) so deprecation warnings don't fail the build - warnings still print (use --werror to keep strict)."
+    cp "$f" "$bak"
+    sed -E \
+      -e 's@^([[:space:]]*)/WX([[:space:]]|$)@\1# /WX disabled by falcor.sh\2@' \
+      -e 's@^([[:space:]]*)-Werror([[:space:]]|$)@\1# -Werror disabled by falcor.sh\2@' \
+      "$bak" >"$f"
+  elif [ -f "$bak" ]; then
+    # --werror: undo a previous relaxation so Falcor builds strictly again.
+    log_info "Restoring Falcor's strict warnings-as-errors (--werror)."
+    mv -f "$bak" "$f"
+  fi
+}
+
 # Fail early (with build instructions) when the requested local Slang build is
 # missing, and warn when slang-gfx is absent since Falcor imports it. The
 # artifact names follow the build target, not the host: a Windows target needs
@@ -445,6 +484,8 @@ cmd_build() {
   verify_slang_build
 
   [ "$IS_WSL" = true ] && log_info "WSL detected; building for target '$TARGET_OS' (override with --target-os)."
+
+  apply_falcor_warning_policy
 
   log_info "Configuring Falcor (preset $FALCOR_PRESET) with local Slang ($SLANG_CONFIG)..."
   # FALCOR_LOCAL_SLANG_BUILD_DIR is resolved relative to FALCOR_LOCAL_SLANG_DIR

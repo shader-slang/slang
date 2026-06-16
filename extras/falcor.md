@@ -54,18 +54,19 @@ Run from a Slang repository checkout:
 
 ### Options
 
-| Option                             | Default                                                         | Meaning                                                        |
-| ---------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------- |
-| `--target-os <windows\|linux>`     | by host (Windows/WSL → `windows`, Linux → `linux`)              | OS to build Falcor/Slang for (see Platforms and WSL).          |
-| `--slang-config <Debug\|Release>`  | `Release`                                                       | Which local Slang build (`build/<config>`) to point Falcor at. |
-| `--falcor-config <Debug\|Release>` | `Release`                                                       | Which Falcor configuration to build and test.                  |
-| `--preset <name>`                  | `windows-vs2022` (windows target), `linux-clang` (linux target) | Falcor CMake configure preset.                                 |
-| `--slang-dir <path>`               | this repository's root                                          | `FALCOR_LOCAL_SLANG_DIR` (Slang source tree).                  |
-| `--falcor-dir <path>`              | `external/falcor`                                               | Where Falcor is cloned/used.                                   |
-| `--ref <git-ref>`                  | Falcor's default branch                                         | Falcor branch/tag/commit to check out (fresh clones only).     |
-| `--config-string <str>`            | `<preset>-<falcor-config>`                                      | Override the value passed to Falcor's test runner `--config`.  |
-| `--image-tests`                    | off                                                             | Also run Falcor's image tests (requires a GPU).                |
-| `--clean`                          | off                                                             | For `clone`: remove an existing Falcor clone first.            |
+| Option                             | Default                                                         | Meaning                                                                                 |
+| ---------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `--target-os <windows\|linux>`     | by host (Windows/WSL → `windows`, Linux → `linux`)              | OS to build Falcor/Slang for (see Platforms and WSL).                                   |
+| `--slang-config <Debug\|Release>`  | `Release`                                                       | Which local Slang build (`build/<config>`) to point Falcor at.                          |
+| `--falcor-config <Debug\|Release>` | `Release`                                                       | Which Falcor configuration to build and test.                                           |
+| `--preset <name>`                  | `windows-vs2022` (windows target), `linux-clang` (linux target) | Falcor CMake configure preset.                                                          |
+| `--slang-dir <path>`               | this repository's root                                          | `FALCOR_LOCAL_SLANG_DIR` (Slang source tree).                                           |
+| `--falcor-dir <path>`              | `external/falcor`                                               | Where Falcor is cloned/used.                                                            |
+| `--ref <git-ref>`                  | Falcor's default branch                                         | Falcor branch/tag/commit to check out (fresh clones only).                              |
+| `--config-string <str>`            | `<preset>-<falcor-config>`                                      | Override the value passed to Falcor's test runner `--config`.                           |
+| `--image-tests`                    | off                                                             | Also run Falcor's image tests (requires a GPU).                                         |
+| `--werror` (`--strict-warnings`)   | off (warnings relaxed)                                          | Keep Falcor's strict warnings-as-errors; by default the build relaxes them (see below). |
+| `--clean`                          | off                                                             | For `clone`: remove an existing Falcor clone first.                                     |
 
 ### Mixing build variants
 
@@ -137,6 +138,7 @@ Notes for WSL/Windows-drive checkouts:
 - **GPU required for image tests.** The unit tests are the default; image tests (`--image-tests`) need a GPU and reference images and will not pass on a headless/GPU-less machine.
 - **Falcor build cost.** A full Falcor build is large; the first `clone`+`build` can take a long time and significant disk space under `external/falcor`.
 - **CMake ≥ 4.** Falcor's pinned `pybind11` declares `cmake_minimum_required(VERSION < 3.5)`, which CMake 4 rejects. The `build` command passes `-DCMAKE_POLICY_VERSION_MINIMUM=3.5` to **Falcor's** configure (only there, never to the Slang build) to allow it to configure; the mitigation is the one CMake itself suggests in the error.
+- **Warnings as errors.** Falcor builds with warnings-as-errors (`/WX` on MSVC) and has no CMake toggle for it, so a newer Slang's deprecation warning (e.g. a `[[deprecated]]` reflection method) would fail Falcor's build. By default `build` relaxes this — it backs up and patches `Source/Falcor/CMakeLists.txt` (in the clone only, reversibly) to drop the warnings-as-error flags, so the build proceeds to any real errors. The **warnings still print**, so Slang version-skew stays visible; this is not suppression of the signal. Pass `--werror` to keep Falcor strict, or re-run `clone --clean` to restore the original.
 
 ## Related documentation
 
