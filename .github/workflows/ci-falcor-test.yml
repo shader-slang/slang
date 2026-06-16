@@ -54,13 +54,14 @@ jobs:
           # slang-rt.dll must be copied alongside slang.dll: it is a version-matched
           # runtime peer, and leaving C:\Falcor's older copy in place while replacing
           # slang.dll causes FalcorTest.exe to crash during DLL initialization.
+          # D3D12/ (D3D12 Agility SDK DLLs) and optix/ are intentionally NOT copied
+          # from the CI artifact: the old Falcor-specific build did not produce these
+          # directories, so the versions already present from C:\Falcor (copied during
+          # setup-falcor) are correct for FalcorTest.exe. Overwriting them with the CI
+          # artifact's versions would break FalcorTest.exe at startup.
           for name in slang.dll slang-rt.dll slang-compiler.dll slang-llvm.dll slang-glslang.dll slang-glsl-module.dll dxcompiler.dll dxil.dll slangc.exe; do
             [[ -f "$SRC/$name" ]] || { echo "Missing required file: $SRC/$name" >&2; exit 1; }
             cp --verbose "$SRC/$name" "$TARGET/"
-          done
-          for d in D3D12 optix; do
-            [[ -d "$SRC/$d" ]] || { echo "Missing required directory: $SRC/$d" >&2; exit 1; }
-            cp --verbose -r "$SRC/$d" "$TARGET/"
           done
           shopt -s nullglob
           modules=( "$SRC"/slang-standard-module-*/ )
