@@ -4773,6 +4773,27 @@ private:
     const UnownedStringSlice userSemanticName = toSlice("user_semantic");
 };
 
+// Re-point at `newFunc` every `IREntryPointParamDecoration` that currently names `oldFunc` as
+// its originating entry point. When entry-point `uniform` parameters are hoisted to global scope
+// (moveEntryPointUniformParamsToGlobalScope), each resulting global param is tagged with an
+// IREntryPointParamDecoration recording the entry-point function it came from. If a later pass
+// replaces the entry point with a wrapper (as lowerOutParameters does below), those tags still
+// reference the old function; introduceExplicitGlobalContext binds a global uniform to an entry
+// point only when this decoration names that entry point, so without re-pointing the uniform is
+// silently dropped — on Metal a struct-returning vertex shader's `uniform T*` gets no [[buffer]]
+// argument and reads uninitialized memory.
+static void retargetEntryPointParamDecorations(IRFunc* oldFunc, IRFunc* newFunc)
+{
+    List<IREntryPointParamDecoration*> decorationsToRetarget;
+    for (auto use = oldFunc->firstUse; use; use = use->nextUse)
+    {
+        if (auto decor = as<IREntryPointParamDecoration>(use->getUser()))
+            decorationsToRetarget.add(decor);
+    }
+    for (auto decor : decorationsToRetarget)
+        decor->setOperand(0, newFunc);
+}
+
 void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointInfo& entryPoint)
 {
     const auto oldFunc = entryPoint.entryPointFunc;
@@ -4792,6 +4813,10 @@ void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointIn
 
     if (oldFunc == entryPoint.entryPointFunc)
         return;
+
+    // The wrapper is now the entry point, so global uniform params that recorded `oldFunc` as
+    // their originating entry point must follow it (see retargetEntryPointParamDecorations).
+    retargetEntryPointParamDecorations(oldFunc, entryPoint.entryPointFunc);
 
     // Since this will no longer be the entry point function, remove those decorations
     List<IRDecoration*> ds;
