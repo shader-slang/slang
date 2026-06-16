@@ -6,6 +6,16 @@
 
 #include <cstring>
 
+// VK_KHR_portability_enumeration was introduced in Vulkan SDK 1.3.x headers.
+// Define string and flag fallbacks so the runtime detection below compiles
+// against any SDK version; both values are fixed by the Vulkan spec.
+#ifndef VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
+#define VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME "VK_KHR_portability_enumeration"
+#endif
+#ifndef VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR
+#define VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR ((VkInstanceCreateFlagBits)0x00000001)
+#endif
+
 namespace vkdemo
 {
 
