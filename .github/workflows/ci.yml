@@ -164,7 +164,7 @@ jobs:
   test-linux-debug-gcc-x86_64-rhi:
     needs: [filter, build-linux-debug-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-rhi-test-container.yml
+    uses: ./.github/workflows/ci-rhi-test-container.yml
     with:
       config: debug
 
@@ -179,7 +179,7 @@ jobs:
   test-linux-release-gcc-x86_64-rhi:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-rhi-test-container.yml
+    uses: ./.github/workflows/ci-rhi-test-container.yml
     with:
       config: release
 
@@ -234,7 +234,7 @@ jobs:
   test-macos-debug-clang-aarch64-rhi:
     needs: [filter, build-macos-debug-clang-aarch64]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-rhi-test.yml
+    uses: ./.github/workflows/ci-rhi-test.yml
     with:
       os: macos
       compiler: clang
@@ -258,7 +258,7 @@ jobs:
   test-macos-release-clang-aarch64-rhi:
     needs: [filter, build-macos-release-clang-aarch64]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-rhi-test.yml
+    uses: ./.github/workflows/ci-rhi-test.yml
     with:
       os: macos
       compiler: clang
@@ -308,7 +308,7 @@ jobs:
   test-windows-debug-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-rhi-test.yml
+    uses: ./.github/workflows/ci-rhi-test.yml
     with:
       os: windows
       compiler: cl
@@ -332,7 +332,7 @@ jobs:
   test-windows-release-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-rhi-test.yml
+    uses: ./.github/workflows/ci-rhi-test.yml
     with:
       os: windows
       compiler: cl
