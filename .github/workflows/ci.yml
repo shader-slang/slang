@@ -87,7 +87,8 @@ jobs:
           fi
           python3 extras/ci/wait-for-priority.py \
             --repo "$GITHUB_REPOSITORY" \
-            --workflow ci.yml
+            --workflow ci.yml \
+            --max-yield-hours 8
 
       - name: Stop yielded bot CI
         if: steps.priority.outputs.yielded == 'true'

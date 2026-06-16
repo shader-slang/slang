@@ -34,9 +34,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # --lookback-hours (12) must stay above wait-for-priority.py's
+          # --max-yield-hours (8) so a run ages out and escalates before this
+          # stops considering it. --max-attempts uses the script default (a high
+          # safety backstop). --max-reruns 1 throttles escalations to one bot
+          # run per fire, avoiding a thundering herd when several have aged out.
           python3 extras/ci/retry-yielded-bot-ci.py \
             --repo "$GITHUB_REPOSITORY" \
             --workflow ci.yml \
             --lookback-hours 12 \
-            --max-attempts 3 \
             --max-reruns 1

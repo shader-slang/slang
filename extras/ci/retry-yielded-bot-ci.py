@@ -205,7 +205,18 @@ def main():
     )
     parser.add_argument("--workflow", default=DEFAULT_WORKFLOW)
     parser.add_argument("--lookback-hours", type=int, default=12)
-    parser.add_argument("--max-attempts", type=int, default=3)
+    parser.add_argument(
+        "--max-attempts",
+        type=int,
+        default=30,
+        help=(
+            "Safety backstop on total reruns of one yielded run. The real "
+            "terminator is wait-for-priority.py's aging: once a run is older "
+            "than its --max-yield-hours it escalates and succeeds, so it stops "
+            "being a candidate. Keep this high enough that it never cuts a run "
+            "off before that ceiling (reruns can fire faster than hourly)."
+        ),
+    )
     parser.add_argument("--max-reruns", type=int, default=1)
     parser.add_argument(
         "--bot-login",

@@ -20,6 +20,13 @@ script or API failures. The effect is:
 A running bot job is never preempted: this gate only stops bot runs that have
 not yet started consuming the expensive build/test runners.
 
+Anti-starvation (aging): strict priority yielding would let a bot run starve
+forever if higher-priority CI never stops arriving. To bound that, the gate
+ages: once a run has been waiting longer than --max-yield-hours (measured from
+its original creation, so the age accumulates across reruns), it stops yielding
+and proceeds regardless. This guarantees every bot run completes within roughly
+that window even during sustained contention.
+
 Usage (in a workflow step):
     python3 extras/ci/wait-for-priority.py --workflow ci.yml
 
@@ -29,6 +36,7 @@ Requires: gh CLI (authenticated via the workflow token).
 import argparse
 import os
 import sys
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gh_api import gh_api, gh_api_list
@@ -92,6 +100,25 @@ def fetch_self_run(repo, run_id):
     return data
 
 
+def parse_github_time(value):
+    if not value:
+        return None
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def run_age_hours(run):
+    """Hours since the run was first created.
+
+    Uses `created_at`, which stays fixed across reruns (only `run_started_at`
+    and `run_attempt` change), so the age keeps growing each time the retry
+    workflow reruns a still-yielding bot run.
+    """
+    created = parse_github_time((run or {}).get("created_at"))
+    if created is None:
+        return None
+    return (datetime.now(timezone.utc) - created).total_seconds() / 3600.0
+
+
 def classify_blockers(runs, self_run_id, self_run_number, bot_logins):
     """Return (human_blockers, older_bot_blockers) among active runs."""
     human = []
@@ -144,6 +171,17 @@ def main():
         help="Additional exact bot login to treat as low priority. May be repeated.",
     )
     parser.add_argument(
+        "--max-yield-hours",
+        type=float,
+        default=8.0,
+        help=(
+            "Anti-starvation ceiling: once this run has been waiting longer "
+            "than this many hours (measured from its original creation, across "
+            "reruns), stop yielding and proceed regardless of higher-priority "
+            "CI. Default: 8."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Report the current decision without writing GITHUB_OUTPUT.",
@@ -154,17 +192,20 @@ def main():
 
     self_run_id = int(os.environ.get("GITHUB_RUN_ID", "0"))
     self_run_number = None
+    self_age_hours = None
     if self_run_id:
         try:
             self_run = fetch_self_run(args.repo, self_run_id)
             self_run_number = self_run.get("run_number")
+            self_age_hours = run_age_hours(self_run)
         except RuntimeError as exc:
             print(f"::warning::{exc}")
     if self_run_number is None:
         self_run_number = int(os.environ.get("GITHUB_RUN_NUMBER", "0"))
 
+    age_note = f", age {self_age_hours:.1f}h" if self_age_hours is not None else ""
     print(
-        f"Priority gate for run #{self_run_number} (id={self_run_id}) "
+        f"Priority gate for run #{self_run_number} (id={self_run_id}{age_note}) "
         f"on {args.repo} workflow {args.workflow}."
     )
 
@@ -174,8 +215,32 @@ def main():
     )
 
     yielded = bool(human or older_bot)
+
+    # Aging: if we would yield but have already waited past the ceiling, escalate
+    # and run anyway so a continuous stream of higher-priority CI cannot starve
+    # this bot run indefinitely. Unknown age (self-run fetch failed) is treated
+    # conservatively as "not yet aged out" so we keep yielding.
+    escalated = (
+        yielded
+        and self_age_hours is not None
+        and self_age_hours >= args.max_yield_hours
+    )
+    if escalated:
+        yielded = False
+
     if not args.dry_run:
         write_output("yielded", "true" if yielded else "false")
+
+    if escalated:
+        print(
+            f"Waited {self_age_hours:.1f}h (>= {args.max_yield_hours}h ceiling); "
+            "escalating priority and proceeding despite higher-priority CI."
+        )
+        for run in human:
+            print(f"  would have yielded to {describe(run)}")
+        for run in older_bot:
+            print(f"  would have yielded behind {describe(run)}")
+        return 0
 
     if not yielded:
         print("No higher-priority CI is active. Proceeding.")
