@@ -1,37 +1,43 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-12T13:18:05+00:00
 target_doc: cross-cutting/diagnostics.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 81f47a822a99f93b8701131d76480cb13010b16d56d184d434ff385df559169e
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: d42270f6daaebc67791d018218ab19aef406d36f8b4094dd0346c2a1ef697ec1
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 2
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 1
+  major: 0
+  minor: 0
   nit: 0
 ---
 
 # Review report for cross-cutting/diagnostics.md
 
 ## Summary
-The page is structurally lint-clean, but review found 2 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The diagnostics page satisfies the prompt contract and the sampled source claims align with the recorded source commit. I found no reportable factual, structural, link, style, or front-matter issues.
 
 ## Items checked
-- Checked `Severity`, `DiagnosticInfo`, sink storage, warning-state tracker, diagnostic override declarations, internal-error macros, and diagnostic-guideline links.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show cross-cutting/diagnostics.md` and reviewed the per-doc prompt, `_common.md`, the resolved watched files, and dependency `architecture/overview.md`.
+- Checked front matter for all required generated-doc keys, the recorded source commit, digest shape, and warning string.
+- Verified required coverage for `DiagnosticSink`, diagnostic definitions, severity levels, source-location rendering, error code namespace, internal compiler errors, and the new-diagnostic checklist.
+- Spot-checked more than 10 source claims against `slang-diagnostic-sink.h`, `slang-diagnostic-sink.cpp`, `slang-diagnostics.h`, `slang-diagnostics.lua`, `diagnostics/type-errors.lua`, `slang-common.h`, and `slang-signal.cpp`.
+- Checked relative links and peer links used by the page; no unresolved target was found.
+- Checked that the body has no source line-number citations requiring line-by-line verification.
 
 ## Findings
+(no findings)
 
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Internal-compiler errors and assertions` | The page discusses `SLANG_ASSERT` environment behavior and release assert mechanics, but the watched paths do not include the assertion implementation; the prompt says to cite `source/core/slang-common.h` only if watched. | The diagnostics manifest entry excludes `source/core/slang-common.h`. | Limit this section to watched diagnostics macros such as `SLANG_INTERNAL_ERROR`, `SLANG_UNIMPLEMENTED`, and `SLANG_DIAGNOSE_UNEXPECTED`, or expand watched paths. |
-| F-002 | minor | `## Diagnostic definitions in Lua` | The page cites `slang-rich-diagnostics.h/.cpp`, but those files are not in the manifest watched paths. | The diagnostics manifest entry includes `slang-diagnostics.*`, `slang-diagnostics.lua`, and `diagnostics/*.lua`, not rich-diagnostic implementation files. | Add those files to watched paths or anchor the description to watched Lua and `slang-diagnostics.h`. |
+## No-issues notes
+- The `Severity` enum and rendered severity names match `source/compiler-core/slang-diagnostic-sink.h`.
+- The rich and legacy diagnostic examples match `source/slang/diagnostics/type-errors.lua` and `source/slang/slang-diagnostics.lua`.
+- The assertion paragraph now distinguishes sink-based internal-error diagnostics from `SLANG_ASSERT` / `SLANG_RELEASE_ASSERT` handling.

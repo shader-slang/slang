@@ -319,6 +319,11 @@ Instrument the shader with per-function-entry coverage counters. Shares the synt
 Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths. Expression-level short-circuit and ternary branches are not instrumented by this mode yet. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
 
 
+<a id="trace-coverage-boolean"></a>
+### -trace-coverage-boolean
+Record boolean coverage instead of exact execution counts: each counter slot is written with 1 (via a plain non-atomic store) whenever its entry executes, rather than atomically incremented per execution. This removes all atomic contention, so coverage is dramatically faster and avoids the GPU watchdog timeouts that heavy per-execution counting can trigger, at the cost of exact counts (the counter is 0 or non-zero). Off by default. Ignored when no coverage mode is enabled. 
+
+
 <a id="trace-coverage-binding"></a>
 ### -trace-coverage-binding
 
@@ -341,6 +346,14 @@ Reserve a descriptor set when auto-allocating the synthesized `__slang_coverage`
 **-coverage-manifest-output &lt;path&gt;**
 
 Write shader coverage manifest metadata to an explicit JSON sidecar path. Use this when compiled output is written to stdout or when the build needs a stable manifest path instead of the default `&lt;output&gt;.coverage-manifest.json` sidecar. Requires at least one coverage tracing mode, is not supported for container outputs, and is valid only when exactly one compiled artifact carries coverage metadata. The path must not overlap any emitted artifact path. 
+
+
+<a id="trace-coverage-counter-width"></a>
+### -trace-coverage-counter-width
+
+**-trace-coverage-counter-width &lt;bits&gt;**
+
+Per-slot bit width of the synthesized `__slang_coverage` buffer. Accepts `64` (default) or `32`. uint64 counters effectively cannot wrap within any practical run; uint32 counters wrap silently at 2^32 hits per slot. Use `32` when targeting a runtime driver that does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon, which exposes `shaderBufferInt64Atomics = false`). Implies `-trace-coverage` is meaningful; ignored when no coverage mode is enabled. 
 
 
 <a id="report-dynamic-dispatch-sites"></a>
@@ -620,7 +633,7 @@ Specify the space index for the system defined global bindless resource array.
 
 **-spirv-resource-heap-stride &lt;stride&gt;**
 
-Specify the byte stride for the resource descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType). 
+Specify the byte stride for the resource descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType); for RaytracingAccelerationStructure entries, the 0 default emits a literal 8-byte ArrayStride for the uint64 device address elements. An explicit stride value still overrides these defaults; for acceleration-structure entries it must be at least 8 bytes. 
 
 
 <a id="spirv-sampler-heap-stride"></a>
@@ -1343,6 +1356,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_quad_control` : enables the SPV_KHR_quad_control extension 
 * `SPV_KHR_fragment_shader_barycentric` : enables the SPV_KHR_fragment_shader_barycentric extension 
 * `SPV_KHR_non_semantic_info` : enables the SPV_KHR_non_semantic_info extension 
+* `SPV_KHR_shader_abort` : enables the SPV_KHR_shader_abort extension 
 * `SPV_KHR_device_group` : enables the SPV_KHR_device_group extension 
 * `SPV_KHR_variable_pointers` : enables the SPV_KHR_variable_pointers extension 
 * `SPV_KHR_ray_tracing` : enables the SPV_KHR_ray_tracing extension 
@@ -1495,6 +1509,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_EXT_buffer_reference` : enables the GL_EXT_buffer_reference extension 
 * `GL_EXT_buffer_reference_uvec2` : enables the GL_EXT_buffer_reference_uvec2 extension 
 * `GL_EXT_debug_printf` : enables the GL_EXT_debug_printf extension 
+* `GL_EXT_shader_abort` : enables the GL_EXT_shader_abort extension 
 * `GL_EXT_demote_to_helper_invocation` : enables the GL_EXT_demote_to_helper_invocation extension 
 * `GL_EXT_maximal_reconvergence` : enables the GL_EXT_maximal_reconvergence extension 
 * `GL_EXT_shader_quad_control` : enables the GL_EXT_shader_quad_control extension 
@@ -1749,6 +1764,7 @@ A capability describes an optional feature that a target may or may not support.
 * `image_loadstore` 
 * `nonuniformqualifier` 
 * `printf` 
+* `abort` 
 * `texturefootprint` 
 * `texturefootprintclamp` 
 * `shader5_sm_4_0` 

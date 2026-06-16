@@ -16,6 +16,7 @@
 #include "slang-type-system-shared.h"
 
 #include <functional>
+#include <mutex>
 
 //
 #include "slang-ir.h.fiddle"
@@ -2064,6 +2065,51 @@ struct IRAnalysis
     IRDominatorTree* getDominatorTree();
 };
 
+struct ModuleLinkingInfo : RefObject
+{
+    typedef Dictionary<IRInst*, List<IRAnnotation*>> InstAnnotationMap;
+
+    ModuleLinkingInfo(IRModule* module);
+
+    /// Query the acceleration cache for module-scope annotations on `target`.
+    /// The result is only valid while the module is unchanged from when this info was built.
+    ArrayView<IRAnnotation*> getAnnotationsForTarget(IRInst* target);
+
+    /// Query the acceleration cache for global HLSL/downstream exports.
+    /// The result is only valid while the module is unchanged from when this info was built.
+    ArrayView<IRInst*> getHLSLExports() { return m_hlslExports.getArrayView(); }
+
+    /// Query the acceleration cache for global shader parameters.
+    /// The result is only valid while the module is unchanged from when this info was built.
+    ArrayView<IRInst*> getGlobalParams() { return m_globalParams.getArrayView(); }
+
+    /// Query the acceleration cache for globals with KnownBuiltin decorations.
+    /// The result is only valid while the module is unchanged from when this info was built.
+    ArrayView<IRInst*> getKnownBuiltins() { return m_knownBuiltins.getArrayView(); }
+
+    /// Return the module's GlobalHashedStringLiterals aggregate, if present when this info was
+    /// built.
+    IRGlobalHashedStringLiterals* getGlobalHashedStringLiterals()
+    {
+        return m_globalHashedStringLiterals;
+    }
+
+private:
+    void _build(IRModule* module);
+
+    // Acceleration cache from annotated inst to the module-scope annotations that target it.
+    InstAnnotationMap m_instAnnotationMap;
+
+    // Acceleration caches for linker decisions that previously scanned all global instructions.
+    List<IRInst*> m_hlslExports;
+    List<IRInst*> m_globalParams;
+    List<IRInst*> m_knownBuiltins;
+
+    // Cached while walking global instructions with the linker caches above. Each module is
+    // expected to contain at most one IRGlobalHashedStringLiterals instruction.
+    IRGlobalHashedStringLiterals* m_globalHashedStringLiterals = nullptr;
+};
+
 FIDDLE()
 struct IRModule : RefObject
 {
@@ -2106,6 +2152,28 @@ public:
     {
         return &m_annotationLookupCache;
     }
+
+    /// Ensure the module-owned acceleration cache used by linker global handling is built.
+    /// A built cache assumes the module will not change after it is built; callers must
+    /// manually rebuild it if module-scope annotations, global params, exports, known builtins,
+    /// or global hashed string literals change.
+    void _ensureLinkingInfo();
+
+    /// Build or return the module-owned acceleration cache used by linker global handling.
+    /// The returned info has the same lifetime and invalidation assumptions as
+    /// `_ensureLinkingInfo()`.
+    ModuleLinkingInfo* _getOrCreateLinkingInfo();
+
+    /// Return the module-owned linker acceleration cache if it has already been built.
+    /// A built cache assumes the module has not changed since `_ensureLinkingInfo()`.
+    ModuleLinkingInfo* _getLinkingInfo();
+
+    /// Drop the module-owned linker acceleration cache after mutating module-scope state that
+    /// it records. The cache will be rebuilt by the next `_ensureLinkingInfo()` or
+    /// `_getOrCreateLinkingInfo()` call.
+    /// This is not thread-safe and should only be used by experimental APIs that mutate an
+    /// existing module.
+    void _invalidateLinkingInfo();
 
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
     {
@@ -2177,7 +2245,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 18;
+    const static UInt k_maxSupportedModuleVersion = 21;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:
@@ -2239,6 +2307,11 @@ private:
 
     // (inst, association-kind) -> associated-inst
     Dictionary<AnnotationCacheKey, IRAnnotation*> m_annotationLookupCache;
+
+    // Acceleration cache for linker global handling.
+    // Assumes the module will not change after the cache is built; rebuild manually if it does.
+    RefPtr<ModuleLinkingInfo> m_linkingInfo;
+    std::mutex m_linkingInfoMutex;
 };
 
 

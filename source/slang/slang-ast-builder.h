@@ -447,6 +447,12 @@ public:
 
     DeclRef<Decl> getLookupDeclRef(Type* base, SubtypeWitness* subtypeWitness, Decl* declToLookup)
     {
+        // A `LookupDeclRef`'s lookup `base` and its `subtypeWitness` must stay consistent:
+        // `base` should be the type that `subtypeWitness` proves conforms to the interface
+        // declaring `declToLookup` (i.e. `subtypeWitness->getSub()`). Conformance queries
+        // (`SemanticsVisitor::checkAndConstructSubtypeWitness`) now guarantee the witness is
+        // rooted at the queried type, so a caller threading both through here gets a
+        // well-formed lookup. See #11469 for the interface-as-existential-box subtlety.
         auto result = getOrCreate<LookupDeclRef>(declToLookup, base, subtypeWitness);
         return result;
     }
@@ -716,6 +722,11 @@ public:
     Val* getShapeReduceIntValPack(Val* valuePack, IntVal* axis);
 
     NonEmptyPackWitness* getNonEmptyPackWitness(Val* pack);
+    DeclaredVariadicPackCountWitness* getDeclaredVariadicPackCountWitness(
+        DeclRef<GenericVariadicPackCountConstraintDecl> declRef);
+    ConcreteVariadicPackCountWitness* getConcreteVariadicPackCountWitness(
+        Val* pack,
+        IntVal* expectedCount);
     HasDiffTypeInfoWitness* getHasDiffTypeInfoWitness(
         DeclRef<HasDiffTypeInfoConstraintDecl> declRef);
 

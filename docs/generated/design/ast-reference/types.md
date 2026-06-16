@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-12T09:35:18+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 05b1016228f8c0bbf2fd6e6ea6d165c4d173a37c116aea0c0eccdb47c10abf97
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:15:50Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 41373768d4b2491e1d78d77785d48737b8704c56161f5e163acb779e61a784be
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -45,7 +45,6 @@ flowchart TD
   Type --> FuncType
   Type --> AndType
   Type --> ModifiedType
-  Type --> ThisType
   Type --> ExtractExistentialType
   Type --> ExistentialSpecializedType
   Type --> GenericDeclRefType
@@ -59,6 +58,7 @@ flowchart TD
   DeclRefType --> ConditionalType
   DeclRefType --> AtomicType
   DeclRefType --> TupleType
+  DeclRefType --> ThisType
   ArithmeticExpressionType --> BasicExpressionType
   ArithmeticExpressionType --> VectorExpressionType
   ArithmeticExpressionType --> MatrixExpressionType

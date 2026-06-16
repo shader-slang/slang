@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:45:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 7334450582d01cf1d273acf69603e1a99298f518a80c10f85a058fb506f75ff0
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:19:21Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 7000c50536855f3dc1b45bca7d5d1e8dd84cac67a0962f289a509743162726d3
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -29,7 +29,7 @@ Visibility modifiers are declared in
 (lines 48-70). The `DeclVisibility` enum that the rest of the
 compiler reasons about is in
 [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-(lines 1858-1864). The classification helper `getDeclVisibility` and
+(lines 1866-1872). The classification helper `getDeclVisibility` and
 the per-module default-visibility setup live in
 [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp);
 the visibility filter applied to lookup results and the
@@ -50,26 +50,26 @@ per-decl visibility validation is in
   marker class.
 - `DeclVisibility`
   ([slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-  lines 1858-1864) — internal enum with values `Private`, `Internal`,
+  lines 1866-1872) — internal enum with values `Private`, `Internal`,
   `Public`, and the alias `Default = Internal`. The numeric order
   is `Private < Internal < Public`; `Math::Min` over visibility
   values is used throughout to compute the effective visibility of a
   composite (e.g. a parameterized type).
 - `ModuleDecl::defaultVisibility`
   ([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) line
-  817) — `DeclVisibility` field that records the default visibility
+  835) — `DeclVisibility` field that records the default visibility
   applied to members of the module that carry no explicit modifier.
   Initialized to `DeclVisibility::Internal` at declaration time and
   overridden during semantic checking as described below.
 - `SlangLanguageVersion`
   ([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) line
-  815) — the per-module language-version field, set from the
+  833) — the per-module language-version field, set from the
   `module` declaration's version (or the linkage default). The
   legacy version constant `SLANG_LANGUAGE_VERSION_LEGACY` is
   `2018` in [slang.h](../../../../include/slang.h); the same header
   defines `SLANG_LANGUAGE_VERSION_DEFAULT` as
   `SLANG_LANGUAGE_VERSION_LEGACY` (so the documented language
-  default is still 2018), and `SessionDesc::minLanguageVersion`
+  default is still 2018), and `SlangGlobalSessionDesc::minLanguageVersion`
   defaults to `SLANG_LANGUAGE_VERSION_2025`. New sessions therefore
   reject modules whose declared version is older than 2025 by
   default, but a host that overrides `minLanguageVersion` can still
@@ -98,23 +98,23 @@ levels:
 
 The mapping is implemented in `getDeclVisibility`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-lines 19309-19362): the function walks `decl->modifiers` and returns
+lines 19971-20024): the function walks `decl->modifiers` and returns
 the first `VisibilityModifier` it finds.
 
 `getDeclVisibility` also implements three structural fall-throughs:
 
 - For an `AccessorDecl` or `EnumCaseDecl`, visibility is inherited
-  from the enclosing decl (lines 19322-19329).
+  from the enclosing decl (lines 19986-19989).
 - For a `GenericDecl`, visibility is taken from its `inner` decl
-  (lines 19320-19321).
+  (lines 19982-19983).
 - For a generic parameter (`isGenericParam` / `GenericTypeConstraintDecl`),
   visibility is the visibility of the generic decl's inner decl
-  (lines 19311-19319).
+  (lines 19973-19980).
 
 If no visibility modifier is present and the decl is not inside an
 interface, the visibility is the module's default (see below). If
 the decl is inside an interface, it inherits the interface's
-visibility (lines 19342-19346).
+visibility (lines 20005-20008).
 
 ### Defaults by language version
 
@@ -122,7 +122,7 @@ visibility (lines 19342-19346).
 members of the module that have no explicit modifier. The default
 is computed in `getDeclVisibility`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-lines 19347-19353):
+lines 20009-20015):
 
 ```cpp
 defaultVis = parentModule->languageVersion == SLANG_LANGUAGE_VERSION_LEGACY
@@ -137,11 +137,11 @@ unless the module is marked `public` at the top:
 `checkModule` flips the module-wide default to `public` when it
 finds a `PublicModifier` on the `ModuleDecl`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-lines 4954-4957).
+lines 4994-4997).
 
 `NamespaceDecl` is unconditionally `Public`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-lines 19357-19360); restricting namespace visibility would be
+lines 20019-20022); restricting namespace visibility would be
 meaningless because namespaces only group named members and do not
 themselves carry behaviour.
 
@@ -164,7 +164,7 @@ Visibility is consulted at two distinct points:
 1. **Lookup boundary.** Most lookup call sites in the checker pass
    their result through `filterLookupResultByVisibilityAndDiagnose`
    ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-   lines 1222-1244). If lookup returned candidates but all are
+   lines 1234-1256). If lookup returned candidates but all are
    filtered out, the function emits diagnostic
    `decl-is-not-visible` (`Diagnostics::DeclIsNotVisible`,
    `slang-diagnostics.lua` 30600) and reports the *first* offending
@@ -180,7 +180,7 @@ Visibility is consulted at two distinct points:
 Both call sites delegate to the same predicate,
 `SemanticsVisitor::isDeclVisibleFromScope(declRef, scope)`
 ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-lines 1079-1207). The predicate computes the decl's
+lines 1091-1219). The predicate computes the decl's
 `DeclVisibility` and dispatches:
 
 - `Public` — always visible.
@@ -194,11 +194,11 @@ lines 1079-1207). The predicate computes the decl's
   not visible.
 
 The private-access check walks the requesting scope's parent chain
-looking for the parent aggregate (lines 1094-1107). When the
+looking for the parent aggregate (lines 1106-1119). When the
 candidate decl lives in an `ExtensionDecl`, the predicate also
 resolves the extension's target type and checks for type equality
 with the enclosing aggregate of the requesting scope
-(lines 1122-1204). This lets `extension S { private foo() {...} }`
+(lines 1121-1216). This lets `extension S { private foo() {...} }`
 work when called from inside `S` itself or from another extension on
 `S` — even a generic extension that specializes to `S`.
 
@@ -206,7 +206,7 @@ work when called from inside `S` itself or from another extension on
 
 `SemanticsVisitor::getTypeVisibility`
 ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-lines 1063-1077) computes the visibility of a `Type` by taking the
+lines 1075-1089) computes the visibility of a `Type` by taking the
 minimum of the underlying decl's visibility and the visibilities of
 any generic type arguments. This is what makes
 `HashMap<String, InternalKey>` effectively `internal` even if
@@ -214,13 +214,39 @@ any generic type arguments. This is what makes
 
 `SemanticsVisitor::checkVisibility`
 ([slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp)
-lines 2104-2168) enforces the converse: a decl cannot reference a
+lines 2123-2187) enforces the converse: a decl cannot reference a
 type that is *less* visible than itself. Violations produce
 diagnostic `use-of-less-visible-type`
 (`Diagnostics::UseOfLessVisibleType`, code 30604). The same
 function also enforces that a decl's visibility cannot exceed its
 parent container's; violations produce
 `decl-cannot-have-higher-visibility` (code 30601).
+
+### Interaction with `extern` and `export`
+
+The `extern` and `export` modifiers are distinct from the
+`public` / `internal` / `private` classification and do not change a
+decl's `DeclVisibility`; instead they affect lookup or cross-module
+reachability directly:
+
+- `ExternModifier`
+  ([slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h)
+  line 100) and `ExtensionExternVarModifier` (line 231) mark `extern`
+  decls. `DeclPassesLookupMask`
+  ([slang-lookup.cpp](../../../../source/slang/slang-lookup.cpp)
+  lines 41-54) always drops `ExtensionExternVarModifier` decls from
+  lookup, and drops an `ExternModifier` member whose parent is an
+  `ExtensionDecl`, so those `extern` members are hidden from lookup
+  regardless of their visibility keyword.
+- `HLSLExportModifier` (line 112) marks a decl `[export]` for linkage;
+  it records linkage intent and does not by itself raise a decl's
+  `DeclVisibility`.
+- `ExportedModifier` (line 142) on an `import` controls transitive
+  cross-module reachability: `isModuleReachableViaExportedImports`
+  ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+  lines 8954-8980) only follows imports marked with `ExportedModifier`,
+  so an `__exported import` re-exports the imported module while a
+  plain `import` does not.
 
 ### Generic parameters, accessors, and synthesized members
 
@@ -236,7 +262,7 @@ modifier and inherit the parent's default. A few synthesis sites
 explicitly propagate the parent's visibility — see
 `addVisibilityModifier(structDecl, getDeclVisibility(parent))` at
 [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-line 804 — so the synthesized declaration does not inadvertently
+line 816 — so the synthesized declaration does not inadvertently
 become more public than its parent.
 
 ### Interaction with `IgnoreForLookupModifier`
@@ -247,7 +273,7 @@ line 248) is skipped by lookup before visibility filtering even
 sees it. Today the only producer of this modifier is the tag-type
   inheritance decl on enums
   ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-  line 11601), which is excluded from lookup so the enum's tag type
+  line 11792), which is excluded from lookup so the enum's tag type
 does not appear as a base interface during member lookup
 ([slang-lookup.cpp](../../../../source/slang/slang-lookup.cpp) line
 462). Visibility rules therefore never apply to such a decl.
@@ -258,7 +284,7 @@ does not appear as a base interface during member lookup
   rejects this: the diagnostic `decl-cannot-have-higher-visibility`
   fires at the inner decl
   ([slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp)
-  lines 2164-2168).
+  lines 2183-2187).
 - **`private` outside an aggregate or namespace.** The diagnostic
   `invalid-use-of-private-visibility`
   (`slang-diagnostics.lua` 30603) fires when a top-level decl is
@@ -266,8 +292,14 @@ does not appear as a base interface during member lookup
 - **Visibility modifier on a node that does not accept one.** The
   diagnostic `invalid-visibility-modifier-on-type-of-decl`
   (`slang-diagnostics.lua` 36005) fires when, for example, the user
-  writes `public public ...` or attaches a visibility modifier to a
-  statement / unsupported node kind.
+  marks a namespace `private` or `internal` or otherwise attaches a
+  visibility modifier to an unsupported node kind. (A repeated
+  modifier such as `public public ...` is instead caught by the
+  conflict-group check, which emits `duplicate-modifier`
+  (`Diagnostics::DuplicateModifier`, `slang-diagnostics.lua` 31202)
+  from
+  [slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp)
+  line 2306.)
 - **Less-visible type in a more-visible signature.** A `public
   func foo(x: InternalT)` produces `use-of-less-visible-type`
   (code 30604).
@@ -292,12 +324,30 @@ does not appear as a base interface during member lookup
   `applyExtensionToType` to align the candidate's container type
   with the requesting scope's container type
   ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-  lines 1182-1188).
+  lines 1194-1198).
 - **Synthesized derivative members.** When auto-diff synthesizes a
   derivative as an `extension` on a function-as-type whose owner is
   itself a struct member, `isDeclVisibleFromScope` resolves the
   parent aggregate recursively so that the derivative inherits the
-  ordinary member's visibility scope (lines 1139-1156).
+  ordinary member's visibility scope (lines 1151-1167).
+- **Re-exporting a non-exported decl through an alias.** A `using`
+  declaration in Slang only brings a *namespace* into scope —
+  `visitUsingDecl`
+  ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+  lines 16419-16480) requires its argument to resolve to a
+  `NamespaceDeclBase` and otherwise emits `ExpectedANamespace`; it does
+  not re-export an individual `internal` member, so there is no
+  `using`-specific visibility rejection in the watched paths. The
+  source-backed rejection path for an alias that exposes a less-visible
+  decl is the `FuncAliasDecl` branch of
+  `validatePublicCallableOperandVisibility`
+  ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+  lines 9012-9037): a `public` alias whose target is not `Public`, or
+  whose target's module is reachable only through a plain (non
+  `__exported`) `import`, is rejected with
+  `public-custom-derivative-uses-non-exported-import`
+  (`Diagnostics::PublicCustomDerivativeUsesNonExportedImport`,
+  `slang-diagnostics.lua` 31162).
 - **`IgnoreForLookupModifier`.** A decl marked
   `IgnoreForLookupModifier` is invisible to lookup regardless of any
   visibility modifier; visibility analysis is therefore moot for

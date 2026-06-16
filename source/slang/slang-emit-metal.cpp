@@ -1250,6 +1250,15 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 getIntVal(vecType->getElementCount()));
             return;
         }
+    case kIROp_MetalPackedVectorType:
+        {
+            auto packedVecType = (IRMetalPackedVectorType*)type;
+            m_writer->emit("packed_");
+            emitVectorTypeNameImpl(
+                packedVecType->getElementType(),
+                getIntVal(packedVecType->getElementCount()));
+            return;
+        }
     case kIROp_MatrixType:
         {
             auto matType = (IRMatrixType*)type;

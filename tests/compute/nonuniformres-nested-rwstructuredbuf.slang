@@ -22,14 +22,14 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     // CHECK2: %[[VAR3]] = OpCopyObject %{{.*}}
     // CHECK2: %{{.*}} = OpBitcast %int %[[VAR3]]
 
-    // CHECK3-DAG: OpDecorate %[[IDX1:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK3-DAG: OpDecorate %[[AC1:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK3-DAG: OpDecorate %[[IDX2:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK3-DAG: OpDecorate %[[AC2:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK3: %[[AC1]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %buffer %[[IDX1]]
-    // CHECK3: %{{.*}} = OpAccessChain %_ptr_StorageBuffer_int %[[AC1]]
-    // CHECK3: %[[AC2]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %buffer %[[IDX2]]
-    // CHECK3: %{{.*}} = OpAccessChain %_ptr_StorageBuffer_int %[[AC2]]
+    // CHECK3-DAG: %[[AC1:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %buffer %[[IDX1:[a-zA-Z0-9_]+]]
+    // CHECK3-DAG: OpDecorate %[[IDX1]] NonUniform
+    // CHECK3-DAG: OpDecorate %[[AC1]] NonUniform
+    // CHECK3-DAG: %{{.*}} = OpAccessChain %_ptr_StorageBuffer_int %[[AC1]]
+    // CHECK3-DAG: %[[AC2:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %buffer %[[IDX2:[a-zA-Z0-9_]+]]
+    // CHECK3-DAG: OpDecorate %[[IDX2]] NonUniform
+    // CHECK3-DAG: OpDecorate %[[AC2]] NonUniform
+    // CHECK3-DAG: %{{.*}} = OpAccessChain %_ptr_StorageBuffer_int %[[AC2]]
     
     // CHECK4: Array<RWStructuredBuffer<int>>  [[BUFFER:buffer[_0-9]*]];
     // CHECK4: [[GLOBALPARAMS:globalParams[_0-9]*]]->[[BUFFER]][_S{{[0-9]+}}]

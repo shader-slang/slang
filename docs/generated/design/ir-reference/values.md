@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:19:22Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -29,14 +29,14 @@ The opcodes documented here are spread through
 - `Constant` group at line ~838 (literals).
 - `Undefined` group at line ~857 plus `defaultConstruct` at line
   ~899.
-- Memory and field opcodes at lines ~1056-1066 and ~1122-1136.
-- Arithmetic, comparison, bit and logical ops at lines ~1392-1447.
-- Conversion opcodes at lines ~2486-2509.
+- Memory and field opcodes at lines ~1056-1066 and ~1151-1166.
+- Arithmetic, comparison, bit and logical ops at lines ~1423-1478.
+- Conversion opcodes at lines ~2510-2538.
 - Result / Optional / Conditional makers and getters at lines
   ~1020-1030.
 - Aggregate constructors (`makeVector`, `makeMatrix`, `makeArray`,
   `makeStruct`, `makeTuple`, ...) at lines ~948-970.
-- Swizzle / reshape opcodes at lines ~1238-1289.
+- Swizzle / reshape opcodes at lines ~1267-1318.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). Builder
@@ -101,7 +101,7 @@ and `Poison`; only its concrete children are listed here.
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `LoadFromUninitializedMemory` | — | — | | (synthesized) | A load from uninitialized memory; like LLVM's `freeze(undef)`. Frontend diagnostics surface uses. |
-| `Poison` | — | — | | (synthesized) | Infectious undefined value; analogue of LLVM `poison`. |
+| `Poison` | — | — | H | (synthesized) | Infectious undefined value; analogue of LLVM `poison`. Hoistable, so all poison values of the same type dedupe to one inst (built via `IRBuilder::getPoison`). |
 | `defaultConstruct` | — | — | | `DefaultConstructExpr` and synthesized in IR passes | Produces a default-initialized value of the result type. |
 
 ### Arithmetic and bitwise
@@ -129,8 +129,8 @@ and `Poison`; only its concrete children are listed here.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `logicalAnd` | `And` | `left, right` | | `InfixExpr` (`&&`) | Short-circuit logical AND. |
-| `logicalOr` | `Or` | `left, right` | | `InfixExpr` (`\|\|`) | Short-circuit logical OR. |
+| `logicalAnd` | `And` | `left, right` | | `InfixExpr` (`&&`) | Boolean AND of two already-evaluated `bool` operands; short-circuiting is handled by control flow during lowering, not by this opcode. |
+| `logicalOr` | `Or` | `left, right` | | `InfixExpr` (`\|\|`) | Boolean OR of two already-evaluated `bool` operands; short-circuiting is handled by control flow during lowering, not by this opcode. |
 | `select` | `Select` | `condition, trueResult, falseResult` | | `SelectExpr` and ternary `cond ? a : b` lowering | Branch-free conditional selection. |
 
 ### Comparison
@@ -363,6 +363,12 @@ which lets the optimizer assume the original expression had no
 defined value and rewrite freely. The Lua comment notes the
 exceptions (`select` and block parameters, which can pass through
 a poison operand on a non-taken edge without poisoning the result).
+`Poison` is hoistable, so every poison value of a given type
+deduplicates to a single inst; it is constructed through
+`IRBuilder::getPoison` (declared in
+[slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h)),
+whose `get`-prefixed name reflects the deduplicated, hoistable
+construction.
 
 ### `defaultConstruct`
 
@@ -397,9 +403,8 @@ explicit operands so the backend can emit either a single literal
   `extractTaggedUnionTag` / `extractTaggedUnionPayload`,
   `packAnyValue` / `unpackAnyValue`, and other existential-side
   opcodes that share lowering paths with the value opcodes here.
-- [misc.md](misc.md) — `bitfieldExtract` and `bitfieldInsert` and
-  the type-introspection predicates that complement the conversion
-  family.
+- [misc.md](misc.md) — the type-introspection predicates
+  (`IsType`, `IsInt`) that complement the conversion family.
 - [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md) — the
   expression visitors that produce these opcodes.
 - [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md) —

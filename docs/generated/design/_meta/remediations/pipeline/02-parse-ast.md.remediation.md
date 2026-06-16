@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T19:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-12T14:12:44Z
 target_doc: pipeline/02-parse-ast.md
 review_report: ../../reviews/pipeline/02-parse-ast.md.review.md
-target_doc_source_commit_before: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 actions:
-  fixed: 1
+  fixed: 0
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,15 +18,12 @@ actions:
 
 ## Summary
 
-Restructured the page to match the prompt's required headings.
-"Generics and where-clauses" is now `## Generics ambiguity` (with new
-content covering the `<` disambiguation strategy), and "Modifiers
-and attributes" is now `## Modifier parsing`. The two sections are
-re-ordered so generics precedes modifiers (matching the prompt
-ordering).
+The review reported zero findings (finding_count 0). No remediation
+actions were required and the target document was not edited, so
+`target_doc_source_commit_after` equals `_before`. All five action
+counts are 0.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | The prompt mandates `## Generics ambiguity` and `## Modifier parsing`; the page used different headings and was missing coverage of the `<` disambiguation strategy that the "Generics ambiguity" section is supposed to discuss. | Renamed and reordered the two sections. Added a paragraph to `## Generics ambiguity` explaining that the parser uses a try/rollback strategy (not a single-token heuristic) and noting that generic *declarations* are syntactically unambiguous because they follow a declaration keyword. Linked to `../../design/parsing.md` for the deeper treatment, as the prompt requests. |

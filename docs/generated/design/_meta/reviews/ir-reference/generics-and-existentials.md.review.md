@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-12T12:06:07+00:00
 target_doc: ir-reference/generics-and-existentials.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: fail
+  completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 2
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 2
+  major: 0
   minor: 0
   nit: 0
 ---
@@ -24,14 +24,14 @@ severity_breakdown:
 # Review report for ir-reference/generics-and-existentials.md
 
 ## Summary
-The page is structurally lint-clean, but review found 2 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+No findings were identified. The page now includes table rows for witness-table facts and the type-flow specialization cluster, and sampled operand, flag, and source-origin claims matched the watched files.
 
 ## Items checked
-- Checked generic application, witness lookup, existential construction/destructuring, RTTI, AnyValue rows, duplicate rows, and relevant source ranges.
+- Ran `regenerate.py show ir-reference/generics-and-existentials.md` and used its prompt path, watched files, and dependencies.
+- Read `_common.md`, `ir-reference-generics-and-existentials.md`, the full target document, `cross-cutting/ir-instructions.md`, `pipeline/04-ast-to-ir.md`, `ast-reference/declarations.md`, `ir-reference/types.md`, and `ir-reference/structure.md`.
+- Verified front matter keys, target source commit, watched-path digest shape, required IR-reference sections, table columns, and all relative links via source inspection plus pending lint.
+- Checked the documented generic application, witness lookup, existential construction/destructuring, witness-table facts, RTTI, type-flow specialization, tagged-union, dispatcher, specialization-key, and AnyValue rows against `source/slang/slang-ir-insts.lua`.
+- Spot-checked more than 10 factual claims: `specialize` operands and `H` flag, `lookupWitness` wrapper and minimum operands, `makeExistential` operands, existential projection flags, `interface_req_entry` `G` flag, `builtinRequirementKey` operands and `H` flag, `GetSequentialID`, `GetDynamicResourceHeap`, `GetDispatcher` key type, `SpecializeExistentialsInFunc` operands, `WeakUse`, and `packAnyValue`/`unpackAnyValue` behavior.
 
 ## Findings
-
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | major | lines 78-164 | The page omits the type-flow/tagged-union specialization cluster, which is existential/generic machinery. | `source/slang/slang-ir-insts.lua:2893-3121` defines set, tag-translation, tagged-union, and existential-specialization opcodes. | Add a sub-table for type-flow sets/tagged unions or route them to `misc.md` and cross-link explicitly. |
-| F-002 | major | lines 126-143 | Structural opcodes such as `key`, `indexedFieldKey`, `witness_table`, and witness-table entries duplicate rows already in `structure.md`. | Duplicate rows are present in `docs/generated/design/ir-reference/structure.md` and this page. | Choose the owning page for each concrete opcode and replace duplicate rows with cross-links. |
+(no findings)

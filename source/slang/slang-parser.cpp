@@ -1757,10 +1757,135 @@ static Decl* parseOptGenericDecl(Parser* parser, const ParseFunc& parseInner)
     }
 }
 
+static bool _isCountOfKeyword(Token const& token)
+{
+    return token.type == TokenType::Identifier && token.getContent() == "countof";
+}
+
+// Pack-count constraints use the built-in `countof(...)` form. A plain
+// identifier named `countof` can still appear in an ordinary type constraint,
+// so pack-count detection must require the following `(` before it takes over
+// parsing from the existing generic-constraint fallback.
+static bool _isCountOfCallStart(TokenReader reader)
+{
+    if (!_isCountOfKeyword(reader.peekToken()))
+        return false;
+    reader.advanceToken();
+    return reader.peekTokenType() == TokenType::LParent;
+}
+
+static bool _isGenericWhereClauseBoundary(Token const& token)
+{
+    if (token.type == TokenType::EndOfFile || token.type == TokenType::LBrace ||
+        token.type == TokenType::Semicolon)
+    {
+        return true;
+    }
+    return token.type == TokenType::Identifier && token.getContent() == "where";
+}
+
+static bool _isPackCountConstraintOperator(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+    case TokenType::OpEql:
+    case TokenType::OpNeq:
+    case TokenType::OpGreater:
+    case TokenType::OpGeq:
+    case TokenType::OpLess:
+    case TokenType::OpLeq:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Parse the `countof(Pack)` operand used by the pack-count generic constraint
+// parser. The caller already consumed the `countof` token so the helper keeps
+// the AST source location on that token while parsing only the parenthesized
+// operand expression.
+static CountOfExpr* _parsePackCountConstraintCountOfExpr(Parser* parser, Token const& countOfToken)
+{
+    auto countOfExpr = parser->astBuilder->create<CountOfExpr>();
+    countOfExpr->loc = countOfToken.loc;
+    countOfExpr->type = parser->astBuilder->getIntType();
+    parser->ReadMatchingToken(TokenType::LParent);
+    countOfExpr->value = parser->ParseExpression();
+    parser->ReadMatchingToken(TokenType::RParent);
+    return countOfExpr;
+}
+
+// Read and diagnose the comparison operator in `countof(Pack) == IntExpr`.
+// Non-equality comparison tokens are consumed so semantic checking receives a
+// single pack-count constraint node and the parser can continue at `IntExpr`.
+static Token _readPackCountConstraintOperator(Parser* parser)
+{
+    auto opToken = parser->tokenReader.peekToken();
+    if (_isPackCountConstraintOperator(opToken.type))
+    {
+        parser->ReadToken();
+    }
+    else
+    {
+        opToken = parser->ReadToken(TokenType::OpEql);
+    }
+
+    if (opToken.type != TokenType::OpEql)
+    {
+        parser->sink->diagnose(
+            Diagnostics::VariadicPackCountConstraintRequiresEquality{.location = opToken.loc});
+    }
+    return opToken;
+}
+
+// Look only inside the current `where` clause for `Expr == countof(Pack)`.
+// The language accepts only `countof(Pack) == IntExpr`, but recognizing the
+// reversed top-level form here lets the parser issue the orientation diagnostic
+// before the existing type-constraint fallback interprets `Expr` as a type.
+static bool _hasCountOfOnRightOfPackCountComparison(Parser* parser)
+{
+    TokenReader reader = parser->tokenReader;
+    for (;;)
+    {
+        auto token = reader.peekToken();
+        if (_isGenericWhereClauseBoundary(token))
+            return false;
+
+        if (_isPackCountConstraintOperator(token.type))
+        {
+            reader.advanceToken();
+            return _isCountOfCallStart(reader);
+        }
+
+        SkipBalancedToken(&reader);
+    }
+}
+
+// After diagnosing `Expr == countof(Pack)`, discard any remaining tokens that
+// belong to the same clause, e.g. the `+ 1` in `N == countof(T) + 1`. The next
+// `where`, `{`, or `;` is left unread for `maybeParseGenericConstraints` or the
+// enclosing declaration parser.
+static void _skipRestOfGenericWhereClause(Parser* parser)
+{
+    for (;;)
+    {
+        auto token = parser->tokenReader.peekToken();
+        if (_isGenericWhereClauseBoundary(token))
+            return;
+        SkipBalancedToken(&parser->tokenReader);
+    }
+}
+
 static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericParent)
 {
     if (!genericParent)
         return;
+
+    // Pack-count constraints are a targeted generic-constraint spelling, not a
+    // general boolean `where` expression. `maybeParseGenericConstraints`
+    // accepts only `countof(Pack) == IntExpr`; clauses like `N == countof(T)`
+    // are rejected here before the existing type/witness constraint parser sees
+    // the left operand as an unrelated type constraint.
     Token whereToken;
     while (AdvanceIf(parser, "where", &whereToken))
     {
@@ -1780,6 +1905,40 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                 addModifier(constraint, parser->astBuilder->create<OptionalConstraintModifier>());
             }
             AddMember(genericParent, constraint);
+            continue;
+        }
+
+        Token countOfToken;
+        if (_isCountOfCallStart(parser->tokenReader) && AdvanceIf(parser, "countof", &countOfToken))
+        {
+            auto constraint = parser->astBuilder->create<GenericVariadicPackCountConstraintDecl>();
+            constraint->whereTokenLoc = whereToken.loc;
+            constraint->loc = countOfToken.loc;
+            auto leftCountOfExpr = _parsePackCountConstraintCountOfExpr(parser, countOfToken);
+            constraint->packExpr = leftCountOfExpr->value;
+            _readPackCountConstraintOperator(parser);
+            constraint->expectedCountExpr = parser->ParseArgExpr();
+            if (optional)
+            {
+                addModifier(constraint, parser->astBuilder->create<OptionalConstraintModifier>());
+            }
+            AddMember(genericParent, constraint);
+            continue;
+        }
+
+        if (_hasCountOfOnRightOfPackCountComparison(parser))
+        {
+            parser->ParseExpression(Precedence::BitShift);
+            auto opToken = parser->tokenReader.peekToken();
+            if (_isPackCountConstraintOperator(opToken.type))
+                parser->ReadToken();
+            else
+                parser->ReadToken(TokenType::OpEql);
+            countOfToken = parser->ReadToken("countof");
+            parser->sink->diagnose(Diagnostics::VariadicPackCountConstraintRequiresCountofOnLeft{
+                .location = countOfToken.loc});
+            _parsePackCountConstraintCountOfExpr(parser, countOfToken);
+            _skipRestOfGenericWhereClause(parser);
             continue;
         }
 
@@ -2073,8 +2232,23 @@ static Stmt* parseOptBody(Parser* parser)
 }
 
 
-static void parseOptionalGenericConstraints(Parser* parser, ContainerDecl* decl)
+// Parse an optional `: Base1, Base2, ...` constraint clause for `decl`.
+//
+// The constraint subject is derived from `decl` (the constrained entity), but
+// the resulting `GenericTypeConstraintDecl`s are added to `constraintTarget`.
+// For most decls these are the same. For an `associatedtype` declared in an
+// interface, `constraintTarget` is the enclosing interface, so that the
+// constraint becomes an interface-level requirement (a sibling of the
+// associated type) -- the same representation as a `__constraint` declaration.
+// This unifies how constraints declared on a base interface's associated type
+// and on a derived interface are handled.
+static void parseOptionalGenericConstraints(
+    Parser* parser,
+    ContainerDecl* decl,
+    ContainerDecl* constraintTarget = nullptr)
 {
+    if (!constraintTarget)
+        constraintTarget = decl;
     if (AdvanceIf(parser, TokenType::Colon))
     {
         do
@@ -2106,7 +2280,7 @@ static void parseOptionalGenericConstraints(Parser* parser, ContainerDecl* decl)
             }
 
             paramConstraint->sup = parser->ParseTypeExp();
-            AddMember(decl, paramConstraint);
+            AddMember(constraintTarget, paramConstraint);
         } while (AdvanceIf(parser, TokenType::Comma));
     }
 }
@@ -4008,10 +4182,66 @@ static NodeBase* parseAssocType(Parser* parser, void*)
     auto nameToken = parser->ReadToken(TokenType::Identifier);
     assocTypeDecl->nameAndLoc = NameLoc(nameToken);
     assocTypeDecl->loc = nameToken.loc;
-    parseOptionalGenericConstraints(parser, assocTypeDecl);
-    maybeParseGenericConstraints(parser, assocTypeDecl);
+
+    // An associated type's constraints -- whether written as an inheritance
+    // clause (`associatedtype A : IBar`) or a `where` clause
+    // (`associatedtype A where A : IBar`) -- are modeled identically: as
+    // constraint requirements of the enclosing interface, siblings of the
+    // associated type. This mirrors how a generic parameter and its constraints
+    // are parallel members of the enclosing `GenericDecl`, and is the same
+    // representation produced by a `__constraint` declaration. The two surface
+    // forms are therefore exactly equivalent.
+    ContainerDecl* constraintTarget = assocTypeDecl;
+    if (parser->currentScope)
+    {
+        if (auto interfaceDecl = as<InterfaceDecl>(parser->currentScope->containerDecl))
+            constraintTarget = interfaceDecl;
+    }
+    parseOptionalGenericConstraints(parser, assocTypeDecl, constraintTarget);
+    maybeParseGenericConstraints(parser, constraintTarget);
     parser->ReadToken(TokenType::Semicolon);
     return assocTypeDecl;
+}
+
+// Parses an interface-level constraint requirement declared in an interface body:
+//
+//     __constraint <type> == <type>;   // type-equality requirement
+//     __constraint <type> :  <type>;   // subtype requirement
+//
+// The constraint becomes a direct `GenericTypeConstraintDecl` member of the
+// enclosing interface, refining the implicit `This` type and/or associated
+// types inherited from base interfaces. For example, in
+//
+//     interface IDerived : IBase { __constraint DataType == This; }
+//
+// the subject `DataType` resolves (through `This`) to the associated type
+// inherited from `IBase`, and the requirement asserts `This.DataType == This`
+// for any type conforming to `IDerived`.
+static NodeBase* parseInterfaceConstraintDecl(Parser* parser, void*)
+{
+    auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
+    parser->FillPosition(constraint);
+
+    // `__constraint` is only meaningful as a requirement of an interface (it refines
+    // `This` and/or inherited associated types). Restricting it to an interface body is
+    // handled centrally by `isDeclAllowed` (a `GenericTypeConstraintDecl` is only
+    // permitted under an `InterfaceDecl`); generic-parameter constraints use a different
+    // parse path that does not flow through that check, so they are unaffected.
+
+    constraint->sub = parser->ParseTypeExp();
+    Token constraintToken;
+    if (AdvanceIf(parser, TokenType::OpEql, &constraintToken))
+    {
+        constraint->isEqualityConstraint = true;
+    }
+    else
+    {
+        constraintToken = parser->ReadToken(TokenType::Colon);
+    }
+    constraint->loc = constraintToken.loc;
+    constraint->sup = parser->ParseTypeExp();
+    parser->ReadToken(TokenType::Semicolon);
+    return constraint;
 }
 
 static NodeBase* parseAssocFunc(Parser* parser, void*)
@@ -4782,14 +5012,32 @@ NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
 {
     TypeDefDecl* typeDefDecl = parser->astBuilder->create<TypeDefDecl>();
 
-    // TODO(tfoley): parse an actual declarator
+    // Parse the base type. `ParseTypeExpAllowDecl` already consumes any leading
+    // array suffix, so the leading-array form `typedef int[2] arr;` arrives here
+    // with `type` fully formed.
     auto type = parser->ParseTypeExpAllowDecl();
 
-    auto nameToken = parser->ReadToken(TokenType::Identifier);
-    typeDefDecl->loc = nameToken.loc;
+    // Parse the alias name through the shared declarator machinery rather than a bare
+    // identifier read. This accepts the full non-abstract declarator that variable
+    // declarations accept -- a name plus trailing `[N]` array suffixes, and the prefix `*`
+    // pointer / parenthesized declarator forms -- so the C-style `typedef int arr[2];` now
+    // parses where the old `ReadToken(Identifier)` rejected it. We use the bare declarator,
+    // not parseInitDeclarator, because a typedef takes no initializer or semantics.
+    //
+    // UnwrapDeclarator folds the declarator suffixes onto the base type with C
+    // array-variable semantics: `typedef int m[A][B];` yields Array<Array<int, B>, A> -- the
+    // same type as the variable `int m[A][B];`. For a single dimension that equals the
+    // leading form `typedef int[N] arr;`; for multiple dimensions the trailing form is the
+    // transpose of the leading form (which wraps left-to-right), so the two are not
+    // interchangeable beyond one dimension.
+    DeclaratorInfo declaratorInfo;
+    declaratorInfo.typeSpec = type.exp;
+    auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);
+    UnwrapDeclarator(parser->astBuilder, declarator, &declaratorInfo);
 
-    typeDefDecl->nameAndLoc = NameLoc(nameToken);
-    typeDefDecl->type = type;
+    typeDefDecl->loc = declaratorInfo.nameAndLoc.loc;
+    typeDefDecl->nameAndLoc = declaratorInfo.nameAndLoc;
+    typeDefDecl->type = TypeExp(declaratorInfo.typeSpec);
 
     AdvanceIf(parser, TokenType::Semicolon);
 
@@ -4967,6 +5215,8 @@ static bool shouldDeclBeCheckedForNestingValidity(ASTNodeType declType)
     case ASTNodeType::ImplementingDecl:
     case ASTNodeType::ModuleDeclarationDecl:
     case ASTNodeType::AssocTypeDecl:
+    case ASTNodeType::GenericTypeConstraintDecl:
+    case ASTNodeType::GenericVariadicPackCountConstraintDecl:
         return true;
     default:
         return false;
@@ -5035,6 +5285,10 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::LetDecl:
         case ASTNodeType::GenericDecl:
         case ASTNodeType::ConstructorDecl:
+        // A `__constraint` (and a relocated `associatedtype A : I` / `where` bound) is a
+        // requirement of the enclosing interface.
+        case ASTNodeType::GenericTypeConstraintDecl:
+        case ASTNodeType::GenericVariadicPackCountConstraintDecl:
             return true;
         default:
             return false;
@@ -5127,6 +5381,9 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::TypeDefDecl:
         case ASTNodeType::ExtensionDecl:
         case ASTNodeType::SubscriptDecl:
+        // A generic's `where` / `<T : I>` constraints are siblings of its parameters.
+        case ASTNodeType::GenericTypeConstraintDecl:
+        case ASTNodeType::GenericVariadicPackCountConstraintDecl:
             return true;
         default:
             return false;
@@ -5658,13 +5915,86 @@ static bool parseGLSLGlobalDecl(Parser* parser, ContainerDecl* containerDecl)
     return false;
 }
 
-static void parseInterfaceDefaultMethodAsExplicitGeneric(
+enum class InterfaceDefaultImplBodyStatus
+{
+    None,
+    Complete,
+    Partial,
+};
+
+// Storage declarations such as subscripts and properties represent default bodies on
+// their accessors, so classify the whole accessor set before deciding how to handle it.
+static InterfaceDefaultImplBodyStatus getStorageDeclDefaultImplBodyStatus(
+    ContainerDecl* storageDecl,
+    AccessorDecl** outFirstAccessorWithBody = nullptr)
+{
+    bool hasAccessorBody = false;
+    bool hasAccessorWithoutBody = false;
+    for (auto accessorDecl : storageDecl->getDirectMemberDeclsOfType<AccessorDecl>())
+    {
+        if (accessorDecl->body)
+        {
+            if (!hasAccessorBody && outFirstAccessorWithBody)
+                *outFirstAccessorWithBody = accessorDecl;
+
+            hasAccessorBody = true;
+        }
+        else
+        {
+            hasAccessorWithoutBody = true;
+        }
+    }
+
+    if (hasAccessorBody && hasAccessorWithoutBody)
+        return InterfaceDefaultImplBodyStatus::Partial;
+
+    return hasAccessorBody ? InterfaceDefaultImplBodyStatus::Complete
+                           : InterfaceDefaultImplBodyStatus::None;
+}
+
+static InterfaceDefaultImplBodyStatus getInterfaceDefaultImplBodyStatus(
+    CallableDecl* callableDecl,
+    AccessorDecl** outFirstAccessorWithBody = nullptr)
+{
+    if (auto funcDecl = as<FuncDecl>(callableDecl))
+    {
+        return funcDecl->body != nullptr ? InterfaceDefaultImplBodyStatus::Complete
+                                         : InterfaceDefaultImplBodyStatus::None;
+    }
+
+    if (auto subscriptDecl = as<SubscriptDecl>(callableDecl))
+    {
+        // A subscript default implementation is represented by accessor bodies.
+        return getStorageDeclDefaultImplBodyStatus(subscriptDecl, outFirstAccessorWithBody);
+    }
+
+    return InterfaceDefaultImplBodyStatus::None;
+}
+
+static void removeInterfaceDefaultImplBodyFromRequirement(Decl* parsedDecl)
+{
+    auto requirementDecl = maybeGetInner(parsedDecl);
+    if (auto funcDecl = as<FuncDecl>(requirementDecl))
+    {
+        funcDecl->body = nullptr;
+    }
+    else if (auto subscriptDecl = as<SubscriptDecl>(requirementDecl))
+    {
+        // The parsed interface member remains the abstract requirement. Its accessor
+        // bodies either belong to the duplicate `InterfaceDefaultImplDecl` or have
+        // already been diagnosed as an unsupported partial default implementation.
+        for (auto accessorDecl : subscriptDecl->getDirectMemberDeclsOfType<AccessorDecl>())
+            accessorDecl->body = nullptr;
+    }
+}
+
+static void parseInterfaceDefaultCallableAsExplicitGeneric(
     Parser* parser,
     Decl* parsedDecl,
     ContainerDecl* interfaceDecl)
 {
-    // If we parsed an interface method with a body,
-    // parse it again as an explicit generic decl on ThisType.
+    // If we parsed an interface callable with a body, parse it again as an
+    // explicit generic decl on ThisType.
     auto astBuilder = parser->astBuilder;
     InterfaceDefaultImplDecl* genericDecl = astBuilder->create<InterfaceDefaultImplDecl>();
     parser->PushScope(genericDecl);
@@ -5723,31 +6053,45 @@ static void parseInterfaceDefaultMethodAsExplicitGeneric(
     }
 
     // Remove the body from the requirement decl.
-    auto requirementFunc = maybeGetInner(parsedDecl);
-    if (auto funcDecl = as<FuncDecl>(requirementFunc))
-        funcDecl->body = nullptr;
+    removeInterfaceDefaultImplBodyFromRequirement(parsedDecl);
 }
 
-static void maybeReparseInterfaceFuncAsExplicitGeneric(
+static void maybeReparseInterfaceCallableAsExplicitGeneric(
     Parser* parser,
     Decl* parsedDecl,
     ContainerDecl* containerDecl,
     TokenReader tokenReader)
 {
-    auto funcDecl = as<FuncDecl>(maybeGetInner(parsedDecl));
-    if (!funcDecl || !funcDecl->body)
+    auto callableDecl = as<CallableDecl>(maybeGetInner(parsedDecl));
+    if (!callableDecl)
+        return;
+
+    AccessorDecl* accessorWithDefaultBody = nullptr;
+    auto defaultImplBodyStatus =
+        getInterfaceDefaultImplBodyStatus(callableDecl, &accessorWithDefaultBody);
+    if (defaultImplBodyStatus == InterfaceDefaultImplBodyStatus::None)
         return;
 
     auto interfaceDecl = as<InterfaceDecl>(containerDecl);
     if (!interfaceDecl)
         return;
 
+    if (defaultImplBodyStatus == InterfaceDefaultImplBodyStatus::Partial)
+    {
+        Decl* diagnosticDecl = accessorWithDefaultBody ? static_cast<Decl*>(accessorWithDefaultBody)
+                                                       : static_cast<Decl*>(callableDecl);
+        parser->sink->diagnose(
+            Diagnostics::PartialInterfaceAccessorDefaultImplementation{.decl = diagnosticDecl});
+        removeInterfaceDefaultImplBodyFromRequirement(parsedDecl);
+        return;
+    }
+
     if (parser->sink->getErrorCount() != 0)
         return;
 
     Parser newParser(*parser);
     newParser.tokenReader = tokenReader;
-    parseInterfaceDefaultMethodAsExplicitGeneric(&newParser, parsedDecl, interfaceDecl);
+    parseInterfaceDefaultCallableAsExplicitGeneric(&newParser, parsedDecl, interfaceDecl);
 }
 
 static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedTokenType matchType)
@@ -5808,7 +6152,7 @@ static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedToke
             // as an `UnparsedStmt` at this stage of parsing, which is a relatively simple
             // process. Once we have the functionality to systematically clone AST nodes,
             // we can eliminate this reparsing hack.
-            maybeReparseInterfaceFuncAsExplicitGeneric(
+            maybeReparseInterfaceCallableAsExplicitGeneric(
                 parser,
                 as<Decl>(decl),
                 containerDecl,
@@ -10386,6 +10730,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
 
     _makeParseDecl("typedef", parseTypeDef),
     _makeParseDecl("associatedtype", parseAssocType),
+    _makeParseDecl("__constraint", parseInterfaceConstraintDecl),
     _makeParseDecl("__associatedfunc", parseAssocFunc),
     _makeParseDecl("type_param", parseGlobalGenericTypeParamDecl),
     _makeParseDecl("cbuffer", parseHLSLCBufferDecl),

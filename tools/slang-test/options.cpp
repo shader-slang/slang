@@ -77,8 +77,12 @@ static bool _isSubCommand(const char* arg)
         "  -category <name>               Only run tests in specified category\n"
         "  -exclude <name>                Exclude tests in specified category\n"
         "  -exclude-prefix <prefix>       Exclude tests with specified path prefix\n"
-        "  -api <expr>                    Enable specific APIs (e.g., 'vk+dx12' or '+dx11')\n"
-        "  -synthesizedTestApi <expr>     Set APIs for synthesized tests\n"
+        "  -api <expr>                    Enable specific APIs, e.g. 'vk+dx12', 'all-vk',\n"
+        "                                 or '+dx11'. '+'/'-' add/remove an API; a leading\n"
+        "                                 name resets the set. Keywords: all, none,\n"
+        "                                 vk (vulkan), dx11 (d3d11), dx12 (d3d12),\n"
+        "                                 mtl (metal), cuda, cpu, llvm, wgpu (webgpu)\n"
+        "  -synthesizedTestApi <expr>     Set APIs for synthesized tests (same <expr> as -api)\n"
         "  -skip-api-detection            Skip API availability detection\n"
         "  -only-api-detection            Only run API detection and print results, then exit\n"
         "  -server-count <n>              Set number of test servers (default: 1)\n"
@@ -135,6 +139,13 @@ static bool _isSubCommand(const char* arg)
     *optionsOut = Options();
 
     List<const char*> positionalArgs;
+
+    // Track whether an -api / -synthesizedTestApi option has been seen so a
+    // later name-leading expression (which resets the API set and silently
+    // discards earlier options) can be rejected. Operator-leading (+/-)
+    // expressions still accumulate.
+    bool apiOptionSeen = false;
+    bool synthesizedApiOptionSeen = false;
 
     int argCount = argc;
     char const* const* argCursor = argv;
@@ -436,6 +447,23 @@ static bool _isSubCommand(const char* arg)
             }
             const char* apiList = *argCursor++;
 
+            // Each -api expression is parsed relative to the previous result,
+            // but that previous value is only kept when the expression begins
+            // with an operator ('+' or '-'). An expression that begins with an
+            // API name resets from scratch and silently discards any earlier
+            // -api. Reject that case so a later -api cannot quietly override an
+            // earlier one; combine them into one expression or lead with +/-.
+            if (apiOptionSeen && apiList[0] != '+' && apiList[0] != '-')
+            {
+                stdError.print(
+                    "error: -api expression '%s' would discard the previous -api; "
+                    "begin it with '+' or '-' to combine, or merge them into a single "
+                    "expression (eg 'vk+dx12' or 'all-vk')\n",
+                    apiList);
+                return SLANG_FAIL;
+            }
+            apiOptionSeen = true;
+
             SlangResult res = RenderApiUtil::parseApiFlags(
                 UnownedStringSlice(apiList),
                 optionsOut->enabledApis,
@@ -457,6 +485,19 @@ static bool _isSubCommand(const char* arg)
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
+
+            // Same silent-override hazard as -api: a name-leading expression
+            // resets the set and discards any earlier -synthesizedTestApi.
+            if (synthesizedApiOptionSeen && apiList[0] != '+' && apiList[0] != '-')
+            {
+                stdError.print(
+                    "error: -synthesizedTestApi expression '%s' would discard the previous "
+                    "-synthesizedTestApi; begin it with '+' or '-' to combine, or merge them "
+                    "into a single expression (eg 'vk+dx12' or 'all-vk')\n",
+                    apiList);
+                return SLANG_FAIL;
+            }
+            synthesizedApiOptionSeen = true;
 
             SlangResult res = RenderApiUtil::parseApiFlags(
                 UnownedStringSlice(apiList),

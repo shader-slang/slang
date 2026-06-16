@@ -220,6 +220,7 @@ enum class SyntheticResourceKnownID : uint32_t
 
 class ArtifactPostEmitMetadata : public ComBaseObject,
                                  public IArtifactPostEmitMetadata,
+                                 public slang::IBindlessResourceMetadata,
                                  public slang::ICoverageTracingMetadata,
                                  public slang::ISyntheticResourceMetadata,
                                  public slang::ICooperativeTypesMetadata
@@ -248,6 +249,9 @@ public:
         bool& outUsed) SLANG_OVERRIDE;
 
     SLANG_NO_THROW virtual const char* SLANG_MCALL getDebugBuildIdentifier() SLANG_OVERRIDE;
+
+    // IBindlessResourceMetadata
+    SLANG_NO_THROW virtual bool SLANG_MCALL usesBindlessResourceHeap() SLANG_OVERRIDE;
 
     // ICoverageTracingMetadata
     SLANG_NO_THROW virtual uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE;
@@ -299,10 +303,27 @@ public:
     List<slang::CooperativeVectorTypeUsageInfo> m_cooperativeVectorTypes;
     List<slang::CooperativeVectorCombination> m_cooperativeVectorCombinations;
     String m_debugBuildIdentifier;
+    bool m_usesBindlessResourceHeap = false;
 
     // Coverage tracing data, populated by `instrumentCoverage` when
     // `-trace-coverage` is active. Empty otherwise.
     uint32_t m_coverageCounterCount = 0;
+    // Byte width of one counter slot in the synthesized buffer
+    // (`4` for `uint`, `8` for `uint64_t`). The width is the caller's
+    // choice via `-trace-coverage-counter-width`, not something the
+    // compiler derives from the target: the compiler cannot see the
+    // runtime driver's int64-atomic support. `instrumentCoverage`
+    // sets this field by reading the synthesized buffer's element
+    // type back, so the recorded width can never drift from the
+    // actual storage width. The field is overwritten with `4` or `8`
+    // whenever a buffer is actually synthesized; if the pass early-
+    // returns before synthesis (coverage disabled, no marker ops
+    // survived, unsupported target, name collision, binding
+    // collision), the legacy sentinel `4` remains — which is
+    // self-consistent because no buffer was produced for the host to
+    // read back. The legacy sentinel also covers reads from older
+    // metadata objects that pre-date this field.
+    uint32_t m_coverageCounterByteWidth = 4;
     List<CoverageTracingEntry> m_coverageEntries;
 
     // Generic compiler-synthesized bindable resources, including
