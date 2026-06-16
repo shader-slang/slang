@@ -39,39 +39,8 @@ static IRType* replaceImageElementType(IRInst* originalType, IRInst* newElementT
 
 static void resolveTextureFormatForParameter(IRInst* textureInst, IRTextureTypeBase* textureType)
 {
-    // The `format` operand of `IRTextureType` is optional (see
-    // `IRResourceType::hasFormat()`); read it via the same guarded pattern used
-    // at the SPIR-V/WGSL emit readers so a texture type without operand 8 here
-    // does not assert (debug) or read out-of-bounds (release).
-    //
-    // **Data-flow change vs. pre-PR shape.** Before this change the initial
-    // `format` read here was a dead store — overwritten by
-    // `format = decor->getFormat()` further down before any read — and the
-    // early-return called `textureType->getFormat()` a second time
-    // independently. This refactor makes the initial read live by reusing it
-    // in the `decor->getFormat() == format` early-return guard. For
-    // `hasFormat() == true` it is a behavior-preserving "two reads into one
-    // variable" simplification. For `hasFormat() == false` (the new defensive
-    // branch — see reachability note below) `format` is `unknown`, so a
-    // texture lacking the format operand whose `IRFormatDecoration` is also
-    // `unknown` early-returns (nothing to attach), while a decoration with
-    // any other format proceeds to attach it.
-    //
-    // **Reachability.** This function is itself the pass that *attaches* the
-    // format operand to global texture insts, invoked only from the global
-    // walk in `resolveTextureFormat` below; no present-day caller is known to
-    // land an unformatted `IRTextureTypeBase` here. The `!hasFormat()` branch
-    // hardens the site against a future caller that bypasses or precedes the
-    // global format-resolve pass.
-    //
-    // Note: line 54 below synthesizes the (non-`unknown`) format constant with
-    // `builder.getUIntType()` — a pre-existing schema-drift vs. the schema
-    // citations above, latent today because the surrounding
-    // `if (format != ImageFormat::unknown)` guard means it never emits the
-    // `0`-valued constant that would collide with this branch's `int 0` in
-    // the hoistable cache. Tracked at shader-slang/slang#11503; same flag
-    // applies to the sibling fallbacks at `slang-emit-spirv.cpp` and
-    // `slang-ir-util.cpp`.
+    // The `format` operand of `IRTextureType` is optional
+    // (`IRResourceType::hasFormat()`); fall back to `unknown` when absent.
     ImageFormat format =
         textureType->hasFormat() ? (ImageFormat)textureType->getFormat() : ImageFormat::unknown;
     auto decor = textureInst->findDecoration<IRFormatDecoration>();

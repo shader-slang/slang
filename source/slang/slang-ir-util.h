@@ -594,6 +594,10 @@ bool canInstBeStored(IRInst* inst);
 IRType* getTextureTypeFromCombinedTextureSampler(IRType* type);
 IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type);
 
+// Return the `format` operand of `textureType`, or a synthesized `Unknown`
+// constant when the optional operand (`IRResourceType::hasFormat()`) is absent.
+IRInst* getTextureFormatOrUnknown(IRBuilder& builder, IRTextureTypeBase* textureType);
+
 bool isReadNoneCallee(IRInst* callee);
 bool isNoSideEffectCallee(IRInst* callee);
 
