@@ -1,39 +1,12 @@
 // Regression test for https://github.com/shader-slang/slang/issues/11496
 //
-// Pre-fix: `slangc` SIGSEGV'd in the SPIR-V emitter on the repro below.
-// Post-fix (this PR): the defensive null-guard at the
-// `kIROp_SPIRVAsmOperandImageType / SampledImageType` arm of
-// `emitSpvAsmOperand` raises `SLANG_UNEXPECTED`, which surfaces as a
-// `error[E99997]` internal-error diagnostic. This test asserts the
-// crash-to-diagnostic conversion only.
-//
-// **#11498 coupling.** The diagnostic this test pins is produced *because*
-// the upstream orphan-`IRParam` producer (shader-slang/slang#11498) has not
-// been fixed yet. When #11498 lands, the reporter's shader will compile
-// cleanly: there will be no `error[E99997]` and this test's `//CHECK` lines
-// will no longer match. At that point this file should be deleted or
-// repurposed as a positive compile test in the #11498 PR — do NOT silently
-// accept a false-FAIL here as a regression.
-//
-// Minimal repro shape — what is load-bearing for the pre-fix SIGSEGV (per the
-// debug-build evidence collected at HEAD `5230a81`):
-//   * `[noinline]` callee taking a `Texture2D` parameter (the parameter must
-//     reach SPIR-V emit; inlining the callee removes the parameter and the
-//     crash).
-//   * Texture argument supplied via `DescriptorHandle<Texture2D>` under
-//     `spvDescriptorHeapEXT` (this is what funnels the parameter through the
-//     specialization path that produces the orphan `IRParam`).
-//   * Texture sampled via `tex.Sample(...)` (the inline-SPIR-V asm template
-//     `__sampledImageType(this)` from `hlsl.meta.slang` is what reaches the
-//     guarded arm).
-//
-// The `float4 values[N]` parameter and the `pc.data->values` plumbing are
-// preserved from the reporter's original shader to keep the repro close to
-// the user-reported form; they are not strictly required to trigger the
-// crash but reducing them further is best done in the #11498 PR alongside
-// the actual root-cause fix.
+// Sampling a `DescriptorHandle<Texture2D>` inside a `[noinline]` callee under
+// `spvDescriptorHeapEXT` previously SIGSEGV'd in the SPIR-V emitter (a
+// null-typed orphan `IRParam` reached the asm-operand image-type rebuild).
+// The crash is now resolved upstream; this test asserts the repro compiles to
+// valid SPIR-V — the texture type and the sample both emit.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -profile spirv_1_6 -capability spvDescriptorHeapEXT
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -profile spirv_1_6 -capability spvDescriptorHeapEXT
 
 SamplerState sampler;
 
@@ -63,20 +36,5 @@ float4 main(uniform PushConstants pc)
     return bad_function(pc.tex, pc.data->values);
 }
 
-// `DIAGNOSTIC_TEST:SIMPLE` matches each CHECK against one emitted diagnostic
-// (`tools/slang-test/diagnostic-annotation-util.cpp:475` matches the substring
-// against `diag.message`, `diag.severity`, or `diag.errorCode` and consumes
-// the diagnostic). `SLANG_UNEXPECTED` produces a single diagnostic line, so we
-// have exactly one CHECK to spend.
-//
-// We pin a distinctive substring of the runtime message body (the literal
-// string `slang-emit-spirv.cpp` passes to `SLANG_UNEXPECTED`) rather than the
-// diagnostic code `E99997`, because `E99997` is the generic
-// `compilation-aborted-due-to-exception` catch-all
-// (`source/slang/slang-diagnostics.lua` E99997 entry) emitted for *every*
-// uncaught exception in the compiler — not specific to this site. A
-// `//CHECK: E99997` would false-pass on any unrelated exception fired by this
-// input. Pinning the message body asserts *this* guard ran. The trade-off:
-// a same-site message-body refactor would need this CHECK updated alongside
-// the message string.
-//CHECK: SPIRVAsmOperandImageType / SampledImageType operand value has no resolvable texture type
+//CHECK: OpTypeImage
+//CHECK: OpImageSampleImplicitLod
