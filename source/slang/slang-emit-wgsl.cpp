@@ -808,6 +808,22 @@ static bool isStaticConst(IRInst* inst)
 
 void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
 {
+    // A module-scope `static const` whose type is an array or matrix cannot be emitted as a
+    // WGSL `const`. A WGSL `const` is a compile-time value (closer to C++ `constexpr` than
+    // `const`), and the WGSL spec only permits a value (non-reference) of array type to be
+    // indexed by a const-expression. So a constant array indexed by a runtime value, e.g.
+    // `static const float2 positions[]; ... positions[SV_VertexID]`, is rejected by the WGSL
+    // validator ("The expression may only be indexed by a constant"). Emit such globals as
+    // `var<private>` instead: a private module-scope variable accepts the same inline
+    // const-expression initializer but, being addressable, is runtime-indexable. Matrices are
+    // included for the same reason. Scalar/vector constants stay `const` (a value of vector
+    // type is dynamically indexable in WGSL), and function-local constants are unaffected.
+    const bool emitModuleScopeArrayOrMatrixAsPrivateVar =
+        varDecl->getParent()->getOp() == kIROp_ModuleInst &&
+        varDecl->getOp() != kIROp_GlobalParam && varDecl->getOp() != kIROp_GlobalVar &&
+        varDecl->getOp() != kIROp_Var &&
+        (type->getOp() == kIROp_ArrayType || type->getOp() == kIROp_MatrixType);
+
     switch (varDecl->getOp())
     {
     case kIROp_GlobalParam:
@@ -824,7 +840,9 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         }
         break;
     default:
-        if (isStaticConst(varDecl))
+        if (emitModuleScopeArrayOrMatrixAsPrivateVar)
+            m_writer->emit("var");
+        else if (isStaticConst(varDecl))
             m_writer->emit("const");
         else
             m_writer->emit("var");
@@ -872,7 +890,7 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         m_writer->emit("storage, read");
         m_writer->emit(">");
     }
-    else if (varDecl->getOp() == kIROp_GlobalVar)
+    else if (varDecl->getOp() == kIROp_GlobalVar || emitModuleScopeArrayOrMatrixAsPrivateVar)
     {
         // Global ("module-scope") non-handle variables need to specify storage space
 
