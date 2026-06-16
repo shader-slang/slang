@@ -970,9 +970,8 @@ struct ForwardDiffTranslationContext
         {
             if (auto generic = as<IRGeneric>(specialize->getBase()))
             {
-                auto genericReturnType = context->resolveType(
-                    &builder,
-                    findGenericReturnVal(generic)->getFullType());
+                auto genericReturnType =
+                    context->resolveType(&builder, findGenericReturnVal(generic)->getFullType());
                 if (auto funcType = as<IRFuncType>(genericReturnType))
                     return maybeExpandConcreteFuncTypePacks(&builder, funcType);
             }
