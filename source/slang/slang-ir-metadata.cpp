@@ -5,6 +5,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target-program.h"
 
 #include <utility>
 
@@ -118,6 +119,88 @@ static void _insertBinding(
     ranges.add(newRange);
 }
 
+static bool _isBindlessResourceHeapGlobalParam(IRInst* inst, SlangInt bindlessSpaceIndex)
+{
+    SLANG_ASSERT(bindlessSpaceIndex >= 0);
+
+    auto globalParam = as<IRGlobalParam>(inst);
+    if (!globalParam)
+        return false;
+
+    auto layoutDecoration = globalParam->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecoration)
+        return false;
+
+    auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+    if (!varLayout)
+        return false;
+
+    auto descriptorTableSlotOffset =
+        varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot);
+    if (!descriptorTableSlotOffset)
+        return false;
+
+    UInt spaceIndex = descriptorTableSlotOffset->getSpace();
+    if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+        spaceIndex += spaceAttr->getOffset();
+    if (spaceIndex != (UInt)bindlessSpaceIndex)
+        return false;
+
+    // `lowerDynamicResourceHeap` replaces the intrinsic with a synthetic global param in the
+    // reserved bindless space, so opcode checks alone no longer see the heap after lowering.
+    auto typeLayout = varLayout->getTypeLayout();
+    auto descriptorTableSlotSize =
+        typeLayout ? typeLayout->findSizeAttr(LayoutResourceKind::DescriptorTableSlot) : nullptr;
+    return descriptorTableSlotSize && descriptorTableSlotSize->getSize().isInfinite();
+}
+
+static bool _instUsesBindlessResourceHeap(IRInst* inst, SlangInt bindlessSpaceIndex)
+{
+    SLANG_ASSERT(bindlessSpaceIndex >= 0);
+
+    // Dynamic-resource-heap lowering can replace the heap intrinsic with a synthetic global
+    // parameter, so check for that lowered form before looking at opcode uses.
+    if (_isBindlessResourceHeapGlobalParam(inst, bindlessSpaceIndex))
+        return true;
+
+    switch (inst->getOp())
+    {
+    case kIROp_GetDynamicResourceHeap:
+    case kIROp_LoadResourceDescriptorFromHeap:
+    case kIROp_LoadSamplerDescriptorFromHeap:
+    case kIROp_SPIRVLoadDescriptorFromHeap:
+    case kIROp_SPIRVLoadTexelPointerFromHeap:
+    case kIROp_SPIRVResourceHeap:
+    case kIROp_SPIRVSamplerHeap:
+        // Target-independent and SPIR-V descriptor-heap ops can still be present when metadata
+        // is collected; SPIR-V descriptor-heap extension tests cover these cases.
+        return true;
+    case kIROp_CastDescriptorHandleToResource:
+    case kIROp_CastResourceToDescriptorHandle:
+    case kIROp_CastUInt2ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt2:
+    case kIROp_CastUInt64ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt64:
+        // These casts can survive into target IR and still indicate a descriptor-handle path that
+        // needs the bindless resource heap.
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool doesInstAndChildrenUseBindlessResourceHeap(IRInst* inst, SlangInt bindlessSpaceIndex)
+{
+    if (_instUsesBindlessResourceHeap(inst, bindlessSpaceIndex))
+        return true;
+
+    for (auto child : inst->getChildren())
+        if (doesInstAndChildrenUseBindlessResourceHeap(child, bindlessSpaceIndex))
+            return true;
+
+    return false;
+}
+
 void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadata)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
@@ -190,12 +273,30 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
 }
 
 // Collects the metadata from the provided IR module, saves it in outMetadata.
-void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMetadata)
+void collectMetadata(
+    const IRModule* irModule,
+    TargetProgram* targetProgram,
+    ArtifactPostEmitMetadata& outMetadata)
 {
+    SLANG_ASSERT(targetProgram);
+
+    SlangInt bindlessSpaceIndex = -1;
+    if (auto programLayout = targetProgram->getExistingLayout())
+    {
+        bindlessSpaceIndex = programLayout->bindlessSpaceIndex;
+    }
+
     // Scan the instructions looking for global resource declarations
     // and exported functions.
+    bool usesBindlessResourceHeap = false;
     for (const auto& inst : irModule->getGlobalInsts())
     {
+        if (bindlessSpaceIndex >= 0 && !usesBindlessResourceHeap)
+        {
+            if (doesInstAndChildrenUseBindlessResourceHeap(inst, bindlessSpaceIndex))
+                usesBindlessResourceHeap = true;
+        }
+
         if (auto func = as<IRFunc>(inst))
         {
             if (func->findDecoration<IRDownstreamModuleExportDecoration>())
@@ -216,6 +317,7 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
             continue;
         collectMetadataFromInst(param, outMetadata);
     }
+    outMetadata.m_usesBindlessResourceHeap = usesBindlessResourceHeap;
 }
 
 static SlangScalarType _getScalarTypeFromIRType(IRType* type)

@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:17:29Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -24,10 +24,10 @@ break encoding of a Slang `loop` or `ifElse`.
 
 The control-flow opcodes live in two places in
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
-`block` is declared at line ~829 alongside the other module-level
+`block` is declared at line ~846 alongside the other module-level
 parent opcodes, and `TerminatorInst` plus its children occupy
-lines ~1291-1375. The `param` opcode is declared at line ~1055,
-`discard` at line ~1377, and `gpuForeach` at line ~1482.
+lines ~1342-1426. The `param` opcode is declared at line ~1072,
+`discard` at line ~1427, and `gpuForeach` at line ~1532.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The

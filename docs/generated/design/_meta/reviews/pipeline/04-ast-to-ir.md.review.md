@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-12T12:04:49+00:00
 target_doc: pipeline/04-ast-to-ir.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: fcfe91e111a6ac8caf6474a3c896282098f36eaaf23bfc11208dcafc53594873
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: d6bb63223a0f2c41cb6dae09f1e45a4ddd44111fc422e5baf80f5ec043e38517
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
   factual_accuracy: pass
   cross_references: pass
@@ -24,11 +24,23 @@ severity_breakdown:
 # Review report for pipeline/04-ast-to-ir.md
 
 ## Summary
-No findings were identified in this pass. The page matched its prompt contract and the sampled source claims checked during review.
+
+The AST-to-IR page matches its lowering prompt and the sampled lowering sources. I found no findings.
 
 ## Items checked
-- Checked `generateIRForTranslationUnit`, specialized component and conformance IR generation, IR module creation, `IRBuilder` flags, representative AST-to-IR mappings, and adjacent 04b/04c descriptions.
+
+- Ran `regenerate.py show pipeline/04-ast-to-ir.md` and read the target page, `_common.md`, `pipeline-04-ast-to-ir.md`, dependencies `pipeline/03-semantic-check.md` and `cross-cutting/ir-instructions.md`.
+- Verified front matter keys, recorded source commit, and 64-character hex watched-path digest.
+- Spot-checked 15 lowering claims against `source/slang/slang-lower-to-ir.h`, `source/slang/slang-lower-to-ir.cpp`, `source/slang/slang-ir.h`, `source/slang/slang-ir.cpp`, `source/slang/slang-ir-insts.h`, and `source/slang/slang-ir-insts.lua`.
+- Checked cited lowering symbols including `generateIRForTranslationUnit`, `generateIRForSpecializedComponentType`, `generateIRForTypeConformance`, `getInterfaceRequirementKey`, `IRBuiltinRequirementDecoration`, `visitGenericTypeConstraintDecl`, and `Diagnostics::UnsupportedAssignmentTarget`.
+- Resolved relative links with `regenerate.py lint` for this assigned doc group; lint reported no issues.
 
 ## Findings
 
 (no findings)
+
+## No-issues notes
+
+- The page correctly keeps opcode details and pass ordering out of scope and links to the dedicated pages.
+- The built-in requirement-key discussion is supported by the `getInterfaceRequirementKey` implementation and cache.
+- The adjacent pipeline notes match the pre-link and layout-IR pages.

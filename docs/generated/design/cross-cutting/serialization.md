@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-07T14:35:56+00:00
-source_commit: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-watched_paths_digest: 5b25292bf14e2a45191187f721db5ff6afa45b617dfab12381292b32174d4546
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:13:29Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 8b042e75fd998180a0b911649454d28b10dc08df645aa95b3ce5e8eb390b7f82
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -144,6 +144,49 @@ one RIFF file with well-known chunk codes per payload.
 The RIFF wrapping is what allows tools to inspect partial structure
 of a `.slang-module` file (chunk types, sizes) without parsing the
 inner serialized content — useful for sanity checks and recovery.
+
+## IR flat-module read path
+
+[slang-serialize-ir.cpp](../../../../source/slang/slang-serialize-ir.cpp)
+does not serialize the IR object graph directly. It first flattens a
+module into parallel arrays — one entry per instruction, walked in
+preorder by `traverseInstsInSerializationOrder` in
+[slang-serialize-ir.h](../../../../source/slang/slang-serialize-ir.h):
+`instAllocInfo`, `childCounts`, `sourceLocs`, plus a single
+`operandIndices` list (type-use slot followed by each operand, with a
+`nullptr` operand encoded as `-1`), `stringLengths`, and the
+concatenated `stringChars`. On load, `deserializeFromFlatModule`
+allocates every instruction up front and then a recursive lambda
+rebuilds the parent/child links and resolves operand pointers by
+indexing back into the allocated `insts` array.
+
+Because the flat tables come from a file that may be malformed,
+`deserializeFromFlatModule` treats their relationships as
+serialized invariants and validates them with `SLANG_RELEASE_ASSERT`
+before dereferencing — for example that `childCounts` and `sourceLocs`
+each have one entry per instruction, that every `operandIndices` read
+stays in range and resolves to a valid instruction index
+(`-1 <= index < numInsts`), and that string-literal lengths are
+non-negative, fit in `uint32_t`, and do not run past the end of
+`stringChars`. After the walk it asserts that every flat table was
+fully consumed (`instIndex == numInsts`,
+`operandIndex == operandIndicesCount`, and the literal/string cursors
+reach the end of their lists) and that the root is an `IRModuleInst`.
+The literal/string-consumption check is skipped when
+`readContext._foundUnrecognizedInstructions` is set, because the reader
+cannot know whether a future unknown opcode (mapped to `Unrecognized`,
+see [Versioning](#versioning-and-backwards-compatibility)) would have
+consumed literal or string payloads; that case is left to the
+recoverable read failure handled in
+[slang-serialize-container.cpp](../../../../source/slang/slang-serialize-container.cpp).
+
+The recursive rebuild and the matching write-side traversal share a
+fixed recursion budget, `kMaxIRSerializationDepth` (512) declared in
+[slang-serialize-ir.h](../../../../source/slang/slang-serialize-ir.h),
+asserted on each level of `go`/`traverseInstsInSerializationOrder` so a
+deeply-nested or adversarial module fails fast instead of overflowing
+the C++ stack. Keeping the bound on both sides keeps round-trips
+symmetric.
 
 ## Source-location serialization
 

@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T14:30:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 8749b5a60327ef9aea96c0b02a10d643c2d39d04195e7cbd40904b69dabc7f6e
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:17:30Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 3c3b5585e80344fff65833edfb71495cd9350eddefb45844496574bcd283e01a
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -23,10 +23,11 @@ headings are approximate (precise at `source_commit`).
 
 The orchestrator is `linkAndOptimizeIR` in
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (declared
-around line 892 at `source_commit`). It is called by
-`emitEntryPointsSourceFromIR` (line 2365) and by the variants used
-when emitting LLVM, VM, or other non-textual targets (calls visible
-near lines 2508, 3083, 3124, 3178). The function:
+around line 895 at `source_commit`). It is called by
+`emitEntryPointsSourceFromIR` (defined at line 2526; the call is at
+line 2670) and by the variants used when emitting LLVM, VM, or other
+non-textual targets (calls visible near lines 3245, 3286, 3340). The
+function:
 
 1. Links the per-translation-unit IR modules together (using
    [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp)).
@@ -297,7 +298,7 @@ These passes run only for their named target.
 
 | Pass | File | Purpose |
 | --- | --- | --- |
-| Coverage instrument | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | Instruments shaders for coverage tracking; honors `-trace-coverage-binding` and `-trace-coverage-reserved-space` for explicit / reserved binding-slot control |
+| Coverage instrument | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | Synthesizes a `__slang_coverage` buffer (`RWStructuredBuffer<uint64_t>` by default, `uint` when the caller opts down via the validated `counterByteWidth` of `{4, 8}`) and rewrites marker ops into atomic adds; honors `-trace-coverage-binding` / `-trace-coverage-reserved-space` for binding-slot control, and `-trace-coverage-boolean` to record execution as a non-atomic store of `1` instead of an exact count |
 | Finalize coverage metadata | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `finalizeCoverageInstrumentationMetadata`; runs after global / entry-point uniform packing to fill in CPU/CUDA uniform-marshaling fields determined by the final post-packing layout |
 | Insert debug value store | [slang-ir-insert-debug-value-store.cpp](../../../../source/slang/slang-ir-insert-debug-value-store.cpp) | Debug-info preservation across optimization |
 | Liveness | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | Liveness analysis used by debug info |
@@ -311,20 +312,6 @@ listed for completeness.
 | Pass | File | Purpose |
 | --- | --- | --- |
 | SPIR-V opcode info / snippet | [slang-ir-spirv-snippet.cpp](../../../../source/slang/slang-ir-spirv-snippet.cpp) | SPIR-V code-snippet helpers used by SPIR-V passes |
-
-## Pass utilities
-
-These files do not implement transformations but are linked into
-many passes. They provide IR walking, instruction-info lookup, and
-cloning support that the categorized passes above rely on.
-
-| Module | File | Purpose |
-| --- | --- | --- |
-| Clone | [slang-ir-clone.cpp](../../../../source/slang/slang-ir-clone.cpp) | Generic IR clone helpers (used by inlining, specialization, generics) |
-| Dominators | [slang-ir-dominators.cpp](../../../../source/slang/slang-ir-dominators.cpp) | Dominator-tree construction; used by SSA construction, loop and SCCP passes |
-| Util | [slang-ir-util.cpp](../../../../source/slang/slang-ir-util.cpp) | Common IR walking / mutation primitives |
-| Insts info | [slang-ir-insts-info.cpp](../../../../source/slang/slang-ir-insts-info.cpp) | Opcode tables, name lookup, and per-opcode metadata used by the pretty printer and passes that switch on opcode |
-| Insts stable names | [slang-ir-insts-stable-names.cpp](../../../../source/slang/slang-ir-insts-stable-names.cpp) | Maps between opcode enum values and serialization-stable string names |
 
 ## Adding a new pass
 
@@ -350,6 +337,20 @@ When adding a pass:
    `COMPARE_COMPUTE` or `INTERPRET` test, plus a `DIAGNOSTIC_TEST` if
    the pass emits errors.
 6. Run `./extras/formatting.sh` before committing.
+
+## Pass utilities
+
+These files do not implement transformations but are linked into
+many passes. They provide IR walking, instruction-info lookup, and
+cloning support that the categorized passes above rely on.
+
+| Module | File | Purpose |
+| --- | --- | --- |
+| Clone | [slang-ir-clone.cpp](../../../../source/slang/slang-ir-clone.cpp) | Generic IR clone helpers (used by inlining, specialization, generics) |
+| Dominators | [slang-ir-dominators.cpp](../../../../source/slang/slang-ir-dominators.cpp) | Dominator-tree construction; used by SSA construction, loop and SCCP passes |
+| Util | [slang-ir-util.cpp](../../../../source/slang/slang-ir-util.cpp) | Common IR walking / mutation primitives |
+| Insts info | [slang-ir-insts-info.cpp](../../../../source/slang/slang-ir-insts-info.cpp) | Opcode tables, name lookup, and per-opcode metadata used by the pretty printer and passes that switch on opcode |
+| Insts stable names | [slang-ir-insts-stable-names.cpp](../../../../source/slang/slang-ir-insts-stable-names.cpp) | Maps between opcode enum values and serialization-stable string names |
 
 ## What is not in this document
 
