@@ -827,14 +827,20 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
     // initializer stays a self-contained const-expression. The two
     // `tests/wgsl/static-const-array-*` tests guard these invariants.
     //
-    // Only arrays are converted: array-value runtime indexing is the established WGSL rejection.
-    // Scalar/vector/matrix constants stay `const` (a vector value is dynamically indexable in
-    // WGSL; the matrix case is unproven), and function-local constants are unaffected. The
-    // GlobalParam/GlobalVar/Var exclusions are load-bearing, not redundant with the switch below:
-    // the predicate is also read in the address-space chain (which runs for all ops), where a
-    // module-scope `GlobalParam` array would otherwise be wrongly given `<private>`.
+    // Only arrays are converted. Unlike an array value, a *value* of scalar, vector, or matrix
+    // type is runtime-indexable in WGSL, so those constants do not hit the array-value
+    // restriction that motivates this fix and stay `const`. (The matrix case is exercised by
+    // `tests/wgsl/static-const-matrix.slang`, which runtime-indexes a `static const` matrix and
+    // validates it through Tint on CI; if WGSL ever rejected that, matrices would be an instance
+    // of the same bug to convert too.) Function-local constants are unaffected.
+    //
+    // Of the op exclusions, only `!= kIROp_GlobalParam` is load-bearing: the predicate is also
+    // read in the address-space chain, where a module-scope `GlobalParam` array would otherwise
+    // be wrongly given `<private>`. The `GlobalVar`/`Var` terms are defensive — a `GlobalVar`
+    // already enters that branch via the explicit `== kIROp_GlobalVar` disjunct, and a local
+    // `Var` has no `ModuleInst` parent.
     const bool emitModuleScopeArrayConstAsPrivateVar =
-        varDecl->getParent()->getOp() == kIROp_ModuleInst &&
+        varDecl->getParent() && varDecl->getParent()->getOp() == kIROp_ModuleInst &&
         varDecl->getOp() != kIROp_GlobalParam && varDecl->getOp() != kIROp_GlobalVar &&
         varDecl->getOp() != kIROp_Var && type->getOp() == kIROp_ArrayType;
 

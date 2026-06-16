@@ -33,7 +33,9 @@ VertexOutput vertexMain(uint vertexID : SV_VertexID)
 // must not survive. If it had instead become a `var<private>` that `midWeight` indexes, both
 // `weights` and a `var<private>` declaration would appear.
 // WGSL-NOT: weights
-// A constant-only-indexed array must not be spuriously promoted to a private variable either.
-// WGSL-NOT: var<private>
+// A constant-only-indexed array must not be spuriously promoted to a private variable. Bind the
+// check to the array's own declaration (not a bare `var<private>`, which WGSL I/O legalization
+// can legitimately emit for unrelated reasons).
+// WGSL-NOT: var<private>{{.*}}weights
 // ...and the dependent constant must survive as the folded element value (weights[1] == 0.5f).
 // WGSL: 0.5f
