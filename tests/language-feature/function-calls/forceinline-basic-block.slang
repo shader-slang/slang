@@ -36,4 +36,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // After the inlined region the caller's own function scope is restored as a one-operand
 // DebugScope (instead of the previous scope-clearing DebugNoScope). See shader-slang/slang#11616.
 // CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}}{{$}}
+// Exactly one top-level one-operand restore is expected; a spurious second would be a bug.
+// CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}}{{$}}
 // CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope

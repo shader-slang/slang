@@ -34,9 +34,22 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // "computeMain" name string, then the DebugFunction that names it.
 // CHECK-DAG: %[[CMNAME:[0-9]+]] = OpString "computeMain"
 // CHECK-DAG: %[[CALLER:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction %[[CMNAME]]
+// Also capture inlineSingleBasicBlock2's DebugFunction; it pins the intermediate-restore check below.
+// CHECK-DAG: %[[BB2NAME:[0-9]+]] = OpString "inlineSingleBasicBlock2"
+// CHECK-DAG: %[[BB2:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction %[[BB2NAME]]
 
 // computeMain's own entry scope is a one-operand DebugScope referencing that DebugFunction.
 // CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %[[CALLER]]{{$}}
+
+// Cascading fix #4 (intermediate-restore inline depth). inlineSingleBasicBlock2's scope appears as a
+// *two-operand* DebugScope twice under computeMain's inline context: once opening its own inlined
+// body, and once as the intermediate restore after the nested inlineSingleBasicBlock1 region returns
+// (immediately before result1's DebugValue). Both carry inlineSingleBasicBlock2's DebugInlinedAt, so
+// the restore keeps its inline depth. If the clone-loop upgrade that re-attaches the outer call's
+// DebugInlinedAt to a cloned one-operand restore were dropped, the intermediate restore would
+// collapse to one operand and this count would fall to 1.
+// CHECK-COUNT-2: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %[[BB2]] %{{[0-9]+}}{{$}}
+// CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugValue %result1
 
 // After the inlined callee's debug records, the caller (computeMain) function scope is restored
 // as a one-operand DebugScope referencing that same DebugFunction, immediately before the

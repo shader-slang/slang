@@ -10086,20 +10086,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // inliner emits a `DebugScope` with no `InlinedAt` to restore a *non-inlined* caller's
         // own function scope after an inlined region (see emitCalleeDebugInlinedAt in
         // slang-ir-inline.cpp). Emit the one-operand form in that case, matching the per-function
-        // entry `DebugScope` emitted in emitGlobalInst.
+        // entry `DebugScope` emitted in emitFuncDefinition. The single emit below differs between
+        // the one- and two-operand forms only by the trailing optional `inlinedAt` operand.
+        SpvInst* inlinedAt = nullptr;
         if (auto inlinedAtInst = debugScope->getInlinedAt())
         {
-            auto inlinedAt = ensureInst(inlinedAtInst);
+            inlinedAt = ensureInst(inlinedAtInst);
             if (!inlinedAt)
                 return nullptr;
-
-            return emitOpDebugScope(
-                parent,
-                nullptr,
-                m_voidType,
-                getNonSemanticDebugInfoExtInst(),
-                scope,
-                inlinedAt);
         }
 
         return emitOpDebugScope(
@@ -10107,7 +10101,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             nullptr,
             m_voidType,
             getNonSemanticDebugInfoExtInst(),
-            scope);
+            scope,
+            inlinedAt);
     }
 
 
