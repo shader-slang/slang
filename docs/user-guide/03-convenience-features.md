@@ -697,14 +697,16 @@ state, and combines the objects with an `OpSampledImage` instruction.
 By default, when using the `spvDescriptorHeapEXT` capability, Slang reinterprets the resource or sampler
 heap as an array of the requested resource type, whose stride is defined by the resource type and obtained
 from the `OpConstantSizeOfEXT` instruction. The user can override this behavior and specify a different
-stride with the `-spirv-resource-heap-stride` or `-spirv-sampler-heap-stride` compiler options.
+stride with the `-spirv-resource-heap-stride` or `-spirv-sampler-heap-stride` compiler options. For
+acceleration-structure entries, an explicit resource heap stride must be at least 8 bytes.
 
 > **Note on `RaytracingAccelerationStructure`:** When the `spvDescriptorHeapEXT` capability is active and
 > a `DescriptorHandle<RaytracingAccelerationStructure>` is dereferenced, Slang loads a 64-bit device address
 > from the descriptor heap and converts it to an acceleration structure handle via
-> `OpConvertUToAccelerationStructureKHR`. This matches how GPU drivers expose acceleration structure
-> descriptors in the heap (as device addresses), and requires either the `SPV_KHR_ray_tracing` or
-> `SPV_KHR_ray_query` extension.
+> `OpConvertUToAccelerationStructureKHR`. The heap entry type is `uint64_t`, so the default heap stride is
+> based on the address width rather than the opaque acceleration structure type. This matches how GPU
+> drivers expose acceleration structure descriptors in the heap (as device addresses), and requires either
+> the `SPV_KHR_ray_tracing` or `SPV_KHR_ray_query` extension.
 
 ### Custom Descriptor Fetch
 
