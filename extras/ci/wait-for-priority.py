@@ -39,58 +39,17 @@ import sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from gh_api import gh_api, gh_api_list
-
-DEFAULT_REPO = "shader-slang/slang"
-DEFAULT_WORKFLOW = "ci.yml"
-
-DEFAULT_BOT_LOGINS = {
-    "nv-slang-bot",
-    "nv-slang-bot[bot]",
-}
-
-# Run statuses that mean a run still holds, or is waiting for, runner capacity.
-ACTIVE_STATUSES = {"queued", "in_progress", "waiting", "requested", "pending"}
-
-
-def normalize_bot_logins(extra_logins=None):
-    bot_logins = {login.lower() for login in DEFAULT_BOT_LOGINS}
-    bot_logins.update((login or "").lower() for login in (extra_logins or []))
-    bot_logins.discard("")
-    return bot_logins
-
-
-def is_bot(login, bot_logins):
-    if not login:
-        return False
-    login = login.lower()
-    return login.endswith("[bot]") or login in bot_logins
-
-
-def run_actor_login(run):
-    """Best-effort login of whoever caused the run."""
-    for key in ("triggering_actor", "actor"):
-        actor = run.get(key) or {}
-        login = actor.get("login")
-        if login:
-            return login
-    return ""
-
-
-def fetch_active_runs(repo, workflow):
-    """Return active CI runs for the workflow across all active statuses."""
-    runs = {}
-    for status in sorted(ACTIVE_STATUSES):
-        endpoint = (
-            f"/repos/{repo}/actions/workflows/{workflow}/runs"
-            f"?status={status}&per_page=100"
-        )
-        items, err = gh_api_list(endpoint, "workflow_runs")
-        if err:
-            raise RuntimeError(f"Failed to list {status} runs: {err}")
-        for run in items or []:
-            runs[run["id"]] = run
-    return list(runs.values())
+from gh_api import gh_api
+from ci_priority_common import (
+    ACTIVE_STATUSES,
+    DEFAULT_REPO,
+    DEFAULT_WORKFLOW,
+    fetch_active_runs,
+    is_bot,
+    normalize_bot_logins,
+    parse_github_time,
+    run_actor_login,
+)
 
 
 def fetch_self_run(repo, run_id):
@@ -98,12 +57,6 @@ def fetch_self_run(repo, run_id):
     if err:
         raise RuntimeError(f"Failed to fetch self run {run_id}: {err}")
     return data
-
-
-def parse_github_time(value):
-    if not value:
-        return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def run_age_hours(run):

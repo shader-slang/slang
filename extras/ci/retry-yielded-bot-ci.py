@@ -18,17 +18,16 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gh_api import gh_api_list
-
-DEFAULT_REPO = "shader-slang/slang"
-DEFAULT_WORKFLOW = "ci.yml"
-
-DEFAULT_BOT_LOGINS = {
-    "nv-slang-bot",
-    "nv-slang-bot[bot]",
-}
-
-ACTIVE_STATUSES = {"queued", "in_progress", "waiting", "requested", "pending"}
-
+from ci_priority_common import (
+    ACTIVE_STATUSES,
+    DEFAULT_REPO,
+    DEFAULT_WORKFLOW,
+    fetch_active_runs,
+    is_bot,
+    normalize_bot_logins,
+    parse_github_time,
+    run_actor_login,
+)
 
 GATE_JOB_NAME = "wait-for-human-priority"
 YIELDED_STEP_NAME = "Stop yielded bot CI"
@@ -40,52 +39,8 @@ RERUNNABLE_CONCLUSIONS = {"failure", "cancelled"}
 RETRYABLE_EVENTS = ("workflow_dispatch",)
 
 
-def normalize_bot_logins(extra_logins=None):
-    bot_logins = {login.lower() for login in DEFAULT_BOT_LOGINS}
-    bot_logins.update((login or "").lower() for login in (extra_logins or []))
-    bot_logins.discard("")
-    return bot_logins
-
-
-def is_bot(login, bot_logins):
-    if not login:
-        return False
-    login = login.lower()
-    return login.endswith("[bot]") or login in bot_logins
-
-
-def run_actor_login(run):
-    for key in ("triggering_actor", "actor"):
-        actor = run.get(key) or {}
-        login = actor.get("login")
-        if login:
-            return login
-    return ""
-
-
-def fetch_active_runs(repo, workflow):
-    runs = {}
-    for status in sorted(ACTIVE_STATUSES):
-        items, err = gh_api_list(
-            f"/repos/{repo}/actions/workflows/{workflow}/runs"
-            f"?status={status}&per_page=100",
-            "workflow_runs",
-        )
-        if err:
-            raise RuntimeError(f"Failed to list {status} runs: {err}")
-        for run in items or []:
-            runs[run["id"]] = run
-    return list(runs.values())
-
-
 def any_active_ci(runs):
     return [run for run in runs if run.get("status") in ACTIVE_STATUSES]
-
-
-def parse_github_time(value):
-    if not value:
-        return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def fetch_recent_completed_runs(repo, workflow):
