@@ -519,16 +519,17 @@ Use the `/repro-remix` skill or see `extras/repro-remix.md`.
 
 ### Rebuilding after `hlsl.meta.slang` / `core.meta.slang` changes
 
-The core module source (`hlsl.meta.slang`, `core.meta.slang`, etc.) is embedded into the `slang-bootstrap` binary at compile time. After modifying these files you **must** `touch` the file before building to guarantee CMake detects the change, run the bootstrap generator, then rebuild `slangc`:
+The core module source (`hlsl.meta.slang`, `core.meta.slang`, etc.) is embedded into the `slang-bootstrap` binary at compile time. After modifying these files, force CMake to observe the newer timestamp, regenerate the core-module headers through the build graph, then rebuild `slangc` with the preset/configuration you are using:
 
 ```bash
-touch source/slang/hlsl.meta.slang   # (or whichever meta file changed)
-cmake --build --preset debug --target slang-bootstrap
-./build/generators/Debug/bin/slang-bootstrap
-cmake --build --preset debug --target slangc
+cmake -E touch source/slang/hlsl.meta.slang   # or whichever meta file changed
+cmake --build --preset <preset> --target generate_core_module_headers
+cmake --build --preset <preset> --target slangc
 ```
 
-If you skip the `touch` step the cached bootstrap binary may silently embed the OLD source, and diagnostic line numbers from `./build/generators/Debug/bin/slang-bootstrap` will not match the current source file — a sure sign the binary is stale.
+Use the same `<preset>` you use for the build, such as `debug`, `release`, or `releaseWithDebugInfo`. The `generate_core_module_headers` target invokes the correct `slang-bootstrap` binary for that host/configuration, including Windows `.exe` paths and non-Debug output directories.
+
+If you skip the `cmake -E touch` step the cached bootstrap binary may silently embed the OLD source, and diagnostics from the bootstrap step will not match the current source file — a sure sign the binary is stale.
 
 ### HLSL named-constant emission rule
 
