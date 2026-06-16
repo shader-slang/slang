@@ -668,6 +668,12 @@ Without requesting `spvDescriptorHeapEXT`, Slang introduces a global array of de
 from it. The descriptor set ID of the global descriptor array can be configured with the
 `-bindless-space-index` (or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
 
+Reflection reports this value as a reserved bindless space for descriptor-handle-capable targets.
+That reservation can be present even when optimization and target lowering remove all descriptor
+handle uses from the emitted shader. Hosts that need to decide whether to bind a descriptor heap
+should query target metadata for `IBindlessResourceMetadata::usesBindlessResourceHeap()` instead of
+using `getBindlessSpaceIndex() >= 0` as the usage test.
+
 Default behavior assigns binding indices based on descriptor types:
 
 | Enum Value             | Vulkan Descriptor Type                    | Binding Index |
