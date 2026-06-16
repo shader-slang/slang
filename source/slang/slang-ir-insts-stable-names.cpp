@@ -3,7 +3,7 @@
 namespace Slang
 {
 
-static const UInt kOpcodeToStableName[] = {
+static constexpr UInt kOpcodeToStableName[] = {
 #if 0 // FIDDLE TEMPLATE:
 % local insts = require("source/slang/slang-ir-insts.lua")
 % insts.traverse(function(inst)
@@ -21,7 +21,7 @@ static const UInt kOpcodeToStableName[] = {
 #endif // FIDDLE END
 };
 
-static const IROp kStableNameToOpcode[] = {
+static constexpr IROp kStableNameToOpcode[] = {
 #if 0 // FIDDLE TEMPLATE:
 % local insts = require("source/slang/slang-ir-insts.lua")
 % for i = 0, insts.max_stable_name do 
@@ -38,6 +38,36 @@ static const IROp kStableNameToOpcode[] = {
 #include "slang-ir-insts-stable-names.cpp.fiddle"
 #endif // FIDDLE END
 };
+
+#define SLANG_CHECK_IR_STABLE_NAME(op, stableName)                  \
+    static_assert(kOpcodeToStableName[op] == stableName);           \
+    static_assert(kStableNameToOpcode[stableName] == op)
+
+SLANG_CHECK_IR_STABLE_NAME(kIROp_NodeLaunchDecoration, 865);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_NodeMaxDispatchGridDecoration, 866);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_NodeDispatchGridDecoration, 867);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_MaxRecordsDecoration, 868);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_NodeOutputRecordGetElementPtr, 869);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_GetEnumBarrierMemoryTypeFlags, 870);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_GetEnumBarrierSemanticFlags, 871);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_WorkGraphRecordTypeDecoration, 872);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_NodeIDDecoration, 873);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_NodeIsProgramEntryDecoration, 874);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_NodeArraySizeDecoration, 875);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_AllowSparseNodesDecoration, 876);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_WorkGraphRecordElementTypeDecoration, 877);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_DispatchNodeInputRecordType, 878);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_ThreadNodeInputRecordType, 879);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_GroupNodeInputRecordsType, 880);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_EmptyNodeInputType, 881);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_ThreadNodeOutputRecordsType, 882);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_GroupNodeOutputRecordsType, 883);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_NodeOutputType, 884);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_NodeOutputArrayType, 885);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_EmptyNodeOutputType, 886);
+SLANG_CHECK_IR_STABLE_NAME(kIROp_EmptyNodeOutputArrayType, 887);
+
+#undef SLANG_CHECK_IR_STABLE_NAME
 
 UInt getOpcodeStableName(IROp op)
 {

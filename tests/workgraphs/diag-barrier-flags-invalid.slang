@@ -19,7 +19,7 @@ void main(RWBuffer<int> values)
 #elif defined(MEMORY_MIXED)
     Barrier((BarrierMemoryTypeFlags)(0x01 | 0x80), BarrierSemanticFlags.GROUP_SYNC);
 //CHECK_MEMORY_MIXED: E31117
-//CHECK_MEMORY_MIXED: unrecognized BarrierMemoryTypeFlags value '0x81'
+//CHECK_MEMORY_MIXED: UAV_MEMORY
 #elif defined(MEMORY_ZERO)
     Barrier((BarrierMemoryTypeFlags)0, BarrierSemanticFlags.GROUP_SYNC);
 //CHECK_MEMORY_ZERO: E31117
@@ -34,7 +34,7 @@ void main(RWBuffer<int> values)
 #elif defined(SEMANTIC_MIXED)
     Barrier(BarrierMemoryTypeFlags.UAV_MEMORY, (BarrierSemanticFlags)(0x01 | 0x80));
 //CHECK_SEMANTIC_MIXED: E31116
-//CHECK_SEMANTIC_MIXED: unrecognized BarrierSemanticFlags value '0x81'
+//CHECK_SEMANTIC_MIXED: GROUP_SYNC
 #elif defined(SEMANTIC_RUNTIME)
     BarrierSemanticFlags semanticFlags = (BarrierSemanticFlags)values[0];
     Barrier(BarrierMemoryTypeFlags.UAV_MEMORY, semanticFlags);

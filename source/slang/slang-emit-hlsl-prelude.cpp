@@ -530,14 +530,15 @@ static char const* getWorkGraphRecordTypeName(IROp op)
     case kIROp_EmptyNodeOutputArrayType:
         return "EmptyNodeOutputArray";
     default:
-        return nullptr;
+        SLANG_UNEXPECTED("unrecognized work-graph record type IROp");
+        UNREACHABLE_RETURN(nullptr);
     }
 }
 
 void HLSLSourceEmitter::emitWorkGraphRecordType(IRType* type)
 {
     auto typeName = getWorkGraphRecordTypeName(type->getOp());
-    SLANG_ASSERT(typeName);
+    SLANG_RELEASE_ASSERT(typeName);
 
     m_writer->emit(typeName);
     if (auto elementType = getWorkGraphRecordElementType(type))
@@ -572,12 +573,11 @@ void HLSLSourceEmitter::emitNamedMemoryTypeFlagSet(uint32_t flagVal)
             if (!first)
                 m_writer->emit(" | ");
             auto name = getBarrierMemoryTypeFlagName(bit);
-            SLANG_ASSERT(name);
+            SLANG_RELEASE_ASSERT(name);
             m_writer->emit(name);
             first = false;
         }
-        if (first)
-            m_writer->emit("0");
+        SLANG_RELEASE_ASSERT(!first);
     }
     m_writer->emit(")");
 }
@@ -606,12 +606,11 @@ void HLSLSourceEmitter::emitNamedSemanticFlagSet(uint32_t flagVal)
             if (!first)
                 m_writer->emit(" | ");
             auto name = getBarrierSemanticFlagName(bit);
-            SLANG_ASSERT(name);
+            SLANG_RELEASE_ASSERT(name);
             m_writer->emit(name);
             first = false;
         }
-        if (first)
-            m_writer->emit("0");
+        SLANG_RELEASE_ASSERT(!first);
     }
     m_writer->emit(")");
 }
