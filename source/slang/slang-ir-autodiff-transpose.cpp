@@ -1838,11 +1838,8 @@ struct DiffTransposePass
             (IRType*)packType,
             (UInt)gradElements.getCount(),
             gradElements.getBuffer());
-        return TranspositionResult(List<RevGradient>(RevGradient(
-            RevGradient::Flavor::Simple,
-            pack,
-            gradPack,
-            fwdMakeCoopVector)));
+        return TranspositionResult(List<RevGradient>(
+            RevGradient(RevGradient::Flavor::Simple, pack, gradPack, fwdMakeCoopVector)));
     }
 
     TranspositionResult transposeMakeMatrixFromScalar(
