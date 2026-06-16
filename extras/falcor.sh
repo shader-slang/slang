@@ -335,37 +335,6 @@ preflight_target_tools() {
   fi
 }
 
-# Relax (or, with --werror, restore) Falcor's warnings-as-errors before
-# configuring. Falcor hardcodes /WX (MSVC; -Werror would apply to clang/gcc) in
-# Source/Falcor/CMakeLists.txt with no CMake toggle, so we patch that one file
-# in place after backing it up. Only the warnings-as-error flags are removed -
-# warnings (e.g. Slang deprecations) still print, so version-skew stays visible;
-# the build just proceeds to the real errors instead of stopping at a warning.
-# The patch is idempotent (the backup's presence marks "already patched"),
-# reversible (--werror or `clone --clean` restores it), and scoped to Falcor.
-apply_falcor_warning_policy() {
-  local f="$FALCOR_DIR/Source/Falcor/CMakeLists.txt"
-  local bak="$f.falcor-sh.bak"
-  [ -f "$f" ] || return 0
-
-  if [ "$RELAX_WARNINGS" = true ]; then
-    if [ -f "$bak" ]; then
-      log_info "Falcor warnings-as-errors already relaxed (patched on a previous run)."
-      return 0
-    fi
-    log_info "Relaxing Falcor's warnings-as-errors (/WX, -Werror) so deprecation warnings don't fail the build - warnings still print (use --werror to keep strict)."
-    cp "$f" "$bak"
-    sed -E \
-      -e 's@^([[:space:]]*)/WX([[:space:]]|$)@\1# /WX disabled by falcor.sh\2@' \
-      -e 's@^([[:space:]]*)-Werror([[:space:]]|$)@\1# -Werror disabled by falcor.sh\2@' \
-      "$bak" >"$f"
-  elif [ -f "$bak" ]; then
-    # --werror: undo a previous relaxation so Falcor builds strictly again.
-    log_info "Restoring Falcor's strict warnings-as-errors (--werror)."
-    mv -f "$bak" "$f"
-  fi
-}
-
 # Fail early (with build instructions) when the requested local Slang build is
 # missing, and warn when slang-gfx is absent since Falcor imports it. The
 # artifact names follow the build target, not the host: a Windows target needs
@@ -485,8 +454,6 @@ cmd_build() {
 
   [ "$IS_WSL" = true ] && log_info "WSL detected; building for target '$TARGET_OS' (override with --target-os)."
 
-  apply_falcor_warning_policy
-
   log_info "Configuring Falcor (preset $FALCOR_PRESET) with local Slang ($SLANG_CONFIG)..."
   # FALCOR_LOCAL_SLANG_BUILD_DIR is resolved relative to FALCOR_LOCAL_SLANG_DIR
   # by Falcor (SLANG_DIR = DIR/BUILD_DIR), so it names the per-config build
@@ -494,14 +461,28 @@ cmd_build() {
   # -DCMAKE_POLICY_VERSION_MINIMUM=3.5 lets Falcor's pinned pybind11 (which
   # declares cmake_minimum_required < 3.5) configure under CMake >= 4; it is
   # scoped to Falcor's configure here and never applied to the Slang build.
-  (
-    cd "$FALCOR_DIR" &&
-      "$CMAKE" --preset "$FALCOR_PRESET" \
-        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-        -DFALCOR_LOCAL_SLANG=ON \
-        -DFALCOR_LOCAL_SLANG_DIR="$(to_native "$SLANG_DIR")" \
-        -DFALCOR_LOCAL_SLANG_BUILD_DIR="build/$SLANG_CONFIG"
+  local -a configure_args=(
+    --preset "$FALCOR_PRESET"
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+    -DFALCOR_LOCAL_SLANG=ON
+    -DFALCOR_LOCAL_SLANG_DIR="$(to_native "$SLANG_DIR")"
+    -DFALCOR_LOCAL_SLANG_BUILD_DIR="build/$SLANG_CONFIG"
   )
+  # Relax Falcor's warnings-as-errors without editing any Falcor file: inject a
+  # CMake include (via Falcor's own CMAKE_PROJECT_Falcor_INCLUDE hook) that
+  # strips the blanket /WX from the Falcor target once it is defined. Warnings
+  # still print, so Slang version-skew stays visible; --werror skips this.
+  if [ "$RELAX_WARNINGS" = true ]; then
+    log_info "Relaxing Falcor's warnings-as-errors via CMAKE_PROJECT_Falcor_INCLUDE (warnings still print; use --werror to keep strict)."
+    configure_args+=(-DCMAKE_PROJECT_Falcor_INCLUDE="$(to_native "$SCRIPT_DIR/falcor-relax-warnings.cmake")")
+  else
+    # --werror: CMAKE_PROJECT_Falcor_INCLUDE is a cache variable, so a strict
+    # reconfigure of a build dir previously configured relaxed would otherwise
+    # keep the cached include and stay relaxed. Explicitly clear it (this
+    # configure path is owned by falcor.sh) to genuinely restore strictness.
+    configure_args+=(-UCMAKE_PROJECT_Falcor_INCLUDE)
+  fi
+  (cd "$FALCOR_DIR" && "$CMAKE" "${configure_args[@]}")
 
   log_info "Building Falcor ($FALCOR_CONFIG)..."
   "$CMAKE" --build "$(to_native "$(falcor_build_dir)")" --config "$FALCOR_CONFIG"
