@@ -2787,6 +2787,7 @@ struct ForwardDiffTranslationContext
         case kIROp_SizeOf:
         case kIROp_AlignOf:
         case kIROp_Printf:
+        case kIROp_Abort:
         case kIROp_GetCurrentStage:
         case kIROp_GetOffsetPtr:
         case kIROp_IsNullExistential:

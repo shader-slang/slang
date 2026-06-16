@@ -45,76 +45,26 @@ jobs:
           fi
           echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
 
-  # Low-priority gate: only nv-slang-bot[bot]-triggered CI runs this — both
-  # bot-authored PRs and bot-triggered workflow_dispatch runs. It exits quickly.
-  # If human-authored CI, merge-queue CI, or older bot CI is active, a marker
-  # step fails this bot run so it consumes no expensive build/test runners. The
-  # retry-yielded-bot-ci workflow reruns yielded bot CI after CI becomes quiet.
-  # Human PRs and human dispatches skip this job (result == 'skipped').
-  wait-for-human-priority:
-    needs: [filter]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (
-      (github.event_name == 'pull_request' &&
-      github.event.pull_request.user.login == 'nv-slang-bot[bot]') ||
-      (github.event_name == 'workflow_dispatch' &&
-      github.triggering_actor == 'nv-slang-bot[bot]')
-      )
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    # Only reads Actions API state and runs a script; no write access needed.
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - id: priority
-        name: Check priority gate
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          python3 extras/ci/wait-for-priority.py \
-            --repo "$GITHUB_REPOSITORY" \
-            --workflow ci.yml
-
-      - name: Stop yielded bot CI
-        if: steps.priority.outputs.yielded == 'true'
-        run: |
-          echo "::error::priority-gate-yielded: higher-priority CI is active; retry-yielded-bot-ci will rerun this bot CI when quiet"
-          exit 1
-
   # Linux builds (containerized builds on GitHub-hosted runners)
   build-linux-debug-gcc-x86_64:
-    needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build-container.yml
     with:
       config: debug
       runs-on: '["ubuntu-22.04"]'
 
   build-linux-release-gcc-x86_64:
-    needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build-container.yml
     with:
       config: release
       runs-on: '["ubuntu-22.04"]'
 
   build-linux-release-gcc-wasm:
-    needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -125,22 +75,16 @@ jobs:
 
   # Sanitizer build+test (blocking via check-ci, runs on every PR)
   sanitizer-linux-clang-x86_64:
-    needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-sanitizer.yml
     with:
       runs-on: '["ubuntu-22.04"]'
 
   # macOS builds
   build-macos-debug-clang-aarch64:
-    needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: macos
@@ -150,11 +94,8 @@ jobs:
       runs-on: '["macos-latest"]'
 
   build-macos-release-clang-aarch64:
-    needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: macos
@@ -165,11 +106,8 @@ jobs:
 
   # Linux ARM64 builds (GitHub-hosted)
   build-linux-debug-gcc-aarch64:
-    needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -180,11 +118,8 @@ jobs:
       warnings-as-errors: false
 
   build-linux-release-gcc-aarch64:
-    needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -196,11 +131,8 @@ jobs:
 
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
-    needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -210,11 +142,8 @@ jobs:
       runs-on: '["Windows", "self-hosted", "build"]'
 
   build-windows-release-cl-x86_64-gpu:
-    needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -232,6 +161,13 @@ jobs:
       config: debug
       server-count: 4
 
+  test-linux-debug-gcc-x86_64-rhi:
+    needs: [filter, build-linux-debug-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-rhi-test-container.yml
+    with:
+      config: debug
+
   test-linux-release-gcc-x86_64:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
@@ -239,6 +175,13 @@ jobs:
     with:
       config: release
       server-count: 4
+
+  test-linux-release-gcc-x86_64-rhi:
+    needs: [filter, build-linux-release-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-rhi-test-container.yml
+    with:
+      config: release
 
   # Linux x86_64 SM80+ capability tests (self-hosted L4/Blackwell runner).
   # Runs only cooperative-matrix / neural coverage that T4 cannot safely
@@ -251,7 +194,6 @@ jobs:
       config: release
       runs-on: '["Linux", "self-hosted", "SM80Plus"]'
       gpu-tier: sm80plus
-      run-rhi-tests: false
       server-count: 4
 
   # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
@@ -289,6 +231,17 @@ jobs:
       full-gpu-tests: true
       server-count: 3
 
+  test-macos-debug-clang-aarch64-rhi:
+    needs: [filter, build-macos-debug-clang-aarch64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-rhi-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+
   test-macos-release-clang-aarch64:
     needs: [filter, build-macos-release-clang-aarch64]
     if: needs.filter.outputs.should-run == 'true'
@@ -301,6 +254,17 @@ jobs:
       runs-on: '["macos-latest"]'
       full-gpu-tests: true
       server-count: 3
+
+  test-macos-release-clang-aarch64-rhi:
+    needs: [filter, build-macos-release-clang-aarch64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-rhi-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
 
   # Linux ARM64 tests (GitHub-hosted, CPU only)
   test-linux-debug-gcc-aarch64:
@@ -341,6 +305,17 @@ jobs:
       full-gpu-tests: true
       gpu-tier: t4
 
+  test-windows-debug-cl-x86_64-gpu-rhi:
+    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-rhi-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+
   test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
@@ -354,10 +329,21 @@ jobs:
       full-gpu-tests: true
       gpu-tier: t4
 
+  test-windows-release-cl-x86_64-gpu-rhi:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-rhi-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+
   # MaterialX Integration Tests (Windows only for initial validation)
   test-materialx-windows-release:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/materialx-test.yml
     with:
       os: windows
@@ -366,18 +352,61 @@ jobs:
       config: release
       runs-on: '["windows-latest"]'
 
+  # Verify docs/command-line-slangc-reference.md matches `slangc -help`.
+  # Reuses the release artifact built by build-linux-release-gcc-x86_64 instead
+  # of building slangc again from scratch (the old standalone
+  # check-cmdline-ref.yml did a full redundant build for this one check).
+  # Comment /regenerate-cmdline-ref on the PR to auto-fix a failure.
+  check-cmdline-ref:
+    needs: [filter, build-linux-release-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Download Slang release artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: slang-tests-linux-x86_64-gcc-release
+          path: artifacts
+
+      - name: Generate command line reference
+        run: |
+          # slangc is dynamically linked against libslang; the artifact lays
+          # libraries under Release/lib, separate from the Release/bin binaries.
+          chmod +x artifacts/Release/bin/* 2>/dev/null || true
+          export LD_LIBRARY_PATH="$PWD/artifacts/Release/lib:$LD_LIBRARY_PATH"
+          mkdir -p temp
+          # Capture stdout+stderr to match how the golden file is produced by
+          # regenerate-cmdline-ref.yml; otherwise stray stderr output would be
+          # baked into the reference but missing here, causing a spurious diff.
+          artifacts/Release/bin/slangc -help-style markdown -h > temp/command-line-slangc-reference.md 2>&1
+
+      - name: Compare with existing reference
+        run: |
+          if ! diff -q temp/command-line-slangc-reference.md docs/command-line-slangc-reference.md > /dev/null; then
+            echo "Command line reference is out of date. Diff:"
+            diff -u docs/command-line-slangc-reference.md temp/command-line-slangc-reference.md
+            echo "Please run 'slangc -help-style markdown -h > docs/command-line-slangc-reference.md' or comment '/regenerate-cmdline-ref' on your PR."
+            exit 1
+          fi
+
   # Aggregate gate required by branch protection / the merge queue.
   #
   # The build jobs must be listed in `needs` even though every test job
   # already depends on a build job: when a needed job fails, GitHub
-  # Actions marks the dependent jobs "skipped" (not "failed"), and
-  # skipped must be allowed here because several test jobs intentionally
-  # skip on plain pull_request events (they only run in the merge queue).
-  # Without the build jobs listed explicitly, a broken build turns all
-  # its test jobs into allowed skips and the gate passes (see #11553).
+  # Actions marks the dependent jobs "skipped" (not "failed"). Once the
+  # filter says CI should run, requiring every needed job to succeed
+  # ensures skipped jobs cannot hide a failed dependency (see #11553).
   check-ci:
     needs:
       [
+        filter,
         build-linux-debug-gcc-x86_64,
         build-linux-release-gcc-x86_64,
         build-linux-release-gcc-wasm,
@@ -388,18 +417,24 @@ jobs:
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
         test-windows-release-cl-x86_64-gpu,
+        test-windows-release-cl-x86_64-gpu-rhi,
         test-windows-debug-cl-x86_64-gpu,
+        test-windows-debug-cl-x86_64-gpu-rhi,
         test-macos-release-clang-aarch64,
+        test-macos-release-clang-aarch64-rhi,
         test-macos-debug-clang-aarch64,
+        test-macos-debug-clang-aarch64-rhi,
         test-linux-release-gcc-x86_64,
+        test-linux-release-gcc-x86_64-rhi,
         test-linux-release-gcc-x86_64-sm80,
         test-linux-release-gcc-x86_64-cpu,
         test-linux-debug-gcc-x86_64,
+        test-linux-debug-gcc-x86_64-rhi,
         test-linux-release-gcc-aarch64,
         test-linux-debug-gcc-aarch64,
         test-materialx-windows-release,
         sanitizer-linux-clang-x86_64,
-        wait-for-human-priority,
+        check-cmdline-ref,
       ]
     runs-on: ubuntu-latest
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
@@ -407,26 +442,32 @@ jobs:
       - name: Check CI Results
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+          FILTER_RESULT: ${{ needs.filter.result }}
+          SHOULD_RUN: ${{ needs.filter.outputs.should-run }}
         run: |
           echo "=== CI Results Summary ==="
           echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
 
-          # Allow "success" and "skipped"; fail on "failure" or "cancelled".
-          # Checking the generic `needs` JSON (rather than enumerating each
-          # job) means any job added to `needs` above is gated automatically.
-          # This also covers the wait-for-human-priority gate: when a bot run
-          # yields, that job fails, so check-ci goes red and retry-yielded-bot-ci
-          # picks it up — no explicit per-gate check needed here.
-          failed=$(echo "$NEEDS_JSON" | jq -r 'to_entries[]
-            | select(.value.result == "failure" or .value.result == "cancelled")
-            | .key')
-          if [[ -n "$failed" ]]; then
-            echo "These CI jobs failed or were cancelled:"
-            echo "$failed"
+          # If the filter succeeded and determined CI is unnecessary,
+          # skipped build/test jobs are expected for a docs-only change.
+          if [[ "$FILTER_RESULT" == "success" && "$SHOULD_RUN" != "true" ]]; then
+            echo "Filter determined CI is unnecessary; skipped jobs are expected."
+            exit 0
+          fi
+
+          # Require every needed job to succeed. Checking the generic
+          # `needs` JSON (rather than enumerating each job) means any job
+          # added to `needs` above is gated automatically.
+          unsuccessful=$(echo "$NEEDS_JSON" | jq -r 'to_entries[]
+            | select(.value.result != "success")
+            | "\(.key): \(.value.result)"')
+          if [[ -n "$unsuccessful" ]]; then
+            echo "These CI jobs did not succeed:"
+            echo "$unsuccessful"
             exit 1
           fi
 
-          echo "All CI jobs completed successfully (passed or skipped)!"
+          echo "All CI jobs completed successfully!"
 
   # Automatically retry GPU health check failures by dispatching ci-retry.yml,
   # which watches this run until it completes, then reruns only failed jobs.

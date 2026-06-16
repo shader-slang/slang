@@ -311,6 +311,30 @@ struct OverloadCandidate
     // candidate reports this reason instead of falling back to only the generic
     // "could not specialize" diagnostic.
     GenericArgumentInferenceFailure genericInferenceFailure;
+
+    // Records the first argument that failed to type-check while trying this
+    // candidate, so a "no applicable overload" diagnostic can point the user at
+    // which argument is wrong (issue #7857). `argMismatchArgIndex` is the 0-based
+    // argument index (-1 until a mismatch is recorded); `argMismatchExpectedType`
+    // is the parameter type and `argMismatchActualType` is the argument type.
+    Index argMismatchArgIndex = -1;
+    Type* argMismatchExpectedType = nullptr;
+    Type* argMismatchActualType = nullptr;
+};
+
+struct ResolvedOperatorOverload
+{
+    // The resolved decl.
+    Decl* decl;
+
+    // The cached overload candidate in the current TypeCheckingCache.
+    // Note that a `OverloadCandidate` object is not migratable over different
+    // Linkages (compile sessions), so we will need to use `cacheVersion` to track
+    // if this `candidate` is valid for the current session. If not, we will
+    // recreate it from `decl`.
+    OverloadCandidate candidate;
+    // The version of the TypeCheckingCache for which the cached candidate is valid.
+    int cacheVersion;
 };
 
 struct TypeCheckingCache : public RefObject
