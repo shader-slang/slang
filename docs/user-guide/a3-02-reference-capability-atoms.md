@@ -95,7 +95,7 @@ Stages
 > Ray-Miss shader stage & ray-tracing capabilities
 
 `node`
-> Work-graph node stage
+> Work-graph node stage (requires SM 6.8 or later)
 
 `pixel`
 > Pixel shader stage

@@ -1505,7 +1505,7 @@ alias task = _amplification + _meshshading;
 /// [Stage]
 alias amplification = _amplification + _meshshading;
 
-/// Work-graph node stage
+/// Work-graph node stage (requires SM 6.8 or later)
 /// [Stage]
 alias node = _node + _sm_6_8;
 
