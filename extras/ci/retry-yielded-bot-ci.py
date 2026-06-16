@@ -91,8 +91,9 @@ def parse_github_time(value):
 def fetch_recent_completed_runs(repo, workflow):
     """Return completed runs for events the priority gate can yield.
 
-    The gate runs for bot-authored pull requests and bot-triggered
-    workflow_dispatch runs, so both event types are candidates for rerun.
+    Only the bot's workflow_dispatch (draft-testing) runs are throttled and can
+    yield, so RETRYABLE_EVENTS holds just that event. The bot's ready-for-review
+    PRs run at full priority and never yield, so they are never rerun here.
     """
     runs = {}
     for event in RETRYABLE_EVENTS:
