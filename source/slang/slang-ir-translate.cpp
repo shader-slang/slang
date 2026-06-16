@@ -497,8 +497,9 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
                         return nullptr;
                 }
 
-                if (specResult && specResult != specInst)
-                    specInst->replaceUsesWith(specResult);
+                auto currentSpecInst = as<IRSpecialize>(instRef->getOperand(0));
+                if (specResult && currentSpecInst && specResult != currentSpecInst)
+                    currentSpecInst->replaceUsesWith(specResult);
 
                 // No need to memoize since specializeGeneric will already have memoized this.
                 return specResult;
