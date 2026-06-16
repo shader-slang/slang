@@ -45,7 +45,20 @@ jobs:
           cd ..\
       - name: Copy Slang to Falcor
         run: |
-          cp --verbose --recursive --target-directory ./FalcorBin/build/windows-vs2022/bin/Release slang-bin/Release/bin/*
+          TARGET="./FalcorBin/build/windows-vs2022/bin/Release"
+          SRC="slang-bin/Release/bin"
+          # Copy only Slang core DLLs and executables — the full CI artifact also
+          # contains gfx.dll, platform.dll, dawn.dll, and test-tool DLLs that
+          # Falcor provides its own versions of; overwriting those breaks FalcorTest.
+          for name in slang.dll slang-compiler.dll slang-llvm.dll slang-glslang.dll slang-glsl-module.dll dxcompiler.dll dxil.dll slangc.exe; do
+            [ -f "$SRC/$name" ] && cp --verbose "$SRC/$name" "$TARGET/"
+          done
+          for d in D3D12 optix; do
+            [ -d "$SRC/$d" ] && cp --verbose -r "$SRC/$d" "$TARGET/"
+          done
+          for d in "$SRC"/slang-standard-module-*/; do
+            [ -d "$d" ] && cp --verbose -r "$d" "$TARGET/"
+          done
       - name: falcor-unit-test
         shell: pwsh
         run: |
