@@ -20097,6 +20097,30 @@ void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl).freeze(getASTBuilder());
 }
 
+// A `[ForwardDerivative(fn)]` / `[BackwardDerivative(fn)]` attribute references a
+// user-defined derivative function `fn` that is not part of the decorated function's
+// body, so its capability requirements would otherwise be ignored. Resolve the
+// referenced function decl from the (already checked) attribute `funcExpr` so the
+// caller can propagate its capability requirements onto the primal function.
+static FunctionDeclBase* _getUserDefinedDerivativeFuncDecl(UserDefinedDerivativeAttribute* attr)
+{
+    Expr* expr = attr->funcExpr;
+    // The derivative reference may be wrapped in generic-application or
+    // higher-order-invoke nodes; dig down to the underlying decl reference.
+    for (;;)
+    {
+        if (auto genericApp = as<GenericAppExpr>(expr))
+            expr = genericApp->functionExpr;
+        else if (auto higherOrder = as<HigherOrderInvokeExpr>(expr))
+            expr = higherOrder->baseFunction;
+        else
+            break;
+    }
+    if (auto declRefExpr = as<DeclRefExpr>(expr))
+        return as<FunctionDeclBase>(declRefExpr->declRef.getDecl());
+    return nullptr;
+}
+
 void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
 {
     setParentFuncOfVisitor(funcDecl);
@@ -20128,6 +20152,33 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         { _propagateRequirement(this, mutableFuncDeclCapSet, funcDecl, node, nodeCaps, refLoc); },
         [this, funcDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, funcDecl, category); });
+
+    // A user-defined forward/backward derivative function is invoked when this
+    // function is differentiated, so its capability requirements must also be
+    // reflected on this function. These references live on attributes rather than
+    // in the function body, so propagate them explicitly here.
+    for (auto attr : funcDecl->getModifiersOfType<UserDefinedDerivativeAttribute>())
+    {
+        if (auto derivativeFuncDecl = _getUserDefinedDerivativeFuncDecl(attr))
+        {
+            ensureDecl(derivativeFuncDecl, DeclCheckState::CapabilityChecked);
+            // Point the provenance note at the referenced derivative function
+            // inside the attribute (e.g. the 'foo' in [BackwardDerivative(foo)])
+            // rather than the whole attribute, since that is what the user needs
+            // to fix. Fall back to the attribute location if the reference has
+            // no valid location.
+            SourceLoc refLoc = attr->funcExpr ? attr->funcExpr->loc : SourceLoc();
+            if (!refLoc.isValid())
+                refLoc = attr->loc;
+            _propagateRequirement(
+                this,
+                mutableFuncDeclCapSet,
+                funcDecl,
+                derivativeFuncDecl,
+                derivativeFuncDecl->inferredCapabilityRequirements,
+                refLoc);
+        }
+    }
 
     // non-static function join's capabilities with parent
     // to become a superset of the parent.

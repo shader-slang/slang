@@ -889,10 +889,19 @@ static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, Di
             printDiagnosticArg(fieldNameSb, field->getKey());
             if (synthesized)
             {
+                // The field key's source location can be empty (e.g. when the
+                // struct definition comes from a linked module). Fall back to
+                // the struct type's location and then the constructor function
+                // so the warning always points somewhere meaningful.
+                SourceLoc loc = field->getKey()->sourceLoc;
+                if (!loc.isValid())
+                    loc = stype->sourceLoc;
+                if (!loc.isValid())
+                    loc = func->sourceLoc;
                 sink->diagnose(Diagnostics::FieldNotDefaultInitialized{
                     .typeName = typeNameSb.produceString(),
                     .fieldName = fieldNameSb.produceString(),
-                    .location = field->getKey()->sourceLoc,
+                    .location = loc,
                 });
             }
             else
