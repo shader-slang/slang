@@ -40,9 +40,8 @@ static void callSlot(void* obj, int slot)
 static gfx::Result callShaderProgramD3D12Slot(void* obj, int slot, void** outRootSignature)
 {
     void** vtbl = *reinterpret_cast<void***>(obj);
-    return reinterpret_cast<gfx::Result(SLANG_MCALL*)(void*, void**)>(vtbl[slot])(
-        obj,
-        outRootSignature);
+    return reinterpret_cast<gfx::Result(SLANG_MCALL*)(void*, void**)>(
+        vtbl[slot])(obj, outRootSignature);
 }
 
 // ---------------------------------------------------------------------------
