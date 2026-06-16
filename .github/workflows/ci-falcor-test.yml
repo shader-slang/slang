@@ -130,9 +130,11 @@ jobs:
           extract: false
 
       - name: run falcor-compiler-perf-test
+        env:
+          DOWNLOADED_FILE: ${{ fromJson(steps.download.outputs.downloaded_files)[0] }}
         run: |
           set -euo pipefail
-          filename='${{ fromJson(steps.download.outputs.downloaded_files)[0] }}'
+          filename="$DOWNLOADED_FILE"
           [[ -f "$filename" ]] || { echo "Downloaded file not found: $filename" >&2; exit 1; }
           python -m zipfile -e "$filename" ./falcor-perf-test
           export PATH="./build/Release/bin:$PATH"
