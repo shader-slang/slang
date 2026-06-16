@@ -45,19 +45,28 @@ jobs:
           cd ..\
       - name: Copy Slang to Falcor
         run: |
+          set -euo pipefail
           TARGET="./FalcorBin/build/windows-vs2022/bin/Release"
           SRC="slang-bin/Release/bin"
           # Copy only Slang core DLLs and executables — the full CI artifact also
           # contains gfx.dll, platform.dll, dawn.dll, and test-tool DLLs that
           # Falcor provides its own versions of; overwriting those breaks FalcorTest.
+          # slang-rt.dll must be copied alongside slang.dll: it is a version-matched
+          # runtime peer, and leaving C:\Falcor's older copy in place while replacing
+          # slang.dll causes FalcorTest.exe to crash during DLL initialization.
           for name in slang.dll slang-rt.dll slang-compiler.dll slang-llvm.dll slang-glslang.dll slang-glsl-module.dll dxcompiler.dll dxil.dll slangc.exe; do
-            [ -f "$SRC/$name" ] && cp --verbose "$SRC/$name" "$TARGET/"
+            [[ -f "$SRC/$name" ]] || { echo "Missing required file: $SRC/$name" >&2; exit 1; }
+            cp --verbose "$SRC/$name" "$TARGET/"
           done
           for d in D3D12 optix; do
-            [ -d "$SRC/$d" ] && cp --verbose -r "$SRC/$d" "$TARGET/"
+            [[ -d "$SRC/$d" ]] || { echo "Missing required directory: $SRC/$d" >&2; exit 1; }
+            cp --verbose -r "$SRC/$d" "$TARGET/"
           done
-          for d in "$SRC"/slang-standard-module-*/; do
-            [ -d "$d" ] && cp --verbose -r "$d" "$TARGET/"
+          shopt -s nullglob
+          modules=( "$SRC"/slang-standard-module-*/ )
+          (( ${#modules[@]} > 0 )) || { echo "Missing slang-standard-module-* in $SRC" >&2; exit 1; }
+          for d in "${modules[@]}"; do
+            cp --verbose -r "$d" "$TARGET/"
           done
       - name: falcor-unit-test
         shell: pwsh
