@@ -1,0 +1,63 @@
+name: CI RHI Test Workflow
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      compiler:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+      artifact-suffix:
+        required: false
+        type: string
+        default: ""
+        description: "Optional suffix for artifact name (e.g., '-cuda')"
+
+jobs:
+  test-slang-rhi:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 50
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          submodules: "recursive"
+          fetch-depth: "1"
+
+      - name: Common Test Setup
+        uses: ./.github/actions/common-test-setup
+        with:
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
+          artifact-suffix: ${{ inputs.artifact-suffix }}
+
+      - name: Run slang-rhi tests
+        run: |
+          export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
+          "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
+
+      - name: Run slang-rhi tests (OptiX 8.0)
+        if: inputs.os == 'windows' || inputs.os == 'linux'
+        run: |
+          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80000 -tc="ray-tracing-*.cuda"
+
+      - name: Run slang-rhi tests (OptiX 8.1)
+        if: inputs.os == 'windows' || inputs.os == 'linux'
+        run: |
+          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"

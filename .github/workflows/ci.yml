@@ -161,6 +161,13 @@ jobs:
       config: debug
       server-count: 4
 
+  test-linux-debug-gcc-x86_64-rhi:
+    needs: [filter, build-linux-debug-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-rhi-test-container.yml
+    with:
+      config: debug
+
   test-linux-release-gcc-x86_64:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
@@ -168,6 +175,13 @@ jobs:
     with:
       config: release
       server-count: 4
+
+  test-linux-release-gcc-x86_64-rhi:
+    needs: [filter, build-linux-release-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-rhi-test-container.yml
+    with:
+      config: release
 
   # Linux x86_64 SM80+ capability tests (self-hosted L4/Blackwell runner).
   # Runs only cooperative-matrix / neural coverage that T4 cannot safely
@@ -180,7 +194,6 @@ jobs:
       config: release
       runs-on: '["Linux", "self-hosted", "SM80Plus"]'
       gpu-tier: sm80plus
-      run-rhi-tests: false
       server-count: 4
 
   # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
@@ -218,6 +231,17 @@ jobs:
       full-gpu-tests: true
       server-count: 3
 
+  test-macos-debug-clang-aarch64-rhi:
+    needs: [filter, build-macos-debug-clang-aarch64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-rhi-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+
   test-macos-release-clang-aarch64:
     needs: [filter, build-macos-release-clang-aarch64]
     if: needs.filter.outputs.should-run == 'true'
@@ -230,6 +254,17 @@ jobs:
       runs-on: '["macos-latest"]'
       full-gpu-tests: true
       server-count: 3
+
+  test-macos-release-clang-aarch64-rhi:
+    needs: [filter, build-macos-release-clang-aarch64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-rhi-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
 
   # Linux ARM64 tests (GitHub-hosted, CPU only)
   test-linux-debug-gcc-aarch64:
@@ -270,6 +305,17 @@ jobs:
       full-gpu-tests: true
       gpu-tier: t4
 
+  test-windows-debug-cl-x86_64-gpu-rhi:
+    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-rhi-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+
   test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
@@ -282,6 +328,17 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
       gpu-tier: t4
+
+  test-windows-release-cl-x86_64-gpu-rhi:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-rhi-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
   # MaterialX Integration Tests (Windows only for initial validation)
   test-materialx-windows-release:
@@ -316,13 +373,19 @@ jobs:
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
         test-windows-release-cl-x86_64-gpu,
+        test-windows-release-cl-x86_64-gpu-rhi,
         test-windows-debug-cl-x86_64-gpu,
+        test-windows-debug-cl-x86_64-gpu-rhi,
         test-macos-release-clang-aarch64,
+        test-macos-release-clang-aarch64-rhi,
         test-macos-debug-clang-aarch64,
+        test-macos-debug-clang-aarch64-rhi,
         test-linux-release-gcc-x86_64,
+        test-linux-release-gcc-x86_64-rhi,
         test-linux-release-gcc-x86_64-sm80,
         test-linux-release-gcc-x86_64-cpu,
         test-linux-debug-gcc-x86_64,
+        test-linux-debug-gcc-x86_64-rhi,
         test-linux-release-gcc-aarch64,
         test-linux-debug-gcc-aarch64,
         test-materialx-windows-release,
