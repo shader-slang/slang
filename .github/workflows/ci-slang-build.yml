@@ -209,7 +209,7 @@ jobs:
                 "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}" \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
-                -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
+                -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=OFF \
                 $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
@@ -219,7 +219,7 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
-                -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
+                -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=OFF \
                 $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
@@ -230,7 +230,7 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
-                -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
+                -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=OFF \
                 $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
