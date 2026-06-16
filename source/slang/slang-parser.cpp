@@ -1757,10 +1757,135 @@ static Decl* parseOptGenericDecl(Parser* parser, const ParseFunc& parseInner)
     }
 }
 
+static bool _isCountOfKeyword(Token const& token)
+{
+    return token.type == TokenType::Identifier && token.getContent() == "countof";
+}
+
+// Pack-count constraints use the built-in `countof(...)` form. A plain
+// identifier named `countof` can still appear in an ordinary type constraint,
+// so pack-count detection must require the following `(` before it takes over
+// parsing from the existing generic-constraint fallback.
+static bool _isCountOfCallStart(TokenReader reader)
+{
+    if (!_isCountOfKeyword(reader.peekToken()))
+        return false;
+    reader.advanceToken();
+    return reader.peekTokenType() == TokenType::LParent;
+}
+
+static bool _isGenericWhereClauseBoundary(Token const& token)
+{
+    if (token.type == TokenType::EndOfFile || token.type == TokenType::LBrace ||
+        token.type == TokenType::Semicolon)
+    {
+        return true;
+    }
+    return token.type == TokenType::Identifier && token.getContent() == "where";
+}
+
+static bool _isPackCountConstraintOperator(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+    case TokenType::OpEql:
+    case TokenType::OpNeq:
+    case TokenType::OpGreater:
+    case TokenType::OpGeq:
+    case TokenType::OpLess:
+    case TokenType::OpLeq:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Parse the `countof(Pack)` operand used by the pack-count generic constraint
+// parser. The caller already consumed the `countof` token so the helper keeps
+// the AST source location on that token while parsing only the parenthesized
+// operand expression.
+static CountOfExpr* _parsePackCountConstraintCountOfExpr(Parser* parser, Token const& countOfToken)
+{
+    auto countOfExpr = parser->astBuilder->create<CountOfExpr>();
+    countOfExpr->loc = countOfToken.loc;
+    countOfExpr->type = parser->astBuilder->getIntType();
+    parser->ReadMatchingToken(TokenType::LParent);
+    countOfExpr->value = parser->ParseExpression();
+    parser->ReadMatchingToken(TokenType::RParent);
+    return countOfExpr;
+}
+
+// Read and diagnose the comparison operator in `countof(Pack) == IntExpr`.
+// Non-equality comparison tokens are consumed so semantic checking receives a
+// single pack-count constraint node and the parser can continue at `IntExpr`.
+static Token _readPackCountConstraintOperator(Parser* parser)
+{
+    auto opToken = parser->tokenReader.peekToken();
+    if (_isPackCountConstraintOperator(opToken.type))
+    {
+        parser->ReadToken();
+    }
+    else
+    {
+        opToken = parser->ReadToken(TokenType::OpEql);
+    }
+
+    if (opToken.type != TokenType::OpEql)
+    {
+        parser->sink->diagnose(
+            Diagnostics::VariadicPackCountConstraintRequiresEquality{.location = opToken.loc});
+    }
+    return opToken;
+}
+
+// Look only inside the current `where` clause for `Expr == countof(Pack)`.
+// The language accepts only `countof(Pack) == IntExpr`, but recognizing the
+// reversed top-level form here lets the parser issue the orientation diagnostic
+// before the existing type-constraint fallback interprets `Expr` as a type.
+static bool _hasCountOfOnRightOfPackCountComparison(Parser* parser)
+{
+    TokenReader reader = parser->tokenReader;
+    for (;;)
+    {
+        auto token = reader.peekToken();
+        if (_isGenericWhereClauseBoundary(token))
+            return false;
+
+        if (_isPackCountConstraintOperator(token.type))
+        {
+            reader.advanceToken();
+            return _isCountOfCallStart(reader);
+        }
+
+        SkipBalancedToken(&reader);
+    }
+}
+
+// After diagnosing `Expr == countof(Pack)`, discard any remaining tokens that
+// belong to the same clause, e.g. the `+ 1` in `N == countof(T) + 1`. The next
+// `where`, `{`, or `;` is left unread for `maybeParseGenericConstraints` or the
+// enclosing declaration parser.
+static void _skipRestOfGenericWhereClause(Parser* parser)
+{
+    for (;;)
+    {
+        auto token = parser->tokenReader.peekToken();
+        if (_isGenericWhereClauseBoundary(token))
+            return;
+        SkipBalancedToken(&parser->tokenReader);
+    }
+}
+
 static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericParent)
 {
     if (!genericParent)
         return;
+
+    // Pack-count constraints are a targeted generic-constraint spelling, not a
+    // general boolean `where` expression. `maybeParseGenericConstraints`
+    // accepts only `countof(Pack) == IntExpr`; clauses like `N == countof(T)`
+    // are rejected here before the existing type/witness constraint parser sees
+    // the left operand as an unrelated type constraint.
     Token whereToken;
     while (AdvanceIf(parser, "where", &whereToken))
     {
@@ -1780,6 +1905,40 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                 addModifier(constraint, parser->astBuilder->create<OptionalConstraintModifier>());
             }
             AddMember(genericParent, constraint);
+            continue;
+        }
+
+        Token countOfToken;
+        if (_isCountOfCallStart(parser->tokenReader) && AdvanceIf(parser, "countof", &countOfToken))
+        {
+            auto constraint = parser->astBuilder->create<GenericVariadicPackCountConstraintDecl>();
+            constraint->whereTokenLoc = whereToken.loc;
+            constraint->loc = countOfToken.loc;
+            auto leftCountOfExpr = _parsePackCountConstraintCountOfExpr(parser, countOfToken);
+            constraint->packExpr = leftCountOfExpr->value;
+            _readPackCountConstraintOperator(parser);
+            constraint->expectedCountExpr = parser->ParseArgExpr();
+            if (optional)
+            {
+                addModifier(constraint, parser->astBuilder->create<OptionalConstraintModifier>());
+            }
+            AddMember(genericParent, constraint);
+            continue;
+        }
+
+        if (_hasCountOfOnRightOfPackCountComparison(parser))
+        {
+            parser->ParseExpression(Precedence::BitShift);
+            auto opToken = parser->tokenReader.peekToken();
+            if (_isPackCountConstraintOperator(opToken.type))
+                parser->ReadToken();
+            else
+                parser->ReadToken(TokenType::OpEql);
+            countOfToken = parser->ReadToken("countof");
+            parser->sink->diagnose(Diagnostics::VariadicPackCountConstraintRequiresCountofOnLeft{
+                .location = countOfToken.loc});
+            _parsePackCountConstraintCountOfExpr(parser, countOfToken);
+            _skipRestOfGenericWhereClause(parser);
             continue;
         }
 
@@ -5057,6 +5216,7 @@ static bool shouldDeclBeCheckedForNestingValidity(ASTNodeType declType)
     case ASTNodeType::ModuleDeclarationDecl:
     case ASTNodeType::AssocTypeDecl:
     case ASTNodeType::GenericTypeConstraintDecl:
+    case ASTNodeType::GenericVariadicPackCountConstraintDecl:
         return true;
     default:
         return false;
@@ -5128,6 +5288,7 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         // A `__constraint` (and a relocated `associatedtype A : I` / `where` bound) is a
         // requirement of the enclosing interface.
         case ASTNodeType::GenericTypeConstraintDecl:
+        case ASTNodeType::GenericVariadicPackCountConstraintDecl:
             return true;
         default:
             return false;
@@ -5222,6 +5383,7 @@ static bool isDeclAllowed(bool languageServer, ASTNodeType parentType, ASTNodeTy
         case ASTNodeType::SubscriptDecl:
         // A generic's `where` / `<T : I>` constraints are siblings of its parameters.
         case ASTNodeType::GenericTypeConstraintDecl:
+        case ASTNodeType::GenericVariadicPackCountConstraintDecl:
             return true;
         default:
             return false;
