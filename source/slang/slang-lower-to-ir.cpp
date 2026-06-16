@@ -513,6 +513,12 @@ struct SharedIRGenContext
 
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
 
+    // Concrete pack-count witnesses prove facts that have already been checked
+    // by the front end and carry no IR operands. `visitConcreteVariadicPackCountWitness`
+    // reuses this module-level proof-only table instead of emitting one table
+    // for every specialized call site.
+    IRInst* concreteVariadicPackCountWitnessTable = nullptr;
+
     uint32_t nextCoverageBranchSiteID = 1;
 
     // External (imported) unsafeForceInline functions that need to
@@ -2561,6 +2567,40 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         IRInst* loweredPack =
             as<Type>(pack) ? lowerType(context, as<Type>(pack)) : lowerSimpleVal(context, pack);
         return LoweredValInfo::simple(emitNonEmptyPackWitness(loweredPack));
+    }
+
+    LoweredValInfo visitDeclaredVariadicPackCountWitness(DeclaredVariadicPackCountWitness* witness)
+    {
+        auto builder = getBuilder();
+        auto witnessType = builder->getWitnessTableType(builder->getVoidType());
+        return emitDeclRef(context, witness->getDeclRef(), witnessType);
+    }
+
+    IRInst* emitConcreteVariadicPackCountWitness()
+    {
+        if (auto witnessTable = context->shared->concreteVariadicPackCountWitnessTable)
+            return witnessTable;
+
+        auto builder = getBuilder();
+        auto voidType = builder->getVoidType();
+
+        // Pack-count witnesses carry no runtime data. Use the same proof-only
+        // witness-table shape as other hidden generic witnesses so calls and
+        // generic params have a concrete IR value without introducing a runtime
+        // `countof` operation.
+        auto oldLoc = builder->getInsertLoc();
+        builder->setInsertInto(builder->getModule());
+        auto witnessTable = builder->createWitnessTable(voidType, voidType);
+        builder->setInsertLoc(oldLoc);
+        context->shared->concreteVariadicPackCountWitnessTable = witnessTable;
+
+        return witnessTable;
+    }
+
+    LoweredValInfo visitConcreteVariadicPackCountWitness(ConcreteVariadicPackCountWitness* witness)
+    {
+        SLANG_UNUSED(witness); // Proof-only witness, operands are not needed at runtime.
+        return LoweredValInfo::simple(emitConcreteVariadicPackCountWitness());
     }
 
     LoweredValInfo visitHasDiffTypeInfoWitness(HasDiffTypeInfoWitness* witness)
@@ -5156,6 +5196,16 @@ struct ExprLoweringContext
                         subContext,
                         genSubst,
                         nonEmptyConstraintDecl,
+                        argCounter++);
+                }
+                else if (
+                    auto packCountConstraintDecl =
+                        as<GenericVariadicPackCountConstraintDecl>(memberDecl))
+                {
+                    _lowerSubstitutionArg(
+                        subContext,
+                        genSubst,
+                        packCountConstraintDecl,
                         argCounter++);
                 }
                 else if (
@@ -10608,6 +10658,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitGenericVariadicPackCountConstraintDecl(
+        GenericVariadicPackCountConstraintDecl* decl)
+    {
+        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl);
+            globalGenericParamDecl)
+        {
+            auto witnessType = getBuilder()->getWitnessTableType(getBuilder()->getVoidType());
+            auto inst = getBuilder()->emitGlobalGenericParam(witnessType);
+            addLinkageDecoration(context, inst, decl);
+            return LoweredValInfo::simple(inst);
+        }
+
+        SLANG_UNEXPECTED("pack-count constraint during lowering");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
     {
         auto inst = getBuilder()->emitGlobalGenericTypeParam();
@@ -12639,6 +12705,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     void emitGenericConstraintDecl(
         IRGenContext* subContext,
+        GenericVariadicPackCountConstraintDecl* constraintDecl)
+    {
+        auto subBuilder = subContext->irBuilder;
+        // Generic lowering turns each source generic constraint into a hidden
+        // parameter. The checker has already validated `countof(Pack) == Count`,
+        // so lowering only needs a proof value with the same witness-table
+        // representation consumed by `visitDeclaredVariadicPackCountWitness`.
+        auto witnessType = subBuilder->getWitnessTableType(subBuilder->getVoidType());
+        auto param = subBuilder->emitParam(witnessType);
+        addNameHint(context, param, constraintDecl);
+        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+    }
+
+    void emitGenericConstraintDecl(
+        IRGenContext* subContext,
         HasDiffTypeInfoConstraintDecl* constraintDecl)
     {
         auto subBuilder = subContext->irBuilder;
@@ -12710,6 +12791,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
             {
                 emitGenericConstraintDecl(subContext, nonEmptyConstraintDecl);
+            }
+            else if (
+                auto packCountConstraintDecl =
+                    as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
+            {
+                emitGenericConstraintDecl(subContext, packCountConstraintDecl);
             }
             else if (
                 auto hasDiffTypeInfoConstraintDecl =

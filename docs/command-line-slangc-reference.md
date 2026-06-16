@@ -633,7 +633,7 @@ Specify the space index for the system defined global bindless resource array.
 
 **-spirv-resource-heap-stride &lt;stride&gt;**
 
-Specify the byte stride for the resource descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType). 
+Specify the byte stride for the resource descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType); for RaytracingAccelerationStructure entries, the 0 default emits a literal 8-byte ArrayStride for the uint64 device address elements. An explicit stride value still overrides these defaults; for acceleration-structure entries it must be at least 8 bytes. 
 
 
 <a id="spirv-sampler-heap-stride"></a>
@@ -1356,6 +1356,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_quad_control` : enables the SPV_KHR_quad_control extension 
 * `SPV_KHR_fragment_shader_barycentric` : enables the SPV_KHR_fragment_shader_barycentric extension 
 * `SPV_KHR_non_semantic_info` : enables the SPV_KHR_non_semantic_info extension 
+* `SPV_KHR_shader_abort` : enables the SPV_KHR_shader_abort extension 
 * `SPV_KHR_device_group` : enables the SPV_KHR_device_group extension 
 * `SPV_KHR_variable_pointers` : enables the SPV_KHR_variable_pointers extension 
 * `SPV_KHR_ray_tracing` : enables the SPV_KHR_ray_tracing extension 
@@ -1508,6 +1509,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_EXT_buffer_reference` : enables the GL_EXT_buffer_reference extension 
 * `GL_EXT_buffer_reference_uvec2` : enables the GL_EXT_buffer_reference_uvec2 extension 
 * `GL_EXT_debug_printf` : enables the GL_EXT_debug_printf extension 
+* `GL_EXT_shader_abort` : enables the GL_EXT_shader_abort extension 
 * `GL_EXT_demote_to_helper_invocation` : enables the GL_EXT_demote_to_helper_invocation extension 
 * `GL_EXT_maximal_reconvergence` : enables the GL_EXT_maximal_reconvergence extension 
 * `GL_EXT_shader_quad_control` : enables the GL_EXT_shader_quad_control extension 
@@ -1762,6 +1764,7 @@ A capability describes an optional feature that a target may or may not support.
 * `image_loadstore` 
 * `nonuniformqualifier` 
 * `printf` 
+* `abort` 
 * `texturefootprint` 
 * `texturefootprintclamp` 
 * `shader5_sm_4_0` 
