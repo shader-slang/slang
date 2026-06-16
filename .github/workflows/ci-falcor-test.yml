@@ -32,17 +32,16 @@ jobs:
           name: slang-tests-windows-x86_64-cl-release
           path: slang-bin
       - name: setup-falcor
-        shell: pwsh
         run: |
-          mkdir FalcorBin
-          cd FalcorBin
-          Copy-Item -Path 'C:\Falcor\build\windows-vs2022\bin' -Destination '.\build\windows-vs2022\bin' -Recurse -Exclude ("*.pdb")
-          Copy-Item -Path 'C:\Falcor\tests' -Destination '.\' -Recurse
-          Copy-Item -Path 'C:\Falcor\tools' -Destination '.\' -Recurse
-          Copy-Item -Path 'C:\Falcor\media' -Destination '.\' -Recurse
-          Copy-Item -Path 'C:\Falcor\media_internal' -Destination '.\' -Recurse
-          Copy-Item -Path 'C:\Falcor\scripts' -Destination '.\' -Recurse
-          cd ..\
+          set -euo pipefail
+          mkdir -p FalcorBin/build/windows-vs2022
+          cp -r 'C:/Falcor/build/windows-vs2022/bin' 'FalcorBin/build/windows-vs2022/bin'
+          find 'FalcorBin/build/windows-vs2022/bin' -name '*.pdb' -delete
+          cp -r 'C:/Falcor/tests' 'FalcorBin/tests'
+          cp -r 'C:/Falcor/tools' 'FalcorBin/tools'
+          cp -r 'C:/Falcor/media' 'FalcorBin/media'
+          cp -r 'C:/Falcor/media_internal' 'FalcorBin/media_internal'
+          cp -r 'C:/Falcor/scripts' 'FalcorBin/scripts'
       - name: Copy Slang to Falcor
         run: |
           set -euo pipefail
@@ -70,25 +69,15 @@ jobs:
             cp --verbose -r "$d" "$TARGET/"
           done
       - name: falcor-unit-test
-        shell: pwsh
         run: |
-          $ErrorActionPreference = "Stop"
-          cd .\FalcorBin\tests
+          set -euo pipefail
+          cd FalcorBin/tests
           python ./testing/run_unit_tests.py --config windows-vs2022-Release -t "-slow"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-          cd ../../
       - name: falcor-image-test
-        shell: pwsh
         run: |
-          $ErrorActionPreference = "Stop"
-          cd .\FalcorBin\tests
+          set -euo pipefail
+          cd FalcorBin/tests
           python ./testing/run_image_tests.py --config windows-vs2022-Release --run-only
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-          cd ../../
 
   test-falcor-perf:
     name: Test (Falcor Perf)
@@ -141,26 +130,13 @@ jobs:
           extract: false
 
       - name: run falcor-compiler-perf-test
-        shell: pwsh
         run: |
-          $ErrorActionPreference = "Stop"
-          $filename = '${{ fromJson(steps.download.outputs.downloaded_files)[0] }}'
-          # Check if the downloaded file exists
-          if (-not (Test-Path $filename)) {
-            Write-Error "Downloaded file not found: $filename"
-            exit 1
-          }
-          Expand-Archive $filename -DestinationPath .\falcor-perf-test
-          $env:PATH = ".\build\Release\bin;" + $env:PATH
-
-          # View current PATH
-          Write-Host "PATH is $env:PATH"
-
-          # Run the executable and check exit code
-          Write-Host "Running falcor performance test..."
-          & .\falcor-perf-test\bin\Release\falcor_perftest.exe
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "falcor_perftest.exe failed with exit code: $LASTEXITCODE"
-            exit $LASTEXITCODE
-          }
-          Write-Host "falcor performance test completed successfully"
+          set -euo pipefail
+          filename='${{ fromJson(steps.download.outputs.downloaded_files)[0] }}'
+          [[ -f "$filename" ]] || { echo "Downloaded file not found: $filename" >&2; exit 1; }
+          python -m zipfile -e "$filename" ./falcor-perf-test
+          export PATH="./build/Release/bin:$PATH"
+          echo "PATH is $PATH"
+          echo "Running falcor performance test..."
+          ./falcor-perf-test/bin/Release/falcor_perftest.exe
+          echo "falcor performance test completed successfully"
