@@ -1426,6 +1426,14 @@ void WGSLSourceEmitter::emitCallArg(IRInst* inst)
 // of a larger aggregate, never used directly (e.g. it is not the base of a runtime GetElement).
 // Such a constituent must be inlined into its enclosing aggregate's initializer; an aggregate
 // used directly is the outermost one and must stay a declaration.
+//
+// Known limitation: an aggregate that is BOTH a nested constituent AND used directly (e.g. a
+// named `static const` array shared as an element of another `static const` array and also
+// independently runtime-indexed) returns false here, so it stays a separate `var<private>`
+// declaration that the enclosing converted array's initializer then references by name —
+// invalid WGSL. This shape is not constructible from typical anonymous nested literals (whose
+// inner Make* insts are used only as the parent's operands); fully handling it would require
+// inlining a duplicate copy of the constituent into the enclosing initializer.
 static bool isOnlyUsedAsAggregateConstituent(IRInst* inst)
 {
     bool hasUse = false;
