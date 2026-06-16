@@ -1294,6 +1294,20 @@ warning(
 )
 
 err(
+    "discarded-no-discard-result",
+    30059,
+    "result of '[NoDiscard]' function is discarded",
+    span { loc = "expr:Expr", message = "the result of calling '~name:Name' is discarded; this function is marked '[NoDiscard]'." }
+)
+
+err(
+    "no-discard-on-void-function",
+    30069,
+    "'[NoDiscard]' applied to a function returning 'void'",
+    span { loc = "decl:Decl", message = "'[NoDiscard]' is not allowed on a function that returns 'void'; there is no result to discard." }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",
