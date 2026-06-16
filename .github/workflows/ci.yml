@@ -286,7 +286,7 @@ jobs:
   # MaterialX Integration Tests (Windows only for initial validation)
   test-materialx-windows-release:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/materialx-test.yml
     with:
       os: windows
@@ -299,12 +299,13 @@ jobs:
   #
   # The build jobs must be listed in `needs` even though every test job
   # already depends on a build job: when a needed job fails, GitHub
-  # Actions marks the dependent jobs "skipped" (not "failed"). Requiring
-  # every needed job to succeed ensures skipped jobs cannot hide a failed
-  # dependency (see #11553).
+  # Actions marks the dependent jobs "skipped" (not "failed"). Once the
+  # filter says CI should run, requiring every needed job to succeed
+  # ensures skipped jobs cannot hide a failed dependency (see #11553).
   check-ci:
     needs:
       [
+        filter,
         build-linux-debug-gcc-x86_64,
         build-linux-release-gcc-x86_64,
         build-linux-release-gcc-wasm,
@@ -333,9 +334,18 @@ jobs:
       - name: Check CI Results
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+          FILTER_RESULT: ${{ needs.filter.result }}
+          SHOULD_RUN: ${{ needs.filter.outputs.should-run }}
         run: |
           echo "=== CI Results Summary ==="
           echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+
+          # If the filter succeeded and determined CI is unnecessary,
+          # skipped build/test jobs are expected for a docs-only change.
+          if [[ "$FILTER_RESULT" == "success" && "$SHOULD_RUN" != "true" ]]; then
+            echo "Filter determined CI is unnecessary; skipped jobs are expected."
+            exit 0
+          fi
 
           # Require every needed job to succeed. Checking the generic
           # `needs` JSON (rather than enumerating each job) means any job
