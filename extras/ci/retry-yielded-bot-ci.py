@@ -4,9 +4,10 @@ Rerun bot CI runs that intentionally yielded to higher-priority CI.
 
 This script is designed for a short-lived workflow_run/scheduled workflow. It
 does not wait or poll. Each invocation checks whether the CI workflow is quiet;
-if so, it reruns at most one recent bot-triggered run (pull_request or
-workflow_dispatch) whose priority gate failed in the dedicated "Stop yielded
-bot CI" marker step.
+if so, it reruns at most one recent bot-triggered workflow_dispatch run whose
+priority gate failed in the dedicated "Stop yielded bot CI" marker step. Only
+the bot's workflow_dispatch (draft-testing) runs can yield; its ready-for-review
+PRs run at full priority and never need a rerun.
 """
 
 import argparse
@@ -34,8 +35,9 @@ YIELDED_STEP_NAME = "Stop yielded bot CI"
 CHECK_CI_JOB_NAME = "check-ci"
 RERUNNABLE_CONCLUSIONS = {"failure", "cancelled"}
 
-# Events the priority gate can yield, and so the events we may need to rerun.
-RETRYABLE_EVENTS = ("pull_request", "workflow_dispatch")
+# Only the bot's workflow_dispatch runs can yield (see the wait-for-human-priority
+# gate in ci.yml), so they are the only runs we ever need to rerun.
+RETRYABLE_EVENTS = ("workflow_dispatch",)
 
 
 def normalize_bot_logins(extra_logins=None):

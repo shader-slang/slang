@@ -45,22 +45,23 @@ jobs:
           fi
           echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
 
-  # Low-priority gate: only nv-slang-bot[bot]-triggered CI runs this — both
-  # bot-authored PRs and bot-triggered workflow_dispatch runs. It exits quickly.
-  # If human-authored CI, merge-queue CI, or older bot CI is active, a marker
-  # step fails this bot run so it consumes no expensive build/test runners. The
-  # retry-yielded-bot-ci workflow reruns yielded bot CI after CI becomes quiet.
-  # Human PRs and human dispatches skip this job (result == 'skipped').
+  # Low-priority gate. This job runs for every PR/dispatch that needs CI, but
+  # only nv-slang-bot[bot] workflow_dispatch runs can ever yield. Those are the
+  # bot's draft-testing runs: a draft PR has no pull_request CI, so the bot
+  # dispatches CI manually while iterating. Every other run — human PRs, the
+  # bot's own ready-for-review PRs, and merge_group — is full priority, so the
+  # gate succeeds immediately and the build jobs (which require this job to
+  # succeed) proceed normally. When a throttled bot dispatch must yield to
+  # human, merge-queue, or older bot CI, a marker step fails this job so it
+  # consumes no expensive build/test runners; retry-yielded-bot-ci then reruns
+  # it once CI is quiet.
+  #
+  # The job deliberately resolves to success or failure, never 'skipped':
+  # a skipped dependency would collide with the implicit success() that gates
+  # the build jobs and silently skip all of CI. See the build-job `if` below.
   wait-for-human-priority:
     needs: [filter]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (
-      (github.event_name == 'pull_request' &&
-      github.event.pull_request.user.login == 'nv-slang-bot[bot]') ||
-      (github.event_name == 'workflow_dispatch' &&
-      github.triggering_actor == 'nv-slang-bot[bot]')
-      )
+    if: needs.filter.outputs.should-run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Only reads Actions API state and runs a script; no write access needed.
@@ -75,7 +76,15 @@ jobs:
         name: Check priority gate
         env:
           GH_TOKEN: ${{ github.token }}
+          # Only the bot's own workflow_dispatch runs (its draft-testing runs)
+          # are throttled. The bot's ready-for-review PRs are treated as human.
+          IS_THROTTLED_BOT: ${{ github.event_name == 'workflow_dispatch' && github.triggering_actor == 'nv-slang-bot[bot]' }}
         run: |
+          if [[ "$IS_THROTTLED_BOT" != "true" ]]; then
+            echo "Not a throttled bot run; proceeding without yielding."
+            echo "yielded=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           python3 extras/ci/wait-for-priority.py \
             --repo "$GITHUB_REPOSITORY" \
             --workflow ci.yml
