@@ -4283,6 +4283,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     // after this inst in the block, because OpKill is a terminator inst.
                     break;
                 }
+                if (irInst->getOp() == kIROp_Abort)
+                {
+                    // OpAbortKHR is a terminator inst; stop emitting further instructions.
+                    break;
+                }
             }
         }
 
@@ -4780,6 +4785,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+
+    /// Emit `OpAbortKHR` (VK_KHR_shader_abort) for an `Abort` instruction.
+    /// The instruction's single operand is the packed message struct prepared by
+    /// `processAbort` in slang-ir-spirv-legalize.cpp; its type goes through the
+    /// regular type-emission path, which provides the explicit layout
+    /// decorations (member `Offset`s and `ArrayStride`) the payload requires.
+    SpvInst* emitAbort(SpvInstParent* parent, IRInst* inst)
+    {
+        ensureExtensionDeclaration(toSlice("SPV_KHR_shader_abort"));
+        requireSPIRVCapability(SpvCapabilityAbortKHR);
+
+        auto message = inst->getOperand(0);
+        return emitOpAbortKHR(parent, inst, message->getDataType(), message);
+    }
 
     // The instructions that appear inside the basic blocks of
     // functions are what we will call "local" instructions.
@@ -5603,6 +5622,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     SpvLiteralInteger::from32(1),
                     operands.getArrayView());
             }
+            break;
+        case kIROp_Abort:
+            result = emitAbort(parent, inst);
             break;
         // Debug instructions are now handled by processDebugLocalInst()
         case kIROp_DebugLine:

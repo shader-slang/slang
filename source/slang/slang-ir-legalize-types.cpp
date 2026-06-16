@@ -846,6 +846,88 @@ static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<Leg
         legalArgs.getArrayView().getBuffer()));
 }
 
+/// Validate abort payload argument types after variadic-pack and pair legalization.
+/// Scalar values and ordinary vectors with basic element types are accepted because
+/// they have printf-style format specifiers. Composite, pointer, resource, and other
+/// non-basic payloads are rejected with E55211 before target-specific lowering.
+static bool validateAbortArgumentTypes(
+    IRTypeLegalizationContext* context,
+    IRInst* abortInst,
+    ArrayView<IRInst*> args)
+{
+    ShortList<IRInst*> payloadArgs;
+    collectFlattenedVariadicOperands(args, 1, payloadArgs);
+
+    for (auto arg : payloadArgs)
+    {
+        auto argType = arg->getDataType();
+        auto elementType = argType;
+        if (auto vectorType = as<IRVectorType>(argType))
+            elementType = vectorType->getElementType();
+        if (as<IRBasicType>(elementType))
+            continue;
+
+        context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
+            .type = argType,
+            .location = abortInst->sourceLoc});
+        return false;
+    }
+    return true;
+}
+
+/// Legalize an `Abort` instruction by rebuilding it from its legalized operands.
+/// Operands that legalized to nothing (`none`) are dropped, `simple` operands are
+/// forwarded unchanged, and `pair` operands contribute only their ordinary
+/// (non-resource) side, since only ordinary data can be carried in an abort message.
+static LegalVal legalizeAbort(
+    IRTypeLegalizationContext* context,
+    IRInst* originalInst,
+    ArrayView<LegalVal> args)
+{
+    ShortList<IRInst*> legalArgs;
+    for (Index i = 0; i < args.getCount(); i++)
+    {
+        auto arg = args[i];
+        switch (arg.flavor)
+        {
+        case LegalVal::Flavor::none:
+            break;
+        case LegalVal::Flavor::simple:
+            legalArgs.add(arg.getSimple());
+            break;
+        case LegalVal::Flavor::pair:
+            {
+                auto ordinaryVal = arg.getPair()->ordinaryVal;
+                if (ordinaryVal.flavor != LegalVal::Flavor::simple)
+                {
+                    context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
+                        .type = originalInst->getOperand(i)->getDataType(),
+                        .location = originalInst->sourceLoc});
+                    return LegalVal::simple(context->builder->getVoidValue());
+                }
+                legalArgs.add(ordinaryVal.getSimple());
+            }
+            break;
+        default:
+            context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
+                .type = originalInst->getOperand(i)->getDataType(),
+                .location = originalInst->sourceLoc});
+            return LegalVal::simple(context->builder->getVoidValue());
+        }
+    }
+    if (!validateAbortArgumentTypes(context, originalInst, legalArgs.getArrayView().arrayView))
+        return LegalVal::simple(context->builder->getVoidValue());
+
+    auto newAbort = context->builder->emitIntrinsicInst(
+        context->builder->getVoidType(),
+        kIROp_Abort,
+        (UInt)legalArgs.getCount(),
+        legalArgs.getArrayView().getBuffer());
+    newAbort->sourceLoc = originalInst->sourceLoc;
+    originalInst->transferDecorationsTo(newAbort);
+    return LegalVal::simple(newAbort);
+}
+
 static LegalVal legalizeDebugVar(
     IRTypeLegalizationContext* context,
     LegalType type,
@@ -2081,6 +2163,9 @@ static LegalVal legalizeInst(
     case kIROp_Printf:
         result = legalizePrintf(context, args);
         break;
+    case kIROp_Abort:
+        result = legalizeAbort(context, inst, args);
+        break;
     case kIROp_LoadFromUninitializedMemory:
     case kIROp_Poison:
         return legalizeUndefined(context, inst);
@@ -2357,6 +2442,10 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
         if (legalArg.flavor != LegalVal::Flavor::simple)
             anyComplex = true;
     }
+    // Always rebuild abort so its variadic payload is validated before
+    // target-specific legalization or emission.
+    if (inst->getOp() == kIROp_Abort)
+        anyComplex = true;
 
     // We must also legalize the type of the instruction, since that
     // is implicitly one of its operands.
