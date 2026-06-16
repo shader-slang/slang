@@ -30205,14 +30205,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         this.copyFrom(other);
     }
 
-    [ForceInline]
-    [require(cooperative_vector)]
-    __init<each U : __BuiltinArithmeticType>(expand each U args)
-    {
-        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
-        this = __makeCoopVec<T, N>(expand (__arithmetic_cast<T>(each args)));
-    }
-
     [OverloadRank(-10)]
     [ForceInline]
     [require(cooperative_vector)]
@@ -31198,6 +31190,41 @@ extension CoopVec<T, N> : IDifferentiable
     static Differential dadd(Differential a, Differential b)
     {
         return __internal_add(a, b);
+    }
+}
+
+// Keep the general value-pack constructor as an extension so overload resolution compares it
+// against the floating differentiable constructor using extension-to-extension rules.
+extension<T : __BuiltinArithmeticType, let N : int> CoopVec<T, N>
+{
+    [OverloadRank(-1)]
+    [ForceInline]
+    [require(cooperative_vector)]
+    __init<each U : __BuiltinArithmeticType>(expand each U args)
+    {
+        // This preserves the existing arithmetic constructor behavior while letting the floating
+        // overload below win by overload rank for differentiable element and argument types.
+        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
+        this = __makeCoopVec<T, N>(expand (__arithmetic_cast<T>(each args)));
+    }
+}
+
+// Keep the differentiable value-pack constructor in the floating CoopVec extension.
+// The general constructor is also an extension, while this overload is only
+// available when both the CoopVec element type and constructor operands are differentiable.
+// The direct [Differentiable] annotation lets autodiff synthesize the constructor derivative.
+extension<T : __BuiltinFloatingPointType, let N : int> CoopVec<T, N>
+{
+    [OverloadRank(1)]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [Differentiable]
+    __init<each U : __BuiltinFloatingPointType>(expand each U args)
+    {
+        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
+        // Use the direct floating cast intrinsic so autodiff can transpose the constructor
+        // operands through kIROp_FloatCast instead of a wrapper call around __arithmetic_cast.
+        this = __makeCoopVec<T, N>(expand (__real_cast<T>(each args)));
     }
 }
 

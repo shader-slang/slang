@@ -1944,28 +1944,33 @@ vector<T, N> __mul_p_d(vector<T, N> a, vector<T, N> b)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__unsafeForceInlineEarly]
+[Differentiable]
 CoopVec<T, N> __mul_p_d(CoopVec<T, N> a, CoopVec<T, N> b)
 {
+    // CoopVec unary JVP rules use this helper for element-wise tangent products, mirroring the
+    // scalar/vector overloads above.
     return a * b;
 }
 
 // CoopVec differentials have the same type as their primal values, so common unary
 // derivative rules can reuse element-wise CoopVec multiplication.
+// Use function-extension targets so the derivative signature can attach these rules to the native
+// CoopVec overload. The target stays as the overload-set name because the core-module bootstrap
+// checker cannot resolve `NAME<T, N>` for these overloaded free functions inside this macro.
 #define COOPVEC_UNARY_DERIVATIVE_IMPL(NAME, FWD_DIFF_FUNC, BWD_DIFF_FUNC)                    \
-    __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
     [PreferRecompute]                                                                        \
-    [ForwardDerivativeOf(NAME)]                                                              \
-    DifferentialPair<CoopVec<T, N>> __d_##NAME##_coopvec(                                    \
-        DifferentialPair<CoopVec<T, N>> dpx)                                                 \
+    __func_extension<T : __BuiltinFloatingPointType, let N : int>                            \
+    fwd_diff(NAME)(DifferentialPair<CoopVec<T, N>> dpx)                                      \
+        -> DifferentialPair<CoopVec<T, N>>                                                   \
     {                                                                                        \
         typealias ReturnType = CoopVec<T, N>;                                                \
         return DifferentialPair<ReturnType>(NAME(dpx.p), FWD_DIFF_FUNC);                     \
     }                                                                                        \
-    __generic<T : __BuiltinFloatingPointType, let N : int>                                   \
     [PreferRecompute]                                                                        \
-    [BackwardDerivativeOf(NAME)]                                                             \
-    void __d_##NAME##_coopvec(                                                               \
+    __func_extension<T : __BuiltinFloatingPointType, let N : int>                            \
+    bwd_diff(NAME)(                                                                          \
         inout DifferentialPair<CoopVec<T, N>> dpx, CoopVec<T, N>.Differential dOut)          \
+        -> void                                                                              \
     {                                                                                        \
         typealias ReturnType = CoopVec<T, N>;                                                \
         dpx = diffPair(dpx.p, BWD_DIFF_FUNC);                                                \
@@ -1974,8 +1979,8 @@ CoopVec<T, N> __mul_p_d(CoopVec<T, N> a, CoopVec<T, N> b)
 #define COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(NAME, DIFF_FUNC)                                \
     COOPVEC_UNARY_DERIVATIVE_IMPL(                                                           \
         NAME,                                                                                 \
-        __mul_p_d(DIFF_FUNC, dpx.d),                                                          \
-        __mul_p_d(DIFF_FUNC, dOut))
+        (DIFF_FUNC).mul(dpx.d),                                                               \
+        (DIFF_FUNC).mul(dOut))
 
 // Binary math functions such as min/max use the scalar derivative implementation per
 // component so they keep the same boundary behavior as scalar and vector overloads.
@@ -2102,22 +2107,35 @@ COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(sin, cos(dpx.p))
 SIMPLE_UNARY_DERIVATIVE_IMPL(sinh, cosh(dpx.p))
 // cos, cosh
 SIMPLE_UNARY_DERIVATIVE_IMPL(cos, -sin(dpx.p))
-COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(cos, -sin(dpx.p))
+COOPVEC_UNARY_DERIVATIVE_IMPL(
+    cos,
+    sin(dpx.p).mul(dpx.d).neg(),
+    sin(dpx.p).mul(dOut).neg())
 SIMPLE_UNARY_DERIVATIVE_IMPL(cosh, sinh(dpx.p))
 // tan, tanh
 SIMPLE_UNARY_DERIVATIVE_IMPL(tan, T(1.0) / (cos(dpx.p) * cos(dpx.p)))
 SIMPLE_UNARY_DERIVATIVE_IMPL(tanh, T(1.0) / (cosh(dpx.p) * cosh(dpx.p)))
-COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(
+COOPVEC_UNARY_DERIVATIVE_IMPL(
     tanh,
-    ReturnType(T(1.0)) - tanh(dpx.p) * tanh(dpx.p))
+    // Write `(1 - tanh(x)^2) * dx` as `dx - tanh(x)^2 * dx`; this keeps the
+    // CoopVec derivative body on native element-wise arithmetic instead of constructing
+    // a temporary filled coefficient vector.
+    dpx.d.sub(tanh(dpx.p).mul(tanh(dpx.p)).mul(dpx.d)),
+    dOut.sub(tanh(dpx.p).mul(tanh(dpx.p)).mul(dOut)))
 // Logarithm
 SIMPLE_UNARY_DERIVATIVE_IMPL(log, T(1.0) / dpx.p)
-COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(log, ReturnType(T(1.0)) / dpx.p)
+COOPVEC_UNARY_DERIVATIVE_IMPL(
+    log,
+    dpx.d.div(dpx.p),
+    dOut.div(dpx.p))
 SIMPLE_UNARY_DERIVATIVE_IMPL(log10, T(1.0) / (dpx.p * T(2.3025850929940456840179914546844)))
 SIMPLE_UNARY_DERIVATIVE_IMPL(log2, T(1.0) / (dpx.p * T(0.69314718055994530941723212145818)))
-COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(
+COOPVEC_UNARY_DERIVATIVE_IMPL(
     log2,
-    ReturnType(T(1.0)) / (dpx.p * T(0.69314718055994530941723212145818)))
+    // `d log2(x) = dx / (x * ln(2))`; spelling the quotient directly avoids
+    // building a temporary reciprocal CoopVec inside the derivative coefficient.
+    dpx.d.div(dpx.p * T(0.69314718055994530941723212145818)),
+    dOut.div(dpx.p * T(0.69314718055994530941723212145818)))
 // Square root
 SIMPLE_UNARY_DERIVATIVE_IMPL(sqrt, T(0.5) / sqrt(max(ReturnType(T(1e-7)), dpx.p)))
 // Reciprocal
@@ -2130,9 +2148,10 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(asin, T(1.0) / sqrt(T(1.0) - dpx.p * dpx.p))
 SIMPLE_UNARY_DERIVATIVE_IMPL(acos, T(-1.0) / sqrt(T(1.0) - dpx.p * dpx.p))
 // Arc-tan
 SIMPLE_UNARY_DERIVATIVE_IMPL(atan, T(1.0) / (T(1.0) + dpx.p * dpx.p))
-COOPVEC_SIMPLE_UNARY_DERIVATIVE_IMPL(
+COOPVEC_UNARY_DERIVATIVE_IMPL(
     atan,
-    ReturnType(T(1.0)) / (ReturnType(T(1.0)) + dpx.p * dpx.p))
+    dpx.d.div(dpx.p.mul(dpx.p).add(ReturnType.replicate(T(1.0)))),
+    dOut.div(dpx.p.mul(dpx.p).add(ReturnType.replicate(T(1.0)))))
 // Arc-sinh
 SIMPLE_UNARY_DERIVATIVE_IMPL(asinh, T(1.0) / sqrt(dpx.p * dpx.p + T(1.0)))
 // Arc-cosh

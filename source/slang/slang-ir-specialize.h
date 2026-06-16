@@ -31,7 +31,13 @@ bool specializeModule(
 
 void finalizeSpecialization(IRModule* module);
 
-IRInst* specializeGeneric(SpecializationContext* context, IRSpecialize* specInst);
+IRInst* specializeGeneric(
+    SpecializationContext* context,
+    IRSpecialize* specInst,
+    bool queueFollowUpWork = true);
 IRInst* specializeGeneric(IRSpecialize* specInst);
+
+/// Run local specialization opportunities exposed under an already-materialized IR value.
+bool specializeChildInsts(SpecializationContext* context, IRInst* rootInst);
 
 } // namespace Slang
