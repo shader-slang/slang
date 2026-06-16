@@ -5,7 +5,7 @@ import experimental.workgraph;
 // Test that a broadcasting-launch node shader compiles to dxil.
 
 [shader("node")]
-[NodeLaunch("broadcasting")]
+[NodeLaunch("BROADCASTING")]
 [NodeDispatchGrid(1, 1, 1)]
 [numthreads(1, 1, 1)]
 void main(RWBuffer<int> output)

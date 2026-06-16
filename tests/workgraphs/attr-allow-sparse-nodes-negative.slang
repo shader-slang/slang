@@ -3,6 +3,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_DISPATCH_INPUT,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DDISPATCH_INPUT
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_GROUP_INPUT,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DGROUP_INPUT
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_THREAD_OUTPUT_RECORDS,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DTHREAD_OUTPUT_RECORDS
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_EMPTY_INPUT,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DEMPTY_INPUT
 import experimental.workgraph;
 
 struct Record
@@ -11,8 +12,12 @@ struct Record
 };
 
 [shader("node")]
+#if defined(EMPTY_INPUT)
+[NodeLaunch("coalescing")]
+#else
 [NodeLaunch("broadcasting")]
 [NodeDispatchGrid(1, 1, 1)]
+#endif
 [numthreads(1, 1, 1)]
 void main(
 #if defined(NODE_OUTPUT)
@@ -35,6 +40,10 @@ void main(
     [AllowSparseNodes]
 //CHECK_THREAD_OUTPUT_RECORDS: E31118
     ThreadNodeOutputRecords<Record> output)
+#elif defined(EMPTY_INPUT)
+    [AllowSparseNodes]
+//CHECK_EMPTY_INPUT: E31118
+    EmptyNodeInput input)
 #endif
 {
 }

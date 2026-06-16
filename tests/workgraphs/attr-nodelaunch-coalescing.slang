@@ -5,7 +5,7 @@ import experimental.workgraph;
 // Test that a coalescing-launch node shader compiles to dxil.
 
 [shader("node")]
-[NodeLaunch("coalescing")]
+[NodeLaunch("Coalescing")]
 [numthreads(1, 1, 1)]
 void main(RWBuffer<int> output)
 {
