@@ -11066,15 +11066,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         IRBuilder builder(m_irModule);
                         auto textureInst =
                             as<IRTextureTypeBase>(operand->getValue()->getDataType());
-                        // Guards a null/non-texture data type (e.g. the orphan
-                        // `IRParam` from shader-slang/slang#11496) that would
-                        // otherwise SIGSEGV on the member accesses below.
-                        if (!textureInst)
-                        {
-                            SLANG_UNEXPECTED(
-                                "SPIRVAsmOperandImageType / SampledImageType operand value "
-                                "has no resolvable texture type");
-                        }
+                        // Defensive guard for shader-slang/slang#11496 (null/non-texture data
+                        // type).
+                        SLANG_RELEASE_ASSERT(textureInst);
                         auto formatInst = getTextureFormatOrUnknown(builder, textureInst);
                         auto imageType = builder.getTextureType(
                             textureInst->getElementType(),
