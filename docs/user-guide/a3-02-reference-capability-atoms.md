@@ -1305,28 +1305,28 @@ Compound Capabilities
 `rayquery`
 > Capabilities needed for compute-shader rayquery
 
-`rayquery_lss`
-> Collection of capabilities for the line-swept-spheres (LSS) accessors of an
-> inline ray query. Available on any RayQuery-capable stage, but each target
-> must carry its LSS geometry support: GLSL requires
+`rayquery_lss_nv`
+> Collection of capabilities for the NV line-swept-spheres (LSS) accessors of
+> an inline ray query. These are vendor (NV) extensions on every target, so the
+> alias carries the `NV` suffix. Available on any RayQuery-capable stage, but
+> each target must carry its LSS geometry support: GLSL requires
 > `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
 > `spvRayTracingLinearSweptSpheresGeometryNV` (so a SPIR-V caller cannot satisfy
 > this with plain ray query alone, and a sphere-only caller cannot reach the
-> LSS accessors); HLSL/NVAPI (`_sm_6_3`), Metal, and CUDA/OptiX carry the
-> geometry support implicitly.
+> LSS accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
 
 `rayquery_position`
 > Collection of capabilities for rayquery + ray_tracing_position_fetch.
 
-`rayquery_sphere`
-> Collection of capabilities for the sphere-geometry accessors of an inline
-> ray query. Available on any RayQuery-capable stage, but each target must
-> carry its sphere geometry support: GLSL requires
+`rayquery_sphere_nv`
+> Collection of capabilities for the NV sphere-geometry accessors of an inline
+> ray query. These are vendor (NV) extensions on every target, so the alias
+> carries the `NV` suffix. Available on any RayQuery-capable stage, but each
+> target must carry its sphere geometry support: GLSL requires
 > `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
 > `spvRayTracingSpheresGeometryNV` (so a SPIR-V caller cannot satisfy this with
 > plain ray query alone, and an LSS-only caller cannot reach the sphere
-> accessors); HLSL/NVAPI (`_sm_6_3`), Metal, and CUDA/OptiX carry the geometry
-> support implicitly.
+> accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
 
 `raytracing`
 > Capabilities needed for minimal raytracing support

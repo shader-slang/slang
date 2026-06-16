@@ -10,7 +10,6 @@
 // HLSL emission with NVAPI (NvRt* calls):
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -profile sm_6_5 -stage compute -entry computeMain -capability hlsl_nvapi
 
-[require(spirv, rayquery_lss)]
 RaytracingAccelerationStructure scene;
 RWStructuredBuffer<float> gOutput;
 
@@ -30,32 +29,32 @@ void computeMain()
     float accum = 0.0;
     while (q.Proceed())
     {
-        if (q.CandidateIsNonOpaqueSphere())
+        if (q.CandidateIsNonOpaqueSphereNV())
         {
-            float4 s = q.CandidateSphereObjectPositionAndRadius();
+            float4 s = q.CandidateSphereObjectPositionAndRadiusNV();
             accum += s.x + s.w;
             q.CommitNonOpaqueTriangleHit();
         }
-        else if (q.CandidateIsNonOpaqueLss())
+        else if (q.CandidateIsNonOpaqueLssNV())
         {
-            float2x4 lss = q.CandidateLssObjectPositionsAndRadii();
+            float2x4 lss = q.CandidateLssObjectPositionsAndRadiiNV();
             accum += lss[0].x + lss[1].w;
-            accum += q.CandidateLssHitParameter();
+            accum += q.CandidateLssHitParameterNV();
             q.CommitNonOpaqueTriangleHit();
         }
     }
 
     // Committed-side accessors.
-    if (q.CommittedIsSphere())
+    if (q.CommittedIsSphereNV())
     {
-        float4 cs = q.CommittedSphereObjectPositionAndRadius();
+        float4 cs = q.CommittedSphereObjectPositionAndRadiusNV();
         accum += cs.x + cs.w;
     }
-    else if (q.CommittedIsLss())
+    else if (q.CommittedIsLssNV())
     {
-        float2x4 clss = q.CommittedLssObjectPositionsAndRadii();
+        float2x4 clss = q.CommittedLssObjectPositionsAndRadiiNV();
         accum += clss[0].x + clss[1].w;
-        accum += q.CommittedLssHitParameter();
+        accum += q.CommittedLssHitParameterNV();
     }
 
     gOutput[0] = accum;

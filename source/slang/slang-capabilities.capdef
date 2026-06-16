@@ -2590,35 +2590,31 @@ alias raytracing_anyhit_closesthit = anyhit_closesthit + raytracing;
 /// [Compound]
 alias raytracing_lss = raytracing_anyhit_closesthit | spvRayTracingLinearSweptSpheresGeometryNV;
 
-/// Collection of capabilities for the sphere-geometry accessors of an inline
-/// ray query. Available on any RayQuery-capable stage, but each target must
-/// carry its sphere geometry support: GLSL requires
+/// Collection of capabilities for the NV sphere-geometry accessors of an inline
+/// ray query. These are vendor (NV) extensions on every target, so the alias
+/// carries the `NV` suffix. Available on any RayQuery-capable stage, but each
+/// target must carry its sphere geometry support: GLSL requires
 /// `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
 /// `spvRayTracingSpheresGeometryNV` (so a SPIR-V caller cannot satisfy this with
 /// plain ray query alone, and an LSS-only caller cannot reach the sphere
-/// accessors); HLSL/NVAPI (`_sm_6_3`), Metal, and CUDA/OptiX carry the geometry
-/// support implicitly.
+/// accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
 /// [Compound]
-alias rayquery_sphere = _GL_NV_linear_swept_spheres
-                      | _sm_6_3
-                      | metal
-                      | cuda
-                      | spvRayQueryKHR + spvRayTracingSpheresGeometryNV;
+alias rayquery_sphere_nv = _GL_NV_linear_swept_spheres
+                         | _sm_6_3
+                         | spvRayQueryKHR + spvRayTracingSpheresGeometryNV;
 
-/// Collection of capabilities for the line-swept-spheres (LSS) accessors of an
-/// inline ray query. Available on any RayQuery-capable stage, but each target
-/// must carry its LSS geometry support: GLSL requires
+/// Collection of capabilities for the NV line-swept-spheres (LSS) accessors of
+/// an inline ray query. These are vendor (NV) extensions on every target, so the
+/// alias carries the `NV` suffix. Available on any RayQuery-capable stage, but
+/// each target must carry its LSS geometry support: GLSL requires
 /// `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
 /// `spvRayTracingLinearSweptSpheresGeometryNV` (so a SPIR-V caller cannot satisfy
 /// this with plain ray query alone, and a sphere-only caller cannot reach the
-/// LSS accessors); HLSL/NVAPI (`_sm_6_3`), Metal, and CUDA/OptiX carry the
-/// geometry support implicitly.
+/// LSS accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
 /// [Compound]
-alias rayquery_lss = _GL_NV_linear_swept_spheres
-                   | _sm_6_3
-                   | metal
-                   | cuda
-                   | spvRayQueryKHR + spvRayTracingLinearSweptSpheresGeometryNV;
+alias rayquery_lss_nv = _GL_NV_linear_swept_spheres
+                      | _sm_6_3
+                      | spvRayQueryKHR + spvRayTracingLinearSweptSpheresGeometryNV;
 
 /// hit object APIs allow raygen shaders, but not the non-hit object APIs. So we have this special
 /// capdef specifically for the hitobject variant.

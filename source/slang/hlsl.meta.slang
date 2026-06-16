@@ -22322,8 +22322,8 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_sphere)]
-    float4 CandidateSphereObjectPositionAndRadius()
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    float4 CandidateSphereObjectPositionAndRadiusNV()
     {
         __target_switch
         {
@@ -22350,8 +22350,8 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_sphere)]
-    float4 CommittedSphereObjectPositionAndRadius()
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    float4 CommittedSphereObjectPositionAndRadiusNV()
     {
         __target_switch
         {
@@ -22378,8 +22378,8 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_lss)]
-    float2x4 CandidateLssObjectPositionsAndRadii()
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float2x4 CandidateLssObjectPositionsAndRadiiNV()
     {
         __target_switch
         {
@@ -22425,8 +22425,8 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_lss)]
-    float2x4 CommittedLssObjectPositionsAndRadii()
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float2x4 CommittedLssObjectPositionsAndRadiiNV()
     {
         __target_switch
         {
@@ -22472,8 +22472,8 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_lss)]
-    float CandidateLssHitParameter()
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float CandidateLssHitParameterNV()
     {
         __target_switch
         {
@@ -22498,8 +22498,8 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_lss)]
-    float CommittedLssHitParameter()
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float CommittedLssHitParameterNV()
     {
         __target_switch
         {
@@ -22524,8 +22524,8 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_lss)]
-    bool CandidateIsNonOpaqueLss()
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    bool CandidateIsNonOpaqueLssNV()
     {
         __target_switch
         {
@@ -22550,8 +22550,8 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_lss)]
-    bool CommittedIsLss()
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    bool CommittedIsLssNV()
     {
         __target_switch
         {
@@ -22576,8 +22576,8 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_sphere)]
-    bool CandidateIsNonOpaqueSphere()
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    bool CandidateIsNonOpaqueSphereNV()
     {
         __target_switch
         {
@@ -22601,8 +22601,8 @@ $}
     __glsl_extension(GL_NV_linear_swept_spheres)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery_sphere)]
-    bool CommittedIsSphere()
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    bool CommittedIsSphereNV()
     {
         __target_switch
         {
