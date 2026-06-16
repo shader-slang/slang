@@ -836,5 +836,6 @@ return {
 	["Decoration.BuiltinRequirementDecoration"] = 860,
 	["builtinRequirementKey"] = 861,
 	["ImageTexelPointer"] = 862,
-	["Type.MetalPackedVec"] = 863
+	["Type.MetalPackedVec"] = 863,
+	["getNaturalAlignment"] = 864
 }

@@ -4967,7 +4967,21 @@ err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",
-    span { loc = "location", message = "invalid alignment `~alignment:Int` specified for the byte address buffer resource with the element size of `~elementSize:Int`" }
+    span { loc = "location", message = "the alignment `~alignment:Int` of a byte address buffer access must be at least `~requiredAlignment:Int`, the natural alignment of the access type's scalar components" }
+)
+
+err(
+    "byte-address-buffer-alignment-not-power-of-two",
+    41301,
+    "byte address buffer alignment must be a power of two",
+    span { loc = "location", message = "the alignment `~alignment:Int` of a byte address buffer access must be a power of two" }
+)
+
+err(
+    "byte-address-buffer-location-not-aligned",
+    41303,
+    "byte address buffer location is not a multiple of the specified alignment",
+    span { loc = "location", message = "the byte address buffer location `~offset:Int` is not a multiple of the specified alignment `~alignment:Int`" }
 )
 
 err(

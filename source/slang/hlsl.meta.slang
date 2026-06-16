@@ -288,7 +288,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, __naturalStrideOf<uint2>());
+            return __byteAddressBufferLoad<uint2>(this, location, __naturalAlignmentOf<uint2>());
         }
     }
 
@@ -354,7 +354,7 @@ struct ByteAddressBuffer
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location with natural alignment.
-    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@param location The input address in bytes, which must be a multiple of 4 (the natural alignment of `uint3`).
     ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
@@ -365,7 +365,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, __naturalStrideOf<uint3>());
+            return __byteAddressBufferLoad<uint3>(this, location, __naturalAlignmentOf<uint3>());
         }
     }
 
@@ -442,7 +442,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
+            return __byteAddressBufferLoad<uint4>(this, location, __naturalAlignmentOf<uint4>());
         }
     }
 
@@ -479,7 +479,7 @@ struct ByteAddressBuffer
 
     /// Load a value with type `T` from the buffer at the specified location with natural alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of the natural stride of `T`.
+    ///@param location The input address in bytes, which must be a multiple of `T`'s natural alignment.
     ///@return The value loaded from the buffer.
     ///@remarks
     /// Currently, this function only supports when `T` is scalar, vector or matrix type.
@@ -488,7 +488,7 @@ struct ByteAddressBuffer
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     T LoadAligned<T>(uint location)
     {
-        return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
+        return __byteAddressBufferLoad<T>(this, location, __naturalAlignmentOf<T>());
     }
 };
 
@@ -6244,7 +6244,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, __naturalStrideOf<uint2>());
+            return __byteAddressBufferLoad<uint2>(this, location, __naturalAlignmentOf<uint2>());
         }
     }
 
@@ -6310,7 +6310,7 @@ struct $(item.name)
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location with natural alignment.
-    ///@param location The input address in bytes, which must be a multiple of 12.
+    ///@param location The input address in bytes, which must be a multiple of 4 (the natural alignment of `uint3`).
     ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
@@ -6321,7 +6321,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, __naturalStrideOf<uint3>());
+            return __byteAddressBufferLoad<uint3>(this, location, __naturalAlignmentOf<uint3>());
         }
     }
 
@@ -6398,7 +6398,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
+            return __byteAddressBufferLoad<uint4>(this, location, __naturalAlignmentOf<uint4>());
         }
     }
 
@@ -6458,7 +6458,7 @@ struct $(item.name)
 
     /// Load a value with type `T` from the buffer at the specified location with natural alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of the natural stride of `T`.
+    ///@param location The input address in bytes, which must be a multiple of `T`'s natural alignment.
     ///@return The value loaded from the buffer.
     ///@remarks
     /// Currently, this function only supports when `T` is scalar, vector, or matrix type.
@@ -6467,7 +6467,7 @@ struct $(item.name)
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     T LoadAligned<T>(uint location)
     {
-        return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
+        return __byteAddressBufferLoad<T>(this, location, __naturalAlignmentOf<T>());
     }
 
 ${
@@ -7040,7 +7040,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".Store2";
         default:
-            __byteAddressBufferStore(this, address, __naturalStrideOf<uint2>(), value);
+            __byteAddressBufferStore(this, address, __naturalAlignmentOf<uint2>(), value);
         }
     }
 
@@ -7074,7 +7074,7 @@ $}
 
     /// Set three values to the buffer at the specified location, the address will be aligned
     /// to the alignment of `uint3`, which is 12.
-    ///@param address The input address in bytes, which must be a multiple of 12.
+    ///@param address The input address in bytes, which must be a multiple of 4 (the natural alignment of `uint3`).
     ///@param value Three input values.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
@@ -7084,7 +7084,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".Store3";
         default:
-            __byteAddressBufferStore(this, address, __naturalStrideOf<uint3>(), value);
+            __byteAddressBufferStore(this, address, __naturalAlignmentOf<uint3>(), value);
         }
     }
 
@@ -7129,7 +7129,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".Store4";
         default:
-            __byteAddressBufferStore(this, address, __naturalStrideOf<uint4>(), value);
+            __byteAddressBufferStore(this, address, __naturalAlignmentOf<uint4>(), value);
         }
     }
 
@@ -7156,7 +7156,7 @@ $}
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void StoreAligned<T>(uint address, T value)
     {
-        __byteAddressBufferStore(this, address, __naturalStrideOf<T>(), value);
+        __byteAddressBufferStore(this, address, __naturalAlignmentOf<T>(), value);
     }
 };
 
