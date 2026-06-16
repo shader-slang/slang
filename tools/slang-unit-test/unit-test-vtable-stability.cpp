@@ -37,6 +37,14 @@ static void callSlot(void* obj, int slot)
     reinterpret_cast<void(SLANG_MCALL*)(void*)>(vtbl[slot])(obj);
 }
 
+static gfx::Result callShaderProgramD3D12Slot(void* obj, int slot, void** outRootSignature)
+{
+    void** vtbl = *reinterpret_cast<void***>(obj);
+    return reinterpret_cast<gfx::Result(SLANG_MCALL*)(void*, void**)>(vtbl[slot])(
+        obj,
+        outRootSignature);
+}
+
 // ---------------------------------------------------------------------------
 // ISlangUnknown  (3 slots: 0-2)
 // ---------------------------------------------------------------------------
@@ -77,6 +85,7 @@ SLANG_UNIT_TEST(vtableISlangUnknown)
 struct IShaderProgramD3D12Probe : gfx::IShaderProgramD3D12
 {
     int lastSlot = -1;
+    void* expectedRootSignature() { return static_cast<gfx::IShaderProgramD3D12*>(this); }
     SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
         SLANG_OVERRIDE
     {
@@ -100,9 +109,10 @@ struct IShaderProgramD3D12Probe : gfx::IShaderProgramD3D12
         lastSlot = 2;
         return 1;
     }
-    SLANG_NO_THROW gfx::Result SLANG_MCALL getRootSignature(void**) SLANG_OVERRIDE
+    SLANG_NO_THROW gfx::Result SLANG_MCALL getRootSignature(void** outRootSignature) SLANG_OVERRIDE
     {
         lastSlot = 3;
+        *outRootSignature = expectedRootSignature();
         return SLANG_OK;
     }
 };
@@ -114,8 +124,11 @@ SLANG_UNIT_TEST(vtableIShaderProgramD3D12)
     gfx::IShaderProgramD3D12* queried = nullptr;
     SLANG_CHECK(p.queryInterface(SLANG_UUID_IShaderProgramD3D12, (void**)&queried) == SLANG_OK);
     SLANG_CHECK(queried == &p);
-    callSlot(queried, 3);
+
+    void* rootSignature = nullptr;
+    SLANG_CHECK(callShaderProgramD3D12Slot(queried, 3, &rootSignature) == SLANG_OK);
     SLANG_CHECK(p.lastSlot == 3); // getRootSignature
+    SLANG_CHECK(rootSignature == p.expectedRootSignature());
 }
 
 // ---------------------------------------------------------------------------

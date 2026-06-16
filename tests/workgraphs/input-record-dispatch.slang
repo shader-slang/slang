@@ -21,5 +21,4 @@ void main(DispatchNodeInputRecord<RecordData> input, RWBuffer<int> output)
 //CHK_DXIL: dx.op.createNodeInputRecordHandle
 //CHK_DXIL: dx.op.getNodeRecordPtr
 //CHK_HLSL: DispatchNodeInputRecord
-//CHK_HLSL: input_0.Get()
-//CHK_HLSL: _S1.value_0
+//CHK_HLSL: input_0.Get().value_0

@@ -1580,7 +1580,7 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    if (isD3DTarget(targetRequest))
+    if (target == CodeGenTarget::HLSL || isD3DTarget(targetRequest))
     {
         SLANG_PASS(validateBarrierFlagsForHLSL, sink);
         if (sink->getErrorCount() != 0)

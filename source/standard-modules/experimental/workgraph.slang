@@ -56,8 +56,8 @@ __generic<T>
 __intrinsic_type(DispatchNodeInputRecord)
 public struct DispatchNodeInputRecord
 {
-    /// Returns the input record value.
-    public T Get()
+    /// Returns a read-only reference to the input record.
+    public Ref<T, Access.Read> Get()
     {
         __target_switch
         {
@@ -73,7 +73,7 @@ __generic<T>
 __intrinsic_type(ThreadNodeInputRecord)
 public struct ThreadNodeInputRecord
 {
-    public T Get()
+    public Ref<T, Access.Read> Get()
     {
         __target_switch
         {
@@ -98,7 +98,7 @@ public struct GroupNodeInputRecords
         }
     }
 
-    public T Get(uint index)
+    public Ref<T, Access.Read> Get(uint index = 0)
     {
         __target_switch
         {

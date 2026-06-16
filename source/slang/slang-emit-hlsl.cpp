@@ -3,6 +3,7 @@
 
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
+#include "slang-ir-hlsl-util.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
@@ -1877,10 +1878,8 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
 
     case kIROp_StructType:
-        {
-            m_writer->emit(getName(type));
-            return;
-        }
+        m_writer->emit(getName(type));
+        return;
 
     case kIROp_VectorType:
         {

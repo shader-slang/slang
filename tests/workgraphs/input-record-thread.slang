@@ -20,5 +20,4 @@ void main(ThreadNodeInputRecord<RecordData> input, RWBuffer<int> output)
 //CHK_DXIL: dx.op.getNodeRecordPtr
 //CHK_HLSL: [NodeLaunch("thread")]
 //CHK_HLSL: ThreadNodeInputRecord
-//CHK_HLSL: input_0.Get()
-//CHK_HLSL: _S1.value_0
+//CHK_HLSL: input_0.Get().value_0

@@ -22,5 +22,4 @@ void main([MaxRecords(8)] GroupNodeInputRecords<RecordData> input, RWBuffer<int>
 //CHK_DXIL: dx.op.getNodeRecordPtr
 //CHK_DXIL: !{i32 1, i32 65, i32 2, !{{[0-9]+}}, i32 3, i32 8}
 //CHK_HLSL: [MaxRecords(8)] GroupNodeInputRecords
-//CHK_HLSL: input_0.Get(0U)
-//CHK_HLSL: _S1.value_0
+//CHK_HLSL: input_0.Get(0U).value_0

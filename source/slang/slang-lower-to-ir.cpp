@@ -3033,6 +3033,16 @@ IRType* lowerType(IRGenContext* context, Type* type)
     return loweredType;
 }
 
+static void addNodeIDDecoration(IRGenContext* context, IRInst* inst, NodeIDAttribute* nodeIDAttr)
+{
+    auto builder = context->irBuilder;
+    IRStringLit* nameLit = builder->getStringValue(nodeIDAttr->name.getUnownedSlice());
+    SLANG_ASSERT(nodeIDAttr->arrayIndex);
+    IRInst* indexVal = getSimpleVal(context, lowerVal(context, nodeIDAttr->arrayIndex));
+    IRInst* ops[2] = {nameLit, indexVal};
+    builder->addDecoration(inst, kIROp_NodeIDDecoration, ops, 2);
+}
+
 void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
 {
     auto builder = context->irBuilder;
@@ -3184,11 +3194,7 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         }
         else if (auto nodeIDAttr = as<NodeIDAttribute>(mod))
         {
-            IRStringLit* nameLit = builder->getStringValue(nodeIDAttr->name.getUnownedSlice());
-            SLANG_ASSERT(nodeIDAttr->arrayIndex);
-            IRInst* indexVal = getSimpleVal(context, lowerVal(context, nodeIDAttr->arrayIndex));
-            IRInst* ops[2] = {nameLit, indexVal};
-            builder->addDecoration(inst, kIROp_NodeIDDecoration, ops, 2);
+            addNodeIDDecoration(context, inst, nodeIDAttr);
         }
         else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(mod))
         {
@@ -14363,13 +14369,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto nodeIDAttr = as<NodeIDAttribute>(modifier))
             {
                 subContext->irBuilder->setInsertBefore(irFunc);
-                IRStringLit* nameLit =
-                    getBuilder()->getStringValue(nodeIDAttr->name.getUnownedSlice());
-                SLANG_ASSERT(nodeIDAttr->arrayIndex);
-                IRInst* indexVal =
-                    getSimpleVal(subContext, lowerVal(subContext, nodeIDAttr->arrayIndex));
-                IRInst* ops[2] = {nameLit, indexVal};
-                getBuilder()->addDecoration(irFunc, kIROp_NodeIDDecoration, ops, 2);
+                addNodeIDDecoration(subContext, irFunc, nodeIDAttr);
             }
             else if (as<NodeIsProgramEntryAttribute>(modifier))
             {

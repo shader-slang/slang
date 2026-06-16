@@ -1,6 +1,7 @@
 // slang-ir-hlsl-legalize.cpp
 #include "slang-ir-hlsl-legalize.h"
 
+#include "slang-ir-hlsl-util.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"
@@ -57,9 +58,36 @@ static void validateBarrierFlagsForHLSLInst(IRInst* inst, DiagnosticSink* sink)
         validateBarrierFlagsForHLSLInst(child, sink);
 }
 
+static void validateBarrierFlagsForHLSLFunc(IRFunc* func, DiagnosticSink* sink)
+{
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+            validateBarrierFlagsForHLSLInst(inst, sink);
+    }
+}
+
 void validateBarrierFlagsForHLSL(IRModule* module, DiagnosticSink* sink)
 {
-    validateBarrierFlagsForHLSLInst(module->getModuleInst(), sink);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        switch (globalInst->getOp())
+        {
+        case kIROp_GetEnumBarrierMemoryTypeFlags:
+        case kIROp_GetEnumBarrierSemanticFlags:
+            validateBarrierFlagsForHLSLInst(globalInst, sink);
+            break;
+        case kIROp_Func:
+            validateBarrierFlagsForHLSLFunc(as<IRFunc>(globalInst), sink);
+            break;
+        case kIROp_Generic:
+            if (auto innerFunc = as<IRFunc>(findGenericReturnVal(as<IRGeneric>(globalInst))))
+                validateBarrierFlagsForHLSLFunc(innerFunc, sink);
+            break;
+        default:
+            break;
+        }
+    }
 }
 
 static void addDefaultPayloadAccessQualifiersToField(IRBuilder& builder, IRStructKey* fieldKey)
