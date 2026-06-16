@@ -1,4 +1,8 @@
 //TEST:SIMPLE(filecheck=WGSL): -stage vertex -entry vertexMain -target wgsl
+// This second directive hands the emitted WGSL to Tint (via wgsl-spirv-asm) so we validate that
+// the output actually compiles, not just that the keyword flipped. It is exercised on CI where
+// Tint is available, and is ignored where the downstream compiler is absent.
+//TEST:SIMPLE(filecheck=SPV): -stage vertex -entry vertexMain -target wgsl-spirv-asm
 
 // Regression test for issue #6747.
 //
@@ -31,6 +35,7 @@ VertexOutput vertexMain(uint vertexID : SV_VertexID)
     VertexOutput output;
     // Indexing the global with a runtime value is exactly what a WGSL `const` forbids.
     // WGSL: positions{{.*}}[vertexID
+    // SPV: OpEntryPoint
     output.position = float4(positions[vertexID], 0.0f, 1.0f);
     return output;
 }

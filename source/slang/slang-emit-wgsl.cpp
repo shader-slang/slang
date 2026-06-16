@@ -808,21 +808,35 @@ static bool isStaticConst(IRInst* inst)
 
 void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
 {
-    // A module-scope `static const` whose type is an array or matrix cannot be emitted as a
-    // WGSL `const`. A WGSL `const` is a compile-time value (closer to C++ `constexpr` than
-    // `const`), and the WGSL spec only permits a value (non-reference) of array type to be
-    // indexed by a const-expression. So a constant array indexed by a runtime value, e.g.
-    // `static const float2 positions[]; ... positions[SV_VertexID]`, is rejected by the WGSL
-    // validator ("The expression may only be indexed by a constant"). Emit such globals as
-    // `var<private>` instead: a private module-scope variable accepts the same inline
-    // const-expression initializer but, being addressable, is runtime-indexable. Matrices are
-    // included for the same reason. Scalar/vector constants stay `const` (a value of vector
-    // type is dynamically indexable in WGSL), and function-local constants are unaffected.
-    const bool emitModuleScopeArrayOrMatrixAsPrivateVar =
+    // A module-scope `static const` array cannot be emitted as a WGSL `const`. A WGSL `const` is
+    // a compile-time value (closer to C++ `constexpr` than `const`), and the WGSL spec only
+    // permits a value (non-reference) of array type to be indexed by a const-expression. So a
+    // constant array indexed by a runtime value, e.g. `static const float2 positions[]; ...
+    // positions[SV_VertexID]`, is rejected by the WGSL validator ("The expression may only be
+    // indexed by a constant"). Emit such globals as `var<private>` instead: a private
+    // module-scope variable accepts the same inline const-expression initializer but, being
+    // addressable, is runtime-indexable.
+    //
+    // This is purely type-based (every module-scope array constant becomes `var<private>`; no
+    // use-analysis). That is safe because constant-indexed reads have already been folded away
+    // before this emitter runs: replaceGlobalConstants inlines the constant's value into its
+    // uses, then the peephole pass folds `GetElement(MakeArray, constIndex)` to the element. So
+    // constant-indexed reads have folded away, and no `const` is left whose initializer reads the
+    // converted `var` (which a WGSL `const` could not legally do).
+    // shouldFoldInstIntoUseSites keeps nested constituents inline so the `var<private>`
+    // initializer stays a self-contained const-expression. The two
+    // `tests/wgsl/static-const-array-*` tests guard these invariants.
+    //
+    // Only arrays are converted: array-value runtime indexing is the established WGSL rejection.
+    // Scalar/vector/matrix constants stay `const` (a vector value is dynamically indexable in
+    // WGSL; the matrix case is unproven), and function-local constants are unaffected. The
+    // GlobalParam/GlobalVar/Var exclusions are load-bearing, not redundant with the switch below:
+    // the predicate is also read in the address-space chain (which runs for all ops), where a
+    // module-scope `GlobalParam` array would otherwise be wrongly given `<private>`.
+    const bool emitModuleScopeArrayConstAsPrivateVar =
         varDecl->getParent()->getOp() == kIROp_ModuleInst &&
         varDecl->getOp() != kIROp_GlobalParam && varDecl->getOp() != kIROp_GlobalVar &&
-        varDecl->getOp() != kIROp_Var &&
-        (type->getOp() == kIROp_ArrayType || type->getOp() == kIROp_MatrixType);
+        varDecl->getOp() != kIROp_Var && type->getOp() == kIROp_ArrayType;
 
     switch (varDecl->getOp())
     {
@@ -840,7 +854,10 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         }
         break;
     default:
-        if (emitModuleScopeArrayOrMatrixAsPrivateVar)
+        // When this emits `var`, the matching `<private>` address space is emitted by the
+        // storage-space chain below (the two must stay in lockstep — a module-scope `var`
+        // without an address space is invalid WGSL).
+        if (emitModuleScopeArrayConstAsPrivateVar)
             m_writer->emit("var");
         else if (isStaticConst(varDecl))
             m_writer->emit("const");
@@ -890,9 +907,11 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         m_writer->emit("storage, read");
         m_writer->emit(">");
     }
-    else if (varDecl->getOp() == kIROp_GlobalVar || emitModuleScopeArrayOrMatrixAsPrivateVar)
+    else if (varDecl->getOp() == kIROp_GlobalVar || emitModuleScopeArrayConstAsPrivateVar)
     {
-        // Global ("module-scope") non-handle variables need to specify storage space
+        // Global ("module-scope") non-handle variables need to specify storage space. This also
+        // covers an array constant converted to `var<private>` above (which is not a GlobalVar
+        // but is likewise emitted as a module-scope private variable).
 
         // https://www.w3.org/TR/WGSL/#var-decls
         // "
@@ -1402,8 +1421,57 @@ void WGSLSourceEmitter::emitCallArg(IRInst* inst)
     }
 }
 
+// Return true if every use of `inst` is as an operand of another aggregate constructor
+// (MakeArray/MakeStruct/MakeArrayFromElement) — i.e. `inst` is only ever a nested constituent
+// of a larger aggregate, never used directly (e.g. it is not the base of a runtime GetElement).
+// Such a constituent must be inlined into its enclosing aggregate's initializer; an aggregate
+// used directly is the outermost one and must stay a declaration.
+static bool isOnlyUsedAsAggregateConstituent(IRInst* inst)
+{
+    bool hasUse = false;
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        hasUse = true;
+        switch (use->getUser()->getOp())
+        {
+        case kIROp_MakeArray:
+        case kIROp_MakeStruct:
+        case kIROp_MakeArrayFromElement:
+            break;
+        default:
+            return false;
+        }
+    }
+    return hasUse;
+}
+
 bool WGSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
+    // The base class never folds MakeArray/MakeStruct/MakeArrayFromElement because in C/HLSL
+    // they lower to initializer lists, which are not valid in a general expression context.
+    // WGSL instead emits them as constructor expressions (`type(args...)`, see
+    // tryEmitInstExprImpl), which ARE valid anywhere. For a *module-scope* constant aggregate
+    // that is only a nested constituent of a larger aggregate, this is load-bearing: a nested
+    // `static const` (e.g. `int g[2][3]`) otherwise emits each inner MakeArray/MakeStruct as a
+    // *separate named* module-scope declaration, and once an array constant is emitted as
+    // `var<private>` (see emitVarKeywordImpl) its initializer may not reference another
+    // module-scope variable. Folding the inner constituents inline keeps the initializer a
+    // self-contained const-expression. The outermost aggregate is used directly (e.g.
+    // runtime-indexed) so it is left unfolded — it stays a declaration eligible for the
+    // `var<private>` conversion. Function-local aggregates are left to the base policy.
+    switch (inst->getOp())
+    {
+    case kIROp_MakeArray:
+    case kIROp_MakeStruct:
+    case kIROp_MakeArrayFromElement:
+        if (inst->getParent() && inst->getParent()->getOp() == kIROp_ModuleInst &&
+            isOnlyUsedAsAggregateConstituent(inst))
+            return true;
+        break;
+    default:
+        break;
+    }
+
     bool result = CLikeSourceEmitter::shouldFoldInstIntoUseSites(inst);
     if (result)
     {

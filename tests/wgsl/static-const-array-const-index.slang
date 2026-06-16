@@ -29,8 +29,11 @@ VertexOutput vertexMain(uint vertexID : SV_VertexID)
     return output;
 }
 
-// The constant-indexed array must fold away; no identifier derived from it survives.
-// (If it instead became a `var<private>` referenced by `midWeight`, "weights" would appear.)
+// The constant-indexed array must fold away; the identifier `weights` (a unique substring here)
+// must not survive. If it had instead become a `var<private>` that `midWeight` indexes, both
+// `weights` and a `var<private>` declaration would appear.
 // WGSL-NOT: weights
-// ...and the dependent constant must survive as the folded element value (weights[1] == 0.5).
-// WGSL: 0.5
+// A constant-only-indexed array must not be spuriously promoted to a private variable either.
+// WGSL-NOT: var<private>
+// ...and the dependent constant must survive as the folded element value (weights[1] == 0.5f).
+// WGSL: 0.5f
