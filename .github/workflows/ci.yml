@@ -45,12 +45,56 @@ jobs:
           fi
           echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
 
+  # Low-priority gate: only nv-slang-bot[bot]-triggered CI runs this — both
+  # bot-authored PRs and bot-triggered workflow_dispatch runs. It exits quickly.
+  # If human-authored CI, merge-queue CI, or older bot CI is active, a marker
+  # step fails this bot run so it consumes no expensive build/test runners. The
+  # retry-yielded-bot-ci workflow reruns yielded bot CI after CI becomes quiet.
+  # Human PRs and human dispatches skip this job (result == 'skipped').
+  wait-for-human-priority:
+    needs: [filter]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (
+      (github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login == 'nv-slang-bot[bot]') ||
+      (github.event_name == 'workflow_dispatch' &&
+      github.triggering_actor == 'nv-slang-bot[bot]')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only reads Actions API state and runs a script; no write access needed.
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: priority
+        name: Check priority gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 extras/ci/wait-for-priority.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow ci.yml
+
+      - name: Stop yielded bot CI
+        if: steps.priority.outputs.yielded == 'true'
+        run: |
+          echo "::error::priority-gate-yielded: higher-priority CI is active; retry-yielded-bot-ci will rerun this bot CI when quiet"
+          exit 1
+
   # Linux x86_64 builds run in the CI container on the GCP self-hosted build
   # pool. container-user is the GCP build runner image's UID:GID (1003), which
   # owns _work; the reusable workflow defaults to 1001 for GitHub-hosted runners.
   build-linux-debug-gcc-x86_64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build-container.yml
     # id-token is never part of the default GITHUB_TOKEN even when the repo
     # default is "write"; it must be requested explicitly for the reusable
@@ -66,8 +110,11 @@ jobs:
       container-user: "1003:1003"
 
   build-linux-release-gcc-x86_64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build-container.yml
     # id-token is never part of the default GITHUB_TOKEN even when the repo
     # default is "write"; it must be requested explicitly for the reusable
@@ -88,8 +135,11 @@ jobs:
   # found". Moving it onto the build pool requires running it in the CI
   # container like the other Linux builds — tracked as a follow-up.
   build-linux-release-gcc-wasm:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -102,16 +152,22 @@ jobs:
   # clang CI container; kept on GitHub-hosted until validated on the GCP build
   # pool (tracked with the wasm container follow-up).
   sanitizer-linux-clang-x86_64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-sanitizer.yml
     with:
       runs-on: '["ubuntu-22.04"]'
 
   # macOS builds
   build-macos-debug-clang-aarch64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: macos
@@ -121,8 +177,11 @@ jobs:
       runs-on: '["macos-latest"]'
 
   build-macos-release-clang-aarch64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: macos
@@ -133,8 +192,11 @@ jobs:
 
   # Linux ARM64 builds (GitHub-hosted)
   build-linux-debug-gcc-aarch64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -145,8 +207,11 @@ jobs:
       warnings-as-errors: false
 
   build-linux-release-gcc-aarch64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -158,8 +223,11 @@ jobs:
 
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -169,8 +237,11 @@ jobs:
       runs-on: '["Windows", "self-hosted", "build"]'
 
   build-windows-release-cl-x86_64-gpu:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -489,6 +560,7 @@ jobs:
         test-falcor,
         test-compile-regression,
         test-benchmark,
+        wait-for-human-priority,
       ]
     runs-on: ubuntu-latest
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
