@@ -36,16 +36,24 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[i] = result;
 }
 
-// Anchor on computeMain's DebugFunction.
+// Anchor on computeMain's DebugFunction, and on the multi-block callee's DebugFunction (used below
+// to pin the multi-block restore upgrade).
 // CHECK-DAG: %[[CMNAME:[0-9]+]] = OpString "computeMain"
 // CHECK-DAG: %[[CALLER:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction %[[CMNAME]]
+// CHECK-DAG: %[[MBNAME:[0-9]+]] = OpString "multiBlockInline"
+// CHECK-DAG: %[[MULTI:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction %[[MBNAME]]
 
 // computeMain's own entry scope is a one-operand DebugScope.
 // CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %[[CALLER]]{{$}}
 
-// The multi-block callee is inlined with inline depth, so a two-operand DebugScope (scope +
-// DebugInlinedAt) appears under computeMain's inline context.
-// CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}{{$}}
+// The multi-block callee is inlined with inline depth: its scope appears only as a *two-operand*
+// DebugScope (scope + DebugInlinedAt) under computeMain's inline context — both the per-block scopes
+// and the intermediate restore left after the nested leafInline region returns. The multi-block
+// clone loop's debugScopeToUpgrade step re-attaches the outer call's DebugInlinedAt to that restore;
+// if it were dropped, the restore would collapse to a one-operand DebugScope %[[MULTI]], which the
+// CHECK-NOT below rejects across the whole inlined region (up to computeMain's own restore).
+// CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %[[MULTI]] %{{[0-9]+}}{{$}}
+// CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %[[MULTI]]{{$}}
 
 // After the inlined region, computeMain's own scope is restored as a one-operand DebugScope
 // immediately before the caller-local `result` DebugValue.
