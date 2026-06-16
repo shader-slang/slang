@@ -161,6 +161,13 @@ jobs:
       config: debug
       server-count: 4
 
+  test-linux-debug-gcc-x86_64-rhi:
+    needs: [filter, build-linux-debug-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-rhi-test-container.yml
+    with:
+      config: debug
+
   test-linux-release-gcc-x86_64:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
@@ -168,6 +175,13 @@ jobs:
     with:
       config: release
       server-count: 4
+
+  test-linux-release-gcc-x86_64-rhi:
+    needs: [filter, build-linux-release-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-rhi-test-container.yml
+    with:
+      config: release
 
   # Linux x86_64 SM80+ capability tests (self-hosted L4/Blackwell runner).
   # Runs only cooperative-matrix / neural coverage that T4 cannot safely
@@ -180,7 +194,6 @@ jobs:
       config: release
       runs-on: '["Linux", "self-hosted", "SM80Plus"]'
       gpu-tier: sm80plus
-      run-rhi-tests: false
       server-count: 4
 
   # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
@@ -218,6 +231,17 @@ jobs:
       full-gpu-tests: true
       server-count: 3
 
+  test-macos-debug-clang-aarch64-rhi:
+    needs: [filter, build-macos-debug-clang-aarch64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-rhi-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+
   test-macos-release-clang-aarch64:
     needs: [filter, build-macos-release-clang-aarch64]
     if: needs.filter.outputs.should-run == 'true'
@@ -230,6 +254,17 @@ jobs:
       runs-on: '["macos-latest"]'
       full-gpu-tests: true
       server-count: 3
+
+  test-macos-release-clang-aarch64-rhi:
+    needs: [filter, build-macos-release-clang-aarch64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-rhi-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
 
   # Linux ARM64 tests (GitHub-hosted, CPU only)
   test-linux-debug-gcc-aarch64:
@@ -270,6 +305,17 @@ jobs:
       full-gpu-tests: true
       gpu-tier: t4
 
+  test-windows-debug-cl-x86_64-gpu-rhi:
+    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-rhi-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+
   test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
@@ -283,10 +329,21 @@ jobs:
       full-gpu-tests: true
       gpu-tier: t4
 
+  test-windows-release-cl-x86_64-gpu-rhi:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-rhi-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+
   # MaterialX Integration Tests (Windows only for initial validation)
   test-materialx-windows-release:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/materialx-test.yml
     with:
       os: windows
@@ -299,14 +356,13 @@ jobs:
   #
   # The build jobs must be listed in `needs` even though every test job
   # already depends on a build job: when a needed job fails, GitHub
-  # Actions marks the dependent jobs "skipped" (not "failed"), and
-  # skipped must be allowed here because several test jobs intentionally
-  # skip on plain pull_request events (they only run in the merge queue).
-  # Without the build jobs listed explicitly, a broken build turns all
-  # its test jobs into allowed skips and the gate passes (see #11553).
+  # Actions marks the dependent jobs "skipped" (not "failed"). Once the
+  # filter says CI should run, requiring every needed job to succeed
+  # ensures skipped jobs cannot hide a failed dependency (see #11553).
   check-ci:
     needs:
       [
+        filter,
         build-linux-debug-gcc-x86_64,
         build-linux-release-gcc-x86_64,
         build-linux-release-gcc-wasm,
@@ -317,13 +373,19 @@ jobs:
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
         test-windows-release-cl-x86_64-gpu,
+        test-windows-release-cl-x86_64-gpu-rhi,
         test-windows-debug-cl-x86_64-gpu,
+        test-windows-debug-cl-x86_64-gpu-rhi,
         test-macos-release-clang-aarch64,
+        test-macos-release-clang-aarch64-rhi,
         test-macos-debug-clang-aarch64,
+        test-macos-debug-clang-aarch64-rhi,
         test-linux-release-gcc-x86_64,
+        test-linux-release-gcc-x86_64-rhi,
         test-linux-release-gcc-x86_64-sm80,
         test-linux-release-gcc-x86_64-cpu,
         test-linux-debug-gcc-x86_64,
+        test-linux-debug-gcc-x86_64-rhi,
         test-linux-release-gcc-aarch64,
         test-linux-debug-gcc-aarch64,
         test-materialx-windows-release,
@@ -335,23 +397,32 @@ jobs:
       - name: Check CI Results
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+          FILTER_RESULT: ${{ needs.filter.result }}
+          SHOULD_RUN: ${{ needs.filter.outputs.should-run }}
         run: |
           echo "=== CI Results Summary ==="
           echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
 
-          # Allow "success" and "skipped"; fail on "failure" or "cancelled".
-          # Checking the generic `needs` JSON (rather than enumerating each
-          # job) means any job added to `needs` above is gated automatically.
-          failed=$(echo "$NEEDS_JSON" | jq -r 'to_entries[]
-            | select(.value.result == "failure" or .value.result == "cancelled")
-            | .key')
-          if [[ -n "$failed" ]]; then
-            echo "These CI jobs failed or were cancelled:"
-            echo "$failed"
+          # If the filter succeeded and determined CI is unnecessary,
+          # skipped build/test jobs are expected for a docs-only change.
+          if [[ "$FILTER_RESULT" == "success" && "$SHOULD_RUN" != "true" ]]; then
+            echo "Filter determined CI is unnecessary; skipped jobs are expected."
+            exit 0
+          fi
+
+          # Require every needed job to succeed. Checking the generic
+          # `needs` JSON (rather than enumerating each job) means any job
+          # added to `needs` above is gated automatically.
+          unsuccessful=$(echo "$NEEDS_JSON" | jq -r 'to_entries[]
+            | select(.value.result != "success")
+            | "\(.key): \(.value.result)"')
+          if [[ -n "$unsuccessful" ]]; then
+            echo "These CI jobs did not succeed:"
+            echo "$unsuccessful"
             exit 1
           fi
 
-          echo "All CI jobs completed successfully (passed or skipped)!"
+          echo "All CI jobs completed successfully!"
 
   # Automatically retry GPU health check failures by dispatching ci-retry.yml,
   # which watches this run until it completes, then reruns only failed jobs.
