@@ -14863,6 +14863,35 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
     return info;
 }
 
+// Stamp the entry-point function's required SPIR-V / Metal language-version capability
+// atoms onto `irFunc` as IRRequireCapabilityAtomDecoration. The atoms are taken from the
+// function's inferred capability requirements, which fold in any `[require(...)]`
+// attributes. Both the codegen front-end lowering and the layout/reflection IR module call
+// this, so the codegen module carries the same per-entry-point version requirement the
+// reflection module records; the SPIR-V backend reads these decorations to raise the
+// emitted binary version (see determineSpirvVersion in slang-ir-spirv-legalize.cpp; #11631).
+static void addEntryPointRequireCapabilityDecorations(
+    IRBuilder* builder,
+    IRInst* irFunc,
+    FuncDecl* entryPointFuncDecl)
+{
+    const auto latestSpirvAtom = getLatestSpirvAtom();
+    const auto latestMetalAtom = getLatestMetalAtom();
+    CapabilitySet capabilitySet{entryPointFuncDecl->inferredCapabilityRequirements};
+    for (auto atomSet : capabilitySet.getAtomSets())
+    {
+        for (auto atomVal : atomSet)
+        {
+            auto atom = asAtom(atomVal);
+            if ((atom >= CapabilityAtom::_spirv_1_0 && atom <= latestSpirvAtom) ||
+                (atom >= CapabilityAtom::metallib_2_3 && atom <= latestMetalAtom))
+            {
+                builder->addRequireCapabilityAtomDecoration(irFunc, (CapabilityName)atom);
+            }
+        }
+    }
+}
+
 static void lowerFrontEndEntryPointToIR(
     IRGenContext* context,
     EntryPoint* entryPoint,
@@ -14919,6 +14948,13 @@ static void lowerFrontEndEntryPointToIR(
             entryPointName->text.getUnownedSlice(),
             moduleName.getUnownedSlice());
     }
+
+    // Carry the entry point's required SPIR-V / Metal language-version capability atoms
+    // (including any contributed by `[require(...)]`) into the codegen module, so the
+    // SPIR-V backend can raise the emitted binary version to match (#11631). Previously
+    // these were recorded only on the layout/reflection IR module, so codegen never saw
+    // them and `[require(spirv_1_x)]` had no effect on the emitted version.
+    addEntryPointRequireCapabilityDecorations(builder, instToDecorate, entryPointFuncDecl);
 }
 
 static void lowerProgramEntryPointToIR(
@@ -16065,9 +16101,6 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
     builder->addLayoutDecoration(irModule->getModuleInst(), irGlobalScopeVarLayout);
 
-    auto latestSpirvAtom = getLatestSpirvAtom();
-    auto latestMetalAtom = getLatestMetalAtom();
-
     for (auto entryPointLayout : programLayout->entryPoints)
     {
         auto funcDeclRef = entryPointLayout->entryPoint;
@@ -16095,19 +16128,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
         auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
         SLANG_ASSERT(asFuncDecl);
-        CapabilitySet set{asFuncDecl->inferredCapabilityRequirements};
-        for (auto atomSet : set.getAtomSets())
-        {
-            for (auto atomVal : atomSet)
-            {
-                auto atom = asAtom(atomVal);
-                if (atom >= CapabilityAtom::_spirv_1_0 && atom <= latestSpirvAtom ||
-                    atom >= CapabilityAtom::metallib_2_3 && atom <= latestMetalAtom)
-                {
-                    builder->addRequireCapabilityAtomDecoration(irFunc, (CapabilityName)atom);
-                }
-            }
-        }
+        addEntryPointRequireCapabilityDecorations(builder, irFunc, asFuncDecl);
 
         auto irEntryPointLayout = lowerEntryPointLayout(context, entryPointLayout);
 
