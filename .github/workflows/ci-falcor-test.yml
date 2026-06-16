@@ -50,7 +50,7 @@ jobs:
           # Copy only Slang core DLLs and executables — the full CI artifact also
           # contains gfx.dll, platform.dll, dawn.dll, and test-tool DLLs that
           # Falcor provides its own versions of; overwriting those breaks FalcorTest.
-          for name in slang.dll slang-compiler.dll slang-llvm.dll slang-glslang.dll slang-glsl-module.dll dxcompiler.dll dxil.dll slangc.exe; do
+          for name in slang.dll slang-rt.dll slang-compiler.dll slang-llvm.dll slang-glslang.dll slang-glsl-module.dll dxcompiler.dll dxil.dll slangc.exe; do
             [ -f "$SRC/$name" ] && cp --verbose "$SRC/$name" "$TARGET/"
           done
           for d in D3D12 optix; do
