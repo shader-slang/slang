@@ -1,29 +1,22 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-05T15:45:00Z
+remediated_at: 2026-06-12T14:12:51Z
 target_doc: pipeline/overview.md
 review_report: ../../reviews/pipeline/overview.md.review.md
-target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
-actions:
-  fixed: 1
-  rejected_bogus: 0
-  rejected_out_of_scope: 0
-  deferred: 0
-  escalated: 0
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+actions: { fixed: 1, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
 ---
 
 # Remediation report for pipeline/overview.md
 
 ## Summary
 
-The single nit was fixed by renaming the `## End-to-end flow` Mermaid
-node IDs from PascalCase to camelCase, as the prompt's quality
-checklist requires. The visible node labels were left unchanged.
+The review raised one nit finding and no other issues. I fixed it: the intended-reader sentence was a separate second paragraph, but `_common.md` requires the first body paragraph itself to state both what the document covers and who its intended reader is. The breakdown is 1 fixed, 0 rejected-bogus, 0 rejected-out-of-scope, 0 deferred, 0 escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `docs/generated/design/_meta/prompts/pipeline-overview.md:45` requires camelCase Mermaid node IDs; the diagram used PascalCase (`Source`, `Lex`, ...). | Renamed IDs to `source`, `lexPreprocess`, `parse`, `semanticCheck`, `lower`, `irPasses`, `emit`, `targetArtifact`, preserving labels. |
+| F-001 | fixed | Verified against `docs/generated/design/_meta/prompts/_common.md:65-66`, which requires the first body paragraph to state both the coverage and the intended reader; the doc split these across two paragraphs. Correct and in-contract. | Merged the intended-reader clause into the first paragraph so it states both purpose and audience. |

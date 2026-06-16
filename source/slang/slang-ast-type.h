@@ -935,7 +935,9 @@ class NamedExpressionType : public Type
 ///
 /// This function is primarily concerned with adjusting a parameter-passing
 /// mode to account for non-copyable types, which may need different defaults
-/// than a copyable type.
+/// than a copyable type. It also forces mesh-shader output parameters
+/// (`MeshOutputType`) to a direction-neutral mode, since their output direction
+/// is intrinsic to the type rather than to an explicit `out` modifier.
 ///
 ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,

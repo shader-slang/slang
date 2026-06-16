@@ -722,6 +722,11 @@ public:
     Val* getShapeReduceIntValPack(Val* valuePack, IntVal* axis);
 
     NonEmptyPackWitness* getNonEmptyPackWitness(Val* pack);
+    DeclaredVariadicPackCountWitness* getDeclaredVariadicPackCountWitness(
+        DeclRef<GenericVariadicPackCountConstraintDecl> declRef);
+    ConcreteVariadicPackCountWitness* getConcreteVariadicPackCountWitness(
+        Val* pack,
+        IntVal* expectedCount);
     HasDiffTypeInfoWitness* getHasDiffTypeInfoWitness(
         DeclRef<HasDiffTypeInfoConstraintDecl> declRef);
 

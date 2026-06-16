@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: f2b871e4496ed32a327e98986317cc4eb48691d204aad2e863ea2eebf51fc801
+generated_at: 2026-06-12T10:19:23Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: a7949e2fefe07d4849f23549562f5e13de05d1d144fa356c7ca6858d3f5d3c21
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -443,7 +443,7 @@ finds in the parent rather than creating a new scope (see
 Cross-module sibling namespaces are linked into the lookup chain by
   `addSiblingScopeForContainerDecl` during semantic checking
   ([slang-check-decl.cpp line
-  16408](../../../../source/slang/slang-check-decl.cpp)). `UsingDecl`
+  16510](../../../../source/slang/slang-check-decl.cpp)). `UsingDecl`
 captures the current scope at parse time and injects names at check
 time via the same sibling-scope mechanism.
 
@@ -488,12 +488,19 @@ does not pass through the `GenericDecl`.
   as overloaded; ranking is deferred to
   [overload-resolution.md](overload-resolution.md). The first item
   is also stored in `LookupResult::item` so that callers checking
-  for "any" result do not pay for the items list.
+  for "any" result do not pay for the items list. When such an
+  overloaded result is later re-filtered against a narrower
+  `LookupMask` and only one item matches, `refineLookup`
+  ([slang-lookup.cpp lines
+  128-143](../../../../source/slang/slang-lookup.cpp)) iterates
+  `inResult.items`, drops every item failing `DeclPassesLookupMask`
+  silently, and returns the single surviving item — no diagnostic is
+  raised for the filtered-out candidates.
 - **Ambiguous reference at use site.** When a non-overloadable
   result resolves to multiple decls (e.g. two types with the same
   name reachable via different sibling scopes), the checker emits
   diagnostic `ambiguous-reference` (`slang-diagnostics.lua` line
-  3731, code 39999) at the use site.
+  3738, code 39999) at the use site.
 - **Forward reference inside a `BlockStmt`.** Using `b` before its
   `DeclStmt` reaches the lookup with `hiddenFromLookup = true`;
   `_isUncheckedLocalVar` skips the decl, so lookup returns either
@@ -529,7 +536,7 @@ does not pass through the `GenericDecl`.
 - **`IgnoreForLookupModifier` on a base.** The synthetic tag-type
   inheritance on enums carries this modifier
   ([slang-check-decl.cpp line
-  11713](../../../../source/slang/slang-check-decl.cpp)) so the
+  11792](../../../../source/slang/slang-check-decl.cpp)) so the
   underlying integer type is not surfaced as a base interface when
   looking up enum members.
 

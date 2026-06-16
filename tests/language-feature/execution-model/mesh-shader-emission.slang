@@ -8,6 +8,9 @@
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -stage mesh -entry meshMain
 //TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv-asm -stage mesh -entry meshMain -emit-spirv-directly
+// Compile the emitted HLSL through DXC: the pre-fix doubled `out` is invalid HLSL
+// that DXC rejects, so a successful dxil compile is itself a regression check.
+//TEST:SIMPLE(filecheck=CHECK_DXIL): -target dxil-assembly -stage mesh -entry meshMain -profile sm_6_6
 
 struct MeshVertex
 {
@@ -42,11 +45,17 @@ void meshMain(
     }
 }
 
-// HLSL: keeps the explicit attributes and output declarations.
+// HLSL: keeps the explicit attributes and output declarations. Each mesh-output
+// qualifier must be emitted exactly once — never dropped, never doubled as
+// `out indices out` (regression for shader-slang/slang#11543).
 // CHECK_HLSL-DAG: outputtopology("triangle")
 // CHECK_HLSL-DAG: numthreads(3, 1, 1)
-// CHECK_HLSL-DAG: out indices
-// CHECK_HLSL-DAG: out vertices
+// CHECK_HLSL-DAG: out indices {{[A-Za-z_0-9]+}} triangles
+// CHECK_HLSL-DAG: out vertices {{[A-Za-z_0-9]+}} verts
+// CHECK_HLSL-DAG: out primitives {{[A-Za-z_0-9]+}} prims
+// CHECK_HLSL-NOT: indices out
+// CHECK_HLSL-NOT: vertices out
+// CHECK_HLSL-NOT: primitives out
 // CHECK_HLSL-DAG: SetMeshOutputCounts
 
 // SPIRV: emits MeshEXT execution mode + the per-vertex / per-primitive
@@ -59,3 +68,7 @@ void meshMain(
 // CHECK_SPIRV-DAG: BuiltIn Position
 // CHECK_SPIRV-DAG: BuiltIn PrimitiveTriangleIndicesEXT
 // CHECK_SPIRV-DAG: OpSetMeshOutputsEXT
+
+// DXIL: DXC accepts the emitted HLSL (the mesh entry compiles to DXIL).
+// CHECK_DXIL: call void @dx.op.setMeshOutputCounts
+// CHECK_DXIL: @dx.op.emitIndices

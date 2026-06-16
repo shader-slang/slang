@@ -1844,6 +1844,62 @@ err(
     span { loc = "expr:Expr", message = "this pack parameter is declared outside the current generic" }
 )
 
+err(
+    "invalid-variadic-pack-count-constraint-target",
+    30430,
+    "`countof(...)` pack-count constraint requires a generic type pack or value pack parameter",
+    span { loc = "expr:Expr", message = "expected a direct reference to a generic pack parameter here" }
+)
+
+err(
+    "variadic-pack-count-constraint-target-must-be-from-current-generic",
+    30431,
+    "`countof(...)` pack-count constraint target must be declared in the current generic",
+    span { loc = "expr:Expr", message = "this pack parameter is declared outside the current generic" }
+)
+
+err(
+    "invalid-variadic-pack-count-constraint-count",
+    30432,
+    "`countof(...)` pack-count constraint requires a compile-time integer count",
+    span { loc = "expr:Expr", message = "expected a compile-time integer expression here" }
+)
+
+err(
+    "variadic-pack-count-does-not-match",
+    30433,
+    "pack count does not satisfy `countof(...)` constraint",
+    span { loc = "location", message = "expected ~expectedCount:Int elements, but pack argument has ~actualCount:Int" }
+)
+
+err(
+    "optional-variadic-pack-count-constraint-is-invalid",
+    30434,
+    "`optional countof(...)` pack-count constraint is not meaningful",
+    span { loc = "expr:Expr", message = "remove `optional` from this `countof(...)` constraint" }
+)
+
+err(
+    "variadic-pack-count-proof-unavailable",
+    30435,
+    "`countof(...)` pack-count constraint is not satisfied",
+    span { loc = "expr:Expr", message = "cannot prove the required `countof(...)` pack-count constraint for this specialization" }
+)
+
+err(
+    "variadic-pack-count-constraint-requires-equality",
+    30436,
+    "`countof(...)` pack-count constraint requires '=='",
+    span { loc = "location", message = "use '==' for a `countof(...)` pack-count constraint" }
+)
+
+err(
+    "variadic-pack-count-constraint-requires-countof-on-left",
+    30437,
+    "`countof(...)` pack-count constraint must be written with `countof(...)` on the left side",
+    span { loc = "location", message = "write this constraint as `countof(Pack) == IntExpr`" }
+)
+
 -- Float bit cast diagnostics
 
 err(
@@ -2983,6 +3039,16 @@ err(
     30317,
     "interface requirement has body",
     span { loc = "decl:Decl", message = "non-method interface requirement cannot have a body." }
+)
+
+err(
+    "partial-interface-accessor-default-implementation",
+    30318,
+    "partial interface accessor default implementation",
+    span {
+        loc = "decl:Decl",
+        message = "interface accessor default implementation is incomplete; define all accessors or none."
+    }
 )
 
 err(
@@ -4589,6 +4655,20 @@ warning(
 )
 
 warning(
+    "possibly-using-uninitialized-variable",
+    41035,
+    "possible use of uninitialized variable",
+    span { loc = "location", message = "variable '~varName' may be uninitialized on some paths; it is only conditionally assigned" }
+)
+
+warning(
+    "possibly-using-uninitialized-value",
+    41036,
+    "possible use of uninitialized value",
+    span { loc = "location", message = "value of type '~typeName' may be uninitialized on some paths; it is only conditionally assigned" }
+)
+
+warning(
     "using-uninitialized-global-variable",
     41017,
     "use of uninitialized global variable",
@@ -4838,6 +4918,19 @@ err(
     "coverage-manifest-output-without-coverage-data",
     45112,
     "`-coverage-manifest-output` path '~path' was requested, but the selected target did not produce coverage metadata"
+)
+
+err(
+    "coverage-counter-width-invalid",
+    45113,
+    "`-trace-coverage-counter-width` value is invalid",
+    span { loc = "location", message = "option `-trace-coverage-counter-width` accepts only `32` or `64`, but got `~parsedValue:Int`. uint64 (the default) effectively cannot wrap; uint32 wraps silently at 2^32 hits per slot but is needed when the runtime driver does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon)." }
+)
+
+err(
+    "coverage-counter-width-bytes-invalid",
+    45114,
+    "coverage counter width API option value is invalid: the `CompilerOptionName::TraceCoverageCounterByteWidth` API option accepts only `4` (uint32) or `8` (uint64), but got `~byteWidth:Int`. This is the API-path counterpart to `E45113` (the CLI parser, which validates bits 32/64 before storing the byte width here); a host setting the API option directly must pass the byte width (divide bits by 8), not the bit width."
 )
 
 -- 41xxx - Semantic checking (continued)
