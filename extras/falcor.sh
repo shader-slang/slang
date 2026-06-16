@@ -14,14 +14,26 @@
 # is normally unnecessary - the `install` command exists only to refresh those
 # binaries after a Slang-only rebuild.
 #
+# Platforms: Falcor builds on Windows and Linux. The build target is chosen by
+# host (and overridable with --target-os):
+#   - native Windows (git-bash/MSYS)  -> windows
+#   - WSL                             -> windows (WSL runs on a Windows host, and
+#                                        many Slang devs build Slang for Windows;
+#                                        pass --target-os linux for an in-WSL
+#                                        Linux build instead)
+#   - native Linux                    -> linux
+# Under WSL with a Windows target, Windows tools (cmake.exe, cmd.exe) are used
+# and paths are translated with wslpath.
+#
 # Prerequisites:
-#   Slang must already be built with the gfx target ENABLED (the default), e.g.
+#   Slang must already be built for the target OS with the gfx target ENABLED
+#   (the default), e.g.
 #     cmake --preset default
 #     cmake --build --preset release   # or --preset debug
 #   Falcor imports both `slang` and `slang-gfx`, so a Slang built with
 #   -DSLANG_ENABLE_GFX=0 will not satisfy Falcor's CMake imports.
 #   The host also needs whatever Falcor itself requires (CMake, a C++ toolchain,
-#   and a GPU/driver for the image tests). Falcor supports Linux and Windows.
+#   and a GPU/driver for the image tests).
 #
 # Usage:
 #   ./extras/falcor.sh <command> [options]
@@ -52,24 +64,27 @@ if [ ! -f "CMakeLists.txt" ]; then
   exit 1
 fi
 
-# Host detection picks a sensible default Falcor preset and the platform-specific
-# Slang shared-library names that Falcor imports.
+# Detect the host OS and whether we are running under WSL (Linux-by-uname, but
+# on a Windows machine). These pick the default build target below.
 case "$(uname -s)" in
-MINGW* | MSYS* | CYGWIN*)
-  HOST_OS=windows
-  DEFAULT_PRESET=windows-vs2022
-  ;;
-Linux*)
-  HOST_OS=linux
-  DEFAULT_PRESET=linux-clang
-  ;;
-*)
-  # Falcor only ships Windows and Linux presets, so for anything else (e.g.
-  # macOS) require the user to pass --preset explicitly.
-  HOST_OS=other
-  DEFAULT_PRESET=""
-  ;;
+MINGW* | MSYS* | CYGWIN*) RAW_HOST=windows ;;
+Linux*) RAW_HOST=linux ;;
+*) RAW_HOST=other ;;
 esac
+
+IS_WSL=false
+if grep -qiE "microsoft|wsl" /proc/version 2>/dev/null || [ -n "${WSL_DISTRO_NAME:-}" ]; then
+  IS_WSL=true
+fi
+
+# Default build target: native Windows and WSL build for Windows; native Linux
+# builds for Linux. Unsupported hosts (e.g. macOS) fall through to linux naming
+# but get no default preset, so build/install will require --preset.
+if [ "$RAW_HOST" = windows ] || [ "$IS_WSL" = true ]; then
+  DEFAULT_TARGET_OS=windows
+else
+  DEFAULT_TARGET_OS=linux
+fi
 
 usage() {
   cat <<EOF
@@ -87,16 +102,20 @@ Commands:
   all        Run clone, build and test in sequence
 
 Options:
+  --target-os <windows|linux>      OS to build Falcor/Slang for
+                                   (default: $DEFAULT_TARGET_OS on this host;
+                                   WSL defaults to windows - see header)
   --slang-config <Debug|Release>   Slang build config to use (default: Release)
   --falcor-config <Debug|Release>  Falcor build config to build/test (default: Release)
   --preset <name>                  Falcor CMake configure preset
-                                   (default: $DEFAULT_PRESET)
+                                   (default: windows-vs2022 for a windows target,
+                                   linux-clang for a linux target)
   --slang-dir <path>               Slang source dir for FALCOR_LOCAL_SLANG_DIR
                                    (default: this repository's root)
   --falcor-dir <path>              Where to clone/use Falcor
                                    (default: external/falcor)
   --ref <git-ref>                  Falcor branch/tag/commit to clone
-                                   (default: Falcor's default branch)
+                                   (default: Falcor's default branch; fresh clones only)
   --config-string <str>            Override the test runner --config value
                                    (default: <preset>-<falcor-config>)
   --image-tests                    Also run Falcor's image tests (needs a GPU)
@@ -105,11 +124,14 @@ Options:
 EOF
 }
 
-# Defaults (may be overridden by options below).
+# Defaults (may be overridden by options below). TARGET_OS and FALCOR_PRESET are
+# left empty here and derived after parsing so --target-os can influence the
+# default preset.
 COMMAND=""
+TARGET_OS=""
 SLANG_CONFIG="Release"
 FALCOR_CONFIG="Release"
-FALCOR_PRESET="$DEFAULT_PRESET"
+FALCOR_PRESET=""
 SLANG_DIR="$SLANG_ROOT"
 FALCOR_DIR="$SLANG_ROOT/external/falcor"
 FALCOR_REF=""
@@ -129,6 +151,11 @@ require_value() {
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+  --target-os)
+    require_value "$1" "$#"
+    TARGET_OS="$2"
+    shift 2
+    ;;
   --slang-config)
     require_value "$1" "$#"
     SLANG_CONFIG="$2"
@@ -199,6 +226,46 @@ if [ -z "$COMMAND" ]; then
   exit 1
 fi
 
+# Resolve the build target and its default preset now that options are parsed.
+[ -z "$TARGET_OS" ] && TARGET_OS="$DEFAULT_TARGET_OS"
+case "$TARGET_OS" in
+windows | linux) ;;
+*)
+  log_error "Invalid --target-os '$TARGET_OS' (expected: windows or linux)"
+  exit 1
+  ;;
+esac
+
+if [ -z "$FALCOR_PRESET" ]; then
+  if [ "$RAW_HOST" = other ]; then
+    # e.g. macOS: Falcor ships no preset we can pick, so require --preset.
+    FALCOR_PRESET=""
+  elif [ "$TARGET_OS" = windows ]; then
+    FALCOR_PRESET="windows-vs2022"
+  else
+    FALCOR_PRESET="linux-clang"
+  fi
+fi
+
+# Under WSL with a Windows target we must drive the Windows toolchain (cmake.exe,
+# cmd.exe) and translate WSL paths to Windows paths for those tools.
+USE_EXE=false
+if [ "$IS_WSL" = true ] && [ "$TARGET_OS" = windows ]; then
+  USE_EXE=true
+fi
+CMAKE=cmake
+[ "$USE_EXE" = true ] && CMAKE=cmake.exe
+
+# Translate a WSL path to a Windows path when invoking Windows tools; otherwise
+# echo it unchanged. Used for absolute paths handed to cmake.exe under WSL.
+to_native() {
+  if [ "$USE_EXE" = true ] && command -v wslpath >/dev/null 2>&1; then
+    wslpath -w "$1"
+  else
+    printf '%s\n' "$1"
+  fi
+}
+
 # A Falcor configure preset is only needed by commands that configure/build
 # Falcor (build, install) or derive the default test config string; clone does
 # not need one. Hosts without an auto-detected preset (e.g. macOS) must pass
@@ -215,17 +282,55 @@ require_preset() {
 falcor_build_dir() { printf '%s\n' "$FALCOR_DIR/build/$FALCOR_PRESET"; }
 falcor_output_bin() { printf '%s\n' "$FALCOR_DIR/build/$FALCOR_PRESET/bin/$FALCOR_CONFIG"; }
 
-# Run Falcor's dependency-fetch step (git submodules + packman) for the host.
+# Run Falcor's dependency-fetch step (git submodules + packman) for the target.
 run_falcor_setup() {
-  if [ "$HOST_OS" = windows ]; then
+  if [ "$TARGET_OS" = windows ]; then
     cmd.exe /C "setup.bat"
   else
-    ./setup.sh
+    # Invoke via `sh` so that a CRLF (^M) shebang on a Windows-checked-out
+    # setup.sh doesn't make the kernel look for the interpreter `/bin/sh<CR>`.
+    sh ./setup.sh
+  fi
+}
+
+# Invoke a Falcor test wrapper. Under WSL with a Windows target the wrapper is a
+# .bat that must be launched through cmd.exe; otherwise it runs directly.
+run_test_runner() {
+  local runner="$1"
+  shift
+  if [ "$USE_EXE" = true ]; then
+    (cd "$(dirname "$runner")" && cmd.exe /C "$(basename "$runner")" "$@")
+  else
+    "$runner" "$@"
+  fi
+}
+
+# Fail early, with clear guidance, when the CMake that the chosen target needs
+# isn't reachable, or (for a WSL->Windows build) when Falcor lives on a
+# WSL-native path that Windows tools cannot use as a working directory.
+preflight_target_tools() {
+  if ! command -v "$CMAKE" >/dev/null 2>&1; then
+    log_error "'$CMAKE' not found on PATH for target '$TARGET_OS'."
+    if [ "$USE_EXE" = true ]; then
+      log_error "A Windows CMake (cmake.exe) must be reachable from WSL, or use --target-os linux."
+    fi
+    exit 1
+  fi
+  if [ "$USE_EXE" = true ]; then
+    case "$(to_native "$FALCOR_DIR")" in
+    '\\'*)
+      log_error "Falcor is on a WSL-native path; Windows tools need a Windows-drive path."
+      log_error "Clone under /mnt/<drive>/... for --target-os windows, or use --target-os linux."
+      exit 1
+      ;;
+    esac
   fi
 }
 
 # Fail early (with build instructions) when the requested local Slang build is
-# missing, and warn when slang-gfx is absent since Falcor imports it.
+# missing, and warn when slang-gfx is absent since Falcor imports it. The
+# artifact names follow the build target, not the host: a Windows target needs
+# slang.dll, a Linux target needs libslang.so.
 verify_slang_build() {
   if [ ! -f "$SLANG_DIR/include/slang.h" ]; then
     log_error "Slang headers not found at $SLANG_DIR/include/slang.h"
@@ -235,7 +340,7 @@ verify_slang_build() {
 
   local base="$SLANG_DIR/build/$SLANG_CONFIG"
   local slang_lib gfx_lib
-  if [ "$HOST_OS" = windows ]; then
+  if [ "$TARGET_OS" = windows ]; then
     slang_lib="$base/bin/slang.dll"
     gfx_lib="$base/bin/gfx.dll"
   else
@@ -244,8 +349,13 @@ verify_slang_build() {
   fi
 
   if [ ! -f "$slang_lib" ]; then
-    log_error "Local Slang $SLANG_CONFIG build not found: $slang_lib"
-    log_error "Build Slang first, for example:"
+    log_error "Local Slang $SLANG_CONFIG build for target '$TARGET_OS' not found: $slang_lib"
+    if [ "$IS_WSL" = true ]; then
+      log_error "WSL detected with --target-os $TARGET_OS. If you built Slang for the"
+      log_error "other OS, switch with --target-os windows|linux; otherwise build Slang:"
+    else
+      log_error "Build Slang first, for example:"
+    fi
     log_error "  cmake --preset default"
     log_error "  cmake --build --preset $(echo "$SLANG_CONFIG" | tr '[:upper:]' '[:lower:]')"
     exit 1
@@ -256,13 +366,26 @@ verify_slang_build() {
     log_warning "Falcor imports slang-gfx; build Slang with SLANG_ENABLE_GFX=ON (the default)."
   fi
 
-  log_success "Found local Slang $SLANG_CONFIG build at $base"
+  log_success "Found local Slang $SLANG_CONFIG build (target $TARGET_OS) at $base"
 }
 
 ensure_falcor_present() {
   if [ ! -d "$FALCOR_DIR" ]; then
     log_error "Falcor not found at $FALCOR_DIR. Run: $0 clone"
     exit 1
+  fi
+}
+
+# Warn when a previously-cloned Falcor has CRLF line endings in its shell
+# scripts (a Windows git checkout with core.autocrlf=true), which breaks
+# setup.sh under a Unix shell. Fresh clones avoid this (we clone with
+# core.autocrlf=false), so the fix is to re-clone with --clean.
+warn_if_crlf_setup() {
+  if [ "$TARGET_OS" != windows ] && [ -f "$FALCOR_DIR/setup.sh" ] &&
+    grep -q $'\r' "$FALCOR_DIR/setup.sh" 2>/dev/null; then
+    log_warning "Falcor's setup.sh has CRLF (Windows) line endings."
+    log_warning "If setup fails with '/bin/sh^M: bad interpreter' or 'packman: not found',"
+    log_warning "re-clone with: $0 clone --clean (fresh clones use core.autocrlf=false)."
   fi
 }
 
@@ -298,13 +421,18 @@ cmd_clone() {
   else
     log_info "Cloning Falcor into $FALCOR_DIR..."
     mkdir -p "$(dirname "$FALCOR_DIR")"
-    git clone https://github.com/NVIDIAGameWorks/Falcor.git "$FALCOR_DIR"
+    # Force LF line endings regardless of the user's global git config so that
+    # Falcor's shell scripts (setup.sh, tools/packman/packman) stay runnable
+    # under a Unix shell (e.g. WSL on a Windows drive).
+    git clone -c core.autocrlf=false -c core.eol=lf \
+      https://github.com/NVIDIAGameWorks/Falcor.git "$FALCOR_DIR"
     if [ -n "$FALCOR_REF" ]; then
       log_info "Checking out Falcor ref: $FALCOR_REF"
       (cd "$FALCOR_DIR" && git checkout "$FALCOR_REF")
     fi
   fi
 
+  warn_if_crlf_setup
   log_info "Fetching Falcor dependencies (this runs Falcor's setup script)..."
   (cd "$FALCOR_DIR" && run_falcor_setup)
   log_success "Falcor ready at $FALCOR_DIR ($(cd "$FALCOR_DIR" && git rev-parse --short HEAD))"
@@ -313,32 +441,40 @@ cmd_clone() {
 cmd_build() {
   require_preset
   ensure_falcor_present
+  preflight_target_tools
   verify_slang_build
+
+  [ "$IS_WSL" = true ] && log_info "WSL detected; building for target '$TARGET_OS' (override with --target-os)."
 
   log_info "Configuring Falcor (preset $FALCOR_PRESET) with local Slang ($SLANG_CONFIG)..."
   # FALCOR_LOCAL_SLANG_BUILD_DIR is resolved relative to FALCOR_LOCAL_SLANG_DIR
-  # by Falcor (SLANG_DIR = DIR/BUILD_DIR), so it must name the per-config build
+  # by Falcor (SLANG_DIR = DIR/BUILD_DIR), so it names the per-config build
   # subdirectory (e.g. build/Release), not an absolute path.
+  # -DCMAKE_POLICY_VERSION_MINIMUM=3.5 lets Falcor's pinned pybind11 (which
+  # declares cmake_minimum_required < 3.5) configure under CMake >= 4; it is
+  # scoped to Falcor's configure here and never applied to the Slang build.
   (
     cd "$FALCOR_DIR" &&
-      cmake --preset "$FALCOR_PRESET" \
+      "$CMAKE" --preset "$FALCOR_PRESET" \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DFALCOR_LOCAL_SLANG=ON \
-        -DFALCOR_LOCAL_SLANG_DIR="$SLANG_DIR" \
+        -DFALCOR_LOCAL_SLANG_DIR="$(to_native "$SLANG_DIR")" \
         -DFALCOR_LOCAL_SLANG_BUILD_DIR="build/$SLANG_CONFIG"
   )
 
   log_info "Building Falcor ($FALCOR_CONFIG)..."
-  cmake --build "$(falcor_build_dir)" --config "$FALCOR_CONFIG"
+  "$CMAKE" --build "$(to_native "$(falcor_build_dir)")" --config "$FALCOR_CONFIG"
   log_success "Falcor built; local Slang deployed via deploy_dependencies."
 }
 
 cmd_install() {
   require_preset
   ensure_falcor_present
+  preflight_target_tools
   verify_slang_build
 
   log_info "Re-deploying local Slang into Falcor (deploy_dependencies)..."
-  if cmake --build "$(falcor_build_dir)" --config "$FALCOR_CONFIG" --target deploy_dependencies; then
+  if "$CMAKE" --build "$(to_native "$(falcor_build_dir)")" --config "$FALCOR_CONFIG" --target deploy_dependencies; then
     log_success "Re-deployed local Slang via Falcor's deploy_dependencies target."
     return 0
   fi
@@ -350,8 +486,8 @@ cmd_install() {
   mkdir -p "$out"
   # Copy just the shared runtime libraries. verify_slang_build already confirmed
   # the primary one is present, so each glob matches at least that file; matching
-  # by extension also skips any subdirectories under lib/.
-  if [ "$HOST_OS" = windows ]; then
+  # by extension also skips any subdirectories.
+  if [ "$TARGET_OS" = windows ]; then
     cp -f "$base/bin/"*.dll "$out/"
   else
     cp -f "$base/lib/"*.so* "$out/"
@@ -367,8 +503,8 @@ cmd_test() {
     exit 1
   fi
   local config_string="${CONFIG_STRING:-$FALCOR_PRESET-$FALCOR_CONFIG}"
-  local ext="sh"
-  [ "$HOST_OS" = windows ] && ext="bat"
+  local ext=sh
+  [ "$TARGET_OS" = windows ] && ext=bat
   local unit_runner="$FALCOR_DIR/tests/run_unit_tests.$ext"
   local image_runner="$FALCOR_DIR/tests/run_image_tests.$ext"
 
@@ -379,7 +515,7 @@ cmd_test() {
   fi
 
   log_info "Running Falcor unit tests (--config $config_string)..."
-  "$unit_runner" --config "$config_string"
+  run_test_runner "$unit_runner" --config "$config_string"
 
   if [ "$IMAGE_TESTS" = true ]; then
     if [ ! -f "$image_runner" ]; then
@@ -387,7 +523,7 @@ cmd_test() {
       exit 1
     fi
     log_info "Running Falcor image tests (--config $config_string)..."
-    "$image_runner" --config "$config_string" --run-only
+    run_test_runner "$image_runner" --config "$config_string" --run-only
   fi
   log_success "Falcor tests finished."
 }
