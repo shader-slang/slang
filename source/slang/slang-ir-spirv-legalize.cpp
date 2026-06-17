@@ -33,10 +33,11 @@ namespace Slang
 
 // Returns true when `inst` is a compile-time-constant value. Used to decide whether an image
 // gather's `Offset` operand can be lowered to the capability-free `ConstOffset` (issue #9382):
-// a leaf is constant when it is an `IRConstant` (int/float/bool/...), and a composite
+// a leaf is constant when it is an `IRConstant` (int/float/bool/...); a composite
 // (`MakeVector`/`MakeArray`/`MakeStruct`/`MakeMatrix`, e.g. `int2(2, 1)`) is constant when all of
-// its operands are. Anything else is treated as a runtime value, which is the safe default: it
-// keeps the `Offset` form (valid SPIR-V) and only forgoes the capability optimization.
+// its element operands are; and a scalar splat (`MakeVectorFromScalar`, e.g. `int2(1)`) is constant
+// when its scalar value is. Anything else is treated as a runtime value, which is the safe default:
+// it keeps the `Offset` form (valid SPIR-V) and only forgoes the capability optimization.
 static bool isIRConstantValue(IRInst* inst)
 {
     if (!inst)
@@ -51,6 +52,10 @@ static bool isIRConstantValue(IRInst* inst)
     case kIROp_MakeArray:
     case kIROp_MakeStruct:
     case kIROp_MakeMatrix:
+    case kIROp_MakeVectorFromScalar:
+        // Each of these is constant iff all of its value operands are. For `MakeVectorFromScalar`
+        // (e.g. `int2(1)`) the single operand is the scalar value; the element type and count come
+        // from the result type, not from operands.
         for (UInt i = 0; i < inst->getOperandCount(); i++)
             if (!isIRConstantValue(inst->getOperand(i)))
                 return false;
