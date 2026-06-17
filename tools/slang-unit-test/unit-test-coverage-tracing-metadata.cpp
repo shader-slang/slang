@@ -433,8 +433,8 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         JSONValue buffer = findJsonField(container, parsed.root, "buffer");
         SLANG_CHECK(buffer.isValid());
         checkJsonStringField(container, buffer, "name", "__slang_coverage");
-        checkJsonStringField(container, buffer, "element_type", "uint32");
-        checkJsonIntField(container, buffer, "element_stride", 4);
+        checkJsonStringField(container, buffer, "element_type", "uint64");
+        checkJsonIntField(container, buffer, "element_stride", 8);
         SLANG_CHECK(findJsonField(container, buffer, "space").isValid());
         SLANG_CHECK(findJsonField(container, buffer, "binding").isValid());
         SLANG_CHECK(!findJsonField(container, buffer, "uniform_offset").isValid());
@@ -538,8 +538,8 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         JSONValue buffer = findJsonField(container, parsed.root, "buffer");
         SLANG_CHECK(buffer.isValid());
         checkJsonStringField(container, buffer, "name", "__slang_coverage");
-        checkJsonStringField(container, buffer, "element_type", "uint32");
-        checkJsonIntField(container, buffer, "element_stride", 4);
+        checkJsonStringField(container, buffer, "element_type", "uint64");
+        checkJsonIntField(container, buffer, "element_stride", 8);
         SLANG_CHECK(findJsonField(container, buffer, "uniform_offset").isValid());
         SLANG_CHECK(findJsonField(container, buffer, "uniform_stride").isValid());
 
@@ -2388,4 +2388,275 @@ SLANG_UNIT_TEST(coverageTracingDoWhileBranchArmKinds)
     SLANG_CHECK(branchEntryCount == 2);
     SLANG_CHECK(seenTrueArm);
     SLANG_CHECK(seenFalseArm);
+}
+
+// The `-trace-coverage-counter-width` CLI flag validates its bit value
+// (32/64) up front and stores a byte width (4/8). The matching public
+// API option `CompilerOptionName::TraceCoverageCounterByteWidth` is a
+// byte width and is NOT routed through that CLI validation, so an API caller
+// that supplies a value other than 4 or 8 — most realistically by
+// forwarding the bit width (32/64) without dividing by 8 — must still
+// fail loudly rather than silently producing uint32 counters. This test
+// pins that contract: invalid byte widths fail codegen with E45114, and
+// the two legal widths (4 and 8) compile.
+SLANG_UNIT_TEST(coverageTracingInvalidCounterWidthFailsCodegen)
+{
+    const char* shaderSource = R"(
+        RWStructuredBuffer<uint> outputBuffer;
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void computeMain(uint3 tid : SV_DispatchThreadID)
+        {
+            outputBuffer[0] = tid.x;
+        }
+    )";
+
+    // Compile the shader with `-trace-coverage` and the given API byte
+    // width, forcing codegen so the coverage pass (and its width
+    // validation) runs. Returns the codegen result and any diagnostics.
+    auto compileWithCounterByteWidth = [&](int counterByteWidth,
+                                           ComPtr<slang::IBlob>& outDiagnostics) -> SlangResult
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_CPP_SOURCE;
+        targetDesc.profile = globalSession->findProfile("sm_5_0");
+
+        slang::CompilerOptionEntry coverageOptions[2] = {};
+        coverageOptions[0].name = slang::CompilerOptionName::TraceCoverage;
+        coverageOptions[0].value.kind = slang::CompilerOptionValueKind::Int;
+        coverageOptions[0].value.intValue0 = 1;
+        coverageOptions[1].name = slang::CompilerOptionName::TraceCoverageCounterByteWidth;
+        coverageOptions[1].value.kind = slang::CompilerOptionValueKind::Int;
+        coverageOptions[1].value.intValue0 = counterByteWidth;
+
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.compilerOptionEntryCount = 2;
+        sessionDesc.compilerOptionEntries = coverageOptions;
+
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> diagnostics;
+        auto module = session->loadModuleFromSourceString(
+            "coverageInvalidCounterWidth",
+            "coverageInvalidCounterWidth.slang",
+            shaderSource,
+            diagnostics.writeRef());
+        SLANG_CHECK(module != nullptr);
+
+        ComPtr<slang::IEntryPoint> entryPoint;
+        module->findEntryPointByName("computeMain", entryPoint.writeRef());
+        SLANG_CHECK(entryPoint != nullptr);
+
+        slang::IComponentType* components[] = {module, entryPoint.get()};
+        ComPtr<slang::IComponentType> program;
+        SLANG_CHECK(
+            session->createCompositeComponentType(
+                components,
+                SLANG_COUNT_OF(components),
+                program.writeRef(),
+                nullptr) == SLANG_OK);
+
+        ComPtr<slang::IComponentType> linked;
+        SLANG_CHECK(program->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> codeBlob;
+        outDiagnostics.setNull();
+        SlangResult codeResult =
+            linked->getEntryPointCode(0, 0, codeBlob.writeRef(), outDiagnostics.writeRef());
+        return codeResult;
+    };
+
+    // Invalid byte widths must fail codegen with E45114. `32`/`64` are
+    // the bit values a caller is most likely to forward by mistake; `2`
+    // and `16` cover other out-of-range integers.
+    const int invalidByteWidths[] = {2, 16, 32, 64};
+    for (int badWidth : invalidByteWidths)
+    {
+        ComPtr<slang::IBlob> diagnostics;
+        SlangResult codeResult = compileWithCounterByteWidth(badWidth, diagnostics);
+        SLANG_CHECK(SLANG_FAILED(codeResult));
+        SLANG_CHECK(diagnostics != nullptr);
+        String diagnosticText(UnownedStringSlice(
+            (const char*)diagnostics->getBufferPointer(),
+            diagnostics->getBufferSize()));
+        SLANG_CHECK(diagnosticText.indexOf(toSlice("E45114")) != -1);
+    }
+
+    // The two legal byte widths must compile (positive control, so a
+    // future regression that rejects 4 or 8 is also caught). On the
+    // CPU target the choice surfaces in the emitted code as the
+    // selected prelude helper (`_slang_atomic_add_u32` for byte width
+    // 4, `_slang_atomic_add_u64` for byte width 8). Pin both
+    // directions so a future regression that wires up the API path
+    // but always emits the same width is also caught.
+    auto compileAndGetCode = [&](int counterByteWidth, String& outCode) -> SlangResult
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_CPP_SOURCE;
+        targetDesc.profile = globalSession->findProfile("sm_5_0");
+        slang::CompilerOptionEntry coverageOptions[2] = {};
+        coverageOptions[0].name = slang::CompilerOptionName::TraceCoverage;
+        coverageOptions[0].value.kind = slang::CompilerOptionValueKind::Int;
+        coverageOptions[0].value.intValue0 = 1;
+        coverageOptions[1].name = slang::CompilerOptionName::TraceCoverageCounterByteWidth;
+        coverageOptions[1].value.kind = slang::CompilerOptionValueKind::Int;
+        coverageOptions[1].value.intValue0 = counterByteWidth;
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.compilerOptionEntries = coverageOptions;
+        sessionDesc.compilerOptionEntryCount = SLANG_COUNT_OF(coverageOptions);
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK(SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+        ComPtr<slang::IBlob> diagnostics;
+        ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+            "m",
+            "m.slang",
+            shaderSource,
+            diagnostics.writeRef()));
+        SLANG_CHECK(module != nullptr);
+        ComPtr<slang::IEntryPoint> ep;
+        SLANG_CHECK(SLANG_SUCCEEDED(module->findEntryPointByName("computeMain", ep.writeRef())));
+        slang::IComponentType* components[] = {module, ep};
+        ComPtr<slang::IComponentType> composed;
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            session->createCompositeComponentType(components, 2, composed.writeRef())));
+        ComPtr<slang::IComponentType> linked;
+        SLANG_CHECK(SLANG_SUCCEEDED(composed->link(linked.writeRef())));
+        ComPtr<slang::IBlob> codeBlob;
+        SlangResult codeResult =
+            linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnostics.writeRef());
+        if (SLANG_SUCCEEDED(codeResult) && codeBlob)
+        {
+            outCode = String(UnownedStringSlice(
+                (const char*)codeBlob->getBufferPointer(),
+                codeBlob->getBufferSize()));
+        }
+        return codeResult;
+    };
+
+    // The CPP target's `getEntryPointCode` returns the prelude
+    // textually expanded (not as an `#include` directive), so a plain
+    // substring search for `_slang_atomic_add_u64` would always hit
+    // the prelude's function definition regardless of which helper
+    // the coverage pass actually calls. Distinguish the call site
+    // from the definition by matching the call pattern
+    // `<helper>((` — coverage atomic-add lowering emits the pointer
+    // operand inside an extra set of parentheses (`((&...))`), while
+    // the prelude's function signature is `<helper>(uint32_t* ptr,
+    // ...)`. The double opening paren is the call-site marker.
+    String code32;
+    SLANG_CHECK(SLANG_SUCCEEDED(compileAndGetCode(4, code32)));
+    SLANG_CHECK(code32.indexOf(toSlice("_slang_atomic_add_u32((")) != -1);
+    SLANG_CHECK(code32.indexOf(toSlice("_slang_atomic_add_u64((")) == -1);
+
+    String code64;
+    SLANG_CHECK(SLANG_SUCCEEDED(compileAndGetCode(8, code64)));
+    SLANG_CHECK(code64.indexOf(toSlice("_slang_atomic_add_u64((")) != -1);
+    SLANG_CHECK(code64.indexOf(toSlice("_slang_atomic_add_u32((")) == -1);
+}
+
+// Verify that compiling with `-trace-coverage-boolean` produces
+// `CoverageCounterMode::Boolean` in the metadata for every entry, and
+// that the manifest serializes it as "boolean" rather than "unknown".
+// This is a regression test for the case where _getCoverageCounterModeName
+// lacked a case for Boolean and silently returned "unknown".
+SLANG_UNIT_TEST(coverageTracingBooleanCounterMode)
+{
+    const char* shaderSource = R"(
+        RWStructuredBuffer<uint> outputBuffer;
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void computeMain(uint3 tid : SV_DispatchThreadID)
+        {
+            if (tid.x > 0)
+                outputBuffer[0] = tid.x;
+            else
+                outputBuffer[0] = 0;
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+
+    slang::CompilerOptionEntry options[2] = {};
+    options[0].name = slang::CompilerOptionName::TraceCoverage;
+    options[0].value.kind = slang::CompilerOptionValueKind::Int;
+    options[0].value.intValue0 = 1;
+    options[1].name = slang::CompilerOptionName::TraceCoverageBoolean;
+    options[1].value.kind = slang::CompilerOptionValueKind::Int;
+    options[1].value.intValue0 = 1;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntries = options;
+    sessionDesc.compilerOptionEntryCount = SLANG_COUNT_OF(options);
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+        "booleanTest",
+        "booleanTest.slang",
+        shaderSource,
+        diagnostics.writeRef()));
+    SLANG_CHECK(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK(module->findEntryPointByName("computeMain", entryPoint.writeRef()) == SLANG_OK);
+
+    slang::IComponentType* parts[] = {module, entryPoint};
+    ComPtr<slang::IComponentType> composed;
+    SLANG_CHECK(
+        session->createCompositeComponentType(parts, 2, composed.writeRef(), nullptr) == SLANG_OK);
+
+    ComPtr<slang::IComponentType> linked;
+    SLANG_CHECK(composed->link(linked.writeRef(), nullptr) == SLANG_OK);
+
+    ComPtr<slang::IBlob> code;
+    SLANG_CHECK(linked->getEntryPointCode(0, 0, code.writeRef(), nullptr) == SLANG_OK);
+
+    ComPtr<slang::IMetadata> metadata;
+    SLANG_CHECK(linked->getEntryPointMetadata(0, 0, metadata.writeRef(), nullptr) == SLANG_OK);
+
+    auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
+        slang::ICoverageTracingMetadata::getTypeGuid());
+    SLANG_CHECK(coverage != nullptr);
+
+    // Every entry produced in boolean mode must carry Boolean mode.
+    uint32_t count = coverage->getEntryCount();
+    SLANG_CHECK(count > 0);
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        slang::CoverageEntryInfo entry = {};
+        SLANG_CHECK(coverage->getEntryInfo(i, &entry) == SLANG_OK);
+        SLANG_CHECK(entry.counterMode == slang::CoverageCounterMode::Boolean);
+    }
+
+    // The manifest must serialize Boolean as "boolean", not "unknown".
+    ComPtr<ISlangBlob> manifestBlob;
+    SLANG_CHECK(slang_writeCoverageManifestJson(coverage, manifestBlob.writeRef()) == SLANG_OK);
+    UnownedStringSlice manifestText(
+        (const char*)manifestBlob->getBufferPointer(),
+        manifestBlob->getBufferSize());
+    SLANG_CHECK(manifestText.indexOf(toSlice("\"boolean\"")) != -1);
+    SLANG_CHECK(manifestText.indexOf(toSlice("\"unknown\"")) == -1);
 }

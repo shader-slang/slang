@@ -194,80 +194,51 @@ struct BasicTypeKeyPair
     HashCode getHashCode() const { return combineHash(type1.getRaw(), type2.getRaw()); }
 };
 
-struct OperatorOverloadCacheKey
+// Focused failure data produced while a generic candidate is still being
+// inferred. `inferGenericArguments` fills this optional record, and
+// `CompleteOverloadCandidate` emits it only if overload resolution selects that
+// failed generic candidate.
+struct GenericArgumentInferenceFailure
 {
-    int32_t operatorName;
-    bool isGLSLMode;
-    BasicTypeKey args[2];
-    bool operator==(OperatorOverloadCacheKey key) const
+    enum class Kind
     {
-        return operatorName == key.operatorName && args[0] == key.args[0] &&
-               args[1] == key.args[1] && isGLSLMode == key.isGLSLMode;
+        None,
+        VariadicPackCountMismatch,
+    };
+
+    struct VariadicPackCountMismatch
+    {
+        SourceLoc location = SourceLoc();
+        int64_t expectedCount = 0;
+        int64_t actualCount = 0;
+    };
+
+    Kind kind = Kind::None;
+    union
+    {
+        VariadicPackCountMismatch variadicPackCountMismatch;
+    };
+
+    GenericArgumentInferenceFailure()
+        : variadicPackCountMismatch()
+    {
     }
-    HashCode getHashCode() const
+
+    GenericArgumentInferenceFailure(GenericArgumentInferenceFailure const& other)
+        : kind(other.kind), variadicPackCountMismatch(other.variadicPackCountMismatch)
     {
-        return combineHash(operatorName, args[0].getRaw(), args[1].getRaw(), isGLSLMode ? 1 : 0);
     }
-    bool fromOperatorExpr(OperatorExpr* opExpr)
+
+    GenericArgumentInferenceFailure& operator=(GenericArgumentInferenceFailure const& other)
     {
-        // First, lets see if the argument types are ones
-        // that we can encode in our space of keys.
-        args[0] = BasicTypeKey::invalid();
-        args[1] = BasicTypeKey::invalid();
-        if (opExpr->arguments.getCount() > 2)
-            return false;
-
-        for (Index i = 0; i < opExpr->arguments.getCount(); i++)
-        {
-            auto key = makeBasicTypeKey(opExpr->arguments[i]->type, opExpr->arguments[i]);
-            if (key.getRaw() == BasicTypeKey::invalid().getRaw())
-            {
-                return false;
-            }
-            args[i] = key;
-        }
-
-        // Next, lets see if we can find an intrinsic opcode
-        // attached to an overloaded definition (filtered for
-        // definitions that could conceivably apply to us).
-        //
-        // TODO: This should really be parsed on the operator name
-        // plus fixity, rather than the intrinsic opcode...
-        //
-        // We will need to reject postfix definitions for prefix
-        // operators, and vice versa, to ensure things work.
-        //
-        auto prefixExpr = as<PrefixExpr>(opExpr);
-        auto postfixExpr = as<PostfixExpr>(opExpr);
-
-        if (auto overloadedBase = as<OverloadedExpr>(opExpr->functionExpr))
-        {
-            for (auto item : overloadedBase->lookupResult2)
-            {
-                // Look at a candidate definition to be called and
-                // see if it gives us a key to work with.
-                //
-                Decl* funcDecl = item.declRef.getDecl();
-                if (auto genDecl = as<GenericDecl>(funcDecl))
-                    funcDecl = genDecl->inner;
-
-                // Reject definitions that have the wrong fixity.
-                //
-                if (prefixExpr && !funcDecl->findModifier<PrefixModifier>())
-                    continue;
-                if (postfixExpr && !funcDecl->findModifier<PostfixModifier>())
-                    continue;
-
-                if (auto intrinsicOp = funcDecl->findModifier<IntrinsicOpModifier>())
-                {
-                    operatorName = intrinsicOp->op;
-                    return true;
-                }
-            }
-        }
-        return false;
+        kind = other.kind;
+        variadicPackCountMismatch = other.variadicPackCountMismatch;
+        return *this;
     }
 };
+
+DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal);
+bool arePackCountExpectedCountsEqual(ASTBuilder* astBuilder, IntVal* left, IntVal* right);
 
 struct OverloadCandidate
 {
@@ -334,6 +305,21 @@ struct OverloadCandidate
     // the solver's fixpoint -- the same path used for inferred generic arguments
     // -- rather than a separate linear pass. -1 until computed.
     Index explicitGenericArgCount = -1;
+
+    // When a generic candidate fails before producing a specialized decl-ref,
+    // the solver can record a focused failure reason here. The selected failed
+    // candidate reports this reason instead of falling back to only the generic
+    // "could not specialize" diagnostic.
+    GenericArgumentInferenceFailure genericInferenceFailure;
+
+    // Records the first argument that failed to type-check while trying this
+    // candidate, so a "no applicable overload" diagnostic can point the user at
+    // which argument is wrong (issue #7857). `argMismatchArgIndex` is the 0-based
+    // argument index (-1 until a mismatch is recorded); `argMismatchExpectedType`
+    // is the parameter type and `argMismatchActualType` is the argument type.
+    Index argMismatchArgIndex = -1;
+    Type* argMismatchExpectedType = nullptr;
+    Type* argMismatchActualType = nullptr;
 };
 
 struct ResolvedOperatorOverload
@@ -353,11 +339,7 @@ struct ResolvedOperatorOverload
 
 struct TypeCheckingCache : public RefObject
 {
-    Dictionary<OperatorOverloadCacheKey, ResolvedOperatorOverload> resolvedOperatorOverloadCache;
     Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
-
-    // The version used to invalidate the cached declRefs in ResolvedOperatorOverload entries.
-    int version = 0;
 };
 
 enum class CoercionSite
@@ -786,6 +768,21 @@ struct SharedSemanticsContext : public RefObject
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
+
+    // Whether the `glsl` module has been imported into this checking session. Set when the
+    // `glsl` import is handled (see `importModuleIntoScope`), rather than scanning the imported
+    // module list on demand, because the builtin-operator fast path consults
+    // `isGLSLOperatorScope()` for every operator expression.
+    bool m_isGLSLModuleImported = false;
+
+public:
+    /// Is the current checking session in GLSL operator scope? True when `-allow-glsl` is set or
+    /// the `glsl` module has been imported (its overloads give builtin operators GLSL semantics).
+    bool isGLSLOperatorScope()
+    {
+        return getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL) ||
+               m_isGLSLModuleImported;
+    }
 
 public:
     SharedSemanticsContext(
@@ -2576,6 +2573,14 @@ public:
         ConstantFoldingKind kind,
         ConstantFoldingCircularityInfo* circularityInfo);
 
+    /// Constant-fold a builtin-operator fast-path node (`a + b`, `N / 2`, etc.), producing a
+    /// concrete `ConstantIntVal`, a `PolynomialIntVal` (for `+`/`-`/`*`), or a decl-free
+    /// `BuiltinOperationIntVal` when operands are still symbolic.
+    IntVal* tryConstantFoldBuiltinOperatorExpr(
+        SubstExpr<BuiltinOperatorExpr> expr,
+        ConstantFoldingKind kind,
+        ConstantFoldingCircularityInfo* circularityInfo);
+
     /// Try to apply front-end constant folding to determine the value of `expr`.
     IntVal* tryConstantFoldExpr(
         SubstExpr<Expr> expr,
@@ -2894,6 +2899,13 @@ public:
         // This tracks costs when a type parameter is promoted to satisfy an interface
         // constraint (e.g., int -> float to satisfy __BuiltinFloatingPointType).
         ConversionCost typePromotionCost = kConversionCost_None;
+
+        // Optional channel for a generic-argument solve to explain a focused
+        // failure to overload completion. Solving can run while collecting
+        // speculative candidates, so diagnostics are delayed until overload
+        // resolution selects the failed candidate.
+        GenericArgumentInferenceFailure* failure = nullptr;
+        SourceLoc applicationLoc = SourceLoc();
     };
 
     bool isRelevantGeneric(GenericInferenceContext& system, Decl* generic);
@@ -3383,7 +3395,8 @@ public:
         OverloadResolveContext& context,
         ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost,
-        List<QualType>* innerParameterTypes = nullptr);
+        List<QualType>* innerParameterTypes = nullptr,
+        GenericArgumentInferenceFailure* outFailure = nullptr);
 
     void AddTypeOverloadCandidates(Type* type, OverloadResolveContext& context);
 
@@ -3604,6 +3617,11 @@ public:
 
     Expr* visitInvokeExpr(InvokeExpr* expr);
 
+    // A `BuiltinOperatorExpr` is produced already-checked by `convertToBuiltinArithmeticOp`
+    // (during `visitInvokeExpr`), so checking it is a no-op; this exists for visitor
+    // completeness / idempotent re-checks.
+    Expr* visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr);
+
     Expr* visitSelectExpr(SelectExpr* expr);
 
     Expr* visitVarExpr(VarExpr* expr);
@@ -3698,6 +3716,59 @@ public:
 private:
     // Convert the logic operator expression to not use 'InvokeExpr' type
     Expr* convertToLogicOperatorExpr(InvokeExpr* expr);
+
+    // Recognize an ordinary builtin operator on builtin scalar/vector/matrix operands and
+    // rewrite it directly to a `BuiltinOperatorExpr` carrying the resolved `BuiltinOperationKind`,
+    // returning null when the operator should instead go through normal overload resolution.
+    //
+    // This exists for performance: the vast majority of operators in real shader code are builtin
+    // arithmetic/comparison/bitwise/unary ops on numeric scalars/vectors/matrices, and routing
+    // each one through full generic `operator OP` overload resolution (candidate collection,
+    // inference, coercion) is a large front-end cost. Handling them here lets the common case skip
+    // all of that and lower straight to the corresponding builtin IR op.
+    //
+    // Recognized: `+ - * / %`, `== != < > <= >=`, `& | ^ << >>`, and unary `- ! ~` on builtin
+    // integer/floating-point/bool operands (same-type operands as-is; different builtin types
+    // promoted via `getBuiltinArithmeticCommonType`). Returns null to fall back to normal
+    // resolution for: the short-circuiting `&&`/`||`, mixed shapes that are not
+    // broadcast-compatible, user-defined operand types, and -- in GLSL operator scope only --
+    // matrix operands and vector equality (`==`/`!=`), whose semantics the `glsl` module owns.
+    Expr* convertToBuiltinArithmeticOp(InvokeExpr* expr);
+
+    // For a builtin binary operator `a OP b` whose operands have *different* builtin
+    // scalar/vector/matrix types, compute the common operand type that overload resolution
+    // would converge on (the "usual arithmetic conversions"): the result element type is the
+    // higher-ranked of the two base types (float beats int; among ints the larger size wins,
+    // and on a size tie the unsigned type wins) so neither operand needs a narrowing
+    // conversion, and the result shape broadcasts a scalar against a vector/matrix (requiring
+    // matching extents for vector-vector / matrix-matrix). Returns null when the operands are
+    // not both builtin numeric scalar/vector/matrix types or the shapes are not
+    // broadcast-compatible, in which case the caller falls back to overload resolution.
+    Type* getBuiltinArithmeticCommonType(Type* left, Type* right);
+
+    // Return `target` with its element/base type replaced by `newElementType`, preserving the
+    // composite shape: a scalar becomes `newElementType`, a `vector<T,N>` becomes
+    // `vector<newElementType,N>`, and a `matrix<T,R,C>` becomes `matrix<newElementType,R,C>`.
+    Type* substituteElementOfCompositeType(Type* target, Type* newElementType);
+
+    // Coerce the operands of a builtin binary operator to the common operand type that overload
+    // resolution would have selected (via `getBuiltinArithmeticCommonType`), and return that
+    // type. Each operand is converted to its *own* shape with the common element base (so e.g. a
+    // `vector * scalar` stays a two-shape operation that backends can lower to a vector-times-
+    // scalar instruction). `outLeftArg`/`outRightArg` receive the (possibly coerced) operand
+    // expressions. Operands that are already the same type are returned unchanged. Returns null
+    // when the operands are not broadcast-compatible builtin numeric types or a coercion fails,
+    // signalling that the fast-path conversion should be abandoned.
+    Type* coerceOperandsOfBuiltinBinaryExpr(
+        Expr* leftArg,
+        Expr* rightArg,
+        Expr*& outLeftArg,
+        Expr*& outRightArg);
+
+    // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either
+    // `-allow-glsl` is set, or the `glsl` module is in scope (its `operator*` overloads
+    // make `mat * mat` a matrix product). The builtin-operator fast path is disabled then.
+    bool isGLSLOperatorScope();
 };
 
 struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmtVisitor>
@@ -3766,6 +3837,11 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     void visitExpressionStmt(ExpressionStmt* stmt);
 
     void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt);
+
+    // If `expr` is the discarded result of a call to a `[NoDiscard]` function,
+    // emit an error. Used for any context where an expression's result is
+    // ignored (an expression statement, or a `for` loop's side-effect expression).
+    void maybeDiagnoseDiscardedNoDiscardResult(Expr* expr);
 
     // Try to infer the max number of iterations the loop will run.
     void tryInferLoopMaxIterations(ForStmt* stmt);
@@ -3911,6 +3987,17 @@ Witness* findNonEmptyPackWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
     Val* constrainedArg,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    bool shouldEmitError);
+
+// Return the witness that proves `countof(constrainedArg) == expectedCount`,
+// or `nullptr` if the concrete count or an in-scope declared constraint cannot
+// prove that equality.
+Witness* findVariadicPackCountWitnessForConstraint(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    Val* constrainedArg,
+    IntVal* expectedCount,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);
 

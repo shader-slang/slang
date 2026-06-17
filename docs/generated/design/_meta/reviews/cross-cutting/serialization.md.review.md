@@ -1,37 +1,44 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-12T13:18:05+00:00
 target_doc: cross-cutting/serialization.md
-target_doc_source_commit: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-target_doc_watched_paths_digest: 5b25292bf14e2a45191187f721db5ff6afa45b617dfab12381292b32174d4546
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 8b042e75fd998180a0b911649454d28b10dc08df645aa95b3ce5e8eb390b7f82
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 2
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 1
+  major: 0
+  minor: 0
   nit: 0
 ---
 
 # Review report for cross-cutting/serialization.md
 
 ## Summary
-The page is structurally lint-clean, but review found 2 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The serialization page satisfies the prompt contract and the sampled source claims align with the recorded source commit. I found no reportable factual, structural, link, style, or front-matter issues.
 
 ## Items checked
-- Checked generic serialize pattern, fossil validation comments, RIFF chunk structure, watched serialize files, module-version note, and front matter.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show cross-cutting/serialization.md` and reviewed the per-doc prompt, `_common.md`, resolved watched files, and dependency `architecture/overview.md`.
+- Checked front matter for required keys, source commit, watched-path digest, and warning string.
+- Verified required coverage for serialized payloads, generic serialization, fossil, RIFF containers, source-location serialization, versioning, round-trip/repro notes, and adding serialized fields.
+- Spot-checked more than 10 source claims against `slang-serialize.h`, `slang-serialize-container.cpp`, `slang-serialize-fossil.h`, `slang-serialize-ir.cpp`, `slang-serialize-ir.h`, `slang-serialize-riff.cpp`, `slang-serialize-source-loc.cpp`, and `slang-ir.h`.
+- Confirmed that every serialize-related file listed in the resolved watched paths is mentioned in the page.
+- Checked relative links and peer links used by the page; no unresolved target was found.
+- Checked that the body has no source line-number citations requiring line-by-line verification.
 
 ## Findings
+(no findings)
 
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## What is serialized` and `## Source-location serialization` | The page relies on `slang-serialize-ir-types.*` and `slang-serialize-source-loc.*`, but those files are not watched for this page. | The serialization manifest entry includes serialize AST/IR/container/fossil/riff files, but not IR-types or source-loc serialization files. | Add those files to watched paths or mark those details as requiring additional watched paths. |
-| F-002 | minor | `## Round-trip and repro files` | The page adds unsupported guidance that `-target slang` plus the test-server framework is the supported path; the prompt only asks for a deprecated repro note. | `docs/generated/design/_meta/prompts/cross-cutting-serialization.md` limits this section to historical repro handling, and watched paths do not establish the alternative workflow. | Remove the alternative-workflow claim unless the manifest is expanded to include supporting files. |
+## No-issues notes
+- The fossil validation description matches `SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS` and `SLANG_SERIALIZE_FOSSIL_VALIDATE`.
+- The flat IR read-path description matches `deserializeFromFlatModule`, including the `Unrecognized` skip for literal/string-consumption assertions.
+- The module-version note matches the `IRModule` version constants and nearby comments in `source/slang/slang-ir.h`.

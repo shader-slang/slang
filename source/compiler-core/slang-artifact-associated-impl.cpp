@@ -289,6 +289,8 @@ void* ArtifactPostEmitMetadata::getInterface(const Guid& guid)
     }
     if (guid == slang::IMetadata::getTypeGuid())
         return static_cast<slang::IMetadata*>(this);
+    if (guid == slang::IBindlessResourceMetadata::getTypeGuid())
+        return static_cast<slang::IBindlessResourceMetadata*>(this);
     if (guid == slang::ICoverageTracingMetadata::getTypeGuid())
     {
         return static_cast<slang::ICoverageTracingMetadata*>(this);
@@ -356,6 +358,11 @@ const char* ArtifactPostEmitMetadata::getDebugBuildIdentifier()
     return m_debugBuildIdentifier.getBuffer();
 }
 
+bool ArtifactPostEmitMetadata::usesBindlessResourceHeap()
+{
+    return m_usesBindlessResourceHeap;
+}
+
 uint32_t ArtifactPostEmitMetadata::getCounterCount()
 {
     return m_coverageCounterCount;
@@ -387,6 +394,14 @@ static constexpr size_t kSyntheticResourceInfoV1MinSize =
         if ((outInfo)->structSize >=                                                      \
             offsetof(slang::CoverageEntryInfo, fieldName) + sizeof((outInfo)->fieldName)) \
             (outInfo)->fieldName = (value);                                               \
+    } while (0)
+
+#define SLANG_WRITE_OPTIONAL_COVERAGE_BUFFER_FIELD(outInfo, fieldName, value)              \
+    do                                                                                     \
+    {                                                                                      \
+        if ((outInfo)->structSize >=                                                       \
+            offsetof(slang::CoverageBufferInfo, fieldName) + sizeof((outInfo)->fieldName)) \
+            (outInfo)->fieldName = (value);                                                \
     } while (0)
 
 SlangResult ArtifactPostEmitMetadata::getEntryInfo(
@@ -447,6 +462,16 @@ SlangResult ArtifactPostEmitMetadata::getBufferInfo(slang::CoverageBufferInfo* o
             break;
         }
     }
+
+    // Optional tail field: write the per-slot byte width only if the
+    // caller's `CoverageBufferInfo` is large enough to receive it.
+    // Older callers (smaller `structSize`) see no field; their
+    // pre-existing default of `4` from the struct's in-class
+    // initializer continues to apply at the caller side.
+    SLANG_WRITE_OPTIONAL_COVERAGE_BUFFER_FIELD(
+        outInfo,
+        elementByteWidth,
+        m_coverageCounterByteWidth);
     return SLANG_OK;
 }
 
