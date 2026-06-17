@@ -1021,6 +1021,16 @@ class NonEmptyPackConstraintDecl : public Decl
 };
 
 FIDDLE()
+class GenericVariadicPackCountConstraintDecl : public Decl
+{
+    FIDDLE(...)
+    SourceLoc whereTokenLoc = SourceLoc();
+    FIDDLE() Expr* packExpr = nullptr;
+    FIDDLE() Expr* expectedCountExpr = nullptr;
+    FIDDLE() IntVal* expectedCountVal = nullptr;
+};
+
+FIDDLE()
 class HasDiffTypeInfoConstraintDecl : public Decl
 {
     FIDDLE(...)

@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:30:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: f11187e79ffaa9e1c1966046a9bb76df4bb33cabc81ba4f496d6f224fcf0ca12
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:13:32Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: d8643144402b3b5b8e46aca73d7eff5df8942a1b6227b1a92d42854ab8ea8279
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -82,6 +82,7 @@ lives in the [pipeline](../pipeline) and
 | --- | --- | --- |
 | Front-end compile request | [slang-compile-request.h](../../../../source/slang/slang-compile-request.h), `slang-compile-request.cpp` | Drives parsing, checking, lowering for a translation unit |
 | End-to-end compile request | `slang-end-to-end-request.cpp` | Backs a single `slangc` / public-API compile invocation |
+| Repro capture and replay | `slang-repro.h`, `slang-repro.cpp`, `slang-repro-validator.h`, `slang-repro-validator.cpp` | Serializes a compile request for `-extract-repro` / `-load-repro`; the validator checks repro inputs before they are used |
 | Module | [slang-module.h](../../../../source/slang/slang-module.h), `slang-module.cpp` | Holds AST + IR for a translation unit; implements `IModule` |
 | Module library | `slang-module-library.h`, `slang-module-library.cpp` | Bundles compiled modules into reusable libraries |
 | Linkage | `slang-session.h`, `slang-session.cpp` | The class behind the public `slang::ISession` — a per-configuration scope owning search paths, target settings, and the source manager |
@@ -274,14 +275,44 @@ output can be compiled by the downstream toolchain.
 | LLVM helpers | [slang-llvm.h](../../../../prelude/slang-llvm.h) | `slang-llvm` integration |
 | Torch prelude | [slang-torch-prelude.h](../../../../prelude/slang-torch-prelude.h) | PyTorch glue |
 
-## Other source/ subdirectories
+## source/slang-llvm/ — LLVM-based JIT and native compilation
 
-| Subdirectory | Role |
-| --- | --- |
-| [source/slang-llvm/](../../../../source/slang-llvm) | LLVM-based JIT / native compilation |
-| [source/slang-glslang/](../../../../source/slang-glslang) | Bridge to Khronos glslang for SPIR-V via GLSL |
-| [source/slang-dispatcher/](../../../../source/slang-dispatcher) | Common dispatcher for downstream-tool invocation |
-| [source/slang-rt/](../../../../source/slang-rt) | Runtime library used by emitted CPU/Torch/CUDA targets |
-| [source/slang-record-replay/](../../../../source/slang-record-replay) | Public-API call recorder/replayer |
-| [source/slang-wasm/](../../../../source/slang-wasm) | WebAssembly bindings |
-| [source/slangc/](../../../../source/slangc) | Command-line driver for the compiler |
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| LLVM bridge | [slang-llvm.cpp](../../../../source/slang-llvm/slang-llvm.cpp), `slang-llvm-builder.cpp`, `slang-llvm-jit-shared-library.cpp` | LLVM-based JIT / native compilation; built out-of-tree (see [dependency-graph.md](dependency-graph.md)) |
+
+## source/slang-glslang/ — Khronos glslang bridge
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| glslang shim | [slang-glslang.cpp](../../../../source/slang-glslang/slang-glslang.cpp), `slang-glslang.h` | Bridge to Khronos glslang for SPIR-V via GLSL |
+
+## source/slang-dispatcher/ — downstream-tool dispatcher
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| Dispatcher entry | [main.cpp](../../../../source/slang-dispatcher/main.cpp) | Common dispatcher for downstream-tool invocation |
+
+## source/slang-rt/ — runtime library
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| Runtime | [slang-rt.cpp](../../../../source/slang-rt/slang-rt.cpp), `slang-rt.h` | Runtime library used by emitted CPU/Torch/CUDA targets |
+
+## source/slang-record-replay/ — public-API record/replay
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| Recorder/replayer | [replay-context.cpp](../../../../source/slang-record-replay/replay-context.cpp), `replay-handlers.cpp`, `replay-stream-decoder.cpp` | Public-API call recorder/replayer; sources are folded into `slang` (see [dependency-graph.md](dependency-graph.md)) |
+
+## source/slang-wasm/ — WebAssembly bindings
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| WASM bindings | [slang-wasm.cpp](../../../../source/slang-wasm/slang-wasm.cpp), `slang-wasm-bindings.cpp`, `slang-wasm.h` | WebAssembly bindings for the public API |
+
+## source/slangc/ — command-line driver
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| Driver entry | [main.cpp](../../../../source/slangc/main.cpp) | Command-line driver for the compiler |

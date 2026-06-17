@@ -575,15 +575,60 @@ if(_dxc_build_from_source)
     file(WRITE "${_dxc_build_dir}/.clang-format" "BasedOnStyle: LLVM\n")
 
     # Step 2: Configure DXC at Slang configure time.
-    # The stamp content is keyed on resolved source commit, generator, platform,
-    # toolset, both compilers, and forwarded configure arguments so switching any
-    # of these invalidates the cached configure. A SHA256 hash keeps the content
-    # short regardless of lengths.
-    string(
-        SHA256
-        _dxc_config_hash
-        "${_dxc_expected_git_commit}_${CMAKE_GENERATOR}_${CMAKE_GENERATOR_PLATFORM}_${CMAKE_GENERATOR_TOOLSET}_${CMAKE_C_COMPILER}_${CMAKE_CXX_COMPILER}_${_dxc_forwarded_config_args}"
+    #
+    # _dxc_configure_args is the single source of truth for the configure
+    # invocation: it is used both to compute the stamp hash below and to run the
+    # configure itself. Because the stamp hashes the exact argument list, any
+    # change to the configure command (flags, compilers, generator, build type,
+    # forwarded args) automatically invalidates the stamp and forces a
+    # reconfigure. That reconfigure rewrites the stamp, which in turn cascades
+    # into a rebuild via the configure-stamp DEPENDS edge on the DXC build
+    # custom command. This keeps a stale configuration from silently surviving a
+    # flag change (e.g. the -Wno-invalid-specialization workaround below).
+    set(_dxc_configure_args
+        -B
+        "${_dxc_build_dir}"
+        -S
+        "${_dxc_src_dir}"
+        ${_dxc_generator_args}
+        -C
+        "${_dxc_src_dir}/cmake/caches/PredefinedParams.cmake"
+        # Forward parent compilers so DXC uses the same toolchain.
+        "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+        "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+        # CMAKE_BUILD_TYPE is ignored by multi-config generators (VS); the
+        # config is selected via --config MinSizeRel in the build command.
+        # Passing it here covers single-config generators (Ninja).
+        -DCMAKE_BUILD_TYPE=MinSizeRel
+        -DHLSL_COPY_GENERATED_SOURCES=OFF
+        -DLLVM_INCLUDE_TESTS=OFF
+        -DCLANG_INCLUDE_TESTS=OFF
+        -DLLVM_ENABLE_WARNINGS=OFF
+        ${_dxc_forwarded_config_args}
+        -Wno-dev
     )
+
+    # Apple Clang 21+ (Xcode 26+) ships a libc++ that marks
+    # std::is_nothrow_constructible with [[_Clang::__no_specializations__]],
+    # turning DXC's LLVM StringRef trait specializations into
+    # -Winvalid-specialization hard errors. Only this toolchain needs the
+    # suppression, so scope it to AppleClang >= 21; other compilers (and older
+    # AppleClang) must not receive a flag they do not need.
+    if(
+        CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang"
+        AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "21.0.0"
+    )
+        list(
+            APPEND
+            _dxc_configure_args
+            "-DCMAKE_CXX_FLAGS=-Wno-invalid-specialization"
+        )
+    endif()
+
+    # A SHA256 hash keeps the stamp content short regardless of argument length.
+    # The leading "stamp-v1;" token is a manual schema version: bump it to force
+    # every checkout to reconfigure DXC even when no configure argument changed.
+    string(SHA256 _dxc_config_hash "stamp-v1;${_dxc_configure_args}")
     set(_dxc_configure_stamp "${_dxc_build_dir}/.slang_dxc_configured")
     set(_dxc_configure_is_current OFF)
     if(EXISTS "${_dxc_configure_stamp}")
@@ -607,20 +652,7 @@ if(_dxc_build_from_source)
     if(NOT _dxc_configure_is_current)
         message(STATUS "Configuring DXC from source (${_dxc_version_tag})...")
         execute_process(
-            COMMAND
-                ${CMAKE_COMMAND} -B "${_dxc_build_dir}" -S "${_dxc_src_dir}"
-                ${_dxc_generator_args} -C
-                "${_dxc_src_dir}/cmake/caches/PredefinedParams.cmake"
-                # Forward parent compilers so DXC uses the same toolchain.
-                "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
-                "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
-                # CMAKE_BUILD_TYPE is ignored by multi-config generators (VS);
-                # the config is selected via --config MinSizeRel in the build
-                # command. Passing it here covers single-config generators (Ninja).
-                -DCMAKE_BUILD_TYPE=MinSizeRel -DHLSL_COPY_GENERATED_SOURCES=OFF
-                -DLLVM_INCLUDE_TESTS=OFF -DCLANG_INCLUDE_TESTS=OFF
-                -DLLVM_ENABLE_WARNINGS=OFF ${_dxc_forwarded_config_args}
-                -Wno-dev
+            COMMAND ${CMAKE_COMMAND} ${_dxc_configure_args}
             RESULT_VARIABLE _dxc_configure_result
             OUTPUT_VARIABLE _dxc_configure_output
             ERROR_VARIABLE _dxc_configure_error

@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-28T08:22:13+00:00
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-watched_paths_digest: 901d192b17338b4a7dc882dff1bea2cd6f2750dad1694a5f0787288344552a33
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:21:40Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -30,14 +30,22 @@ and `DifferentialPairGetPrimalBase`. The bulk of the
 differentiation-operator opcodes (`ForwardDifferentiate`,
 `BackwardDifferentiate`, the propagate / primal / remat variants,
 and the legacy-bridge opcodes) live under the `TranslateBase`
-hoistable group at line ~2561. Two additional opcodes that are
+hoistable group at line ~2592. Three additional opcodes that are
 specific to checkpointing — `checkpointObj`,
 `ReportCheckpointStore`, and `loopExitValue` — live in the
-value-producing section (around lines 1448-1465). A handful of
+value-producing section (around lines ~1480-1487). A handful of
 related opcodes are documented in sibling pages: the differential
 pair *types* are in [types.md](types.md); generic-annotation opcodes
 that mark differentiable types (`DifferentiableTypeAnnotation`,
 `DifferentiableTypeDictionaryItem`) are in [misc.md](misc.md).
+
+Two further opcodes that identify the built-in `IDifferentiable`
+family of interface requirements live just after the ordinary
+`StructKey` entry: `BuiltinRequirementKey` (a hoistable inst, line
+~829) and the `BuiltinRequirementDecoration` (line ~2112). These are
+produced during AST lowering, not by the autodiff passes, but the
+autodiff passes are their primary consumer; they are described under
+[built-in requirement keys](#built-in-requirement-keys) below.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The
@@ -47,8 +55,14 @@ opcodes are introduced primarily by the autodiff IR passes
 `slang-ir-autodiff-transcribe.cpp`, and friends); a small number
 are produced by
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-when lowering the user-facing `__fwd_diff` and `__bwd_diff`
-syntactic forms.
+when lowering the user-facing `__fwd_diff` syntactic form
+(`visitForwardDifferentiateExpr` emits `ForwardDifferentiate`), when
+lowering the differentiation `Val`s stored in witness tables
+(`visitBackwardDifferentiateVal` emits `BackwardDifferentiate`), or
+when assigning requirement keys to the built-in differentiable
+interfaces. The `__bwd_diff` expression form
+(`BackwardDifferentiateExpr`) is resolved before IR lowering, so its
+`visit*` calls `SLANG_UNEXPECTED` rather than emitting an opcode.
 
 ## Family hierarchy
 
@@ -59,6 +73,7 @@ flowchart TD
   Diff --> DifferentialPairGetDifferentialBase
   Diff --> DifferentialPairGetPrimalBase
   Diff --> TranslateBase
+  Diff --> BuiltinRequirementKey
   Diff --> Checkpointing
   MakeDifferentialPairBase --> MakeDiffPair
   MakeDifferentialPairBase --> MakeDiffRefPair
@@ -122,7 +137,7 @@ value.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `BackwardDifferentiate` | — | (variadic, `min=3`) | H | `BackwardDifferentiateExpr` (`__bwd_diff(...)`) in `slang-lower-to-ir.cpp` | Translates a function value into its reverse-mode adjoint. |
+| `BackwardDifferentiate` | — | (variadic, `min=3`) | H | (synthesized) | Translates a function value into its reverse-mode adjoint. |
 | `BackwardDifferentiatePrimal` | — | (variadic, `min=1`) | H | (synthesized) | Primal-only side of the reverse-mode pair, used to compute the values reverse mode needs to remember. |
 | `BackwardDifferentiatePropagate` | — | (variadic, `min=1`) | H | (synthesized) | Backwards-propagation side of the reverse-mode pair; produces the adjoint update. |
 | `BackwardRemat` | — | (variadic, `min=1`) | H | (synthesized) | Rematerialization variant: recomputes primal values rather than reading them from a checkpoint. |
@@ -175,6 +190,23 @@ backward auto-diff passes; none survive past those passes.
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `DiffTypeInfo` | — | — | H | (synthesized) | Holds witness tables for differential type info (`thisType` witness, return-type witness, parameter witnesses); lowered to a `MakeTuple` after specialization. |
+
+### Built-in requirement keys
+
+The `IDifferentiable` / `IBackwardDifferentiable` / `IBwdCallable`
+interfaces are recognized by the compiler, and the autodiff passes
+need to look their requirements up by *role*
+(`BuiltinRequirementKind::DifferentialType`, `DAddFunc`,
+`DifferentialWitness`, etc.) rather than by entry position, which is
+not semantically meaningful. `BuiltinRequirementKey` is the
+hoistable requirement-key inst that carries that role, and
+`BuiltinRequirementDecoration` is the matching decoration scanned by
+the lookup helper.
+
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `BuiltinRequirementKey` | `IRBuiltinRequirementKey` | `kindOperand` | H | (lowering) | Requirement key for a recognized built-in interface requirement; deduplicated by construction from its `kind` operand. |
+| `BuiltinRequirementDecoration` | `IRBuiltinRequirementDecoration` | `kindOperand` | | (lowering) | Marks an interface requirement key with the `BuiltinRequirementKind` of the built-in requirement it represents. |
 
 ### Checkpointing and rematerialization
 
@@ -230,6 +262,29 @@ call graph. Its result is a function whose signature accepts the
 recorded primal-side state plus an output-adjoint and produces the
 input-adjoints. The propagate-context family in [types.md](types.md)
 defines the typed channels through which the state flows.
+
+### `BuiltinRequirementKey`
+
+`BuiltinRequirementKey(kind)` is the IR-level key under which a
+built-in `IDifferentiable`-family requirement is stored in and
+fetched from a witness table. Unlike an ordinary `StructKey` — a
+distinct global symbol per requirement decl, unified across modules
+by its `key_<mangled>` linkage name — the built-in key is
+*hoistable*, so it is deduplicated by construction from its `kind`
+operand. The same logical requirement therefore resolves to one key
+inst whether it is referenced from the canonical interface
+constraint, from a constraint synthesized while building a type's
+`Differential`, or across the precompiled-core-module boundary; no
+linkage decoration is needed because identity comes from the operand.
+`getInterfaceRequirementKey` in
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+emits the key and tags it with `BuiltinRequirementDecoration`;
+`getInterfaceEntryByBuiltinRequirement` in
+`slang-ir-autodiff.cpp` then scans that decoration to find a
+requirement entry by role instead of by position. Because a built-in
+requirement may be reached through dynamic dispatch, the `lookupKey`
+operand of `GetDispatcher` is typed as a plain `IRInst` rather
+than `IRStructKey`.
 
 ### `checkpointObj` and `ReportCheckpointStore`
 
