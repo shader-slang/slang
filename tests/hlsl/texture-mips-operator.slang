@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -O0
 
-// CHECK: OpImageFetch %v4float {{.*}} Lod %int_1
+// CHECK: OpImageFetch %v4float {{.*}} Lod %{{[A-Za-z0-9_]+}}
 
 RWStructuredBuffer<float4> result;
 

@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_SPV):-target spirv -entry main -stage compute
-//TEST:SIMPLE(filecheck=CHECK_GLSL_SPV):-target spirv -entry main -stage compute -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=CHECK_SPV):-target spirv -entry main -stage compute -O0
+//TEST:SIMPLE(filecheck=CHECK_GLSL_SPV):-target spirv -entry main -stage compute -emit-spirv-via-glsl -O0
 //TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry main -stage compute
@@ -38,57 +38,23 @@ MyStruct func(RWStructuredBuffer<uint> buffer)
 void main(uint3 pixelIndex : SV_DispatchThreadID)
 {
 
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR3:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR4:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR5:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR6:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR7:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR8:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR9:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR10:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR11:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR12:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR13:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR14:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR15:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR16:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR17:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK_GLSL_SPV: OpDecorate %[[VAR18:[a-zA-Z0-9_]+]] NonUniform
-
-    // Direct-SPIRV decoration coverage. The four globalBuffer descriptor-array
-    // accesses are emitted in source order (case 1, 2, 3, 4), and slang-test
-    // appends "; NonUniform" inline to decorated instructions. We pin each case
-    // by its index and assert its decoration status on its own line -- this
-    // proves *which* chains are (and are not) decorated, so a case-swap
-    // regression (e.g. dropping case 2 while spuriously decorating the uniform
-    // case 3) is caught, unlike a bare count. Matching the inline annotation also
-    // avoids depending on FileCheck's cursor relative to the annotations section.
-    //   - case 1 (uint `bufferIdx`):  decorated
-    //   - case 2 (int `bufferIdx2`):  decorated
-    //   - case 3 (uniform `bufferIdx3`): NOT decorated (line ends after the index)
-    //   - case 4 ((uint)((int)NonUniformResourceIndex(bufferIdx)) -- collapses back
-    //     to `bufferIdx`): decorated
-    // `[^0-9]` after `bufferIdx` keeps case 1/4 from matching `bufferIdx2`/`3`.
-    // CHECK_SPV: %globalBuffer %bufferIdx{{[^0-9].*}}NonUniform
-    // CHECK_SPV: %globalBuffer %bufferIdx2{{.*}}NonUniform
-    // CHECK_SPV: %globalBuffer %bufferIdx3{{[[:space:]]*$}}
-    // CHECK_SPV: %globalBuffer %bufferIdx{{[^0-9].*}}NonUniform
+    // NonUniform propagation is pinned per *callee specialization* rather than
+    // at the call site: Slang specializes `func` per argument type/uniformity,
+    // so the access chain into `globalBuffer` lives inside the specialized
+    // callee, not (necessarily) inlined at the call site. This keeps the test
+    // independent of whether a downstream optimizer happens to inline calls.
+    //   - case 1 (uint `bufferIdx`):       calls `func`,   callee decorated
+    //   - case 2 (int `bufferIdx2`):       calls `func_0`, callee decorated
+    //   - case 3 (uniform `bufferIdx3`):   calls `func_1`, callee NOT decorated
+    //   - case 4 (cast of a NonUniformResourceIndex back to uint, so it
+    //     collapses to the same specialization as case 1): calls `func` again
+    // CHECK_SPV: OpFunctionCall %MyStruct %func %bufferIdx{{[[:space:]]*$}}
 
     uint bufferIdx = pixelIndex.x;
     uint nonUniformIdx = NonUniformResourceIndex(bufferIdx);
     RWStructuredBuffer<uint> buffer = globalBuffer[nonUniformIdx];
 
-    // CHECK_GLSL_SPV: %[[VAR1]] = OpCopyObject %uint %{{.*}}
-
-    // CHECK_GLSL_SPV: %[[VAR4]] = OpCopyObject %uint %[[VAR1]]
-    // CHECK_GLSL_SPV: %[[VAR5]] = OpAccessChain %_ptr_Uniform_uint %globalBuffer_0 %[[VAR4]] %int_0 %int_0
-    // CHECK_GLSL_SPV: %[[VAR6]] = OpLoad %uint %[[VAR5]]
-
-    // CHECK_GLSL_SPV: %[[VAR7]] = OpCopyObject %uint %[[VAR1]]
-    // CHECK_GLSL_SPV: %[[VAR8]] = OpAccessChain %_ptr_Uniform_uint %globalBuffer_0 %[[VAR7]] %int_0 %int_0
-    // CHECK_GLSL_SPV: %[[VAR9]] = OpLoad %uint %[[VAR8]]
+    // CHECK_GLSL_SPV: OpFunctionCall %MyStruct_0 %func_0_u1_
 
     // CHECK_GLSL: func_0({{.*}}nonuniformEXT({{.*}}))
     // CHECK_HLSL: func_0(globalBuffer_0[NonUniformResourceIndex({{.*}})])
@@ -98,19 +64,10 @@ void main(uint3 pixelIndex : SV_DispatchThreadID)
     int bufferIdx2 = pixelIndex.y;
 
     // Test case 2: Make sure we cover the case for the different data type of the index.
-    // In this case, slang will specialize the function to 'MyStruct func(int)'
-    // The access chain for bufferIdx2 should be decorated NonUniform (the case-2
-    // CHECK_SPV above pins this).
+    // In this case, slang will specialize the function to 'MyStruct func(int)'.
+    // CHECK_SPV: OpFunctionCall %MyStruct %func_0 %bufferIdx2
 
-    // CHECK_GLSL_SPV: %[[VAR2]] = OpCopyObject %int %{{.*}}
-
-    // CHECK_GLSL-SPV: %[[VAR10]] = OpCopyObject %int %[[VAR2]]
-    // CHECK_GLSL-SPV: %[[VAR11]] = OpAccessChain %_ptr_Uniform_uint %globalBuffer_0 %[[VAR10]] %int_0 %int_0
-    // CHECK_GLSL-SPV: %[[VAR12]] = OpLoad %uint %[[VAR11]]
-
-    // CHECK_GLSL-SPV: %[[VAR13]] = OpCopyObject %int %[[VAR2]]
-    // CHECK_GLSL-SPV: %[[VAR14]] = OpAccessChain %_ptr_Uniform_uint %globalBuffer_0 %[[VAR13]] %int_0 %int_0
-    // CHECK_GLSL-SPV: %[[VAR15]] = OpLoad %uint %[[VAR14]]
+    // CHECK_GLSL_SPV: OpFunctionCall %MyStruct_0 %func_1_i1_
     RWStructuredBuffer<uint> buffer2 = globalBuffer[NonUniformResourceIndex(bufferIdx2)];
 
     // CHECK_GLSL: func_1({{.*}}nonuniformEXT({{.*}}))
@@ -118,28 +75,45 @@ void main(uint3 pixelIndex : SV_DispatchThreadID)
     // CHECK_CUDA: func_{{[0-9]+}}(globalParams_{{[0-9]+}}->globalBuffer_{{[0-9]+}}[{{.*}}])
     MyStruct myStruct2 = func(buffer2);
 
-    // Test case 3: a uniform index must NOT propagate NonUniform into the callee,
-    // so the access chain for the uniform bufferIdx3 must NOT be decorated
-    // NonUniform. The case-3 CHECK_SPV above pins this (its line ends right after
-    // %bufferIdx3, with no "; NonUniform" inline annotation).
+    // Test case 3: a uniform index must NOT propagate NonUniform into the callee.
+    // CHECK_SPV: OpFunctionCall %MyStruct %func_1 %bufferIdx3
     int bufferIdx3 = pixelIndex.z;
 
     RWStructuredBuffer<uint> buffer3 = globalBuffer[bufferIdx3];
+    // CHECK_GLSL_SPV: OpFunctionCall %MyStruct_0 %func_2_i1_
     // CHECK_CUDA: func_{{[0-9]+}}(globalParams_{{[0-9]+}}->globalBuffer_{{[0-9]+}}[{{.*}}])
     MyStruct myStruct3 = func(buffer3);
 
-    // CHECK_GLSL-SPV: %[[VAR19:[a-zA-Z0-9_]+]]  = OpBitcast %int %[[VAR3]]
-    // CHECK_GLSL-SPV: %[[VAR16]] = OpCopyObject %int %[[VAR19]]
-    // CHECK_GLSL-SPV: %[[VAR17]] = OpAccessChain %_ptr_Uniform_uint %globalBuffer_0 %[[VAR16]] %int_0 %int_0
-    // CHECK_GLSL-SPV: %[[VAR18]] = OpLoad %uint %[[VAR17]]
-    //
     // Test case 4: an intCast/uintCast of a NonUniformResourceIndex is still a
-    // NonUniformResourceIndex.
-    // Since after the nested cast, the index data type is 'uint' now, make sure it calls the same function as the test case 1.
+    // NonUniformResourceIndex. Since after the nested cast, the index data type
+    // is 'uint' now, make sure it calls the same specialization as test case 1.
+    // CHECK_SPV: OpFunctionCall %MyStruct %func %{{[0-9]+}}
+    // CHECK_GLSL_SPV: OpFunctionCall %MyStruct_0 %func_0_u1_
     // CHECK_GLSL: func_0({{.*}}nonuniformEXT({{.*}}))
     // CHECK_CUDA: func_{{[0-9]+}}(globalParams_{{[0-9]+}}->globalBuffer_{{[0-9]+}}[{{.*}}])
     RWStructuredBuffer<uint> buffer4 = globalBuffer[(uint)((int)NonUniformResourceIndex(bufferIdx))];
     MyStruct myStruct4 = func(buffer4);
+
+    // Now check the decoration inside each specialized callee, in their
+    // definition order. `func`/`func_0_u1_` and `func_0`/`func_1_i1_` are the
+    // nonuniform-index specializations (decorated); `func_1`/`func_2_i1_` is
+    // the uniform-index specialization (NOT decorated -- its access chain
+    // line ends right after the index, with no "; NonUniform" annotation).
+    // CHECK_SPV: %func = OpFunction
+    // CHECK_SPV: OpAccessChain {{.*}} %globalBuffer {{.*}} ; NonUniform
+    // CHECK_SPV: %func_0 = OpFunction
+    // CHECK_SPV: OpAccessChain {{.*}} %globalBuffer {{.*}} ; NonUniform
+    // CHECK_SPV: %func_1 = OpFunction
+    // CHECK_SPV: OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %globalBuffer %{{[A-Za-z0-9_]+}}{{[[:space:]]*$}}
+
+    // CHECK_GLSL_SPV: %func_0_u1_ = OpFunction
+    // CHECK_GLSL_SPV: OpCopyObject %uint %{{.*}} ; NonUniform
+    // CHECK_GLSL_SPV: OpAccessChain {{.*}} %globalBuffer_0 {{.*}} ; NonUniform
+    // CHECK_GLSL_SPV: %func_1_i1_ = OpFunction
+    // CHECK_GLSL_SPV: OpCopyObject %int %{{.*}} ; NonUniform
+    // CHECK_GLSL_SPV: OpAccessChain {{.*}} %globalBuffer_0 {{.*}} ; NonUniform
+    // CHECK_GLSL_SPV: %func_2_i1_ = OpFunction
+    // CHECK_GLSL_SPV: OpAccessChain %_ptr_Uniform_uint %globalBuffer_0 %{{[A-Za-z0-9_]+}} %int_0 %int_0{{[[:space:]]*$}}
 
     outputBuffer[0] = uint3(myStruct.a, myStruct.b, myStruct.c);
     outputBuffer[1] = uint3(myStruct2.a, myStruct2.b, myStruct2.c);

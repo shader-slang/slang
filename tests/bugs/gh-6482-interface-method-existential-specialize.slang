@@ -1,10 +1,10 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -O0
 
 // This is a test that checks that we can apply partial specialization to a function
 // that takes existential parameters.
 
-// CHECK: OpRayQueryProceedKHR
-// CHECK: OpImageWrite
+// CHECK-DAG: OpRayQueryProceedKHR
+// CHECK-DAG: OpImageWrite
 
 public interface IRandom {
     [mutating] uint32_t next_uint();

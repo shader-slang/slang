@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry compute_main -stage compute
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry compute_main -stage compute
 
-//TEST:SIMPLE(filecheck=SPV): -target spirv
+//TEST:SIMPLE(filecheck=SPV): -target spirv -O0
 
 // Check that we can specialize buffer loads through bindless handles, and
 // do not load big struct elements into registers unnecessarily.
@@ -38,10 +38,13 @@ ConstantBuffer<Root> cb;
 
 RWStructuredBuffer<float> outputBuffer;
 
+// `bottomGetValue` is not inlined, so the deferred load's result is
+// returned from its own function rather than stored directly at the
+// `compute_main` call site.
 // SPV: OpEntryPoint
 // SPV-NOT: OpLoad %Middle
 // SPV: %[[REG:[A-Za-z0-9_]+]] = OpLoad %float
-// SPV: OpStore {{.*}} %[[REG]]
+// SPV: OpReturnValue %[[REG]]
 
 // Check that the generated CUDA code contains a specialized `bottomGetValue` function that has
 // the complete parameter list to access the `bigArray` element directly, without needing to load

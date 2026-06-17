@@ -9,7 +9,7 @@
 // `-target hlsl` and an ICE on `-target spirv`.
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -stage compute -entry main
-//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv-asm -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv-asm -stage compute -entry main -O0
 //TEST:INTERPRET(filecheck=CHECK_INTERP): -entry interpretMain
 
 // The fix should ensure `this_type` (the unresolved IR placeholder) does not
@@ -24,10 +24,11 @@
 // CHECK_HLSL-NOT: this_type
 
 // SPIR-V should compile successfully (no ICE) and emit the dispatch chain
-// fully constant-folded into observable stores. Pinning the composites +
-// stores catches silent miscompilation that an `OpEntryPoint`-only check
-// would miss (e.g. a future regression that produces a clean module but
-// folds the call away to undef).
+// as concrete calls into the resolved witness (not `this_type`), with the
+// initial constant and the ternary's selected constant reaching observable
+// stores. Pinning the composites + the calls catches silent miscompilation
+// that an `OpEntryPoint`-only check would miss (e.g. a future regression
+// that leaves `this_type` behind, or folds a call away to undef).
 // CHECK_SPV: OpEntryPoint
 // CHECK_SPV-DAG: %[[F1:[A-Za-z0-9_]+]] = OpConstant %float 1
 // CHECK_SPV-DAG: %[[F2:[A-Za-z0-9_]+]] = OpConstant %float 2
@@ -35,7 +36,8 @@
 // CHECK_SPV-DAG: %[[V123:[A-Za-z0-9_]+]] = OpConstantComposite %v3float %[[F1]] %[[F2]] %[[F3]]
 // CHECK_SPV-DAG: %[[V111:[A-Za-z0-9_]+]] = OpConstantComposite %v3float %[[F1]] %[[F1]] %[[F1]]
 // CHECK_SPV: OpStore {{.*}} %[[V123]]
-// CHECK_SPV: OpStore {{.*}} %[[V123]]
+// CHECK_SPV: OpFunctionCall %v3float %cast_my_inst
+// CHECK_SPV: OpFunctionCall %MaterialProperties %MyInst_collect_properties{{[A-Za-z0-9_]*}}
 // CHECK_SPV: OpStore {{.*}} %[[V111]]
 
 // CHECK_INTERP: matched=1

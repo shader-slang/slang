@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv-asm -entry computeMain -stage compute -O0
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_OUTPUT): -cpu -compute -shaderobj -output-using-type
 
 // Regression test for #10212.
@@ -20,11 +20,18 @@
 // CHECK_HLSL: outputBuffer_0[int(0)] = m_0[int(3)][int(0)];
 // CHECK_HLSL: outputBuffer_0[int(1)] = m_0[int(2)][int(1)];
 
+// `writeOut`/`addInOut` are not inlined, so the constant they write isn't
+// stored directly to the swizzle target; instead the caller loads the
+// l-value into a temporary, calls the function, then writes the temporary
+// back. We pin that write-back to the same access chain the l-value
+// resolved to, which is what #10212 actually got wrong.
 // CHECK_SPV-DAG: %[[ROW3:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_Function_v4float %m %int_3
 // CHECK_SPV-DAG: %[[ELEM30:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_Function_float %[[ROW3]] %int_0
-// CHECK_SPV: OpStore %[[ELEM30]] %float_11
+// CHECK_SPV: OpFunctionCall %void %writeOut {{.*}} %float_11
+// CHECK_SPV: OpStore %[[ELEM30]]
 // CHECK_SPV-DAG: %[[ROW2:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_Function_v4float %m %int_2
 // CHECK_SPV-DAG: %[[ELEM21:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_Function_float %[[ROW2]] %int_1
+// CHECK_SPV: OpFunctionCall %void %addInOut {{.*}} %float_5
 // CHECK_SPV: OpStore %[[ELEM21]]
 
 // CHECK_OUTPUT: 11.0
