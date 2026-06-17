@@ -11,7 +11,7 @@ jobs:
   test-benchmark:
     name: Test (Benchmark)
     timeout-minutes: 60
-    runs-on: [Windows, self-hosted]
+    runs-on: [Windows, self-hosted, benchmark]
     defaults:
       run:
         shell: bash
