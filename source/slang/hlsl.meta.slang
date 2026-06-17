@@ -463,8 +463,8 @@ struct ByteAddressBuffer
 
     /// Load a value with type `T` from the buffer at the specified location with a known alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@param location The input address in bytes, which must be a multiple of `alignment`.
+    ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
     ///@return The value loaded from the buffer.
     ///@remarks
     /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
@@ -472,7 +472,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
-    T LoadAligned<T>(uint location, uint alignment)
+    T LoadAligned<T>(uint location, constexpr uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
@@ -5894,23 +5894,23 @@ uint64_t __asuint64(uint2 i)
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
-T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, uint offset, uint alignment);
+T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, uint offset, constexpr uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, uint offset, uint alignment);
+T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, uint offset, constexpr uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment);
+T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, constexpr uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, uint alignment, T value);
+void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, constexpr uint alignment, T value);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment, T value);
+void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, constexpr uint alignment, T value);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
 [require(cpp_cuda, byteaddressbuffer)]
@@ -6442,8 +6442,8 @@ struct $(item.name)
 
     /// Load a value with type `T` from the buffer at the specified location with a known alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@param location The input address in bytes, which must be a multiple of `alignment`.
+    ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
     ///@return The value loaded from the buffer.
     ///@remarks
     /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
@@ -6451,7 +6451,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-    T LoadAligned<T>(uint location, uint alignment)
+    T LoadAligned<T>(uint location, constexpr uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
@@ -7142,7 +7142,7 @@ $}
 
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-    void Store<T>(uint address, T value, uint alignment)
+    void Store<T>(uint address, T value, constexpr uint alignment)
     {
         __byteAddressBufferStore(this, address, alignment, value);
     }
