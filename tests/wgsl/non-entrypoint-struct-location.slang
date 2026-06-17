@@ -9,6 +9,9 @@
 // `@location(0)`, which WGSL rejects as a duplicate location.
 
 // Helper / non-entry-point struct: this is the case the original bug missed.
+// CHECK-DAG asserts struct survival so the @location checks below fail loudly (not vacuously) if
+// inlining/DCE ever drops GBuffer.
+//CHECK-DAG: struct GBuffer
 struct GBuffer
 {
     //CHECK-DAG: @location(0) albedo
