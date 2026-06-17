@@ -4473,19 +4473,33 @@ static bool _getBuiltinCompositeTypeShape(
     return true;
 }
 
-// Return true if `type` is a builtin floating-point scalar, vector, or matrix (i.e. its element
-// base type carries the `FloatingPoint` flag: `half`/`float`/`double` and their vector/matrix
-// forms). Used to reject bitwise/shift operators on floating-point operands, which have no valid
-// integer interpretation, with a dedicated diagnostic. Returns false for any non-builtin or
-// non-floating-point type (including `bool`, integers, and user-defined/generic types).
-static bool _isBuiltinFloatingPointType(Type* type)
+// Return true when both operands of a bitwise/shift operator are builtin scalar/vector/matrix
+// types and at least one has a floating-point element type (`half`/`float`/`double`), and set
+// `outFloatOperandType` to a floating-point operand's type. Such an operation has no valid integer
+// interpretation and is rejected with a dedicated diagnostic. Returns false (leaving the operands
+// to normal overload resolution) when EITHER operand is non-builtin -- so a user-defined
+// `operator OP` with a builtin/user-type mix (e.g. `operator|(float, MyType)`) and generic-context
+// resolution are unaffected -- and when both operands are builtin but neither is floating-point
+// (e.g. `int << uint`, `bool | bool`).
+static bool _isBuiltinFloatingPointBitwiseOperands(
+    Type* left,
+    Type* right,
+    Type*& outFloatOperandType)
 {
-    BaseType base;
-    IntVal* rows;
-    IntVal* cols;
-    if (!_getBuiltinCompositeTypeShape(type, base, rows, cols))
+    BaseType leftBase, rightBase;
+    IntVal *leftRows, *leftCols, *rightRows, *rightCols;
+    if (!_getBuiltinCompositeTypeShape(left, leftBase, leftRows, leftCols))
         return false;
-    return (BaseTypeInfo::getInfo(base).flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+    if (!_getBuiltinCompositeTypeShape(right, rightBase, rightRows, rightCols))
+        return false;
+    bool leftFloat =
+        (BaseTypeInfo::getInfo(leftBase).flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+    bool rightFloat =
+        (BaseTypeInfo::getInfo(rightBase).flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+    if (!leftFloat && !rightFloat)
+        return false;
+    outFloatOperandType = leftFloat ? left : right;
+    return true;
 }
 
 // Compute the common element base type for `a OP b`, following the "usual arithmetic
@@ -4699,23 +4713,24 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
             return nullptr;
     }
 
-    // A bitwise or shift operator (`& | ^ << >>`) with a builtin floating-point operand on either
-    // side has no valid integer interpretation. Reject it here with a dedicated diagnostic, before
-    // the shift/common-type machinery below, so every floating-point case gets the same actionable
-    // error: same-type (`float | float`, `float << float`), mixed via the usual arithmetic
-    // conversions (`float | int`), vector (`float3 | float3`), and -- crucially -- mixed-type
-    // shifts (`float << int`, `int << float`) which would otherwise hit the mixed-shift early
-    // return below and fall through to a confusing "ambiguous call"/"no overload" error (this is
-    // the regression in issue #11648). Only genuine builtin floating-point operands match:
-    // `bool` resolves cleanly via the `ILogical` overloads (handled by the eligibility check
-    // below), and non-builtin or generic operands are not floating-point-typed here, so
-    // user-defined `operator OP` and generic-context resolution are unaffected.
-    if (isBitwise && (_isBuiltinFloatingPointType(leftArg->type.type) ||
-                      _isBuiltinFloatingPointType(rightArg->type.type)))
+    // A bitwise or shift operator (`& | ^ << >>`) on two builtin operands where at least one is
+    // floating-point has no valid integer interpretation. Reject it here with a dedicated
+    // diagnostic, before the shift/common-type machinery below, so every floating-point case gets
+    // the same actionable error: same-type (`float | float`, `float << float`), mixed via the usual
+    // arithmetic conversions (`float | int`), vector (`float3 | float3`), and -- crucially --
+    // mixed-type shifts (`float << int`, `int << float`) which would otherwise hit the mixed-shift
+    // early return below and fall through to a confusing "ambiguous call"/"no overload" error (the
+    // regression in issue #11648). The predicate requires BOTH operands to be builtin: if either is
+    // non-builtin (user-defined or generic), it returns false and the operands fall through to
+    // normal overload resolution, so a user-defined `operator OP` with a builtin/user-type mix
+    // (e.g. `operator|(float, MyType)`) and generic-context resolution are unaffected. `bool` is
+    // not floating-point, so `bool` bitwise also falls through (to the `ILogical` overloads via the
+    // eligibility check below).
+    if (Type * floatOperandType; isBitwise && _isBuiltinFloatingPointBitwiseOperands(
+                                                  leftArg->type.type,
+                                                  rightArg->type.type,
+                                                  floatOperandType))
     {
-        Type* floatOperandType = _isBuiltinFloatingPointType(leftArg->type.type)
-                                     ? leftArg->type.type
-                                     : rightArg->type.type;
         getSink()->diagnose(Diagnostics::BitwiseOperatorRequiresIntegerOperands{
             .name = varExpr->name,
             .type = floatOperandType,

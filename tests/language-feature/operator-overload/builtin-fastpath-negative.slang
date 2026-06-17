@@ -20,6 +20,16 @@ V operator+(V a, int b)
     return r;
 }
 
+// A user-defined `operator|` with a builtin-float / user-type mix. The float-bitwise fast-path
+// rejection (#11648) only fires when BOTH operands are builtin, so this overload must still be
+// selected for `float | V` rather than the operands being diagnosed as a float bitwise op.
+V operator|(float a, V b)
+{
+    V r;
+    r.x = int(a) * 10 + b.x;
+    return r;
+}
+
 bool sideEffect()
 {
     printf("called\n");
@@ -33,6 +43,10 @@ void main()
     V r = v + 5; // must select the user operator+: 3 + 5*1000 = 5003
     printf("user=%d\n", r.x);
     //CHECK: user=5003
+
+    V r2 = 2.0f | v; // must select user operator|(float, V): int(2.0)*10 + 3 = 23
+    printf("userOr=%d\n", r2.x);
+    //CHECK: userOr=23
 
     bool b = false && sideEffect(); // must short-circuit: sideEffect() not evaluated
     //CHECK-NOT: called
