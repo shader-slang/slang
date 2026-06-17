@@ -1287,6 +1287,50 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addUsersToWorkList(newInst);
     }
 
+    // Retypes a descriptor-heap `ConstantBuffer<T>` fetch into the StorageBuffer storage
+    // class. A descriptor-heap constant buffer is fetched through an `OpBufferPointerEXT`
+    // raw-memory buffer pointer (not a bound UBO), so it must live in StorageBuffer like
+    // the StructuredBuffer-via-heap path. Left in Uniform, its pointer types carry no
+    // pointer-type `ArrayStride` (Uniform uses logical addressing), so addressing a nested
+    // array through the buffer pointer computes an undefined offset while the leading
+    // scalar at offset 0 stays correct -- the miscompile in #11483. Retyping the load
+    // result here lets the existing pointer-stride emission fire, and the StorageBuffer
+    // address space propagates to the chained field/element-address pointers via
+    // `processFieldAddress`/`processGetElementPtrImpl`.
+    void processConstantBufferDescriptorHeapLoad(IRSPIRVLoadDescriptorFromHeap* loadInst)
+    {
+        auto cbType = as<IRConstantBufferType>(loadInst->getDataType());
+        if (!cbType)
+            return;
+
+        // Non-struct constant-buffer elements are wrapped into a block struct by a later
+        // pass (`wrapRemainingConstantBufferElementTypes`); retyping them here, before that
+        // wrapping runs, would produce a non-block buffer pointer. Leave them to the
+        // generic post-worklist ConstantBuffer translation.
+        auto elementType = cbType->getElementType();
+        if (!as<IRStructType>(elementType))
+            return;
+
+        IRBuilder builder(m_sharedContext->m_irModule);
+        builder.setInsertBefore(loadInst);
+        builder.addDecorationIfNotExist(elementType, kIROp_SPIRVBlockDecoration);
+        auto dataLayout = cbType->getDataLayout();
+        if (!dataLayout)
+            dataLayout = builder.getDefaultBufferLayoutType();
+        auto newPtrType = builder.getPtrType(
+            elementType,
+            AccessQualifier::Immutable,
+            getStorageBufferAddressSpace(),
+            dataLayout);
+        auto newLoad = builder.emitLoadDescriptorFromHeap(
+            newPtrType,
+            loadInst->getHeap(),
+            loadInst->getIndex());
+        loadInst->replaceUsesWith(newLoad);
+        loadInst->removeAndDeallocate();
+        addUsersToWorkList(newLoad);
+    }
+
     void processMeshOutputGetElementPtr(IRMeshOutputRef* gepInst)
     {
         processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
@@ -2324,6 +2368,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_RWStructuredBufferGetElementPtr:
                 processRWStructuredBufferGetElementPtr(
                     cast<IRRWStructuredBufferGetElementPtr>(inst));
+                break;
+            case kIROp_SPIRVLoadDescriptorFromHeap:
+                processConstantBufferDescriptorHeapLoad(cast<IRSPIRVLoadDescriptorFromHeap>(inst));
                 break;
             case kIROp_MeshOutputRef:
                 processMeshOutputGetElementPtr(cast<IRMeshOutputRef>(inst));
