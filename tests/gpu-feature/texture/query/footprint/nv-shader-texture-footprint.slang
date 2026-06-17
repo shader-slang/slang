@@ -153,6 +153,23 @@ CLAMP(  accumulate##ND(r, texture##ND.queryFootprint##COARSE_OR_FINE##GradClamp 
 // SPIRV-DAG: OpImageSampleFootprintNV {{.*}}{{[[:space:]]}}Grad{{[[:space:]]}}
 // SPIRV-DAG: OpImageSampleFootprintNV {{.*}}{{[[:space:]]}}Grad|MinLod{{[[:space:]]}}
 
+// Recover the Coarse-vs-Fine distinction by name rather than by binding a
+// boolean to the flag word: `queryFootprintCoarseBias` and
+// `queryFootprintFineBias` are genuinely distinct functions/specializations
+// in both backends (only their *shared low-level helper*, where one exists,
+// is parameterized by the bool), so checking that both get called proves
+// Coarse and Fine are not collapsed into the same call.
+// SPIRV-DAG: OpFunctionCall {{.*}} %queryFootprintCoarse{{[A-Za-z0-9_]*}}
+// SPIRV-DAG: OpFunctionCall {{.*}} %queryFootprintCoarseBias{{[A-Za-z0-9_]*}}
+// SPIRV-DAG: OpFunctionCall {{.*}} %queryFootprintCoarseClamp{{[A-Za-z0-9_]*}}
+// SPIRV-DAG: OpFunctionCall {{.*}} %queryFootprintCoarseBiasClamp{{[A-Za-z0-9_]*}}
+// SPIRV-DAG: OpFunctionCall {{.*}} %queryFootprintCoarseLevel{{[A-Za-z0-9_]*}}
+// SPIRV-DAG: OpFunctionCall {{.*}} %queryFootprintFine{{[A-Za-z0-9_]*}}
+// SPIRV-DAG: OpFunctionCall {{.*}} %queryFootprintFineBias{{[A-Za-z0-9_]*}}
+// SPIRV-DAG: OpFunctionCall {{.*}} %queryFootprintFineClamp{{[A-Za-z0-9_]*}}
+// SPIRV-DAG: OpFunctionCall {{.*}} %queryFootprintFineBiasClamp{{[A-Za-z0-9_]*}}
+// SPIRV-DAG: OpFunctionCall {{.*}} %queryFootprintFineLevel{{[A-Za-z0-9_]*}}
+
     {
         let coords = c.xy;
         let dx = gx.xy;

@@ -25,10 +25,12 @@
 
 // SPIR-V should compile successfully (no ICE) and emit the dispatch chain
 // as concrete calls into the resolved witness (not `this_type`), with the
-// initial constant and the ternary's selected constant reaching observable
-// stores. Pinning the composites + the calls catches silent miscompilation
-// that an `OpEntryPoint`-only check would miss (e.g. a future regression
-// that leaves `this_type` behind, or folds a call away to undef).
+// initial constant, *both call results*, and the ternary's selected
+// constant all reaching observable stores. Binding each call's own result
+// id and requiring it (not just the call) to reach an `OpStore` is what
+// catches a regression that compiles cleanly but discards/replaces the
+// dispatch result (e.g. folds a call's use away) -- an `OpEntryPoint`-only
+// check, or a check that only confirms the call exists, would miss that.
 // CHECK_SPV: OpEntryPoint
 // CHECK_SPV-DAG: %[[F1:[A-Za-z0-9_]+]] = OpConstant %float 1
 // CHECK_SPV-DAG: %[[F2:[A-Za-z0-9_]+]] = OpConstant %float 2
@@ -36,8 +38,11 @@
 // CHECK_SPV-DAG: %[[V123:[A-Za-z0-9_]+]] = OpConstantComposite %v3float %[[F1]] %[[F2]] %[[F3]]
 // CHECK_SPV-DAG: %[[V111:[A-Za-z0-9_]+]] = OpConstantComposite %v3float %[[F1]] %[[F1]] %[[F1]]
 // CHECK_SPV: OpStore {{.*}} %[[V123]]
-// CHECK_SPV: OpFunctionCall %v3float %cast_my_inst
-// CHECK_SPV: OpFunctionCall %MaterialProperties %MyInst_collect_properties{{[A-Za-z0-9_]*}}
+// CHECK_SPV: %[[CASTCALL:[A-Za-z0-9_]+]] = OpFunctionCall %v3float %cast_my_inst
+// CHECK_SPV: %[[MEMBERCALL:[A-Za-z0-9_]+]] = OpFunctionCall %MaterialProperties %MyInst_collect_properties{{[A-Za-z0-9_]*}}
+// CHECK_SPV: %[[MEMBERRESULT:[A-Za-z0-9_]+]] = OpCompositeExtract %v3float %[[MEMBERCALL]] 0
+// CHECK_SPV: OpStore {{.*}} %[[MEMBERRESULT]]
+// CHECK_SPV: OpStore {{.*}} %[[CASTCALL]]
 // CHECK_SPV: OpStore {{.*}} %[[V111]]
 
 // CHECK_INTERP: matched=1
