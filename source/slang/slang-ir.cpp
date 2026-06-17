@@ -901,6 +901,51 @@ void fixUpFuncType(IRFunc* func)
     fixUpFuncType(func, func->getResultType());
 }
 
+IRFuncType* maybeExpandConcreteFuncTypePacks(IRBuilder* builder, IRFuncType* funcType)
+{
+    List<IRType*> paramTypes;
+    bool foundConcretePack = false;
+
+    for (auto paramType : funcType->getParamTypes())
+    {
+        if (auto typePack = as<IRTypePack>(paramType))
+        {
+            // Only flatten packs that specialization has already made concrete. Other pack-shaped
+            // IR must continue through the normal specialization/lowering path.
+            foundConcretePack = true;
+            for (UInt ii = 0; ii < typePack->getOperandCount(); ii++)
+                paramTypes.add((IRType*)typePack->getOperand(ii));
+        }
+        else
+        {
+            paramTypes.add(paramType);
+        }
+    }
+
+    if (!foundConcretePack)
+        return funcType;
+
+    if (auto attr = funcType->getAttr())
+        return builder->getFuncType(
+            paramTypes.getCount(),
+            paramTypes.getBuffer(),
+            funcType->getResultType(),
+            attr);
+
+    return builder->getFuncType(paramTypes, funcType->getResultType());
+}
+
+IRFuncType* maybeExpandConcreteFuncTypePacks(
+    IRBuilder* builder,
+    IRInst* funcValue,
+    IRFuncType* funcType)
+{
+    auto expandedFuncType = maybeExpandConcreteFuncTypePacks(builder, funcType);
+    if (expandedFuncType != funcType)
+        builder->replaceOperand(&funcValue->typeUse, expandedFuncType);
+    return expandedFuncType;
+}
+
 //
 
 bool isTerminatorInst(IROp op)
@@ -3240,6 +3285,23 @@ static IRCompilerDictionaryScope* findScope(IRCompilerDictionary* dict)
     return nullptr;
 }
 
+static void addCompilerDictionaryEntryKeys(
+    IRBuilder* builder,
+    List<IRInst*>& keyVals,
+    IRCompilerDictionaryScope* scope,
+    IRInst* translationInst)
+{
+    keyVals.reserve(2 + translationInst->getOperandCount());
+    keyVals.add(scope);
+    // Operand 1 is the opcode discriminator and is kept as a strong dictionary-entry operand so
+    // DCE cannot collect and recreate it between cache insertions/lookups.
+    keyVals.add(builder->getIntValue(builder->getUIntType(), (UInt)translationInst->getOp()));
+    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
+    {
+        keyVals.add(translationInst->getOperand(ii));
+    }
+}
+
 IRCompilerDictionaryEntry* IRBuilder::fetchCompilerDictionaryEntry(
     IRCompilerDictionary* dict,
     IRInst* translationInst)
@@ -3249,13 +3311,7 @@ IRCompilerDictionaryEntry* IRBuilder::fetchCompilerDictionaryEntry(
 
     List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
 
-    keyVals.reserve(2 + translationInst->getOperandCount());
-    keyVals.add(scope);
-    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
-    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
-    {
-        keyVals.add(translationInst->getOperand(ii));
-    }
+    addCompilerDictionaryEntryKeys(this, keyVals, scope, translationInst);
 
     auto entry = _getCompilerDictionaryEntry(keyVals);
     getModule()->getContainerPool().free(&keyVals);
@@ -3287,13 +3343,7 @@ void IRBuilder::addCompilerDictionaryEntry(
 
     List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
 
-    keyVals.reserve(2 + translationInst->getOperandCount());
-    keyVals.add(scope);
-    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
-    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
-    {
-        keyVals.add(translationInst->getOperand(ii));
-    }
+    addCompilerDictionaryEntryKeys(this, keyVals, scope, translationInst);
 
     auto entry = _getCompilerDictionaryEntry(keyVals);
     if (auto existingVal = entry->getValue(); existingVal)
@@ -3319,13 +3369,7 @@ IRInst* IRBuilder::tryLookupCompilerDictionaryValue(
 
     List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
 
-    keyVals.reserve(2 + translationInst->getOperandCount());
-    keyVals.add(scope);
-    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
-    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
-    {
-        keyVals.add(translationInst->getOperand(ii));
-    }
+    addCompilerDictionaryEntryKeys(this, keyVals, scope, translationInst);
 
     auto entry = _getCompilerDictionaryEntry(keyVals);
     getModule()->getContainerPool().free(&keyVals);
@@ -5686,6 +5730,11 @@ IRInst* IRBuilder::emitElementExtract(IRInst* base, IRInst* index)
     else if (auto vectorType = as<IRVectorType>(base->getDataType()))
     {
         type = vectorType->getElementType();
+    }
+    // CoopVec element extraction produces the element type just like vector extraction.
+    else if (auto coopVectorType = as<IRCoopVectorType>(base->getDataType()))
+    {
+        type = coopVectorType->getElementType();
     }
     else if (auto packedVectorType = as<IRMetalPackedVectorType>(base->getDataType()))
     {
