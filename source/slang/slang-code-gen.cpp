@@ -394,14 +394,19 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 
     SLANG_ASSERT(compilerType != PassThroughMode::None);
 
-    // Get the required downstream compiler
-    IDownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(compilerType, sink);
-    if (!compiler)
+    IDownstreamCompiler* compiler = nullptr;
+    auto loadDownstreamCompiler = [&]() -> SlangResult
     {
-        auto compilerName = TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)compilerType);
-        sink->diagnose(Diagnostics::PassThroughCompilerNotFound{.compiler = compilerName});
-        return SLANG_FAIL;
-    }
+        compiler = session->getOrLoadDownstreamCompiler(compilerType, sink);
+        if (!compiler)
+        {
+            auto compilerName =
+                TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)compilerType);
+            sink->diagnose(Diagnostics::PassThroughCompilerNotFound{.compiler = compilerName});
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
+    };
 
     Dictionary<String, String> preprocessorDefinitions;
     List<String> includePaths;
@@ -441,6 +446,8 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     original file, if there is one */
     if (auto endToEndReq = isPassThroughEnabled())
     {
+        SLANG_RETURN_ON_FAIL(loadDownstreamCompiler());
+
         // If we are pass through, we may need to set extension tracker state.
         if (ShaderExtensionTracker* glslTracker = as<ShaderExtensionTracker>(extensionTracker))
         {
@@ -533,6 +540,13 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 
         sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget(
             (SlangCompileTarget)sourceTarget);
+    }
+
+    // Non-pass-through targets emit and validate Slang-owned intermediate source before
+    // requiring the downstream compiler, so Slang diagnostics are not hidden by tool setup errors.
+    if (!compiler)
+    {
+        SLANG_RETURN_ON_FAIL(loadDownstreamCompiler());
     }
 
     if (sourceArtifact)
