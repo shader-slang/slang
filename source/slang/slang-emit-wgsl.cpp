@@ -2,6 +2,7 @@
 
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
+#include "slang-parameter-binding.h"
 #include "slang-rich-diagnostics.h"
 
 // A note on row/column "terminology reversal".
@@ -263,6 +264,25 @@ static bool isPowerOf2(const uint32_t n)
     return (n != 0U) && ((n - 1U) & n) == 0U;
 }
 
+// Resolve a varying field's WGSL `@location` from its semantic. `getSemanticIndex()` is -1 for
+// structs that skip entry-point varying-parameter legalization (e.g. one returned by a helper
+// function); their ordinal still lives in the name ("SV_TARGET1"), so recover it there instead of
+// defaulting to 0, which would collapse sibling fields onto a duplicate `@location(0)`.
+static int resolveWGSLLocation(IRSemanticDecoration* semantic)
+{
+    if (const int parsedIndex = semantic->getSemanticIndex(); parsedIndex >= 0)
+        return parsedIndex;
+
+    UnownedStringSlice baseName;
+    UnownedStringSlice trailingDigits;
+    if (splitNameAndIndex(semantic->getSemanticName(), baseName, trailingDigits))
+    {
+        return stringToInt(String(trailingDigits));
+    }
+
+    return 0;
+}
+
 bool WGSLSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
 {
     if (auto sysSemanticDecor = inst->findDecoration<IRTargetSystemValueDecoration>())
@@ -282,7 +302,7 @@ void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
         if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
         {
             m_writer->emit("@location(");
-            m_writer->emit(semanticDecoration->getEffectiveSemanticIndex());
+            m_writer->emit(resolveWGSLLocation(semanticDecoration));
             m_writer->emit(")");
             return;
         }
