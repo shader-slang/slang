@@ -1899,6 +1899,23 @@ private:
         // constraints use the existing join behavior for call inference.
         else if (!mergeTypeConstraint(type, argInfo.getPriority(), c, cType))
         {
+            // Two ordinary constraints inferred conflicting types for this
+            // parameter with no common type (e.g. `foo<T>(T, T)` called with
+            // unrelated `A` and `B`). `mergeTypeConstraint` returns false before
+            // mutating `type`, so `type` still holds the first candidate and
+            // `cType` the second. Capture both for a focused diagnostic; the
+            // formatting is deferred to `CompleteOverloadCandidate`. First
+            // recorded reason wins.
+            if (m_context.failure &&
+                m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
+                typeParam && typeParam->getName() && type.type && cType.type)
+            {
+                auto& conflict = m_context.failure->setGenericParamUnificationConflict();
+                conflict.paramName = typeParam->getName();
+                conflict.firstType = type.type;
+                conflict.secondType = cType.type;
+                conflict.location = m_context.applicationLoc;
+            }
             return ConstraintSolvingState::Failed;
         }
 
@@ -2693,16 +2710,16 @@ private:
                     // where a type `T` used only in return position, or a value
                     // `N` not mentioned in any parameter, fails — such a parameter
                     // produces no ordinary solver constraint, so
-                    // `areOrdinaryConstraintsSatisfied` cannot flag it. We only
-                    // record the parameter name; `CompleteOverloadCandidate`
+                    // `areOrdinaryConstraintsSatisfied` cannot flag it. We record
+                    // the parameter declaration; `CompleteOverloadCandidate`
                     // formats the diagnostic if this candidate is selected. First
                     // recorded reason wins.
                     if (m_context.failure &&
                         m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
-                        member->getName())
+                        member && member->getName())
                     {
                         auto& notInferred = m_context.failure->setOrdinaryGenericParamNotInferred();
-                        notInferred.paramName = member->getName();
+                        notInferred.member = member;
                         notInferred.location = m_context.applicationLoc;
                     }
                     return false;
@@ -2983,18 +3000,36 @@ private:
         //
         // This routine also serves equality constraints (`where T == X`), whose
         // `sup` is the concrete right-hand type rather than an interface. The
-        // "does not conform to interface" framing applies only to conformance
-        // (`T : IFoo`) constraints, so equality-constraint failures are excluded
-        // here and fall through to the generic fallback instead.
+        // specific "does not conform to interface" framing applies only to
+        // conformance (`T : IFoo`) constraints; every other unsatisfied
+        // constraint kind (equality, etc.) gets the general "does not satisfy
+        // generic constraint" reason instead of falling through to the generic
+        // fallback.
         if (m_context.failure &&
-            m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
-            !constraintDecl->isEqualityConstraint && sub && sup &&
+            m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None && sub && sup &&
             !hasUnreadyDependenciesForVal(sub) && !hasUnreadyDependenciesForVal(sup))
         {
-            auto& conformance = m_context.failure->setInterfaceConformanceNotSatisfied();
-            conformance.subType = sub;
-            conformance.supType = sup;
-            conformance.location = m_context.applicationLoc;
+            if (!constraintDecl->isEqualityConstraint)
+            {
+                auto& conformance = m_context.failure->setInterfaceConformanceNotSatisfied();
+                conformance.subType = sub;
+                conformance.supType = sup;
+                conformance.location = m_context.applicationLoc;
+            }
+            else
+            {
+                // General fallback for a non-conformance unsatisfied constraint.
+                // `argType` is the substituted value that violates it; the
+                // declared (unsubstituted) two sides print the constraint form
+                // (e.g. `T == int`), and the constraint declaration anchors a
+                // "see declaration" note.
+                auto& unsat = m_context.failure->setGenericConstraintNotSatisfied();
+                unsat.argType = sub;
+                unsat.constraintSub = constraintDecl->sub.type;
+                unsat.constraintSup = constraintDecl->sup.type;
+                unsat.constraintLoc = constraintDecl->loc;
+                unsat.location = m_context.applicationLoc;
+            }
         }
         return nullptr;
     }
@@ -3265,15 +3300,15 @@ private:
                 // Capture the focused reason for the selected-candidate path: an
                 // ordinary generic parameter was never determined from the call
                 // (for example a type `T` used only in return position, or a
-                // value `N` not mentioned in any parameter). We only record the
-                // parameter name here; `CompleteOverloadCandidate` formats the
-                // diagnostic if this candidate is selected. First reason wins.
+                // value `N` not mentioned in any parameter). We record the
+                // parameter declaration here; `CompleteOverloadCandidate` formats
+                // the diagnostic if this candidate is selected. First reason wins.
                 if (m_context.failure &&
                     m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
                     constraint.decl && constraint.decl->getName())
                 {
                     auto& notInferred = m_context.failure->setOrdinaryGenericParamNotInferred();
-                    notInferred.paramName = constraint.decl->getName();
+                    notInferred.member = constraint.decl;
                     notInferred.location = m_context.applicationLoc;
                 }
                 return false;

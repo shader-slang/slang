@@ -351,15 +351,8 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     //
     bool success = true;
 
-    auto maybeReportGeneralError = [&]()
-    {
-        if (context.mode != OverloadResolveContext::Mode::JustTrying)
-        {
-            getSink()->diagnose(Diagnostics::CannotSpecializeGeneric{
-                .generic = candidate.item.declRef.getDecl(),
-                .location = context.loc});
-        }
-    };
+    // Collect the generic's parameter types up front; the error reporter below
+    // uses their count to report explicit-argument-list arity mismatches.
     List<QualType> paramTypes;
     for (auto memberRef : getMembers(m_astBuilder, genericDeclRef))
     {
@@ -380,6 +373,41 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             paramTypes.add(DeclRefType::create(m_astBuilder, typePackParam));
         }
     }
+
+    // A trailing type/value pack means the generic has no single expected
+    // argument count, so a variadic generic falls back to the general error.
+    bool hasParamPack = false;
+    for (auto& paramType : paramTypes)
+    {
+        if (isPackType(paramType.type))
+            hasParamPack = true;
+    }
+
+    // When an explicit generic-argument list has the wrong number of arguments
+    // (e.g. `Foo<int>` or `Foo<int, float, half>` for `Foo<T, U>`), report a
+    // focused arity diagnostic naming the expected and provided counts. Other
+    // specialization failures keep the general "cannot specialize" error.
+    auto maybeReportGeneralError = [&]()
+    {
+        if (context.mode == OverloadResolveContext::Mode::JustTrying)
+            return;
+        Index expectedCount = paramTypes.getCount();
+        Index providedCount = context.getArgCount();
+        if (!hasParamPack && providedCount != expectedCount)
+        {
+            getSink()->diagnose(Diagnostics::GenericArgumentListArityMismatch{
+                .generic = candidate.item.declRef.getDecl(),
+                .expectedCount = expectedCount,
+                .actualCount = providedCount,
+                .location = context.loc});
+        }
+        else
+        {
+            getSink()->diagnose(Diagnostics::CannotSpecializeGeneric{
+                .generic = candidate.item.declRef.getDecl(),
+                .location = context.loc});
+        }
+    };
     ShortList<OverloadResolveContext::MatchedArg> matchedArgs;
     if (!context.matchArgumentsToParams(this, paramTypes, false, matchedArgs))
     {
@@ -1518,7 +1546,41 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
             {
                 auto& failure = candidate.genericInferenceFailure.ordinaryGenericParamNotInferred;
                 getSink()->diagnose(Diagnostics::GenericParameterCouldNotBeInferred{
+                    .paramName = failure.member->getName(),
+                    .location = failure.location});
+
+                String declString =
+                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                    .signature = declString,
+                    .location = candidate.item.declRef.getLoc()});
+                goto error;
+            }
+        case GenericArgumentInferenceFailure::Kind::GenericConstraintNotSatisfied:
+            {
+                auto& failure = candidate.genericInferenceFailure.genericConstraintNotSatisfied;
+                getSink()->diagnose(Diagnostics::GenericArgumentDoesNotSatisfyConstraint{
+                    .argType = failure.argType,
+                    .constraintSub = failure.constraintSub,
+                    .constraintSup = failure.constraintSup,
+                    .location = failure.location});
+                getSink()->diagnose(Diagnostics::SeeGenericConstraintDeclaration{
+                    .location = failure.constraintLoc});
+
+                String declString =
+                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                    .signature = declString,
+                    .location = candidate.item.declRef.getLoc()});
+                goto error;
+            }
+        case GenericArgumentInferenceFailure::Kind::GenericParamUnificationConflict:
+            {
+                auto& failure = candidate.genericInferenceFailure.genericParamUnificationConflict;
+                getSink()->diagnose(Diagnostics::GenericParameterUnificationConflict{
                     .paramName = failure.paramName,
+                    .firstType = failure.firstType,
+                    .secondType = failure.secondType,
                     .location = failure.location});
 
                 String declString =

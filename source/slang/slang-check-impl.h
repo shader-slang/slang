@@ -211,6 +211,8 @@ struct GenericArgumentInferenceFailure
         GenericArityMismatch,
         OrdinaryGenericParamNotInferred,
         InterfaceConformanceNotSatisfied,
+        GenericConstraintNotSatisfied,
+        GenericParamUnificationConflict,
     };
 
     struct VariadicPackCountMismatch
@@ -233,21 +235,51 @@ struct GenericArgumentInferenceFailure
     // An ordinary generic parameter (such as a type `T` that appears only in
     // return position, or a value `N` not mentioned in any parameter) was never
     // determined from the call, so its solver constraint stayed unsatisfied.
+    // The parameter declaration itself is stored (not just its name) so the
+    // diagnostic can use the full declaration (name, type-vs-value kind, loc).
     struct OrdinaryGenericParamNotInferred
     {
         SourceLoc location = SourceLoc();
-        Name* paramName = nullptr;
+        Decl* member = nullptr;
     };
 
     // A source generic constraint `T : IFoo` could not be discharged: the
     // inferred argument for `T` (`subType`) does not conform to the required
-    // interface (`supType`). Both are captured already substituted under the
-    // current (failed) specialization.
+    // interface (`supType`). The capture site records these only once both are
+    // concrete (its `hasUnreadyDependenciesForVal` guard), so they are always
+    // fully substituted under the current (failed) specialization when read.
     struct InterfaceConformanceNotSatisfied
     {
         SourceLoc location = SourceLoc();
         Type* subType = nullptr;
         Type* supType = nullptr;
+    };
+
+    // A source generic constraint that is not an interface conformance (e.g. an
+    // equality constraint `where T == int`) could not be satisfied. `argType` is
+    // the substituted argument that violates it; `constraintSub`/`constraintSup`
+    // are the declared (unsubstituted) two sides of the constraint, used to print
+    // its form (e.g. `T == int`); `constraintLoc` points at the constraint
+    // declaration for a "see declaration" note. This is the general fallback for
+    // unsatisfied constraints that lack a more specific message.
+    struct GenericConstraintNotSatisfied
+    {
+        SourceLoc location = SourceLoc();
+        Type* argType = nullptr;
+        Type* constraintSub = nullptr;
+        Type* constraintSup = nullptr;
+        SourceLoc constraintLoc = SourceLoc();
+    };
+
+    // Two ordinary constraints inferred conflicting types for one type parameter
+    // with no common type (e.g. `foo<T>(T, T)` called with unrelated `A` and
+    // `B`). Captures the parameter name and both candidate types.
+    struct GenericParamUnificationConflict
+    {
+        SourceLoc location = SourceLoc();
+        Name* paramName = nullptr;
+        Type* firstType = nullptr;
+        Type* secondType = nullptr;
     };
 
     Kind kind = Kind::None;
@@ -257,7 +289,21 @@ struct GenericArgumentInferenceFailure
         GenericArityMismatch genericArityMismatch;
         OrdinaryGenericParamNotInferred ordinaryGenericParamNotInferred;
         InterfaceConformanceNotSatisfied interfaceConformanceNotSatisfied;
+        GenericConstraintNotSatisfied genericConstraintNotSatisfied;
+        GenericParamUnificationConflict genericParamUnificationConflict;
     };
+
+    // Every payload must be trivially destructible: that is what makes the
+    // placement-new in `set*()` / `copyActiveMemberFrom` (which never destroys
+    // the previously active member first) well-defined.
+    static_assert(
+        std::is_trivially_destructible_v<VariadicPackCountMismatch> &&
+            std::is_trivially_destructible_v<GenericArityMismatch> &&
+            std::is_trivially_destructible_v<OrdinaryGenericParamNotInferred> &&
+            std::is_trivially_destructible_v<InterfaceConformanceNotSatisfied> &&
+            std::is_trivially_destructible_v<GenericConstraintNotSatisfied> &&
+            std::is_trivially_destructible_v<GenericParamUnificationConflict>,
+        "GenericArgumentInferenceFailure payloads must be trivially destructible");
 
     GenericArgumentInferenceFailure()
         : variadicPackCountMismatch()
@@ -303,6 +349,16 @@ struct GenericArgumentInferenceFailure
         kind = Kind::InterfaceConformanceNotSatisfied;
         return *new (&interfaceConformanceNotSatisfied) InterfaceConformanceNotSatisfied();
     }
+    GenericConstraintNotSatisfied& setGenericConstraintNotSatisfied()
+    {
+        kind = Kind::GenericConstraintNotSatisfied;
+        return *new (&genericConstraintNotSatisfied) GenericConstraintNotSatisfied();
+    }
+    GenericParamUnificationConflict& setGenericParamUnificationConflict()
+    {
+        kind = Kind::GenericParamUnificationConflict;
+        return *new (&genericParamUnificationConflict) GenericParamUnificationConflict();
+    }
 
 private:
     // Begin the lifetime of whichever union member `kind` selects, copy-
@@ -332,8 +388,15 @@ private:
             new (&interfaceConformanceNotSatisfied)
                 InterfaceConformanceNotSatisfied(other.interfaceConformanceNotSatisfied);
             break;
+        case Kind::GenericConstraintNotSatisfied:
+            new (&genericConstraintNotSatisfied)
+                GenericConstraintNotSatisfied(other.genericConstraintNotSatisfied);
+            break;
+        case Kind::GenericParamUnificationConflict:
+            new (&genericParamUnificationConflict)
+                GenericParamUnificationConflict(other.genericParamUnificationConflict);
+            break;
         case Kind::None:
-        default:
             break;
         }
     }

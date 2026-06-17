@@ -1928,6 +1928,34 @@ err(
     span { loc = "location", message = "could not infer generic argument for parameter '~paramName:Name'" }
 )
 
+err(
+    "generic-argument-does-not-satisfy-constraint",
+    30440,
+    "generic argument does not satisfy generic constraint",
+    span { loc = "location", message = "generic argument '~argType:Type' does not satisfy the generic constraint '~constraintSub:Type == ~constraintSup:Type'" }
+)
+
+standalone_note(
+    "see-generic-constraint-declaration",
+    -1,
+    "see generic constraint declaration",
+    span { loc = "location" }
+)
+
+err(
+    "generic-argument-list-arity-mismatch",
+    30441,
+    "wrong number of generic arguments",
+    span { loc = "location", message = "generic '~generic:Decl' expects ~expectedCount:Int generic argument(s) but ~actualCount:Int were provided" }
+)
+
+err(
+    "generic-parameter-unification-conflict",
+    30442,
+    "cannot deduce generic argument",
+    span { loc = "location", message = "cannot deduce generic argument for '~paramName:Name': no common type for candidate types '~firstType:Type' and '~secondType:Type'" }
+)
+
 -- Float bit cast diagnostics
 
 err(
