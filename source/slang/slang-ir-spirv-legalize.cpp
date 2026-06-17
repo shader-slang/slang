@@ -1303,10 +1303,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         if (!cbType)
             return;
 
-        // Non-struct constant-buffer elements are wrapped into a block struct by a later
-        // pass (`wrapRemainingConstantBufferElementTypes`); retyping them here, before that
-        // wrapping runs, would produce a non-block buffer pointer. Leave them to the
-        // generic post-worklist ConstantBuffer translation.
+        // Only retype constant buffers whose element is already a block struct at this
+        // point: user structs and (already-wrapped) array elements qualify. Scalar,
+        // vector, and matrix elements are wrapped into a block struct by a later pass
+        // (`wrapRemainingConstantBufferElementTypes`), so they are not yet structs here and
+        // are left to the generic post-worklist ConstantBuffer translation (which keeps
+        // them Uniform); retyping a not-yet-wrapped element would produce a non-block
+        // buffer pointer. Those non-array elements have no nested-array addressing through
+        // the buffer pointer, so the Uniform class is harmless for them.
         auto elementType = cbType->getElementType();
         if (!as<IRStructType>(elementType))
             return;
