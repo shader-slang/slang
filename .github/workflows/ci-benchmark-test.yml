@@ -1,0 +1,52 @@
+name: CI MDL Benchmark Test Workflow
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  test-benchmark:
+    name: Test (Benchmark)
+    timeout-minutes: 60
+    runs-on: [Windows, self-hosted]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Add Git Bash to PATH
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          submodules: "false"
+          fetch-depth: "1"
+      - name: Download Slang build
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: slang-tests-windows-x86_64-cl-release
+          path: build
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: "shader-slang/MDL-SDK"
+          path: "external/MDL-SDK"
+          sparse-checkout: |
+            ./examples/mdl_sdk/dxr/content/slangified
+      - name: Run benchmark
+        run: |
+          set -euo pipefail
+          # compile.py hardcodes slangc at ..\..\build\Release\bin\slangc.exe
+          # (relative to tools/benchmark), which is exactly where the downloaded
+          # artifact lands; fail fast if it is missing.
+          SLANGC_PATH="$(pwd)/build/Release/bin/slangc.exe"
+          [[ -f "$SLANGC_PATH" ]] || { echo "Missing required file: $SLANGC_PATH" >&2; exit 1; }
+          cd tools/benchmark
+          cp ../../external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang .
+          # Pin prettytable; argparse is in the stdlib (3.2+) so it is dropped.
+          pip install prettytable==3.17.0
+          python compile.py --samples 1 --target dxil
