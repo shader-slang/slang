@@ -33,7 +33,7 @@ void computeMain()
     // CHECK: OpFunctionCall %float %ddx_or %val %float_1
     // CHECK: OpFunctionEnd
     // CHECK-LABEL: %ddx_or = OpFunction
-    // CHECK-NOT: OpFunctionCall %float %ddx
+    // CHECK-NOT: OpDPdx
     // CHECK: OpReturnValue %defaultVal
     // CHECK: OpFunctionEnd
     output[0] = intermediate(2.0);
