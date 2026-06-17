@@ -3765,6 +3765,13 @@ err(
     span { loc = "expr:Expr", message = "ambiguous call to overloaded operation with arguments of type ~args" }
 )
 
+err(
+    "bitwise-operator-requires-integer-operands",
+    39999,
+    "bitwise operator '~name:Name' requires integer operands, but the operands have type ~type:Type",
+    span { loc = "expr:Expr", message = "bitwise operator '~name' requires integer operands" }
+)
+
 standalone_note(
     "overload-candidate",
     40011,

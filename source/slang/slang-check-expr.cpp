@@ -4714,9 +4714,10 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     bool isBoolBase = (baseType == BaseType::Bool);
     // Some operators do not apply to every element type. For example, it is invalid to apply a
     // bitwise operator to a floating-point operand, and arithmetic does not apply to `bool`. When
-    // the element type is not valid for the operator family we return null, so the expression
-    // falls back to normal overload resolution (which will either find a user-provided overload
-    // or produce the appropriate diagnostic) instead of being lowered as a builtin operation.
+    // the element type is not valid for the operator family we normally return null, so the
+    // expression falls back to normal overload resolution (which will either find a user-provided
+    // overload or produce the appropriate diagnostic) instead of being lowered as a builtin
+    // operation.
     //   - bitwise/shift (`& | ^ << >> ~`): integer only;
     //   - equality (`== !=`): integer, floating-point, or bool;
     //   - arithmetic (`+ - * / %`) and ordering comparison (`< > <= >=`): integer or float.
@@ -4728,7 +4729,25 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     else
         eligible = isIntegerBase || isFloatBase;
     if (!eligible)
+    {
+        // A bitwise/shift operator on a genuine builtin floating-point operand is the one decline
+        // we diagnose here rather than leaving to overload resolution: there is no valid integer
+        // interpretation, and falling through would match every integer `operator OP` at an equal
+        // `float`->integer conversion cost with no tie-break, producing a confusing "ambiguous
+        // call" (E39999) rather than an actionable message (issue #11648). Only floating-point
+        // bases are caught -- `bool` operands resolve cleanly via the `ILogical` overloads, and any
+        // non-builtin or generic operand already declined at `coerceOperandsOfBuiltinBinaryExpr`
+        // above, so user-defined `operator OP` and generic-context resolution are unaffected.
+        if (isBitwise && isFloatBase)
+        {
+            getSink()->diagnose(Diagnostics::BitwiseOperatorRequiresIntegerOperands{
+                .name = varExpr->name,
+                .type = operandType,
+                .expr = expr});
+            return CreateErrorExpr(expr);
+        }
         return nullptr;
+    }
 
     // Result type: arithmetic/bitwise preserve the operand type; comparison yields a
     // boolean of matching shape (scalar -> bool, vector<T,N> -> vector<bool,N>,
