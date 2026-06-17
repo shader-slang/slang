@@ -1727,6 +1727,29 @@ Result linkAndOptimizeIR(
         // On CPU/CUDA targets, we simply elminate any empty types if
         // they are not part of public interface.
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
+
+        // Empty types that ARE part of the public interface survive the legalization above,
+        // but an empty struct still occupies a byte as a C/C++/CUDA *source* member, while
+        // layout/reflection give it size 0 and skip it, so a retained empty field pushes
+        // following fields past their reflected offsets (shader-slang#8125). Drop those empty
+        // fields here and rewrite their uses so the emitted struct layout agrees with reflection.
+        //
+        // This is specific to the C-like *source* emitters (C++ / CUDA): the direct-LLVM CPU
+        // path (`isCPUTargetViaLLVM`) lowers an empty struct to a zero-size LLVM type that
+        // already matches reflection, so it neither needs nor tolerates this rewrite (the
+        // synthesized empty-struct values trip the LLVM emitter, e.g. on autodiff existential
+        // code). Hence the `!isCPUTargetViaLLVM` guard.
+        //
+        // Placement: right after this CPU/CUDA `legalizeEmptyTypes` (so non-public empty types
+        // are already lowered to `void` and only public-interface empty fields remain), and
+        // BEFORE the later unconditional `legalizeEmptyTypes` that runs for AD 2.0. AD 2.0
+        // synthesizes differential/internal types rather than new empty fields in the user's
+        // public-interface structs, and running this removal after those AD passes mis-handles
+        // AD's own (existential) structs.
+        if (!isCPUTargetViaLLVM(targetRequest))
+        {
+            SLANG_PASS(removeEmptyStructFields);
+        }
     }
 
     if (isCPUTargetViaLLVM(targetRequest))
