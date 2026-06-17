@@ -35,6 +35,7 @@ jobs:
         with:
           repository: "shader-slang/MDL-SDK"
           path: "external/MDL-SDK"
+          persist-credentials: false
           sparse-checkout: |
             ./examples/mdl_sdk/dxr/content/slangified
       - name: Run benchmark
