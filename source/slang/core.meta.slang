@@ -343,6 +343,26 @@ interface IFloat : IArithmetic, IDifferentiable
     This scale<T:__BuiltinFloatingPointType>(T scale);
 }
 
+// Interface for value types that support arithmetic through IArithmetic-style methods
+// and can expose those methods as differentiable operations.
+interface IDifferentiableArithmetic : IArithmetic, IDifferentiable
+{
+    [Differentiable]
+    This add(This other);
+
+    [Differentiable]
+    This sub(This other);
+
+    [Differentiable]
+    This mul(This other);
+
+    [Differentiable]
+    This div(This other);
+
+    [Differentiable]
+    This neg();
+}
+
 /// A type that can be used as an operand for builtins
 [sealed]
 [builtin]
@@ -3611,6 +3631,53 @@ __prefix T operator -(T v0)
 ${
     } // foreach ["IArithmetic", "IFloat"]
 $}
+
+// Let differentiable arithmetic-only types use the normal operators inside AD code without
+// requiring those types to satisfy the richer IFloat interface.
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+T operator +(T v0, T v1)
+{
+    return v0.add(v1);
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+T operator -(T v0, T v1)
+{
+    return v0.sub(v1);
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+T operator *(T v0, T v1)
+{
+    return v0.mul(v1);
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+T operator /(T v0, T v1)
+{
+    return v0.div(v1);
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+__prefix T operator -(T v0)
+{
+    return v0.neg();
+}
 
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
