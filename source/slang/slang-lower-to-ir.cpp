@@ -3033,6 +3033,8 @@ IRType* lowerType(IRGenContext* context, Type* type)
     return loweredType;
 }
 
+// Emits a kIROp_NodeIDDecoration on `inst` from a checked NodeIDAttribute.
+// The decoration stores the lowered name string and array index operands consumed by HLSL emit.
 static void addNodeIDDecoration(IRGenContext* context, IRInst* inst, NodeIDAttribute* nodeIDAttr)
 {
     auto builder = context->irBuilder;

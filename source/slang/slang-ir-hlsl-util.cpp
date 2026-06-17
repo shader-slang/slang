@@ -47,7 +47,8 @@ bool isValidBarrierMemoryTypeFlags(uint32_t flagVal)
 bool isValidBarrierSemanticFlags(uint32_t flagVal)
 {
     auto knownFlags = getKnownBarrierSemanticFlags();
-    return flagVal == BarrierSemanticFlags::Reorder || (flagVal & ~knownFlags) == 0;
+    return flagVal == BarrierSemanticFlags::Reorder ||
+           (flagVal != 0 && (flagVal & ~knownFlags) == 0);
 }
 
 bool isBarrierFlagValueCast(IRInst* castInst, IRType* fromType, IRType* toType)
