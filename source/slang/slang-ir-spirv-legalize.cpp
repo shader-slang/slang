@@ -31,13 +31,18 @@
 namespace Slang
 {
 
-// Returns true when `inst` is a compile-time-constant value. Used to decide whether an image
-// gather's `Offset` operand can be lowered to the capability-free `ConstOffset` (issue #9382):
-// a leaf is constant when it is an `IRConstant` (int/float/bool/...); a composite
-// (`MakeVector`/`MakeArray`/`MakeStruct`/`MakeMatrix`, e.g. `int2(2, 1)`) is constant when all of
-// its element operands are; and a scalar splat (`MakeVectorFromScalar`, e.g. `int2(1)`) is constant
-// when its scalar value is. Anything else is treated as a runtime value, which is the safe default:
-// it keeps the `Offset` form (valid SPIR-V) and only forgoes the capability optimization.
+// Returns true when `inst` is emitted as a SPIR-V constant object (`OpConstant` /
+// `OpConstantComposite`), i.e. one that is legal as a `ConstOffset` image operand. Used to decide
+// whether an image gather's `Offset` operand can be lowered to the capability-free `ConstOffset`
+// (issue #9382): a leaf `IRConstant`, or a composite constructor
+// (`MakeVector`/`MakeArray`/`MakeStruct`/`MakeMatrix`/`MakeVectorFromScalar` — e.g. `int2(2, 1)` or
+// `int2(1)`) whose operands are all such constants.
+//
+// This deliberately does NOT treat constant-FOLDABLE expressions (e.g. `-int2(2, 1)`, which lowers
+// to `Neg(MakeVector(...))`) as constants. Such expressions are emitted as ordinary SPIR-V
+// instructions (`OpSNegate`, `OpIAdd`, ...) at this stage; using them as a `ConstOffset` would be
+// invalid SPIR-V ("Expected Image Operand ConstOffset to be a const object"). They safely keep the
+// `Offset` form plus the capability; a later spirv-opt pass may fold the operand to a constant.
 static bool isIRConstantValue(IRInst* inst)
 {
     if (!inst)
@@ -53,9 +58,9 @@ static bool isIRConstantValue(IRInst* inst)
     case kIROp_MakeStruct:
     case kIROp_MakeMatrix:
     case kIROp_MakeVectorFromScalar:
-        // Each of these is constant iff all of its value operands are. For `MakeVectorFromScalar`
-        // (e.g. `int2(1)`) the single operand is the scalar value; the element type and count come
-        // from the result type, not from operands.
+        // Composite constructors that emit as `OpConstantComposite` when their operands are
+        // constant. (For `MakeVectorFromScalar`, e.g. `int2(1)`, the single operand is the scalar
+        // value; the element type and count live in the result type, not the operands.)
         for (UInt i = 0; i < inst->getOperandCount(); i++)
             if (!isIRConstantValue(inst->getOperand(i)))
                 return false;
