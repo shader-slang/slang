@@ -1,4 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY_DXIL,non-exhaustive): -target dxil-asm -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY_MIXED): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY_MIXED
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY_ZERO): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY_ZERO
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY_RUNTIME): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY_RUNTIME
@@ -16,6 +17,7 @@ void main(RWBuffer<int> values)
 #if defined(MEMORY)
     Barrier((BarrierMemoryTypeFlags)0xdead, BarrierSemanticFlags.GROUP_SYNC);
 //CHECK_MEMORY: E31117
+//CHECK_MEMORY_DXIL: E31117
 #elif defined(MEMORY_MIXED)
     Barrier((BarrierMemoryTypeFlags)(0x01 | 0x80), BarrierSemanticFlags.GROUP_SYNC);
 //CHECK_MEMORY_MIXED: E31117

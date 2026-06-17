@@ -13,7 +13,7 @@ import experimental.workgraph;
 void main(
     EmptyNodeInput input,
     EmptyNodeOutput outputA,
-    [AllowSparseNodes] EmptyNodeOutputArray outputArr)
+    [AllowSparseNodes] no_diff EmptyNodeOutputArray outputArr)
 {
     uint count = input.Count();
     if (outputA.IsValid())

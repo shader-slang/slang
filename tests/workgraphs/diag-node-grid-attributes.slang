@@ -1,4 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_CONFLICT,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DCONFLICT
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_CONFLICT_REVERSE,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DCONFLICT_REVERSE
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_CONFLICT_DOUBLE_MAX,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DCONFLICT_DOUBLE_MAX
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_THREAD,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DTHREAD
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_THREAD_MAX,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DTHREAD_MAX
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_COALESCING,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DCOALESCING
@@ -11,6 +13,18 @@ import experimental.workgraph;
 [NodeDispatchGrid(1, 1, 1)]
 [NodeMaxDispatchGrid(2, 2, 2)]
 //CHECK_CONFLICT: modifier 'NodeMaxDispatchGrid' is redundant or conflicting with existing modifier 'NodeDispatchGrid'
+[numthreads(1, 1, 1)]
+#elif defined(CONFLICT_REVERSE)
+[NodeLaunch("broadcasting")]
+[NodeMaxDispatchGrid(2, 2, 2)]
+[NodeDispatchGrid(1, 1, 1)]
+//CHECK_CONFLICT_REVERSE: modifier 'NodeDispatchGrid' is redundant or conflicting with existing modifier 'NodeMaxDispatchGrid'
+[numthreads(1, 1, 1)]
+#elif defined(CONFLICT_DOUBLE_MAX)
+[NodeLaunch("broadcasting")]
+[NodeMaxDispatchGrid(1, 1, 1)]
+[NodeMaxDispatchGrid(2, 2, 2)]
+//CHECK_CONFLICT_DOUBLE_MAX: modifier 'NodeMaxDispatchGrid' is redundant or conflicting with existing modifier 'NodeMaxDispatchGrid'
 [numthreads(1, 1, 1)]
 #elif defined(THREAD)
 [NodeLaunch("thread")]
