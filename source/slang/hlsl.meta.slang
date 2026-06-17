@@ -4007,7 +4007,11 @@ vector<T.Element,4> __texture_gather_offset(
     case spirv:
         let sampledImage = __makeCombinedTextureSampler(texture, s);
         return spirv_asm {
-            OpCapability ImageGatherExtended;
+            // The `Offset` operand here is the runtime form; the ImageGatherExtended
+            // capability it requires is NOT declared in this block. Instead,
+            // slang-ir-spirv-legalize.cpp rewrites the operand to the capability-free
+            // `ConstOffset` for a compile-time-constant offset, and synthesizes the
+            // capability only when the offset is a runtime value (issue #9382).
             // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
             result:$$vector<T.Element,4> = OpImageGather $sampledImage $location $component Offset $offset;
         };
@@ -4061,7 +4065,10 @@ vector<T.Element,4> __texture_gather_offset(
         __intrinsic_asm "textureGatherOffset($0, $1, $2, $3)";
     case spirv:
         return spirv_asm {
-            OpCapability ImageGatherExtended;
+            // The required ImageGatherExtended capability is not declared here:
+            // slang-ir-spirv-legalize.cpp rewrites the operand to the capability-free
+            // `ConstOffset` for a constant offset, and synthesizes the capability only
+            // for a runtime offset (issue #9382).
             result:$$vector<T.Element,4> = OpImageGather $sampler $location $component Offset $offset;
         };
     }
