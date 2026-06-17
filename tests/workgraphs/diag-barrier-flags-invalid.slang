@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY,non-exhaustive): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY_DXIL,non-exhaustive): -target dxil-asm -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY -emit-ir -o /dev/null
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY_DXIL,non-exhaustive): -target dxil-asm -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY -emit-ir
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY_MIXED): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY_MIXED
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY_ZERO): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY_ZERO
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_MEMORY_RUNTIME): -target hlsl -stage node -entry main -profile lib_6_8 -experimental-feature -DMEMORY_RUNTIME
