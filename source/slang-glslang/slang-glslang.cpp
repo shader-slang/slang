@@ -351,8 +351,14 @@ static int glslang_optimizeSPIRV(
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 3
 
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-            optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
-
+            // NOTE: spvtools::CreatePrivateToLocalPass() is intentionally not run.
+            // It moves a `Private` variable used within a single function into
+            // that function's `Function` (per-call) storage, but does not verify
+            // the function executes at most once per invocation. That silently
+            // drops the cross-call persistence of function-`static` locals reached
+            // through non-inlined, multiply-called helpers (e.g. via a variadic
+            // `expand`), producing wrong results on SPIR-V. See
+            // shader-slang/slang#11651.
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
 
             optimizer.RegisterPass(spvtools::CreateCCPPass());            // 4 *
@@ -456,7 +462,8 @@ static int glslang_optimizeSPIRV(
 #endif
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass());
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-            optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
+            // private-to-local intentionally omitted — see the note in the
+            // default-optimization block above (shader-slang/slang#11651).
             optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
             optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
