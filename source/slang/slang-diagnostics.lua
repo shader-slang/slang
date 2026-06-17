@@ -5328,6 +5328,13 @@ fatal(
     span { loc = "location", message = "use of uninitialized opaque handle '~handleType:IRInst'." }
 )
 
+err(
+    "opaque-type-in-local-variable-not-allowed-on-spirv",
+    56004,
+    "opaque type in local variable is not supported for SPIR-V",
+    span { loc = "location", message = "a resource or other opaque-typed value ('~type:IRInst') cannot be placed in a function-local variable for the SPIR-V target; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function" }
+)
+
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
