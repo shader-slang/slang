@@ -3768,7 +3768,7 @@ err(
 err(
     "bitwise-operator-requires-integer-operands",
     39999,
-    "bitwise operator '~name:Name' requires integer operands, but the operands have type ~type:Type",
+    "bitwise operator '~name:Name' requires integer operands, but the operand type is ~type:Type",
     span { loc = "expr:Expr", message = "bitwise operator '~name' requires integer operands" }
 )
 

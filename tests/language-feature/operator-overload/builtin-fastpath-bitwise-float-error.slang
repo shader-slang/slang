@@ -28,4 +28,10 @@ void test(float a, float b, double d0, double d1, int i, float3 v0, float3 v1)
     //CHECK: requires integer operands
     float3 r6 = v0 | v1; // component-wise float vector
     //CHECK: requires integer operands
+    // Mixed-type shifts skip common-type promotion, but a float operand on either side is still
+    // rejected here rather than falling through to a confusing "no overload" error (#11648).
+    float r7 = a << i; // float << int
+    //CHECK: requires integer operands
+    int r8 = i << a; // int << float
+    //CHECK: requires integer operands
 }
