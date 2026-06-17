@@ -12,7 +12,18 @@
 // error-typed results are ignored.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
-void test(float a, float b, double d0, double d1, int i, float3 v0, float3 v1)
+void test(
+    float a,
+    float b,
+    double d0,
+    double d1,
+    int i,
+    float3 v0,
+    float3 v1,
+    float2x2 m0,
+    float2x2 m1,
+    half h0,
+    half h1)
 {
     float r0 = a | b;
     //CHECK: requires integer operands
@@ -26,12 +37,29 @@ void test(float a, float b, double d0, double d1, int i, float3 v0, float3 v1)
     //CHECK: requires integer operands
     double r5 = d0 | d1;
     //CHECK: requires integer operands
-    float3 r6 = v0 | v1; // component-wise float vector
+    half r6 = h0 ^ h1; // 16-bit float element is still floating-point
+    //CHECK: requires integer operands
+    float3 r7 = v0 | v1; // component-wise float vector
+    //CHECK: requires integer operands
+    float2x2 r8 = m0 | m1; // component-wise float matrix
     //CHECK: requires integer operands
     // Mixed-type shifts skip common-type promotion, but a float operand on either side is still
     // rejected here rather than falling through to a confusing "no overload" error (#11648).
-    float r7 = a << i; // float << int
+    float r9 = a << i; // float << int
     //CHECK: requires integer operands
-    int r8 = i << a; // int << float
+    int r10 = i << a; // int << float
     //CHECK: requires integer operands
+    // Unary `~` on a float operand is rejected by the same diagnostic, instead of a confusing
+    // "no overload for 'operator~'".
+    float r11 = ~a;
+    //CHECK: requires integer operands
+    // The result/assignment-target type is irrelevant: the diagnostic keys off the *operand*
+    // element type, so a float bitwise op fails even when assigned to an `int`.
+    int r12 = a | b;
+    //CHECK: requires integer operands
+
+    // The original confusing symptoms must be gone: no ambiguous-overload error for `|`/`&`/`^`
+    // and no "no overload" error for the mixed-type float shifts.
+    //CHECK-NOT: ambiguous
+    //CHECK-NOT: no overload
 }

@@ -4645,7 +4645,23 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         // `-` => signed/float negate; `~` => integer bitwise-not; `!` => bool logical-not.
         bool uEligible = isNeg ? (uInt || uFloat) : (isBitNot ? uInt : /*isLogicalNot*/ uBool);
         if (!uEligible)
+        {
+            // `~` on a builtin floating-point operand has no integer interpretation; diagnose it
+            // with the same dedicated error as the binary bitwise/shift operators (issue #11648)
+            // instead of letting it fall through to a confusing `no overload for 'operator~'`.
+            // `uBasic` is non-null here (non-builtin operands already returned above), so `uFloat`
+            // means a genuine builtin half/float/double operand; user-defined `operator~` and
+            // generic operands are unaffected.
+            if (isBitNot && uFloat)
+            {
+                getSink()->diagnose(Diagnostics::BitwiseOperatorRequiresIntegerOperands{
+                    .name = uVarExpr->name,
+                    .type = uOperandType,
+                    .expr = expr});
+                return CreateErrorExpr(expr);
+            }
             return nullptr;
+        }
 
         auto node = m_astBuilder->create<BuiltinOperatorExpr>();
         node->op = uKind;
