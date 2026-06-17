@@ -455,9 +455,14 @@ cmd_build() {
   [ "$IS_WSL" = true ] && log_info "WSL detected; building for target '$TARGET_OS' (override with --target-os)."
 
   log_info "Configuring Falcor (preset $FALCOR_PRESET) with local Slang ($SLANG_CONFIG)..."
-  # FALCOR_LOCAL_SLANG_BUILD_DIR is resolved relative to FALCOR_LOCAL_SLANG_DIR
-  # by Falcor (SLANG_DIR = DIR/BUILD_DIR), so it names the per-config build
-  # subdirectory (e.g. build/Release), not an absolute path.
+  # Falcor computes SLANG_DIR = ${FALCOR_LOCAL_SLANG_DIR}/${FALCOR_LOCAL_SLANG_BUILD_DIR}
+  # by raw string concatenation, so FALCOR_LOCAL_SLANG_BUILD_DIR must stay the
+  # RELATIVE per-config subdir (e.g. build/Release). It is declared CACHE PATH
+  # by Falcor, and CMake auto-converts a relative PATH given on the command line
+  # to an absolute path (relative to the cmake working directory) - which would
+  # turn build/Release into <falcor-dir>/build/Release and make the concatenation
+  # double the path (slang.lib then fails to link). Passing it :STRING keeps it
+  # relative. FALCOR_LOCAL_SLANG_DIR is already absolute, so it needs no such guard.
   # -DCMAKE_POLICY_VERSION_MINIMUM=3.5 lets Falcor's pinned pybind11 (which
   # declares cmake_minimum_required < 3.5) configure under CMake >= 4; it is
   # scoped to Falcor's configure here and never applied to the Slang build.
@@ -466,7 +471,7 @@ cmd_build() {
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5
     -DFALCOR_LOCAL_SLANG=ON
     -DFALCOR_LOCAL_SLANG_DIR="$(to_native "$SLANG_DIR")"
-    -DFALCOR_LOCAL_SLANG_BUILD_DIR="build/$SLANG_CONFIG"
+    -DFALCOR_LOCAL_SLANG_BUILD_DIR:STRING="build/$SLANG_CONFIG"
   )
   # Relax Falcor's warnings-as-errors without editing any Falcor file: inject a
   # CMake include (via Falcor's own CMAKE_PROJECT_Falcor_INCLUDE hook) that
