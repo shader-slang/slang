@@ -5,6 +5,9 @@
 //   2. `&&` must keep short-circuit semantics: the fast path bails on it (it is neither
 //      arithmetic, comparison, nor bitwise) and `convertToLogicOperatorExpr` runs first, so the
 //      right-hand side is not evaluated when the left is false.
+//   3. A user-defined `operator|` with a builtin-float / user-type mix (`float | V`) must still be
+//      selected: the float-bitwise rejection (#11648) fires only when BOTH operands are builtin, so
+//      a builtin/user-type mix falls through to overload resolution.
 //TEST:INTERPRET(filecheck=CHECK):
 
 struct V
