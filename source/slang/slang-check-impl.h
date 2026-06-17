@@ -195,15 +195,22 @@ struct BasicTypeKeyPair
 };
 
 // Focused failure data produced while a generic candidate is still being
-// inferred. `inferGenericArguments` fills this optional record, and
-// `CompleteOverloadCandidate` emits it only if overload resolution selects that
-// failed generic candidate.
+// inferred. The generic solver fills this optional record with the first
+// concrete reason a candidate failed, and `CompleteOverloadCandidate` formats
+// it into a focused diagnostic only if overload resolution selects that failed
+// candidate. Each `Kind` captures just the offending fields (counts, a
+// parameter name, or the substituted sub/super types) at the failure site;
+// the more expensive diagnostic formatting is deferred to the selected-
+// candidate path so speculative candidates never pay for it.
 struct GenericArgumentInferenceFailure
 {
     enum class Kind
     {
         None,
         VariadicPackCountMismatch,
+        GenericArityMismatch,
+        OrdinaryGenericParamNotInferred,
+        InterfaceConformanceNotSatisfied,
     };
 
     struct VariadicPackCountMismatch
@@ -213,10 +220,43 @@ struct GenericArgumentInferenceFailure
         int64_t actualCount = 0;
     };
 
+    // The call supplied a number of value arguments that the generic function's
+    // parameter list could not match, so argument-to-parameter matching failed
+    // before any inference could run.
+    struct GenericArityMismatch
+    {
+        SourceLoc location = SourceLoc();
+        Int expectedParamCount = 0;
+        Int actualArgCount = 0;
+    };
+
+    // An ordinary generic parameter (such as a type `T` that appears only in
+    // return position, or a value `N` not mentioned in any parameter) was never
+    // determined from the call, so its solver constraint stayed unsatisfied.
+    struct OrdinaryGenericParamNotInferred
+    {
+        SourceLoc location = SourceLoc();
+        Name* paramName = nullptr;
+    };
+
+    // A source generic constraint `T : IFoo` could not be discharged: the
+    // inferred argument for `T` (`subType`) does not conform to the required
+    // interface (`supType`). Both are captured already substituted under the
+    // current (failed) specialization.
+    struct InterfaceConformanceNotSatisfied
+    {
+        SourceLoc location = SourceLoc();
+        Type* subType = nullptr;
+        Type* supType = nullptr;
+    };
+
     Kind kind = Kind::None;
     union
     {
         VariadicPackCountMismatch variadicPackCountMismatch;
+        GenericArityMismatch genericArityMismatch;
+        OrdinaryGenericParamNotInferred ordinaryGenericParamNotInferred;
+        InterfaceConformanceNotSatisfied interfaceConformanceNotSatisfied;
     };
 
     GenericArgumentInferenceFailure()
@@ -225,15 +265,77 @@ struct GenericArgumentInferenceFailure
     }
 
     GenericArgumentInferenceFailure(GenericArgumentInferenceFailure const& other)
-        : kind(other.kind), variadicPackCountMismatch(other.variadicPackCountMismatch)
+        : kind(other.kind)
     {
+        copyActiveMemberFrom(other);
     }
 
     GenericArgumentInferenceFailure& operator=(GenericArgumentInferenceFailure const& other)
     {
         kind = other.kind;
-        variadicPackCountMismatch = other.variadicPackCountMismatch;
+        copyActiveMemberFrom(other);
         return *this;
+    }
+
+    // Select a union variant and return a reference for the caller to populate.
+    // Each setter begins the chosen member's lifetime with placement-new and
+    // updates `kind` in lockstep, so the invariant "`kind` names the live union
+    // member" holds by construction at every capture site. The previously
+    // active member is trivially destructible, so it needs no explicit
+    // destruction before the new member is constructed in place.
+    VariadicPackCountMismatch& setVariadicPackCountMismatch()
+    {
+        kind = Kind::VariadicPackCountMismatch;
+        return *new (&variadicPackCountMismatch) VariadicPackCountMismatch();
+    }
+    GenericArityMismatch& setGenericArityMismatch()
+    {
+        kind = Kind::GenericArityMismatch;
+        return *new (&genericArityMismatch) GenericArityMismatch();
+    }
+    OrdinaryGenericParamNotInferred& setOrdinaryGenericParamNotInferred()
+    {
+        kind = Kind::OrdinaryGenericParamNotInferred;
+        return *new (&ordinaryGenericParamNotInferred) OrdinaryGenericParamNotInferred();
+    }
+    InterfaceConformanceNotSatisfied& setInterfaceConformanceNotSatisfied()
+    {
+        kind = Kind::InterfaceConformanceNotSatisfied;
+        return *new (&interfaceConformanceNotSatisfied) InterfaceConformanceNotSatisfied();
+    }
+
+private:
+    // Begin the lifetime of whichever union member `kind` selects, copy-
+    // constructing it from `other`'s active member. The payloads embed a
+    // `SourceLoc`, which has a user-provided copy constructor and so is not
+    // trivially copyable; assigning into a union member whose lifetime has not
+    // begun would be undefined. Placement-new starts that lifetime correctly
+    // for both copy construction (no member live yet) and copy assignment (the
+    // previously active member is trivially destructible, so it needs no
+    // explicit destruction before the new member is constructed in place).
+    void copyActiveMemberFrom(GenericArgumentInferenceFailure const& other)
+    {
+        switch (other.kind)
+        {
+        case Kind::VariadicPackCountMismatch:
+            new (&variadicPackCountMismatch)
+                VariadicPackCountMismatch(other.variadicPackCountMismatch);
+            break;
+        case Kind::GenericArityMismatch:
+            new (&genericArityMismatch) GenericArityMismatch(other.genericArityMismatch);
+            break;
+        case Kind::OrdinaryGenericParamNotInferred:
+            new (&ordinaryGenericParamNotInferred)
+                OrdinaryGenericParamNotInferred(other.ordinaryGenericParamNotInferred);
+            break;
+        case Kind::InterfaceConformanceNotSatisfied:
+            new (&interfaceConformanceNotSatisfied)
+                InterfaceConformanceNotSatisfied(other.interfaceConformanceNotSatisfied);
+            break;
+        case Kind::None:
+        default:
+            break;
+        }
     }
 };
 

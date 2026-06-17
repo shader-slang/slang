@@ -2688,6 +2688,23 @@ private:
                 {
                     if (isArgReady(member))
                         continue;
+                    // Capture the focused reason for the selected-candidate path:
+                    // an ordinary generic parameter never became ready. This is
+                    // where a type `T` used only in return position, or a value
+                    // `N` not mentioned in any parameter, fails — such a parameter
+                    // produces no ordinary solver constraint, so
+                    // `areOrdinaryConstraintsSatisfied` cannot flag it. We only
+                    // record the parameter name; `CompleteOverloadCandidate`
+                    // formats the diagnostic if this candidate is selected. First
+                    // recorded reason wins.
+                    if (m_context.failure &&
+                        m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
+                        member->getName())
+                    {
+                        auto& notInferred = m_context.failure->setOrdinaryGenericParamNotInferred();
+                        notInferred.paramName = member->getName();
+                        notInferred.location = m_context.applicationLoc;
+                    }
                     return false;
                 }
             }
@@ -2702,7 +2719,16 @@ private:
                 if (!isGenericConstraintDecl(member))
                     continue;
                 if (!isArgReady(member))
+                {
+                    // A constraint witness argument that never became ready
+                    // rejects this candidate. The focused interface-conformance
+                    // reason (`T : IFoo` with a non-conforming `T`) is recorded
+                    // earlier, at the witness-proof site in
+                    // `trySolveSubtypeWitnessForConstraint`, because a required
+                    // subtype witness that cannot be proven fails the work list
+                    // before final validation ever runs.
                     return false;
+                }
             }
         }
         return true;
@@ -2935,6 +2961,41 @@ private:
 
         // A required subtype constraint with no acceptable proof rejects the
         // generic application.
+        //
+        // Capture the focused interface-conformance reason for the
+        // selected-candidate path: the inferred argument `sub` does not conform
+        // to the required interface `sup`. This is the authoritative failure
+        // site for `T : IFoo` with a non-conforming `T`, because a required
+        // subtype witness that cannot be proven fails here during the work list
+        // (`runWorkList` returns `Failed`), before final argument validation
+        // runs. The abstract-self-type guard above (and the optional-constraint
+        // cases) have already returned, so reaching this point means a genuine
+        // unsatisfiable required conformance. We record only the substituted
+        // `sub`/`sup` types; `CompleteOverloadCandidate` formats the diagnostic
+        // if this candidate is selected. First recorded reason wins.
+        //
+        // `trySolveSubtypeWitnessForConstraint` can run speculatively while the
+        // subject argument is still an unsolved generic parameter, so guard on
+        // `sub` being concrete (no free generic parameter of the generics being
+        // solved). Recording a stale, partially-solved `sub` would either name
+        // the wrong type or emit a spurious "does not conform" for a candidate
+        // that ultimately succeeds or fails for a different reason.
+        //
+        // This routine also serves equality constraints (`where T == X`), whose
+        // `sup` is the concrete right-hand type rather than an interface. The
+        // "does not conform to interface" framing applies only to conformance
+        // (`T : IFoo`) constraints, so equality-constraint failures are excluded
+        // here and fall through to the generic fallback instead.
+        if (m_context.failure &&
+            m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
+            !constraintDecl->isEqualityConstraint && sub && sup &&
+            !hasUnreadyDependenciesForVal(sub) && !hasUnreadyDependenciesForVal(sup))
+        {
+            auto& conformance = m_context.failure->setInterfaceConformanceNotSatisfied();
+            conformance.subType = sub;
+            conformance.supType = sup;
+            conformance.location = m_context.applicationLoc;
+        }
         return nullptr;
     }
 
@@ -3111,8 +3172,7 @@ private:
         if (!actualConstant || !expectedConstant)
             return;
 
-        m_context.failure->kind = GenericArgumentInferenceFailure::Kind::VariadicPackCountMismatch;
-        auto& failure = m_context.failure->variadicPackCountMismatch;
+        auto& failure = m_context.failure->setVariadicPackCountMismatch();
         failure.expectedCount = (int64_t)expectedConstant->getValue();
         failure.actualCount = (int64_t)actualConstant->getValue();
         failure.location = m_context.applicationLoc;
@@ -3201,7 +3261,23 @@ private:
             if (!isOrdinarySolverConstraint(constraint))
                 continue;
             if (!constraint.satisfied)
+            {
+                // Capture the focused reason for the selected-candidate path: an
+                // ordinary generic parameter was never determined from the call
+                // (for example a type `T` used only in return position, or a
+                // value `N` not mentioned in any parameter). We only record the
+                // parameter name here; `CompleteOverloadCandidate` formats the
+                // diagnostic if this candidate is selected. First reason wins.
+                if (m_context.failure &&
+                    m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
+                    constraint.decl && constraint.decl->getName())
+                {
+                    auto& notInferred = m_context.failure->setOrdinaryGenericParamNotInferred();
+                    notInferred.paramName = constraint.decl->getName();
+                    notInferred.location = m_context.applicationLoc;
+                }
                 return false;
+            }
         }
         return true;
     }

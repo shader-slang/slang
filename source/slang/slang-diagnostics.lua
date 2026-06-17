@@ -1914,6 +1914,20 @@ err(
     span { loc = "location", message = "write this constraint as `countof(Pack) == IntExpr`" }
 )
 
+err(
+    "generic-specialization-arity-mismatch",
+    30438,
+    "wrong number of arguments in call to generic function",
+    span { loc = "location", message = "could not specialize generic: it expects ~expectedCount:Int parameter(s) but the call provides ~actualCount:Int argument(s)" }
+)
+
+err(
+    "generic-parameter-could-not-be-inferred",
+    30439,
+    "generic parameter could not be inferred",
+    span { loc = "location", message = "could not infer generic argument for parameter '~paramName:Name'" }
+)
+
 -- Float bit cast diagnostics
 
 err(

@@ -1475,24 +1475,77 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
     // special case for generic argument inference failure
     if (candidate.status == OverloadCandidate::Status::GenericArgumentInferenceFailed)
     {
-        // Pack-count mismatches can fail during generic argument solving before
-        // the candidate has a specialized decl-ref. The solver records the
-        // concrete `(expected, actual)` pair, and this final selected-candidate
-        // path emits the focused diagnostic instead of the generic fallback.
-        if (candidate.genericInferenceFailure.kind ==
-            GenericArgumentInferenceFailure::Kind::VariadicPackCountMismatch)
+        // The solver records the first concrete reason a generic candidate
+        // failed to specialize (in `candidate.genericInferenceFailure`). When a
+        // focused reason was captured, emit the corresponding specific
+        // diagnostic here, on the selected-candidate path, instead of the
+        // generic fallback. Each case needs its own block scope because the
+        // shared `goto error` below would otherwise cross variable
+        // initializations. A reason of `None` falls through to the fallback.
+        switch (candidate.genericInferenceFailure.kind)
         {
-            auto& failure = candidate.genericInferenceFailure.variadicPackCountMismatch;
-            getSink()->diagnose(Diagnostics::VariadicPackCountDoesNotMatch{
-                .expectedCount = failure.expectedCount,
-                .actualCount = failure.actualCount,
-                .location = failure.location});
+        case GenericArgumentInferenceFailure::Kind::VariadicPackCountMismatch:
+            {
+                auto& failure = candidate.genericInferenceFailure.variadicPackCountMismatch;
+                getSink()->diagnose(Diagnostics::VariadicPackCountDoesNotMatch{
+                    .expectedCount = failure.expectedCount,
+                    .actualCount = failure.actualCount,
+                    .location = failure.location});
 
-            String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
-            getSink()->diagnose(Diagnostics::GenericSignatureTried{
-                .signature = declString,
-                .location = candidate.item.declRef.getLoc()});
-            goto error;
+                String declString =
+                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                    .signature = declString,
+                    .location = candidate.item.declRef.getLoc()});
+                goto error;
+            }
+        case GenericArgumentInferenceFailure::Kind::GenericArityMismatch:
+            {
+                auto& failure = candidate.genericInferenceFailure.genericArityMismatch;
+                getSink()->diagnose(Diagnostics::GenericSpecializationArityMismatch{
+                    .expectedCount = failure.expectedParamCount,
+                    .actualCount = failure.actualArgCount,
+                    .location = failure.location});
+
+                String declString =
+                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                    .signature = declString,
+                    .location = candidate.item.declRef.getLoc()});
+                goto error;
+            }
+        case GenericArgumentInferenceFailure::Kind::OrdinaryGenericParamNotInferred:
+            {
+                auto& failure = candidate.genericInferenceFailure.ordinaryGenericParamNotInferred;
+                getSink()->diagnose(Diagnostics::GenericParameterCouldNotBeInferred{
+                    .paramName = failure.paramName,
+                    .location = failure.location});
+
+                String declString =
+                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                    .signature = declString,
+                    .location = candidate.item.declRef.getLoc()});
+                goto error;
+            }
+        case GenericArgumentInferenceFailure::Kind::InterfaceConformanceNotSatisfied:
+            {
+                auto& failure = candidate.genericInferenceFailure.interfaceConformanceNotSatisfied;
+                getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                    .typeArg = failure.subType,
+                    .interface = failure.supType,
+                    .location = failure.location});
+
+                String declString =
+                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                    .signature = declString,
+                    .location = candidate.item.declRef.getLoc()});
+                goto error;
+            }
+        case GenericArgumentInferenceFailure::Kind::None:
+        default:
+            break;
         }
 
         String callString = getCallSignatureString(context);
@@ -2812,6 +2865,18 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
         // defaults, so the match is allowed to account for default values.
         if (!context.matchArgumentsToParams(this, *innerParameterTypes, true, matchedArgs))
         {
+            // Capture the focused arity reason for the selected-candidate path.
+            // We only record the offending counts here (the expected parameter
+            // count and the supplied value-argument count); the actual
+            // diagnostic is formatted in `CompleteOverloadCandidate` if this
+            // candidate is selected. First recorded reason wins.
+            if (outFailure && outFailure->kind == GenericArgumentInferenceFailure::Kind::None)
+            {
+                auto& mismatch = outFailure->setGenericArityMismatch();
+                mismatch.expectedParamCount = innerParameterTypes->getCount();
+                mismatch.actualArgCount = context.getArgCount();
+                mismatch.location = context.loc;
+            }
             return DeclRef<Decl>();
         }
 
