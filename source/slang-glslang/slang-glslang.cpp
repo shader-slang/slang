@@ -322,6 +322,8 @@ static int glslang_optimizeSPIRV(
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
 #endif
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            // Do NOT re-enable: unsound for function-`static` locals in
+            // multiply-called, non-inlined helpers (shader-slang/slang#11651).
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
             optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
@@ -359,6 +361,15 @@ static int glslang_optimizeSPIRV(
             // through non-inlined, multiply-called helpers (e.g. via a variadic
             // `expand`), producing wrong results on SPIR-V. See
             // shader-slang/slang#11651.
+            //
+            // Removing it does not regress the cases where it was sound: the
+            // remaining passes (scalar-replacement / CCP / local-access-chain-
+            // convert / load-store-elim / DCE) still promote single-function
+            // `Private` variables to registers. The cost is SPIR-V code size for
+            // variables that are genuinely single-call, and this also disables the
+            // pass on the `-emit-spirv-via-glsl` path (which shares this routine);
+            // both are accepted to keep `static` locals correct, since SPIR-V has
+            // no per-variable "do not localize" decoration to scope it narrower.
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
 
             optimizer.RegisterPass(spvtools::CreateCCPPass());            // 4 *
@@ -411,6 +422,8 @@ static int glslang_optimizeSPIRV(
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
 #endif
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 9
+            // Do NOT re-enable: unsound for function-`static` locals in
+            // multiply-called, non-inlined helpers (shader-slang/slang#11651).
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
             // optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(0));   // 12
             // optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());
