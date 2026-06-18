@@ -413,6 +413,17 @@ protected:
     {
         m_entryPointFunc = entryPointFunc;
 
+        // Reset the per-parameter scratch state. The entry-point *result* is
+        // legalized below, before the parameter loop runs `processParam`, so any
+        // `m_param`/`m_paramLayout` left over from a previously-processed entry
+        // point must not leak into result legalization: that earlier parameter
+        // may have been removed and deallocated, so reading it would be a
+        // use-after-free, and even when live it would attach diagnostics to the
+        // wrong location. Result-position diagnostics fall back to the entry
+        // point itself via `getUnsupportedVaryingDiagnosticLoc`.
+        m_param = nullptr;
+        m_paramLayout = nullptr;
+
         // Before diving into the work of processing an entry point, we start by
         // extracting a bunch of information about the entry point that will
         // be useful to the downstream logic.
@@ -1039,13 +1050,29 @@ protected:
     // to diagnose the case of a system-value semantic that isn't
     // understood by the target.
 
+    // Source location to attach an unsupported-varying diagnostic to. This is
+    // normally the parameter being processed, but the entry-point *result* is
+    // legalized first (in `processEntryPoint`, before the parameter loop sets
+    // `m_param`), so `m_param` is null while a result-position varying is being
+    // legalized. Fall back to the entry-point function's location in that case;
+    // `m_entryPointFunc` is always set before any varying value is legalized.
+    // Without this fallback an unsupported result-position system value (e.g. a
+    // graphics `SV_Position` returned by a vertex entry compiled to a CPU host
+    // target) dereferences a null `m_param` and crashes instead of diagnosing
+    // (#11659).
+    SourceLoc getUnsupportedVaryingDiagnosticLoc() const
+    {
+        SLANG_ASSERT(m_entryPointFunc);
+        return m_param ? m_param->sourceLoc : m_entryPointFunc->sourceLoc;
+    }
+
     LegalizedVaryingVal diagnoseUnsupportedSystemVal(VaryingParamInfo const& info)
     {
         SLANG_UNUSED(info);
 
         m_sink->diagnose(Diagnostics::Unimplemented{
             .feature = "this target doesn't support this system-defined varying parameter",
-            .location = m_param->sourceLoc});
+            .location = getUnsupportedVaryingDiagnosticLoc()});
 
         return LegalizedVaryingVal();
     }
@@ -1056,7 +1083,7 @@ protected:
 
         m_sink->diagnose(Diagnostics::Unimplemented{
             .feature = "this target doesn't support this user-defined varying parameter",
-            .location = m_param->sourceLoc});
+            .location = getUnsupportedVaryingDiagnosticLoc()});
 
         return LegalizedVaryingVal();
     }
