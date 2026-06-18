@@ -3216,19 +3216,37 @@ static SlangResult createArtifactFromIR(
     if (!compiler)
     {
         // `spirv-opt` is genuinely optional for this compile, so we ship the valid
-        // base SPIR-V unchanged. Optimization is left silent on purpose: the level
-        // defaults to `OptimizationLevel::Default` (not `None`) and the effective
-        // level reaches the optimize block below by option-set inheritance rather
-        // than a local set, so there is no reliable signal here to tell an explicit
-        // `-O` from the implicit default — warning whenever the level is non-None
-        // would fire on ordinary compiles (including the reporter's plain
-        // `-target spirv`), re-introducing noise on the exact path this fix keeps
-        // clean. Validation, by contrast, is an explicit opt-in (off by default,
-        // enabled only via SLANG_RUN_SPIRV_VALIDATION); if it was requested but
-        // cannot run, warn so a green compile is not mistaken for "validated".
-        if (shouldRunSPIRVValidation(codeGenContext))
+        // base SPIR-V unchanged. But if the user *explicitly* asked for a post-
+        // processing step that needs the optimizer, warn that it was dropped rather
+        // than report a clean success that quietly skipped it.
+        //
+        // Optimization defaults to `OptimizationLevel::Default` (not `None`), so the
+        // level alone cannot distinguish an explicit `-O` from the implicit default.
+        // `hasOption` does: defaults are resolved via `getDefault` and never enter the
+        // option map, and `getIntOption` has no parent fallback, so a key is present
+        // here only when it was explicitly set (and merged down). We therefore warn
+        // for optimization only when the level was explicitly set to something other
+        // than `None`, which keeps the reporter's plain `-target spirv` compile quiet.
+        // Validation is a separate explicit opt-in (off by default, enabled only via
+        // SLANG_RUN_SPIRV_VALIDATION).
+        auto& programOptionSet = codeGenContext->getTargetProgram()->getOptionSet();
+        const bool optimizationRequested =
+            programOptionSet.hasOption(CompilerOptionName::Optimization) &&
+            programOptionSet.getOptimizationLevel() != OptimizationLevel::None;
+        const bool validationRequested = shouldRunSPIRVValidation(codeGenContext);
+        if (optimizationRequested || validationRequested)
         {
-            codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationSkippedNoOptimizer{});
+            StringBuilder feature;
+            if (optimizationRequested)
+                feature << "optimization";
+            if (validationRequested)
+            {
+                if (feature.getLength())
+                    feature << " and ";
+                feature << "validation";
+            }
+            codeGenContext->getSink()->diagnose(Diagnostics::SpirvRequestedStepSkippedNoOptimizer{
+                .feature = feature.produceString()});
         }
     }
     if (compiler)
