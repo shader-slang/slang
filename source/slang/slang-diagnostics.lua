@@ -914,6 +914,13 @@ err(
     span { loc = "location", message = "cannot use 'volatile' as a type modifier" }
 )
 
+err(
+    "operator-name-on-variable",
+    20020,
+    "invalid use of 'operator' name",
+    span { loc = "location", message = "'operator~op' can only be used to declare an operator function, not a variable or parameter name." }
+)
+
 warning(
     "unintended-empty-statement",
     20101,

@@ -1401,11 +1401,17 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     return decl;
 }
 
-static NameLoc ParseDeclName(Parser* parser)
+// Parse the name of a declaration. When `outIsOperatorName` is non-null it is
+// set to true if the name used the `operator <op>` form (e.g. `operator+`),
+// so callers that build variable/parameter declarators can reject it later
+// (only operator functions may use such a name).
+static NameLoc ParseDeclName(Parser* parser, bool* outIsOperatorName = nullptr)
 {
     Token nameToken;
     if (AdvanceIf(parser, "operator"))
     {
+        if (outIsOperatorName)
+            *outIsOperatorName = true;
         nameToken = parser->ReadToken();
         switch (nameToken.type)
         {
@@ -1493,6 +1499,12 @@ struct Declarator : RefObject
 struct NameDeclarator : Declarator
 {
     NameLoc nameAndLoc;
+
+    // True when the name was written using the `operator <op>` form (e.g.
+    // `operator+`). Such names are only valid when declaring an operator
+    // function; we carry the provenance here so the variable/parameter
+    // completion path can reject them (see CompleteVarDecl).
+    bool isOperatorName = false;
 };
 
 // A declarator that declares a pointer type
@@ -1523,6 +1535,10 @@ struct DeclaratorInfo
     NameLoc nameAndLoc;
     Modifiers semantics;
     Expr* initializer = nullptr;
+
+    // Propagated from NameDeclarator: true when the name used the
+    // `operator <op>` form, which is only valid for operator functions.
+    bool isOperatorName = false;
 };
 
 // Add a member declaration to its container, and ensure that its
@@ -2422,6 +2438,17 @@ static void CompleteVarDecl(Parser* parser, VarDeclBase* decl, DeclaratorInfo co
 {
     parser->FillPosition(decl);
 
+    // The `operator <op>` name form is only valid for declaring operator
+    // functions. Reaching here means the declarator completed as a variable
+    // or parameter (operator functions are routed to parseTraditionalFuncDecl
+    // before this point), so an operator name is a syntax error.
+    if (declaratorInfo.isOperatorName)
+    {
+        parser->sink->diagnose(Diagnostics::OperatorNameOnVariable{
+            .op = declaratorInfo.nameAndLoc.name->text,
+            .location = declaratorInfo.nameAndLoc.loc});
+    }
+
     if (!declaratorInfo.nameAndLoc.name)
     {
         // HACK(tfoley): we always give a name, even if the declarator didn't include one... :(
@@ -2460,7 +2487,7 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
         {
             auto nameDeclarator = new NameDeclarator();
             nameDeclarator->flavor = Declarator::Flavor::name;
-            nameDeclarator->nameAndLoc = ParseDeclName(parser);
+            nameDeclarator->nameAndLoc = ParseDeclName(parser, &nameDeclarator->isOperatorName);
             declarator = nameDeclarator;
         }
         break;
@@ -2650,6 +2677,7 @@ static void UnwrapDeclarator(
             {
                 auto nameDeclarator = (NameDeclarator*)declarator.Ptr();
                 ioInfo->nameAndLoc = nameDeclarator->nameAndLoc;
+                ioInfo->isOperatorName = nameDeclarator->isOperatorName;
                 return;
             }
             break;
