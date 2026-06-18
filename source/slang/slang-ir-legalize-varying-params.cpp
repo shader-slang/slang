@@ -2140,9 +2140,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     // `m_param` is non-null here. It can be null only while a
                     // *result* is legalized (the result is processed before the
                     // parameter loop assigns `m_param`); a result is never a
-                    // hit attribute, so this dereference is safe — assert the
-                    // invariant rather than silently masking it.
-                    SLANG_ASSERT(m_param);
+                    // hit attribute, so this dereference is safe. Enforce the
+                    // invariant in every build configuration (SLANG_ASSERT is a
+                    // no-op `assume` in release) rather than risking a null
+                    // dereference if the invariant is ever violated.
+                    SLANG_RELEASE_ASSERT(m_param);
                     m_sink->diagnose(Diagnostics::Unexpected{
                         .message = "the supplied hit attribute exceeds the maximum hit attribute "
                                    "structure "
