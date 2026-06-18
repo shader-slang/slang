@@ -5421,9 +5421,9 @@ warning(
 )
 
 warning(
-    "spirv-requested-step-skipped-no-optimizer",
+    "spirv-validation-skipped-no-optimizer",
     57006,
-    "requested SPIR-V post-processing (~feature) was skipped because the optional 'spirv-opt' tool from the slang-glslang library is unavailable; the valid SPIR-V module was emitted unchanged. Build or install slang-glslang to enable it."
+    "SPIR-V validation was requested (SLANG_RUN_SPIRV_VALIDATION) but could not run because the optional 'spirv-opt' tool from the slang-glslang library is unavailable; the emitted SPIR-V was not validated. Build or install slang-glslang to enable validation."
 )
 
 err(

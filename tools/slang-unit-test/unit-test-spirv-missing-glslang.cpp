@@ -70,12 +70,10 @@ bool diagnosticsContain(slang::IBlob* diagnostics, const char* needle)
 
 // Compile a trivial single-entry-point compute shader to SPIR-V with slang-glslang
 // made unavailable. `requestSeparateDebug` requests the separate debug-info artifact
-// (which genuinely needs spirv-opt); `explicitOptimizationLevel >= 0` sets an
-// explicit optimization level (use -1 to leave it at the default). Returns the
-// `getEntryPointCode` result plus the produced code and diagnostics.
+// (which genuinely needs spirv-opt). Returns the `getEntryPointCode` result plus the
+// produced code and diagnostics.
 SlangResult compileWithMissingGlslang(
     bool requestSeparateDebug,
-    int explicitOptimizationLevel,
     ComPtr<slang::IBlob>& outCode,
     ComPtr<slang::IBlob>& outDiagnostics)
 {
@@ -90,7 +88,7 @@ SlangResult compileWithMissingGlslang(
     targetDesc.format = SLANG_SPIRV;
     targetDesc.profile = globalSession->findProfile("spirv_1_5");
 
-    slang::CompilerOptionEntry options[3] = {};
+    slang::CompilerOptionEntry options[2] = {};
     uint32_t optionCount = 0;
     options[optionCount].name = slang::CompilerOptionName::EmitSpirvDirectly;
     options[optionCount].value.kind = slang::CompilerOptionValueKind::Int;
@@ -101,13 +99,6 @@ SlangResult compileWithMissingGlslang(
         options[optionCount].name = slang::CompilerOptionName::EmitSeparateDebug;
         options[optionCount].value.kind = slang::CompilerOptionValueKind::Int;
         options[optionCount].value.intValue0 = 1;
-        optionCount++;
-    }
-    if (explicitOptimizationLevel >= 0)
-    {
-        options[optionCount].name = slang::CompilerOptionName::Optimization;
-        options[optionCount].value.kind = slang::CompilerOptionValueKind::Int;
-        options[optionCount].value.intValue0 = explicitOptimizationLevel;
         optionCount++;
     }
 
@@ -164,17 +155,12 @@ SlangResult compileWithMissingGlslang(
 // Degrade-success: with slang-glslang unavailable, a plain single-module SPIR-V
 // compile (default optimization, no validation) must still succeed and emit valid
 // SPIR-V, rather than failing with the fatal "failed to load downstream compiler
-// 'spirv-opt'" error (E00100) from #11662. It must also stay quiet — no
-// dropped-step warning — because nothing optional was *explicitly* requested.
+// 'spirv-opt'" error (E00100) from #11662.
 SLANG_UNIT_TEST(spirvMissingGlslangDegradesGracefully)
 {
     ComPtr<slang::IBlob> code;
     ComPtr<slang::IBlob> diagnostics;
-    SlangResult res = compileWithMissingGlslang(
-        /*requestSeparateDebug:*/ false,
-        /*explicitOptimizationLevel:*/ -1,
-        code,
-        diagnostics);
+    SlangResult res = compileWithMissingGlslang(/*requestSeparateDebug:*/ false, code, diagnostics);
 
     SLANG_CHECK(res == SLANG_OK);
     SLANG_CHECK(code != nullptr);
@@ -183,33 +169,6 @@ SLANG_UNIT_TEST(spirvMissingGlslangDegradesGracefully)
         SLANG_CHECK(code->getBufferSize() != 0);
     }
     SLANG_CHECK(!diagnosticsContain(diagnostics, "E00100"));
-    // The default optimization level must not be mistaken for an explicit request,
-    // so the dropped-step warning must NOT fire on this happy path.
-    SLANG_CHECK(!diagnosticsContain(diagnostics, "post-processing"));
-}
-
-// Explicitly-requested optimization that cannot run must degrade (still SLANG_OK,
-// valid SPIR-V) but surface the dropped-step warning, so the user is not misled
-// into thinking the requested optimization happened.
-SLANG_UNIT_TEST(spirvMissingGlslangWarnsOnDroppedOptimization)
-{
-    ComPtr<slang::IBlob> code;
-    ComPtr<slang::IBlob> diagnostics;
-    SlangResult res = compileWithMissingGlslang(
-        /*requestSeparateDebug:*/ false,
-        /*explicitOptimizationLevel:*/ SLANG_OPTIMIZATION_LEVEL_HIGH,
-        code,
-        diagnostics);
-
-    SLANG_CHECK(res == SLANG_OK);
-    SLANG_CHECK(code != nullptr);
-    if (code)
-    {
-        SLANG_CHECK(code->getBufferSize() != 0);
-    }
-    SLANG_CHECK(!diagnosticsContain(diagnostics, "E00100"));
-    SLANG_CHECK(diagnosticsContain(diagnostics, "post-processing"));
-    SLANG_CHECK(diagnosticsContain(diagnostics, "optimization"));
 }
 
 // Required-fail: separate debug-info extraction genuinely needs spirv-opt, so with
@@ -221,11 +180,7 @@ SLANG_UNIT_TEST(spirvMissingGlslangRequiredStepFailsLoudly)
 {
     ComPtr<slang::IBlob> code;
     ComPtr<slang::IBlob> diagnostics;
-    SlangResult res = compileWithMissingGlslang(
-        /*requestSeparateDebug:*/ true,
-        /*explicitOptimizationLevel:*/ -1,
-        code,
-        diagnostics);
+    SlangResult res = compileWithMissingGlslang(/*requestSeparateDebug:*/ true, code, diagnostics);
 
     SLANG_CHECK(SLANG_FAILED(res));
     SLANG_CHECK(diagnosticsContain(diagnostics, "E00100"));

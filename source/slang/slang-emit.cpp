@@ -3213,41 +3213,22 @@ static SlangResult createArtifactFromIR(
         }
         return SLANG_FAIL;
     }
-    if (!compiler)
+    if (!compiler && shouldRunSPIRVValidation(codeGenContext))
     {
         // `spirv-opt` is genuinely optional for this compile, so we ship the valid
-        // base SPIR-V unchanged. But if the user *explicitly* asked for a post-
-        // processing step that needs the optimizer, warn that it was dropped rather
-        // than report a clean success that quietly skipped it.
-        //
-        // Optimization defaults to `OptimizationLevel::Default` (not `None`), so the
-        // level alone cannot distinguish an explicit `-O` from the implicit default.
-        // `hasOption` does: defaults are resolved via `getDefault` and never enter the
-        // option map, and `getIntOption` has no parent fallback, so a key is present
-        // here only when it was explicitly set (and merged down). We therefore warn
-        // for optimization only when the level was explicitly set to something other
-        // than `None`, which keeps the reporter's plain `-target spirv` compile quiet.
-        // Validation is a separate explicit opt-in (off by default, enabled only via
-        // SLANG_RUN_SPIRV_VALIDATION).
-        auto& programOptionSet = codeGenContext->getTargetProgram()->getOptionSet();
-        const bool optimizationRequested =
-            programOptionSet.hasOption(CompilerOptionName::Optimization) &&
-            programOptionSet.getOptimizationLevel() != OptimizationLevel::None;
-        const bool validationRequested = shouldRunSPIRVValidation(codeGenContext);
-        if (optimizationRequested || validationRequested)
-        {
-            StringBuilder feature;
-            if (optimizationRequested)
-                feature << "optimization";
-            if (validationRequested)
-            {
-                if (feature.getLength())
-                    feature << " and ";
-                feature << "validation";
-            }
-            codeGenContext->getSink()->diagnose(Diagnostics::SpirvRequestedStepSkippedNoOptimizer{
-                .feature = feature.produceString()});
-        }
+        // base SPIR-V unchanged. Optimization degradation is intentionally silent:
+        // there is no reliable signal *at this layer* to tell an explicitly-requested
+        // optimization from the implicit default. The level defaults to
+        // `OptimizationLevel::Default` (not `None`), and the option is materialized
+        // into the program option set even for a plain compile (e.g. the COM
+        // `getEntryPointCode` path), so neither the level nor `hasOption(Optimization)`
+        // distinguishes an explicit `-O` from the default — warning on it would fire
+        // on ordinary `-target spirv` compiles. Since optimization only enhances an
+        // already-valid module, dropping it silently is acceptable. Validation, by
+        // contrast, is an explicit opt-in (off by default, enabled only via
+        // SLANG_RUN_SPIRV_VALIDATION), so a requested-but-skipped validation is warned
+        // here — a green compile must not be mistaken for "validated".
+        codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationSkippedNoOptimizer{});
     }
     if (compiler)
     {
