@@ -413,14 +413,17 @@ protected:
     {
         m_entryPointFunc = entryPointFunc;
 
-        // Reset the per-parameter scratch state. The entry-point *result* is
-        // legalized below, before the parameter loop runs `processParam`, so any
-        // `m_param`/`m_paramLayout` left over from a previously-processed entry
-        // point must not leak into result legalization: that earlier parameter
-        // may have been removed and deallocated, so reading it would be a
-        // use-after-free, and even when live it would attach diagnostics to the
-        // wrong location. Result-position diagnostics fall back to the entry
-        // point itself via `getUnsupportedVaryingDiagnosticLoc`.
+        // Reset the per-parameter scratch state before legalizing this entry
+        // point. The entry-point *result* is legalized below, before the
+        // parameter loop runs `processParam`, and result-position diagnostics
+        // read `m_param` (via `getUnsupportedVaryingDiagnosticLoc`). A `m_param`
+        // left over from a previously-processed entry point must not leak into
+        // that result legalization: the earlier parameter may already have been
+        // removed and deallocated (use-after-free), and even when live it would
+        // attach diagnostics to the wrong location. `m_paramLayout` is read only
+        // in the parameter path (set fresh by `processParam`), so it is never
+        // observed during result legalization; resetting it here is hygiene to
+        // keep the two members consistent, not a fix for a result-path read.
         m_param = nullptr;
         m_paramLayout = nullptr;
 
@@ -2132,6 +2135,14 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     /*the builder in use*/ &builder);
                 if (ioBaseAttributeIndex > 8)
                 {
+                    // A hit-attribute varying is always an entry-point *parameter*
+                    // (an OptiX intersection/any-hit input), never a result, so
+                    // `m_param` is non-null here. It can be null only while a
+                    // *result* is legalized (the result is processed before the
+                    // parameter loop assigns `m_param`); a result is never a
+                    // hit attribute, so this dereference is safe — assert the
+                    // invariant rather than silently masking it.
+                    SLANG_ASSERT(m_param);
                     m_sink->diagnose(Diagnostics::Unexpected{
                         .message = "the supplied hit attribute exceeds the maximum hit attribute "
                                    "structure "
