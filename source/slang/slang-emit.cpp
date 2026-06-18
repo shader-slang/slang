@@ -3114,9 +3114,74 @@ static SlangResult createArtifactFromIR(
 
     artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
 
+    // Collect the SPIR-V inputs up front (the base module emitted above plus any
+    // embedded downstream SPIR-V from precompiled modules) so we can tell whether
+    // a multi-module link is actually required before deciding how to treat a
+    // missing downstream optimizer (see the load below).
+    bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
+        CompilerOptionName::EmbedDownstreamIR);
+
+    List<uint32_t*> spirvFiles;
+    List<uint32_t> spirvSizes;
+    if (!isPrecompilation && !codeGenContext->shouldSkipDownstreamLinking())
+    {
+        // Start with the SPIR-V we just generated.
+        // SPIRV-Tools-link expects the size in 32-bit words
+        // whereas the spirv blob size is in bytes.
+        spirvFiles.add((uint32_t*)spirv.getBuffer());
+        spirvSizes.add(int(spirv.getCount()) / 4);
+
+        // Iterate over all modules in the linkedIR. For each module, if it
+        // contains an embedded downstream ir instruction, add it to the list
+        // of spirv files.
+        auto program = codeGenContext->getProgram();
+
+        program->enumerateIRModules(
+            [&](IRModule* irModule)
+            {
+                for (auto globalInst : irModule->getModuleInst()->getChildren())
+                {
+                    if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
+                    {
+                        if (inst->getTarget() == CodeGenTarget::SPIRV)
+                        {
+                            auto slice = inst->getBlob()->getStringSlice();
+                            spirvFiles.add((uint32_t*)slice.begin());
+                            spirvSizes.add(int(slice.getLength()) / 4);
+                        }
+                    }
+                }
+            });
+
+        SLANG_ASSERT(int(spirv.getCount()) % 4 == 0);
+        SLANG_ASSERT(spirvFiles.getCount() == spirvSizes.getCount());
+    }
+    const bool needsSpirvLink = spirvFiles.getCount() > 1;
+
+    // `spirv-opt` (provided by the optional slang-glslang shared library) is
+    // genuinely required only for multi-module linking and for extracting a
+    // separate debug-info artifact; validation is diagnostic-only and optimization
+    // merely enhances an already-valid module. Load it best-effort (no diagnostic
+    // sink) so that a
+    // build or runtime without slang-glslang (e.g. SLANG_ENABLE_SLANG_GLSLANG=OFF)
+    // does not turn successfully-emitted, valid SPIR-V into a fatal error. We then
+    // fail explicitly, with an accurate diagnostic, only when a step that
+    // genuinely requires the compiler cannot proceed. getOrLoadDownstreamCompiler
+    // memoizes its result per session, so this point-of-use check (rather than the
+    // sink passed to the load) is what reliably catches a required-but-absent
+    // compiler, even when an earlier best-effort load already cached a null.
+    const bool requiresDownstreamCompiler =
+        needsSpirvLink || targetCompilerOptions.shouldEmitSeparateDebugInfo();
     IDownstreamCompiler* compiler = codeGenContext->getSession()->getOrLoadDownstreamCompiler(
         PassThroughMode::SpirvOpt,
-        codeGenContext->getSink());
+        nullptr);
+    if (requiresDownstreamCompiler && !compiler)
+    {
+        codeGenContext->getSink()->diagnose(Diagnostics::FailedToLoadDownstreamCompiler{
+            .compiler = TypeTextUtil::getPassThroughAsHumanText(
+                SlangPassThrough(PassThroughMode::SpirvOpt))});
+        return SLANG_FAIL;
+    }
     if (compiler)
     {
 #if 0
@@ -3124,65 +3189,23 @@ static SlangResult createArtifactFromIR(
         compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
 #endif
 
-        bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
-            CompilerOptionName::EmbedDownstreamIR);
-
-        if (!isPrecompilation && !codeGenContext->shouldSkipDownstreamLinking())
+        if (needsSpirvLink)
         {
             ComPtr<IArtifact> linkedArtifact;
+            SlangResult linkresult = compiler->link(
+                (const uint32_t**)spirvFiles.getBuffer(),
+                (const uint32_t*)spirvSizes.getBuffer(),
+                (uint32_t)spirvFiles.getCount(),
+                linkedArtifact.writeRef());
 
-            // collect spirv files
-            List<uint32_t*> spirvFiles;
-            List<uint32_t> spirvSizes;
-
-            // Start with the SPIR-V we just generated.
-            // SPIRV-Tools-link expects the size in 32-bit words
-            // whereas the spirv blob size is in bytes.
-            spirvFiles.add((uint32_t*)spirv.getBuffer());
-            spirvSizes.add(int(spirv.getCount()) / 4);
-
-            // Iterate over all modules in the linkedIR. For each module, if it
-            // contains an embedded downstream ir instruction, add it to the list
-            // of spirv files.
-            auto program = codeGenContext->getProgram();
-
-            program->enumerateIRModules(
-                [&](IRModule* irModule)
-                {
-                    for (auto globalInst : irModule->getModuleInst()->getChildren())
-                    {
-                        if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
-                        {
-                            if (inst->getTarget() == CodeGenTarget::SPIRV)
-                            {
-                                auto slice = inst->getBlob()->getStringSlice();
-                                spirvFiles.add((uint32_t*)slice.begin());
-                                spirvSizes.add(int(slice.getLength()) / 4);
-                            }
-                        }
-                    }
-                });
-
-            SLANG_ASSERT(int(spirv.getCount()) % 4 == 0);
-            SLANG_ASSERT(spirvFiles.getCount() == spirvSizes.getCount());
-
-            if (spirvFiles.getCount() > 1)
+            if (linkresult != SLANG_OK)
             {
-                SlangResult linkresult = compiler->link(
-                    (const uint32_t**)spirvFiles.getBuffer(),
-                    (const uint32_t*)spirvSizes.getBuffer(),
-                    (uint32_t)spirvFiles.getCount(),
-                    linkedArtifact.writeRef());
-
-                if (linkresult != SLANG_OK)
-                {
-                    return SLANG_FAIL;
-                }
-
-                ComPtr<ISlangBlob> blob;
-                linkedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef());
-                artifact = _Move(linkedArtifact);
+                return SLANG_FAIL;
             }
+
+            ComPtr<ISlangBlob> blob;
+            linkedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef());
+            artifact = _Move(linkedArtifact);
         }
 
         if (shouldRunSPIRVValidation(codeGenContext))
