@@ -10,7 +10,9 @@
 // silently lost.
 //
 // FileCheck asserts the ordering: optixSetPayload_N appears before the terminating intrinsic in
-// the emitted entry-point kernel. (CUDA-source emit only; no GPU needed.)
+// the emitted entry-point kernel. Only this ordering is under test — the distinct p.hit values
+// (1..5) keep the entry points readable but are not themselves asserted by the checks.
+// (CUDA-source emit only; no GPU needed.)
 
 //TEST:SIMPLE(filecheck=ACCEPT): -target cuda -entry anyHitAccept
 //TEST:SIMPLE(filecheck=IGNORE): -target cuda -entry anyHitIgnore

@@ -1721,10 +1721,16 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
     // Resolve the callee of a call to the concrete IR function it targets, unwrapping a
     // `specialize` wrapper around a function. Returns null for indirect calls (e.g. a call
-    // through a function value) where the callee is not a known function. This mirrors the callee
-    // resolution already used by emitPayloadWritebacks() below; by this point in the pipeline
-    // generics are specialized and witness lookups resolved, so calls reaching the CUDA legalizer
-    // are to concrete functions.
+    // through a function value) where the callee is not a known function. This is the single
+    // resolver shared by emitPayloadWritebacks() and the terminate-reaching analysis below.
+    //
+    // Resolution boundary (the contract the analysis below relies on): by this point in the
+    // pipeline generics are specialized and witness lookups resolved, so every call that reaches
+    // the CUDA legalizer targets a concrete function. The only callee this returns null for is a
+    // genuinely indirect call (a call through a function value); a terminating intrinsic reached
+    // only through such a call is therefore not detectable here, but those calls are resolved away
+    // before this stage, so the terminate-reaching analysis covers every case that can actually
+    // occur.
     static IRFunc* getResolvedCalleeFunc(IRCall* call)
     {
         auto callee = call->getCallee();
@@ -1736,9 +1742,14 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     }
 
     // Return true if `func` itself calls, or transitively reaches through resolvable direct
-    // calls, a shader-terminating intrinsic (IgnoreHit/AcceptHitAndEndSearch). `visited` guards
-    // against call-graph cycles. This decides which callees must be inlined into a ray entry
-    // point so that the payload write-back is emitted before the ray terminates.
+    // calls, a shader-terminating intrinsic (IgnoreHit/AcceptHitAndEndSearch). This decides which
+    // callees must be inlined into a ray entry point so that the payload write-back is emitted
+    // before the ray terminates.
+    //
+    // `visited` is recursion-internal scratch: callers must pass a freshly-constructed empty set.
+    // It only guards against call-graph cycles — a `func` already in `visited` short-circuits to
+    // false regardless of whether it reaches a terminating intrinsic, so the set is NOT a memo of
+    // the predicate and must not be shared across separate top-level queries.
     bool funcReachesShaderTerminatingIntrinsic(IRFunc* func, HashSet<IRFunc*>& visited)
     {
         if (!func || !visited.add(func))
@@ -1766,8 +1777,12 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     // Return true if the terminate-reaching call subgraph reachable from `func` contains a cycle.
     // A recursive helper that terminates the ray cannot be flattened by inlining (inlining a
     // recursive call chain would not terminate), so the caller must skip inlining and diagnose
-    // instead. Standard DFS back-edge detection restricted to functions in `terminateReaching`:
-    // `onStack` holds the current DFS path, `done` holds fully-explored functions.
+    // instead. Standard DFS back-edge detection restricted to functions in `terminateReaching`.
+    //
+    // `terminateReaching` is a real input (the set the search is restricted to). `onStack` (the
+    // current DFS path) and `done` (fully-explored functions) are recursion-internal scratch:
+    // callers must pass freshly-constructed empty sets, and on the early `return true` they are
+    // left indeterminate (the unwinding `onStack.remove`/`done.add` are skipped).
     bool terminateSubgraphHasCycle(
         IRFunc* func,
         HashSet<IRFunc*>& terminateReaching,
@@ -1808,6 +1823,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     // point reproduces exactly the codegen already produced when the callee is marked
     // [ForceInline] (the maintainer's documented workaround), where the write-back lands before
     // the terminate.
+    //
+    // On the rare path where a terminate-reaching callee cannot be flattened (a recursive chain,
+    // or a callee inlineCall cannot inline), the write-back cannot be guaranteed, so this pass
+    // emits an error (Diagnostics::ShaderTerminatingIntrinsicInNoninlinableCallee) via `sink`
+    // rather than silently miscompiling.
     void inlineShaderTerminatingCalleesForRayEntryPoints(IRModule* module, DiagnosticSink* sink)
     {
         for (auto globalInst : module->getGlobalInsts())
@@ -1819,23 +1839,14 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             if (!entryPointDecor || !entryPoint->getFirstBlock())
                 continue;
 
-            // Shader-terminating intrinsics are only valid in ray-tracing stages. Restricting the
-            // pass to those stages keeps non-ray CUDA kernels a strict no-op, and ensures a user
-            // function that merely shares the name "IgnoreHit"/"AcceptHitAndEndSearch" outside a
-            // ray shader (matched by isShaderTerminatingIntrinsic's name-hint check) is never
-            // affected.
-            switch (entryPointDecor->getProfile().getStage())
-            {
-            case Stage::RayGeneration:
-            case Stage::Intersection:
-            case Stage::AnyHit:
-            case Stage::ClosestHit:
-            case Stage::Miss:
-            case Stage::Callable:
-                break;
-            default:
+            // IgnoreHit/AcceptHitAndEndSearch are any-hit-only intrinsics (declared
+            // `[require(..., raytracing_anyhit)]` in the core module), so a terminating call can
+            // only legitimately appear in an `anyhit` entry point. Gating on Stage::AnyHit keeps
+            // every other entry point (including non-ray CUDA kernels) a strict no-op, and ensures
+            // an unrelated function that merely shares the name "IgnoreHit"/"AcceptHitAndEndSearch"
+            // — which isShaderTerminatingIntrinsic matches via name hint — is never disturbed.
+            if (entryPointDecor->getProfile().getStage() != Stage::AnyHit)
                 continue;
-            }
 
             // Collect every defined function reachable from the entry point via resolvable
             // direct calls.
@@ -1857,7 +1868,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                         }
             }
 
-            // Of those, find the ones that reach a shader-terminating intrinsic.
+            // From the reachable set, compute `terminateReaching`: the functions (keyed on their
+            // pre-inlining identity) that reach a terminating intrinsic. This set is authoritative
+            // for exactly two decisions made before any IR is mutated: the `contains(entryPoint)`
+            // "is there anything to do" early-out, and the acyclicity check. The inlining loop and
+            // residual scan below deliberately do NOT consult it — they re-derive "reaches a
+            // terminating intrinsic" against the entry point's *current* blocks, because inlining
+            // mutates those blocks and a set keyed on the original functions would be stale.
             HashSet<IRFunc*> terminateReaching;
             for (auto func : reachable)
             {
@@ -1884,16 +1901,26 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             if (!hasCycle)
             {
                 // Inline into the entry point every call that transitively reaches a terminating
-                // intrinsic, until none remain. The terminate-reaching subgraph is acyclic
-                // (checked above), so the bodies brought in only expose strictly-shallower
-                // terminating calls and the loop terminates. We inline exactly these calls
-                // (rather than marking callees [ForceInline] and running the module-wide
-                // force-inliner) so unrelated callees are left untouched. The result is the same
-                // flattened entry point that a [ForceInline] callee produces, so
-                // emitPayloadWritebacks() then inserts the payload write-back before each
-                // terminating call.
+                // intrinsic, until none remain. We inline exactly these calls (rather than marking
+                // callees [ForceInline] and running the module-wide force-inliner) so unrelated
+                // callees are left untouched. The result is the same flattened entry point that a
+                // [ForceInline] callee produces, so emitPayloadWritebacks() then inserts the
+                // payload write-back before each terminating call.
+                //
+                // Termination (decreasing measure): each iteration inlines *all* terminate-reaching
+                // calls currently in the entry point, so the maximum entry-point-to-terminate call
+                // nesting depth strictly decreases by one per iteration. The terminate-reaching
+                // subgraph is acyclic (checked above), so that depth is finite and bounded by the
+                // number of reachable functions; the loop therefore converges in at most
+                // `reachable.getCount()` real passes plus one final no-op pass. `maxIterations` is
+                // a deliberately generous cap, not a tight bound: the assertion exists only to turn
+                // a hypothetical non-terminating loop into a debug-build failure, never to fire on
+                // a valid input.
+                Index maxIterations = reachable.getCount() + 1;
+                Index iterationCount = 0;
                 for (bool changed = true; changed;)
                 {
+                    SLANG_ASSERT(iterationCount++ <= maxIterations);
                     changed = false;
                     List<IRCall*> terminatingCalls;
                     for (auto block : entryPoint->getBlocks())
@@ -1917,9 +1944,10 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             // in the entry point's own blocks (which emitPayloadWritebacks() handles). If a
             // resolvable callee that reaches one is still present (a recursive chain skipped
             // above, or a callee that inlineCall could not flatten), the payload write-back before
-            // ray termination cannot be guaranteed; diagnose rather than silently miscompile.
-            // (A terminating call reached only through a truly indirect/unresolvable callee is not
-            // detectable here, but such calls are resolved away before the CUDA legalizer runs.)
+            // ray termination cannot be guaranteed; diagnose rather than silently miscompile. (The
+            // only residual shape this cannot see is a terminating call reached through a genuinely
+            // indirect callee — see the resolution-boundary contract on getResolvedCalleeFunc; such
+            // calls are resolved away before this stage.)
             IRCall* residualCall = nullptr;
             for (auto block : entryPoint->getBlocks())
             {
@@ -1943,13 +1971,10 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             }
             if (residualCall)
             {
-                sink->diagnose(Diagnostics::Unimplemented{
-                    .feature =
-                        "a shader-terminating intrinsic (IgnoreHit or AcceptHitAndEndSearch) is "
-                        "reachable from this ray entry point only through a call that could not be "
-                        "inlined (for example, recursion); mark the intervening function(s) "
-                        "[ForceInline] or call the intrinsic directly in the entry point so the "
-                        "ray payload can be written back before the ray terminates",
+                // A dedicated `err`-severity diagnostic (not the internal-error `Unimplemented`,
+                // code 99999): this is a user-correctable limitation with an actionable workaround,
+                // not a compiler bug to "file an issue" about.
+                sink->diagnose(Diagnostics::ShaderTerminatingIntrinsicInNoninlinableCallee{
                     .location = residualCall->sourceLoc});
             }
         }
@@ -1989,14 +2014,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 {
                     if (auto call = as<IRCall>(inst))
                     {
-                        auto callee = call->getCallee();
-                        auto calleeFunc = as<IRFunc>(callee);
-                        if (!calleeFunc)
-                        {
-                            if (auto specialize = as<IRSpecialize>(callee))
-                                calleeFunc = as<IRFunc>(specialize->getBase());
-                        }
-
+                        auto calleeFunc = getResolvedCalleeFunc(call);
                         if (isShaderTerminatingIntrinsic(calleeFunc))
                         {
                             builder.setInsertBefore(call);
