@@ -108,6 +108,41 @@
 namespace Slang
 {
 
+String getGenericConstraintFailureString(Decl* constraintDecl)
+{
+    StringBuilder sb;
+    if (auto typeConstraint = as<GenericTypeConstraintDecl>(constraintDecl))
+    {
+        if (typeConstraint->sub.type)
+            typeConstraint->sub.type->toText(sb);
+        sb << (typeConstraint->isEqualityConstraint ? " == " : " : ");
+        if (typeConstraint->sup.type)
+            typeConstraint->sup.type->toText(sb);
+    }
+    else if (auto coercion = as<TypeCoercionConstraintDecl>(constraintDecl))
+    {
+        // A coercion constraint `where To(From)` requires `From` to convert to
+        // `To`; render it directionally as `From -> To`.
+        if (coercion->fromType.type)
+            coercion->fromType.type->toText(sb);
+        sb << " -> ";
+        if (coercion->toType.type)
+            coercion->toType.type->toText(sb);
+    }
+    else if (auto nonEmpty = as<NonEmptyPackConstraintDecl>(constraintDecl))
+    {
+        sb << "nonempty(";
+        if (auto packVar = as<DeclRefExpr>(nonEmpty->packExpr))
+            sb << getText(packVar->name);
+        sb << ")";
+    }
+    else if (constraintDecl && constraintDecl->getName())
+    {
+        sb << getText(constraintDecl->getName());
+    }
+    return sb.produceString();
+}
+
 bool SemanticsVisitor::isRelevantGeneric(GenericInferenceContext& system, Decl* generic)
 {
     for (auto genericDecl = system.genericDecl; genericDecl;
@@ -1713,7 +1748,28 @@ private:
         // the same write path.
         Val* solvedWitness = trySolveWitnessForConstraint(constraint.genericDecl, constraint.decl);
         if (!solvedWitness)
+        {
+            // A null witness here is a genuine, readiness-confirmed failure: the
+            // dependency check above already returned `Blocked` for any
+            // not-yet-ready constraint, so reaching this point means this source
+            // constraint cannot be satisfied for the current arguments. Record
+            // the general "does not satisfy generic constraint" reason naming the
+            // source constraint (rendered adaptively per kind by
+            // `getGenericConstraintFailureString`). This is the uniform fallback
+            // for every constraint kind; a more specific reason recorded earlier
+            // (e.g. the conformance message in `trySolveSubtypeWitnessForConstraint`
+            // or a variadic pack-count mismatch) wins via `kind == None`.
+            if (m_context.failure &&
+                m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
+                constraint.decl)
+            {
+                auto& unsat = m_context.failure->setGenericConstraintNotSatisfied();
+                unsat.constraintDecl = constraint.decl;
+                unsat.constraintLoc = constraint.decl->loc;
+                unsat.location = m_context.applicationLoc;
+            }
             return ConstraintSolvingState::Failed;
+        }
 
         // Store the proof in `m_args` immediately. Later ordinary defaults and
         // witness constraints substitute through this same array, so a solved
@@ -1908,12 +1964,12 @@ private:
             // recorded reason wins.
             if (m_context.failure &&
                 m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
-                typeParam && typeParam->getName() && type.type && cType.type)
+                typeParam && type.type && cType.type)
             {
                 auto& conflict = m_context.failure->setGenericParamUnificationConflict();
-                conflict.paramName = typeParam->getName();
-                conflict.firstType = type.type;
-                conflict.secondType = cType.type;
+                conflict.paramDecl = typeParam;
+                conflict.firstVal = type.type;
+                conflict.secondVal = cType.type;
                 conflict.location = m_context.applicationLoc;
             }
             return ConstraintSolvingState::Failed;
@@ -2095,6 +2151,21 @@ private:
         }
         else if (valPriority == c.priority && !val->equals(cVal))
         {
+            // Two same-priority value constraints require this parameter to be
+            // two different values (e.g. `let N` forced to both `4` and `8`).
+            // `val` holds the first and `cVal` the second; capture them for a
+            // focused unification-conflict diagnostic. First recorded reason
+            // wins; formatting is deferred to `CompleteOverloadCandidate`.
+            if (m_context.failure &&
+                m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None && val &&
+                cVal)
+            {
+                auto& conflict = m_context.failure->setGenericParamUnificationConflict();
+                conflict.paramDecl = valParam;
+                conflict.firstVal = val;
+                conflict.secondVal = cVal;
+                conflict.location = m_context.applicationLoc;
+            }
             return ConstraintSolvingState::Failed;
         }
 
@@ -2716,7 +2787,7 @@ private:
                     // recorded reason wins.
                     if (m_context.failure &&
                         m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
-                        member && member->getName())
+                        member)
                     {
                         auto& notInferred = m_context.failure->setOrdinaryGenericParamNotInferred();
                         notInferred.member = member;
@@ -3001,35 +3072,20 @@ private:
         // This routine also serves equality constraints (`where T == X`), whose
         // `sup` is the concrete right-hand type rather than an interface. The
         // specific "does not conform to interface" framing applies only to
-        // conformance (`T : IFoo`) constraints; every other unsatisfied
-        // constraint kind (equality, etc.) gets the general "does not satisfy
-        // generic constraint" reason instead of falling through to the generic
-        // fallback.
+        // conformance (`T : IFoo`) constraints, so only those are captured here;
+        // every other unsatisfied constraint kind (equality, coercion, ...) is
+        // captured uniformly by the general `GenericConstraintNotSatisfied`
+        // reason in `solveWitnessConstraint` at the readiness-confirmed failure
+        // point, so it is left for that path here.
         if (m_context.failure &&
-            m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None && sub && sup &&
+            m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
+            !constraintDecl->isEqualityConstraint && sub && sup &&
             !hasUnreadyDependenciesForVal(sub) && !hasUnreadyDependenciesForVal(sup))
         {
-            if (!constraintDecl->isEqualityConstraint)
-            {
-                auto& conformance = m_context.failure->setInterfaceConformanceNotSatisfied();
-                conformance.subType = sub;
-                conformance.supType = sup;
-                conformance.location = m_context.applicationLoc;
-            }
-            else
-            {
-                // General fallback for a non-conformance unsatisfied constraint.
-                // `argType` is the substituted value that violates it; the
-                // declared (unsubstituted) two sides print the constraint form
-                // (e.g. `T == int`), and the constraint declaration anchors a
-                // "see declaration" note.
-                auto& unsat = m_context.failure->setGenericConstraintNotSatisfied();
-                unsat.argType = sub;
-                unsat.constraintSub = constraintDecl->sub.type;
-                unsat.constraintSup = constraintDecl->sup.type;
-                unsat.constraintLoc = constraintDecl->loc;
-                unsat.location = m_context.applicationLoc;
-            }
+            auto& conformance = m_context.failure->setInterfaceConformanceNotSatisfied();
+            conformance.subType = sub;
+            conformance.supType = sup;
+            conformance.location = m_context.applicationLoc;
         }
         return nullptr;
     }
@@ -3305,7 +3361,7 @@ private:
                 // the diagnostic if this candidate is selected. First reason wins.
                 if (m_context.failure &&
                     m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
-                    constraint.decl && constraint.decl->getName())
+                    constraint.decl)
                 {
                     auto& notInferred = m_context.failure->setOrdinaryGenericParamNotInferred();
                     notInferred.member = constraint.decl;

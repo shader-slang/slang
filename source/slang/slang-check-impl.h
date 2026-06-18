@@ -64,6 +64,16 @@ Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink);
 /// Note: this currently does not include PtrTypeBase.
 Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 
+/// Render a generic source constraint declaration to a short, human-readable
+/// string for diagnostics, adapting to the constraint kind: a
+/// `GenericTypeConstraintDecl` prints as `<sub> == <sup>` (equality) or
+/// `<sub> : <sup>` (conformance/subtype), a `TypeCoercionConstraintDecl` as
+/// `<from> -> <to>`, a `NonEmptyPackConstraintDecl` as `nonempty(<pack>)`, and
+/// any other constraint kind falls back to its declared name. Used by the
+/// "does not satisfy generic constraint" diagnostic so the message reflects the
+/// actual constraint rather than assuming an equality.
+String getGenericConstraintFailureString(Decl* constraintDecl);
+
 inline int getIntValueBitSize(IntegerLiteralValue val)
 {
 #if SLANG_VC
@@ -255,31 +265,33 @@ struct GenericArgumentInferenceFailure
         Type* supType = nullptr;
     };
 
-    // A source generic constraint that is not an interface conformance (e.g. an
-    // equality constraint `where T == int`) could not be satisfied. `argType` is
-    // the substituted argument that violates it; `constraintSub`/`constraintSup`
-    // are the declared (unsubstituted) two sides of the constraint, used to print
-    // its form (e.g. `T == int`); `constraintLoc` points at the constraint
-    // declaration for a "see declaration" note. This is the general fallback for
-    // unsatisfied constraints that lack a more specific message.
+    // A source generic constraint that is not an interface conformance could not
+    // be satisfied — the general fallback for every constraint kind handled by
+    // the witness solver other than conformance (today: equality `where T == X`,
+    // type coercion `where U(T)`, non-empty pack `where nonempty(P)`, ...).
+    // `constraintDecl` is the source constraint declaration, rendered to a
+    // readable form (e.g. `T == int`, `T : IFoo`, `T -> U`) by
+    // `getGenericConstraintFailureString`; `constraintLoc` anchors a
+    // "see declaration" note. The declaration is captured (not a pre-rendered
+    // string) so formatting stays deferred to `CompleteOverloadCandidate`.
     struct GenericConstraintNotSatisfied
     {
         SourceLoc location = SourceLoc();
-        Type* argType = nullptr;
-        Type* constraintSub = nullptr;
-        Type* constraintSup = nullptr;
+        Decl* constraintDecl = nullptr;
         SourceLoc constraintLoc = SourceLoc();
     };
 
-    // Two ordinary constraints inferred conflicting types for one type parameter
-    // with no common type (e.g. `foo<T>(T, T)` called with unrelated `A` and
-    // `B`). Captures the parameter name and both candidate types.
+    // Two ordinary constraints inferred conflicting arguments for one generic
+    // parameter (e.g. `foo<T>(T, T)` with unrelated `A`/`B`, or `foo<let N:int>`
+    // required to be both `4` and `8`). Captures the parameter declaration and
+    // both candidate values; `Val*` covers both type parameters (the candidates
+    // are `Type`s) and value parameters (the candidates are `IntVal`s).
     struct GenericParamUnificationConflict
     {
         SourceLoc location = SourceLoc();
-        Name* paramName = nullptr;
-        Type* firstType = nullptr;
-        Type* secondType = nullptr;
+        Decl* paramDecl = nullptr;
+        Val* firstVal = nullptr;
+        Val* secondVal = nullptr;
     };
 
     Kind kind = Kind::None;

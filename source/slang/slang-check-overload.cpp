@@ -1560,9 +1560,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
             {
                 auto& failure = candidate.genericInferenceFailure.genericConstraintNotSatisfied;
                 getSink()->diagnose(Diagnostics::GenericArgumentDoesNotSatisfyConstraint{
-                    .argType = failure.argType,
-                    .constraintSub = failure.constraintSub,
-                    .constraintSup = failure.constraintSup,
+                    .constraint = getGenericConstraintFailureString(failure.constraintDecl),
                     .location = failure.location});
                 getSink()->diagnose(Diagnostics::SeeGenericConstraintDeclaration{
                     .location = failure.constraintLoc});
@@ -1577,10 +1575,15 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
         case GenericArgumentInferenceFailure::Kind::GenericParamUnificationConflict:
             {
                 auto& failure = candidate.genericInferenceFailure.genericParamUnificationConflict;
+                StringBuilder firstBuilder, secondBuilder;
+                if (failure.firstVal)
+                    failure.firstVal->toText(firstBuilder);
+                if (failure.secondVal)
+                    failure.secondVal->toText(secondBuilder);
                 getSink()->diagnose(Diagnostics::GenericParameterUnificationConflict{
-                    .paramName = failure.paramName,
-                    .firstType = failure.firstType,
-                    .secondType = failure.secondType,
+                    .paramName = failure.paramDecl->getName(),
+                    .firstCandidate = firstBuilder.produceString(),
+                    .secondCandidate = secondBuilder.produceString(),
                     .location = failure.location});
 
                 String declString =

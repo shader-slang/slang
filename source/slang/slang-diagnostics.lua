@@ -1931,8 +1931,8 @@ err(
 err(
     "generic-argument-does-not-satisfy-constraint",
     30440,
-    "generic argument does not satisfy generic constraint",
-    span { loc = "location", message = "generic argument '~argType:Type' does not satisfy the generic constraint '~constraintSub:Type == ~constraintSup:Type'" }
+    "generic constraint not satisfied",
+    span { loc = "location", message = "could not satisfy the generic constraint '~constraint:String'" }
 )
 
 standalone_note(
@@ -1953,7 +1953,7 @@ err(
     "generic-parameter-unification-conflict",
     30442,
     "cannot deduce generic argument",
-    span { loc = "location", message = "cannot deduce generic argument for '~paramName:Name': no common type for candidate types '~firstType:Type' and '~secondType:Type'" }
+    span { loc = "location", message = "cannot deduce generic argument for '~paramName:Name': conflicting requirements '~firstCandidate:String' and '~secondCandidate:String'" }
 )
 
 -- Float bit cast diagnostics
