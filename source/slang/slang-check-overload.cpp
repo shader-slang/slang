@@ -353,12 +353,20 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
 
     // Collect the generic's parameter types up front; the error reporter below
     // uses their count to report explicit-argument-list arity mismatches.
+    // `requiredCount` is the minimum number of explicit arguments the caller
+    // must supply: every parameter without a default value (defaults are
+    // trailing), so an explicit list shorter than this under-fills a required
+    // parameter, while one no longer than `paramTypes.getCount()` can have the
+    // remainder filled from defaults.
     List<QualType> paramTypes;
+    Index requiredCount = 0;
     for (auto memberRef : getMembers(m_astBuilder, genericDeclRef))
     {
         if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
         {
             paramTypes.add(DeclRefType::create(m_astBuilder, typeParamRef));
+            if (!typeParamRef.getDecl()->initType.type)
+                requiredCount = paramTypes.getCount();
         }
         else if (auto valPackParam = memberRef.as<GenericValuePackParamDecl>())
         {
@@ -367,6 +375,8 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
         else if (auto valParamRef = memberRef.as<GenericValueParamDecl>())
         {
             paramTypes.add(getType(m_astBuilder, valParamRef));
+            if (!valParamRef.getDecl()->initExpr)
+                requiredCount = paramTypes.getCount();
         }
         else if (auto typePackParam = memberRef.as<GenericTypePackParamDecl>())
         {
@@ -385,15 +395,21 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
 
     // When an explicit generic-argument list has the wrong number of arguments
     // (e.g. `Foo<int>` or `Foo<int, float, half>` for `Foo<T, U>`), report a
-    // focused arity diagnostic naming the expected and provided counts. Other
-    // specialization failures keep the general "cannot specialize" error.
+    // focused arity diagnostic naming the expected and provided counts. The
+    // arity message only fires when the provided count is genuinely outside the
+    // generic's allowed range — fewer than `requiredCount` (under-fills a
+    // non-defaulted parameter) or more than `paramTypes.getCount()` (over-fills
+    // the whole list). A count within `[requiredCount, paramTypes.getCount()]`
+    // that still fails (e.g. a defaulted parameter whose default cannot be
+    // substituted) is not an arity problem, so it keeps the general "cannot
+    // specialize" error rather than misreporting the argument count.
     auto maybeReportGeneralError = [&]()
     {
         if (context.mode == OverloadResolveContext::Mode::JustTrying)
             return;
         Index expectedCount = paramTypes.getCount();
         Index providedCount = context.getArgCount();
-        if (!hasParamPack && providedCount != expectedCount)
+        if (!hasParamPack && (providedCount < requiredCount || providedCount > expectedCount))
         {
             getSink()->diagnose(Diagnostics::GenericArgumentListArityMismatch{
                 .generic = candidate.item.declRef.getDecl(),
