@@ -5411,13 +5411,19 @@ err(
     span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
--- SPIRV (57001-57005)
+-- SPIRV (57001-57006)
 
 warning(
     "spirv-opt-failed",
     57001,
     "spirv-opt optimization failed",
     span { loc = "location", message = "spirv-opt failed. ~error" }
+)
+
+warning(
+    "spirv-validation-skipped-no-optimizer",
+    57006,
+    "SPIR-V validation was requested (SLANG_RUN_SPIRV_VALIDATION) but could not run because the optional 'spirv-opt' tool from the slang-glslang library is unavailable; the emitted SPIR-V was not validated. Build or install slang-glslang to enable validation."
 )
 
 err(

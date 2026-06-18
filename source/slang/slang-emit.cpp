@@ -3158,18 +3158,35 @@ static SlangResult createArtifactFromIR(
     }
     const bool needsSpirvLink = spirvFiles.getCount() > 1;
 
-    // `spirv-opt` (provided by the optional slang-glslang shared library) is
-    // genuinely required only for multi-module linking and for extracting a
-    // separate debug-info artifact; validation is diagnostic-only and optimization
-    // merely enhances an already-valid module. Load it best-effort (no diagnostic
-    // sink) so that a
-    // build or runtime without slang-glslang (e.g. SLANG_ENABLE_SLANG_GLSLANG=OFF)
-    // does not turn successfully-emitted, valid SPIR-V into a fatal error. We then
-    // fail explicitly, with an accurate diagnostic, only when a step that
-    // genuinely requires the compiler cannot proceed. getOrLoadDownstreamCompiler
-    // memoizes its result per session, so this point-of-use check (rather than the
-    // sink passed to the load) is what reliably catches a required-but-absent
-    // compiler, even when an earlier best-effort load already cached a null.
+    // `spirv-opt` (provided by the optional slang-glslang shared library, loaded
+    // at runtime via dlopen) is consulted only after the valid base SPIR-V module
+    // has already been emitted and added to the artifact above. It is genuinely
+    // *required* for only two post-emit steps:
+    //   - multi-module linking (`needsSpirvLink`): otherwise the artifact would
+    //     contain just the first module's SPIR-V; and
+    //   - separate debug-info extraction (`shouldEmitSeparateDebugInfo()`):
+    //     `dbgArtifact` is produced *only* inside the optimize-success branch
+    //     below and is then dereferenced unconditionally by the caller
+    //     `emitSPIRVForEntryPointsDirectly` (`dbgArtifact->getName()`) when
+    //     separate debug info is requested. Without the optimizer that artifact
+    //     stays null, so its absence must fail here rather than crash later.
+    // Validation is diagnostic-only and optimization merely enhances an
+    // already-valid module, so both degrade gracefully when the optimizer is
+    // absent. We therefore load `spirv-opt` best-effort (passing a null diagnostic
+    // sink) so that a build or runtime without slang-glslang (e.g.
+    // SLANG_ENABLE_SLANG_GLSLANG=OFF, or a missing/uninstalled .so) does not turn
+    // successfully-emitted, valid SPIR-V into a fatal error, and we fail explicitly
+    // only when a genuinely-required step cannot proceed. `requiresDownstreamCompiler`
+    // means "the requested output is incorrect without the optimizer", not "a
+    // compiler was requested". Because `getOrLoadDownstreamCompiler` memoizes its
+    // result per session (the first attempt sets the init bit; later calls return
+    // the cached result without re-running the locator), this point-of-use check on
+    // the resolved `compiler` pointer — rather than choosing the sink by need on the
+    // load — is what reliably catches a required-but-absent compiler even when an
+    // earlier best-effort load in the same session already cached a null. After the
+    // early-return below, reaching the `if (compiler)` block with a null `compiler`
+    // therefore means only *optional* steps (validation, optimization) will be
+    // skipped — never the required link/separate-debug work.
     const bool requiresDownstreamCompiler =
         needsSpirvLink || targetCompilerOptions.shouldEmitSeparateDebugInfo();
     IDownstreamCompiler* compiler = codeGenContext->getSession()->getOrLoadDownstreamCompiler(
@@ -3177,10 +3194,42 @@ static SlangResult createArtifactFromIR(
         nullptr);
     if (requiresDownstreamCompiler && !compiler)
     {
-        codeGenContext->getSink()->diagnose(Diagnostics::FailedToLoadDownstreamCompiler{
-            .compiler = TypeTextUtil::getPassThroughAsHumanText(
-                SlangPassThrough(PassThroughMode::SpirvOpt))});
+        // The best-effort load above used a null sink and memoized a null result.
+        // Re-probe once with the real sink so a genuinely-required failure still
+        // reports the full diagnostic chain (the top-level E00100 plus the
+        // per-library `note[E99996]` lines naming each library the locator tried);
+        // the memoized null must be cleared first or the locator will not re-run.
+        codeGenContext->getSession()->resetDownstreamCompiler(PassThroughMode::SpirvOpt);
+        codeGenContext->getSession()->getOrLoadDownstreamCompiler(
+            PassThroughMode::SpirvOpt,
+            codeGenContext->getSink());
+        // The re-probe emits the full chain on the (expected) failure; guard against
+        // ever returning failure with an empty sink.
+        if (codeGenContext->getSink()->getErrorCount() == 0)
+        {
+            codeGenContext->getSink()->diagnose(Diagnostics::FailedToLoadDownstreamCompiler{
+                .compiler = TypeTextUtil::getPassThroughAsHumanText(
+                    SlangPassThrough(PassThroughMode::SpirvOpt))});
+        }
         return SLANG_FAIL;
+    }
+    if (!compiler)
+    {
+        // `spirv-opt` is genuinely optional for this compile, so we ship the valid
+        // base SPIR-V unchanged. Optimization is left silent on purpose: the level
+        // defaults to `OptimizationLevel::Default` (not `None`) and the effective
+        // level reaches the optimize block below by option-set inheritance rather
+        // than a local set, so there is no reliable signal here to tell an explicit
+        // `-O` from the implicit default — warning whenever the level is non-None
+        // would fire on ordinary compiles (including the reporter's plain
+        // `-target spirv`), re-introducing noise on the exact path this fix keeps
+        // clean. Validation, by contrast, is an explicit opt-in (off by default,
+        // enabled only via SLANG_RUN_SPIRV_VALIDATION); if it was requested but
+        // cannot run, warn so a green compile is not mistaken for "validated".
+        if (shouldRunSPIRVValidation(codeGenContext))
+        {
+            codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationSkippedNoOptimizer{});
+        }
     }
     if (compiler)
     {
