@@ -1928,41 +1928,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
         targetCaps.join(stageCapabilitySet);
-
-        // The kernel-style CPU host targets only emit compute kernels; they do
-        // not support graphics or ray-tracing entry points. This is the set of
-        // CPU targets that run the CPU varying-parameter legalizer
-        // (`legalizeEntryPointVaryingParamsForCPU`): C/C++ source and header,
-        // shader object code, shader host-callable, and shader LLVM-IR emit
-        // through it directly, while the binary kernel target
-        // `ShaderSharedLibrary` emits through C++ source first (-> `CPPSource`
-        // via `_getDefaultSourceForTarget`) and so runs it too. That
-        // legalizer only models the compute system values, so a graphics entry
-        // point (e.g. a vertex shader returning `SV_Position`) is not
-        // representable there and previously flowed into it and crashed on a
-        // null parameter (#11659). The capability system treats pipeline stages
-        // as target-orthogonal (a stage atom has an empty target "keyhole"), so
-        // it does not flag this combination; reject it here, at the front-end,
-        // with the existing capability diagnostic. CUDA is excluded
-        // (`isCPUTarget` is false for it -- it uses its own legalizer and
-        // supports OptiX ray-tracing stages), as are host-side compiles
-        // (non-kernel CPU targets) and entry points whose stage is unresolved.
-        if (isCPUTarget(target) && isKernelTarget(target->getTarget()) && stage != Stage::Compute &&
-            stage != Stage::Unknown)
-        {
-            maybeDiagnose(
-                sink,
-                linkage->m_optionSet,
-                DiagnosticCategory::Capability,
-                Diagnostics::EntryPointUsesUnavailableCapability{
-                    .stage =
-                        capabilityNameToString((CapabilityName)stageCapabilitySet.getTargetStage()),
-                    .target = capabilityNameToString(
-                        (CapabilityName)target->getTargetCaps().getCompileTarget()),
-                    .decl = entryPointFuncDecl});
-            continue;
-        }
-
         if (targetCaps.isIncompatibleWith(
                 CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}))
         {
