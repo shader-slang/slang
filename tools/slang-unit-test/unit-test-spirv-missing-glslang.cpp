@@ -169,6 +169,11 @@ SLANG_UNIT_TEST(spirvMissingGlslangDegradesGracefully)
         SLANG_CHECK(code->getBufferSize() != 0);
     }
     SLANG_CHECK(!diagnosticsContain(diagnostics, "E00100"));
+    // Guards the CI regression from PR #11663: a plain default-optimization compile
+    // (validation off) must stay warning-free. The skipped-validation warning (57006)
+    // fires only when SPIR-V validation was explicitly requested, so it must not appear
+    // here.
+    SLANG_CHECK(!diagnosticsContain(diagnostics, "57006"));
 }
 
 // Required-fail: separate debug-info extraction genuinely needs spirv-opt, so with

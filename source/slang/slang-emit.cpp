@@ -3200,18 +3200,24 @@ static SlangResult createArtifactFromIR(
         // per-library `note[E99996]` lines naming each library the locator tried);
         // the memoized null must be cleared first or the locator will not re-run.
         codeGenContext->getSession()->resetDownstreamCompiler(PassThroughMode::SpirvOpt);
-        codeGenContext->getSession()->getOrLoadDownstreamCompiler(
+        compiler = codeGenContext->getSession()->getOrLoadDownstreamCompiler(
             PassThroughMode::SpirvOpt,
             codeGenContext->getSink());
-        // The re-probe emits the full chain on the (expected) failure; guard against
-        // ever returning failure with an empty sink.
-        if (codeGenContext->getSink()->getErrorCount() == 0)
+        if (!compiler)
         {
-            codeGenContext->getSink()->diagnose(Diagnostics::FailedToLoadDownstreamCompiler{
-                .compiler = TypeTextUtil::getPassThroughAsHumanText(
-                    SlangPassThrough(PassThroughMode::SpirvOpt))});
+            // The sink-backed re-probe already emitted the chain on the (expected)
+            // failure; guard against ever returning failure with an empty sink.
+            if (codeGenContext->getSink()->getErrorCount() == 0)
+            {
+                codeGenContext->getSink()->diagnose(Diagnostics::FailedToLoadDownstreamCompiler{
+                    .compiler = TypeTextUtil::getPassThroughAsHumanText(
+                        SlangPassThrough(PassThroughMode::SpirvOpt))});
+            }
+            return SLANG_FAIL;
         }
-        return SLANG_FAIL;
+        // Re-probe unexpectedly succeeded (loader state changed between the two
+        // loads): use the now-loaded compiler and fall through to the normal
+        // link/validate/optimize path below.
     }
     if (!compiler && shouldRunSPIRVValidation(codeGenContext))
     {
