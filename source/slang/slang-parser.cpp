@@ -1541,12 +1541,13 @@ struct DeclaratorInfo
     // Propagated from NameDeclarator: true when the name used the
     // `operator <op>` form, which is only valid for operator functions.
     // This is read only in `CompleteVarDecl` (the traditional variable/parameter
-    // completion chokepoint), which is where the reported bug lived. The typedef
-    // path also flows through `UnwrapDeclarator` and so carries the flag, but it
-    // does not reject it, so `typedef int operator+;` is still accepted; closing
-    // that pre-existing gap is out of scope for this fix. Property declarations
-    // never set the flag because their name is parsed as a plain identifier
-    // (a leading `operator` token is rejected earlier as an unexpected token).
+    // completion chokepoint), which is where the reported bug lived. Other C-style
+    // declarator paths that also flow through `UnwrapDeclarator` carry the flag but
+    // do not reject it, so `typedef int operator+;` and the traditional-syntax
+    // `property int operator+ { ... }` are still accepted; closing those pre-existing
+    // gaps is out of scope for this fix. The modern `let`/`var`-style forms (and the
+    // modern `property name : type` form) read a plain identifier and never set the
+    // flag (a leading `operator` token is an unexpected-token error there).
     bool isOperatorName = false;
 };
 
