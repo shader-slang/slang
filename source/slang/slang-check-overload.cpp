@@ -1576,7 +1576,9 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
             {
                 auto& failure = candidate.genericInferenceFailure.genericConstraintNotSatisfied;
                 getSink()->diagnose(Diagnostics::GenericArgumentDoesNotSatisfyConstraint{
-                    .constraint = getGenericConstraintFailureString(failure.constraintDecl),
+                    .constraint = ASTPrinter::getGenericConstraintString(
+                        failure.constraintDecl,
+                        m_astBuilder),
                     .location = failure.location});
                 getSink()->diagnose(Diagnostics::SeeGenericConstraintDeclaration{
                     .location = failure.constraintLoc});

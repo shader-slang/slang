@@ -108,41 +108,6 @@
 namespace Slang
 {
 
-String getGenericConstraintFailureString(Decl* constraintDecl)
-{
-    StringBuilder sb;
-    if (auto typeConstraint = as<GenericTypeConstraintDecl>(constraintDecl))
-    {
-        if (typeConstraint->sub.type)
-            typeConstraint->sub.type->toText(sb);
-        sb << (typeConstraint->isEqualityConstraint ? " == " : " : ");
-        if (typeConstraint->sup.type)
-            typeConstraint->sup.type->toText(sb);
-    }
-    else if (auto coercion = as<TypeCoercionConstraintDecl>(constraintDecl))
-    {
-        // A coercion constraint `where To(From)` requires `From` to convert to
-        // `To`; render it directionally as `From -> To`.
-        if (coercion->fromType.type)
-            coercion->fromType.type->toText(sb);
-        sb << " -> ";
-        if (coercion->toType.type)
-            coercion->toType.type->toText(sb);
-    }
-    else if (auto nonEmpty = as<NonEmptyPackConstraintDecl>(constraintDecl))
-    {
-        sb << "nonempty(";
-        if (auto packVar = as<DeclRefExpr>(nonEmpty->packExpr))
-            sb << getText(packVar->name);
-        sb << ")";
-    }
-    else if (constraintDecl && constraintDecl->getName())
-    {
-        sb << getText(constraintDecl->getName());
-    }
-    return sb.produceString();
-}
-
 bool SemanticsVisitor::isRelevantGeneric(GenericInferenceContext& system, Decl* generic)
 {
     for (auto genericDecl = system.genericDecl; genericDecl;
@@ -1755,7 +1720,7 @@ private:
             // constraint cannot be satisfied for the current arguments. Record
             // the general "does not satisfy generic constraint" reason naming the
             // source constraint (rendered adaptively per kind by
-            // `getGenericConstraintFailureString`). This is the uniform fallback
+            // `ASTPrinter::getGenericConstraintString`). This is the uniform fallback
             // for every constraint kind; a more specific reason recorded earlier
             // (e.g. the conformance message in `trySolveSubtypeWitnessForConstraint`
             // or a variadic pack-count mismatch) wins via `kind == None`.

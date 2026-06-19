@@ -64,16 +64,6 @@ Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink);
 /// Note: this currently does not include PtrTypeBase.
 Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 
-/// Render a generic source constraint declaration to a short, human-readable
-/// string for diagnostics, adapting to the constraint kind: a
-/// `GenericTypeConstraintDecl` prints as `<sub> == <sup>` (equality) or
-/// `<sub> : <sup>` (conformance/subtype), a `TypeCoercionConstraintDecl` as
-/// `<from> -> <to>`, a `NonEmptyPackConstraintDecl` as `nonempty(<pack>)`, and
-/// any other constraint kind falls back to its declared name. Used by the
-/// "does not satisfy generic constraint" diagnostic so the message reflects the
-/// actual constraint rather than assuming an equality.
-String getGenericConstraintFailureString(Decl* constraintDecl);
-
 inline int getIntValueBitSize(IntegerLiteralValue val)
 {
 #if SLANG_VC
@@ -270,8 +260,8 @@ struct GenericArgumentInferenceFailure
     // the witness solver other than conformance (today: equality `where T == X`,
     // type coercion `where U(T)`, non-empty pack `where nonempty(P)`, ...).
     // `constraintDecl` is the source constraint declaration, rendered to a
-    // readable form (e.g. `T == int`, `T : IFoo`, `T -> U`) by
-    // `getGenericConstraintFailureString`; `constraintLoc` anchors a
+    // readable form (e.g. `T == int`, `T : IFoo`, `int(T)`) by
+    // `ASTPrinter::getGenericConstraintString`; `constraintLoc` anchors a
     // "see declaration" note. The declaration is captured (not a pre-rendered
     // string) so formatting stays deferred to `CompleteOverloadCandidate`.
     struct GenericConstraintNotSatisfied

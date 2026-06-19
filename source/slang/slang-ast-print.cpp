@@ -1795,6 +1795,47 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     return getDeclSignatureString(item.declRef, astBuilder);
 }
 
+void ASTPrinter::addGenericConstraint(Decl* constraintDecl)
+{
+    StringBuilder& sb = m_builder;
+    if (auto typeConstraint = as<GenericTypeConstraintDecl>(constraintDecl))
+    {
+        addType(typeConstraint->sub.type);
+        sb << (typeConstraint->isEqualityConstraint ? " == " : " : ");
+        addType(typeConstraint->sup.type);
+    }
+    else if (auto coercion = as<TypeCoercionConstraintDecl>(constraintDecl))
+    {
+        // A coercion constraint is written `where To(From)` in Slang, requiring
+        // `From` to be convertible to `To`; render it the same way so the
+        // diagnostic echoes the source syntax.
+        addType(coercion->toType.type);
+        sb << "(";
+        addType(coercion->fromType.type);
+        sb << ")";
+    }
+    else if (auto nonEmpty = as<NonEmptyPackConstraintDecl>(constraintDecl))
+    {
+        sb << "nonempty(";
+        if (auto packVar = as<DeclRefExpr>(nonEmpty->packExpr))
+            sb << getText(packVar->name);
+        sb << ")";
+    }
+    else if (constraintDecl && constraintDecl->getName())
+    {
+        sb << getText(constraintDecl->getName());
+    }
+}
+
+/* static */ String ASTPrinter::getGenericConstraintString(
+    Decl* constraintDecl,
+    ASTBuilder* astBuilder)
+{
+    ASTPrinter astPrinter(astBuilder);
+    astPrinter.addGenericConstraint(constraintDecl);
+    return astPrinter.getString();
+}
+
 /* static */ UnownedStringSlice ASTPrinter::getPart(
     Part::Type partType,
     const UnownedStringSlice& slice,

@@ -4,7 +4,7 @@
 // that fails while the generic argument is being *inferred* from the call (as
 // opposed to the explicit-argument path, which has its own dedicated message)
 // must report the general "generic constraint not satisfied" diagnostic,
-// rendering the coercion adaptively as `T -> int` with a see-declaration note.
+// rendering the coercion in Slang syntax as `int(T)` with a see-declaration note.
 
 struct S
 {
@@ -21,7 +21,7 @@ void main()
 {
     S s;
     convert(s);
-/*CHECK: could not satisfy the generic constraint 'T -> int'
+/*CHECK: could not satisfy the generic constraint 'int(T)'
 */
 //CHECK: see generic constraint declaration
 }
