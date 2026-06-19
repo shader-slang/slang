@@ -752,6 +752,8 @@ bool isCoreModuleMemberFuncDecl(Decl* decl);
 // Ensure that a version of the given declaration has been emitted to the IR
 LoweredValInfo ensureDecl(IRGenContext* context, Decl* decl);
 
+LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst, IRType* type);
+
 // Emit code as needed to construct a reference to the given declaration with
 // any needed specializations in place.
 LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType* type);
@@ -1625,6 +1627,8 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     }
     else if (const auto typeConstraint = as<TypeConstraintDecl>(requirementDecl); typeConstraint)
     {
+        if (isGenericInterfaceRequirementSignatureConstraint(requirementDecl))
+            return false;
     }
     else if (const auto varDecl = as<VarDeclBase>(requirementDecl); varDecl)
     {
@@ -2325,9 +2329,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         if (as<ThisTypeConstraintDecl>(val->getDeclRef()))
             return LoweredValInfo::simple(context->thisTypeWitness);
 
+        auto declRef = val->getDeclRef();
+        // A subtype witness is a proof term. Lower it to the witness value directly rather than
+        // through the `DeclRef<Decl>` wrapper, which also lowers associated callable/type metadata
+        // onto the resulting IR value. When the proof is the witness table currently being filled,
+        // attaching that metadata can recursively lower types through a partially built table.
         return emitDeclRef(
             context,
-            val->getDeclRef(),
+            declRef.getDecl(),
+            declRef.declRefBase,
             context->irBuilder->getWitnessTableType(lowerType(context, val->getSup())));
     }
 
@@ -2740,10 +2750,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             return lowerSimpleIntrinsicType(type);
         }
 
-
-        return (IRType*)getSimpleVal(
-            context,
-            emitDeclRef(context, declRef, context->irBuilder->getTypeKind()));
+        auto loweredDeclRef = emitDeclRef(context, declRef, context->irBuilder->getTypeKind());
+        return (IRType*)getSimpleVal(context, loweredDeclRef);
     }
 
     IRType* visitValuePackType(ValuePackType* type)
@@ -4808,7 +4816,9 @@ void lowerAssociatedVal(IRGenContext* context, IRInst* irKey, SlangInt id, Val* 
     }
 
     if (irAssocVal)
+    {
         context->irBuilder->addAnnotation(irKey, (AnnotationKind)id, irAssocVal);
+    }
 };
 
 void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal)
@@ -4827,7 +4837,21 @@ void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal)
             for (auto it = diffAttr->begin(val); it != diffAttr->end(val); it++)
             {
                 auto pair = *it;
-                lowerAssociatedVal(context, irVal, pair.key, pair.value->resolve());
+                auto associatedVal = pair.value;
+                if (auto declRef = as<DeclRefBase>(val))
+                {
+                    // Associated vals are recorded against the checked AST decl-ref that produced
+                    // a callee. Interface default implementations can later lower that same
+                    // decl-ref through a concrete conformance, e.g.
+                    // `ITensor<T,D>.load<TIndex>` becomes `Tensor<float,2>.load<int,int>`.
+                    // Substitute the stored associated value through the actual key before
+                    // lowering it so witnesses such as
+                    // `load<TIndex>.fwd_diff : IBackwardDifferentiable<...>` carry the same
+                    // generic/interface substitutions as the callee they annotate.
+                    associatedVal =
+                        associatedVal->substitute(context->astBuilder, SubstitutionSet(declRef));
+                }
+                lowerAssociatedVal(context, irVal, pair.key, associatedVal->resolve());
             }
         }
     }
@@ -5177,6 +5201,9 @@ struct ExprLoweringContext
             }
             for (auto memberDecl : genDecl->getDirectMemberDecls())
             {
+                if (!isGenericConstraintParameterDecl(memberDecl))
+                    continue;
+
                 if (auto constraintDecl = as<GenericTypeConstraintDecl>(memberDecl))
                 {
                     _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
@@ -10328,35 +10355,6 @@ top:
     }
 }
 
-static bool isGenericInterfaceRequirementConstraint(Decl* decl)
-{
-    bool seenGenerics = false;
-    if (as<TypeConstraintDecl>(decl))
-    {
-        // Keep going up through the parents until we hit an InterfaceDecl &
-        // keep track of whether we see any GenericDecl along the way.
-        //
-        auto parentDecl = decl->parentDecl;
-        while (parentDecl)
-        {
-            if (as<InterfaceDecl>(parentDecl))
-            {
-                return seenGenerics;
-            }
-            if (as<GenericDecl>(parentDecl))
-            {
-                seenGenerics = true;
-            }
-            parentDecl = parentDecl->parentDecl;
-        }
-    }
-
-    // If this isn't a constraint decl or it's not inside an interface, it's
-    // not a generic interface requirement constraint.
-    //
-    return false;
-}
-
 struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 {
     IRGenContext* context;
@@ -10561,6 +10559,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
     {
+        if (isGenericInterfaceRequirementSignatureConstraint(decl))
+            return LoweredValInfo();
+
         // An interface-level constraint (declared via `__constraint` in an
         // interface body) is a direct member of the interface. It lowers as the
         // key for that interface requirement, just like a constraint attached to
@@ -10568,6 +10569,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (as<InterfaceDecl>(decl->parentDecl))
         {
             return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
+        }
+        if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
+        {
+            if (as<InterfaceDecl>(genericDecl->parentDecl))
+            {
+                return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
+            }
         }
 
         // This might be a type constraint on an associated type,
@@ -10627,6 +10635,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl)
     {
+        if (isGenericInterfaceRequirementSignatureConstraint(decl))
+            return LoweredValInfo();
+
         if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             SLANG_UNUSED(globalGenericParamDecl);
@@ -10645,6 +10656,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl)
     {
+        if (isGenericInterfaceRequirementSignatureConstraint(decl))
+            return LoweredValInfo();
+
         if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             SLANG_UNUSED(globalGenericParamDecl);
@@ -10661,6 +10675,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitGenericVariadicPackCountConstraintDecl(
         GenericVariadicPackCountConstraintDecl* decl)
     {
+        if (isInterfaceRequirement(decl))
+            return LoweredValInfo();
+
+        if (isGenericInterfaceRequirementSignatureConstraint(decl))
+            return LoweredValInfo();
+
         if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl);
             globalGenericParamDecl)
         {
@@ -10670,8 +10690,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return LoweredValInfo::simple(inst);
         }
 
-        SLANG_UNEXPECTED("pack-count constraint during lowering");
-        UNREACHABLE_RETURN(LoweredValInfo());
+        return LoweredValInfo();
     }
 
     LoweredValInfo visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
@@ -10700,10 +10719,62 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return false;
     }
 
-    Decl* getTargetRequirement(Decl* decl)
+    void lowerSubstitutionArg(
+        IRGenContext* subContext,
+        GenericAppDeclRef* subst,
+        Decl* paramDecl,
+        Index argIndex)
     {
-        SLANG_ASSERT(as<CallableDecl>(decl->parentDecl));
-        return decl->parentDecl;
+        SLANG_ASSERT(argIndex < subst->getArgs().getCount());
+        auto argVal = lowerVal(subContext, subst->getArgs()[argIndex]);
+        subContext->setValue(paramDecl, argVal);
+    }
+
+    void lowerSubstitutionEnv(IRGenContext* subContext, DeclRefBase* subst)
+    {
+        if (!subst)
+            return;
+
+        lowerSubstitutionEnv(subContext, subst->getBase());
+
+        auto genericAppDeclRef = as<GenericAppDeclRef>(subst);
+        if (!genericAppDeclRef)
+            return;
+
+        auto genericDecl = genericAppDeclRef->getGenericDecl();
+        Index argCounter = 0;
+
+        for (auto memberDecl : genericDecl->getDirectMemberDecls())
+        {
+            if (auto typeParamDecl = as<GenericTypeParamDecl>(memberDecl))
+            {
+                lowerSubstitutionArg(subContext, genericAppDeclRef, typeParamDecl, argCounter++);
+            }
+            else if (auto typePackParamDecl = as<GenericTypePackParamDecl>(memberDecl))
+            {
+                lowerSubstitutionArg(
+                    subContext,
+                    genericAppDeclRef,
+                    typePackParamDecl,
+                    argCounter++);
+            }
+            else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(memberDecl))
+            {
+                lowerSubstitutionArg(subContext, genericAppDeclRef, valPackParamDecl, argCounter++);
+            }
+            else if (auto valParamDecl = as<GenericValueParamDecl>(memberDecl))
+            {
+                lowerSubstitutionArg(subContext, genericAppDeclRef, valParamDecl, argCounter++);
+            }
+        }
+
+        for (auto memberDecl : genericDecl->getDirectMemberDecls())
+        {
+            if (!isGenericConstraintParameterDecl(memberDecl))
+                continue;
+
+            lowerSubstitutionArg(subContext, genericAppDeclRef, memberDecl, argCounter++);
+        }
     }
 
     void lowerWitnessTable(
@@ -10723,156 +10794,134 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (!irRequirementKey)
                 continue;
 
-            IRInst* irSatisfyingVal = nullptr;
-
-            switch (satisfyingWitness.getFlavor())
+            auto lowerSatisfyingWitness = [&](IRGenContext* witnessContext,
+                                              RequirementWitness witness) -> IRInst*
             {
-            case RequirementWitness::Flavor::declRef:
+                auto witnessBuilder = witnessContext->irBuilder;
+                switch (witness.getFlavor())
                 {
-                    auto satisfyingDeclRef = satisfyingWitness.getDeclRef();
-                    irSatisfyingVal = getSimpleVal(
-                        subContext,
-                        emitDeclRef(
-                            subContext,
-                            satisfyingDeclRef,
-                            // TODO: we need to know what type to plug in here...
-                            nullptr));
-                }
-                break;
-
-            case RequirementWitness::Flavor::val:
-                {
-                    auto satisfyingVal = satisfyingWitness.getVal()->resolve();
-                    if (isGenericInterfaceRequirementConstraint(requiredMemberDecl))
+                case RequirementWitness::Flavor::declRef:
                     {
-                        // Get the decl that this constraint is referencing.
-                        auto decl = getTargetRequirement(requiredMemberDecl);
-                        auto satisfyingTargetDeclRef =
-                            astWitnessTable->m_requirementDictionary[decl].getValue().getDeclRef();
-                        auto satisfyingTargetIR = getSimpleVal(
-                            subContext,
+                        auto satisfyingDeclRef = witness.getDeclRef();
+                        return getSimpleVal(
+                            witnessContext,
                             emitDeclRef(
-                                subContext,
-                                satisfyingTargetDeclRef,
+                                witnessContext,
+                                satisfyingDeclRef,
                                 // TODO: we need to know what type to plug in here...
                                 nullptr));
-
-                        IRGenContext genericConstraintContext(
-                            subContext->shared,
-                            subContext->astBuilder);
-
-                        IRGenEnv subEnv;
-                        subEnv.outer = subContext->env;
-                        IRBuilder subIRBuilder(subContext->irBuilder->getModule());
-
-                        IRGenContext genericConstraintEmitContext = *subContext;
-                        genericConstraintEmitContext.irBuilder = &subIRBuilder;
-                        genericConstraintEmitContext.env = &subEnv;
-
-                        IRGeneric* constraintGeneric = emitOuterGenerics(
-                            &genericConstraintEmitContext,
-                            satisfyingTargetDeclRef.getDecl(),
-                            nullptr);
-
-                        irSatisfyingVal =
-                            lowerSimpleVal(&genericConstraintEmitContext, satisfyingVal);
-
-                        auto outerMostConstraintGeneric =
-                            finishOuterGenerics(&subIRBuilder, irSatisfyingVal, constraintGeneric);
-                        irSatisfyingVal = outerMostConstraintGeneric;
-
-                        // Collect all specialization layers first
-                        List<List<IRInst*>> specializationLayers;
-                        while (auto specIR = as<IRSpecialize>(satisfyingTargetIR))
-                        {
-                            List<IRInst*> specializationArgs;
-                            for (UInt i = 0; i < specIR->getArgCount(); i++)
-                            {
-                                specializationArgs.add(specIR->getArg(i));
-                            }
-                            specializationLayers.add(specializationArgs);
-                            satisfyingTargetIR = specIR->getBase();
-                        }
-
-                        // Apply the specialization layers in reverse order
-                        for (Index i = specializationLayers.getCount(); i > 0; --i)
-                        {
-                            auto& specializationArgs = specializationLayers[i - 1];
-
-                            // Copy specialization arguments onto the outer generic
-                            irSatisfyingVal = subIRBuilder.emitSpecializeInst(
-                                as<IRGeneric>(irSatisfyingVal)
-                                    ? (IRType*)subIRBuilder.emitSpecializeInst(
-                                          subIRBuilder.getTypeKind(),
-                                          irSatisfyingVal->getDataType(),
-                                          specializationArgs)
-                                    : irSatisfyingVal->getDataType(),
-                                irSatisfyingVal,
-                                specializationArgs);
-                        }
                     }
-                    else
+
+                case RequirementWitness::Flavor::val:
                     {
-                        irSatisfyingVal = lowerSimpleVal(subContext, satisfyingVal);
+                        auto satisfyingVal = witness.getVal()->resolve();
+                        return lowerSimpleVal(witnessContext, satisfyingVal);
                     }
-                }
-                break;
 
-            case RequirementWitness::Flavor::witnessTable:
-                {
-                    auto astReqWitnessTable = satisfyingWitness.getWitnessTable();
-                    IRWitnessTable* irSatisfyingWitnessTable = nullptr;
-                    if (!mapASTToIRWitnessTable.tryGetValue(
-                            astReqWitnessTable,
-                            irSatisfyingWitnessTable))
+                case RequirementWitness::Flavor::witnessTable:
                     {
-                        // Need to construct a sub-witness-table
-                        auto irWitnessTableBaseType =
-                            lowerType(subContext, astReqWitnessTable->baseType);
-
-                        auto concreteType = irWitnessTable->getConcreteType();
-
-                        irSatisfyingWitnessTable =
-                            subBuilder->createWitnessTable(irWitnessTableBaseType, concreteType);
-
-                        // Avoid adding same decorations and child more than once.
-                        if (!irSatisfyingWitnessTable->hasDecorationOrChild())
-                        {
-                            auto mangledName = getMangledNameForConformanceWitness(
-                                subContext->astBuilder,
-                                astReqWitnessTable->witnessedType,
-                                astReqWitnessTable->baseType,
-                                concreteType->getOp());
-
-                            subBuilder->addExportDecoration(
-                                irSatisfyingWitnessTable,
-                                mangledName.getUnownedSlice());
-
-                            if (isExportedType(astReqWitnessTable->witnessedType))
-                            {
-                                subBuilder->addHLSLExportDecoration(irSatisfyingWitnessTable);
-                                subBuilder->addKeepAliveDecoration(irSatisfyingWitnessTable);
-                            }
-
-                            // Recursively lower the sub-table.
-                            lowerWitnessTable(
-                                subContext,
+                        auto astReqWitnessTable = witness.getWitnessTable();
+                        IRWitnessTable* irSatisfyingWitnessTable = nullptr;
+                        if (!mapASTToIRWitnessTable.tryGetValue(
                                 astReqWitnessTable,
-                                irSatisfyingWitnessTable,
-                                mapASTToIRWitnessTable);
+                                irSatisfyingWitnessTable))
+                        {
+                            // Need to construct a sub-witness-table
+                            auto irWitnessTableBaseType =
+                                lowerType(witnessContext, astReqWitnessTable->baseType);
 
-                            irSatisfyingWitnessTable->moveToEnd();
+                            auto concreteType = irWitnessTable->getConcreteType();
+
+                            irSatisfyingWitnessTable = witnessBuilder->createWitnessTable(
+                                irWitnessTableBaseType,
+                                concreteType);
+
+                            // Avoid adding same decorations and child more than once.
+                            if (!irSatisfyingWitnessTable->hasDecorationOrChild())
+                            {
+                                auto mangledName = getMangledNameForConformanceWitness(
+                                    witnessContext->astBuilder,
+                                    astReqWitnessTable->witnessedType,
+                                    astReqWitnessTable->baseType,
+                                    concreteType->getOp());
+
+                                witnessBuilder->addExportDecoration(
+                                    irSatisfyingWitnessTable,
+                                    mangledName.getUnownedSlice());
+
+                                if (isExportedType(astReqWitnessTable->witnessedType))
+                                {
+                                    witnessBuilder->addHLSLExportDecoration(
+                                        irSatisfyingWitnessTable);
+                                    witnessBuilder->addKeepAliveDecoration(
+                                        irSatisfyingWitnessTable);
+                                }
+
+                                // Recursively lower the sub-table.
+                                lowerWitnessTable(
+                                    witnessContext,
+                                    astReqWitnessTable,
+                                    irSatisfyingWitnessTable,
+                                    mapASTToIRWitnessTable);
+
+                                irSatisfyingWitnessTable->moveToEnd();
+                            }
                         }
+                        return irSatisfyingWitnessTable;
                     }
-                    irSatisfyingVal = irSatisfyingWitnessTable;
+
+                default:
+                    SLANG_UNEXPECTED("handled requirement witness case");
+                    break;
                 }
-                break;
+                return nullptr;
+            };
 
-            default:
-                SLANG_UNEXPECTED("handled requirement witness case");
-                break;
+            IRInst* irSatisfyingVal = nullptr;
+            auto requiredConstraintDecl = as<GenericTypeConstraintDecl>(requiredMemberDecl);
+            auto genericRequirementDecl = requiredConstraintDecl
+                                              ? as<GenericDecl>(requiredConstraintDecl->parentDecl)
+                                              : nullptr;
+            if (genericRequirementDecl && genericRequirementDecl->inner == requiredMemberDecl)
+            {
+                // A generic interface requirement key lowers to an IR generic, so its satisfying
+                // witness has to be lowered under the requirement-local generic parameters. For
+                // example `[Differentiable] f<T>()` contributes the sibling requirement
+                // `generic<T> This.f<T> : IForwardDifferentiable<This.f<T>>`.
+                //
+                // The interface's own generic arguments are already supplied by this witness
+                // table's `baseType`, e.g. `ITensor<Tensor.T, Tensor.N>`. Seed those substitutions
+                // into the lowering environment, then emit only the local `T` wrapper. Emitting the
+                // interface's generic ancestors again would produce a dead outer generic layer
+                // (`generic<ITensor.T, ITensor.D> generic<TIndex> ...`) whose body still captures
+                // the enclosing concrete conformance environment.
+                IRGeneric* activeGeneric = nullptr;
+                if (auto activeBlock = as<IRBlock>(subBuilder->getInsertLoc().getParent()))
+                    activeGeneric = as<IRGeneric>(activeBlock->getParent());
+
+                IRBuilderInsertLocScope insertScope(subBuilder);
+                IRGenEnv genericEnv;
+                genericEnv.outer = subContext->env;
+
+                IRGenContext genericContext = *subContext;
+                genericContext.env = &genericEnv;
+
+                if (auto baseDeclRefType = as<DeclRefType>(astWitnessTable->baseType))
+                {
+                    lowerSubstitutionEnv(
+                        &genericContext,
+                        baseDeclRefType->getDeclRef().declRefBase);
+                }
+
+                auto outerGeneric = emitGenericDecl(&genericContext, genericRequirementDecl);
+                auto loweredWitness = lowerSatisfyingWitness(&genericContext, satisfyingWitness);
+                irSatisfyingVal =
+                    finishOuterGenerics(subBuilder, loweredWitness, outerGeneric, activeGeneric);
             }
-
+            else
+            {
+                irSatisfyingVal = lowerSatisfyingWitness(subContext, satisfyingWitness);
+            }
 
             subBuilder->createWitnessTableEntry(irWitnessTable, irRequirementKey, irSatisfyingVal);
         }
@@ -11068,14 +11117,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         auto irWitnessTableBaseType = lowerType(subContext, superType);
 
-        // Register a dummy value to avoid infinite recursions.
-        // Without this, the call to lowerType() can get into an infinite recursion.
-        //
+        auto irSubType = lowerType(subContext, subType);
+
+        // Register a dummy value to avoid infinite recursions while lowering the witness-table
+        // body. The subtype has already been lowered by this point; for callable-type extensions
+        // that matters because lowering the callable decl-ref can attach autodiff-associated
+        // values, and those values must not capture the recursion placeholder as the actual
+        // differentiability witness for the callable.
         context->setGlobalValue(
             inheritanceDecl,
             LoweredValInfo::simple(findOuterMostGeneric(subBuilder->getInsertLoc().getParent())));
-
-        auto irSubType = lowerType(subContext, subType);
 
         // Create the IR-level witness table
         IRInst* irWitnessTable;
@@ -11851,7 +11902,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 callableDecl = as<CallableDecl>(genDecl->inner);
 
             if (callableDecl)
-                operandCount += callableDecl->getMembersOfType<TypeConstraintDecl>().getCount();
+            {
+                for (auto constraintDecl : callableDecl->getMembersOfType<TypeConstraintDecl>())
+                {
+                    if (!isGenericInterfaceRequirementSignatureConstraint(constraintDecl))
+                        operandCount++;
+                }
+            }
         }
 
         // Allocate an IRInterfaceType with the `operandCount` operands.
@@ -11905,10 +11962,42 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // consumers (e.g. autodiff) that read the requirement get a malformed entry.
                 // (Equality constraints, e.g. `__constraint A == B`, are handled by the
                 // generic path below.)
-                auto irBaseType = lowerType(
-                    subContext,
-                    getSup(subContext->astBuilder, relocatedSubtypeConstraint));
-                entry->setRequirementVal(subBuilder->getWitnessTableType(irBaseType));
+                if (auto genericParent =
+                        as<GenericDecl>(relocatedSubtypeConstraint.getDecl()->parentDecl))
+                {
+                    // `[Differentiable]` on a generic interface requirement is represented as a
+                    // sibling `generic { constraint }` requirement. Its `sup` type mentions the
+                    // cloned generic parameters, so lower the witness-table type inside the same
+                    // IR generic environment instead of flattening it to a non-generic entry.
+                    IRGenEnv constraintEnv;
+                    constraintEnv.outer = subContext->env;
+                    IRBuilder constraintBuilder(subContext->irBuilder->getModule());
+
+                    IRGenContext constraintContext = *subContext;
+                    constraintContext.irBuilder = &constraintBuilder;
+                    constraintContext.env = &constraintEnv;
+
+                    auto constraintGeneric = emitOuterGeneric(
+                        &constraintContext,
+                        genericParent,
+                        relocatedSubtypeConstraint.getDecl());
+                    auto irBaseType = lowerType(
+                        &constraintContext,
+                        getSup(constraintContext.astBuilder, relocatedSubtypeConstraint));
+                    auto witnessTableType =
+                        constraintContext.irBuilder->getWitnessTableType(irBaseType);
+                    entry->setRequirementVal(finishOuterGenerics(
+                        &constraintBuilder,
+                        witnessTableType,
+                        constraintGeneric));
+                }
+                else
+                {
+                    auto irBaseType = lowerType(
+                        subContext,
+                        getSup(subContext->astBuilder, relocatedSubtypeConstraint));
+                    entry->setRequirementVal(subBuilder->getWitnessTableType(irBaseType));
+                }
             }
             else
             {
@@ -11987,101 +12076,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                              subContext->astBuilder,
                              createDefaultSpecializedDeclRef(subContext, nullptr, callableDecl)))
                     {
-                        if (!isGenericInterfaceRequirementConstraint(constraintDeclRef.getDecl()))
-                        {
-                            auto constraintKey =
-                                getInterfaceRequirementKey(constraintDeclRef.getDecl());
-                            auto constraintInterfaceType = lowerType(
-                                subContext,
-                                getSup(subContext->astBuilder, constraintDeclRef));
-                            auto witnessTableType =
-                                getBuilder()->getWitnessTableType(constraintInterfaceType);
+                        if (isGenericInterfaceRequirementSignatureConstraint(
+                                constraintDeclRef.getDecl()))
+                            continue;
 
-                            auto constraintEntry = subBuilder->createInterfaceRequirementEntry(
-                                constraintKey,
-                                witnessTableType);
-                            irInterface->setOperand(entryIndex, constraintEntry);
-                            entryIndex++;
+                        auto constraintKey =
+                            getInterfaceRequirementKey(constraintDeclRef.getDecl());
+                        auto constraintInterfaceType = lowerType(
+                            subContext,
+                            getSup(subContext->astBuilder, constraintDeclRef));
+                        auto witnessTableType =
+                            getBuilder()->getWitnessTableType(constraintInterfaceType);
 
-                            context->setValue(
-                                constraintDeclRef.getDecl(),
-                                LoweredValInfo::simple(constraintEntry));
-                        }
-                        else
-                        {
-                            // Emit generics around the constraint entry.
-                            IRGenContext genericConstraintContext(
-                                subContext->shared,
-                                subContext->astBuilder);
+                        auto constraintEntry = subBuilder->createInterfaceRequirementEntry(
+                            constraintKey,
+                            witnessTableType);
+                        irInterface->setOperand(entryIndex, constraintEntry);
+                        entryIndex++;
 
-                            IRGenEnv subEnv;
-                            subEnv.outer = subContext->env;
-                            IRBuilder subIRBuilder(subContext->irBuilder->getModule());
-
-                            IRGenContext genericConstraintEmitContext = *subContext;
-                            genericConstraintEmitContext.irBuilder = &subIRBuilder;
-                            genericConstraintEmitContext.env = &subEnv;
-
-                            IRGeneric* constraintGeneric = emitOuterGenerics(
-                                &genericConstraintEmitContext,
-                                callableDecl,
-                                nullptr);
-
-                            auto constraintInterfaceType = lowerType(
-                                &genericConstraintEmitContext,
-                                getSup(genericConstraintEmitContext.astBuilder, constraintDeclRef));
-                            auto witnessTableType =
-                                genericConstraintEmitContext.irBuilder->getWitnessTableType(
-                                    constraintInterfaceType);
-
-                            auto outerMostConstraintGeneric = finishOuterGenerics(
-                                &subIRBuilder,
-                                witnessTableType,
-                                constraintGeneric);
-                            auto irRequirement = outerMostConstraintGeneric;
-                            auto irTargetRequirement = entry->getRequirementVal();
-
-                            // Collect any specializations around the parent function requirement
-                            // and replicate them around the constraint entry.
-                            //
-
-                            List<List<IRInst*>> specializationLayers;
-                            while (auto specIR = as<IRSpecialize>(irTargetRequirement))
-                            {
-                                List<IRInst*> specializationArgs;
-                                for (UInt i = 0; i < specIR->getArgCount(); i++)
-                                {
-                                    specializationArgs.add(specIR->getArg(i));
-                                }
-                                specializationLayers.add(specializationArgs);
-                                irTargetRequirement = specIR->getBase();
-                            }
-
-                            // Apply the specialization layers in reverse order
-                            for (Index i = specializationLayers.getCount(); i > 0; --i)
-                            {
-                                auto& specializationArgs = specializationLayers[i - 1];
-
-                                // Copy specialization arguments onto the outer generic
-                                irRequirement = subIRBuilder.emitSpecializeInst(
-                                    i > 1 ? as<IRType>(subIRBuilder.getGenericKind())
-                                          : as<IRType>(subIRBuilder.getTypeKind()),
-                                    irRequirement,
-                                    specializationArgs);
-                            }
-
-                            auto constraintKey =
-                                getInterfaceRequirementKey(constraintDeclRef.getDecl());
-                            auto constraintEntry = subBuilder->createInterfaceRequirementEntry(
-                                constraintKey,
-                                irRequirement);
-                            irInterface->setOperand(entryIndex, constraintEntry);
-                            entryIndex++;
-
-                            context->setValue(
-                                constraintDeclRef.getDecl(),
-                                LoweredValInfo::simple(irRequirement));
-                        }
+                        context->setValue(
+                            constraintDeclRef.getDecl(),
+                            LoweredValInfo::simple(constraintEntry));
                     }
                 }
 
@@ -12728,12 +12743,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
     }
 
-    IRGeneric* emitOuterGeneric(IRGenContext* subContext, GenericDecl* genericDecl, Decl* leafDecl)
+    IRGeneric* emitGenericDecl(IRGenContext* subContext, GenericDecl* genericDecl)
     {
         auto subBuilder = subContext->irBuilder;
-
-        // Of course, a generic might itself be nested inside of other generics...
-        emitOuterGenerics(subContext, genericDecl, leafDecl);
 
         // We need to create an IR generic
 
@@ -12781,32 +12793,45 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
             {
-                emitGenericConstraintDecl(subContext, genericTypeConstraintDecl);
+                if (isGenericConstraintParameterDecl(genericTypeConstraintDecl))
+                    emitGenericConstraintDecl(subContext, genericTypeConstraintDecl);
             }
             else if (
                 auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
             {
-                emitGenericConstraintDecl(subContext, typeCoercionConstraintDecl);
+                if (isGenericConstraintParameterDecl(typeCoercionConstraintDecl))
+                    emitGenericConstraintDecl(subContext, typeCoercionConstraintDecl);
             }
             else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
             {
-                emitGenericConstraintDecl(subContext, nonEmptyConstraintDecl);
+                if (isGenericConstraintParameterDecl(nonEmptyConstraintDecl))
+                    emitGenericConstraintDecl(subContext, nonEmptyConstraintDecl);
             }
             else if (
                 auto packCountConstraintDecl =
                     as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
             {
-                emitGenericConstraintDecl(subContext, packCountConstraintDecl);
+                if (isGenericConstraintParameterDecl(packCountConstraintDecl))
+                    emitGenericConstraintDecl(subContext, packCountConstraintDecl);
             }
             else if (
                 auto hasDiffTypeInfoConstraintDecl =
                     as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
             {
-                emitGenericConstraintDecl(subContext, hasDiffTypeInfoConstraintDecl);
+                if (isGenericConstraintParameterDecl(hasDiffTypeInfoConstraintDecl))
+                    emitGenericConstraintDecl(subContext, hasDiffTypeInfoConstraintDecl);
             }
         }
 
         return irGeneric;
+    }
+
+    IRGeneric* emitOuterGeneric(IRGenContext* subContext, GenericDecl* genericDecl, Decl* leafDecl)
+    {
+        // Of course, a generic might itself be nested inside of other generics...
+        emitOuterGenerics(subContext, genericDecl, leafDecl);
+
+        return emitGenericDecl(subContext, genericDecl);
     }
 
     IRGeneric* emitOuterInterfaceGeneric(
@@ -12926,7 +12951,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     // value (if there were no generics), which should be the IR-level
     // representation of the original declaration.
     //
-    IRInst* finishOuterGenerics(IRBuilder* subBuilder, IRInst* val, IRGeneric* parentGeneric)
+    IRInst* finishOuterGenerics(
+        IRBuilder* subBuilder,
+        IRInst* val,
+        IRGeneric* parentGeneric,
+        IRGeneric* stopBeforeGeneric = nullptr)
     {
         IRInst* v = val;
 
@@ -13102,6 +13131,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 break;
 
             parentGeneric = as<IRGeneric>(parentBlock->getParent());
+            if (parentGeneric == stopBeforeGeneric)
+                break;
             if (!parentGeneric)
                 break;
         }
@@ -14562,11 +14593,32 @@ bool canDeclLowerToAGeneric(Decl* decl)
     if (as<TypeDefDecl>(decl))
         return true;
 
-    if (as<GenericTypeConstraintDecl>(decl) && as<CallableDecl>(decl->parentDecl))
+    if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(decl))
     {
-        // A generic type constraint decl nested under a callable decl
-        // will turn into a generic that returns a type (a simple type-level function).
-        return true;
+        if (as<CallableDecl>(genericTypeConstraintDecl->parentDecl))
+        {
+            // A generic type constraint decl nested under a callable decl will turn into a
+            // generic that returns a type (a simple type-level function).
+            return true;
+        }
+
+        if (auto parentGenericDecl = as<GenericDecl>(genericTypeConstraintDecl->parentDecl))
+        {
+            if (parentGenericDecl->inner == genericTypeConstraintDecl)
+            {
+                // A `[Differentiable]` generic interface requirement is represented as a sibling
+                // generic constraint:
+                //
+                //     interface IFoo { __generic<T> f(); }
+                //     interface IFoo { __generic<T> __constraint This.f<T> : IDiff<This.f<T>>; }
+                //
+                // The constraint is an interface requirement key, but the satisfying witness is a
+                // generic value with the same signature as `f`. Keep its `GenericAppDeclRef`
+                // substitutions so lowering produces `specialize(lookupWitness(...), args...)`
+                // instead of dropping the method generic arguments and doing a flat witness lookup.
+                return true;
+            }
+        }
     }
 
     // A static member variable declaration can be lowered into a generic.

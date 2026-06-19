@@ -3058,6 +3058,14 @@ public:
         // needs to pull newly discovered constraints into the iterative loop.
         ShortList<SolverConstraint, 8> discoveredConstraints;
 
+        // Hidden witness arguments discovered while unifying full generic-app
+        // decl-refs. A use site such as `This.load<TIndex>` already carries
+        // proof arguments for `load`'s source generic constraints; when that
+        // lookup resolves to a satisfying method, the solver should preserve
+        // those proof arguments instead of recomputing them from default
+        // declaration context.
+        Dictionary<Decl*, Val*> discoveredWitnessArgs;
+
         // Additional subtype witnesses available to the current constraint solving context.
         Type* subTypeForAdditionalWitnesses = nullptr;
         Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitnesses = nullptr;

@@ -50,6 +50,60 @@ bool isInterfaceRequirement(Decl* decl)
     return false;
 }
 
+bool isGenericConstraintParameterDecl(Decl* decl)
+{
+    auto parentGenericDecl = as<GenericDecl>(decl->parentDecl);
+    if (!parentGenericDecl || parentGenericDecl->inner == decl)
+        return false;
+
+    return as<TypeConstraintDecl>(decl) || as<TypeCoercionConstraintDecl>(decl) ||
+           as<NonEmptyPackConstraintDecl>(decl) ||
+           as<GenericVariadicPackCountConstraintDecl>(decl) ||
+           as<HasDiffTypeInfoConstraintDecl>(decl);
+}
+
+bool isGenericInterfaceRequirementSignatureConstraint(Decl* decl)
+{
+    if (!as<TypeConstraintDecl>(decl) && !as<TypeCoercionConstraintDecl>(decl) &&
+        !as<NonEmptyPackConstraintDecl>(decl) &&
+        !as<GenericVariadicPackCountConstraintDecl>(decl) &&
+        !as<HasDiffTypeInfoConstraintDecl>(decl))
+    {
+        return false;
+    }
+
+    auto parentGenericDecl = as<GenericDecl>(decl->parentDecl);
+    if (!parentGenericDecl)
+    {
+        if (auto parentCallableDecl = as<CallableDecl>(decl->parentDecl))
+        {
+            parentGenericDecl = as<GenericDecl>(parentCallableDecl->parentDecl);
+            if (!parentGenericDecl || parentGenericDecl->inner != parentCallableDecl)
+                return false;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    // Generic interface requirements can carry their own generic signature:
+    //
+    //     interface IFoo {
+    //         __generic<T> f();
+    //         __generic<T> f<T> : IForwardDifferentiableFunc<f<T>>;
+    //     }
+    //
+    // Constraints that are direct members of the generic, but are not the
+    // generic's `inner` declaration, are signature constraints. They are
+    // lowered as hidden generic parameters/proofs when the generic requirement
+    // itself is lowered, not as separate interface requirement keys.
+    if (!isGenericConstraintParameterDecl(decl))
+        return false;
+
+    return isInterfaceRequirement(parentGenericDecl);
+}
+
 //
 // ContainerDeclDirectMemberDecls
 //

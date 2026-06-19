@@ -477,6 +477,276 @@ bool SharedSemanticsContext::tryResolveConstraintTypes(
     return !mustDefer;
 }
 
+static void _collectGenericAppDeclRefs(DeclRefBase* declRefBase, List<GenericAppDeclRef*>& out)
+{
+    for (auto subst = declRefBase; subst; subst = subst->getBase())
+    {
+        if (auto genericAppDeclRef = as<GenericAppDeclRef>(subst))
+            out.add(genericAppDeclRef);
+    }
+}
+
+static void _collectGenericAppDeclRefs(Type* type, List<GenericAppDeclRef*>& out)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        _collectGenericAppDeclRefs(declRefType->getDeclRef().declRefBase, out);
+        return;
+    }
+
+    if (auto eachType = as<EachType>(type))
+    {
+        if (auto elementDeclRefType = eachType->getElementDeclRefType())
+            _collectGenericAppDeclRefs(elementDeclRefType->getDeclRef().declRefBase, out);
+        return;
+    }
+}
+
+static GenericAppDeclRef* _findMatchingGenericAppDeclRef(
+    List<GenericAppDeclRef*> const& genericAppDeclRefs,
+    GenericAppDeclRef* defaultGenericAppDeclRef)
+{
+    for (auto genericAppDeclRef : genericAppDeclRefs)
+    {
+        if (genericAppDeclRef->getGenericDecl() != defaultGenericAppDeclRef->getGenericDecl())
+            continue;
+        if (genericAppDeclRef->getArgCount() != defaultGenericAppDeclRef->getArgCount())
+            continue;
+        return genericAppDeclRef;
+    }
+    return nullptr;
+}
+
+static bool _isDeclDeclaredInGeneric(Decl* decl, GenericDecl* genericDecl)
+{
+    for (auto parent = decl; parent; parent = parent->parentDecl)
+    {
+        if (parent == genericDecl)
+            return true;
+    }
+    return false;
+}
+
+static bool _valMentionsDeclInGeneric(Val* val, GenericDecl* genericDecl, HashSet<Val*>& seenVals);
+
+static bool _declRefMentionsDeclInGeneric(
+    DeclRefBase* declRefBase,
+    GenericDecl* genericDecl,
+    HashSet<Val*>& seenVals)
+{
+    for (auto subst = declRefBase; subst; subst = subst->getBase())
+    {
+        if (_isDeclDeclaredInGeneric(subst->getDecl(), genericDecl))
+            return true;
+
+        if (auto genericAppDeclRef = as<GenericAppDeclRef>(subst))
+        {
+            for (auto arg : genericAppDeclRef->getArgs())
+            {
+                if (_valMentionsDeclInGeneric(arg, genericDecl, seenVals))
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+
+static bool _valMentionsDeclInGeneric(Val* val, GenericDecl* genericDecl, HashSet<Val*>& seenVals)
+{
+    if (!val || !seenVals.add(val))
+        return false;
+
+    if (auto declRefBase = as<DeclRefBase>(val))
+    {
+        if (_declRefMentionsDeclInGeneric(declRefBase, genericDecl, seenVals))
+            return true;
+    }
+
+    for (auto operand : val->m_operands)
+    {
+        switch (operand.kind)
+        {
+        case ValNodeOperandKind::ValNode:
+            if (_valMentionsDeclInGeneric(operand.getVal(), genericDecl, seenVals))
+                return true;
+            break;
+
+        case ValNodeOperandKind::ASTNode:
+            if (auto decl = as<Decl>(operand.values.nodeOperand))
+            {
+                if (_isDeclDeclaredInGeneric(decl, genericDecl))
+                    return true;
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    return false;
+}
+
+static bool _genericAppArgsMentionAnyWrapperGeneric(
+    GenericAppDeclRef* genericAppDeclRef,
+    List<GenericDecl*> const& wrapperGenericDecls)
+{
+    for (auto arg : genericAppDeclRef->getArgs())
+    {
+        for (auto wrapperGenericDecl : wrapperGenericDecls)
+        {
+            HashSet<Val*> seenVals;
+            if (_valMentionsDeclInGeneric(arg, wrapperGenericDecl, seenVals))
+                return true;
+        }
+    }
+    return false;
+}
+
+static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstraint(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    GenericDecl* outerGenericDecl,
+    SubtypeWitness* anchorIsInterfaceWitness,
+    Type* selfType)
+{
+    // `[Differentiable]` on a generic interface requirement is encoded as a sibling
+    // generic requirement:
+    //
+    //     interface IFoo { __generic<T> f(); }
+    //     interface IFoo { __generic<T> __constraint This.f<T> : IDiff<This.f<T>>; }
+    //
+    // When computing inheritance for a lookup-derived requirement type such as
+    // `SomeThis.f<int>`, the direct constraint scan cannot see the inner
+    // `GenericTypeConstraintDecl`. Build a default looked-up instance of the wrapper
+    // to discover which original method generic the constraint subject mentions, then
+    // re-specialize the wrapper with the actual generic arguments carried by `selfType`.
+    // The ordinary endpoint matching below still decides whether the constraint applies.
+    List<GenericDecl*> wrapperGenericDecls;
+    Decl* innerDecl = outerGenericDecl;
+    for (;;)
+    {
+        auto genericDecl = as<GenericDecl>(innerDecl);
+        if (!genericDecl)
+            break;
+
+        wrapperGenericDecls.add(genericDecl);
+        innerDecl = genericDecl->inner;
+    }
+
+    auto constraintDecl = as<GenericTypeConstraintDecl>(innerDecl);
+    if (!constraintDecl || constraintDecl->checkState.isBeingChecked())
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    DeclRef<GenericDecl> lookedUpGenericDeclRef =
+        astBuilder->getLookupDeclRef(anchorIsInterfaceWitness, wrapperGenericDecls[0])
+            .as<GenericDecl>();
+    if (!lookedUpGenericDeclRef)
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    DeclRef<GenericTypeConstraintDecl> defaultConstraintDeclRef;
+    DeclRef<GenericDecl> currentGenericDeclRef = lookedUpGenericDeclRef;
+    for (Index ii = 0; ii < wrapperGenericDecls.getCount(); ++ii)
+    {
+        auto genericDecl = wrapperGenericDecls[ii];
+        auto defaultArgs = getDefaultSubstitutionArgs(astBuilder, visitor, genericDecl);
+        auto currentGenericSubst = SubstitutionSet(currentGenericDeclRef);
+        List<Val*> substitutedDefaultArgs;
+        for (auto defaultArg : defaultArgs)
+            substitutedDefaultArgs.add(defaultArg->substitute(astBuilder, currentGenericSubst));
+
+        Decl* specializedInnerDecl = ii + 1 < wrapperGenericDecls.getCount()
+                                         ? (Decl*)wrapperGenericDecls[ii + 1]
+                                         : (Decl*)constraintDecl;
+
+        auto specializedDeclRef = astBuilder->getGenericAppDeclRef(
+            currentGenericDeclRef,
+            substitutedDefaultArgs.getArrayView(),
+            specializedInnerDecl);
+
+        if (ii + 1 < wrapperGenericDecls.getCount())
+        {
+            currentGenericDeclRef = specializedDeclRef.as<GenericDecl>();
+            if (!currentGenericDeclRef)
+                return DeclRef<GenericTypeConstraintDecl>();
+        }
+        else
+        {
+            defaultConstraintDeclRef = specializedDeclRef.as<GenericTypeConstraintDecl>();
+        }
+    }
+
+    if (!defaultConstraintDeclRef)
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    ensureDecl(visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
+
+    List<GenericAppDeclRef*> defaultEndpointGenericApps;
+    if (auto defaultSub = getSub(astBuilder, defaultConstraintDeclRef))
+        _collectGenericAppDeclRefs(defaultSub, defaultEndpointGenericApps);
+    if (constraintDecl->isEqualityConstraint)
+    {
+        if (auto defaultSup = getSup(astBuilder, defaultConstraintDeclRef))
+            _collectGenericAppDeclRefs(defaultSup, defaultEndpointGenericApps);
+    }
+
+    List<GenericAppDeclRef*> selfGenericApps;
+    _collectGenericAppDeclRefs(selfType, selfGenericApps);
+
+    List<GenericAppDeclRef*> matchedSelfGenericApps;
+    for (auto defaultGenericAppDeclRef : defaultEndpointGenericApps)
+    {
+        if (!_genericAppArgsMentionAnyWrapperGeneric(defaultGenericAppDeclRef, wrapperGenericDecls))
+            continue;
+
+        auto selfGenericAppDeclRef =
+            _findMatchingGenericAppDeclRef(selfGenericApps, defaultGenericAppDeclRef);
+        if (selfGenericAppDeclRef)
+            matchedSelfGenericApps.add(selfGenericAppDeclRef);
+    }
+
+    if (matchedSelfGenericApps.getCount() < wrapperGenericDecls.getCount())
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    List<List<Val*>> actualArgsByWrapper;
+    actualArgsByWrapper.setCount(wrapperGenericDecls.getCount());
+    for (Index ii = 0; ii < wrapperGenericDecls.getCount(); ++ii)
+    {
+        // Decl-ref substitution chains enumerate generic apps from innermost to outermost,
+        // while the wrapper chain is stored outermost to innermost.
+        auto selfGenericAppDeclRef =
+            matchedSelfGenericApps[wrapperGenericDecls.getCount() - 1 - ii];
+        for (auto arg : selfGenericAppDeclRef->getArgs())
+            actualArgsByWrapper[ii].add(arg);
+    }
+
+    currentGenericDeclRef = lookedUpGenericDeclRef;
+    for (Index ii = 0; ii < wrapperGenericDecls.getCount(); ++ii)
+    {
+        Decl* specializedInnerDecl = ii + 1 < wrapperGenericDecls.getCount()
+                                         ? (Decl*)wrapperGenericDecls[ii + 1]
+                                         : (Decl*)constraintDecl;
+
+        auto specializedDeclRef = astBuilder->getGenericAppDeclRef(
+            currentGenericDeclRef,
+            actualArgsByWrapper[ii].getArrayView(),
+            specializedInnerDecl);
+
+        if (ii + 1 < wrapperGenericDecls.getCount())
+        {
+            currentGenericDeclRef = specializedDeclRef.as<GenericDecl>();
+            if (!currentGenericDeclRef)
+                return DeclRef<GenericTypeConstraintDecl>();
+        }
+        else
+        {
+            return specializedDeclRef.as<GenericTypeConstraintDecl>();
+        }
+    }
+
+    return DeclRef<GenericTypeConstraintDecl>();
+}
+
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     DeclRef<Decl> declRef,
     Type* selfType,
@@ -716,7 +986,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     auto currentDeclRef = declRef;
     for (; currentDeclRef;)
     {
-        if (currentDeclRef.as<AggTypeDeclBase>() || currentDeclRef.as<CallableDecl>())
+        if (currentDeclRef.as<AggTypeDeclBase>() || currentDeclRef.as<ExtensionDecl>())
         {
             auto containerDeclRef = currentDeclRef.as<ContainerDecl>();
 
@@ -839,19 +1109,19 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
 
     // Surface interface-level constraints (declared via `__constraint` in an
     // interface body, including those produced by an `associatedtype` with a
-    // trailing constraint) when computing the inheritance of an associated-type
-    // access such as `T.DataType` or `T.TA.TB`.
+    // trailing constraint or synthesized for `[Differentiable]` interface
+    // requirements) when computing the inheritance of a lookup-derived type such
+    // as `T.DataType`, `T.TA.TB`, or `T.dadd`.
     //
     // A constraint like `__constraint This.DataType == This` is a direct
     // `GenericTypeConstraintDecl` member of an interface that some type in the
     // access chain conforms to. Its subject is written relative to the
-    // interface's `This`, so it constrains an associated-type access anchored at
-    // any type that conforms to the interface. We therefore walk the lookup
-    // chain of `selfType` and, at each anchor type, enumerate the interfaces it
-    // conforms to and match constraints whose subject (relative to `This`) names
-    // exactly the chain of associated types leading from the anchor down to
-    // `selfType`. The opposite (`sub`/`sup`) side of a matching constraint is added
-    // as a base of `selfType`.
+    // interface's `This`, so it constrains a lookup access anchored at any type
+    // that conforms to the interface. We therefore walk the lookup chain of
+    // `selfType` and, at each anchor type, enumerate the interfaces it conforms
+    // to and match constraints whose subject (relative to `This`) names exactly
+    // the same lookup-derived type as `selfType`. The opposite (`sub`/`sup`) side
+    // of a matching constraint is added as a base of `selfType`.
     //
     // Worked example:
     //
@@ -868,18 +1138,29 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     // works the same way but only matches on its `sub` endpoint, adding `IFoo`
     // as the base.
     //
+    // A `[Differentiable]` interface method uses the same mechanism:
+    //
+    //     interface IDiff { [Differentiable] static T dadd(T, T); }
+    //
+    // Header checking creates the sibling constraint
+    // `__constraint This.dadd : IForwardDifferentiable<This.dadd>`. When a
+    // generic function calls `T.dadd` for `T : IDiff`, the lookup type
+    // `T.dadd` must inherit from `IForwardDifferentiable<T.dadd>` so
+    // `registerAssociatedMethods` can record the derivative association before
+    // IR differentiability checking.
+    //
     // The constraints are discovered purely from the interfaces each anchor type
     // conforms to (via `getInheritanceInfo(anchorType).facets`); the relocation
     // pass guarantees an `associatedtype`'s trailing bound and `where` clauses
     // also appear as such interface-member `GenericTypeConstraintDecl`s.
     //
-    if (declRef.as<AssocTypeDecl>())
+    if (SubstitutionSet(declRef).findLookupDeclRef())
     {
-        // Walk the associated-type lookup chain of `type` from the outermost access
-        // inward, invoking `callback` once per associated-type lookup with that
-        // lookup's source (the type the access is rooted on at that step). For
-        // `T.A.B` it yields `T.A`, then `T`. Only associated-type lookups are
-        // traversed; the walk stops at the first non-assoc-lookup type.
+        // Walk the lookup chain of `type` from the outermost access inward,
+        // invoking `callback` once per lookup with that lookup's source (the type
+        // the access is rooted on at that step). For `T.A.B` it yields `T.A`,
+        // then `T`; for `T.dadd` it yields `T`. The walk stops at the first
+        // non-lookup-derived type.
         auto enumerateLookupSources = [](Type* type, auto&& callback)
         {
             Type* cur = type;
@@ -888,19 +1169,18 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 auto declRefType = as<DeclRefType>(cur);
                 if (!declRefType)
                     break;
-                auto assocDeclRef = declRefType->getDeclRef().as<AssocTypeDecl>();
-                auto lookupDeclRef = as<LookupDeclRef>(declRefType->getDeclRef().declRefBase);
-                if (!assocDeclRef || !lookupDeclRef)
+                auto lookupDeclRef = SubstitutionSet(declRefType->getDeclRef()).findLookupDeclRef();
+                if (!lookupDeclRef)
                     break;
                 cur = lookupDeclRef->getLookupSource();
                 callback(cur);
             }
         };
 
-        // The depth of an associated-type access is the number of associated-type
-        // lookups applied to its root type (e.g. `T.A.B` has depth 2, `T` has
-        // depth 0).
-        auto assocChainDepth = [&](Type* type) -> Index
+        // The depth of a lookup access is the number of lookup substitutions applied to
+        // its root type (e.g. `T.A.B` has depth 2, `T.dadd` has depth 1, and `T`
+        // has depth 0).
+        auto lookupChainDepth = [&](Type* type) -> Index
         {
             Index depth = 0;
             enumerateLookupSources(type, [&](Type*) { ++depth; });
@@ -908,12 +1188,12 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         };
 
         // The depth of the access we are computing inheritance for. We never add a
-        // base that is a *deeper* associated-type access than `selfType`: an
-        // equality constraint such as `Differential.Differential == Differential`
-        // would otherwise make `T.Differential` claim `T.Differential.Differential`
-        // as a base, which re-expands without bound. Only the reduce-to-shallower
-        // direction of an equality is useful for member lookup, and it terminates.
-        Index selfChainDepth = assocChainDepth(selfType);
+        // base that is a *deeper* lookup access than `selfType`: an equality constraint
+        // such as `Differential.Differential == Differential` would otherwise make
+        // `T.Differential` claim `T.Differential.Differential` as a base, which
+        // re-expands without bound. Only the reduce-to-shallower direction of an
+        // equality is useful for member lookup, and it terminates.
+        Index selfChainDepth = lookupChainDepth(selfType);
 
         // Collect the ancestor anchor types along `selfType`'s lookup chain. For
         // `selfType == T.TA.TB` the anchors are `T.TA` and `T`. Each anchor is a
@@ -936,8 +1216,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 if (!anchorIsInterfaceWitness)
                     continue;
 
-                for (auto constraintDeclRef :
-                     getMembersOfType<GenericTypeConstraintDecl>(astBuilder, interfaceDeclRef))
+                auto tryAddConstraintBase =
+                    [&](DeclRef<GenericTypeConstraintDecl> constraintDeclRef)
                 {
                     auto constraintDecl = constraintDeclRef.getDecl();
 
@@ -948,7 +1228,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     // breaks that cycle; the shallower access does not need the
                     // deeper constraint as one of its bases anyway.
                     if (constraintDecl->checkState.isBeingChecked())
-                        continue;
+                        return;
 
                     // Observe a constraint whose endpoint types resolve; defer one whose
                     // subject is an unresolved multi-level access (resolving it would
@@ -962,21 +1242,25 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     {
                         if (ioSkippedIncompleteFacet)
                             ioSkippedIncompleteFacet->add(constraintDeclRef);
-                        continue;
+                        return;
                     }
 
                     ensureDecl(&visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
 
-                    // Re-express the constraint as a lookup through the witness
-                    // that the anchor type conforms to this interface; this
-                    // substitutes the interface's `This` with the anchor type, so
-                    // both endpoints are expressed as concrete accesses rooted at
-                    // the anchor (e.g. `This.D == This` becomes `T.D == T`).
-                    auto lookedUpConstraint =
-                        astBuilder->getLookupDeclRef(anchorIsInterfaceWitness, constraintDecl)
-                            .as<GenericTypeConstraintDecl>();
-                    if (!lookedUpConstraint)
-                        continue;
+                    DeclRef<GenericTypeConstraintDecl> lookedUpConstraint = constraintDeclRef;
+                    if (!SubstitutionSet(lookedUpConstraint).findLookupDeclRef())
+                    {
+                        // Re-express the constraint as a lookup through the witness
+                        // that the anchor type conforms to this interface; this
+                        // substitutes the interface's `This` with the anchor type, so
+                        // both endpoints are expressed as concrete accesses rooted at
+                        // the anchor (e.g. `This.D == This` becomes `T.D == T`).
+                        lookedUpConstraint =
+                            astBuilder->getLookupDeclRef(anchorIsInterfaceWitness, constraintDecl)
+                                .as<GenericTypeConstraintDecl>();
+                        if (!lookedUpConstraint)
+                            return;
+                    }
 
                     Type* lookedUpSub = getSub(astBuilder, lookedUpConstraint);
                     Type* lookedUpSup = getSup(astBuilder, lookedUpConstraint);
@@ -994,16 +1278,48 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     // have had their witnesses re-rooted; see
                     // `TryCheckOverloadCandidateConstraints`.
                     Type* selfCanonical = selfType->getCanonicalType();
-                    bool matchOnSub =
-                        lookedUpSub && lookedUpSub->getCanonicalType()->equals(selfCanonical);
-                    bool matchOnSup = constraintDecl->isEqualityConstraint && lookedUpSup &&
-                                      lookedUpSup->getCanonicalType()->equals(selfCanonical);
+                    auto doesEndpointMatchSelfType = [&](Type* endpointType) -> bool
+                    {
+                        if (!endpointType)
+                            return false;
+
+                        if (endpointType->getCanonicalType()->equals(selfCanonical))
+                            return true;
+
+                        auto parentGenericDecl = as<GenericDecl>(constraintDecl->parentDecl);
+                        if (!parentGenericDecl)
+                            return false;
+
+                        // A generic interface constraint produced for `[Differentiable]`
+                        // carries a cloned generic signature:
+                        //
+                        //     generic<T> This.f<T> : IDiff<This.f<T>>
+                        //
+                        // When matching that schema against a lookup-derived function type
+                        // from a default implementation, the printed endpoint can be
+                        // `This.f<T>` on both sides while the two `T` declarations are
+                        // distinct binders. Unify with the constraint wrapper as the relevant
+                        // generic so the cloned binder is treated as the parameter being
+                        // instantiated, rather than requiring pointer equality.
+                        SemanticsVisitor::GenericInferenceContext inferenceContext;
+                        inferenceContext.genericDecl = parentGenericDecl;
+                        SemanticsVisitor::UnificationOptions unificationOptions;
+                        unificationOptions.equalityConstraint = true;
+                        return visitor.TryUnifyTypes(
+                            inferenceContext,
+                            unificationOptions,
+                            QualType(endpointType),
+                            QualType(selfType));
+                    };
+                    bool matchOnSub = doesEndpointMatchSelfType(lookedUpSub);
+                    bool matchOnSup = constraintDecl->isEqualityConstraint &&
+                                      doesEndpointMatchSelfType(lookedUpSup);
                     if (!matchOnSub && !matchOnSup)
-                        continue;
+                        return;
 
                     Type* baseType = matchOnSub ? lookedUpSup : lookedUpSub;
                     if (!baseType)
-                        continue;
+                        return;
 
                     // Skip a trivial self-base. Differential idempotence makes
                     // `T.Differential.Differential` canonically equal to
@@ -1011,13 +1327,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     // Differential` matches `selfType == T.Differential` on its deeper
                     // endpoint and would try to add `T.Differential` as its own base.
                     if (baseType->getCanonicalType()->equals(selfCanonical))
-                        continue;
+                        return;
 
-                    // Never introduce a base that is a deeper associated-type
-                    // access than `selfType`; that is the non-terminating
-                    // direction of a self-referential equality constraint.
-                    if (assocChainDepth(baseType) > selfChainDepth)
-                        continue;
+                    // Never introduce a base that is a deeper lookup access than
+                    // `selfType`; that is the non-terminating direction of a
+                    // self-referential equality constraint.
+                    if (lookupChainDepth(baseType) > selfChainDepth)
+                        return;
 
                     // Break *benevolent* equality cycles. An equality such as
                     // `__constraint A == B` makes `T.A` and `T.B` each a base of
@@ -1044,7 +1360,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         if (ioSkippedIncompleteFacet)
                             if (auto baseDeclRefType = as<DeclRefType>(baseType))
                                 ioSkippedIncompleteFacet->add(baseDeclRefType->getDeclRef());
-                        continue;
+                        return;
                     }
 
                     auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
@@ -1052,6 +1368,30 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         baseType,
                         lookedUpConstraint);
                     addDirectBaseType(baseType, satisfyingWitness);
+                };
+
+                for (auto constraintDeclRef :
+                     getMembersOfType<GenericTypeConstraintDecl>(astBuilder, interfaceDeclRef))
+                {
+                    tryAddConstraintBase(constraintDeclRef);
+                }
+
+                for (auto memberDecl : interfaceDeclRef.getDecl()->getDirectMemberDecls())
+                {
+                    auto genericDecl = as<GenericDecl>(memberDecl);
+                    if (!genericDecl)
+                        continue;
+
+                    auto constraintDeclRef = _trySpecializeGenericInterfaceConstraint(
+                        astBuilder,
+                        &visitor,
+                        genericDecl,
+                        anchorIsInterfaceWitness,
+                        selfType);
+                    if (!constraintDeclRef)
+                        continue;
+
+                    tryAddConstraintBase(constraintDeclRef);
                 }
             }
         }

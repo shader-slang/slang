@@ -53,6 +53,23 @@ SubtypeWitness* SemanticsVisitor::isSubtype(
     Type* superType,
     IsSubTypeOptions isSubTypeOptions)
 {
+    // Extension registration happens while declarations advance to `ReadyForLookup`.
+    // Bring endpoint declarations to that state before consulting the subtype cache so an
+    // earlier negative query cannot survive after a synthesized or user extension has made
+    // the conformance visible. `NoCaching` marks recursive contexts where the sub endpoint
+    // may not be safe to finish yet; those callers already opt out of caching negative results.
+    if (!(int(isSubTypeOptions) & int(IsSubTypeOptions::NoCaching)))
+    {
+        if (auto subDeclRefType = as<DeclRefType>(subType))
+        {
+            ensureDecl(subDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
+        }
+    }
+    if (auto superDeclRefType = as<DeclRefType>(superType))
+    {
+        ensureDecl(superDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
+    }
+
     SubtypeWitness* result = nullptr;
     if (getShared()->tryGetSubtypeWitnessFromCache(subType, superType, result))
         return result;
@@ -252,25 +269,139 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     // For now we are continuing to conflate all the subtype-ish relationships but not
     // tangling convertibility into it.
 
-    // First, make sure both sub type and super type decl are ready for lookup.
-    if (!(int(isSubTypeOptions) & int(IsSubTypeOptions::NoCaching)))
-    {
-        if (auto subDeclRefType = as<DeclRefType>(subType))
-        {
-            ensureDecl(subDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
-        }
-    }
-    if (auto superDeclRefType = as<DeclRefType>(superType))
-    {
-        ensureDecl(superDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
-    }
-
     SubtypeWitness* failureWitness = nullptr;
 
     // In the common case, we can use the pre-computed inheritance information for `subType`
     // to enumerate all the types it transitively inherits from.
     //
     auto inheritanceInfo = getShared()->getInheritanceInfo(subType);
+    auto doesFacetTypeMatchSuperType = [&](Type* facetType) -> bool
+    {
+        if (facetType->equals(superType))
+            return true;
+
+        auto facetDeclRefType = as<DeclRefType>(facetType);
+        auto superDeclRefType = as<DeclRefType>(superType);
+        if (!facetDeclRefType || !superDeclRefType)
+            return false;
+
+        auto facetDeclRef = facetDeclRefType->getDeclRef();
+        auto superDeclRef = superDeclRefType->getDeclRef();
+        if (facetDeclRef.getDecl() != superDeclRef.getDecl())
+            return false;
+
+        GenericInferenceContext inferenceContext;
+        auto result = tryUnifyDeclRef(
+            inferenceContext,
+            UnificationOptions(),
+            facetDeclRef.declRefBase,
+            false,
+            superDeclRef.declRefBase,
+            false);
+        return result;
+    };
+
+    auto tryGetInterfaceConstraintRequirementWitness = [&]() -> SubtypeWitness*
+    {
+        auto subDeclRefType = as<DeclRefType>(subType);
+        if (!subDeclRefType)
+            return nullptr;
+
+        auto lookupDeclRef = SubstitutionSet(subDeclRefType->getDeclRef()).findLookupDeclRef();
+        if (!lookupDeclRef)
+            return nullptr;
+
+        auto interfaceDeclRefType = as<DeclRefType>(lookupDeclRef->getWitness()->getSup());
+        if (!interfaceDeclRefType)
+            return nullptr;
+
+        auto interfaceDeclRef = interfaceDeclRefType->getDeclRef().as<InterfaceDecl>();
+        if (!interfaceDeclRef)
+            return nullptr;
+
+        auto thisWitness = lookupDeclRef->getWitness();
+        for (auto requirementDecl : getMembers(m_astBuilder, interfaceDeclRef))
+        {
+            if (!as<GenericTypeConstraintDecl>(requirementDecl.getDecl()) &&
+                !as<GenericDecl>(requirementDecl.getDecl()))
+                continue;
+
+            DeclRef<Decl> requirementDeclRef;
+            if (auto genericDecl = as<GenericDecl>(requirementDecl.getDecl()))
+            {
+                requirementDeclRef = m_astBuilder->getLookupDeclRef(thisWitness, genericDecl);
+
+                while (auto genericRequirementDeclRef = requirementDeclRef.as<GenericDecl>())
+                {
+                    auto defaultArgs = getDefaultSubstitutionArgs(
+                        m_astBuilder,
+                        this,
+                        genericRequirementDeclRef.getDecl());
+
+                    List<Val*> substitutedArgs;
+                    if (auto subjectGenericApp =
+                            SubstitutionSet(subDeclRefType->getDeclRef()).findGenericAppDeclRef())
+                    {
+                        if (subjectGenericApp->getArgs().getCount() == defaultArgs.getCount())
+                        {
+                            for (auto arg : subjectGenericApp->getArgs())
+                                substitutedArgs.add(arg);
+                        }
+                    }
+
+                    if (substitutedArgs.getCount() == 0)
+                    {
+                        auto genericRequirementSubst = SubstitutionSet(genericRequirementDeclRef);
+                        for (auto defaultArg : defaultArgs)
+                        {
+                            substitutedArgs.add(
+                                defaultArg->substitute(m_astBuilder, genericRequirementSubst));
+                        }
+                    }
+
+                    requirementDeclRef = m_astBuilder->getGenericAppDeclRef(
+                        genericRequirementDeclRef,
+                        substitutedArgs.getArrayView());
+                }
+            }
+            else
+            {
+                requirementDeclRef =
+                    m_astBuilder->getLookupDeclRef(thisWitness, requirementDecl.getDecl());
+            }
+
+            auto constraintDeclRef = requirementDeclRef.as<GenericTypeConstraintDecl>();
+            if (!constraintDeclRef)
+                continue;
+
+            ensureDecl(constraintDeclRef, DeclCheckState::ReadyForReference);
+            auto constraintSub = getSub(m_astBuilder, constraintDeclRef);
+            auto constraintSup = getSup(m_astBuilder, constraintDeclRef);
+            if (!constraintSub || !constraintSup)
+                continue;
+            if (!constraintSub->equals(subType))
+                continue;
+            if (!doesFacetTypeMatchSuperType(constraintSup))
+                continue;
+
+            return m_astBuilder->getDeclaredSubtypeWitness(subType, superType, constraintDeclRef);
+        }
+
+        return nullptr;
+    };
+
+    // A looked-up interface requirement can be the subject of another interface-level constraint:
+    //
+    //     interface ITensor { [Differentiable] load<TIndex>(); }
+    //
+    // The differentiability attribute contributes a sibling requirement
+    // `load<TIndex> : IForward/BackwardDifferentiable<load<TIndex>>`. When code in a default
+    // implementation asks whether `This.load<TIndex>` satisfies that interface, the witness must
+    // point at the looked-up requirement key so lowering produces `lookupWitness(thisWitness, key)`
+    // (specialized by `TIndex`) rather than selecting the abstract synthesized extension facet.
+    if (auto interfaceConstraintWitness = tryGetInterfaceConstraintRequirementWitness())
+        return interfaceConstraintWitness;
+
     for (auto facet : inheritanceInfo.facets)
     {
         // The `subType` will have a `facet` for each type
@@ -281,14 +412,15 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // the facets that represent supertypes, and those
         // will be the ones that store a type on the facet.
         //
-        auto facetType = facet->getType()->resolve();
+        auto rawFacetType = facet->getType();
+        auto facetType = as<Type>(rawFacetType->resolve());
         if (!facetType)
             continue;
 
         // We will scan until we find a facet that corresponds
         // to `superType`, or fail to find such a facet.
         //
-        if (!facetType->equals(superType))
+        if (!doesFacetTypeMatchSuperType(facetType))
             continue;
 
         // If the `superType` appears in the flattened inheritance list
@@ -317,13 +449,47 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // box-rooted witness instead of one anchored at a free-floating `ThisType`.
         if (auto boxWitness = as<DeclaredSubtypeWitness>(witness))
         {
-            if (boxWitness->getSub() != subType)
+            if (boxWitness->getSub() != subType || boxWitness->getSup() != superType)
                 return m_astBuilder->getDeclaredSubtypeWitness(
                     subType,
-                    boxWitness->getSup(),
+                    superType,
                     boxWitness->getDeclRef());
         }
         return witness;
+    }
+
+    if (auto subDeclRefType = as<DeclRefType>(subType))
+    {
+        auto subDeclRef = subDeclRefType->getDeclRef();
+        ShortList<Decl*> extensionLookupDecls;
+        extensionLookupDecls.add(subDeclRef.getDecl());
+        if (auto genericDecl = as<GenericDecl>(subDeclRef.getDecl()))
+            extensionLookupDecls.add(getInner(genericDecl));
+
+        for (auto extensionLookupDecl : extensionLookupDecls)
+        {
+            auto candidateExtensions =
+                getShared()->getCandidateExtensionsForTypeDecl(extensionLookupDecl);
+            for (auto extDecl : candidateExtensions)
+            {
+                auto extDeclRef = applyExtensionToType(extDecl, subType);
+                if (!extDeclRef)
+                    continue;
+
+                for (auto inheritanceDeclRef :
+                     getMembersOfType<InheritanceDecl>(m_astBuilder, extDeclRef))
+                {
+                    auto baseType = getSup(m_astBuilder, inheritanceDeclRef);
+                    if (!baseType || !doesFacetTypeMatchSuperType(baseType))
+                        continue;
+
+                    return m_astBuilder->getDeclaredSubtypeWitness(
+                        subType,
+                        superType,
+                        inheritanceDeclRef);
+                }
+            }
+        }
     }
     //
     // TODO: We could expand upon the test using the facet list above

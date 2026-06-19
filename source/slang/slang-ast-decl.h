@@ -1119,6 +1119,23 @@ class AttributeDecl : public ContainerDecl
 bool isInterfaceRequirement(Decl* decl);
 InterfaceDecl* findParentInterfaceDecl(Decl* decl);
 
+/// Return true for a generic constraint declaration that contributes a hidden
+/// argument to a generic application.
+///
+/// The generic's `inner` declaration is its result, not one of its signature
+/// operands, even if that inner declaration is itself a constraint.
+bool isGenericConstraintParameterDecl(Decl* decl);
+
+/// Return true for a constraint that is part of a generic requirement's signature.
+///
+/// For `interface IFoo { f<T>() where T : IBar; }`, the `T : IBar` proof is supplied
+/// when the generic requirement is specialized; it is not a stable fact about every
+/// `IFoo` conformance and should not become an independent witness-table key. The same rule
+/// applies to `countof(...)` and other generic signature proofs. A generic interface-level
+/// constraint whose inner declaration is itself the constraint (for example the requirement
+/// synthesized for `[Differentiable] f<T>()`) is not a signature constraint.
+bool isGenericInterfaceRequirementSignatureConstraint(Decl* decl);
+
 bool isLocalVar(const Decl* decl);
 
 

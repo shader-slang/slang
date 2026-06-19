@@ -698,12 +698,16 @@ static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountCon
         constrainedPackDecl ? as<GenericDecl>(constrainedPackDecl->parentDecl) : nullptr;
     if (!genericDecl || !expectedCount)
         return DeclRef<GenericVariadicPackCountConstraintDecl>();
-
     for (auto constraintDecl :
          genericDecl->getDirectMemberDeclsOfType<GenericVariadicPackCountConstraintDecl>())
     {
         auto constraintDeclRef =
-            astBuilder->getDirectDeclRef<GenericVariadicPackCountConstraintDecl>(constraintDecl);
+            substituteDeclRef(
+                SubstitutionSet(constrainedPackDeclRef),
+                astBuilder,
+                astBuilder->getDirectDeclRef<GenericVariadicPackCountConstraintDecl>(
+                    constraintDecl))
+                .as<GenericVariadicPackCountConstraintDecl>();
         auto packDeclRef = _getPackDeclRefForPackCountConstraint(astBuilder, constraintDeclRef);
         if (packDeclRef.getDecl() != constrainedPackDecl)
             continue;
@@ -729,7 +733,6 @@ Witness* findVariadicPackCountWitnessForConstraint(
     SLANG_ASSERT(!shouldEmitError || maybeContext);
     if (!constrainedArg || !expectedCount)
         return nullptr;
-
     // Pack-count constraints are validation constraints. If `load<3>(1, 2, 3)`
     // reaches this helper, `N` is already solved to `3`; this block may compare
     // concrete counts or forward an in-scope declared proof, but it must not add
@@ -752,9 +755,7 @@ Witness* findVariadicPackCountWitnessForConstraint(
             astBuilder,
             constrainedArg,
             resolvedExpectedCount))
-    {
         return astBuilder->getDeclaredVariadicPackCountWitness(declaredConstraintDeclRef);
-    }
 
     if (shouldEmitError)
     {
@@ -987,7 +988,7 @@ static bool isDeferredValidationWitness(Val* witness)
     // objects.
     return as<TypeCoercionWitness>(witness) || as<NonEmptyPackWitness>(witness) ||
            as<DeclaredVariadicPackCountWitness>(witness) ||
-           as<ConcreteVariadicPackCountWitness>(witness);
+           as<ConcreteVariadicPackCountWitness>(witness) || as<DiffTypeInfoWitness>(witness);
 }
 
 // Return the outermost generic declaration in a nested generic declaration
@@ -2947,6 +2948,13 @@ private:
         if (!markArgConstrainedBySubtypeConstraint(constraintDecl))
             return nullptr;
 
+        if (auto discoveredWitness = m_context.discoveredWitnessArgs.tryGetValue(constraintDecl))
+        {
+            if (constraintDecl->isEqualityConstraint && !isTypeEqualityWitness(*discoveredWitness))
+                return nullptr;
+            return *discoveredWitness;
+        }
+
         // Requirements declared inside an interface are checked while the
         // interface's abstract self type is still in scope. For example,
         // `interface INode { associatedtype Next : INode; }` can ask the solver
@@ -3260,6 +3268,9 @@ private:
             buildSubstDeclRef(constraintDecl).as<GenericVariadicPackCountConstraintDecl>();
         auto expectedCount = getPackCountConstraintExpectedCount(m_astBuilder, constraintDeclRef);
 
+        if (auto discoveredWitness = m_context.discoveredWitnessArgs.tryGetValue(constraintDecl))
+            return *discoveredWitness;
+
         auto witness = findVariadicPackCountWitnessForConstraint(
             m_astBuilder,
             m_visitor,
@@ -3545,8 +3556,29 @@ bool SemanticsVisitor::TryUnifyVals(
         {
             auto constraintDecl1 = fstWit->getDeclRef().as<TypeConstraintDecl>();
             auto constraintDecl2 = sndWit->getDeclRef().as<TypeConstraintDecl>();
-            SLANG_ASSERT(constraintDecl1);
-            SLANG_ASSERT(constraintDecl2);
+            if (auto genericConstraintDecl1 = constraintDecl1.as<GenericTypeConstraintDecl>())
+            {
+                if (isGenericConstraintParameterDecl(genericConstraintDecl1.getDecl()))
+                    constraints.discoveredWitnessArgs[genericConstraintDecl1.getDecl()] = sndWit;
+            }
+            if (auto genericConstraintDecl2 = constraintDecl2.as<GenericTypeConstraintDecl>())
+            {
+                if (isGenericConstraintParameterDecl(genericConstraintDecl2.getDecl()))
+                    constraints.discoveredWitnessArgs[genericConstraintDecl2.getDecl()] = fstWit;
+            }
+            if (!constraintDecl1 || !constraintDecl2)
+            {
+                return TryUnifyTypes(
+                           constraints,
+                           unificationOptions,
+                           fstWit->getSub(),
+                           sndWit->getSub()) &&
+                       TryUnifyTypes(
+                           constraints,
+                           unificationOptions,
+                           fstWit->getSup(),
+                           sndWit->getSup());
+            }
             return TryUnifyTypes(
                 constraints,
                 unificationOptions,
@@ -3605,6 +3637,17 @@ bool SemanticsVisitor::TryUnifyVals(
 
     if (isDeferredValidationWitness(fst) && isDeferredValidationWitness(snd))
     {
+        if (auto fstPackCountWitness = as<DeclaredVariadicPackCountWitness>(fst))
+        {
+            if (auto sndPackCountWitness = as<DeclaredVariadicPackCountWitness>(snd))
+            {
+                constraints.discoveredWitnessArgs[fstPackCountWitness->getDeclRef().getDecl()] =
+                    sndPackCountWitness;
+                constraints.discoveredWitnessArgs[sndPackCountWitness->getDeclRef().getDecl()] =
+                    fstPackCountWitness;
+            }
+        }
+
         // Validation-only witnesses use the same control flow as ordinary
         // constraints: unification may solve their operands elsewhere, and the
         // generic solver later rebuilds the witness for the substituted
