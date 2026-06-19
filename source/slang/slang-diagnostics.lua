@@ -1914,6 +1914,48 @@ err(
     span { loc = "location", message = "write this constraint as `countof(Pack) == IntExpr`" }
 )
 
+err(
+    "generic-specialization-arity-mismatch",
+    30438,
+    "wrong number of arguments in call to generic function",
+    span { loc = "location", message = "could not specialize generic: it expects ~expectedCount:Int parameter(s) but the call provides ~actualCount:Int argument(s)" }
+)
+
+err(
+    "generic-parameter-could-not-be-inferred",
+    30439,
+    "generic parameter could not be inferred",
+    span { loc = "location", message = "could not infer generic argument for parameter '~paramName:Name'" }
+)
+
+err(
+    "generic-argument-does-not-satisfy-constraint",
+    30440,
+    "generic constraint not satisfied",
+    span { loc = "location", message = "could not satisfy the generic constraint '~constraint:String'" }
+)
+
+standalone_note(
+    "see-generic-constraint-declaration",
+    -1,
+    "see generic constraint declaration",
+    span { loc = "location" }
+)
+
+err(
+    "generic-argument-list-arity-mismatch",
+    30441,
+    "wrong number of generic arguments",
+    span { loc = "location", message = "generic '~generic:Decl' expects ~expectedCount:Int generic argument(s) but ~actualCount:Int were provided" }
+)
+
+err(
+    "generic-parameter-unification-conflict",
+    30442,
+    "cannot deduce generic argument",
+    span { loc = "location", message = "cannot deduce generic argument for '~paramName:Name': conflicting requirements '~firstCandidate:String' and '~secondCandidate:String'" }
+)
+
 -- Float bit cast diagnostics
 
 err(
