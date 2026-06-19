@@ -1404,7 +1404,9 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
 // Parse the name of a declaration. When `outIsOperatorName` is non-null it is
 // set to true if the name used the `operator <op>` form (e.g. `operator+`),
 // so callers that build variable/parameter declarators can reject it later
-// (only operator functions may use such a name).
+// (only operator functions may use such a name). The flag is only ever written
+// when the `operator` form is taken, so the caller must initialize the target to
+// false before the call (the `NameDeclarator` field defaults to false).
 static NameLoc ParseDeclName(Parser* parser, bool* outIsOperatorName = nullptr)
 {
     Token nameToken;
@@ -1538,6 +1540,13 @@ struct DeclaratorInfo
 
     // Propagated from NameDeclarator: true when the name used the
     // `operator <op>` form, which is only valid for operator functions.
+    // This is read only in `CompleteVarDecl` (the traditional variable/parameter
+    // completion chokepoint), which is where the reported bug lived. The typedef
+    // path also flows through `UnwrapDeclarator` and so carries the flag, but it
+    // does not reject it, so `typedef int operator+;` is still accepted; closing
+    // that pre-existing gap is out of scope for this fix. Property declarations
+    // never set the flag because their name is parsed as a plain identifier
+    // (a leading `operator` token is rejected earlier as an unexpected token).
     bool isOperatorName = false;
 };
 
@@ -2669,6 +2678,13 @@ static void UnwrapDeclarator(
     RefPtr<Declarator> declarator,
     DeclaratorInfo* ioInfo)
 {
+    // Reset the operator-name provenance up front so the flag is unconditionally
+    // per-declarator: a single `DeclaratorInfo` is reused across declarators in a
+    // multi-declarator list (e.g. `int operator+, y;`), so without this reset a flag
+    // set by an earlier declarator could leak onto a later one whose name flavor is
+    // never reached (malformed input). `nameAndLoc` is always overwritten by the
+    // name case below, but the boolean needs an explicit default.
+    ioInfo->isOperatorName = false;
     while (declarator)
     {
         switch (declarator->flavor)

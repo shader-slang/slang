@@ -36,3 +36,19 @@ void g(int operator*)
 //CHK: 'operator*' can only be used to declare an operator function, not a variable or parameter name.
 {
 }
+
+// Negative: operator name as the *second* declarator in a multi-declarator list.
+// The clean declarator (`x`) must stay valid; only `operator/` errors. A distinct
+// operator (`/`) is used so the diagnostic is not collapsed with the `operator+`
+// case above by the sink's identical-message deduplication.
+int x, operator/;
+//CHK: E20020
+//CHK: 'operator/' can only be used to declare an operator function, not a variable or parameter name.
+
+// Negative: operator name as the *first* declarator in a list; the trailing
+// declarator (`y`) must stay valid. This guards against the operator-name
+// provenance leaking from one declarator onto the next in the shared
+// DeclaratorInfo (`operator%` distinct again to avoid message deduplication).
+int operator%, y;
+//CHK: E20020
+//CHK: 'operator%' can only be used to declare an operator function, not a variable or parameter name.
