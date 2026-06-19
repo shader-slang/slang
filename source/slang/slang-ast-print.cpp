@@ -1821,6 +1821,26 @@ void ASTPrinter::addGenericConstraint(Decl* constraintDecl)
             sb << getText(packVar->name);
         sb << ")";
     }
+    else if (auto packCount = as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
+    {
+        // A variadic pack-count constraint is written `where countof(P) == N`,
+        // requiring the pack `P` to have exactly `N` elements; echo that form.
+        sb << "countof(";
+        addExpr(packCount->packExpr);
+        sb << ") == ";
+        if (packCount->expectedCountExpr)
+            addExpr(packCount->expectedCountExpr);
+        else if (packCount->expectedCountVal)
+            addVal(packCount->expectedCountVal);
+    }
+    else if (auto hasDiffTypeInfo = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+    {
+        // A differentiable-type-info constraint is written `where
+        // __hasDiffTypeInfo(T)`; echo that form.
+        sb << "__hasDiffTypeInfo(";
+        addType(hasDiffTypeInfo->type.type);
+        sb << ")";
+    }
     else if (constraintDecl && constraintDecl->getName())
     {
         sb << getText(constraintDecl->getName());
