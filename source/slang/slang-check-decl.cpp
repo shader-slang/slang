@@ -4057,6 +4057,40 @@ bool isProperConstraineeType(Type* type)
     return true;
 }
 
+static bool isKnownBuiltinDecl(Decl* decl, KnownBuiltinDeclName name)
+{
+    if (auto genericDecl = as<GenericDecl>(decl))
+        decl = getInner(genericDecl);
+
+    auto attr = decl ? decl->findModifier<KnownBuiltinAttribute>() : nullptr;
+    auto constantName = attr ? as<ConstantIntVal>(attr->name) : nullptr;
+    return constantName && constantName->getValue() == (IntegerLiteralValue)name;
+}
+
+static bool isDifferentiabilityRequirementConstraint(GenericTypeConstraintDecl* decl, Type* subType)
+{
+    if (!isInterfaceRequirement(decl))
+        return false;
+
+    auto subDeclRefType = as<DeclRefType>(subType);
+    if (!subDeclRefType)
+        return false;
+
+    auto subDecl = subDeclRefType->getDeclRef().getDecl();
+    if (auto genericSubDecl = as<GenericDecl>(subDecl))
+        subDecl = getInner(genericSubDecl);
+    if (!as<CallableDecl>(subDecl))
+        return false;
+
+    auto supDeclRefType = as<DeclRefType>(decl->sup.type);
+    if (!supDeclRefType)
+        return false;
+
+    auto supDecl = supDeclRefType->getDeclRef().getDecl();
+    return isKnownBuiltinDecl(supDecl, KnownBuiltinDeclName::IForwardDifferentiable) ||
+           isKnownBuiltinDecl(supDecl, KnownBuiltinDeclName::IBackwardDifferentiable);
+}
+
 bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     GenericTypeConstraintDecl* decl,
     TypeExp type,
@@ -4081,6 +4115,8 @@ bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     };
     // Validate that the sub type of a constraint is in valid form.
     //
+    if (isDifferentiabilityRequirementConstraint(decl, type.type))
+        return true;
     if (auto subDeclRef = isDeclRefTypeOf<Decl>(type.type))
     {
         if (subDeclRef.getDecl()->parentDecl == decl->parentDecl)
@@ -5360,6 +5396,187 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // declarations they contain should be fully checked.
 }
 
+static Type* _getCallableRequirementSignatureEndpointTargetType(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* semantics,
+    Type* type)
+{
+    if (auto namedType = as<NamedExpressionType>(type))
+        return getType(astBuilder, namedType->getDeclRef());
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto assocType = as<Type>(_tryLookupConcreteAssociatedTypeFromThisTypeSubst(
+                astBuilder,
+                declRefType->getDeclRef())))
+        {
+            return assocType;
+        }
+
+        if (auto assocTypeDeclRef = declRefType->getDeclRef().as<AssocTypeDecl>())
+        {
+            // A substituted requirement endpoint like `ISimple.U.V` can become `Val.V`, where
+            // the decl-ref to `IBase.V` is based on a `LookupDeclRef` carrying the `Val : IBase`
+            // witness. During conformance checking that carried witness can be an early value
+            // whose table has not yet recorded `V -> int`; refreshing the same subtype query
+            // gives the completed witness table and keeps callable signature matching aligned
+            // with ordinary associated-type lookup.
+            if (auto lookupDeclRef = SubstitutionSet(assocTypeDeclRef).findLookupDeclRef())
+            {
+                auto tryGetWitnessType = [&](SubtypeWitness* witness) -> Type*
+                {
+                    auto requirementWitness = tryLookUpRequirementWitness(
+                        astBuilder,
+                        witness,
+                        assocTypeDeclRef.getDecl());
+                    if (requirementWitness.getFlavor() == RequirementWitness::Flavor::val)
+                        return as<Type>(requirementWitness.getVal());
+                    return nullptr;
+                };
+
+                auto witness = lookupDeclRef->getWitness();
+                if (auto assocType = tryGetWitnessType(witness))
+                    return assocType;
+
+                if (auto refreshedWitness =
+                        semantics->tryGetSubtypeWitness(witness->getSub(), witness->getSup()))
+                {
+                    if (auto assocType = tryGetWitnessType(refreshedWitness))
+                        return assocType;
+                }
+            }
+
+            if (auto memberDeclRef = as<MemberDeclRef>(assocTypeDeclRef.declRefBase))
+            {
+                auto sourceType = DeclRefType::create(
+                    astBuilder,
+                    DeclRef<Decl>(memberDeclRef->getParentOperand()));
+                InterfaceDecl* interfaceDecl = nullptr;
+                for (auto parentDecl = assocTypeDeclRef.getDecl()->parentDecl; parentDecl;
+                     parentDecl = parentDecl->parentDecl)
+                {
+                    if ((interfaceDecl = as<InterfaceDecl>(parentDecl)))
+                        break;
+                }
+                auto interfaceType =
+                    interfaceDecl ? DeclRefType::create(astBuilder, makeDeclRef(interfaceDecl))
+                                  : nullptr;
+                if (sourceType && interfaceType)
+                {
+                    auto witness = semantics->tryGetSubtypeWitness(sourceType, interfaceType);
+                    if (witness)
+                    {
+                        auto requirementWitness = tryLookUpRequirementWitness(
+                            astBuilder,
+                            witness,
+                            assocTypeDeclRef.getDecl());
+                        if (requirementWitness.getFlavor() == RequirementWitness::Flavor::val)
+                            return as<Type>(requirementWitness.getVal());
+                    }
+                }
+            }
+        }
+
+        if (auto typeDefDeclRef = declRefType->getDeclRef().as<TypeDefDecl>())
+            return getType(astBuilder, typeDefDeclRef);
+    }
+
+    return nullptr;
+}
+
+static bool _doesCallableRequirementSignatureTypeMatch(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* semantics,
+    Type* requiredType,
+    Type* satisfyingType)
+{
+    if (requiredType == satisfyingType)
+        return true;
+    if (!requiredType || !satisfyingType)
+        return false;
+    if (requiredType->equals(satisfyingType))
+        return true;
+
+    // Requirement matching substitutes associated-type bindings before comparing callable
+    // signatures. The substituted endpoint can still be spelled as an associated-type projection
+    // such as `ISimple.U.V -> Val.V`, while the implementation-side function type may already
+    // expose the witness value (`int`). Normalize only endpoints backed by existing associated-type
+    // witnesses or explicit type aliases; do not collapse arbitrary lookup paths like `obj1.Data`
+    // and `obj2.Data`.
+    if (auto requiredEndpointTarget =
+            _getCallableRequirementSignatureEndpointTargetType(astBuilder, semantics, requiredType))
+    {
+        if (requiredEndpointTarget != requiredType && _doesCallableRequirementSignatureTypeMatch(
+                                                          astBuilder,
+                                                          semantics,
+                                                          requiredEndpointTarget,
+                                                          satisfyingType))
+        {
+            return true;
+        }
+    }
+
+    if (auto satisfyingEndpointTarget = _getCallableRequirementSignatureEndpointTargetType(
+            astBuilder,
+            semantics,
+            satisfyingType))
+    {
+        if (satisfyingEndpointTarget != satisfyingType &&
+            _doesCallableRequirementSignatureTypeMatch(
+                astBuilder,
+                semantics,
+                requiredType,
+                satisfyingEndpointTarget))
+        {
+            return true;
+        }
+    }
+
+    if (auto requiredFuncType = as<FuncType>(requiredType))
+    {
+        auto satisfyingFuncType = as<FuncType>(satisfyingType);
+        if (!satisfyingFuncType)
+            return false;
+
+        if (requiredFuncType->getParamCount() != satisfyingFuncType->getParamCount())
+            return false;
+
+        for (Index i = 0; i < requiredFuncType->getParamCount(); i++)
+        {
+            if (!_doesCallableRequirementSignatureTypeMatch(
+                    astBuilder,
+                    semantics,
+                    requiredFuncType->getParamTypeWithModeWrapper(i),
+                    satisfyingFuncType->getParamTypeWithModeWrapper(i)))
+            {
+                return false;
+            }
+        }
+
+        return _doesCallableRequirementSignatureTypeMatch(
+                   astBuilder,
+                   semantics,
+                   requiredFuncType->getResultType(),
+                   satisfyingFuncType->getResultType()) &&
+               _doesCallableRequirementSignatureTypeMatch(
+                   astBuilder,
+                   semantics,
+                   requiredFuncType->getErrorType(),
+                   satisfyingFuncType->getErrorType());
+    }
+
+    // A concrete conformance can spell a member signature through the implementation's
+    // associated-type binding while the requirement is spelled through the interface projection.
+    // For example, `Simple : ISimple` binds `ISimple.U` to `Val`, so the requirement result
+    // `U.V` and the implementation result `Val.V` should compare by their canonical type.
+    // Keep this normalization local to callable signature matching; subtype/facet matching still
+    // needs lookup-path identity so unrelated projections from different objects do not collapse.
+    auto requiredCanonicalType = requiredType->getCanonicalType();
+    auto satisfyingCanonicalType = satisfyingType->getCanonicalType();
+    return requiredCanonicalType && satisfyingCanonicalType &&
+           requiredCanonicalType->equals(satisfyingCanonicalType);
+}
+
 bool SemanticsVisitor::doesSignatureMatchRequirement(
     DeclRef<CallableDecl> satisfyingMemberDeclRef,
     DeclRef<CallableDecl> requiredMemberDeclRef,
@@ -5416,16 +5633,20 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         // If the requirement is defined using a funcType, we'll check the effective
         // func-types
         //
-        auto resolvedFuncType =
+        auto resolvedFuncType = as<Type>(
             as<Type>(funcType->substitute(m_astBuilder, SubstitutionSet(requiredMemberDeclRef)))
-                ->resolve();
+                ->resolve());
 
         auto targetFuncType = getTypeForDeclRef(
             m_astBuilder,
             satisfyingMemberDeclRef,
             satisfyingMemberDeclRef.getLoc());
 
-        if (!targetFuncType->equals(resolvedFuncType))
+        if (!_doesCallableRequirementSignatureTypeMatch(
+                m_astBuilder,
+                this,
+                resolvedFuncType,
+                targetFuncType.type))
             return false;
     }
     else
@@ -5451,7 +5672,11 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             auto requiredParamType = getType(m_astBuilder, requiredParam);
             auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
 
-            if (!requiredParamType->equals(satisfyingParamType))
+            if (!_doesCallableRequirementSignatureTypeMatch(
+                    m_astBuilder,
+                    this,
+                    requiredParamType,
+                    satisfyingParamType))
             {
                 return false;
             }
@@ -5459,12 +5684,20 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
 
         auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
         auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
-        if (!requiredResultType->equals(satisfyingResultType))
+        if (!_doesCallableRequirementSignatureTypeMatch(
+                m_astBuilder,
+                this,
+                requiredResultType,
+                satisfyingResultType))
             return false;
 
         auto requiredErrorType = getErrorCodeType(m_astBuilder, requiredMemberDeclRef);
         auto satisfyingErrorType = getErrorCodeType(m_astBuilder, satisfyingMemberDeclRef);
-        if (!requiredErrorType->equals(satisfyingErrorType))
+        if (!_doesCallableRequirementSignatureTypeMatch(
+                m_astBuilder,
+                this,
+                requiredErrorType,
+                satisfyingErrorType))
             return false;
     }
 
@@ -5636,7 +5869,11 @@ bool SemanticsVisitor::doesPropertyMatchRequirement(
     //
     auto satisfyingType = getType(getASTBuilder(), satisfyingMemberDeclRef);
     auto requiredType = getType(getASTBuilder(), requiredMemberDeclRef);
-    if (!satisfyingType->equals(requiredType))
+    if (!_doesCallableRequirementSignatureTypeMatch(
+            m_astBuilder,
+            this,
+            requiredType,
+            satisfyingType))
         return false;
 
     // Each accessor in the requirement must be accounted for by an accessor
@@ -5739,13 +5976,21 @@ bool SemanticsVisitor::doesSubscriptMatchRequirement(
         auto requiredParamType = getType(m_astBuilder, requiredParam);
         auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
 
-        if (!requiredParamType->equals(satisfyingParamType))
+        if (!_doesCallableRequirementSignatureTypeMatch(
+                m_astBuilder,
+                this,
+                requiredParamType,
+                satisfyingParamType))
             return false;
     }
 
     auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
     auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
-    if (!requiredResultType->equals(satisfyingResultType))
+    if (!_doesCallableRequirementSignatureTypeMatch(
+            m_astBuilder,
+            this,
+            requiredResultType,
+            satisfyingResultType))
         return false;
 
     // Each accessor in the requirement must be accounted for by an accessor

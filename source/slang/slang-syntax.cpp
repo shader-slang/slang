@@ -1113,8 +1113,8 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         visitParamDecl(paramDeclRef);
     }
 
-    FuncType* funcType = astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
-    return funcType;
+    auto funcType = astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
+    return as<FuncType>(funcType->substitute(astBuilder, SubstitutionSet(declRef))->resolve());
 }
 
 GenericDeclRefType* getGenericDeclRefType(

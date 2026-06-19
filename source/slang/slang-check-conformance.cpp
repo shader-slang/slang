@@ -290,6 +290,11 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         if (facetDeclRef.getDecl() != superDeclRef.getDecl())
             return false;
 
+        auto facetGenericApp = SubstitutionSet(facetDeclRef).findGenericAppDeclRef();
+        auto superGenericApp = SubstitutionSet(superDeclRef).findGenericAppDeclRef();
+        if (!facetGenericApp && !superGenericApp)
+            return false;
+
         GenericInferenceContext inferenceContext;
         auto result = tryUnifyDeclRef(
             inferenceContext,
@@ -299,6 +304,35 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
             superDeclRef.declRefBase,
             false);
         return result;
+    };
+
+    auto canExtensionPossiblyProvideSuperType = [&](ExtensionDecl* extDecl) -> bool
+    {
+        auto superDeclRefType = as<DeclRefType>(superType);
+        if (!superDeclRefType)
+            return true;
+
+        for (auto member : extDecl->getDirectMemberDecls())
+        {
+            auto inheritanceDecl = as<InheritanceDecl>(member);
+            if (!inheritanceDecl)
+                continue;
+
+            // Applying a generic extension can require proving that extension's source
+            // constraints. When a solver is already trying to prove one of those constraints,
+            // applying an extension whose declared inheritance cannot satisfy the requested
+            // interface only recurses back into the same proof. Filter by the declared
+            // inheritance interface before solving the extension arguments; the full
+            // substituted `doesFacetTypeMatchSuperType` check below remains authoritative.
+            auto baseDeclRefType = as<DeclRefType>(inheritanceDecl->base.type);
+            if (!baseDeclRefType)
+                return true;
+
+            if (baseDeclRefType->getDeclRef().getDecl() == superDeclRefType->getDeclRef().getDecl())
+                return true;
+        }
+
+        return false;
     };
 
     auto tryGetInterfaceConstraintRequirementWitness = [&]() -> SubtypeWitness*
@@ -472,6 +506,9 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
                 getShared()->getCandidateExtensionsForTypeDecl(extensionLookupDecl);
             for (auto extDecl : candidateExtensions)
             {
+                if (!canExtensionPossiblyProvideSuperType(extDecl))
+                    continue;
+
                 auto extDeclRef = applyExtensionToType(extDecl, subType);
                 if (!extDeclRef)
                     continue;
