@@ -1,5 +1,6 @@
 // unit-test-find-type-by-name.cpp
 
+#include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -50,4 +51,93 @@ SLANG_UNIT_TEST(findTypeByName)
 
     spDestroyCompileRequest(request);
     spDestroySession(session);
+}
+
+SLANG_UNIT_TEST(findTypeByNameExtensionTypeAlias)
+{
+    const char* vectorizeSource = R"(
+        module slangpy;
+
+        public struct VectorizeGridArgTo<SlangParameterType, let Dim : int>
+        {
+        }
+
+        extension<let N : int, T : __BuiltinIntegerType> VectorizeGridArgTo<vector<T, N>, N>
+        {
+            typealias VectorType = vector<T, N>;
+        }
+
+        extension<T : __BuiltinIntegerType> VectorizeGridArgTo<T, 1>
+        {
+            typealias VectorType = T;
+        }
+    )";
+
+    const char* userSource = R"(
+        import slangpy;
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void main()
+        {
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto vectorizeModule = session->loadModuleFromSourceString(
+        "slangpy",
+        "slangpy.slang",
+        vectorizeSource,
+        diagnosticBlob.writeRef());
+    if (!vectorizeModule && diagnosticBlob)
+    {
+        fprintf(stderr, "%s\n", (const char*)diagnosticBlob->getBufferPointer());
+    }
+    SLANG_CHECK_ABORT(vectorizeModule != nullptr);
+
+    diagnosticBlob = nullptr;
+    auto module = session->loadModuleFromSourceString(
+        "findTypeByNameExtensionTypeAlias",
+        "findTypeByNameExtensionTypeAlias.slang",
+        userSource,
+        diagnosticBlob.writeRef());
+    if (!module && diagnosticBlob)
+    {
+        fprintf(stderr, "%s\n", (const char*)diagnosticBlob->getBufferPointer());
+    }
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    slang::IComponentType* components[] = {vectorizeModule, module};
+    diagnosticBlob = nullptr;
+    ComPtr<slang::IComponentType> composedProgram;
+    auto composeResult = session->createCompositeComponentType(
+        components,
+        SLANG_COUNT_OF(components),
+        composedProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    if (SLANG_FAILED(composeResult) && diagnosticBlob)
+    {
+        fprintf(stderr, "%s\n", (const char*)diagnosticBlob->getBufferPointer());
+    }
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(composeResult));
+
+    auto layout = composedProgram->getLayout();
+    SLANG_CHECK_ABORT(layout != nullptr);
+    auto scalarAliasType = layout->findTypeByName("VectorizeGridArgTo<uint, 1>.VectorType");
+    SLANG_CHECK_ABORT(scalarAliasType != nullptr);
+    SLANG_CHECK_ABORT(
+        scalarAliasType->getScalarType() == slang::TypeReflection::ScalarType::UInt32);
 }

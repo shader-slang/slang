@@ -17722,6 +17722,63 @@ GenericDecl* SemanticsVisitor::findNextOuterGeneric(Decl* decl)
     return nullptr;
 }
 
+// The final extension-target check below normally uses `Type::equals` after
+// generic inference has solved the extension parameters.  Some generic-dependent
+// types can still carry equivalent, but not pointer-identical, generic decl refs
+// at that point; those cases need the solver fallback.  Fully concrete requests
+// must not use that fallback, because re-unifying a solved target would admit a
+// different concrete extension target, e.g.
+// `VectorizeGridArgTo<vector<uint, 1>, 1>` for `VectorizeGridArgTo<uint, 1>`.
+static bool _containsGenericDependentVal(Val* val, HashSet<Val*>& seenVals)
+{
+    if (!val || !seenVals.add(val))
+        return false;
+
+    if (as<ThisType>(val))
+        return true;
+
+    if (auto declRefType = as<DeclRefType>(val))
+    {
+        if (isGenericParam(declRefType->getDeclRef().getDecl()))
+            return true;
+    }
+    else if (auto declRefIntVal = as<DeclRefIntVal>(val))
+    {
+        if (isGenericParam(declRefIntVal->getDeclRef().getDecl()))
+            return true;
+    }
+
+    for (auto operand : val->m_operands)
+    {
+        switch (operand.kind)
+        {
+        case ValNodeOperandKind::ValNode:
+            if (_containsGenericDependentVal(operand.getVal(), seenVals))
+                return true;
+            break;
+
+        case ValNodeOperandKind::ASTNode:
+            if (auto decl = as<Decl>(operand.values.nodeOperand))
+            {
+                if (isGenericParam(decl) || as<ThisTypeDecl>(decl))
+                    return true;
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    return false;
+}
+
+static bool _containsGenericDependentVal(Val* val)
+{
+    HashSet<Val*> seenVals;
+    return _containsGenericDependentVal(val, seenVals);
+}
+
 static bool _isExactExtensionTargetMatch(
     SemanticsVisitor* visitor,
     Type* extensionTargetType,
@@ -17729,6 +17786,9 @@ static bool _isExactExtensionTargetMatch(
 {
     if (appliedType->equals(extensionTargetType))
         return true;
+
+    if (!_containsGenericDependentVal(appliedType))
+        return false;
 
     auto extensionTargetDeclRefType = as<DeclRefType>(extensionTargetType);
     auto appliedDeclRefType = as<DeclRefType>(appliedType);
