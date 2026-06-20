@@ -406,13 +406,8 @@ struct MatrixTypeLoweringContext
         auto matrixTypeA = as<IRMatrixType>(typeA);
         auto matrixTypeB = as<IRMatrixType>(typeB);
 
-        bool shouldLowerA = matrixTypeA && shouldLowerMatrixType(matrixTypeA);
-        bool shouldLowerB = matrixTypeB && shouldLowerMatrixType(matrixTypeB);
-
         // Only matrix-matrix comparisons are supported
-        SLANG_ASSERT(
-            shouldLowerA && shouldLowerB &&
-            "Comparison operations only supported between matrices that need lowering");
+        SLANG_ASSERT(matrixTypeA && matrixTypeB && "Only matrix-matrix comparisons are supported");
 
         // Create IRBuilder at the top level
         IRBuilder builder(inst);
