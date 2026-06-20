@@ -50,6 +50,21 @@ bool isGenericConstraintParameterDecl(Decl* decl)
 
     if (auto parentGenericDecl = as<GenericDecl>(decl->parentDecl))
     {
+        // A `GenericDecl` can either own signature constraints for its inner declaration, or
+        // wrap a `GenericTypeConstraintDecl` that is itself a standalone interface requirement.
+        // For example:
+        //
+        //     interface IFoo
+        //     {
+        //         void bar<T>();
+        //         __constraint<T> bar<T> : IForwardDifferentiableFunc<bar<T>>;
+        //     }
+        //
+        // The differentiability requirement is represented as a generic interface requirement
+        // whose inner declaration is the `GenericTypeConstraintDecl`, and lowering turns that into
+        // an `IRGeneric` for the constraint requirement. In that shape the constraint is not a
+        // generic constraint parameter for another declaration; it is the standalone interface
+        // requirement for the `bar` method.
         return parentGenericDecl->inner != decl;
     }
 
