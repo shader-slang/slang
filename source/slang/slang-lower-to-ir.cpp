@@ -1627,7 +1627,7 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     }
     else if (const auto typeConstraint = as<TypeConstraintDecl>(requirementDecl); typeConstraint)
     {
-        if (isGenericInterfaceRequirementSignatureConstraint(requirementDecl))
+        if (!isInterfaceRequirement(requirementDecl))
             return false;
     }
     else if (const auto varDecl = as<VarDeclBase>(requirementDecl); varDecl)
@@ -11850,18 +11850,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Emit any generics that should wrap the actual type.
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
-        auto checkNoNestedCallableTypeConstraints = [](CallableDecl* callableDecl)
-        {
-            if (!callableDecl)
-                return;
-
-            if (callableDecl->getDirectMemberDeclsOfType<TypeConstraintDecl>().getCount() != 0)
-            {
-                SLANG_UNEXPECTED(
-                    "interface callable requirements cannot contain nested type constraints");
-            }
-        };
-
         // First, compute the number of requirement entries that will be included in this
         // interface type.
         UInt operandCount = 0;
@@ -11882,7 +11870,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     if (auto accessorDecl = as<AccessorDecl>(member))
                     {
                         operandCount++;
-                        checkNoNestedCallableTypeConstraints(accessorDecl);
                     }
                 }
             }
@@ -11897,16 +11884,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 operandCount +=
                     associatedTypeDecl->getMembersOfType<TypeConstraintDecl>().getCount();
-            }
-
-            auto callableDecl = as<CallableDecl>(requirementDecl);
-
-            if (auto genDecl = as<GenericDecl>(requirementDecl))
-                callableDecl = as<CallableDecl>(genDecl->inner);
-
-            if (callableDecl)
-            {
-                checkNoNestedCallableTypeConstraints(callableDecl);
             }
         }
 
@@ -14558,13 +14535,6 @@ bool canDeclLowerToAGeneric(Decl* decl)
 
     if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(decl))
     {
-        if (as<CallableDecl>(genericTypeConstraintDecl->parentDecl))
-        {
-            // A generic type constraint decl nested under a callable decl will turn into a
-            // generic that returns a type (a simple type-level function).
-            return true;
-        }
-
         if (auto parentGenericDecl = as<GenericDecl>(genericTypeConstraintDecl->parentDecl))
         {
             if (parentGenericDecl->inner == genericTypeConstraintDecl)

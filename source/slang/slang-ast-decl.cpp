@@ -53,12 +53,6 @@ bool isGenericConstraintParameterDecl(Decl* decl)
         return parentGenericDecl->inner != decl;
     }
 
-    if (auto parentCallableDecl = as<CallableDecl>(decl->parentDecl))
-    {
-        auto parentGenericDecl = as<GenericDecl>(parentCallableDecl->parentDecl);
-        return parentGenericDecl && parentGenericDecl->inner == parentCallableDecl;
-    }
-
     return false;
 }
 
@@ -86,43 +80,6 @@ bool isInterfaceRequirement(Decl* decl)
             return false;
     }
     return false;
-}
-
-bool isGenericInterfaceRequirementSignatureConstraint(Decl* decl)
-{
-    if (!_isGenericConstraintDecl(decl))
-        return false;
-
-    auto parentGenericDecl = as<GenericDecl>(decl->parentDecl);
-    if (!parentGenericDecl)
-    {
-        if (auto parentCallableDecl = as<CallableDecl>(decl->parentDecl))
-        {
-            parentGenericDecl = as<GenericDecl>(parentCallableDecl->parentDecl);
-            if (!parentGenericDecl || parentGenericDecl->inner != parentCallableDecl)
-                return false;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-    // Generic interface requirements can carry their own generic signature:
-    //
-    //     interface IFoo {
-    //         __generic<T> f();
-    //         __generic<T> f<T> : IForwardDifferentiableFunc<f<T>>;
-    //     }
-    //
-    // Constraints that are direct members of the generic, but are not the
-    // generic's `inner` declaration, are signature constraints. They are
-    // lowered as hidden generic parameters/proofs when the generic requirement
-    // itself is lowered, not as separate interface requirement keys.
-    if (!isGenericConstraintParameterDecl(decl))
-        return false;
-
-    return isInterfaceRequirement(parentGenericDecl);
 }
 
 //

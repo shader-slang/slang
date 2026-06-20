@@ -4473,22 +4473,7 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
 
     if (!decl->sup.type)
     {
-        if (as<CallableDecl>(decl->parentDecl))
-        {
-            // Check without knowing full bases.
-            SemanticsVisitor visitor(*this);
-
-            // TODO: the allow-static reference bit should really be _not_ here. (maybe in
-            // generic-app-expr checking?)
-            //
-            visitor = visitor.allowStaticReferenceToNonStaticMember();
-            decl->sup = visitor.TranslateTypeNodeForced(decl->sup);
-        }
-        else
-        {
-            // Regular checking.
-            decl->sup = TranslateTypeNodeForced(decl->sup);
-        }
+        decl->sup = TranslateTypeNodeForced(decl->sup);
     }
 
     // If the super-type is an AndType (e.g. `T : A & B`), flatten it and create
@@ -7065,16 +7050,10 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
         {
             // If a subtype witness was found, then the conformance
             // appears to hold, and we can satisfy that requirement.
-            // Skip if already present — this function can be called multiple times
+            // Skip if already present; this function can be called multiple times
             // for the same witness table (e.g., when re-checking conformance during
             // specialization), and we must not double-add entries.
-            // Generic-requirement signature constraints are checked here, but their proofs are
-            // supplied as specialization arguments for the requirement method. They are not stable
-            // facts about the enclosing type's conformance, so they must not become witness-table
-            // entries. Interface-level constraints, including the ones generated for
-            // `[Differentiable]` interface methods, are checked by the main conformance loop.
-            if (!isGenericInterfaceRequirementSignatureConstraint(requirementDecl) &&
-                !witnessTable->m_requirementDictionary.containsKey(requirementDecl))
+            if (!witnessTable->m_requirementDictionary.containsKey(requirementDecl))
             {
                 witnessTable->add(requirementDecl, RequirementWitness(witness));
                 addedRequirementDecls.add(requirementDecl);
@@ -7087,8 +7066,7 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
             //
             if (requirementDecl->findModifier<OptionalConstraintModifier>())
             {
-                if (!isGenericInterfaceRequirementSignatureConstraint(requirementDecl) &&
-                    !witnessTable->m_requirementDictionary.containsKey(requirementDecl))
+                if (!witnessTable->m_requirementDictionary.containsKey(requirementDecl))
                 {
                     witnessTable->add(requirementDecl, m_astBuilder->getOrCreate<NoneWitness>());
                     addedRequirementDecls.add(requirementDecl);
@@ -11117,8 +11095,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // Do not treat that shape as already resolved; it still needs a witness-table entry.
     auto requiredDecl = requiredMemberDeclRef.getDecl();
     auto isGenericWrappedConstraintRequirement =
-        as<GenericTypeConstraintDecl>(requiredDecl) && isInterfaceRequirement(requiredDecl) &&
-        !isGenericInterfaceRequirementSignatureConstraint(requiredDecl);
+        as<GenericTypeConstraintDecl>(requiredDecl) && isInterfaceRequirement(requiredDecl);
     if (!as<InterfaceDecl>(requiredMemberDeclRef.getParent().getDecl()) &&
         !isGenericWrappedConstraintRequirement)
         return true;
