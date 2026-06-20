@@ -205,7 +205,7 @@ struct OptionalTypeLoweringContext
             // it feeds and lower it as a `none` of that type. A dead `none` branch is eliminated
             // later, but a live one must lower to a real value rather than survive to code emit.
             auto targetOptionalType = findTargetOptionalType(inst);
-            SLANG_ASSERT(targetOptionalType);
+            SLANG_RELEASE_ASSERT(targetOptionalType);
             info = getLoweredOptionalType(builder, targetOptionalType);
         }
         if (info->loweredType != info->valueType)

@@ -8237,7 +8237,7 @@ struct TypeFlowSpecializationContext
                 if (auto witnessTable = as<IRWitnessTable>(use->getUser()))
                 {
                     if (witnessTable->getDataType() == targetTableType &&
-                        witnessTable->getParent()->getOp() == kIROp_ModuleInst)
+                        isGlobalInst(witnessTable))
                     {
                         outTables.add(witnessTable);
                     }
