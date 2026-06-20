@@ -53,23 +53,6 @@ SubtypeWitness* SemanticsVisitor::isSubtype(
     Type* superType,
     IsSubTypeOptions isSubTypeOptions)
 {
-    // Extension registration happens while declarations advance to `ReadyForLookup`.
-    // Bring endpoint declarations to that state before consulting the subtype cache so an
-    // earlier negative query cannot survive after a synthesized or user extension has made
-    // the conformance visible. `NoCaching` marks recursive contexts where the sub endpoint
-    // may not be safe to finish yet; those callers already opt out of caching negative results.
-    if (!(int(isSubTypeOptions) & int(IsSubTypeOptions::NoCaching)))
-    {
-        if (auto subDeclRefType = as<DeclRefType>(subType))
-        {
-            ensureDecl(subDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
-        }
-    }
-    if (auto superDeclRefType = as<DeclRefType>(superType))
-    {
-        ensureDecl(superDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
-    }
-
     SubtypeWitness* result = nullptr;
     if (getShared()->tryGetSubtypeWitnessFromCache(subType, superType, result))
         return result;
