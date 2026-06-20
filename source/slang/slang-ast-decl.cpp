@@ -35,8 +35,46 @@ InterfaceDecl* findParentInterfaceDecl(Decl* decl)
     return nullptr;
 }
 
+static bool _isGenericConstraintDecl(Decl* decl)
+{
+    return as<TypeConstraintDecl>(decl) || as<TypeCoercionConstraintDecl>(decl) ||
+           as<NonEmptyPackConstraintDecl>(decl) ||
+           as<GenericVariadicPackCountConstraintDecl>(decl) ||
+           as<HasDiffTypeInfoConstraintDecl>(decl);
+}
+
+bool isGenericConstraintParameterDecl(Decl* decl)
+{
+    if (!_isGenericConstraintDecl(decl))
+        return false;
+
+    if (auto parentGenericDecl = as<GenericDecl>(decl->parentDecl))
+    {
+        return parentGenericDecl->inner != decl;
+    }
+
+    if (auto parentCallableDecl = as<CallableDecl>(decl->parentDecl))
+    {
+        auto parentGenericDecl = as<GenericDecl>(parentCallableDecl->parentDecl);
+        return parentGenericDecl && parentGenericDecl->inner == parentCallableDecl;
+    }
+
+    return false;
+}
+
 bool isInterfaceRequirement(Decl* decl)
 {
+    // A generic signature constraint belongs to the generic requirement it
+    // parameterizes. For example `interface ITensor { load<each I>() where
+    // countof(I) == D; }` supplies the `countof` proof when `load` is
+    // specialized; it is not an independent witness-table requirement on every
+    // conforming type. Constraints whose generic `inner` is the constraint
+    // itself, such as the synthesized differentiability requirement
+    // `__generic<T> f<T> : IForwardDifferentiableFunc<f<T>>`, remain interface
+    // requirements.
+    if (isGenericConstraintParameterDecl(decl))
+        return false;
+
     auto ancestor = decl->parentDecl;
     for (; ancestor; ancestor = ancestor->parentDecl)
     {
@@ -50,27 +88,10 @@ bool isInterfaceRequirement(Decl* decl)
     return false;
 }
 
-bool isGenericConstraintParameterDecl(Decl* decl)
-{
-    auto parentGenericDecl = as<GenericDecl>(decl->parentDecl);
-    if (!parentGenericDecl || parentGenericDecl->inner == decl)
-        return false;
-
-    return as<TypeConstraintDecl>(decl) || as<TypeCoercionConstraintDecl>(decl) ||
-           as<NonEmptyPackConstraintDecl>(decl) ||
-           as<GenericVariadicPackCountConstraintDecl>(decl) ||
-           as<HasDiffTypeInfoConstraintDecl>(decl);
-}
-
 bool isGenericInterfaceRequirementSignatureConstraint(Decl* decl)
 {
-    if (!as<TypeConstraintDecl>(decl) && !as<TypeCoercionConstraintDecl>(decl) &&
-        !as<NonEmptyPackConstraintDecl>(decl) &&
-        !as<GenericVariadicPackCountConstraintDecl>(decl) &&
-        !as<HasDiffTypeInfoConstraintDecl>(decl))
-    {
+    if (!_isGenericConstraintDecl(decl))
         return false;
-    }
 
     auto parentGenericDecl = as<GenericDecl>(decl->parentDecl);
     if (!parentGenericDecl)
