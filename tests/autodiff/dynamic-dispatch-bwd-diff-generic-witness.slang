@@ -1,4 +1,6 @@
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly
 
 // Regression test for a type-flow specialization crash:
 //   "createSet called with non-global operands" (slang-ir.cpp).
@@ -37,7 +39,6 @@ struct Ortho<Real : IFloat> : ISensor<Real>, IDifferentiable
 //TEST_INPUT: type_conformance Perspective<float>:ISensor<float> = 0
 //TEST_INPUT: type_conformance Ortho<float>:ISensor<float> = 1
 
-// One ISensor<float> box: header RTTI[0 0] witness[0 0] (Perspective, seq 0), payload focal=3.0
 //TEST_INPUT: set sensors = ubuffer(data=[0 0 0 0 1077936128 0 0 0], stride=4)
 StructuredBuffer<ISensor<float>> sensors;
 

@@ -85,10 +85,6 @@ struct Triangle : IShape
 //TEST_INPUT: type_conformance ExtraImpl:IExtra = 1
 //TEST_INPUT: type_conformance ExtraImpl2:IExtra = 2
 
-// One existential box for `shapes[0]`:
-//   header: RTTI handle [0 0], witness handle [1 0]  (Square, seq id 1)
-//   payload (Square): side=3.0 (0x40400000=1077936128), a..g = 0   (8 words)
-//                     extra (IExtra box): header [0 0] [1 0], payload v=0,0,0,0  (8 words)
 //TEST_INPUT: set shapes = ubuffer(data=[0 0 1 0 1077936128 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0], stride=4)
 StructuredBuffer<IShape> shapes;
 
