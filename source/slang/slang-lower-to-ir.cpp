@@ -10561,8 +10561,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         // An interface-level constraint (declared via `__constraint` in an
         // interface body) is a direct member of the interface. It lowers as the
-        // key for that interface requirement, just like a constraint attached to
-        // an associated type or interface method.
+        // key for that interface requirement. Constraints written on an
+        // associated type are parsed into this sibling form too.
         if (as<InterfaceDecl>(decl->parentDecl))
         {
             return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
@@ -10573,41 +10573,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
             }
-        }
-
-        // This might be a type constraint on an associated type,
-        // in which case it should lower as the key for that
-        // interface requirement.
-        if (auto assocTypeDecl = as<AssocTypeDecl>(decl->parentDecl))
-        {
-            // TODO: might need extra steps if we ever allow
-            // generic associated types.
-
-
-            if (const auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->parentDecl);
-                interfaceDecl)
-            {
-                // Okay, this seems to be an interface rquirement, and
-                // we should lower it as such.
-                return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
-            }
-        }
-
-        // This might be a type constraint on an associated type,
-        // in which case it should lower as the key for that
-        // interface requirement.
-        if (auto funcDecl = as<FuncDecl>(decl->parentDecl))
-        {
-            // TODO: needs more work for generic functions.
-
-            if (const auto interfaceDecl = as<InterfaceDecl>(funcDecl->parentDecl); interfaceDecl)
-            {
-                // Okay, this seems to be an interface requirement, and
-                // we should lower it as such.
-                return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
-            }
-
-            SLANG_ASSERT("unexpected type constraint inside a function");
         }
 
         if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl);
@@ -11782,12 +11747,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         SLANG_ASSERT(decl->parentDecl != nullptr);
         ShortList<IRInterfaceType*> constraintInterfaces;
-        for (auto constraintDecl : decl->getMembersOfType<GenericTypeConstraintDecl>())
-        {
-            auto baseType = lowerType(context, constraintDecl->sup.type);
-            if (baseType && baseType->getOp() == kIROp_InterfaceType)
-                constraintInterfaces.add((IRInterfaceType*)baseType);
-        }
+        // Bounds on associated types are represented as sibling interface
+        // requirements, so the associated type itself carries no nested
+        // constraint interfaces.
         auto assocType =
             context->irBuilder->getAssociatedType(constraintInterfaces.getArrayView().arrayView);
         context->setValue(decl, assocType);
@@ -11877,14 +11839,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 continue;
 
             operandCount++;
-            // As a special case, any type constraints placed
-            // on an associated type will *also* need to be turned
-            // into requirement keys for this interface.
-            if (auto associatedTypeDecl = as<AssocTypeDecl>(innerRequirementDecl))
-            {
-                operandCount +=
-                    associatedTypeDecl->getMembersOfType<TypeConstraintDecl>().getCount();
-            }
         }
 
         // Allocate an IRInterfaceType with the `operandCount` operands.
@@ -11932,10 +11886,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // `associatedtype A where A : IBar`) is recorded in the unified
                 // representation as an interface-level requirement (a sibling of `A`). It is
                 // a *conformance* requirement: its witness is a witness table for the bound.
-                // We must lower it the same way the conformance was lowered when the bound was
-                // nested in the associated type (see the associated-type constraint loop
-                // below), i.e. with a `WitnessTableType` requirement value -- otherwise
-                // consumers (e.g. autodiff) that read the requirement get a malformed entry.
+                // We must lower it with a `WitnessTableType` requirement value, because
+                // consumers (e.g. autodiff) that read the requirement expect the witness-table
+                // entry for the associated type's bound.
                 // (Equality constraints, e.g. `__constraint A == B`, are handled by the
                 // generic path below.)
                 if (auto genericParent =
@@ -12013,38 +11966,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             irInterface->setOperand(entryIndex, entry);
             entryIndex++;
-            // Add addtional requirements for type constraints placed
-            // on an associated types.
-            if (auto associatedTypeDeclRef = requirementDeclRef.as<AssocTypeDecl>())
-            {
-                for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(
-                         subContext->astBuilder,
-                         associatedTypeDeclRef))
-                {
-                    auto constraintKey = getInterfaceRequirementKey(constraintDeclRef.getDecl());
-                    auto constraintInterfaceType =
-                        lowerType(subContext, getSup(subContext->astBuilder, constraintDeclRef));
-                    auto witnessTableType =
-                        getBuilder()->getWitnessTableType(constraintInterfaceType);
-
-                    auto constraintEntry = subBuilder->createInterfaceRequirementEntry(
-                        constraintKey,
-                        witnessTableType);
-                    irInterface->setOperand(entryIndex, constraintEntry);
-                    entryIndex++;
-
-                    context->setValue(
-                        constraintDeclRef.getDecl(),
-                        LoweredValInfo::simple(constraintEntry));
-                }
-            }
-            else
-            {
-                // Add lowered requirement entry to current decl mapping to prevent
-                // the function requirements from being lowered again when we get to
-                // `ensureAllDeclsRec`.
-                context->setValue(requirementDeclRef.getDecl(), LoweredValInfo::simple(entry));
-            }
+            // Add lowered requirement entry to current decl mapping to prevent
+            // the function requirements from being lowered again when we get to
+            // `ensureAllDeclsRec`.
+            context->setValue(requirementDeclRef.getDecl(), LoweredValInfo::simple(entry));
         };
         for (auto requirementDecl : decl->getDirectMemberDecls())
         {

@@ -898,49 +898,6 @@ breakLabel:;
     auto substSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
     auto substSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
 
-    // If we have a reference to a type constraint for an
-    // associated type declaration, then we can replace it
-    // with the concrete conformance witness for a concrete
-    // type implementing the outer interface.
-    //
-    // TODO: It is a bit gross that we use `GenericTypeConstraintDecl` for
-    // associated types, when they aren't really generic type *parameters*,
-    // so we'll need to change this location in the code if we ever clean
-    // up the hierarchy.
-    //
-    if (auto substTypeConstraintDecl = as<GenericTypeConstraintDecl>(getDeclRef().getDecl()))
-    {
-        if (auto substAssocTypeDecl = as<AssocTypeDecl>(substTypeConstraintDecl->parentDecl))
-        {
-            if (auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->parentDecl))
-            {
-                // At this point we have a constraint decl for an associated type,
-                // and we nee to see if we are dealing with a concrete substitution
-                // for the interface around that associated type.
-                if (auto thisTypeWitness = findThisTypeWitness(subst, interfaceDecl))
-                {
-                    // We need to look up the declaration that satisfies
-                    // the requirement named by the associated type.
-                    Decl* requirementKey = substTypeConstraintDecl;
-                    RequirementWitness requirementWitness =
-                        tryLookUpRequirementWitness(astBuilder, thisTypeWitness, requirementKey);
-                    switch (requirementWitness.getFlavor())
-                    {
-                    default:
-                        break;
-
-                    case RequirementWitness::Flavor::val:
-                        {
-                            auto satisfyingVal = requirementWitness.getVal();
-                            (*ioDiff)++;
-                            return satisfyingVal;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     auto substDeclRef = getDeclRef().substituteImpl(astBuilder, subst, &diff);
     auto rs = astBuilder->getDeclaredSubtypeWitness(substSub, substSup, substDeclRef);
 

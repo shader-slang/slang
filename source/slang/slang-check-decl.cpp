@@ -3724,12 +3724,6 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
         // No conformance needed for MinimalContext (unlike BwdCallable which needs IBwdCallable).
 
         witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(newSynStructDeclRef));
-
-        if (!doesTypeSatisfyConstraintRequirements(requirementDeclRef, witnessTable))
-        {
-            witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
-            return false;
-        }
         return true;
     }
     else if (requirementKind == BuiltinRequirementKind::BwdCallableContextType)
@@ -3778,14 +3772,6 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
         checkAggTypeConformance(synStructDecl);
 
         witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(newSynStructDeclRef));
-
-        if (!doesTypeSatisfyConstraintRequirements(requirementDeclRef, witnessTable))
-        {
-            // If the synthesized type does not satisfy the requirement, we will remove it from the
-            // witness table.
-            witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
-            return false;
-        }
         return true;
     }
     else
@@ -3847,20 +3833,10 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         witnessTable->add(
             requirementDeclRef.getDecl(),
             RequirementWitness(context->conformingType));
-        if (doesTypeSatisfyConstraintRequirements(requirementDeclRef, witnessTable))
-        {
-            // Increase the epoch so that future calls to Type::getCanonicalType will return the
-            // up-to-date folded types.
-            m_astBuilder->incrementEpoch();
-            return true;
-        }
-        else
-        {
-            witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
-        }
-
-        // Something went wrong.
-        return false;
+        // Increase the epoch so that future calls to Type::getCanonicalType will return the
+        // up-to-date folded types.
+        m_astBuilder->incrementEpoch();
+        return true;
     }
 
     if (!aggTypeDecl)
@@ -4034,14 +4010,6 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
     checkAggTypeConformance(aggTypeDecl);
 
     witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(satisfyingType));
-    if (!doesTypeSatisfyConstraintRequirements(requirementDeclRef, witnessTable))
-    {
-        // Note: the call to `doesTypeSatisfyConstraintRequirements` should always
-        // succeed. If not, there is something wrong with the code synthesis logic. For now we just
-        // return false instead of crashing so the user can work around the issues.
-        witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
-        return false;
-    }
     return true;
 }
 
@@ -4136,41 +4104,6 @@ bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
                 diagnose();
                 return false;
             }
-        }
-        else if (as<AssocTypeDecl>(decl->parentDecl))
-        {
-            // If the constraint is on an associated type, then it should either be the associated
-            // type itself, or a associated type of the associated type. For example,
-            // ```
-            // interface IFoo {
-            //    associatedtype T
-            //        where T : IFoo  // OK, constraint is on the associatedtype T itself.
-            //        where T.T == X  // OK, constraint is on the associated type of T.
-            //        where int == X; // Error, int is not a valid left hand side of a constraint.
-            //  }
-            // ```
-            auto lookupDeclRef = as<LookupDeclRef>(subDeclRef.declRefBase);
-            if (!lookupDeclRef)
-            {
-                diagnose();
-                return false;
-            }
-
-            // We allow `associatedtype T where This.T : ...`.
-            // In this case, the left hand side will be in the form of
-            // LookupDeclRef(ThisType, T). i.e. lookupDeclRef->getDecl() == T.
-            //
-            if (lookupDeclRef->getDecl()->parentDecl == decl->parentDecl ||
-                lookupDeclRef->getDecl() == decl->parentDecl)
-                return true;
-            auto baseType = as<Type>(lookupDeclRef->getLookupSource());
-            if (!baseType)
-            {
-                diagnose();
-                return false;
-            }
-            type.type = baseType;
-            return validateGenericConstraintSubType(decl, type, sink);
         }
     }
     if (!isProperConstraineeType(type.type))
@@ -7010,16 +6943,11 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
     DeclRef<ContainerDecl> requirementDeclRef,
     RefPtr<WitnessTable> witnessTable)
 {
-    // We will enumerate the type constraints placed on the
-    // associated type and see if they can be satisfied.
-    //
-    // In the unified representation a constraint on an associated type `A` is
-    // recorded as a requirement of the enclosing interface (a sibling of `A`),
-    // regardless of whether it was written `associatedtype A : IBar`,
-    // `associatedtype A where A : IBar`, or `__constraint A : IBar`. Those
-    // relocated interface-level constraints are validated by the main
-    // conformance loop (`findWitnessForInterfaceRequirement`); here we only
-    // enumerate any constraints nested directly under `requirementDeclRef`.
+    // Some requirements own generic constraints that must be satisfied after
+    // the primary witness has been installed in the witness table. Constraints
+    // written on an associated type are not handled here: the parser records
+    // them as sibling interface requirements, so the normal conformance loop
+    // checks them by key.
     //
     bool conformance = true;
     Val* witness = nullptr;
@@ -7100,33 +7028,14 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
             return false;
     }
 
-    // Register the satisfying type to the witness table
-    // before checking the constraints, since the subtype of
-    // the constraints maybe referencing the satisfying type via
-    // witness lookups.
+    // Register the satisfying type to the witness table. Any constraints
+    // written on this associated type are sibling interface requirements, and
+    // the normal conformance loop checks them by looking up this entry.
     auto requirementWitness = RequirementWitness(satisfyingType->getCanonicalType());
     witnessTable->m_requirementDictionary[requiredAssociatedTypeDeclRef.getDecl()] =
         requirementWitness;
 
-    // We need to confirm that the chosen type `satisfyingType`,
-    // meets all the constraints placed on the associated type
-    // requirement `requiredAssociatedTypeDeclRef`.
-    //
-    // We will enumerate the type constraints placed on the
-    // associated type and see if they can be satisfied.
-    //
-    bool conformance =
-        doesTypeSatisfyConstraintRequirements(requiredAssociatedTypeDeclRef, witnessTable);
-
-    // TODO: if any conformance check failed, we should probably include
-    // that in an error message produced about not satisfying the requirement.
-
-    if (!conformance)
-    {
-        witnessTable->m_requirementDictionary.remove(requiredAssociatedTypeDeclRef.getDecl());
-    }
-
-    return conformance;
+    return true;
 }
 
 bool SemanticsVisitor::doesMemberSatisfyRequirement(
@@ -11971,8 +11880,8 @@ bool SemanticsVisitor::checkConformance(
         if (auto assocTypeDeclRef = declRef.as<AssocTypeDecl>())
         {
             // An associated type declaration represents a requirement
-            // in an outer interface declaration, and its members
-            // (type constraints) represent additional requirements.
+            // in an outer interface declaration. Bounds on the associated
+            // type are represented as sibling interface requirements.
             return true;
         }
         else if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
