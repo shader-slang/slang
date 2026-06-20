@@ -10559,9 +10559,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
     {
-        if (isGenericInterfaceRequirementSignatureConstraint(decl))
-            return LoweredValInfo();
-
         // An interface-level constraint (declared via `__constraint` in an
         // interface body) is a direct member of the interface. It lowers as the
         // key for that interface requirement, just like a constraint attached to
@@ -10572,7 +10569,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         if (auto genericDecl = as<GenericDecl>(decl->parentDecl))
         {
-            if (as<InterfaceDecl>(genericDecl->parentDecl))
+            if (as<InterfaceDecl>(genericDecl->parentDecl) && genericDecl->inner == decl)
             {
                 return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
             }
@@ -10635,9 +10632,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl)
     {
-        if (isGenericInterfaceRequirementSignatureConstraint(decl))
-            return LoweredValInfo();
-
         if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             SLANG_UNUSED(globalGenericParamDecl);
@@ -10656,9 +10650,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl)
     {
-        if (isGenericInterfaceRequirementSignatureConstraint(decl))
-            return LoweredValInfo();
-
         if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             SLANG_UNUSED(globalGenericParamDecl);
@@ -10682,9 +10673,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             UNREACHABLE_RETURN(LoweredValInfo());
         }
 
-        if (isGenericInterfaceRequirementSignatureConstraint(decl))
-            return LoweredValInfo();
-
         if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl);
             globalGenericParamDecl)
         {
@@ -10694,7 +10682,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return LoweredValInfo::simple(inst);
         }
 
-        return LoweredValInfo();
+        SLANG_UNEXPECTED("generic variadic pack-count constraint during lowering");
+        UNREACHABLE_RETURN(LoweredValInfo());
     }
 
     LoweredValInfo visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
