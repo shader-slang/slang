@@ -18,6 +18,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         slang-glslang
         PRIVATE
             SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=$<BOOL:${SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN}>
+            SLANG_ENABLE_SPIRV_OPT_PRIVATE_TO_LOCAL=$<BOOL:${SLANG_ENABLE_SPIRV_OPT_PRIVATE_TO_LOCAL}>
     )
     # Our only interface is through what we define in source/slang-glslang, in the
     # interests of hygiene, hide anything else we link in.

@@ -226,6 +226,18 @@ advanced_option(
     ON
 )
 
+# SPIRV-Tools PrivateToLocalPass moves a `Private` variable used in a single function into that
+# function's per-call `Function` storage without checking the function runs at most once per
+# invocation, so it loses the state of function-`static` locals reached through non-inlined,
+# multiply-called helpers: https://github.com/shader-slang/slang/issues/11651
+# Default OFF disables the pass so the bug is fixed out of the box. Set ON to restore the previous
+# (smaller but unsound) SPIR-V output until SPIRV-Tools gains a single-activation check.
+advanced_option(
+    SLANG_ENABLE_SPIRV_OPT_PRIVATE_TO_LOCAL
+    "Register SPIRV-Tools PrivateToLocalPass in the slang-glslang optimizer pipeline; leave OFF to fix shader-slang/slang#11651 (function-static locals losing state on SPIR-V)"
+    OFF
+)
+
 option(
     SLANG_SPIRV_HEADERS_INCLUDE_DIR
     "Provide a specific path for the SPIR-V headers and grammar files"

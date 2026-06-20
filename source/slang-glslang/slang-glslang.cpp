@@ -29,6 +29,17 @@
 #define SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN 1
 #endif
 
+// CreatePrivateToLocalPass() moves a `Private` variable that is used within a single function into
+// that function's `Function` (per-call) storage, but it does not verify the function executes at
+// most once per invocation. That silently drops the cross-call persistence of a function-`static`
+// local reached through a non-inlined, multiply-called helper (e.g. via a variadic `expand`),
+// producing wrong results on SPIR-V (https://github.com/shader-slang/slang/issues/11651). Default
+// OFF so the reported bug is fixed out of the box; set ON to restore the previous (smaller but
+// unsound) SPIR-V output until SPIRV-Tools gains a single-activation check.
+#ifndef SLANG_ENABLE_SPIRV_OPT_PRIVATE_TO_LOCAL
+#define SLANG_ENABLE_SPIRV_OPT_PRIVATE_TO_LOCAL 0
+#endif
+
 static TBuiltInResource _calcBuiltinResources()
 {
     // NOTE! This is a bit of a hack - to set all the fields to true/UNLIMITED.
@@ -322,9 +333,10 @@ static int glslang_optimizeSPIRV(
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
 #endif
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-            // Do NOT re-enable: unsound for function-`static` locals in
-            // multiply-called, non-inlined helpers (shader-slang/slang#11651).
+#if SLANG_ENABLE_SPIRV_OPT_PRIVATE_TO_LOCAL
+            // Gated OFF by default (shader-slang/slang#11651).
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
+#endif
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
             optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
@@ -353,23 +365,11 @@ static int glslang_optimizeSPIRV(
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 3
 
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-            // NOTE: spvtools::CreatePrivateToLocalPass() is intentionally not run.
-            // It moves a `Private` variable used within a single function into
-            // that function's `Function` (per-call) storage, but does not verify
-            // the function executes at most once per invocation. That silently
-            // drops the cross-call persistence of function-`static` locals reached
-            // through non-inlined, multiply-called helpers (e.g. via a variadic
-            // `expand`), producing wrong results on SPIR-V. See
-            // shader-slang/slang#11651.
-            //
-            // Removing it does not regress the cases where it was sound: the
-            // remaining passes (scalar-replacement / CCP / local-access-chain-
-            // convert / load-store-elim / DCE) still promote single-function
-            // `Private` variables to registers. The cost is SPIR-V code size for
-            // variables that are genuinely single-call, and this also disables the
-            // pass on the `-emit-spirv-via-glsl` path (which shares this routine);
-            // both are accepted to keep `static` locals correct, since SPIR-V has
-            // no per-variable "do not localize" decoration to scope it narrower.
+#if SLANG_ENABLE_SPIRV_OPT_PRIVATE_TO_LOCAL
+            // Gated by SLANG_ENABLE_SPIRV_OPT_PRIVATE_TO_LOCAL (OFF by default); see the rationale
+            // near the top of this file and shader-slang/slang#11651.
+            optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
+#endif
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
 
             optimizer.RegisterPass(spvtools::CreateCCPPass());            // 4 *
@@ -422,9 +422,10 @@ static int glslang_optimizeSPIRV(
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
 #endif
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 9
-            // Do NOT re-enable: unsound for function-`static` locals in
-            // multiply-called, non-inlined helpers (shader-slang/slang#11651).
+#if SLANG_ENABLE_SPIRV_OPT_PRIVATE_TO_LOCAL
+            // Gated OFF by default (shader-slang/slang#11651).
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
+#endif
             // optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(0));   // 12
             // optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());
             optimizer.RegisterPass(spvtools::CreateCCPPass());
@@ -475,8 +476,11 @@ static int glslang_optimizeSPIRV(
 #endif
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass());
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-            // private-to-local intentionally omitted — see the note in the
-            // default-optimization block above (shader-slang/slang#11651).
+#if SLANG_ENABLE_SPIRV_OPT_PRIVATE_TO_LOCAL
+            // Gated OFF by default; unsound for multiply-called, non-inlined helpers
+            // (shader-slang/slang#11651). See SLANG_ENABLE_SPIRV_OPT_PRIVATE_TO_LOCAL above.
+            optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
+#endif
             optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
             optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
