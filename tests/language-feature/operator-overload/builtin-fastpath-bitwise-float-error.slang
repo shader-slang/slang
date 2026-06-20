@@ -1,15 +1,9 @@
 // Regression test for https://github.com/shader-slang/slang/issues/11648
 //
-// A bitwise/shift operator (`& | ^ << >>`) applied to a floating-point operand has no valid
-// integer interpretation. Before the fix, the builtin-operator fast path
-// (`convertToBuiltinArithmeticOp`) declined these operands *silently* (`return nullptr`), so
-// they fell through to normal overload resolution where `float` converted to every integer
-// `operator|` overload at equal conversion cost, producing a confusing
-// `error[E39999]: ambiguous call to '|' ...` (#11648, regression of #11493). The fast path now
-// emits a dedicated, actionable error for genuine builtin float/double operands instead.
-//
-// Front-end (semantic) error, target-independent; `non-exhaustive` so cascading errors from the
-// error-typed results are ignored.
+// A bitwise/shift operator (`& | ^ << >>`) on a floating-point operand has no integer
+// interpretation. The builtin-operator fast path now emits a dedicated error instead of letting it
+// fall through to a confusing `ambiguous call`/`no overload` (#11648, regression of #11493).
+// Front-end error, target-independent; `non-exhaustive` ignores the cascading errors.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 void test(
@@ -43,23 +37,17 @@ void test(
     //CHECK: requires integer operands
     float2x2 r8 = m0 | m1; // component-wise float matrix
     //CHECK: requires integer operands
-    // Mixed-type shifts skip common-type promotion, but a float operand on either side is still
-    // rejected here rather than falling through to a confusing "no overload" error (#11648).
+    // Mixed-type shifts skip common-type promotion but are still rejected (#11648).
     float r9 = a << i; // float << int
     //CHECK: requires integer operands
     int r10 = i << a; // int << float
     //CHECK: requires integer operands
-    // Unary `~` on a float operand is rejected by the same diagnostic, instead of a confusing
-    // "no overload for 'operator~'".
-    float r11 = ~a;
+    float r11 = ~a; // unary `~` rejected by the same diagnostic
     //CHECK: requires integer operands
-    // The result/assignment-target type is irrelevant: the diagnostic keys off the *operand*
-    // element type, so a float bitwise op fails even when assigned to an `int`.
-    int r12 = a | b;
+    int r12 = a | b; // result/target type is irrelevant; the operand element type drives it
     //CHECK: requires integer operands
 
-    // The original confusing symptoms must be gone: no ambiguous-overload error for `|`/`&`/`^`
-    // and no "no overload" error for the mixed-type float shifts.
+    // The original confusing symptoms must be gone.
     //CHECK-NOT: ambiguous
     //CHECK-NOT: no overload
 }

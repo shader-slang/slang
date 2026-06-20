@@ -4473,33 +4473,25 @@ static bool _getBuiltinCompositeTypeShape(
     return true;
 }
 
-// Return true when both operands of a bitwise/shift operator are builtin scalar/vector/matrix
-// types and at least one has a floating-point element type (`half`/`float`/`double`), and set
-// `outFloatOperandType` to a floating-point operand's type. Such an operation has no valid integer
-// interpretation and is rejected with a dedicated diagnostic. Returns false (leaving the operands
-// to normal overload resolution) when EITHER operand is non-builtin -- so a user-defined
-// `operator OP` with a builtin/user-type mix (e.g. `operator|(float, MyType)`) and generic-context
-// resolution are unaffected -- and when both operands are builtin but neither is floating-point
-// (e.g. `int << uint`, `bool | bool`).
-static bool _isBuiltinFloatingPointBitwiseOperands(
-    Type* left,
-    Type* right,
-    Type*& outFloatOperandType)
+// When both bitwise/shift operands are builtin scalar/vector/matrix types and at least one has a
+// floating-point element type, return that floating-point operand's type (such an operation has no
+// integer interpretation and is rejected with a dedicated diagnostic). Returns null when either
+// operand is non-builtin -- so user-defined `operator OP` (e.g. `operator|(float, MyType)`) and
+// generics fall through to overload resolution -- or when neither is floating-point (`int << uint`,
+// `bool | bool`).
+static Type* _isBuiltinFloatingPointBitwiseOperands(Type* left, Type* right)
 {
     BaseType leftBase, rightBase;
     IntVal *leftRows, *leftCols, *rightRows, *rightCols;
     if (!_getBuiltinCompositeTypeShape(left, leftBase, leftRows, leftCols))
-        return false;
+        return nullptr;
     if (!_getBuiltinCompositeTypeShape(right, rightBase, rightRows, rightCols))
-        return false;
-    bool leftFloat =
-        (BaseTypeInfo::getInfo(leftBase).flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
-    bool rightFloat =
-        (BaseTypeInfo::getInfo(rightBase).flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
-    if (!leftFloat && !rightFloat)
-        return false;
-    outFloatOperandType = leftFloat ? left : right;
-    return true;
+        return nullptr;
+    if ((BaseTypeInfo::getInfo(leftBase).flags & BaseTypeInfo::Flag::FloatingPoint) != 0)
+        return left;
+    if ((BaseTypeInfo::getInfo(rightBase).flags & BaseTypeInfo::Flag::FloatingPoint) != 0)
+        return right;
+    return nullptr;
 }
 
 // Compute the common element base type for `a OP b`, following the "usual arithmetic
@@ -4647,11 +4639,8 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         if (!uEligible)
         {
             // `~` on a builtin floating-point operand has no integer interpretation; diagnose it
-            // with the same dedicated error as the binary bitwise/shift operators (issue #11648)
-            // instead of letting it fall through to a confusing `no overload for 'operator~'`.
-            // `uBasic` is non-null here (non-builtin operands already returned above), so `uFloat`
-            // means a genuine builtin half/float/double operand; user-defined `operator~` and
-            // generic operands are unaffected.
+            // with the same error as the binary case (issue #11648) instead of a confusing "no
+            // overload for 'operator~'". Non-builtin operands already returned above.
             if (isBitNot && uFloat)
             {
                 getSink()->diagnose(Diagnostics::BitwiseOperatorRequiresIntegerOperands{
@@ -4729,29 +4718,22 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
             return nullptr;
     }
 
-    // A bitwise or shift operator (`& | ^ << >>`) on two builtin operands where at least one is
-    // floating-point has no valid integer interpretation. Reject it here with a dedicated
-    // diagnostic, before the shift/common-type machinery below, so every floating-point case gets
-    // the same actionable error: same-type (`float | float`, `float << float`), mixed via the usual
-    // arithmetic conversions (`float | int`), vector (`float3 | float3`), and -- crucially --
-    // mixed-type shifts (`float << int`, `int << float`) which would otherwise hit the mixed-shift
-    // early return below and fall through to a confusing "ambiguous call"/"no overload" error (the
-    // regression in issue #11648). The predicate requires BOTH operands to be builtin: if either is
-    // non-builtin (user-defined or generic), it returns false and the operands fall through to
-    // normal overload resolution, so a user-defined `operator OP` with a builtin/user-type mix
-    // (e.g. `operator|(float, MyType)`) and generic-context resolution are unaffected. `bool` is
-    // not floating-point, so `bool` bitwise also falls through (to the `ILogical` overloads via the
-    // eligibility check below).
-    if (Type * floatOperandType; isBitwise && _isBuiltinFloatingPointBitwiseOperands(
-                                                  leftArg->type.type,
-                                                  rightArg->type.type,
-                                                  floatOperandType))
+    // A bitwise/shift operator with a builtin floating-point operand has no integer interpretation.
+    // Reject it here -- before the mixed-shift early return and common-type coercion below -- so
+    // mixed-type shifts (`float << int`, `int << float`), which skip common-type promotion, are
+    // caught too rather than falling through to a confusing "ambiguous"/"no overload" error
+    // (issue #11648). The both-builtin predicate leaves user `operator OP` and generics untouched.
+    if (isBitwise)
     {
-        getSink()->diagnose(Diagnostics::BitwiseOperatorRequiresIntegerOperands{
-            .name = varExpr->name,
-            .type = floatOperandType,
-            .expr = expr});
-        return CreateErrorExpr(expr);
+        if (Type* floatOperandType =
+                _isBuiltinFloatingPointBitwiseOperands(leftArg->type.type, rightArg->type.type))
+        {
+            getSink()->diagnose(Diagnostics::BitwiseOperatorRequiresIntegerOperands{
+                .name = varExpr->name,
+                .type = floatOperandType,
+                .expr = expr});
+            return CreateErrorExpr(expr);
+        }
     }
 
     // Shift operators do not promote to a common type: `a << b` keeps the type of `a` (the
