@@ -10676,7 +10676,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         GenericVariadicPackCountConstraintDecl* decl)
     {
         if (isInterfaceRequirement(decl))
-            return LoweredValInfo();
+        {
+            SLANG_UNEXPECTED("generic variadic pack-count constraint cannot be an interface "
+                             "requirement");
+            UNREACHABLE_RETURN(LoweredValInfo());
+        }
 
         if (isGenericInterfaceRequirementSignatureConstraint(decl))
             return LoweredValInfo();
