@@ -11850,6 +11850,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Emit any generics that should wrap the actual type.
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
+        auto checkNoNestedCallableTypeConstraints = [](CallableDecl* callableDecl)
+        {
+            if (!callableDecl)
+                return;
+
+            if (callableDecl->getDirectMemberDeclsOfType<TypeConstraintDecl>().getCount() != 0)
+            {
+                SLANG_UNEXPECTED(
+                    "interface callable requirements cannot contain nested type constraints");
+            }
+        };
+
         // First, compute the number of requirement entries that will be included in this
         // interface type.
         UInt operandCount = 0;
@@ -11870,9 +11882,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     if (auto accessorDecl = as<AccessorDecl>(member))
                     {
                         operandCount++;
-                        operandCount +=
-                            accessorDecl->getDirectMemberDeclsOfType<TypeConstraintDecl>()
-                                .getCount();
+                        checkNoNestedCallableTypeConstraints(accessorDecl);
                     }
                 }
             }
@@ -11896,11 +11906,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             if (callableDecl)
             {
-                for (auto constraintDecl : callableDecl->getMembersOfType<TypeConstraintDecl>())
-                {
-                    if (!isGenericInterfaceRequirementSignatureConstraint(constraintDecl))
-                        operandCount++;
-                }
+                checkNoNestedCallableTypeConstraints(callableDecl);
             }
         }
 
@@ -12057,42 +12063,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else
             {
-                CallableDecl* callableDecl = nullptr;
-                if (auto genDecl = as<GenericDecl>(requirementDeclRef.getDecl()))
-                    callableDecl = as<CallableDecl>(genDecl->inner);
-                else
-                    callableDecl = as<CallableDecl>(requirementDeclRef.getDecl());
-
-                if (callableDecl)
-                {
-                    for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(
-                             subContext->astBuilder,
-                             createDefaultSpecializedDeclRef(subContext, nullptr, callableDecl)))
-                    {
-                        if (isGenericInterfaceRequirementSignatureConstraint(
-                                constraintDeclRef.getDecl()))
-                            continue;
-
-                        auto constraintKey =
-                            getInterfaceRequirementKey(constraintDeclRef.getDecl());
-                        auto constraintInterfaceType = lowerType(
-                            subContext,
-                            getSup(subContext->astBuilder, constraintDeclRef));
-                        auto witnessTableType =
-                            getBuilder()->getWitnessTableType(constraintInterfaceType);
-
-                        auto constraintEntry = subBuilder->createInterfaceRequirementEntry(
-                            constraintKey,
-                            witnessTableType);
-                        irInterface->setOperand(entryIndex, constraintEntry);
-                        entryIndex++;
-
-                        context->setValue(
-                            constraintDeclRef.getDecl(),
-                            LoweredValInfo::simple(constraintEntry));
-                    }
-                }
-
                 // Add lowered requirement entry to current decl mapping to prevent
                 // the function requirements from being lowered again when we get to
                 // `ensureAllDeclsRec`.
