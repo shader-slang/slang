@@ -160,6 +160,37 @@ struct OptionalTypeLoweringContext
         }
     }
 
+    // Recover the concrete `Optional<T>` a payload-less `OptionalNoneType` `none` is a value for.
+    // The `none` is a branch argument into a merge block; the matching phi parameter there carries
+    // the declared `Optional<T>` we need to lower it.
+    static IRType* findTargetOptionalType(IRInst* noneInst)
+    {
+        for (auto use = noneInst->firstUse; use; use = use->nextUse)
+        {
+            auto branch = as<IRUnconditionalBranch>(use->getUser());
+            if (!branch)
+                continue;
+            UInt argIndex = 0;
+            for (; argIndex < branch->getArgCount(); argIndex++)
+                if (branch->getArg(argIndex) == noneInst)
+                    break;
+            if (argIndex == branch->getArgCount())
+                continue;
+            UInt paramIndex = 0;
+            for (auto param : branch->getTargetBlock()->getParams())
+            {
+                if (paramIndex == argIndex)
+                {
+                    if (as<IROptionalType>(param->getDataType()))
+                        return param->getDataType();
+                    break;
+                }
+                paramIndex++;
+            }
+        }
+        return nullptr;
+    }
+
     void processMakeOptionalNone(IRMakeOptionalNone* inst)
     {
         IRBuilder builderStorage(module);
@@ -167,6 +198,16 @@ struct OptionalTypeLoweringContext
         builder->setInsertBefore(inst);
 
         auto info = getLoweredOptionalType(builder, inst->getDataType());
+        if (!info)
+        {
+            // A non-concrete `none` typed `OptionalNoneType` (see `analyzeMakeOptionalNone`) has
+            // no payload type of its own; recover the concrete `Optional<T>` from the merge point
+            // it feeds and lower it as a `none` of that type. A dead `none` branch is eliminated
+            // later, but a live one must lower to a real value rather than survive to code emit.
+            auto targetOptionalType = findTargetOptionalType(inst);
+            SLANG_ASSERT(targetOptionalType);
+            info = getLoweredOptionalType(builder, targetOptionalType);
+        }
         if (info->loweredType != info->valueType)
         {
             // Synthesize a default-constructed placeholder for the payload.
