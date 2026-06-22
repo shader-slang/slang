@@ -1656,6 +1656,18 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     return true;
 }
 
+static GenericDecl* getGenericInterfaceRequirementDeclForConstraint(
+    GenericTypeConstraintDecl* constraintDecl)
+{
+    if (auto parentGenericDecl = as<GenericDecl>(constraintDecl->parentDecl))
+    {
+        if (parentGenericDecl->inner == constraintDecl)
+            return parentGenericDecl;
+    }
+
+    return nullptr;
+}
+
 IRInst* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
 {
     // Only specific types of decls are treated as requirements, e.g. methods and asssociated types.
@@ -10837,10 +10849,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             IRInst* irSatisfyingVal = nullptr;
             auto requiredConstraintDecl = as<GenericTypeConstraintDecl>(requiredMemberDecl);
-            auto genericRequirementDecl = requiredConstraintDecl
-                                              ? as<GenericDecl>(requiredConstraintDecl->parentDecl)
-                                              : nullptr;
-            if (genericRequirementDecl && genericRequirementDecl->inner == requiredMemberDecl)
+            auto genericRequirementDecl =
+                requiredConstraintDecl
+                    ? getGenericInterfaceRequirementDeclForConstraint(requiredConstraintDecl)
+                    : nullptr;
+            if (genericRequirementDecl)
             {
                 // A generic interface requirement key lowers to an IR generic, so its satisfying
                 // witness has to be lowered under the requirement-local generic parameters. For
@@ -11829,10 +11842,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 for (auto member : as<ContainerDecl>(innerRequirementDecl)
                                        ->getDirectMemberDeclsOfType<AccessorDecl>())
                 {
-                    if (auto accessorDecl = as<AccessorDecl>(member))
-                    {
-                        operandCount++;
-                    }
+                    SLANG_UNUSED(member);
+                    operandCount++;
                 }
             }
             if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
@@ -11891,8 +11902,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // entry for the associated type's bound.
                 // (Equality constraints, e.g. `__constraint A == B`, are handled by the
                 // generic path below.)
-                if (auto genericParent =
-                        as<GenericDecl>(relocatedSubtypeConstraint.getDecl()->parentDecl))
+                if (auto genericParent = getGenericInterfaceRequirementDeclForConstraint(
+                        relocatedSubtypeConstraint.getDecl()))
                 {
                     // `[Differentiable]` on a generic interface requirement is represented as a
                     // sibling `generic { constraint }` requirement. Its `sup` type mentions the

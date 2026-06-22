@@ -2469,7 +2469,10 @@ public:
         MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
     /// Clone generic containers.
-    DeclRef<Decl> liftDeclFromGenericContainers(Decl* decl, SubstitutionSet& outSubst);
+    DeclRef<Decl> liftDeclFromGenericContainers(
+        Decl* decl,
+        SubstitutionSet& outSubst,
+        ContainerDecl* destinationParentDecl = nullptr);
 
     enum SynthesisPattern
     {

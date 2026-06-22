@@ -715,6 +715,28 @@ DeclRefBase* DeclRefBase::getParent()
     auto astBuilder = getCurrentASTBuilder();
     if (!getDecl()->parentDecl)
         return nullptr;
+
+    if (auto genericAppDeclRef = as<GenericAppDeclRef>(this))
+    {
+        auto parentDecl = getDecl()->parentDecl;
+        auto genericDeclRef = genericAppDeclRef->getGenericDeclRef();
+        auto genericDecl = genericDeclRef->getDecl();
+
+        if (parentDecl != genericDecl && parentDecl->isChildOf(genericDecl))
+        {
+            // A generic application can name a nested declaration under the generic's inner
+            // declaration, not only the inner declaration itself. Preserve the same specialization
+            // when asking for such a decl-ref's parent. For example,
+            // `GenericAppDeclRef(generic operator[], GetterDecl, I)` has the specialized
+            // subscript as its parent; dropping the generic app here makes accessor parameter
+            // collection see the source `I` rather than the substituted `I`.
+            return astBuilder->getGenericAppDeclRef(
+                genericDeclRef,
+                genericAppDeclRef->getArgs(),
+                parentDecl);
+        }
+    }
+
     auto parentDecl = getDecl()->parentDecl;
     for (auto base = getBase(); base; base = base->getBase())
     {

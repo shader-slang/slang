@@ -1,4 +1,5 @@
 // slang-check-decl.cpp
+#include "slang-ast-copy.h"
 #include "slang-ast-modifier.h"
 #include "slang-ast-support-types.h"
 #include "slang-check-impl.h"
@@ -4037,6 +4038,13 @@ static bool isKnownBuiltinDecl(Decl* decl, KnownBuiltinDeclName name)
 
 static bool isDifferentiabilityRequirementConstraint(GenericTypeConstraintDecl* decl, Type* subType)
 {
+    if (auto differentiableRequirementDecl = as<DifferentiableRequirementConstraintDecl>(decl))
+    {
+        auto subDeclRefType = as<DeclRefType>(subType);
+        return subDeclRefType && subDeclRefType->getDeclRef().equals(
+                                     differentiableRequirementDecl->callableRequirementDeclRef);
+    }
+
     if (!isInterfaceRequirement(decl))
         return false;
 
@@ -7191,375 +7199,149 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
     return false;
 }
 
-static Expr* _createSyntheticGenericParamExpr(ASTBuilder* astBuilder, Decl* synParamDecl);
+// Returns `sourceGenericDecl` applied to the copied generic's default arguments.
+//
+// For example, after copying `generic<T>` to `generic<T2>`, this returns a decl-ref for the
+// source generic specialized as `generic<T2>`. The caller uses that substitution to rewrite
+// references from the original generic environment into the standalone copied environment.
+static DeclRef<Decl> getSourceDeclRefWithCopiedGenericArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* semantics,
+    GenericDecl* sourceGenericDecl,
+    GenericDecl* copiedGenericDecl)
+{
+    auto defaultArgs = getDefaultSubstitutionArgs(astBuilder, semantics, copiedGenericDecl);
+    return astBuilder->getGenericAppDeclRef(sourceGenericDecl, defaultArgs.getArrayView());
+}
 
-// TODO: Merge this with the similar logic in `synthesizeGenericSignatureForRequirementWitness`
+// Invalidates cached default-substitution arguments for `genericDecl`.
+//
+// Call this after adding copied constraints because later default arguments may include newly
+// copied proof-bearing constraint members.
+static void invalidateDefaultSubstitutionArgs(ASTBuilder* astBuilder, GenericDecl* genericDecl)
+{
+    astBuilder->m_cachedGenericDefaultArgs.remove(genericDecl);
+    genericDecl->_cachedArgsForDefaultSubstitution.clear();
+}
+
 DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
     Decl* decl,
-    SubstitutionSet& outSubstitutions)
+    SubstitutionSet& outSubstitutions,
+    ContainerDecl* destinationParentDecl)
 {
-    List<GenericDecl*> declsToClone;
-    List<GenericDecl*> newGenericDecls;
+    List<GenericDecl*> sourceGenericDecls;
+    List<GenericDecl*> copiedGenericDecls;
 
-    for (auto cur = decl->parentDecl; cur; cur = cur->parentDecl)
+    auto destinationParent = destinationParentDecl ? destinationParentDecl : getModuleDecl(decl);
+    for (auto cur = decl->parentDecl; cur && cur != destinationParent; cur = cur->parentDecl)
     {
         if (auto genericDecl = as<GenericDecl>(cur))
         {
-            declsToClone.add(genericDecl);
+            sourceGenericDecls.add(genericDecl);
         }
     }
 
-    ContainerDecl* parentDecl = getModuleDecl(decl);
+    ContainerDecl* parentDecl = destinationParent;
     Scope* parentScope = getScope(parentDecl);
 
     auto currentDeclRef = decl->getDefaultDeclRef();
     currentDeclRef =
         createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), this, currentDeclRef);
 
-    declsToClone.reverse();
-    Dictionary<Decl*, Decl*> mapOrigToSynParams;
-    Dictionary<Decl*, Decl*> mapSynToOrigTypeParams;
-    for (auto genericDecl : declsToClone)
+    // Move a synthesized declaration out of a nested generic context by giving it its own copied
+    // generic context.
+    //
+    // For example, given:
+    //
+    //     generic<T>
+    //     func f()
+    //     {
+    //         struct Syn { T value; }
+    //     }
+    //
+    // a plain move to module scope would be invalid:
+    //
+    //     struct Syn { T value; } // `T` is dangling.
+    //
+    // Instead, this operation creates a fresh generic context:
+    //
+    //     generic<T2>
+    //     struct Syn { T2 value; }
+    //
+    // The copied generic parameters and constraints form the standalone generic environment for
+    // `Syn`, and references inside `Syn` are rewritten from the original generic binders/proofs to
+    // the copied ones. Constraints are copied as part of that environment, including proof-bearing
+    // constraints such as `where countof(T) == N`, so default substitution arguments and witness
+    // references keep the same logical shape.
+    sourceGenericDecls.reverse();
+    ASTCopyContext outerCopyContext;
+    outerCopyContext.astBuilder = m_astBuilder;
+    outerCopyContext.semantics = this;
+
+    for (auto sourceGenericDecl : sourceGenericDecls)
     {
         auto synGenericDecl = m_astBuilder->create<GenericDecl>();
         synGenericDecl->parentDecl = parentDecl;
+        synGenericDecl->loc = decl->loc;
         synGenericDecl->ownedScope = m_astBuilder->create<Scope>();
         synGenericDecl->ownedScope->containerDecl = synGenericDecl;
         synGenericDecl->ownedScope->parent = parentScope;
-        newGenericDecls.add(synGenericDecl);
+        copiedGenericDecls.add(synGenericDecl);
 
-        // Our synthesized method will have parameters matching the names
-        // and types of those on the requirement, and it will use expressions
-        // that reference those parametesr as arguments for the call expresison
-        // that makes up the body.
-        //
-        for (auto member : genericDecl->getDirectMemberDecls())
-        {
-            if (auto typeParamDeclBase = as<GenericTypeParamDeclBase>(member))
-            {
-                auto synTypeParamDeclBase =
-                    (GenericTypeParamDeclBase*)m_astBuilder->createByNodeType(
-                        typeParamDeclBase->astNodeType);
-                synTypeParamDeclBase->nameAndLoc = typeParamDeclBase->getNameAndLoc();
-                synTypeParamDeclBase->parameterIndex = typeParamDeclBase->parameterIndex;
-                synTypeParamDeclBase->parentDecl = synGenericDecl;
+        if (auto genericParentDecl = as<GenericDecl>(parentDecl))
+            genericParentDecl->inner = synGenericDecl;
 
-                // Note: we intentionally do not copy GenericTypeParamDecl::initType here,
-                // because initType maybe dependent on the original type parameters,
-                // and if we copy we must also substitute all the original type parameters with the
-                // synthesized ones. It shouldn't be required for the implementing declaration to
-                // define initType anyways, so we'll just save ourselves from the trouble.
-                //
-                synGenericDecl->addDirectMemberDecl(synTypeParamDeclBase);
+        GenericSignatureCopier copier(m_astBuilder, this, sourceGenericDecl, synGenericDecl);
+        for (auto const& kv : outerCopyContext.oldToNewDecls)
+            copier.getASTCopier().mapDecl(kv.first, kv.second);
+        copier.copyParameterMembers();
 
-                mapOrigToSynParams.add(typeParamDeclBase, synTypeParamDeclBase);
-                mapSynToOrigTypeParams.add(synTypeParamDeclBase, typeParamDeclBase);
-
-                // Construct a DeclRefExpr from the type parameter.
-                auto synTypeParamDeclRef = makeDeclRef(synTypeParamDeclBase);
-
-                auto synTypeParamDeclRefExpr = m_astBuilder->create<VarExpr>();
-                synTypeParamDeclRefExpr->declRef = synTypeParamDeclRef;
-                synTypeParamDeclRefExpr->type =
-                    getTypeForDeclRef(m_astBuilder, synTypeParamDeclRef, SourceLoc());
-            }
-            else if (auto valParamDecl = as<GenericValueParamDecl>(member))
-            {
-                auto synValParamDecl = m_astBuilder->create<GenericValueParamDecl>();
-                synValParamDecl->nameAndLoc = valParamDecl->nameAndLoc;
-                synValParamDecl->parentDecl = synGenericDecl;
-                synValParamDecl->parameterIndex = valParamDecl->parameterIndex;
-                synValParamDecl->type = valParamDecl->type;
-
-                synGenericDecl->addDirectMemberDecl(synValParamDecl);
-
-                mapOrigToSynParams.add(valParamDecl, synValParamDecl);
-                mapSynToOrigTypeParams.add(synValParamDecl, valParamDecl);
-
-                // Construct a DeclRefExpr from the value parameter.
-                auto synValParamDeclRef = makeDeclRef(synValParamDecl);
-
-                auto synValParamDeclRefExpr = m_astBuilder->create<VarExpr>();
-                synValParamDeclRefExpr->declRef = synValParamDeclRef;
-                synValParamDeclRefExpr->type = synValParamDecl->type.type;
-            }
-            else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(member))
-            {
-                auto synValPackParamDecl = m_astBuilder->create<GenericValuePackParamDecl>();
-                synValPackParamDecl->nameAndLoc = valPackParamDecl->nameAndLoc;
-                synValPackParamDecl->parentDecl = synGenericDecl;
-                synValPackParamDecl->parameterIndex = valPackParamDecl->parameterIndex;
-                synValPackParamDecl->type = valPackParamDecl->type;
-
-                synGenericDecl->addDirectMemberDecl(synValPackParamDecl);
-
-                mapOrigToSynParams.add(valPackParamDecl, synValPackParamDecl);
-                mapSynToOrigTypeParams.add(synValPackParamDecl, valPackParamDecl);
-
-                // Construct a DeclRefExpr from the value pack parameter.
-                auto synValPackParamDeclRef = makeDeclRef(synValPackParamDecl);
-
-                auto synValPackParamDeclRefExpr = m_astBuilder->create<VarExpr>();
-                synValPackParamDeclRefExpr->declRef = synValPackParamDeclRef;
-                synValPackParamDeclRefExpr->type = synValPackParamDecl->type.type;
-            }
-        }
-
-        // With all generic parameters in place, we can now form a partial substitution argument
-        // list without taking into account all the generic constraints.
-
-        // Given `requiredMemberDeclRef` that is `Lookup(ConcreteType:IFoo<int>, IFoo::bar)`, we can
-        // now form a partial specialized declref to `IFoo<int>::bar` with substitution args comming
-        // from the synthesized generic decl, i.e. we want to form:
-        // `Lookup(ConcreteType:IFoo<int>, IFoo::bar)<UImpl>` where `UImpl` is a synthesized generic
-        // parameter.
-        //
-        auto partialDefaultArgs = getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
-        DeclRef<Decl> partiallySpecializedRequiredGenericDeclRef =
-            m_astBuilder->getGenericAppDeclRef(genericDecl, partialDefaultArgs.getArrayView());
+        auto partiallySpecializedSourceDeclRef = getSourceDeclRefWithCopiedGenericArgs(
+            m_astBuilder,
+            this,
+            sourceGenericDecl,
+            synGenericDecl);
 
         // Refine our current specialized decl-ref from src generic heirarchy to the new generic
         // heirarchy.
         //
         currentDeclRef = as<DeclRefBase>(currentDeclRef->substitute(
             getCurrentASTBuilder(),
-            SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+            SubstitutionSet(partiallySpecializedSourceDeclRef)));
 
-        if (auto genericParentDecl = as<GenericDecl>(parentDecl))
-            genericParentDecl->inner = synGenericDecl;
-
-        // With `partiallySpecializedRequiredGenericDeclRef`, we can obtain the right specialized
-        // types from the original requirement decl. For example, we can simply apply declref
-        // substituion on the original type constraint `U:IDerived` to get `UImpl : IDerived`.
-        //
-        for (auto member : genericDecl->getDirectMemberDecls())
+        for (auto member : sourceGenericDecl->getDirectMemberDecls())
         {
-            if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
-            {
-                auto synConstraintDecl = m_astBuilder->create<GenericTypeConstraintDecl>();
-                synConstraintDecl->nameAndLoc = constraintDecl->getNameAndLoc();
-                synConstraintDecl->parentDecl = synGenericDecl;
-                synConstraintDecl->isEqualityConstraint = constraintDecl->isEqualityConstraint;
-                if (constraintDecl->findModifier<OptionalConstraintModifier>())
-                {
-                    addModifier(
-                        synConstraintDecl,
-                        m_astBuilder->create<OptionalConstraintModifier>());
-                }
+            if (!copier.copyConstraintMember(member))
+                continue;
 
-                // For generic constraint Sub : Sup, we need to substitute them with
-                // synthesized generic parameters.
-                //
-                synConstraintDecl->sub = TypeExp((Type*)constraintDecl->sub.type->substitute(
+            // Future constraints in the same generic can depend on proof-bearing members that were
+            // just copied, so refresh default substitution arguments after each copied constraint.
+            invalidateDefaultSubstitutionArgs(m_astBuilder, synGenericDecl);
+            auto partiallySpecializedSourceDeclRefAfterConstraint =
+                getSourceDeclRefWithCopiedGenericArgs(
                     m_astBuilder,
-                    SubstitutionSet(currentDeclRef)));
-                synConstraintDecl->sup = TypeExp((Type*)constraintDecl->sup.type->substitute(
-                    m_astBuilder,
-                    SubstitutionSet(currentDeclRef)));
-                synGenericDecl->addDirectMemberDecl(synConstraintDecl);
-                // mapOrigToSynTypeParams.add(constraintDecl, synConstraintDecl);
-                mapSynToOrigTypeParams.add(synConstraintDecl, constraintDecl);
-
-
-                // Update out decl-ref after adding each constraint, since future constraints even
-                // within the same generic decl may depend on previous ones.
-                //
-                m_astBuilder->m_cachedGenericDefaultArgs.remove(synGenericDecl);
-                synGenericDecl->_cachedArgsForDefaultSubstitution.clear();
-                auto _partialDefaultArgs =
-                    getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
-                DeclRef<Decl> _partiallySpecializedRequiredGenericDeclRef =
-                    m_astBuilder->getGenericAppDeclRef(
-                        genericDecl,
-                        _partialDefaultArgs.getArrayView());
-                currentDeclRef = as<DeclRefBase>(currentDeclRef->substitute(
-                    getCurrentASTBuilder(),
-                    SubstitutionSet(_partiallySpecializedRequiredGenericDeclRef)));
-            }
-            else if (auto coercionDecl = as<TypeCoercionConstraintDecl>(member))
-            {
-                auto synCoercionDecl = m_astBuilder->create<TypeCoercionConstraintDecl>();
-                synCoercionDecl->nameAndLoc = coercionDecl->getNameAndLoc();
-                synCoercionDecl->parentDecl = synGenericDecl;
-                synCoercionDecl->whereTokenLoc = coercionDecl->whereTokenLoc;
-                if (coercionDecl->findModifier<ImplicitConversionModifier>())
-                {
-                    addModifier(
-                        synCoercionDecl,
-                        m_astBuilder->create<ImplicitConversionModifier>());
-                }
-
-                synCoercionDecl->fromType = TypeExp((Type*)coercionDecl->fromType.type->substitute(
-                    m_astBuilder,
-                    SubstitutionSet(currentDeclRef)));
-                synCoercionDecl->toType = TypeExp((Type*)coercionDecl->toType.type->substitute(
-                    m_astBuilder,
-                    SubstitutionSet(currentDeclRef)));
-                synGenericDecl->addDirectMemberDecl(synCoercionDecl);
-                mapSynToOrigTypeParams.add(synCoercionDecl, coercionDecl);
-
-                // Update out decl-ref after adding each constraint, since future constraints
-                // even within the same generic decl may depend on previous ones.
-                //
-                m_astBuilder->m_cachedGenericDefaultArgs.remove(synGenericDecl);
-                synGenericDecl->_cachedArgsForDefaultSubstitution.clear();
-                auto _partialDefaultArgs =
-                    getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
-                DeclRef<Decl> _partiallySpecializedRequiredGenericDeclRef =
-                    m_astBuilder->getGenericAppDeclRef(
-                        genericDecl,
-                        _partialDefaultArgs.getArrayView());
-                currentDeclRef = as<DeclRefBase>(currentDeclRef->substitute(
-                    getCurrentASTBuilder(),
-                    SubstitutionSet(_partiallySpecializedRequiredGenericDeclRef)));
-            }
-            else if (auto hasDiffTypeInfoDecl = as<HasDiffTypeInfoConstraintDecl>(member))
-            {
-                auto synConstraintDecl = m_astBuilder->create<HasDiffTypeInfoConstraintDecl>();
-                synConstraintDecl->nameAndLoc = hasDiffTypeInfoDecl->getNameAndLoc();
-                synConstraintDecl->parentDecl = synGenericDecl;
-                synConstraintDecl->whereTokenLoc = hasDiffTypeInfoDecl->whereTokenLoc;
-
-                synConstraintDecl->type = TypeExp((Type*)hasDiffTypeInfoDecl->type.type->substitute(
-                    m_astBuilder,
-                    SubstitutionSet(currentDeclRef)));
-                synGenericDecl->addDirectMemberDecl(synConstraintDecl);
-                mapSynToOrigTypeParams.add(synConstraintDecl, hasDiffTypeInfoDecl);
-
-                m_astBuilder->m_cachedGenericDefaultArgs.remove(synGenericDecl);
-                synGenericDecl->_cachedArgsForDefaultSubstitution.clear();
-                auto _partialDefaultArgs =
-                    getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
-                DeclRef<Decl> _partiallySpecializedRequiredGenericDeclRef =
-                    m_astBuilder->getGenericAppDeclRef(
-                        genericDecl,
-                        _partialDefaultArgs.getArrayView());
-                currentDeclRef = as<DeclRefBase>(currentDeclRef->substitute(
-                    getCurrentASTBuilder(),
-                    SubstitutionSet(_partiallySpecializedRequiredGenericDeclRef)));
-            }
-            else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(member))
-            {
-                auto synConstraintDecl = m_astBuilder->create<NonEmptyPackConstraintDecl>();
-                synConstraintDecl->nameAndLoc = nonEmptyConstraintDecl->getNameAndLoc();
-                synConstraintDecl->parentDecl = synGenericDecl;
-                synConstraintDecl->loc = nonEmptyConstraintDecl->loc;
-
-                if (auto declRefExpr = as<DeclRefExpr>(nonEmptyConstraintDecl->packExpr))
-                {
-                    auto origPackDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
-                    auto synPackDecl = mapOrigToSynParams.tryGetValue(origPackDecl);
-                    SLANG_ASSERT(synPackDecl);
-                    synConstraintDecl->packExpr =
-                        _createSyntheticGenericParamExpr(m_astBuilder, *synPackDecl);
-                }
-                else
-                {
-                    SLANG_UNEXPECTED("nonempty constraint target must be a direct decl ref");
-                }
-
-                synGenericDecl->addDirectMemberDecl(synConstraintDecl);
-                mapOrigToSynParams.add(nonEmptyConstraintDecl, synConstraintDecl);
-                mapSynToOrigTypeParams.add(synConstraintDecl, nonEmptyConstraintDecl);
-
-                m_astBuilder->m_cachedGenericDefaultArgs.remove(synGenericDecl);
-                synGenericDecl->_cachedArgsForDefaultSubstitution.clear();
-                auto _partialDefaultArgs =
-                    getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
-                DeclRef<Decl> _partiallySpecializedRequiredGenericDeclRef =
-                    m_astBuilder->getGenericAppDeclRef(
-                        genericDecl,
-                        _partialDefaultArgs.getArrayView());
-                currentDeclRef = as<DeclRefBase>(currentDeclRef->substitute(
-                    getCurrentASTBuilder(),
-                    SubstitutionSet(_partiallySpecializedRequiredGenericDeclRef)));
-            }
-            else if (
-                auto packCountConstraintDecl = as<GenericVariadicPackCountConstraintDecl>(member))
-            {
-                auto synConstraintDecl =
-                    m_astBuilder->create<GenericVariadicPackCountConstraintDecl>();
-                synConstraintDecl->nameAndLoc = packCountConstraintDecl->getNameAndLoc();
-                synConstraintDecl->parentDecl = synGenericDecl;
-                synConstraintDecl->loc = packCountConstraintDecl->loc;
-                synConstraintDecl->whereTokenLoc = packCountConstraintDecl->whereTokenLoc;
-                if (packCountConstraintDecl->findModifier<OptionalConstraintModifier>())
-                {
-                    addModifier(
-                        synConstraintDecl,
-                        m_astBuilder->create<OptionalConstraintModifier>());
-                }
-
-                if (auto declRefExpr = as<DeclRefExpr>(packCountConstraintDecl->packExpr))
-                {
-                    auto origPackDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
-                    auto synPackDecl = mapOrigToSynParams.tryGetValue(origPackDecl);
-                    SLANG_ASSERT(synPackDecl);
-                    synConstraintDecl->packExpr =
-                        _createSyntheticGenericParamExpr(m_astBuilder, *synPackDecl);
-                }
-                else
-                {
-                    SLANG_UNEXPECTED("pack-count constraint target must be a direct decl ref");
-                }
-
-                if (auto declRefExpr = as<DeclRefExpr>(packCountConstraintDecl->expectedCountExpr))
-                {
-                    auto origExpectedCountDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
-                    if (auto synExpectedCountDecl =
-                            mapOrigToSynParams.tryGetValue(origExpectedCountDecl))
-                    {
-                        synConstraintDecl->expectedCountExpr =
-                            _createSyntheticGenericParamExpr(m_astBuilder, *synExpectedCountDecl);
-                    }
-                    else
-                    {
-                        synConstraintDecl->expectedCountExpr =
-                            packCountConstraintDecl->expectedCountExpr;
-                    }
-                }
-                else
-                {
-                    synConstraintDecl->expectedCountExpr =
-                        packCountConstraintDecl->expectedCountExpr;
-                }
-
-                SLANG_ASSERT(packCountConstraintDecl->expectedCountVal);
-                if (packCountConstraintDecl->expectedCountVal)
-                {
-                    synConstraintDecl->expectedCountVal =
-                        as<IntVal>(packCountConstraintDecl->expectedCountVal->substitute(
-                            m_astBuilder,
-                            SubstitutionSet(currentDeclRef)));
-                }
-
-                synGenericDecl->addDirectMemberDecl(synConstraintDecl);
-                mapOrigToSynParams.add(packCountConstraintDecl, synConstraintDecl);
-                mapSynToOrigTypeParams.add(synConstraintDecl, packCountConstraintDecl);
-
-                m_astBuilder->m_cachedGenericDefaultArgs.remove(synGenericDecl);
-                synGenericDecl->_cachedArgsForDefaultSubstitution.clear();
-                auto _partialDefaultArgs =
-                    getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
-                DeclRef<Decl> _partiallySpecializedRequiredGenericDeclRef =
-                    m_astBuilder->getGenericAppDeclRef(
-                        genericDecl,
-                        _partialDefaultArgs.getArrayView());
-                currentDeclRef = as<DeclRefBase>(currentDeclRef->substitute(
-                    getCurrentASTBuilder(),
-                    SubstitutionSet(_partiallySpecializedRequiredGenericDeclRef)));
-            }
+                    this,
+                    sourceGenericDecl,
+                    synGenericDecl);
+            currentDeclRef = as<DeclRefBase>(currentDeclRef->substitute(
+                getCurrentASTBuilder(),
+                SubstitutionSet(partiallySpecializedSourceDeclRefAfterConstraint)));
         }
+
+        // The copier drops witness/path-resolution tables because they are tied to the original
+        // declaration graph. Rebuild the derived tables after all copied constraints are present.
+        checkGenericConstraintConformances(synGenericDecl);
 
         // Override generic pointer to point to the original generic container.
         // This will create a substitution of the synthesized parameters for the
         // original parameters.
         //
-        m_astBuilder->m_cachedGenericDefaultArgs.remove(synGenericDecl);
-        synGenericDecl->_cachedArgsForDefaultSubstitution.clear();
-        auto defaultArgs = getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
-        DeclRef<Decl> fullySpecializedDeclRef =
-            m_astBuilder->getGenericAppDeclRef(genericDecl, defaultArgs.getArrayView());
+        invalidateDefaultSubstitutionArgs(m_astBuilder, synGenericDecl);
+        auto fullySpecializedDeclRef = getSourceDeclRefWithCopiedGenericArgs(
+            m_astBuilder,
+            this,
+            sourceGenericDecl,
+            synGenericDecl);
 
         // Refine the current substituted decl-ref further (this will fill in the substitutions for
         // the constraints as well).
@@ -7569,6 +7351,7 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
             SubstitutionSet(fullySpecializedDeclRef)));
 
         // Update parent pointers.
+        outerCopyContext = copier.getASTCopier().getContext();
         parentDecl = synGenericDecl;
         parentScope = synGenericDecl->ownedScope;
     }
@@ -7583,10 +7366,10 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
     outSubstitutions = SubstitutionSet(currentDeclRef);
 
     DeclRefBase* newDeclRef = nullptr;
-    for (Index i = 0; i < (Index)newGenericDecls.getCount(); i++)
+    for (Index i = 0; i < (Index)copiedGenericDecls.getCount(); i++)
     {
-        auto genericDecl = newGenericDecls[i];
-        auto origGenericDecl = declsToClone[i];
+        auto genericDecl = copiedGenericDecls[i];
+        auto origGenericDecl = sourceGenericDecls[i];
 
         auto substArgs = getDefaultSubstitutionArgs(m_astBuilder, this, origGenericDecl);
         newDeclRef = getCurrentASTBuilder()->getGenericAppDeclRef(
@@ -11007,7 +10790,9 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         as<GenericTypeConstraintDecl>(requiredDecl) && isInterfaceRequirement(requiredDecl);
     if (!as<InterfaceDecl>(requiredMemberDeclRef.getParent().getDecl()) &&
         !isGenericWrappedConstraintRequirement)
+    {
         return true;
+    }
 
     // If `requiredMemberDeclRef` is a lookup decl ref for an interface requirement
     // we attempt to do the loopkup through witness tables.
@@ -11111,6 +10896,21 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
 
         auto reqType = getBaseType(m_astBuilder, requiredInheritanceDeclRef);
         auto subIsReqWitness = tryGetSubtypeWitness(subType, reqType);
+        if (!subIsReqWitness)
+        {
+            // `requiredInheritanceDeclRef` is the inherited-interface requirement being checked,
+            // looked up through `subTypeConformsToSuperInterfaceWitness`. When no cached/global
+            // path exists yet, the current conformance itself provides the path: `subType`
+            // conforms to `superInterfaceType`, and that interface inherits `reqType`. This case
+            // matters for compiler-synthesized enum conformances, where the `__EnumType` witness
+            // table is being populated before `TonemapMode : ILogical` has appeared in the
+            // flattened inheritance cache. Build the declared witness from the actual inheritance
+            // decl-ref so the nested witness table below can synthesize `ILogical` requirements.
+            subIsReqWitness = m_astBuilder->getDeclaredSubtypeWitness(
+                subType,
+                reqType,
+                requiredInheritanceDeclRef);
+        }
 
         bool isOnCanonicalPath =
             doesWitnessLookupPathContainDecl(subIsReqWitness, requiredInheritanceDeclRef.getDecl());
@@ -12234,15 +12034,19 @@ void SemanticsVisitor::checkGenericConstraintConformances(GenericDecl* genericDe
         if (!superInterfaceDecl)
             continue;
 
-        // Create a path resolution table for this constraint
+        // The path-resolution table is derived from the constraint's current sub/super types.
+        // `GenericSignatureCopier` drops the source table when copying a generic signature, so the
+        // first check of the copied constraint rebuilds it here. Later visits through the normal
+        // declaration-checking pipeline reuse that table instead of appending duplicate inherited
+        // interface entries.
         RefPtr<WitnessTable> pathResolutionTable = constraintDecl->pathResolutionTable;
-        if (!pathResolutionTable)
-        {
-            pathResolutionTable = new WitnessTable();
-            pathResolutionTable->witnessedType = subType;
-            pathResolutionTable->baseType = superType;
-            constraintDecl->pathResolutionTable = pathResolutionTable;
-        }
+        if (pathResolutionTable)
+            continue;
+
+        pathResolutionTable = new WitnessTable();
+        pathResolutionTable->witnessedType = subType;
+        pathResolutionTable->baseType = superType;
+        constraintDecl->pathResolutionTable = pathResolutionTable;
 
         // Recursively fill in the path resolution table for inheritance requirements
         _fillInGenericConstraintPathResolutionTableForInheritance(
@@ -15377,289 +15181,33 @@ static DeclRef<Decl> buildQualifiedReference(SemanticsVisitor* visitor, Decl* de
     return declRef;
 }
 
-static void _clearDefaultSubstitutionArgs(ASTBuilder* astBuilder, GenericDecl* genericDecl)
-{
-    astBuilder->m_cachedGenericDefaultArgs.remove(genericDecl);
-    genericDecl->_cachedArgsForDefaultSubstitution.clear();
-}
-
-static Expr* _createSyntheticGenericParamExpr(ASTBuilder* astBuilder, Decl* synParamDecl)
-{
-    auto synParamDeclRef = makeDeclRef(synParamDecl);
-
-    auto synParamDeclRefExpr = astBuilder->create<VarExpr>();
-    synParamDeclRefExpr->declRef = synParamDeclRef;
-    synParamDeclRefExpr->type = getTypeForDeclRef(astBuilder, synParamDeclRef, SourceLoc());
-    return synParamDeclRefExpr;
-}
-
-static DeclRef<Decl> _specializeOriginalGenericWithSyntheticParams(
-    ASTBuilder* astBuilder,
-    SemanticsVisitor* visitor,
-    GenericDecl* origGenericDecl,
-    GenericDecl* synGenericDecl,
-    DeclRef<Decl> requirementDeclRef)
-{
-    _clearDefaultSubstitutionArgs(astBuilder, synGenericDecl);
-    auto defaultArgs = getDefaultSubstitutionArgs(astBuilder, visitor, synGenericDecl);
-
-    DeclRef<GenericDecl> origGenericDeclRef = origGenericDecl->getDefaultDeclRef();
-    if (auto existingGenericApp =
-            SubstitutionSet(requirementDeclRef).findGenericAppDeclRef(origGenericDecl))
-    {
-        origGenericDeclRef = DeclRef<GenericDecl>(existingGenericApp->getGenericDeclRef());
-    }
-    return astBuilder->getGenericAppDeclRef(origGenericDeclRef, defaultArgs.getArrayView());
-}
-
-static void _cloneGenericSignatureConstraintForDifferentiabilityRequirement(
-    ASTBuilder* astBuilder,
-    SemanticsVisitor* visitor,
-    GenericDecl* origGenericDecl,
-    GenericDecl* synGenericDecl,
-    Decl* origConstraintDecl,
-    DeclRef<Decl>& ioRequirementDeclRef,
-    Dictionary<Decl*, Decl*>& mapOrigToSynParams)
-{
-    auto currentSubst = SubstitutionSet(ioRequirementDeclRef);
-
-    if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(origConstraintDecl))
-    {
-        auto synConstraintDecl = astBuilder->create<GenericTypeConstraintDecl>();
-        synConstraintDecl->nameAndLoc = genericTypeConstraintDecl->getNameAndLoc();
-        synConstraintDecl->loc = genericTypeConstraintDecl->loc;
-        synConstraintDecl->isEqualityConstraint = genericTypeConstraintDecl->isEqualityConstraint;
-        synConstraintDecl->sub = TypeExp(
-            (Type*)genericTypeConstraintDecl->sub.type->substitute(astBuilder, currentSubst));
-        synConstraintDecl->sup = TypeExp(
-            (Type*)genericTypeConstraintDecl->sup.type->substitute(astBuilder, currentSubst));
-        if (genericTypeConstraintDecl->findModifier<OptionalConstraintModifier>())
-            addModifier(synConstraintDecl, astBuilder->create<OptionalConstraintModifier>());
-
-        synGenericDecl->addDirectMemberDecl(synConstraintDecl);
-    }
-    else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(origConstraintDecl))
-    {
-        auto synConstraintDecl = astBuilder->create<TypeCoercionConstraintDecl>();
-        synConstraintDecl->nameAndLoc = typeCoercionConstraintDecl->getNameAndLoc();
-        synConstraintDecl->loc = typeCoercionConstraintDecl->loc;
-        synConstraintDecl->whereTokenLoc = typeCoercionConstraintDecl->whereTokenLoc;
-        synConstraintDecl->fromType = TypeExp(
-            (Type*)typeCoercionConstraintDecl->fromType.type->substitute(astBuilder, currentSubst));
-        synConstraintDecl->toType = TypeExp(
-            (Type*)typeCoercionConstraintDecl->toType.type->substitute(astBuilder, currentSubst));
-        if (typeCoercionConstraintDecl->findModifier<ImplicitConversionModifier>())
-            addModifier(synConstraintDecl, astBuilder->create<ImplicitConversionModifier>());
-
-        synGenericDecl->addDirectMemberDecl(synConstraintDecl);
-    }
-    else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(origConstraintDecl))
-    {
-        auto synConstraintDecl = astBuilder->create<NonEmptyPackConstraintDecl>();
-        synConstraintDecl->nameAndLoc = nonEmptyConstraintDecl->getNameAndLoc();
-        synConstraintDecl->loc = nonEmptyConstraintDecl->loc;
-
-        if (auto declRefExpr = as<DeclRefExpr>(nonEmptyConstraintDecl->packExpr))
-        {
-            auto origPackDecl = getDeclRef(astBuilder, declRefExpr).getDecl();
-            auto synPackDecl = mapOrigToSynParams.tryGetValue(origPackDecl);
-            SLANG_ASSERT(synPackDecl);
-            synConstraintDecl->packExpr =
-                _createSyntheticGenericParamExpr(astBuilder, *synPackDecl);
-        }
-        else
-        {
-            SLANG_UNEXPECTED("nonempty constraint target must be a direct decl ref");
-        }
-
-        synGenericDecl->addDirectMemberDecl(synConstraintDecl);
-    }
-    else if (
-        auto packCountConstraintDecl =
-            as<GenericVariadicPackCountConstraintDecl>(origConstraintDecl))
-    {
-        auto synConstraintDecl = astBuilder->create<GenericVariadicPackCountConstraintDecl>();
-        synConstraintDecl->nameAndLoc = packCountConstraintDecl->getNameAndLoc();
-        synConstraintDecl->loc = packCountConstraintDecl->loc;
-        synConstraintDecl->whereTokenLoc = packCountConstraintDecl->whereTokenLoc;
-        if (packCountConstraintDecl->findModifier<OptionalConstraintModifier>())
-            addModifier(synConstraintDecl, astBuilder->create<OptionalConstraintModifier>());
-
-        if (auto declRefExpr = as<DeclRefExpr>(packCountConstraintDecl->packExpr))
-        {
-            auto origPackDecl = getDeclRef(astBuilder, declRefExpr).getDecl();
-            auto synPackDecl = mapOrigToSynParams.tryGetValue(origPackDecl);
-            SLANG_ASSERT(synPackDecl);
-            synConstraintDecl->packExpr =
-                _createSyntheticGenericParamExpr(astBuilder, *synPackDecl);
-        }
-        else
-        {
-            SLANG_UNEXPECTED("pack-count constraint target must be a direct decl ref");
-        }
-
-        if (auto declRefExpr = as<DeclRefExpr>(packCountConstraintDecl->expectedCountExpr))
-        {
-            auto origExpectedCountDecl = getDeclRef(astBuilder, declRefExpr).getDecl();
-            if (auto synExpectedCountDecl = mapOrigToSynParams.tryGetValue(origExpectedCountDecl))
-            {
-                synConstraintDecl->expectedCountExpr =
-                    _createSyntheticGenericParamExpr(astBuilder, *synExpectedCountDecl);
-            }
-            else
-            {
-                synConstraintDecl->expectedCountExpr = packCountConstraintDecl->expectedCountExpr;
-            }
-        }
-        else
-        {
-            synConstraintDecl->expectedCountExpr = packCountConstraintDecl->expectedCountExpr;
-        }
-
-        SLANG_ASSERT(packCountConstraintDecl->expectedCountVal);
-        if (!packCountConstraintDecl->expectedCountVal)
-            return;
-        synConstraintDecl->expectedCountVal = as<IntVal>(
-            packCountConstraintDecl->expectedCountVal->substitute(astBuilder, currentSubst));
-
-        synGenericDecl->addDirectMemberDecl(synConstraintDecl);
-    }
-    else if (
-        auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(origConstraintDecl))
-    {
-        auto synConstraintDecl = astBuilder->create<HasDiffTypeInfoConstraintDecl>();
-        synConstraintDecl->nameAndLoc = hasDiffTypeInfoConstraintDecl->getNameAndLoc();
-        synConstraintDecl->loc = hasDiffTypeInfoConstraintDecl->loc;
-        synConstraintDecl->whereTokenLoc = hasDiffTypeInfoConstraintDecl->whereTokenLoc;
-        synConstraintDecl->type = TypeExp(
-            (Type*)hasDiffTypeInfoConstraintDecl->type.type->substitute(astBuilder, currentSubst));
-
-        synGenericDecl->addDirectMemberDecl(synConstraintDecl);
-    }
-    else
-    {
-        return;
-    }
-
-    auto specializedOrigGenericDeclRef = _specializeOriginalGenericWithSyntheticParams(
-        astBuilder,
-        visitor,
-        origGenericDecl,
-        synGenericDecl,
-        ioRequirementDeclRef);
-    ioRequirementDeclRef = substituteDeclRef(
-        SubstitutionSet(specializedOrigGenericDeclRef),
-        astBuilder,
-        ioRequirementDeclRef);
-}
-
-static bool _wrapInterfaceDifferentiabilityRequirementInGenericSignatureIfNeeded(
+static Decl* _moveInterfaceDifferentiabilityRequirementToInterface(
     SemanticsVisitor* visitor,
     InterfaceDecl* interfaceDecl,
     CallableDecl* requirementDecl,
     GenericTypeConstraintDecl* constraintDecl,
-    DeclRef<Decl>& ioRequirementDeclRef)
+    DeclRef<Decl>& ioCallableRequirementDeclRef)
 {
-    List<GenericDecl*> genericParentDecls;
-    for (auto dd = requirementDecl->parentDecl; dd && dd != interfaceDecl; dd = dd->parentDecl)
-    {
-        if (auto genericParentDecl = as<GenericDecl>(dd))
-            genericParentDecls.add(genericParentDecl);
-    }
+    // A differentiability annotation on `interface IFoo { f<T>() }` is a separate interface
+    // requirement about `This.f<T>`, but the requirement type initially mentions `f`'s generic
+    // environment. Start the synthesized constraint under the callable/accessor that owns that
+    // environment and let `liftDeclFromGenericContainers` hoist it into a standalone generic
+    // requirement under the interface when needed. Non-generic callables take the same path, but no
+    // generic wrappers are copied. We only set `parentDecl` here instead of appending to the
+    // callable's direct member list because the declaration is immediately moved; leaving it in the
+    // callable member list would give the AST two owners for the same requirement.
+    constraintDecl->parentDecl = requirementDecl;
+    SubstitutionSet declSubst;
+    visitor->liftDeclFromGenericContainers(constraintDecl, declSubst, interfaceDecl);
 
-    if (genericParentDecls.getCount() == 0)
-        return false;
+    ioCallableRequirementDeclRef =
+        substituteDeclRef(declSubst, visitor->getASTBuilder(), ioCallableRequirementDeclRef);
 
-    genericParentDecls.reverse();
+    Decl* outermostDecl = constraintDecl;
+    while (outermostDecl->parentDecl && outermostDecl->parentDecl != interfaceDecl)
+        outermostDecl = outermostDecl->parentDecl;
 
-    auto astBuilder = visitor->getASTBuilder();
-    ContainerDecl* parentDecl = interfaceDecl;
-    Scope* parentScope = visitor->getScope(interfaceDecl);
-    Dictionary<Decl*, Decl*> mapOrigToSynParams;
-
-    for (auto origGenericDecl : genericParentDecls)
-    {
-        auto synGenericDecl = astBuilder->create<GenericDecl>();
-        synGenericDecl->loc = constraintDecl->loc;
-        synGenericDecl->ownedScope = astBuilder->create<Scope>();
-        synGenericDecl->ownedScope->containerDecl = synGenericDecl;
-        synGenericDecl->ownedScope->parent = parentScope;
-
-        parentDecl->addDirectMemberDecl(synGenericDecl);
-        if (auto parentGenericDecl = as<GenericDecl>(parentDecl))
-            parentGenericDecl->inner = synGenericDecl;
-
-        // A differentiability annotation on `interface IFoo { [Differentiable] f<T>(); }`
-        // creates an interface requirement for `This.f<T> : IForward/BackwardDifferentiable`.
-        // The requirement's `This.f<T>` type mentions `f`'s generic parameters, so the sibling
-        // constraint must carry an equivalent generic signature. We clone the signature here and
-        // substitute the original lookup decl-ref to use the cloned parameters before building
-        // the constraint type.
-        for (auto member : origGenericDecl->getDirectMemberDecls())
-        {
-            if (auto typeParamDeclBase = as<GenericTypeParamDeclBase>(member))
-            {
-                auto synTypeParamDeclBase = (GenericTypeParamDeclBase*)astBuilder->createByNodeType(
-                    typeParamDeclBase->astNodeType);
-                synTypeParamDeclBase->nameAndLoc = typeParamDeclBase->getNameAndLoc();
-                synTypeParamDeclBase->loc = typeParamDeclBase->loc;
-                synTypeParamDeclBase->parameterIndex = typeParamDeclBase->parameterIndex;
-                synGenericDecl->addDirectMemberDecl(synTypeParamDeclBase);
-                mapOrigToSynParams.add(typeParamDeclBase, synTypeParamDeclBase);
-            }
-            else if (auto valParamDecl = as<GenericValueParamDecl>(member))
-            {
-                auto synValParamDecl = astBuilder->create<GenericValueParamDecl>();
-                synValParamDecl->nameAndLoc = valParamDecl->nameAndLoc;
-                synValParamDecl->loc = valParamDecl->loc;
-                synValParamDecl->parameterIndex = valParamDecl->parameterIndex;
-                synValParamDecl->type = valParamDecl->type;
-                synGenericDecl->addDirectMemberDecl(synValParamDecl);
-                mapOrigToSynParams.add(valParamDecl, synValParamDecl);
-            }
-            else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(member))
-            {
-                auto synValPackParamDecl = astBuilder->create<GenericValuePackParamDecl>();
-                synValPackParamDecl->nameAndLoc = valPackParamDecl->nameAndLoc;
-                synValPackParamDecl->loc = valPackParamDecl->loc;
-                synValPackParamDecl->parameterIndex = valPackParamDecl->parameterIndex;
-                synValPackParamDecl->type = valPackParamDecl->type;
-                synGenericDecl->addDirectMemberDecl(synValPackParamDecl);
-                mapOrigToSynParams.add(valPackParamDecl, synValPackParamDecl);
-            }
-        }
-
-        auto specializedOrigGenericDeclRef = _specializeOriginalGenericWithSyntheticParams(
-            astBuilder,
-            visitor,
-            origGenericDecl,
-            synGenericDecl,
-            ioRequirementDeclRef);
-        ioRequirementDeclRef = substituteDeclRef(
-            SubstitutionSet(specializedOrigGenericDeclRef),
-            astBuilder,
-            ioRequirementDeclRef);
-
-        for (auto member : origGenericDecl->getDirectMemberDecls())
-        {
-            _cloneGenericSignatureConstraintForDifferentiabilityRequirement(
-                astBuilder,
-                visitor,
-                origGenericDecl,
-                synGenericDecl,
-                member,
-                ioRequirementDeclRef,
-                mapOrigToSynParams);
-        }
-
-        parentDecl = synGenericDecl;
-        parentScope = synGenericDecl->ownedScope;
-    }
-
-    parentDecl->addDirectMemberDecl(constraintDecl);
-    if (auto parentGenericDecl = as<GenericDecl>(parentDecl))
-        parentGenericDecl->inner = constraintDecl;
-    return true;
+    return outermostDecl;
 }
 
 void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl* decl)
@@ -15759,6 +15307,43 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 m_astBuilder,
                 this,
                 funcDecl->getDefaultDeclRef());
+            // Generic subscript accessors are logically specialized by the subscript's generic
+            // signature, the same way a generic function requirement is. The generic default
+            // substitution utility reaches them through the specialized subscript and therefore
+            // produces:
+            //
+            //     MemberDeclRef(GenericAppDeclRef(generic operator[], SubscriptDecl, I),
+            //     GetterDecl)
+            //
+            // For synthesized differentiability extensions, use the requirement-key shape instead:
+            //
+            //     GenericAppDeclRef(generic operator[], GetterDecl, I)
+            //
+            // The conformance check for `[Differentiable]` interface accessors queries
+            // `Test.operator[]<I>.get : IForward/BackwardDifferentiable<Test.operator[]<I>.get>`.
+            // If the extension facet keeps the member form while the requirement keeps the generic
+            // app form, both print identically but fail `Type::equals` on the hidden callable type
+            // argument.
+            if ((funcDecl->astNodeType == ASTNodeType::GetterDecl ||
+                 funcDecl->astNodeType == ASTNodeType::SetterDecl) &&
+                funcDecl->parentDecl &&
+                funcDecl->parentDecl->astNodeType == ASTNodeType::SubscriptDecl)
+            {
+                if (auto memberDeclRef = as<MemberDeclRef>(specializedFuncDeclRef.declRefBase))
+                {
+                    if (auto parentGenericApp =
+                            as<GenericAppDeclRef>(memberDeclRef->getParentOperand()))
+                    {
+                        if (parentGenericApp->getDecl() == funcDecl->parentDecl)
+                        {
+                            specializedFuncDeclRef = m_astBuilder->getGenericAppDeclRef(
+                                DeclRef<GenericDecl>(parentGenericApp->getGenericDeclRef()),
+                                parentGenericApp->getArgs(),
+                                funcDecl);
+                        }
+                    }
+                }
+            }
             return as<DeclRefType>(DeclRefType::create(m_astBuilder, specializedFuncDeclRef));
         };
         if (!isInterfaceRequirement(decl))
@@ -16082,26 +15667,27 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 [&](bool isBackwardDifferentiabilityRequirement, bool isOptional)
             {
                 auto requirementDeclRef = funcAsLookupDeclRef;
-                auto constraintDecl = getCurrentASTBuilder()->create<GenericTypeConstraintDecl>();
+                auto constraintDecl =
+                    getCurrentASTBuilder()->create<DifferentiableRequirementConstraintDecl>();
                 constraintDecl->loc = decl->loc;
 
-                auto didWrapInGeneric =
-                    _wrapInterfaceDifferentiabilityRequirementInGenericSignatureIfNeeded(
-                        this,
-                        interfaceDecl,
-                        decl,
-                        constraintDecl,
-                        requirementDeclRef);
+                auto interfaceMemberDecl = _moveInterfaceDifferentiabilityRequirementToInterface(
+                    this,
+                    interfaceDecl,
+                    decl,
+                    constraintDecl,
+                    requirementDeclRef);
 
                 // A differentiability annotation on an interface requirement is itself an
                 // interface requirement: `This.f : IForward/BackwardDifferentiable<This.f>`.
-                // Put that constraint next to other interface-level constraints so conformance
-                // checking and IR lowering use the existing requirement-key path. If `f` is
-                // generic, the helper above has cloned `f`'s generic signature around this
-                // sibling constraint, so the `This.f<T>` type below references in-scope synthetic
-                // parameters.
+                // Keep that fact as a sibling requirement, the same way constraints on
+                // associated types are sibling requirements about `This.A`. For generic
+                // callables, the hoist helper above moved the constraint under a standalone copy
+                // of the callable's generic signature, so `This.f<T>` references parameters owned
+                // by this requirement rather than by the callable declaration.
                 auto funcAsLookupType =
                     DeclRefType::create(getCurrentASTBuilder(), requirementDeclRef);
+                constraintDecl->callableRequirementDeclRef = requirementDeclRef.as<CallableDecl>();
                 auto differentiabilityInterfaceType =
                     isBackwardDifferentiabilityRequirement
                         ? getBackwardDiffFuncInterfaceType(funcAsLookupType)
@@ -16120,8 +15706,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         constraintDecl,
                         getCurrentASTBuilder()->create<OptionalConstraintModifier>());
 
-                if (!didWrapInGeneric)
-                    interfaceDecl->addMember(constraintDecl);
+                interfaceDecl->addMember(interfaceMemberDecl);
             };
 
             if (decl->findModifier<ForwardDifferentiableAttribute>() ||

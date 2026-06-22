@@ -258,43 +258,6 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     // to enumerate all the types it transitively inherits from.
     //
     auto inheritanceInfo = getShared()->getInheritanceInfo(subType);
-    auto doesFacetTypeMatchSuperType = [&](Type* facetType) -> bool
-    {
-        if (facetType->equals(superType))
-            return true;
-
-        auto facetDeclRefType = as<DeclRefType>(facetType);
-        auto superDeclRefType = as<DeclRefType>(superType);
-        if (!facetDeclRefType || !superDeclRefType)
-            return false;
-
-        auto facetDeclRef = facetDeclRefType->getDeclRef();
-        auto superDeclRef = superDeclRefType->getDeclRef();
-        if (facetDeclRef.getDecl() != superDeclRef.getDecl())
-            return false;
-
-        // `getInheritanceInfo` remains the source of truth for discovered conformances, but
-        // generic callable constraints can build the facet and the query through different
-        // decl-ref chains. For example, while checking `Tensor<T,N> : ITensor<T,N>`, the
-        // satisfying `Tensor.load<TIndex>` facet and the `ITensor.load<TIndex>` requirement
-        // query can name the same differentiability interface with unifiable generic
-        // arguments even though the full types are not pointer-equal.
-        auto facetGenericApp = SubstitutionSet(facetDeclRef).findGenericAppDeclRef();
-        auto superGenericApp = SubstitutionSet(superDeclRef).findGenericAppDeclRef();
-        if (!facetGenericApp && !superGenericApp)
-            return false;
-
-        GenericInferenceContext inferenceContext;
-        auto result = tryUnifyDeclRef(
-            inferenceContext,
-            UnificationOptions(),
-            facetDeclRef.declRefBase,
-            false,
-            superDeclRef.declRefBase,
-            false);
-        return result;
-    };
-
     for (auto facet : inheritanceInfo.facets)
     {
         // The `subType` will have a `facet` for each type
@@ -313,7 +276,7 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // We will scan until we find a facet that corresponds
         // to `superType`, or fail to find such a facet.
         //
-        if (!doesFacetTypeMatchSuperType(facetType))
+        if (!facetType->equals(superType))
             continue;
 
         // If the `superType` appears in the flattened inheritance list

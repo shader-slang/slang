@@ -1003,6 +1003,20 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
     const TypeExp& _getSupOverride() const { return sup; }
 };
 
+// A synthesized interface requirement for `[Differentiable]` on a callable requirement.
+//
+// For `interface IFoo { [Differentiable] void f<T>(); }`, this decl represents the sibling
+// requirement `f<T> : IForward/BackwardDifferentiableFunc<f<T>>`. If `f` is generic, the decl is
+// wrapped in a copied standalone generic signature, and `callableRequirementDeclRef` stores the
+// `This.f<T>` decl-ref after substituting the callable's generic parameters/proofs with that copied
+// signature.
+FIDDLE()
+class DifferentiableRequirementConstraintDecl : public GenericTypeConstraintDecl
+{
+    FIDDLE(...)
+    FIDDLE() DeclRef<CallableDecl> callableRequirementDeclRef;
+};
+
 FIDDLE()
 class TypeCoercionConstraintDecl : public Decl
 {
@@ -1073,6 +1087,20 @@ template<typename T>
 inline bool isGenericParam(DeclRef<T> declRef)
 {
     return isGenericParam(declRef.getDecl());
+}
+
+inline bool isConstraintDecl(Decl* decl)
+{
+    return as<GenericTypeConstraintDecl>(decl) || as<TypeCoercionConstraintDecl>(decl) ||
+           as<NonEmptyPackConstraintDecl>(decl) ||
+           as<GenericVariadicPackCountConstraintDecl>(decl) ||
+           as<HasDiffTypeInfoConstraintDecl>(decl);
+}
+
+template<typename T>
+inline bool isConstraintDecl(DeclRef<T> declRef)
+{
+    return isConstraintDecl(declRef.getDecl());
 }
 
 // An empty declaration (which might still have modifiers attached).
