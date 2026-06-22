@@ -22,8 +22,32 @@
 #define SLANG_ENABLE_GLSLANG_SUPPORT 1
 #endif
 
+// When slang-glslang is statically linked into slang (SLANG_LIB_TYPE=STATIC), the wrapper's
+// entry points are bound in-process rather than resolved via dlopen. CMake defines this to 1
+// only on the Linux STATIC + slang-glslang-enabled path (see cmake/CompilerFlags.cmake); it
+// defaults to 0 everywhere else so the runtime-dlopen MODULE path is unchanged.
+#ifndef SLANG_STATIC_SLANG_GLSLANG
+#define SLANG_STATIC_SLANG_GLSLANG 0
+#endif
+
 #if SLANG_ENABLE_GLSLANG_SUPPORT
 #include "../slang-glslang/slang-glslang.h"
+#endif
+
+#if SLANG_STATIC_SLANG_GLSLANG
+// Prototypes for the statically-linked wrapper entry points, so they can be referenced
+// directly without dlopen. Signatures mirror the typedefs in slang-glslang.h and the
+// definitions in slang-glslang.cpp.
+extern "C"
+{
+int glslang_compile(glslang_CompileRequest_1_0* request);
+int glslang_compile_1_1(glslang_CompileRequest_1_1* request);
+int glslang_compile_1_2(glslang_CompileRequest_1_2* request);
+bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize);
+bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize);
+bool glslang_disassembleSPIRVWithResult(const uint32_t* contents, int contentsSize, char** outString);
+int glslang_linkSPIRV(glslang_LinkRequest* request);
+}
 #endif
 
 namespace Slang
@@ -62,6 +86,12 @@ public:
 
     /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
+
+#if SLANG_STATIC_SLANG_GLSLANG
+    /// Bind the 7 entry points directly from the statically-linked symbols, mirroring
+    /// what init(ISlangSharedLibrary*) does via findFuncByName for the dlopen path.
+    SlangResult initStatic();
+#endif
 
     GlslangDownstreamCompiler(SlangPassThrough compilerType)
         : m_compilerType(compilerType)
@@ -126,6 +156,27 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
 
     return SLANG_OK;
 }
+
+#if SLANG_STATIC_SLANG_GLSLANG
+SlangResult GlslangDownstreamCompiler::initStatic()
+{
+    m_compile_1_0 = &glslang_compile;
+    m_compile_1_1 = &glslang_compile_1_1;
+    m_compile_1_2 = &glslang_compile_1_2;
+    m_validate = &glslang_validateSPIRV;
+    m_disassemble = &glslang_disassembleSPIRV;
+    m_disassembleWithResult = &glslang_disassembleSPIRVWithResult;
+    m_link = &glslang_linkSPIRV;
+
+    // There is no shared library backing these symbols; they are linked in-process.
+    m_sharedLibrary = nullptr;
+
+    // It's not clear how to query for a version, but we can get a version number from the header.
+    m_desc = Desc(m_compilerType);
+
+    return SLANG_OK;
+}
+#endif
 
 SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_2& request)
 {
@@ -467,6 +518,19 @@ static SlangResult locateGlslangSpirvDownstreamCompiler(
     DownstreamCompilerSet* set,
     SlangPassThrough compilerType)
 {
+#if SLANG_STATIC_SLANG_GLSLANG
+    // slang-glslang is statically linked into slang: bind the entry points in-process
+    // rather than loading a shared library.
+    {
+        auto compiler = new GlslangDownstreamCompiler(compilerType);
+        ComPtr<IDownstreamCompiler> compilerIntf(compiler);
+        SLANG_RETURN_ON_FAIL(compiler->initStatic());
+
+        set->addCompiler(compilerIntf);
+        return SLANG_OK;
+    }
+#else
+
     ComPtr<ISlangSharedLibrary> library;
 
 #if SLANG_UNIX_FAMILY
@@ -513,6 +577,7 @@ static SlangResult locateGlslangSpirvDownstreamCompiler(
 
     set->addCompiler(compilerIntf);
     return SLANG_OK;
+#endif // SLANG_STATIC_SLANG_GLSLANG
 }
 
 SlangResult GlslangDownstreamCompilerUtil::locateCompilers(

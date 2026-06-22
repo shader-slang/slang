@@ -221,12 +221,24 @@ function(set_default_compile_options target)
     # Settings dependent on config options
     #
 
+    # slang-glslang is statically linked into slang (entry points bound in-process,
+    # no dlopen) only on the Linux STATIC + slang-glslang-enabled path.
+    set(slang_static_slang_glslang 0)
+    if(
+        SLANG_LIB_TYPE STREQUAL "STATIC"
+        AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
+        AND SLANG_ENABLE_SLANG_GLSLANG
+    )
+        set(slang_static_slang_glslang 1)
+    endif()
+
     target_compile_definitions(
         ${target}
         PRIVATE
             SLANG_ENABLE_DXIL_SUPPORT=$<BOOL:${SLANG_ENABLE_DXIL}>
             SLANG_ENABLE_WEBGPU=$<BOOL:${SLANG_HAS_WEBGPU_SUPPORT}>
             SLANG_ENABLE_VALIDATION_VM_BYTECODE=$<BOOL:${SLANG_ENABLE_VALIDATION_VM_BYTECODE}>
+            SLANG_STATIC_SLANG_GLSLANG=${slang_static_slang_glslang}
             $<$<BOOL:${SLANG_ENABLE_FULL_DEBUG_VALIDATION}>:SLANG_ENABLE_FULL_IR_VALIDATION>
             $<$<BOOL:${SLANG_ENABLE_IR_BREAK_ALLOC}>:SLANG_ENABLE_IR_BREAK_ALLOC>
             $<$<BOOL:${SLANG_ENABLE_DX_ON_VK}>:SLANG_CONFIG_DX_ON_VK>

@@ -22,3 +22,16 @@ if(NOT MSVC)
         DIRECTORY ${slang_SOURCE_DIR}
     )
 endif()
+
+# On the Linux STATIC path, slang-glslang-compiler.cpp binds the wrapper's 7 entry
+# points in-process (SLANG_STATIC_SLANG_GLSLANG) instead of dlopen'ing them, so it has
+# hard references to those symbols. Link the symbol-localized static archive (built in
+# source/slang-glslang) PUBLICly so every consumer of compiler-core — slang,
+# slang-bootstrap, and the various tools — resolves them transitively.
+if(
+    SLANG_LIB_TYPE STREQUAL "STATIC"
+    AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
+    AND SLANG_ENABLE_SLANG_GLSLANG
+)
+    target_link_libraries(compiler-core PUBLIC slang-glslang-static)
+endif()
