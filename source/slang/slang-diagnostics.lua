@@ -915,10 +915,10 @@ err(
 )
 
 err(
-    "operator-name-on-variable",
+    "operator-name-on-non-function",
     20020,
     "invalid use of 'operator' name",
-    span { loc = "location", message = "'operator~op' can only be used to declare an operator function, not a variable or parameter name." }
+    span { loc = "location", message = "'operator~op' can only be used to declare an operator function." }
 )
 
 warning(
